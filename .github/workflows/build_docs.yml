@@ -46,9 +46,6 @@ jobs:
           environment-file: ${{ matrix.environment-file }}
           micromamba-version: "latest"
 
-      - name: Install backends
-        run: conda install blackjax numpyro -y
-
       - name: Install package
         run: pip install . --no-deps 
 
