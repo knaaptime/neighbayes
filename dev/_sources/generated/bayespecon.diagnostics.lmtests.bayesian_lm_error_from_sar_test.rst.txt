@@ -1,6 +1,0 @@
-﻿bayespecon.diagnostics.lmtests.bayesian\_lm\_error\_from\_sar\_test
-===================================================================
-
-.. currentmodule:: bayespecon.diagnostics.lmtests
-
-.. autofunction:: bayesian_lm_error_from_sar_test

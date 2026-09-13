@@ -1,0 +1,6 @@
+﻿neighbayes.diagnostics.lmtests.SEM\_PANEL\_SUITE
+================================================
+
+.. currentmodule:: neighbayes.diagnostics.lmtests
+
+.. autodata:: SEM_PANEL_SUITE

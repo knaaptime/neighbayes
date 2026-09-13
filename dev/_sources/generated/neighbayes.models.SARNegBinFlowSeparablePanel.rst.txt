@@ -1,0 +1,37 @@
+﻿neighbayes.models.SARNegBinFlowSeparablePanel
+=============================================
+
+.. currentmodule:: neighbayes.models
+
+.. autoclass:: SARNegBinFlowSeparablePanel
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SARNegBinFlowSeparablePanel.__init__
+      ~SARNegBinFlowSeparablePanel.fit
+      ~SARNegBinFlowSeparablePanel.fitted_values
+      ~SARNegBinFlowSeparablePanel.posterior_predictive
+      ~SARNegBinFlowSeparablePanel.residuals
+      ~SARNegBinFlowSeparablePanel.spatial_diagnostics
+      ~SARNegBinFlowSeparablePanel.spatial_diagnostics_decision
+      ~SARNegBinFlowSeparablePanel.spatial_effects
+      ~SARNegBinFlowSeparablePanel.summary
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SARNegBinFlowSeparablePanel.inference_data
+      ~SARNegBinFlowSeparablePanel.pymc_model
+   
+   

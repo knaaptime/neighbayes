@@ -1,0 +1,6 @@
+﻿neighbayes.dgp.generate\_panel\_negbin\_flow\_data\_separable
+=============================================================
+
+.. currentmodule:: neighbayes.dgp
+
+.. autofunction:: generate_panel_negbin_flow_data_separable

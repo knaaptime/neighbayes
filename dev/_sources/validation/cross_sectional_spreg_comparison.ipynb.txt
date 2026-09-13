@@ -7,7 +7,7 @@
     "language": "markdown"
    },
    "source": [
-    "# Cross-Sectional Model Comparison: bayespecon vs spreg"
+    "# Cross-Sectional Model Comparison: neighbayes vs spreg"
    ]
   },
   {
@@ -17,17 +17,17 @@
    "source": [
     "## Columbus example\n",
     "\n",
-    "This notebook compares equivalent cross-sectional models between `bayespecon` and `spreg` on a real example dataset from the PySAL/spreg ecosystem.\n",
+    "This notebook compares equivalent cross-sectional models between `neighbayes` and `spreg` on a real example dataset from the PySAL/spreg ecosystem.\n",
     "\n",
     "The dependent variable is `HOVAL`, with `INC` and `CRIME` used as explanatory variables.\n",
     "\n",
     "Model mapping used:\n",
     "\n",
-    "- `SLX` (bayespecon) vs `spreg.OLS(slx_lags=1)`\n",
-    "- `SAR` (bayespecon) vs `spreg.GM_Lag`\n",
-    "- `SEM` (bayespecon) vs `spreg.GM_Error`\n",
-    "- `SDM` (bayespecon) vs `spreg.GM_Lag(slx_lags=1, w_lags=2)`\n",
-    "- `SDEM` (bayespecon) vs `spreg.GM_Error(slx_lags=1)`\n",
+    "- `SLX` (neighbayes) vs `spreg.OLS(slx_lags=1)`\n",
+    "- `SAR` (neighbayes) vs `spreg.GM_Lag`\n",
+    "- `SEM` (neighbayes) vs `spreg.GM_Error`\n",
+    "- `SDM` (neighbayes) vs `spreg.GM_Lag(slx_lags=1, w_lags=2)`\n",
+    "- `SDEM` (neighbayes) vs `spreg.GM_Error(slx_lags=1)`\n",
     "\n",
     "Dataset: **Columbus** neighborhood data from `libpysal.examples`."
    ]
@@ -49,7 +49,7 @@
     "from IPython.display import display\n",
     "from spreg.sputils import _sp_effects, spmultiplier\n",
     "\n",
-    "from bayespecon.models import SAR, SDEM, SDM, SEM, SLX"
+    "from neighbayes.models import SAR, SDEM, SDM, SEM, SLX"
    ]
   },
   {
@@ -142,7 +142,7 @@
    "metadata": {},
    "outputs": [],
    "source": [
-    "from bayespecon.diagnostics import spatial_mcmc_diagnostic\n",
+    "from neighbayes.diagnostics import spatial_mcmc_diagnostic\n",
     "\n",
     "spatial_mcmc_diagnostic(bayes_models[\"SAR\"], emit_warnings=False).to_frame()"
    ]
@@ -176,7 +176,7 @@
     "    return pd.Series(betas, index=names, dtype=float)\n",
     "\n",
     "\n",
-    "def extract_bayespecon_params(model_name, model, idata):\n",
+    "def extract_neighbayes_params(model_name, model, idata):\n",
     "    out = {}\n",
     "    beta_mean = idata.posterior[\"beta\"].mean((\"chain\", \"draw\")).values\n",
     "    beta_names = (\n",
@@ -205,9 +205,9 @@
     "    return pd.DataFrame(\n",
     "        {\n",
     "            \"feature\": eff.index.tolist(),\n",
-    "            \"direct_bayespecon\": eff[\"direct\"].values,\n",
-    "            \"indirect_bayespecon\": eff[\"indirect\"].values,\n",
-    "            \"total_bayespecon\": eff[\"total\"].values,\n",
+    "            \"direct_neighbayes\": eff[\"direct\"].values,\n",
+    "            \"indirect_neighbayes\": eff[\"indirect\"].values,\n",
+    "            \"total_neighbayes\": eff[\"total\"].values,\n",
     "        }\n",
     "    )\n",
     "\n",
@@ -216,7 +216,7 @@
     "    if model_name == \"SEM\":\n",
     "        # SEM has no spatial multiplier on the systematic component,\n",
     "        # so direct = coefficient, indirect = 0, total = coefficient.\n",
-    "        # bayespecon excludes the intercept from effects, so we\n",
+    "        # neighbayes excludes the intercept from effects, so we\n",
     "        # only compare non-constant covariates here.\n",
     "        sp_params = extract_spreg_params(sp_model)\n",
     "        features = [f for f in [\"INC\", \"CRIME\"] if f in sp_params.index]\n",
@@ -281,7 +281,7 @@
     "\n",
     "for model_name in [\"SLX\", \"SAR\", \"SEM\", \"SDM\", \"SDEM\"]:\n",
     "    sp = extract_spreg_params(spreg_results[model_name])\n",
-    "    by = extract_bayespecon_params(\n",
+    "    by = extract_neighbayes_params(\n",
     "        model_name, bayes_models[model_name], bayes_idata[model_name]\n",
     "    )\n",
     "\n",
@@ -291,7 +291,7 @@
     "            {\n",
     "                \"model\": model_name,\n",
     "                \"parameter\": param,\n",
-    "                \"bayespecon_posterior_mean\": by[param],\n",
+    "                \"neighbayes_posterior_mean\": by[param],\n",
     "                \"spreg_estimate\": sp[param],\n",
     "                \"difference\": by[param] - sp[param],\n",
     "            }\n",
@@ -302,12 +302,12 @@
     "    merged = beff.merge(seff, on=\"feature\", how=\"inner\")\n",
     "    if not merged.empty:\n",
     "        merged[\"direct_difference\"] = (\n",
-    "            merged[\"direct_bayespecon\"] - merged[\"direct_spreg\"]\n",
+    "            merged[\"direct_neighbayes\"] - merged[\"direct_spreg\"]\n",
     "        )\n",
     "        merged[\"indirect_difference\"] = (\n",
-    "            merged[\"indirect_bayespecon\"] - merged[\"indirect_spreg\"]\n",
+    "            merged[\"indirect_neighbayes\"] - merged[\"indirect_spreg\"]\n",
     "        )\n",
-    "        merged[\"total_difference\"] = merged[\"total_bayespecon\"] - merged[\"total_spreg\"]\n",
+    "        merged[\"total_difference\"] = merged[\"total_neighbayes\"] - merged[\"total_spreg\"]\n",
     "        merged.insert(0, \"model\", model_name)\n",
     "    effect_tables[model_name] = merged\n",
     "\n",
@@ -363,11 +363,11 @@
     "language": "markdown"
    },
    "source": [
-    "`bayespecon` uses Bayesian inference while `spreg` reports frequentist point estimates, so exact equality is not expected. The coefficient and effects tables are intended to verify directional and numerical agreement under matched model formulas with `HOVAL` as the dependent variable.\n",
+    "`neighbayes` uses Bayesian inference while `spreg` reports frequentist point estimates, so exact equality is not expected. The coefficient and effects tables are intended to verify directional and numerical agreement under matched model formulas with `HOVAL` as the dependent variable.\n",
     "\n",
     "For effects, this notebook now uses `spreg`'s own spatial-impact utilities: `spreg.sputils.spmultiplier` and `spreg.sputils._sp_effects`. SEM is the one exception, since it has no spatial multiplier on the systematic component and therefore uses direct = coefficient, indirect = 0, total = coefficient.\n",
     "\n",
-    "**Note on intercept exclusion**: `bayespecon` excludes the intercept from spatial effects for all model types, since the intercept has no meaningful spatial impact interpretation. This is consistent with `spreg`'s `_sp_effects`, which also excludes the constant (`CONSTANT`) from its impact calculations."
+    "**Note on intercept exclusion**: `neighbayes` excludes the intercept from spatial effects for all model types, since the intercept has no meaningful spatial impact interpretation. This is consistent with `spreg`'s `_sp_effects`, which also excludes the constant (`CONSTANT`) from its impact calculations."
    ]
   },
   {
@@ -377,7 +377,7 @@
    "source": [
     "## Example: Synthetic Data on a 30x30 Grid\n",
     "\n",
-    "This example demonstrates how to generate synthetic spatial data on a 30x30 regular grid, construct a spatial weights matrix, and fit a cross-sectional spatial regression model using the bayespecon package."
+    "This example demonstrates how to generate synthetic spatial data on a 30x30 regular grid, construct a spatial weights matrix, and fit a cross-sectional spatial regression model using the neighbayes package."
    ]
   },
   {
@@ -387,8 +387,8 @@
    "metadata": {},
    "outputs": [],
    "source": [
-    "from bayespecon import dgp\n",
-    "from bayespecon.models import SAR\n",
+    "from neighbayes import dgp\n",
+    "from neighbayes.models import SAR\n",
     "\n",
     "# Set random seed for reproducibility\n",
     "np.random.seed(42)\n",

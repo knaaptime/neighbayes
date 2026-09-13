@@ -1,0 +1,458 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "0",
+   "metadata": {},
+   "source": [
+    "# How to estimate Poisson origin–destination flow models\n",
+    "\n",
+    "This guide fits `SARPoissonFlowSeparable` to origin–destination counts and\n",
+    "decides between Poisson and negative binomial observation noise for the same\n",
+    "spatial structure.\n",
+    "\n",
+    "Use it when your flows are counts, you want a correctly specified count\n",
+    "likelihood rather than a log-transformed Gaussian, and you need to know\n",
+    "whether the extra dispersion parameter of a negative binomial is buying you\n",
+    "anything.\n",
+    "\n",
+    "The Poisson flow models sample by **auxiliary-mixture Gibbs**\n",
+    "(Frühwirth-Schnatter & Wagner 2006): Poisson inter-arrival times are\n",
+    "augmented and $-\\log\\tau$ is approximated by a ten-component normal mixture,\n",
+    "which leaves a conditionally Gaussian model that the existing SAR machinery —\n",
+    "the same $\\rho$ step, the same sparse solves, the same log-determinant —\n",
+    "already serves."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "1",
+   "metadata": {},
+   "source": [
+    ":::{admonition} Bayesian Poisson is not PPML\n",
+    ":class: warning\n",
+    "\n",
+    "Santos Silva & Tenreyro's Poisson pseudo-maximum-likelihood estimator is a\n",
+    "*quasi*-MLE: its point estimates are consistent under a correct conditional\n",
+    "mean regardless of the true variance, and the inferential work is done by\n",
+    "sandwich standard errors. A Bayesian posterior under a knowingly\n",
+    "misspecified Poisson gives you the right point estimates but credible\n",
+    "intervals that are too narrow when the data are overdispersed — nothing in\n",
+    "the posterior plays the role of the sandwich.\n",
+    "\n",
+    "To carry the actual robustness property you would need a weighted-likelihood\n",
+    "bootstrap or a Gibbs posterior with a sandwich-matched learning rate\n",
+    "(Müller 2013; Syring & Martin 2019). Neither is implemented here, so this\n",
+    "model is `family = \"poisson\"` — a correctly specified Poisson, not PPML.\n",
+    "Read the comparison below as a specification question, not as a robust\n",
+    "alternative to one.\n",
+    ":::"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "2",
+   "metadata": {},
+   "source": [
+    "## Simulate flow counts\n",
+    "\n",
+    "`generate_poisson_flow_data_separable` draws counts from\n",
+    "$y_{ij}\\sim\\text{Poisson}(\\mu_{ij})$ with\n",
+    "$\\log\\boldsymbol\\mu = A(\\rho_d,\\rho_o,\\rho_w)^{-1}X\\beta$ and the separable\n",
+    "restriction $\\rho_w = -\\rho_d\\rho_o$. With $n = 25$ regions there are\n",
+    "$N = n^2 = 625$ flows."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "id": "3",
+   "metadata": {},
+   "source": [
+    "import time\n",
+    "\n",
+    "import arviz as az\n",
+    "import numpy as np\n",
+    "import pandas as pd\n",
+    "\n",
+    "from neighbayes.dgp.flows import generate_poisson_flow_data_separable\n",
+    "from neighbayes.models.flow import SARNegBinFlowSeparable, SARPoissonFlowSeparable\n",
+    "\n",
+    "RHO_D, RHO_O = 0.35, 0.25\n",
+    "\n",
+    "data = generate_poisson_flow_data_separable(n=25, rho_d=RHO_D, rho_o=RHO_O, seed=7)\n",
+    "y, X, G = data[\"y_vec\"], data[\"X\"], data[\"G\"]\n",
+    "\n",
+    "print(f\"flows      : {y.size}\")\n",
+    "print(f\"mean count : {y.mean():.2f}\")\n",
+    "print(f\"variance   : {y.var():.2f}\")\n",
+    "print(f\"zeros      : {(y == 0).mean():.1%}\")"
+   ],
+   "execution_count": null,
+   "outputs": []
+  },
+  {
+   "cell_type": "markdown",
+   "id": "4",
+   "metadata": {},
+   "source": [
+    "Note the variance-to-mean ratio. These counts are *conditionally* Poisson\n",
+    "by construction, yet marginally they look badly overdispersed, because the\n",
+    "spatial filter $A^{-1}$ spreads $\\mu_{ij}$ over orders of magnitude across\n",
+    "cells. **Marginal overdispersion is not evidence that you need a negative\n",
+    "binomial** — in flow data it is the ordinary signature of a gravity mean\n",
+    "with spatial feedback. The question has to be settled by fitting both."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "5",
+   "metadata": {},
+   "source": [
+    "## Fit the Poisson flow model\n",
+    "\n",
+    "The interface is the shared flow-model interface: pass the vectorized flow\n",
+    "counts, the $N\\times p$ origin–destination design matrix, and the regional\n",
+    "weights graph on $n$ units. Poisson flow models are Gibbs-only — `fit(sampler=\"nuts\")` raises."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "id": "6",
+   "metadata": {},
+   "source": [
+    "model_pois = SARPoissonFlowSeparable(y, X, G, col_names=data[\"col_names\"])\n",
+    "\n",
+    "start = time.perf_counter()\n",
+    "idata_pois = model_pois.fit(\n",
+    "    draws=1000, tune=500, chains=2, random_seed=11, progressbar=False\n",
+    ")\n",
+    "secs_pois = time.perf_counter() - start\n",
+    "\n",
+    "az.summary(idata_pois, var_names=[\"rho_d\", \"rho_o\", \"rho_w\"])"
+   ],
+   "execution_count": null,
+   "outputs": []
+  },
+  {
+   "cell_type": "markdown",
+   "id": "7",
+   "metadata": {},
+   "source": [
+    "`rho_w` is deterministic here — the separable model pins it to\n",
+    "$-\\rho_d\\rho_o$ rather than sampling it — so it carries no independent\n",
+    "information. It is reported because the spatial-effects decomposition needs\n",
+    "all three.\n",
+    "\n",
+    "Check recovery against the truth:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "id": "8",
+   "metadata": {},
+   "source": [
+    "post = idata_pois.posterior\n",
+    "print(f\"rho_d: {float(post['rho_d'].mean()):.3f}  (true {RHO_D})\")\n",
+    "print(f\"rho_o: {float(post['rho_o'].mean()):.3f}  (true {RHO_O})\")"
+   ],
+   "execution_count": null,
+   "outputs": []
+  },
+  {
+   "cell_type": "markdown",
+   "id": "9",
+   "metadata": {},
+   "source": [
+    "## Read the spillovers\n",
+    "\n",
+    "`spatial_effects()` gives the LeSage–Thomas-Agnan decomposition of each\n",
+    "covariate into origin, destination, intra-regional and network components."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "id": "10",
+   "metadata": {},
+   "source": [
+    "model_pois.spatial_effects().round(4)"
+   ],
+   "execution_count": null,
+   "outputs": []
+  },
+  {
+   "cell_type": "markdown",
+   "id": "11",
+   "metadata": {},
+   "source": [
+    "## Decide between Poisson and negative binomial\n",
+    "\n",
+    "Fit `SARNegBinFlowSeparable` to the same counts, the same design, the same\n",
+    "weights. Only the observation model differs — the negative binomial adds a\n",
+    "free dispersion parameter `alpha`."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "id": "12",
+   "metadata": {},
+   "source": [
+    "model_nb = SARNegBinFlowSeparable(y, X, G, col_names=data[\"col_names\"])\n",
+    "\n",
+    "start = time.perf_counter()\n",
+    "idata_nb = model_nb.fit(\n",
+    "    draws=1000, tune=500, chains=2, random_seed=11, progressbar=False\n",
+    ")\n",
+    "secs_nb = time.perf_counter() - start\n",
+    "\n",
+    "az.summary(idata_nb, var_names=[\"rho_d\", \"rho_o\", \"alpha\"])"
+   ],
+   "execution_count": null,
+   "outputs": []
+  },
+  {
+   "cell_type": "markdown",
+   "id": "13",
+   "metadata": {},
+   "source": [
+    "Look at `alpha` before anything else. Under the negative binomial,\n",
+    "$\\operatorname{Var}(y) = \\mu + \\mu^2/\\alpha$, so $\\alpha \\to \\infty$ *is* the\n",
+    "Poisson. A posterior mean in the hundreds with a standard deviation of the same\n",
+    "order is the model telling you it cannot locate the dispersion parameter,\n",
+    "because there is no conditional overdispersion to locate. That is the first\n",
+    "piece of evidence for the simpler likelihood.\n",
+    "\n",
+    "Its converse is worth knowing too: as $\\alpha$ grows, the Pólya–Gamma\n",
+    "augmentation the negative binomial sampler relies on degenerates — the working\n",
+    "precision $E[\\omega]$ diverges while the marginal Fisher information stays at\n",
+    "$\\mu$, and effective sample size collapses. Fixing $\\alpha$ at a large value to\n",
+    "\"approximate\" a Poisson is therefore not a shortcut; it is the one regime where\n",
+    "that sampler fails. The auxiliary-mixture scheme exists to reach the Poisson\n",
+    "directly instead."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "14",
+   "metadata": {},
+   "source": [
+    "### Do the two posteriors agree?\n",
+    "\n",
+    "Two independently implemented samplers landing on the same $\\rho$ posterior is\n",
+    "mutual validation. Disagreement beyond Monte Carlo error is a specification\n",
+    "signal, not a rounding difference."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "id": "15",
+   "metadata": {},
+   "source": [
+    "rows = []\n",
+    "for name in (\"rho_d\", \"rho_o\"):\n",
+    "    rows.append(\n",
+    "        {\n",
+    "            \"parameter\": name,\n",
+    "            \"truth\": {\"rho_d\": RHO_D, \"rho_o\": RHO_O}[name],\n",
+    "            \"poisson\": float(idata_pois.posterior[name].mean()),\n",
+    "            \"negbin\": float(idata_nb.posterior[name].mean()),\n",
+    "            \"poisson sd\": float(idata_pois.posterior[name].std()),\n",
+    "            \"negbin sd\": float(idata_nb.posterior[name].std()),\n",
+    "        }\n",
+    "    )\n",
+    "pd.DataFrame(rows).set_index(\"parameter\").round(4)"
+   ],
+   "execution_count": null,
+   "outputs": []
+  },
+  {
+   "cell_type": "markdown",
+   "id": "16",
+   "metadata": {},
+   "source": [
+    "### What does each cost?\n",
+    "\n",
+    "Sampling efficiency is effective sample size per second, not draws per second.\n",
+    "The two likelihoods have different per-sweep costs — the auxiliary-mixture\n",
+    "scheme draws two latent inter-arrival times per observation, the Pólya–Gamma\n",
+    "scheme draws one mixing weight — so equal draws are not equal work."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "id": "17",
+   "metadata": {},
+   "source": [
+    "rows = []\n",
+    "for label, idata, secs in (\n",
+    "    (\"Poisson\", idata_pois, secs_pois),\n",
+    "    (\"NegBin\", idata_nb, secs_nb),\n",
+    "):\n",
+    "    ess = az.ess(idata, var_names=[\"rho_d\", \"rho_o\"])\n",
+    "    rhat = az.rhat(idata, var_names=[\"rho_d\", \"rho_o\"])\n",
+    "    rows.append(\n",
+    "        {\n",
+    "            \"model\": label,\n",
+    "            \"seconds\": secs,\n",
+    "            \"ess rho_d\": float(ess[\"rho_d\"]),\n",
+    "            \"ess rho_o\": float(ess[\"rho_o\"]),\n",
+    "            \"ess/sec rho_d\": float(ess[\"rho_d\"]) / secs,\n",
+    "            \"max rhat\": float(max(rhat[\"rho_d\"], rhat[\"rho_o\"])),\n",
+    "        }\n",
+    "    )\n",
+    "pd.DataFrame(rows).set_index(\"model\").round(3)"
+   ],
+   "execution_count": null,
+   "outputs": []
+  },
+  {
+   "cell_type": "markdown",
+   "id": "18",
+   "metadata": {},
+   "source": [
+    "Neither likelihood dominates on speed, and which one comes out ahead\n",
+    "shifts with $n$, with the count level, and with how much of the mass sits near\n",
+    "zero — so measure it on your own data rather than carrying a rule of thumb.\n",
+    "Efficiency is the tiebreaker, not the criterion. Both samplers here recover the\n",
+    "same $\\rho$ posterior with $\\hat R$ at 1.00, so nothing about the science turns\n",
+    "on the choice; what should decide it is whether the observation model is right,\n",
+    "which is the predictive check below."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "19",
+   "metadata": {},
+   "source": [
+    ":::{admonition} What LOO can and cannot settle here\n",
+    ":class: caution\n",
+    "\n",
+    "Both models now store the true pointwise log-pmf of the observed counts, so\n",
+    "`az.loo` puts them on one scale and the elpd difference between them is\n",
+    "meaningful. Until recently they did not: every negative binomial site stored the\n",
+    "NB2 log-pmf *without* its $-\\log\\Gamma(y+1)$ normalizing term, which shifted\n",
+    "elpd by $+\\sum_i \\log(y_i!)$ — a draw-independent constant, invisible to any\n",
+    "shape or finiteness check, large enough to drive the total positive. A positive\n",
+    "elpd for discrete data was the tell. That constant is now included at every\n",
+    "storage site, and pinned against `scipy.stats.nbinom.logpmf` by test.\n",
+    "\n",
+    "What the comparison still cannot settle is spatial structure. The stored\n",
+    "likelihood is conditional on the reduced-form $\\eta$, so leaving one flow out\n",
+    "does not leave out its neighbours' influence on that flow's own linear\n",
+    "predictor; elpd is not a clean out-of-sample quantity under spatial dependence.\n",
+    "Read it as a verdict on the *observation model* — Poisson against negative\n",
+    "binomial at fixed spatial structure, which is exactly the question here — and\n",
+    "not as a way to choose $\\rho$ parameterizations. Weigh it alongside posterior\n",
+    "agreement, sampling efficiency, and the predictive check in count space below.\n",
+    ":::"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "20",
+   "metadata": {},
+   "source": [
+    "### Posterior predictive check in count space\n",
+    "\n",
+    "The honest specification test is whether replicated counts reproduce features\n",
+    "of the observed data that the likelihood did not fit directly — here the\n",
+    "variance-to-mean ratio and the share of zeros."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "id": "21",
+   "metadata": {},
+   "source": [
+    "y_rep = model_pois.posterior_predictive(random_seed=0)\n",
+    "\n",
+    "obs = {\"var/mean\": y.var() / y.mean(), \"zeros\": (y == 0).mean(), \"max\": y.max()}\n",
+    "rep = {\n",
+    "    \"var/mean\": np.mean(y_rep.var(axis=1) / y_rep.mean(axis=1)),\n",
+    "    \"zeros\": np.mean((y_rep == 0).mean(axis=1)),\n",
+    "    \"max\": np.mean(y_rep.max(axis=1)),\n",
+    "}\n",
+    "pd.DataFrame({\"observed\": obs, \"replicated (mean)\": rep}).round(3)"
+   ],
+   "execution_count": null,
+   "outputs": []
+  },
+  {
+   "cell_type": "markdown",
+   "id": "22",
+   "metadata": {},
+   "source": [
+    "If the replicated variance-to-mean ratio and zero share bracket the\n",
+    "observed values, the Poisson is doing its job and the negative binomial's\n",
+    "dispersion parameter is fitting noise. If replicated counts are systematically\n",
+    "tighter than observed — too little spread, too few zeros — that is genuine\n",
+    "excess dispersion and the negative binomial earns its extra parameter.\n",
+    "\n",
+    "For real trade and migration flows, Santos Silva & Tenreyro (2011) argue that\n",
+    "zero inflation is usually the *wrong* fix for excess zeros: the zeros in\n",
+    "gravity data are ordinary Poisson zeros from small $\\mu_{ij}$, not a separate\n",
+    "structural process. Running the comparison above on your own data is the way\n",
+    "to check that claim rather than assume it."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "23",
+   "metadata": {},
+   "source": [
+    "## When you want all three $\\rho$\n",
+    "\n",
+    "`SARPoissonFlow` exposes the unrestricted three-parameter model, with\n",
+    "$\\rho_w$ free rather than pinned to $-\\rho_d\\rho_o$.\n",
+    "\n",
+    ":::{warning}\n",
+    "The unrestricted parameterization is weakly identified at moderate $n$ for\n",
+    "*both* likelihoods. $\\rho_d$, $\\rho_o$ and $\\rho_w$ trade off along a nearly\n",
+    "flat ridge that one-at-a-time slice updates cannot traverse: at $n = 36$\n",
+    "($N = 1296$), effective sample size falls to single digits out of 2000 draws\n",
+    "with $\\hat R \\approx 1.4$, for this sampler and for `SARNegBinFlow` alike.\n",
+    "\n",
+    "This is weak identification, not a sampler defect — the profile likelihood is\n",
+    "genuinely flat along the ridge, and the samplers are exploring it correctly.\n",
+    "Tuning will not fix it. Prefer `SARPoissonFlowSeparable` unless $\\rho_w$ is\n",
+    "itself the object of interest.\n",
+    ":::"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "24",
+   "metadata": {},
+   "source": [
+    "## See also\n",
+    "\n",
+    "- [How to estimate origin–destination flow models](flow_models.ipynb) —\n",
+    "  the Gaussian and negative binomial flow families, and the effects\n",
+    "  decomposition in full\n",
+    "- [How to estimate panel flow models](panel_flow_models.ipynb) — the same\n",
+    "  models over repeated periods\n",
+    "- [Supported Models](../models.md) — the full model catalogue"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "bayespreg",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.14.4"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

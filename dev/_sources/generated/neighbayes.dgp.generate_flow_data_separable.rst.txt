@@ -1,0 +1,6 @@
+﻿neighbayes.dgp.generate\_flow\_data\_separable
+==============================================
+
+.. currentmodule:: neighbayes.dgp
+
+.. autofunction:: generate_flow_data_separable

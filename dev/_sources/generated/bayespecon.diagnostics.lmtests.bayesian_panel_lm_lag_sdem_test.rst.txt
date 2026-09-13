@@ -1,6 +1,0 @@
-﻿bayespecon.diagnostics.lmtests.bayesian\_panel\_lm\_lag\_sdem\_test
-===================================================================
-
-.. currentmodule:: bayespecon.diagnostics.lmtests
-
-.. autofunction:: bayesian_panel_lm_lag_sdem_test

@@ -6,36 +6,54 @@
 
 Home <self>
 installation
+```
+
+```{toctree}
+:hidden:
+:caption: Tutorial
+:maxdepth: 1
+
+tutorial/quickstart
+tutorial/pedagogical_spatial_models
+tutorial/pedagogical_panel_models
+```
+
+```{toctree}
+:hidden:
+:caption: How-to guides
+:maxdepth: 1
+
+how-to/priors
+how-to/gibbs_sampler
+how-to/spatial_logit
+how-to/negbin_estimation
+how-to/zinb_estimation
+how-to/poisson_flow
+how-to/tobit_models
+how-to/tobit_panel_models
+how-to/flow_models
+how-to/panel_flow_models
+how-to/bayesian_lmtests
+how-to/spatial_cv_demo
+```
+
+```{toctree}
+:hidden:
+:caption: Explanation
+:maxdepth: 1
+
+Why neighbayes <concept>
 Architecture <architecture>
 ```
 
 ```{toctree}
 :hidden:
-:caption: Models
+:caption: Reference
 :maxdepth: 1
 
 Supported Models <models>
-```
-
-```{toctree}
-:hidden:
-:caption: User Guide
-:maxdepth: 1
-
-Quickstart <user-guide/quickstart>
-Cross Sectional Models <user-guide/pedagogical_spatial_models>
-Gibbs Sampler <user-guide/gibbs_sampler>
-Spatial Negative Binomial <user-guide/negbin_estimation>
-Spatial Logit <user-guide/spatial_logit>
-Spatial ZINB <user-guide/zinb_estimation>
-Spatial Tobit/Probit Models <user-guide/nonlinear_models>
-Panel Models <user-guide/pedagogical_panel_models>
-Nonlinear Panel Models <user-guide/nonlinear_panel_models>
-Flow Models <user-guide/flow_models>
-Panel Flow Models <user-guide/panel_flow_models>
-Bayesian Spatial Diagnostics <user-guide/bayesian_lmtests>
-Spatial Block Cross-Validation <user-guide/spatial_cv_demo>
-
+API reference <api>
+References <references>
 ```
 
 ```{toctree}
@@ -52,23 +70,6 @@ External Validation & Replication <validation/index>
 :maxdepth: 1
 
 Performance & Profiling <performance/index>
-
-```
-
-```{toctree}
-:hidden:
-:caption: API
-:maxdepth: 1
-
-API reference <api>
-```
-
-```{toctree}
-:hidden:
-:caption: References
-:maxdepth: 1
-
-References <references>
 ```
 
 ```{toctree}
@@ -76,6 +77,6 @@ References <references>
 :caption: For contributors
 :maxdepth: 1
 
-GitHub <https://github.com/pysal/bayespecon>
-Changelog <https://github.com/pysal/bayespecon/releases>
+GitHub <https://github.com/knaaptime/neighbayes>
+Changelog <https://github.com/knaaptime/neighbayes/releases>
 ```

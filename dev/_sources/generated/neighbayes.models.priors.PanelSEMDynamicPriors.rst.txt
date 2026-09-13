@@ -1,0 +1,37 @@
+﻿neighbayes.models.priors.PanelSEMDynamicPriors
+==============================================
+
+.. currentmodule:: neighbayes.models.priors
+
+.. autoclass:: PanelSEMDynamicPriors
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~PanelSEMDynamicPriors.__init__
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~PanelSEMDynamicPriors.beta_mu
+      ~PanelSEMDynamicPriors.beta_sigma
+      ~PanelSEMDynamicPriors.lam_lower
+      ~PanelSEMDynamicPriors.lam_upper
+      ~PanelSEMDynamicPriors.nu
+      ~PanelSEMDynamicPriors.phi_lower
+      ~PanelSEMDynamicPriors.phi_upper
+      ~PanelSEMDynamicPriors.sigma2_alpha
+      ~PanelSEMDynamicPriors.sigma2_beta
+      ~PanelSEMDynamicPriors.sigma_sigma
+   
+   

@@ -1,0 +1,6 @@
+﻿neighbayes.dgp.generate\_negbin\_flow\_data
+===========================================
+
+.. currentmodule:: neighbayes.dgp
+
+.. autofunction:: generate_negbin_flow_data

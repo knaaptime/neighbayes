@@ -1,0 +1,36 @@
+﻿neighbayes.models.Logit
+=======================
+
+.. currentmodule:: neighbayes.models
+
+.. autoclass:: Logit
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Logit.__init__
+      ~Logit.fit
+      ~Logit.fitted_values
+      ~Logit.residuals
+      ~Logit.spatial_diagnostics
+      ~Logit.spatial_diagnostics_decision
+      ~Logit.spatial_effects
+      ~Logit.summary
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~Logit.inference_data
+      ~Logit.pymc_model
+   
+   

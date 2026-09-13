@@ -1,0 +1,36 @@
+﻿neighbayes.models.SLX
+=====================
+
+.. currentmodule:: neighbayes.models
+
+.. autoclass:: SLX
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SLX.__init__
+      ~SLX.fit
+      ~SLX.fitted_values
+      ~SLX.residuals
+      ~SLX.spatial_diagnostics
+      ~SLX.spatial_diagnostics_decision
+      ~SLX.spatial_effects
+      ~SLX.summary
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SLX.inference_data
+      ~SLX.pymc_model
+   
+   

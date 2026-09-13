@@ -1,6 +1,0 @@
-﻿bayespecon.diagnostics.lmtests.bayesian\_panel\_robust\_lm\_error\_sdem\_test
-=============================================================================
-
-.. currentmodule:: bayespecon.diagnostics.lmtests
-
-.. autofunction:: bayesian_panel_robust_lm_error_sdem_test

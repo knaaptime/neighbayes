@@ -1,6 +1,0 @@
-﻿bayespecon.graph.flow\_weight\_matrices
-=======================================
-
-.. currentmodule:: bayespecon.graph
-
-.. autofunction:: flow_weight_matrices

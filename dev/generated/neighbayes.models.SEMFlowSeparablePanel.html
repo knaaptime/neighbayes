@@ -1,0 +1,3888 @@
+
+
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="neighbayes.models.SEMFlowPanel.html">
+      
+      
+        <link rel="next" href="neighbayes.models.priors.GibbsBasePriors.html">
+      
+      
+      <link rel="icon" href="../_static/pysal_favicon.ico">
+    
+    
+      
+        <title>neighbayes.models.SEMFlowSeparablePanel - neighbayes</title>
+      
+    
+    
+      
+        
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.74c816e3f9967dd6e.min.css?v=6cfe2491" />
+        <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
+        <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+        <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=93c5fc88" />
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#neighbayes.models.SEMFlowSeparablePanel" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="neighbayes" class="md-header__button md-logo" aria-label="neighbayes" data-md-component="logo">
+      <img src="../_static/pysal_logo.svg" alt="logo">
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            neighbayes
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              neighbayes.models.SEMFlowSeparablePanel
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="red"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7M9 21a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-1H9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="red"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7M9 21v-1h6v1a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1m3-17a5 5 0 0 0-5 5c0 2.05 1.23 3.81 3 4.58V16h4v-2.42c1.77-.77 3-2.53 3-4.58a5 5 0 0 0-5-5"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/pysal/neighbayes/" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    pysal/neighbayes
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="neighbayes" class="md-nav__button md-logo" aria-label="neighbayes" data-md-component="logo">
+      <img src="../_static/pysal_logo.svg" alt="logo">
+    </a>
+    neighbayes
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/pysal/neighbayes/" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    pysal/neighbayes
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Home</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Installation</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>Tutorial</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Tutorial</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorial/quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Getting Started with neighbayes</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorial/pedagogical_spatial_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Bayesian spatial models:<wbr> a walkthrough</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorial/pedagogical_panel_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Spatial panel models:<wbr> a walkthrough</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>How-<wbr>to guides</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            <span>How-<wbr>to guides</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/priors.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to set priors</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/gibbs_sampler.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to choose and configure the Gibbs sampler</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/spatial_logit.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to fit spatial logit models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/negbin_estimation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to estimate spatial negative binomial models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/zinb_estimation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to fit zero-<wbr>inflated SAR negative binomial models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/poisson_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to estimate Poisson origin–destination flow models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/tobit_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to fit spatial tobit models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/tobit_panel_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to fit spatial tobit panel models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/flow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to estimate origin–destination flow models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/panel_flow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to estimate panel flow models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/bayesian_lmtests.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to run Bayesian LM specification tests</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/spatial_cv_demo.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to run spatial block cross-<wbr>validation</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>Explanation</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Explanation</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concept.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Why neighbayes</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Architecture</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>Reference</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Reference</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Supported Models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_2" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../api.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    <span>API reference</span>
+    
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6_2" id="__nav_6_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6_2">
+            <span class="md-nav__icon md-icon"></span>
+            <span>API reference</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api.html#cross-sectional-spatial-models" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Cross-<wbr>Sectional Spatial Models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api.html#panel-spatial-models-fixed-effects" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Panel Spatial Models <wbr>(Fixed Effects)</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api.html#panel-spatial-models-random-effects" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Panel Spatial Models <wbr>(Random Effects)</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api.html#dynamic-panel-spatial-models" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Dynamic Panel Spatial Models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api.html#non-linear-spatial-models" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Non-<wbr>Linear Spatial Models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api.html#panel-spatial-models-tobit" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Panel Spatial Models <wbr>(Tobit)</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_2_7" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../api.html#flow-models" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    <span>Flow Models</span>
+    
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6_2_7" id="__nav_6_2_7_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_6_2_7_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6_2_7">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Flow Models</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="neighbayes.models.OLSFlow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>neighbayes.<wbr>models.<wbr>OLSFlow</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="neighbayes.models.SARFlow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>neighbayes.<wbr>models.<wbr>SARFlow</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="neighbayes.models.SARFlowSeparable.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>neighbayes.<wbr>models.<wbr>SARFlow<wbr>Separable</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="neighbayes.models.NegBinFlow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>neighbayes.<wbr>models.<wbr>Neg<wbr>Bin<wbr>Flow</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="neighbayes.models.SARNegBinFlow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>neighbayes.<wbr>models.<wbr>SARNeg<wbr>Bin<wbr>Flow</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="neighbayes.models.SARNegBinFlowSeparable.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>neighbayes.<wbr>models.<wbr>SARNeg<wbr>Bin<wbr>Flow<wbr>Separable</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="neighbayes.models.SEMFlow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>neighbayes.<wbr>models.<wbr>SEMFlow</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="neighbayes.models.SEMFlowSeparable.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>neighbayes.<wbr>models.<wbr>SEMFlow<wbr>Separable</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_2_7_9" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../api.html#panel-flow-models" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    <span>Panel Flow Models</span>
+    
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6_2_7_9" id="__nav_6_2_7_9_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_6_2_7_9_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6_2_7_9">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Panel Flow Models</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="neighbayes.models.OLSFlowPanel.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>neighbayes.<wbr>models.<wbr>OLSFlow<wbr>Panel</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="neighbayes.models.SARFlowPanel.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>neighbayes.<wbr>models.<wbr>SARFlow<wbr>Panel</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="neighbayes.models.SARFlowSeparablePanel.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>neighbayes.<wbr>models.<wbr>SARFlow<wbr>Separable<wbr>Panel</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="neighbayes.models.NegBinFlowPanel.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>neighbayes.<wbr>models.<wbr>Neg<wbr>Bin<wbr>Flow<wbr>Panel</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="neighbayes.models.SARNegBinFlowPanel.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>neighbayes.<wbr>models.<wbr>SARNeg<wbr>Bin<wbr>Flow<wbr>Panel</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="neighbayes.models.SARNegBinFlowSeparablePanel.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>neighbayes.<wbr>models.<wbr>SARNeg<wbr>Bin<wbr>Flow<wbr>Separable<wbr>Panel</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="neighbayes.models.SEMFlowPanel.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>neighbayes.<wbr>models.<wbr>SEMFlow<wbr>Panel</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    <span>neighbayes.<wbr>models.<wbr>SEMFlow<wbr>Separable<wbr>Panel</span>
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="#" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>neighbayes.<wbr>models.<wbr>SEMFlow<wbr>Separable<wbr>Panel</span>
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary">
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel" class="md-nav__link">
+    
+      <span aria-label="Python class" class="objinfo-icon objinfo-icon__data" title="Python class">C</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel (Python class) — Panel separable spatial-error flow model with \lambda_w = -\lambda_d \lambda_o."><span>neighbayes.<wbr>models.<wbr>SEMFlow<wbr>Separable<wbr>Panel</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="neighbayes.models.SEMFlowSeparablePanel">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel-parameters" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Parameters</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.__init__.y" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.__init__.y (Python parameter) — Stacked panel response in shape (T, n, n), (T, n^2), or (n^2 * T,)."><span>y</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.__init__.W" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.__init__.W (Python parameter) — Row-standardized graph on n units."><span>W</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.__init__.X" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.__init__.X (Python parameter) — Stacked panel design matrix in time-first order."><span>X</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.__init__.T" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.__init__.T (Python parameter) — Number of panel periods (must be a positive integer)."><span>T</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.__init__" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.__init__ (Python method)"><span>__<wbr>init__<wbr></span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fit" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.fit (Python method) — Draw samples from the posterior via PyMC NUTS."><span>fit</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="fit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fit-parameters" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Parameters</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fit.draws" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.fit.draws (Python parameter) — Number of posterior samples per chain (after tuning)."><span>draws</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fit.tune" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.fit.tune (Python parameter) — Number of tuning (warm-up) steps per chain."><span>tune</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fit.chains" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.fit.chains (Python parameter) — Number of parallel chains."><span>chains</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fit.random_seed" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.fit.random_seed (Python parameter) — Seed for reproducibility."><span>random_<wbr>seed</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fit.store_lambda" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.fit.store_lambda (Python parameter) — If True, include the high-dimensional fitted mean lambda in the stored posterior."><span>store_<wbr>lambda</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fit.idata_kwargs" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.fit.idata_kwargs (Python parameter) — Forwarded to pm.sample."><span>idata_<wbr>kwargs</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fit.progressbar" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.fit.progressbar (Python parameter) — Show progress bar during sampling."><span>progressbar</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fit.sample_kwargs" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.fit.sample_kwargs (Python parameter) — Additional keyword arguments forwarded to pm.sample. Pass target_accept=0.95 to adjust the NUTS acceptance rate."><span>sample_<wbr>kwargs</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fit-return-type" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Return type</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fitted_values" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.fitted_values (Python method) — Return fitted values at posterior mean parameters."><span>fitted_<wbr>values</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="fitted_values">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fitted_values-returns" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Returns</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fitted_values-return-type" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Return type</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.inference_data" class="md-nav__link">
+    
+      <span aria-label="Python property" class="objinfo-icon objinfo-icon__alias" title="Python property">P</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.inference_data (Python property) — Return the ArviZ InferenceData from the most recent fit."><span>inference_<wbr>data</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="inference_data">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.inference_data-returns" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Returns</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.inference_data-return-type" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Return type</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.posterior_predictive" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.posterior_predictive (Python method) — Draw posterior-predictive samples y_rep for the full panel stack."><span>posterior_<wbr>predictive</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="posterior_predictive">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.posterior_predictive-parameters" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Parameters</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.posterior_predictive.n_draws" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.posterior_predictive.n_draws (Python parameter) — Number of posterior draws to use."><span>n_<wbr>draws</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.posterior_predictive.random_seed" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.posterior_predictive.random_seed (Python parameter) — Seed for the posterior-predictive sampler."><span>random_<wbr>seed</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.posterior_predictive-returns" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Returns</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.posterior_predictive-return-type" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Return type</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.pymc_model" class="md-nav__link">
+    
+      <span aria-label="Python property" class="objinfo-icon objinfo-icon__alias" title="Python property">P</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.pymc_model (Python property) — Return the PyMC model object built for the most recent fit."><span>pymc_<wbr>model</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="pymc_model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.pymc_model-returns" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Returns</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.pymc_model-return-type" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Return type</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.residuals" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.residuals (Python method) — Return residuals y - fitted_values."><span>residuals</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="residuals">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.residuals-returns" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Returns</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.residuals-return-type" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Return type</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics (Python method) — Run Bayesian LM specification tests and return a summary table."><span>spatial_<wbr>diagnostics</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="spatial_diagnostics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics-returns" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Returns</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics-return-type" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Return type</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics-raises" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Raises</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision (Python method) — Return a model-selection decision from Bayesian LM test results."><span>spatial_<wbr>diagnostics_<wbr>decision</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="spatial_diagnostics_decision">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision-parameters" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Parameters</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision.alpha" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision.alpha (Python parameter) — Significance level for the Bayesian p-values."><span>alpha</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision.format" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision.format (Python parameter) — Output format."><span>format</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision-return-type" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Return type</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.spatial_effects" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.spatial_effects (Python method) — Summarize posterior origin/destination/intra/network/total effects."><span>spatial_<wbr>effects</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.summary" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.summary (Python method) — Return posterior summary table."><span>summary</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="summary">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.summary-parameters" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Parameters</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.summary.var_names" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.summary.var_names (Python parameter) — Variable names to include in the summary."><span>var_<wbr>names</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.summary.kwargs" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.summary.kwargs (Python parameter) — Additional arguments passed to arviz.summary()."><span>kwargs</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.summary-returns" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Returns</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.summary-return-type" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Return type</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api.html#default-gibbs-priors" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Default Gibbs Priors</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api.html#default-nuts-priors" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Default NUTS Priors</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api.html#bayesian-diagnostics" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Bayesian Diagnostics</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api.html#data-generating-processes" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Data Generating Processes</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api.html#graph-utilities" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Graph Utilities</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../references.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>References</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>Validation</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Validation</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validation/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>External Validation &amp; Replication</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>Performance</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Performance</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Performance &amp; Profiling</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>For contributors</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            <span>For contributors</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/knaaptime/neighbayes" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Git<wbr>Hub</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/knaaptime/neighbayes/releases" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Changelog</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary">
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel" class="md-nav__link">
+    
+      <span aria-label="Python class" class="objinfo-icon objinfo-icon__data" title="Python class">C</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel (Python class) — Panel separable spatial-error flow model with \lambda_w = -\lambda_d \lambda_o."><span>neighbayes.<wbr>models.<wbr>SEMFlow<wbr>Separable<wbr>Panel</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="neighbayes.models.SEMFlowSeparablePanel">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel-parameters" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Parameters</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.__init__.y" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.__init__.y (Python parameter) — Stacked panel response in shape (T, n, n), (T, n^2), or (n^2 * T,)."><span>y</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.__init__.W" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.__init__.W (Python parameter) — Row-standardized graph on n units."><span>W</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.__init__.X" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.__init__.X (Python parameter) — Stacked panel design matrix in time-first order."><span>X</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.__init__.T" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.__init__.T (Python parameter) — Number of panel periods (must be a positive integer)."><span>T</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.__init__" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.__init__ (Python method)"><span>__<wbr>init__<wbr></span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fit" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.fit (Python method) — Draw samples from the posterior via PyMC NUTS."><span>fit</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="fit">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fit-parameters" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Parameters</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fit.draws" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.fit.draws (Python parameter) — Number of posterior samples per chain (after tuning)."><span>draws</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fit.tune" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.fit.tune (Python parameter) — Number of tuning (warm-up) steps per chain."><span>tune</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fit.chains" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.fit.chains (Python parameter) — Number of parallel chains."><span>chains</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fit.random_seed" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.fit.random_seed (Python parameter) — Seed for reproducibility."><span>random_<wbr>seed</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fit.store_lambda" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.fit.store_lambda (Python parameter) — If True, include the high-dimensional fitted mean lambda in the stored posterior."><span>store_<wbr>lambda</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fit.idata_kwargs" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.fit.idata_kwargs (Python parameter) — Forwarded to pm.sample."><span>idata_<wbr>kwargs</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fit.progressbar" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.fit.progressbar (Python parameter) — Show progress bar during sampling."><span>progressbar</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fit.sample_kwargs" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.fit.sample_kwargs (Python parameter) — Additional keyword arguments forwarded to pm.sample. Pass target_accept=0.95 to adjust the NUTS acceptance rate."><span>sample_<wbr>kwargs</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fit-return-type" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Return type</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fitted_values" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.fitted_values (Python method) — Return fitted values at posterior mean parameters."><span>fitted_<wbr>values</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="fitted_values">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fitted_values-returns" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Returns</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.fitted_values-return-type" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Return type</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.inference_data" class="md-nav__link">
+    
+      <span aria-label="Python property" class="objinfo-icon objinfo-icon__alias" title="Python property">P</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.inference_data (Python property) — Return the ArviZ InferenceData from the most recent fit."><span>inference_<wbr>data</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="inference_data">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.inference_data-returns" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Returns</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.inference_data-return-type" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Return type</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.posterior_predictive" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.posterior_predictive (Python method) — Draw posterior-predictive samples y_rep for the full panel stack."><span>posterior_<wbr>predictive</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="posterior_predictive">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.posterior_predictive-parameters" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Parameters</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.posterior_predictive.n_draws" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.posterior_predictive.n_draws (Python parameter) — Number of posterior draws to use."><span>n_<wbr>draws</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.posterior_predictive.random_seed" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.posterior_predictive.random_seed (Python parameter) — Seed for the posterior-predictive sampler."><span>random_<wbr>seed</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.posterior_predictive-returns" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Returns</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.posterior_predictive-return-type" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Return type</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.pymc_model" class="md-nav__link">
+    
+      <span aria-label="Python property" class="objinfo-icon objinfo-icon__alias" title="Python property">P</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.pymc_model (Python property) — Return the PyMC model object built for the most recent fit."><span>pymc_<wbr>model</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="pymc_model">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.pymc_model-returns" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Returns</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.pymc_model-return-type" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Return type</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.residuals" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.residuals (Python method) — Return residuals y - fitted_values."><span>residuals</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="residuals">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.residuals-returns" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Returns</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.residuals-return-type" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Return type</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics (Python method) — Run Bayesian LM specification tests and return a summary table."><span>spatial_<wbr>diagnostics</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="spatial_diagnostics">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics-returns" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Returns</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics-return-type" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Return type</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics-raises" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Raises</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision (Python method) — Return a model-selection decision from Bayesian LM test results."><span>spatial_<wbr>diagnostics_<wbr>decision</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="spatial_diagnostics_decision">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision-parameters" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Parameters</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision.alpha" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision.alpha (Python parameter) — Significance level for the Bayesian p-values."><span>alpha</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision.format" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision.format (Python parameter) — Output format."><span>format</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision-return-type" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Return type</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.spatial_effects" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.spatial_effects (Python method) — Summarize posterior origin/destination/intra/network/total effects."><span>spatial_<wbr>effects</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.summary" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.summary (Python method) — Return posterior summary table."><span>summary</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="summary">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.summary-parameters" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Parameters</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.summary.var_names" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.summary.var_names (Python parameter) — Variable names to include in the summary."><span>var_<wbr>names</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.summary.kwargs" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SEMFlowSeparablePanel.summary.kwargs (Python parameter) — Additional arguments passed to arviz.summary()."><span>kwargs</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.summary-returns" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Returns</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SEMFlowSeparablePanel.summary-return-type" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Return type</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset" role="main">
+                
+                
+                  
+
+
+  
+    <a href="https://github.com/pysal/neighbayes/blob/main/docs/generated/neighbayes.models.SEMFlowSeparablePanel.rst" title="Edit this page" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 9h5.5L13 3.5zM6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4c0-1.11.89-2 2-2m.12 13.5 3.74 3.74 1.42-1.41-2.33-2.33 2.33-2.33-1.42-1.41zm11.16 0-3.74-3.74-1.42 1.41 2.33 2.33-2.33 2.33 1.42 1.41z"/></svg>
+    </a>
+  
+  
+
+<h1 id="neighbayes-models-semflowseparablepanel">neighbayes.models.SEMFlowSeparablePanel<a class="headerlink" href="#neighbayes-models-semflowseparablepanel" title="Link to this heading">¶</a></h1>
+<dl class="py class objdesc">
+<dt class="sig sig-object highlight py" id="neighbayes.models.SEMFlowSeparablePanel">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neighbayes.models.</span></span><span class="sig-name descname"><span class="pre">SEMFlowSeparablePanel</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.__init__.y" title="neighbayes.models.SEMFlowSeparablePanel.__init__.y (Python parameter) — Stacked panel response in shape (T, n, n), (T, n^2), or (n^2 * T,)."><span class="n"><span class="pre">y</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.__init__.X" title="neighbayes.models.SEMFlowSeparablePanel.__init__.X (Python parameter) — Stacked panel design matrix in time-first order."><span class="n"><span class="pre">X</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.__init__.W" title="neighbayes.models.SEMFlowSeparablePanel.__init__.W (Python parameter) — Row-standardized graph on n units."><span class="n"><span class="pre">W</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.__init__.T" title="neighbayes.models.SEMFlowSeparablePanel.__init__.T (Python parameter) — Number of panel periods (must be a positive integer)."><span class="n"><span class="pre">T</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">**</span></span><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel" title="neighbayes.models.SEMFlowSeparablePanel.__init__.kwargs (Python parameter)"><span class="n"><span class="pre">kwargs</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/flow_panel/_panel.py#L2003-L2171"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel" title="Link to this definition">¶</a></dt>
+<dd><p>Panel separable spatial-error flow model with <span class="math notranslate nohighlight">\(\lambda_w = -\lambda_d \lambda_o\)</span>.</p>
+<p>Panel analogue of <code class="xref py py-class docutils literal notranslate"><span class="pre">SEMFlowSeparable</span></code> and
+spatial-error counterpart of <a class="reference internal" href="neighbayes.models.SARFlowSeparablePanel.html#neighbayes.models.SARFlowSeparablePanel" title="neighbayes.models.SARFlowSeparablePanel (Python class) — Panel separable spatial-lag flow model with \rho_w = -\rho_d \rho_o."><code class="xref py py-class docutils literal notranslate"><span class="pre">SARFlowSeparablePanel</span></code></a>. Uses the
+eigenvalue / Chebyshev factorization of <span class="math notranslate nohighlight">\(\log|B|\)</span> with the panel
+Jacobian scaling <span class="math notranslate nohighlight">\(T \cdot \log|B|\)</span>.</p>
+<dl class="field-list simple">
+<dt class="field-odd" id="neighbayes.models.SEMFlowSeparablePanel-parameters">Parameters<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel-parameters" title="Permalink to this headline">¶</a></dt>
+<dd class="field-odd"><dl class="simple api-field highlight">
+<dt id="neighbayes.models.SEMFlowSeparablePanel.__init__.y"><span class="sig-name descname">y</span><span class="p"> : </span><span class="desctype"><span class="desctype">array-like</span></span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.__init__.y" title="Permalink to this definition">¶</a></dt><dd><p>Stacked panel response in shape <code class="docutils literal notranslate"><span class="pre">(T,</span> <span class="pre">n,</span> <span class="pre">n)</span></code>, <code class="docutils literal notranslate"><span class="pre">(T,</span> <span class="pre">n^2)</span></code>, or
+<code class="docutils literal notranslate"><span class="pre">(n^2</span> <span class="pre">*</span> <span class="pre">T,)</span></code>.</p>
+</dd>
+<dt id="neighbayes.models.SEMFlowSeparablePanel.__init__.W"><span class="sig-name descname">W</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://pysal.org/libpysal/stable/generated/libpysal.graph.Graph.html#libpysal.graph.Graph" title="(in libpysal v4.15.0)">libpysal.graph.Graph</a> or scipy.sparse / dense (n×n) matrix</span></span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.__init__.W" title="Permalink to this definition">¶</a></dt><dd><p>Row-standardized graph on <code class="docutils literal notranslate"><span class="pre">n</span></code> units.</p>
+</dd>
+<dt id="neighbayes.models.SEMFlowSeparablePanel.__init__.X"><span class="n sig-name">X</span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.__init__.X" title="Permalink to this definition">¶</a></dt><dd><p>Stacked panel design matrix in time-first order.</p>
+</dd>
+<dt id="neighbayes.models.SEMFlowSeparablePanel.__init__.T"><span class="sig-name descname">T</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a></span></span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.__init__.T" title="Permalink to this definition">¶</a></dt><dd><p>Number of panel periods (must be a positive integer).</p>
+</dd>
+<dt><span class="sig-name descname">col_names</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a> of <a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a>, optional</span></span></dt><dd><p>Feature names for <code class="docutils literal notranslate"><span class="pre">X</span></code>. Inferred from a DataFrame if omitted.</p>
+</dd>
+<dt><span class="sig-name descname">k</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a>, optional</span></span></dt><dd><p>Number of destination/origin covariate pairs used by flow effects;
+inferred from columns prefixed <code class="docutils literal notranslate"><span class="pre">dest_</span></code> if omitted.</p>
+</dd>
+<dt><span class="sig-name descname">model</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a>, default 0</span></span></dt><dd><p>Fixed-effects transform: <code class="docutils literal notranslate"><span class="pre">0</span></code> pooled, <code class="docutils literal notranslate"><span class="pre">1</span></code> pair FE, <code class="docutils literal notranslate"><span class="pre">2</span></code> time
+FE, <code class="docutils literal notranslate"><span class="pre">3</span></code> two-way FE.</p>
+</dd>
+<dt><span class="sig-name descname">logdet_method</span><span class="p"> : </span><span class="desctype"><span class="desctype">{&quot;eigenvalue&quot;, &quot;chebyshev&quot;, &quot;cheb_cholesky&quot;, &quot;aaa&quot;, &quot;cheb_stochastic&quot;} or None, default None</span></span></dt><dd><p><code class="docutils literal notranslate"><span class="pre">None</span></code> auto-selects (<code class="docutils literal notranslate"><span class="pre">aaa</span></code> for directed W, <code class="docutils literal notranslate"><span class="pre">cheb_cholesky</span></code> for
+symmetric, <code class="docutils literal notranslate"><span class="pre">eigenvalue</span></code> for small n).
+Method for the Kronecker-factored log-determinant.</p>
+</dd>
+<dt><span class="sig-name descname">robust</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)">bool</a>, default False</span></span></dt><dd><p>If True, replace the Normal error with Student-t for robustness
+to heavy-tailed outliers.  The degrees of freedom <span class="math notranslate nohighlight">\(\nu\)</span> are
+<strong>fixed</strong> at <code class="docutils literal notranslate"><span class="pre">priors[&quot;nu&quot;]</span></code> (default 4, LeSage’s <code class="docutils literal notranslate"><span class="pre">rval</span></code>).</p>
+</dd>
+<dt><span class="sig-name descname">symmetric_xo_xd</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)">bool</a>, optional</span></span></dt><dd><p>If <code class="docutils literal notranslate"><span class="pre">None</span></code> (default), origin and destination design blocks are
+compared and symmetry is auto-detected.</p>
+</dd>
+<dt><span class="sig-name descname">priors</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)">dict</a>, optional</span></span></dt><dd><p><p>Override default priors. Supported keys:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">beta_mu</span></code> : float, default 0.0 — Normal prior mean for <code class="docutils literal notranslate"><span class="pre">beta</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">beta_sigma</span></code> : float, default 1e6 — Normal prior std for <code class="docutils literal notranslate"><span class="pre">beta</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">sigma_sigma</span></code> : float, default 10.0 — HalfNormal prior std for <code class="docutils literal notranslate"><span class="pre">sigma</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">lam_lower</span></code> : float, default -0.999 — Lower bound of Uniform prior on <code class="docutils literal notranslate"><span class="pre">lam_d</span></code> and <code class="docutils literal notranslate"><span class="pre">lam_o</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">lam_upper</span></code> : float, default 0.999 — Upper bound of Uniform prior on <code class="docutils literal notranslate"><span class="pre">lam_d</span></code> and <code class="docutils literal notranslate"><span class="pre">lam_o</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">nu</span></code> : float, default 4.0 — Fixed Student-t degrees of freedom (only when <code class="docutils literal notranslate"><span class="pre">robust=True</span></code>).</p></li>
+</ul>
+</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">restrict_positive</span></code> argument inherited from <code class="xref py py-class docutils literal notranslate"><span class="pre">FlowPanelModel</span></code>
+has no effect on this class — separable variants always use Uniform
+priors on the individual <span class="math notranslate nohighlight">\(\lambda\)</span> components.</p>
+<dl class="py method objdesc">
+<dt class="sig sig-object highlight py" id="neighbayes.models.SEMFlowSeparablePanel.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.__init__.y" title="neighbayes.models.SEMFlowSeparablePanel.__init__.y (Python parameter) — Stacked panel response in shape (T, n, n), (T, n^2), or (n^2 * T,)."><span class="n"><span class="pre">y</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.__init__.X" title="neighbayes.models.SEMFlowSeparablePanel.__init__.X (Python parameter) — Stacked panel design matrix in time-first order."><span class="n"><span class="pre">X</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.__init__.W" title="neighbayes.models.SEMFlowSeparablePanel.__init__.W (Python parameter) — Row-standardized graph on n units."><span class="n"><span class="pre">W</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.__init__.T" title="neighbayes.models.SEMFlowSeparablePanel.__init__.T (Python parameter) — Number of panel periods (must be a positive integer)."><span class="n"><span class="pre">T</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">**</span></span><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel" title="neighbayes.models.SEMFlowSeparablePanel.__init__.kwargs (Python parameter)"><span class="n"><span class="pre">kwargs</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/flow_panel/_panel.py#L2058-L2068"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.__init__" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<p class="rubric">Methods</p>
+<table class="autosummary longtable docutils data align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.__init__" title="neighbayes.models.SEMFlowSeparablePanel.__init__ (Python method)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>(y, X, W, T, **kwargs)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.fit" title="neighbayes.models.SEMFlowSeparablePanel.fit (Python method) — Draw samples from the posterior via PyMC NUTS."><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit</span></code></a>([draws, tune, chains, random_seed, ...])</p></td>
+<td><p>Draw samples from the posterior via PyMC NUTS.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.fitted_values" title="neighbayes.models.SEMFlowSeparablePanel.fitted_values (Python method) — Return fitted values at posterior mean parameters."><code class="xref py py-obj docutils literal notranslate"><span class="pre">fitted_values</span></code></a>()</p></td>
+<td><p>Return fitted values at posterior mean parameters.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.posterior_predictive" title="neighbayes.models.SEMFlowSeparablePanel.posterior_predictive (Python method) — Draw posterior-predictive samples y_rep for the full panel stack."><code class="xref py py-obj docutils literal notranslate"><span class="pre">posterior_predictive</span></code></a>([n_draws, random_seed])</p></td>
+<td><p>Draw posterior-predictive samples <code class="docutils literal notranslate"><span class="pre">y_rep</span></code> for the full panel stack.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.residuals" title="neighbayes.models.SEMFlowSeparablePanel.residuals (Python method) — Return residuals y - fitted_values."><code class="xref py py-obj docutils literal notranslate"><span class="pre">residuals</span></code></a>()</p></td>
+<td><p>Return residuals <code class="docutils literal notranslate"><span class="pre">y</span> <span class="pre">-</span> <span class="pre">fitted_values</span></code>.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics" title="neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics (Python method) — Run Bayesian LM specification tests and return a summary table."><code class="xref py py-obj docutils literal notranslate"><span class="pre">spatial_diagnostics</span></code></a>()</p></td>
+<td><p>Run Bayesian LM specification tests and return a summary table.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision" title="neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision (Python method) — Return a model-selection decision from Bayesian LM test results."><code class="xref py py-obj docutils literal notranslate"><span class="pre">spatial_diagnostics_decision</span></code></a>([alpha, format])</p></td>
+<td><p>Return a model-selection decision from Bayesian LM test results.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.spatial_effects" title="neighbayes.models.SEMFlowSeparablePanel.spatial_effects (Python method) — Summarize posterior origin/destination/intra/network/total effects."><code class="xref py py-obj docutils literal notranslate"><span class="pre">spatial_effects</span></code></a>([draws, ...])</p></td>
+<td><p>Summarize posterior origin/destination/intra/network/total effects.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.summary" title="neighbayes.models.SEMFlowSeparablePanel.summary (Python method) — Return posterior summary table."><code class="xref py py-obj docutils literal notranslate"><span class="pre">summary</span></code></a>([var_names])</p></td>
+<td><p>Return posterior summary table.</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Attributes</p>
+<table class="autosummary longtable docutils data align-default">
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.inference_data" title="neighbayes.models.SEMFlowSeparablePanel.inference_data (Python property) — Return the ArviZ InferenceData from the most recent fit."><code class="xref py py-obj docutils literal notranslate"><span class="pre">inference_data</span></code></a></p></td>
+<td><p>Return the ArviZ InferenceData from the most recent fit.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.pymc_model" title="neighbayes.models.SEMFlowSeparablePanel.pymc_model (Python property) — Return the PyMC model object built for the most recent fit."><code class="xref py py-obj docutils literal notranslate"><span class="pre">pymc_model</span></code></a></p></td>
+<td><p>Return the PyMC model object built for the most recent fit.</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py method objdesc">
+<dt class="sig sig-object highlight sig-wrap py" id="neighbayes.models.SEMFlowSeparablePanel.fit">
+<span class="sig-name descname"><span class="pre">fit</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.fit.draws" title="neighbayes.models.SEMFlowSeparablePanel.fit.draws (Python parameter) — Number of posterior samples per chain (after tuning)."><span class="n"><span class="pre">draws</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">2000</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.fit.tune" title="neighbayes.models.SEMFlowSeparablePanel.fit.tune (Python parameter) — Number of tuning (warm-up) steps per chain."><span class="n"><span class="pre">tune</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">1000</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.fit.chains" title="neighbayes.models.SEMFlowSeparablePanel.fit.chains (Python parameter) — Number of parallel chains."><span class="n"><span class="pre">chains</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">4</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.fit.random_seed" title="neighbayes.models.SEMFlowSeparablePanel.fit.random_seed (Python parameter) — Seed for reproducibility."><span class="n"><span class="pre">random_seed</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.fit.store_lambda" title="neighbayes.models.SEMFlowSeparablePanel.fit.store_lambda (Python parameter) — If True, include the high-dimensional fitted mean lambda in the stored posterior."><span class="n"><span class="pre">store_lambda</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.fit.idata_kwargs" title="neighbayes.models.SEMFlowSeparablePanel.fit.idata_kwargs (Python parameter) — Forwarded to pm.sample."><span class="n"><span class="pre">idata_kwargs</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.fit.progressbar" title="neighbayes.models.SEMFlowSeparablePanel.fit.progressbar (Python parameter) — Show progress bar during sampling."><span class="n"><span class="pre">progressbar</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">True</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">**</span></span><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.fit.sample_kwargs" title="neighbayes.models.SEMFlowSeparablePanel.fit.sample_kwargs (Python parameter) — Additional keyword arguments forwarded to pm.sample. Pass target_accept=0.95 to adjust the NUTS acceptance rate."><span class="n"><span class="pre">sample_kwargs</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_mixins/_flow_shared.py#L92-L170"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.fit" title="Link to this definition">¶</a></dt>
+<dd><p>Draw samples from the posterior via PyMC NUTS.</p>
+<dl class="field-list simple">
+<dt class="field-odd" id="neighbayes.models.SEMFlowSeparablePanel.fit-parameters">Parameters<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.fit-parameters" title="Permalink to this headline">¶</a></dt>
+<dd class="field-odd"><dl class="simple api-field highlight">
+<dt id="neighbayes.models.SEMFlowSeparablePanel.fit.draws"><span class="sig-name descname">draws</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a>, default 2000</span></span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.fit.draws" title="Permalink to this definition">¶</a></dt><dd><p>Number of posterior samples per chain (after tuning).</p>
+</dd>
+<dt id="neighbayes.models.SEMFlowSeparablePanel.fit.tune"><span class="sig-name descname">tune</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a>, default 1000</span></span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.fit.tune" title="Permalink to this definition">¶</a></dt><dd><p>Number of tuning (warm-up) steps per chain.</p>
+</dd>
+<dt id="neighbayes.models.SEMFlowSeparablePanel.fit.chains"><span class="sig-name descname">chains</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a>, default 4</span></span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.fit.chains" title="Permalink to this definition">¶</a></dt><dd><p>Number of parallel chains.</p>
+</dd>
+<dt id="neighbayes.models.SEMFlowSeparablePanel.fit.random_seed"><span class="sig-name descname">random_seed</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.fit.random_seed" title="Permalink to this definition">¶</a></dt><dd><p>Seed for reproducibility.</p>
+</dd>
+<dt id="neighbayes.models.SEMFlowSeparablePanel.fit.store_lambda"><span class="sig-name descname">store_lambda</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)">bool</a>, default False</span></span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.fit.store_lambda" title="Permalink to this definition">¶</a></dt><dd><p>If True, include the high-dimensional fitted mean <code class="docutils literal notranslate"><span class="pre">lambda</span></code> in the
+stored posterior. Leaving this False reduces memory and conversion
+overhead for NB flow models.</p>
+</dd>
+<dt id="neighbayes.models.SEMFlowSeparablePanel.fit.idata_kwargs"><span class="sig-name descname">idata_kwargs</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)">dict</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.fit.idata_kwargs" title="Permalink to this definition">¶</a></dt><dd><p>Forwarded to <code class="docutils literal notranslate"><span class="pre">pm.sample</span></code>.  Defaults to
+<code class="docutils literal notranslate"><span class="pre">{&quot;log_likelihood&quot;:</span> <span class="pre">True}</span></code> so that <code class="docutils literal notranslate"><span class="pre">az.loo</span></code> / <code class="docutils literal notranslate"><span class="pre">az.waic</span></code> /
+<code class="docutils literal notranslate"><span class="pre">az.compare</span></code> work out of the box; for SAR flow variants the
+captured Gaussian log-likelihood is post-processed to add the
+Jacobian contribution from <code class="docutils literal notranslate"><span class="pre">log|I_N</span> <span class="pre">-</span> <span class="pre">rho_d</span> <span class="pre">W_d</span> <span class="pre">-</span> <span class="pre">rho_o</span> <span class="pre">W_o</span>
+<span class="pre">-</span> <span class="pre">rho_w</span> <span class="pre">W_w|</span></code>.</p>
+</dd>
+<dt id="neighbayes.models.SEMFlowSeparablePanel.fit.progressbar"><span class="sig-name descname">progressbar</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)">bool</a>, default True</span></span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.fit.progressbar" title="Permalink to this definition">¶</a></dt><dd><p>Show progress bar during sampling.</p>
+</dd>
+<dt id="neighbayes.models.SEMFlowSeparablePanel.fit.sample_kwargs"><span class="o">**</span><span class="n sig-name">sample_kwargs</span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.fit.sample_kwargs" title="Permalink to this definition">¶</a></dt><dd><p>Additional keyword arguments forwarded to <code class="docutils literal notranslate"><span class="pre">pm.sample</span></code>.
+Pass <code class="docutils literal notranslate"><span class="pre">target_accept=0.95</span></code> to adjust the NUTS acceptance rate.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even" id="neighbayes.models.SEMFlowSeparablePanel.fit-return-type">Return type<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.fit-return-type" title="Permalink to this headline">¶</a></dt>
+<dd class="field-even"><p>arviz.InferenceData</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method objdesc">
+<dt class="sig sig-object highlight py" id="neighbayes.models.SEMFlowSeparablePanel.fitted_values">
+<span class="sig-name descname"><span class="pre">fitted_values</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L957-L967"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.fitted_values" title="Link to this definition">¶</a></dt>
+<dd><p>Return fitted values at posterior mean parameters.</p>
+<dl class="field-list simple">
+<dt class="field-odd" id="neighbayes.models.SEMFlowSeparablePanel.fitted_values-returns">Returns<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.fitted_values-returns" title="Permalink to this headline">¶</a></dt>
+<dd class="field-odd"><p>Posterior-mean fitted values (on the model’s native scale;
+fixed-effects-transformed for panel models).</p>
+</dd>
+<dt class="field-even" id="neighbayes.models.SEMFlowSeparablePanel.fitted_values-return-type">Return type<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.fitted_values-return-type" title="Permalink to this headline">¶</a></dt>
+<dd class="field-even"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property objdesc">
+<dt class="sig sig-object highlight sig-wrap py" id="neighbayes.models.SEMFlowSeparablePanel.inference_data">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">inference_data</span></span><span class="p"> <span class="pre">:</span> </span><span class="desctype"><span class="pre">arviz.data.inference_data.InferenceData</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models.py"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.inference_data" title="Link to this definition">¶</a></dt>
+<dd><p>Return the ArviZ InferenceData from the most recent fit.</p>
+<dl class="field-list simple">
+<dt class="field-odd" id="neighbayes.models.SEMFlowSeparablePanel.inference_data-returns">Returns<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.inference_data-returns" title="Permalink to this headline">¶</a></dt>
+<dd class="field-odd"><p>The inference data object, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if the model has not
+been fit yet.</p>
+</dd>
+<dt class="field-even" id="neighbayes.models.SEMFlowSeparablePanel.inference_data-return-type">Return type<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.inference_data-return-type" title="Permalink to this headline">¶</a></dt>
+<dd class="field-even"><p>arviz.InferenceData or None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method objdesc">
+<dt class="sig sig-object highlight py" id="neighbayes.models.SEMFlowSeparablePanel.posterior_predictive">
+<span class="sig-name descname"><span class="pre">posterior_predictive</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.posterior_predictive.n_draws" title="neighbayes.models.SEMFlowSeparablePanel.posterior_predictive.n_draws (Python parameter) — Number of posterior draws to use."><span class="n"><span class="pre">n_draws</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.posterior_predictive.random_seed" title="neighbayes.models.SEMFlowSeparablePanel.posterior_predictive.random_seed (Python parameter) — Seed for the posterior-predictive sampler."><span class="n"><span class="pre">random_seed</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/flow_panel/_panel.py#L440-L494"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.posterior_predictive" title="Link to this definition">¶</a></dt>
+<dd><p>Draw posterior-predictive samples <code class="docutils literal notranslate"><span class="pre">y_rep</span></code> for the full panel stack.</p>
+<dl class="field-list simple">
+<dt class="field-odd" id="neighbayes.models.SEMFlowSeparablePanel.posterior_predictive-parameters">Parameters<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.posterior_predictive-parameters" title="Permalink to this headline">¶</a></dt>
+<dd class="field-odd"><dl class="simple api-field highlight">
+<dt id="neighbayes.models.SEMFlowSeparablePanel.posterior_predictive.n_draws"><span class="sig-name descname">n_draws</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.posterior_predictive.n_draws" title="Permalink to this definition">¶</a></dt><dd><p>Number of posterior draws to use.  Defaults to all.</p>
+</dd>
+<dt id="neighbayes.models.SEMFlowSeparablePanel.posterior_predictive.random_seed"><span class="sig-name descname">random_seed</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)">int</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.posterior_predictive.random_seed" title="Permalink to this definition">¶</a></dt><dd><p>Seed for the posterior-predictive sampler.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even" id="neighbayes.models.SEMFlowSeparablePanel.posterior_predictive-returns">Returns<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.posterior_predictive-returns" title="Permalink to this headline">¶</a></dt>
+<dd class="field-even"><p>Array of shape <code class="docutils literal notranslate"><span class="pre">(n_draws,</span> <span class="pre">N_flow</span> <span class="pre">*</span> <span class="pre">T)</span></code> with posterior-predictive
+flows in time-first stacked order.</p>
+</dd>
+<dt class="field-odd" id="neighbayes.models.SEMFlowSeparablePanel.posterior_predictive-return-type">Return type<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.posterior_predictive-return-type" title="Permalink to this headline">¶</a></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py property objdesc">
+<dt class="sig sig-object highlight py" id="neighbayes.models.SEMFlowSeparablePanel.pymc_model">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">pymc_model</span></span><span class="p"> <span class="pre">:</span> </span><span class="desctype"><a class="reference external" href="https://www.pymc.io/projects/docs/en/stable/api/model/generated/pymc.model.core.Model.html#pymc.model.core.Model" title="(in PyMC v6.3.2)"><span class="pre">pymc.model.core.Model</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/library/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models.py"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.pymc_model" title="Link to this definition">¶</a></dt>
+<dd><p>Return the PyMC model object built for the most recent fit.</p>
+<dl class="field-list simple">
+<dt class="field-odd" id="neighbayes.models.SEMFlowSeparablePanel.pymc_model-returns">Returns<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.pymc_model-returns" title="Permalink to this headline">¶</a></dt>
+<dd class="field-odd"><p>The model object used by <a class="reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.fit" title="neighbayes.models.SEMFlowSeparablePanel.fit (Python method) — Draw samples from the posterior via PyMC NUTS."><code class="xref py py-meth docutils literal notranslate"><span class="pre">fit()</span></code></a>, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if the instance
+has not been fit yet.</p>
+</dd>
+<dt class="field-even" id="neighbayes.models.SEMFlowSeparablePanel.pymc_model-return-type">Return type<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.pymc_model-return-type" title="Permalink to this headline">¶</a></dt>
+<dd class="field-even"><p>pymc.Model or None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method objdesc">
+<dt class="sig sig-object highlight py" id="neighbayes.models.SEMFlowSeparablePanel.residuals">
+<span class="sig-name descname"><span class="pre">residuals</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L969-L979"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.residuals" title="Link to this definition">¶</a></dt>
+<dd><p>Return residuals <code class="docutils literal notranslate"><span class="pre">y</span> <span class="pre">-</span> <span class="pre">fitted_values</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd" id="neighbayes.models.SEMFlowSeparablePanel.residuals-returns">Returns<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.residuals-returns" title="Permalink to this headline">¶</a></dt>
+<dd class="field-odd"><p>Residual vector <code class="docutils literal notranslate"><span class="pre">y</span> <span class="pre">-</span> <span class="pre">fitted_values</span></code> on the same scale as
+<a class="reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.fitted_values" title="neighbayes.models.SEMFlowSeparablePanel.fitted_values (Python method) — Return fitted values at posterior mean parameters."><code class="xref py py-meth docutils literal notranslate"><span class="pre">fitted_values()</span></code></a>.</p>
+</dd>
+<dt class="field-even" id="neighbayes.models.SEMFlowSeparablePanel.residuals-return-type">Return type<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.residuals-return-type" title="Permalink to this headline">¶</a></dt>
+<dd class="field-even"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method objdesc">
+<dt class="sig sig-object highlight py" id="neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics">
+<span class="sig-name descname"><span class="pre">spatial_diagnostics</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L1583-L1653"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics" title="Link to this definition">¶</a></dt>
+<dd><p>Run Bayesian LM specification tests and return a summary table.</p>
+<p>Looks up the diagnostic suite registered for this model class
+and calls each test function on this fitted model, collecting the
+results into a tidy DataFrame.  The set of tests depends on the
+model type — for example, an OLS model runs LM-Lag, LM-Error,
+LM-SDM-Joint, and LM-SLX-Error-Joint, while an SAR model runs
+LM-Error, LM-WX, and Robust-LM-WX.  Panel models run the
+<code class="docutils literal notranslate"><span class="pre">Panel-</span></code>-prefixed analogues (e.g. Panel-LM-Lag).</p>
+<p>Requires the model to have been fit (<code class="docutils literal notranslate"><span class="pre">.fit()</span></code> called) and a
+spatial weights matrix <code class="docutils literal notranslate"><span class="pre">W</span></code> to have been supplied at construction
+time.</p>
+<dl class="field-list simple">
+<dt class="field-odd" id="neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics-returns">Returns<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics-returns" title="Permalink to this headline">¶</a></dt>
+<dd class="field-odd"><p><p>DataFrame indexed by test name with columns:</p>
+<table class="docutils data align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Column</p></th>
+<th class="head"><p>Description</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>statistic</p></td>
+<td><p>Posterior mean of the LM statistic</p></td>
+</tr>
+<tr class="row-odd"><td><p>median</p></td>
+<td><p>Posterior median of the LM statistic</p></td>
+</tr>
+<tr class="row-even"><td><p>df</p></td>
+<td><p>Degrees of freedom for the <span class="math notranslate nohighlight">\(\chi^2\)</span> reference</p></td>
+</tr>
+<tr class="row-odd"><td><p>p_value</p></td>
+<td><p>Bayesian p-value: <code class="docutils literal notranslate"><span class="pre">1</span> <span class="pre">-</span> <span class="pre">chi2.cdf(mean,</span> <span class="pre">df)</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p>ci_lower</p></td>
+<td><p>Lower bound of 95% credible interval (2.5%)</p></td>
+</tr>
+<tr class="row-odd"><td><p>ci_upper</p></td>
+<td><p>Upper bound of 95% credible interval (97.5%)</p></td>
+</tr>
+</tbody>
+</table>
+<p>The DataFrame has <code class="docutils literal notranslate"><span class="pre">attrs[&quot;model_type&quot;]</span></code> (class name) and
+<code class="docutils literal notranslate"><span class="pre">attrs[&quot;n_draws&quot;]</span></code> (total posterior draws) metadata.</p>
+</p>
+</dd>
+<dt class="field-even" id="neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics-return-type">Return type<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics-return-type" title="Permalink to this headline">¶</a></dt>
+<dd class="field-even"><p>pandas.DataFrame</p>
+</dd>
+<dt class="field-odd" id="neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics-raises">Raises<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics-raises" title="Permalink to this headline">¶</a></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the model has not been fit yet.</p></li>
+<li><p><a class="reference external" href="https://docs.python.org/3/library/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If no spatial weights matrix <code class="docutils literal notranslate"><span class="pre">W</span></code> was supplied.</p></li>
+</ul>
+</dd>
+</dl>
+<div class="seealso admonition">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><a class="reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision" title="neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision (Python method) — Return a model-selection decision from Bayesian LM test results."><code class="xref py py-obj docutils literal notranslate"><span class="pre">spatial_diagnostics_decision</span></code></a></dt><dd><p>Model-selection decision based on the test results.</p>
+</dd>
+<dt><a class="reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.spatial_effects" title="neighbayes.models.SEMFlowSeparablePanel.spatial_effects (Python method) — Summarize posterior origin/destination/intra/network/total effects."><code class="xref py py-obj docutils literal notranslate"><span class="pre">spatial_effects</span></code></a></dt><dd><p>Posterior inference for direct/indirect/total impacts.</p>
+</dd>
+</dl>
+</div>
+<p class="example rubric">Examples</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><code><span class="gp">&gt;&gt;&gt; </span><span class="n">ols</span> <span class="o">=</span> <span class="n">OLS</span><span class="p">(</span><span class="n">formula</span><span class="o">=</span><span class="s2">"price ~ income + crime"</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">df</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">w</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ols</span><span class="o">.</span><span class="n">fit</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">ols</span><span class="o">.</span><span class="n">spatial_diagnostics</span><span class="p">()</span>
+<span class="go">                 statistic  median  df  p_value  ci_lower  ci_upper</span>
+<span class="go">LM-Lag                3.21    2.98   1    0.073      0.12      8.54</span>
+<span class="go">LM-Error              5.67    5.34   1    0.017      0.34     12.10</span>
+<span class="go">LM-SDM-Joint          7.89    7.12   4    0.096      1.23     18.32</span>
+<span class="go">LM-SLX-Error-Joint    6.45    5.98   4    0.168      0.89     15.67</span>
+</code></pre></div>
+</div>
+</dd></dl>
+
+<dl class="py method objdesc">
+<dt class="sig sig-object highlight py" id="neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision">
+<span class="sig-name descname"><span class="pre">spatial_diagnostics_decision</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision.alpha" title="neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision.alpha (Python parameter) — Significance level for the Bayesian p-values."><span class="n"><span class="pre">alpha</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">0.05</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision.format" title="neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision.format (Python parameter) — Output format."><span class="n"><span class="pre">format</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="s1">'graphviz'</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_mixins/_flow_shared.py#L172-L224"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision" title="Link to this definition">¶</a></dt>
+<dd><p>Return a model-selection decision from Bayesian LM test results.</p>
+<p>Walks the flow decision tree using Bayesian p-values from
+<a class="reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics" title="neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics (Python method) — Run Bayesian LM specification tests and return a summary table."><code class="xref py py-meth docutils literal notranslate"><span class="pre">spatial_diagnostics()</span></code></a> and recommends either the OLS flow
+baseline (no spatial dependence detected) or the SAR flow model
+(at least one direction is significant).</p>
+<dl class="field-list simple">
+<dt class="field-odd" id="neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision-parameters">Parameters<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision-parameters" title="Permalink to this headline">¶</a></dt>
+<dd class="field-odd"><dl class="simple api-field highlight">
+<dt id="neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision.alpha"><span class="sig-name descname">alpha</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)">float</a>, default 0.05</span></span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision.alpha" title="Permalink to this definition">¶</a></dt><dd><p>Significance level for the Bayesian p-values.</p>
+</dd>
+<dt id="neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision.format"><span class="sig-name descname">format</span><span class="p"> : </span><span class="desctype"><span class="desctype">{&quot;graphviz&quot;, &quot;ascii&quot;, &quot;model&quot;}, default &quot;graphviz&quot;</span></span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision.format" title="Permalink to this definition">¶</a></dt><dd><p>Output format.  <code class="docutils literal notranslate"><span class="pre">&quot;model&quot;</span></code> returns the recommended model name
+string.  <code class="docutils literal notranslate"><span class="pre">&quot;ascii&quot;</span></code> returns an indented box-drawing tree.
+<code class="docutils literal notranslate"><span class="pre">&quot;graphviz&quot;</span></code> returns a <code class="xref py py-class docutils literal notranslate"><span class="pre">graphviz.Digraph</span></code> (with ASCII
+fallback if graphviz is not installed).</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even" id="neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision-return-type">Return type<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.spatial_diagnostics_decision-return-type" title="Permalink to this headline">¶</a></dt>
+<dd class="field-even"><p><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)">str</a> or graphviz.Digraph</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method objdesc">
+<dt class="sig sig-object highlight sig-wrap py" id="neighbayes.models.SEMFlowSeparablePanel.spatial_effects">
+<span class="sig-name descname"><span class="pre">spatial_effects</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.spatial_effects" title="neighbayes.models.SEMFlowSeparablePanel.spatial_effects.draws (Python parameter)"><span class="n"><span class="pre">draws</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.spatial_effects" title="neighbayes.models.SEMFlowSeparablePanel.spatial_effects.return_posterior_samples (Python parameter)"><span class="n"><span class="pre">return_posterior_samples</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.spatial_effects" title="neighbayes.models.SEMFlowSeparablePanel.spatial_effects.ci (Python parameter)"><span class="n"><span class="pre">ci</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">0.95</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.spatial_effects" title="neighbayes.models.SEMFlowSeparablePanel.spatial_effects.mode (Python parameter)"><span class="n"><span class="pre">mode</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="s1">'auto'</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/flow_panel/_panel.py#L311-L407"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.spatial_effects" title="Link to this definition">¶</a></dt>
+<dd><p>Summarize posterior origin/destination/intra/network/total effects.</p>
+<p>See <code class="xref py py-meth docutils literal notranslate"><span class="pre">neighbayes.models.flow.FlowModel.spatial_effects()</span></code> for the
+<code class="docutils literal notranslate"><span class="pre">mode</span></code> semantics (auto / combined / separate destination-origin
+sides per Thomas-Agnan &amp; LeSage 2014, §83.5.2).</p>
+</dd></dl>
+
+<dl class="py method objdesc">
+<dt class="sig sig-object highlight py" id="neighbayes.models.SEMFlowSeparablePanel.summary">
+<span class="sig-name descname"><span class="pre">summary</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.summary.var_names" title="neighbayes.models.SEMFlowSeparablePanel.summary.var_names (Python parameter) — Variable names to include in the summary."><span class="n"><span class="pre">var_names</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">**</span></span><a class="n reference internal" href="#neighbayes.models.SEMFlowSeparablePanel.summary.kwargs" title="neighbayes.models.SEMFlowSeparablePanel.summary.kwargs (Python parameter) — Additional arguments passed to arviz.summary()."><span class="n"><span class="pre">kwargs</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L938-L955"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.summary" title="Link to this definition">¶</a></dt>
+<dd><p>Return posterior summary table.</p>
+<dl class="field-list simple">
+<dt class="field-odd" id="neighbayes.models.SEMFlowSeparablePanel.summary-parameters">Parameters<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.summary-parameters" title="Permalink to this headline">¶</a></dt>
+<dd class="field-odd"><dl class="simple api-field highlight">
+<dt id="neighbayes.models.SEMFlowSeparablePanel.summary.var_names"><span class="sig-name descname">var_names</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#list" title="(in Python v3.14)">list</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.summary.var_names" title="Permalink to this definition">¶</a></dt><dd><p>Variable names to include in the summary.</p>
+</dd>
+<dt id="neighbayes.models.SEMFlowSeparablePanel.summary.kwargs"><span class="o">**</span><span class="n sig-name">kwargs</span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.summary.kwargs" title="Permalink to this definition">¶</a></dt><dd><p>Additional arguments passed to <code class="xref py py-func docutils literal notranslate"><span class="pre">arviz.summary()</span></code>.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even" id="neighbayes.models.SEMFlowSeparablePanel.summary-returns">Returns<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.summary-returns" title="Permalink to this headline">¶</a></dt>
+<dd class="field-even"><p>Posterior summary statistics.</p>
+</dd>
+<dt class="field-odd" id="neighbayes.models.SEMFlowSeparablePanel.summary-return-type">Return type<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SEMFlowSeparablePanel.summary-return-type" title="Permalink to this headline">¶</a></dt>
+<dd class="field-odd"><p>pandas.DataFrame</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  
+  
+  <div class="md-footer-meta md-typeset">
+    
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-footer-copyright__highlight">
+        &#169; Copyright 2018-, pysal developers.
+        
+    </div>
+  
+    Created using
+    <a href="https://www.sphinx-doc.org/" target="_blank" rel="noopener">Sphinx</a>
+    8.2.3.
+     and
+    <a href="https://github.com/jbms/sphinx-immaterial/" target="_blank" rel="noopener">Sphinx-Immaterial</a>
+  
+</div>
+      
+    </div>
+    
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.sections", "navigation.top", "search.share", "search.suggest", "toc.follow", "toc.sticky", "content.code.copy", "content.action.edit"], "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike", "staticVersions": null, "versionPath": "https://pysal.org/neighbayes/versions.json"}}</script>
+    
+      
+        <script src="../_static/sphinx_immaterial_theme.32136f45f91ae6956.min.js?v=a7a9472a"></script>
+        <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+        <script src="../_static/copybutton.js?v=f281be69"></script>
+        <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+        <script id="MathJax-script" src="../_static/mathjax/tex-mml-chtml.js"></script>
+    
+  </body>
+</html>

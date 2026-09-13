@@ -1,0 +1,6 @@
+﻿neighbayes.dgp.simulate\_panel\_sdem\_dynamic\_fe
+=================================================
+
+.. currentmodule:: neighbayes.dgp
+
+.. autofunction:: simulate_panel_sdem_dynamic_fe

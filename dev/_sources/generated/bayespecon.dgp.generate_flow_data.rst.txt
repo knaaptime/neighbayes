@@ -1,6 +1,0 @@
-﻿bayespecon.dgp.generate\_flow\_data
-===================================
-
-.. currentmodule:: bayespecon.dgp
-
-.. autofunction:: generate_flow_data

@@ -1,6 +1,0 @@
-﻿bayespecon.dgp.generate\_panel\_sem\_flow\_data\_separable
-==========================================================
-
-.. currentmodule:: bayespecon.dgp
-
-.. autofunction:: generate_panel_sem_flow_data_separable

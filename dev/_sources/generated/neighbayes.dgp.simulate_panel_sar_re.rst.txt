@@ -1,0 +1,6 @@
+﻿neighbayes.dgp.simulate\_panel\_sar\_re
+=======================================
+
+.. currentmodule:: neighbayes.dgp
+
+.. autofunction:: simulate_panel_sar_re

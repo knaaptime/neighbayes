@@ -1,0 +1,6 @@
+﻿neighbayes.dgp.generate\_panel\_flow\_data
+==========================================
+
+.. currentmodule:: neighbayes.dgp
+
+.. autofunction:: generate_panel_flow_data

@@ -1,0 +1,39 @@
+﻿neighbayes.models.priors.PanelSDMUDynamicPriors
+===============================================
+
+.. currentmodule:: neighbayes.models.priors
+
+.. autoclass:: PanelSDMUDynamicPriors
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~PanelSDMUDynamicPriors.__init__
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~PanelSDMUDynamicPriors.beta_mu
+      ~PanelSDMUDynamicPriors.beta_sigma
+      ~PanelSDMUDynamicPriors.nu
+      ~PanelSDMUDynamicPriors.phi_lower
+      ~PanelSDMUDynamicPriors.phi_upper
+      ~PanelSDMUDynamicPriors.rho_lower
+      ~PanelSDMUDynamicPriors.rho_upper
+      ~PanelSDMUDynamicPriors.sigma2_alpha
+      ~PanelSDMUDynamicPriors.sigma2_beta
+      ~PanelSDMUDynamicPriors.sigma_sigma
+      ~PanelSDMUDynamicPriors.theta_lower
+      ~PanelSDMUDynamicPriors.theta_upper
+   
+   

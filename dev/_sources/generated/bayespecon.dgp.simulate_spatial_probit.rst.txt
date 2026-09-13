@@ -1,6 +1,0 @@
-﻿bayespecon.dgp.simulate\_spatial\_probit
-========================================
-
-.. currentmodule:: bayespecon.dgp
-
-.. autofunction:: simulate_spatial_probit

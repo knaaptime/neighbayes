@@ -1,6 +1,0 @@
-﻿bayespecon.graph.destination\_weights
-=====================================
-
-.. currentmodule:: bayespecon.graph
-
-.. autofunction:: destination_weights

@@ -1,0 +1,37 @@
+﻿neighbayes.models.SARNegBinFlowPanel
+====================================
+
+.. currentmodule:: neighbayes.models
+
+.. autoclass:: SARNegBinFlowPanel
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SARNegBinFlowPanel.__init__
+      ~SARNegBinFlowPanel.fit
+      ~SARNegBinFlowPanel.fitted_values
+      ~SARNegBinFlowPanel.posterior_predictive
+      ~SARNegBinFlowPanel.residuals
+      ~SARNegBinFlowPanel.spatial_diagnostics
+      ~SARNegBinFlowPanel.spatial_diagnostics_decision
+      ~SARNegBinFlowPanel.spatial_effects
+      ~SARNegBinFlowPanel.summary
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SARNegBinFlowPanel.inference_data
+      ~SARNegBinFlowPanel.pymc_model
+   
+   

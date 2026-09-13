@@ -1,6 +1,0 @@
-﻿bayespecon.graph.flow\_design\_matrix\_asymmetric
-=================================================
-
-.. currentmodule:: bayespecon.graph
-
-.. autofunction:: flow_design_matrix_asymmetric

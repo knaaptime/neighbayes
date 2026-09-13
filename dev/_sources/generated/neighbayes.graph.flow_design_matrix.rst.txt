@@ -1,0 +1,6 @@
+﻿neighbayes.graph.flow\_design\_matrix
+=====================================
+
+.. currentmodule:: neighbayes.graph
+
+.. autofunction:: flow_design_matrix

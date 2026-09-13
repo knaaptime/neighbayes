@@ -1,0 +1,36 @@
+﻿neighbayes.models.priors.PanelSDEMREPriors
+==========================================
+
+.. currentmodule:: neighbayes.models.priors
+
+.. autoclass:: PanelSDEMREPriors
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~PanelSDEMREPriors.__init__
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~PanelSDEMREPriors.beta_mu
+      ~PanelSDEMREPriors.beta_sigma
+      ~PanelSDEMREPriors.lam_lower
+      ~PanelSDEMREPriors.lam_upper
+      ~PanelSDEMREPriors.nu
+      ~PanelSDEMREPriors.sigma2_alpha
+      ~PanelSDEMREPriors.sigma2_beta
+      ~PanelSDEMREPriors.sigma_alpha_sigma
+      ~PanelSDEMREPriors.sigma_sigma
+   
+   

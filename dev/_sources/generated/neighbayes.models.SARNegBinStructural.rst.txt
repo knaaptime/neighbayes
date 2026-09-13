@@ -1,0 +1,36 @@
+﻿neighbayes.models.SARNegBinStructural
+=====================================
+
+.. currentmodule:: neighbayes.models
+
+.. autoclass:: SARNegBinStructural
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SARNegBinStructural.__init__
+      ~SARNegBinStructural.fit
+      ~SARNegBinStructural.fitted_values
+      ~SARNegBinStructural.residuals
+      ~SARNegBinStructural.spatial_diagnostics
+      ~SARNegBinStructural.spatial_diagnostics_decision
+      ~SARNegBinStructural.spatial_effects
+      ~SARNegBinStructural.summary
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SARNegBinStructural.inference_data
+      ~SARNegBinStructural.pymc_model
+   
+   

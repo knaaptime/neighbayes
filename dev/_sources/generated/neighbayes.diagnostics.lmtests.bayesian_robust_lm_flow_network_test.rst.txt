@@ -1,0 +1,6 @@
+﻿neighbayes.diagnostics.lmtests.bayesian\_robust\_lm\_flow\_network\_test
+========================================================================
+
+.. currentmodule:: neighbayes.diagnostics.lmtests
+
+.. autofunction:: bayesian_robust_lm_flow_network_test

@@ -1,0 +1,253 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "0",
+   "metadata": {},
+   "source": [
+    "# How to estimate spatial negative binomial models\n",
+    "\n",
+    "Overdispersed counts with spatial dependence. `SARNegBin` is the reduced form\n",
+    "and the default choice; `SARNegBinStructural` adds an explicit latent noise\n",
+    "term and a `sigma` parameter, at a large cost in mixing.\n",
+    "\n",
+    "Both sample by Pólya–Gamma Gibbs, which `fit()` selects for you; `SARNegBin`\n",
+    "also has a NUTS path. Equations and constructor arguments are in\n",
+    "[Supported Models](../models.md)."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "1",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import contextlib\n",
+    "import io\n",
+    "import time\n",
+    "\n",
+    "import arviz as az\n",
+    "import pandas as pd\n",
+    "\n",
+    "from neighbayes.dgp import simulate_sar_negbin\n",
+    "from neighbayes.models import SARNegBin, SARNegBinStructural"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "2",
+   "metadata": {},
+   "source": [
+    "## Simulate a known process\n",
+    "\n",
+    "`simulate_sar_negbin` builds a square grid of side `n`, so `n=25` gives 625\n",
+    "observations. As with the spatial logit models, $\\rho$ in a count model is\n",
+    "weakly identified at small $n$ — a few hundred units is the floor for the\n",
+    "spatial parameter to be recoverable at all."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "3",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "RHO_TRUE, ALPHA_TRUE = 0.4, 2.0\n",
+    "\n",
+    "data = simulate_sar_negbin(n=25, rho=RHO_TRUE, seed=1)\n",
+    "y, X, W = data[\"y\"], data[\"X\"], data[\"W_graph\"]\n",
+    "\n",
+    "print(f\"observations   : {len(y)}\")\n",
+    "print(f\"true parameters: {data['params_true']}\")\n",
+    "print(f\"mean count     : {y.mean():.2f}\")\n",
+    "print(f\"variance       : {y.var():.2f}   (>> mean: overdispersed, as intended)\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "4",
+   "metadata": {},
+   "source": [
+    "## Fit the reduced-form model"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "5",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def fit_timed(model, **kw):\n",
+    "    start = time.perf_counter()\n",
+    "    with (\n",
+    "        contextlib.redirect_stdout(io.StringIO()),\n",
+    "        contextlib.redirect_stderr(io.StringIO()),\n",
+    "    ):\n",
+    "        idata = model.fit(progressbar=False, **kw)\n",
+    "    return idata, time.perf_counter() - start\n",
+    "\n",
+    "\n",
+    "COMMON = dict(draws=1500, tune=800, chains=4, random_seed=1)\n",
+    "\n",
+    "idata_gibbs, secs_gibbs = fit_timed(SARNegBin(y=y, X=X, W=W), **COMMON)\n",
+    "az.summary(idata_gibbs, var_names=[\"rho\", \"beta\", \"alpha\"]).round(3)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "6",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "print(f\"rho   : {float(idata_gibbs.posterior['rho'].mean()):.3f}   (true {RHO_TRUE})\")\n",
+    "print(\n",
+    "    f\"alpha : {float(idata_gibbs.posterior['alpha'].mean()):.3f}   (true {ALPHA_TRUE})\"\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "7",
+   "metadata": {},
+   "source": [
+    "The dispersion parameter recovers tightly. $\\rho$ recovers to within its\n",
+    "posterior standard deviation — read the interval, not the point."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "15",
+   "metadata": {},
+   "source": [
+    "## Configure the sampler\n",
+    "\n",
+    "`gibbs_backend` is `\"auto\"` (JAX when installed, else NumPy), `\"jax\"`, or\n",
+    "`\"numpy\"`, as elsewhere in the package. The count families accept these\n",
+    "additional options; anything else raises `TypeError`.\n",
+    "\n",
+    "| Option | `SARNegBin` | `SARNegBinStructural` | Meaning |\n",
+    "|---|---|---|---|\n",
+    "| `slice_width` | ✅ | — | initial slice interval for ρ |\n",
+    "| `init_jitter` | ✅ | — | dispersion of the chain starting points around the GLM warm start |\n",
+    "| `n_rho_omega_cycles` | ✅ | — | how many ρ/ω sub-sweeps per iteration |\n",
+    "| `krylov_degree`, `krylov_dmax` | ✅ | ✅ | shift-invert Krylov basis for the ρ conditional |\n",
+    "| `krylov_reuse` | ✅ | — | reuse that basis across draws |\n",
+    "| `timeout` | ✅ | — | abort a run exceeding this many seconds |\n",
+    "| `lanczos_deg`, `n_probes` | — | ✅ | stochastic log-determinant depth and probe count |\n",
+    "| `pg_n_terms` | — | ✅ | truncation of the Pólya–Gamma series |\n",
+    "| `return_eta` | — | ✅ | keep the latent field in the returned `InferenceData` |"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "16",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "idata_tuned, _ = fit_timed(\n",
+    "    SARNegBin(y=y, X=X, W=W),\n",
+    "    gibbs_backend=\"numpy\",\n",
+    "    slice_width=0.3,\n",
+    "    init_jitter=0.5,\n",
+    "    krylov_reuse=True,\n",
+    "    draws=800,\n",
+    "    tune=500,\n",
+    "    chains=2,\n",
+    "    random_seed=7,\n",
+    ")\n",
+    "print(\n",
+    "    f\"rho = {float(idata_tuned.posterior['rho'].mean()):.3f}, \"\n",
+    "    f\"ess = {float(az.ess(idata_tuned, var_names=['rho'])['rho']):.0f}\"\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "17",
+   "metadata": {},
+   "source": [
+    "## Is the negative binomial the right likelihood?\n",
+    "\n",
+    "The dispersion parameter answers this. $\\alpha \\to \\infty$ *is* the Poisson, so\n",
+    "a posterior for `alpha` that is large and poorly determined says the data carry\n",
+    "no conditional overdispersion for the extra parameter to fit."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "18",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "alpha = idata_gibbs.posterior[\"alpha\"]\n",
+    "print(f\"alpha: mean {float(alpha.mean()):.2f}, sd {float(alpha.std()):.2f}\")\n",
+    "print(\n",
+    "    f\"94% HDI: {az.hdi(idata_gibbs, var_names=['alpha'], hdi_prob=0.94)['alpha'].values.round(2)}\"\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "19",
+   "metadata": {},
+   "source": [
+    "Here `alpha` is tightly determined near its true value of 2, so the\n",
+    "negative binomial is earning its parameter.\n",
+    "\n",
+    ":::{caution} Do not approximate a Poisson by fixing `alpha` large\n",
+    "It is tempting to reach for a big fixed `alpha` when you want Poisson\n",
+    "behaviour. That is the one regime where PG augmentation degenerates: the\n",
+    "working precision $E[\\omega]$ diverges while the marginal Fisher information\n",
+    "stays at $\\mu$, and effective sample size collapses — measured here as ESS on\n",
+    "$\\beta$ falling from 57 at $\\alpha = 10$ to 3 at $\\alpha = 10^4$, with\n",
+    "$\\hat R = 1.80$. Use a real Poisson sampler instead; the flow case is covered in\n",
+    "[How to estimate Poisson origin–destination flow models](poisson_flow.ipynb).\n",
+    ":::"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "20",
+   "metadata": {},
+   "source": [
+    "## See also\n",
+    "\n",
+    "- [How to fit zero-inflated SAR negative binomial models](zinb_estimation.ipynb)\n",
+    "  — when excess zeros come from a separate process\n",
+    "- [How to estimate Poisson origin–destination flow models](poisson_flow.ipynb)\n",
+    "  — the Poisson case, and why it needs a different augmentation\n",
+    "- [How to set priors](priors.ipynb) — `SARNegBinPriors` adds `alpha_sigma` and\n",
+    "  `alpha_nu`\n",
+    "- [How to fit spatial logit models](spatial_logit.ipynb) — the same Pólya–Gamma\n",
+    "  machinery for binary outcomes"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "bayespreg",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.14.4"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

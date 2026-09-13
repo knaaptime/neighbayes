@@ -1,6 +1,0 @@
-﻿bayespecon.dgp.simulate\_panel\_sem\_dynamic\_fe
-================================================
-
-.. currentmodule:: bayespecon.dgp
-
-.. autofunction:: simulate_panel_sem_dynamic_fe

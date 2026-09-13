@@ -1,0 +1,465 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "0",
+   "metadata": {},
+   "source": [
+    "# How to choose and configure the Gibbs sampler\n",
+    "\n",
+    "`fit()` already uses Gibbs for the Gaussian spatial models — SAR, SEM, SDM,\n",
+    "SDEM and the Gaussian panel families — because they have a registered Gibbs\n",
+    "sampler and `sampler=None` prefers it. This guide covers the decisions left to\n",
+    "you: confirming what you got, checking it against NUTS, picking a backend,\n",
+    "loosening the ρ update when it mixes badly, and changing how the\n",
+    "log-determinant is computed.\n",
+    "\n",
+    "For the block structure and the full table of backends and log-determinant\n",
+    "methods, see [Supported Models](../models.md); for why the conjugate blocks\n",
+    "help at all, [Architecture](../architecture.md)."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "1",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import time\n",
+    "\n",
+    "import arviz as az\n",
+    "import geopandas as gpd\n",
+    "import libpysal\n",
+    "import numpy as np\n",
+    "import pandas as pd\n",
+    "\n",
+    "from neighbayes.models import SAR, SDEM, SDM, SEM\n",
+    "\n",
+    "gdf = gpd.read_file(libpysal.examples.get_path(\"columbus.shp\"))\n",
+    "y = gdf[\"CRIME\"].values.astype(float)\n",
+    "X = np.column_stack(\n",
+    "    [\n",
+    "        np.ones(len(y)),\n",
+    "        gdf[\"INC\"].values.astype(float),\n",
+    "        gdf[\"HOVAL\"].values.astype(float),\n",
+    "    ]\n",
+    ")\n",
+    "W = libpysal.graph.Graph.build_contiguity(gdf).transform(\"r\")\n",
+    "\n",
+    "COMMON = dict(draws=2000, tune=1000, chains=4, random_seed=42)\n",
+    "\n",
+    "\n",
+    "def fit_timed(model, **kw):\n",
+    "    start = time.perf_counter()\n",
+    "    idata = model.fit(progressbar=False, **kw)\n",
+    "    return idata, time.perf_counter() - start\n",
+    "\n",
+    "\n",
+    "def efficiency(label, idata, secs, params=(\"rho\", \"sigma\")):\n",
+    "    ess = az.ess(idata, var_names=list(params))\n",
+    "    rhat = az.rhat(idata, var_names=list(params))\n",
+    "    row = {\"seconds\": secs}\n",
+    "    for p in params:\n",
+    "        row[f\"ess {p}\"] = float(ess[p])\n",
+    "        row[f\"ess/sec {p}\"] = float(ess[p]) / secs\n",
+    "    row[\"max rhat\"] = float(max(float(rhat[p]) for p in params))\n",
+    "    return pd.Series(row, name=label)\n",
+    "\n",
+    "\n",
+    "print(f\"n = {len(y)}, k = {X.shape[1]}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "2",
+   "metadata": {},
+   "source": [
+    "## Confirm which sampler ran\n",
+    "\n",
+    "Nothing in `fit()` announces its choice, so check the `sample_stats` group.\n",
+    "A NUTS run carries `tree_depth` and `diverging`; a Gibbs run does not."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "3",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "idata_default, secs_default = fit_timed(SAR(y=y, X=X, W=W), **COMMON)\n",
+    "\n",
+    "nuts_only = {\"tree_depth\", \"diverging\", \"step_size\"}\n",
+    "present = nuts_only & set(idata_default.sample_stats.data_vars)\n",
+    "print(\"sample_stats:\", sorted(idata_default.sample_stats.data_vars))\n",
+    "print(\"ran NUTS\" if present else \"ran Gibbs\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "4",
+   "metadata": {},
+   "source": [
+    "## Check the Gibbs result against NUTS\n",
+    "\n",
+    "Worth doing once on any new dataset. The two samplers target the same\n",
+    "posterior, so a disagreement beyond Monte Carlo error is a defect rather than a\n",
+    "tuning difference — and this is the cheapest validation available."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "5",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "idata_nuts, secs_nuts = fit_timed(\n",
+    "    SAR(y=y, X=X, W=W), sampler=\"nuts\", target_accept=0.9, **COMMON\n",
+    ")\n",
+    "\n",
+    "pd.DataFrame(\n",
+    "    {\n",
+    "        \"Gibbs\": [\n",
+    "            float(idata_default.posterior[\"rho\"].mean()),\n",
+    "            float(idata_default.posterior[\"sigma\"].mean()),\n",
+    "        ],\n",
+    "        \"NUTS\": [\n",
+    "            float(idata_nuts.posterior[\"rho\"].mean()),\n",
+    "            float(idata_nuts.posterior[\"sigma\"].mean()),\n",
+    "        ],\n",
+    "    },\n",
+    "    index=[\"rho\", \"sigma\"],\n",
+    ").round(4)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "6",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "pd.DataFrame(\n",
+    "    [\n",
+    "        efficiency(\"Gibbs\", idata_default, secs_default),\n",
+    "        efficiency(\"NUTS\", idata_nuts, secs_nuts),\n",
+    "    ]\n",
+    ").round(3)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "7",
+   "metadata": {},
+   "source": [
+    "Read the **ESS-per-second** column, not `seconds` — a sampler twice as\n",
+    "fast and half as efficient has bought you nothing. Columbus has $n = 49$; for\n",
+    "timings at realistic sizes see\n",
+    "[Performance & Profiling](../performance/index.md).\n",
+    "\n",
+    "Two arguments do not cross the sampler boundary: `target_accept` raises\n",
+    "`TypeError` under Gibbs, and `idata_kwargs={\"log_likelihood\": True}` is\n",
+    "NUTS-only — Gibbs builds that group unasked."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "8",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "try:\n",
+    "    SAR(y=y, X=X, W=W).fit(sampler=\"gibbs\", target_accept=0.9, draws=10, tune=10)\n",
+    "except TypeError as err:\n",
+    "    print(f\"TypeError: {err}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "9",
+   "metadata": {},
+   "source": [
+    "## Pin a backend\n",
+    "\n",
+    "`gibbs_backend` defaults to `\"auto\"`, which takes JAX when it is installed and\n",
+    "falls back to NumPy. Pin it explicitly when you are benchmarking, or when you\n",
+    "want the NumPy path's process-level parallelism (`n_jobs`) instead of the JAX\n",
+    "path's vectorised chains (`chain_method`)."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "10",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "pd.DataFrame(\n",
+    "    [\n",
+    "        efficiency(\n",
+    "            backend,\n",
+    "            *fit_timed(\n",
+    "                SAR(y=y, X=X, W=W), sampler=\"gibbs\", gibbs_backend=backend, **COMMON\n",
+    "            ),\n",
+    "        )\n",
+    "        for backend in (\"numpy\", \"jax\")\n",
+    "    ]\n",
+    ").round(3)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "11",
+   "metadata": {},
+   "source": [
+    "JAX pays a one-off compilation cost on the first sweep, so a single\n",
+    "small-$n$ timing is the wrong basis for choosing — at $n = 49$ that cost is a\n",
+    "visible fraction of the total, and at the sizes where you would reach for JAX\n",
+    "it is amortized to nothing."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "12",
+   "metadata": {},
+   "source": [
+    "## Loosen the ρ update when it mixes poorly\n",
+    "\n",
+    "If `ess_bulk` on ρ or λ is low while β and σ² look fine, the slice sampler's\n",
+    "interval is the thing to change. `slice_width` sets its starting width; the\n",
+    "sampler adapts from there during warmup."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "13",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "idata_tuned, secs_tuned = fit_timed(\n",
+    "    SAR(y=y, X=X, W=W),\n",
+    "    sampler=\"gibbs\",\n",
+    "    gibbs_backend=\"numpy\",\n",
+    "    slice_width=0.25,\n",
+    "    n_jobs=-1,\n",
+    "    thin=2,\n",
+    "    **COMMON,\n",
+    ")\n",
+    "print(f\"draws kept per chain with thin=2: {idata_tuned.posterior.sizes['draw']}\")\n",
+    "efficiency(\"slice_width=0.25, thin=2\", idata_tuned, secs_tuned).round(3)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "14",
+   "metadata": {},
+   "source": [
+    "## Change the log-determinant method\n",
+    "\n",
+    "`logdet_method` goes on the **model**, not on `fit()`. Left at `None` it is\n",
+    "chosen for you by size, by whether $W$ is symmetric, and by a fill-in estimate;\n",
+    "override it when you know something the selector does not — that your graph\n",
+    "factorizes cheaply, or that it does not."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "15",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# The constructor reports the valid names, so this cannot drift out of date.\n",
+    "try:\n",
+    "    SAR(y=y, X=X, W=W, logdet_method=\"list-them-please\")\n",
+    "except ValueError as err:\n",
+    "    print(err)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "16",
+   "metadata": {},
+   "source": [
+    "**Verify any approximate method against an exact one before trusting it.**\n",
+    "On a small problem the exact answer is free, so there is no excuse not to."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "17",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "pd.DataFrame(\n",
+    "    [\n",
+    "        pd.Series(\n",
+    "            {\n",
+    "                \"rho mean\": float(idata.posterior[\"rho\"].mean()),\n",
+    "                \"rho sd\": float(idata.posterior[\"rho\"].std()),\n",
+    "                \"seconds\": secs,\n",
+    "                \"ess rho\": float(az.ess(idata, var_names=[\"rho\"])[\"rho\"]),\n",
+    "            },\n",
+    "            name=method,\n",
+    "        )\n",
+    "        for method, (idata, secs) in (\n",
+    "            (\n",
+    "                m,\n",
+    "                fit_timed(\n",
+    "                    SAR(y=y, X=X, W=W, logdet_method=m), sampler=\"gibbs\", **COMMON\n",
+    "                ),\n",
+    "            )\n",
+    "            for m in (\"eigenvalue\", \"chebyshev\", \"cheb_stochastic\")\n",
+    "        )\n",
+    "    ]\n",
+    ").round(4)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "18",
+   "metadata": {},
+   "source": [
+    "`eigenvalue` is exact at this size, so it is the reference. A method whose\n",
+    "ρ posterior drifts from it is trading accuracy for speed — sometimes the right\n",
+    "trade at scale, never one to make unknowingly."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "19",
+   "metadata": {},
+   "source": [
+    "## Apply it to SEM, SDM and SDEM\n",
+    "\n",
+    "The same call works for all four Gaussian models; only the name of the spatial\n",
+    "parameter changes (`rho` for the lag models, `lam` for the error models)."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "20",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "pd.DataFrame(\n",
+    "    [\n",
+    "        pd.Series(\n",
+    "            {\n",
+    "                \"spatial parameter\": param,\n",
+    "                \"posterior mean\": float(idata.posterior[param].mean()),\n",
+    "                \"n coefficients\": idata.posterior[\"beta\"].sizes[\"coefficient\"],\n",
+    "                \"ess\": float(az.ess(idata, var_names=[param])[param]),\n",
+    "                \"rhat\": float(az.rhat(idata, var_names=[param])[param]),\n",
+    "            },\n",
+    "            name=name,\n",
+    "        )\n",
+    "        for name, param, idata in (\n",
+    "            (n, p, fit_timed(cls(y=y, X=X, W=W), sampler=\"gibbs\", **COMMON)[0])\n",
+    "            for n, cls, p in (\n",
+    "                (\"SAR\", SAR, \"rho\"),\n",
+    "                (\"SDM\", SDM, \"rho\"),\n",
+    "                (\"SEM\", SEM, \"lam\"),\n",
+    "                (\"SDEM\", SDEM, \"lam\"),\n",
+    "            )\n",
+    "        )\n",
+    "    ]\n",
+    ").round(4)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "21",
+   "metadata": {},
+   "source": [
+    "## What to check before trusting the output\n",
+    "\n",
+    "`ess_bulk` and `r_hat` on the spatial parameter first — it is the only\n",
+    "non-conjugate block, so it is where trouble shows up."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "22",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "az.summary(idata_default, var_names=[\"rho\", \"sigma\"]).round(4)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "23",
+   "metadata": {},
+   "source": [
+    ":::{caution} Do not select a specification with LOO or WAIC\n",
+    "Both run on this output and both mislead for spatial autoregressive models.\n",
+    "Pointwise leave-one-out assumes observations are exchangeable given the\n",
+    "parameters; under a spatial lag they are not, because dropping $y_i$ changes\n",
+    "the implied mean of its neighbours through $(I - \\rho W)^{-1}$.\n",
+    "\n",
+    "Use [Bayesian LM specification tests](bayesian_lmtests.ipynb) or\n",
+    "[spatial block cross-validation](spatial_cv_demo.ipynb) instead.\n",
+    ":::"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "24",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "model_diag = SAR(y=y, X=X, W=W)\n",
+    "model_diag.fit(sampler=\"gibbs\", progressbar=False, **COMMON)\n",
+    "model_diag.spatial_diagnostics_decision()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "25",
+   "metadata": {},
+   "source": [
+    "## See also\n",
+    "\n",
+    "- [Supported Models](../models.md) — the block structure, every backend, and\n",
+    "  all eleven log-determinant methods\n",
+    "- [Architecture](../architecture.md) — why conjugacy beats gradients here\n",
+    "- [How to set priors](priors.ipynb) — the σ² prior is what keeps that block\n",
+    "  conjugate\n",
+    "- [How to run Bayesian LM specification tests](bayesian_lmtests.ipynb) —\n",
+    "  choosing *which* model to fit, before tuning how you fit it\n",
+    "- [Performance & Profiling](../performance/index.md) — Gibbs-versus-NUTS and\n",
+    "  backend timings at realistic $n$"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "bayespreg",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.14.4"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

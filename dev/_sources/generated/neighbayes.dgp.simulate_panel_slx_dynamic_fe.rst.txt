@@ -1,0 +1,6 @@
+﻿neighbayes.dgp.simulate\_panel\_slx\_dynamic\_fe
+================================================
+
+.. currentmodule:: neighbayes.dgp
+
+.. autofunction:: simulate_panel_slx_dynamic_fe

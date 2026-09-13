@@ -1,0 +1,35 @@
+﻿neighbayes.models.priors.SARPriors
+==================================
+
+.. currentmodule:: neighbayes.models.priors
+
+.. autoclass:: SARPriors
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SARPriors.__init__
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SARPriors.beta_mu
+      ~SARPriors.beta_sigma
+      ~SARPriors.nu
+      ~SARPriors.rho_lower
+      ~SARPriors.rho_upper
+      ~SARPriors.sigma2_alpha
+      ~SARPriors.sigma2_beta
+      ~SARPriors.sigma_sigma
+   
+   

@@ -1,0 +1,37 @@
+﻿neighbayes.models.SARLogit
+==========================
+
+.. currentmodule:: neighbayes.models
+
+.. autoclass:: SARLogit
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SARLogit.__init__
+      ~SARLogit.fit
+      ~SARLogit.fitted_probabilities
+      ~SARLogit.fitted_values
+      ~SARLogit.residuals
+      ~SARLogit.spatial_diagnostics
+      ~SARLogit.spatial_diagnostics_decision
+      ~SARLogit.spatial_effects
+      ~SARLogit.summary
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SARLogit.inference_data
+      ~SARLogit.pymc_model
+   
+   

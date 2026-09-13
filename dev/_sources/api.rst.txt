@@ -1,6 +1,6 @@
 .. _api_ref:
 
-.. currentmodule:: bayespecon
+.. currentmodule:: neighbayes
 
 API reference
 =============
@@ -8,7 +8,7 @@ API reference
 Cross-Sectional Spatial Models
 ------------------------------
 
-.. currentmodule:: bayespecon.models
+.. currentmodule:: neighbayes.models
 
 .. autosummary::
    :toctree: generated/
@@ -94,7 +94,7 @@ Panel Spatial Models (Tobit)
 Flow Models
 -----------
 
-.. currentmodule:: bayespecon.models
+.. currentmodule:: neighbayes.models
 
 .. autosummary::
    :toctree: generated/
@@ -112,7 +112,7 @@ Flow Models
 Panel Flow Models
 ^^^^^^^^^^^^^^^^^
 
-.. currentmodule:: bayespecon.models
+.. currentmodule:: neighbayes.models
 
 .. autosummary::
    :toctree: generated/
@@ -129,7 +129,7 @@ Panel Flow Models
 Default Gibbs Priors
 ---------------------
 
-.. currentmodule:: bayespecon.models.priors
+.. currentmodule:: neighbayes.models.priors
 
 .. autosummary::
    :toctree: generated/
@@ -148,7 +148,7 @@ Default Gibbs Priors
 Default NUTS Priors
 ---------------------
 
-.. currentmodule:: bayespecon.models.priors
+.. currentmodule:: neighbayes.models.priors
 
 .. autosummary::
    :toctree: generated/
@@ -193,7 +193,7 @@ Default NUTS Priors
 Bayesian Diagnostics
 --------------------
 
-.. currentmodule:: bayespecon.diagnostics.lmtests
+.. currentmodule:: neighbayes.diagnostics.lmtests
 
 .. autosummary::
    :toctree: generated/
@@ -314,7 +314,7 @@ and the decision-tree renderers.
 Bayesian Model Comparison
 ^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. currentmodule:: bayespecon.diagnostics
+.. currentmodule:: neighbayes.diagnostics
 
 .. autosummary::
    :toctree: generated/
@@ -357,10 +357,10 @@ Data Generating Processes
    The flow DGPs below take ``G`` (libpysal Graph), ``gdf``, ``n``, and
    ``knn_k`` instead.  All four are optional: when none is supplied the
    DGP synthesises a point grid via
-   :func:`~bayespecon.dgp.utils.synth_point_geodataframe` and builds a
+   :func:`~neighbayes.dgp.utils.synth_point_geodataframe` and builds a
    row-standardised KNN graph automatically.
 
-.. currentmodule:: bayespecon.dgp
+.. currentmodule:: neighbayes.dgp
 
 .. autosummary::
    :toctree: generated/
@@ -411,7 +411,7 @@ The Gaussian flow DGPs (``generate_flow_data``,
 predictor (also exposed in the result dict as ``"eta_vec"`` /
 ``"eta"``).  Pass ``distribution="normal"`` to recover the legacy
 Gaussian-on-y behaviour.  The Gaussian-likelihood flow models in
-``bayespecon.models.flow`` operate on the latent scale, so fit on
+``neighbayes.models.flow`` operate on the latent scale, so fit on
 ``np.log(y)`` to recover the SAR parameters.  The Negative
 Binomial DGPs are unchanged.
 
@@ -436,7 +436,7 @@ Binomial DGPs are unchanged.
 Graph Utilities
 ---------------
 
-.. currentmodule:: bayespecon.graph
+.. currentmodule:: neighbayes.graph
 
 .. autosummary::
    :toctree: generated/

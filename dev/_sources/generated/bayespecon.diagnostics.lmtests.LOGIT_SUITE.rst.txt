@@ -1,6 +1,0 @@
-﻿bayespecon.diagnostics.lmtests.LOGIT\_SUITE
-===========================================
-
-.. currentmodule:: bayespecon.diagnostics.lmtests
-
-.. autodata:: LOGIT_SUITE

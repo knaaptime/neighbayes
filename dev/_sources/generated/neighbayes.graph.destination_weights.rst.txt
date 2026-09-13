@@ -1,0 +1,6 @@
+﻿neighbayes.graph.destination\_weights
+=====================================
+
+.. currentmodule:: neighbayes.graph
+
+.. autofunction:: destination_weights

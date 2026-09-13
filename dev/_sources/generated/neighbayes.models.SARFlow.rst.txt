@@ -1,0 +1,37 @@
+﻿neighbayes.models.SARFlow
+=========================
+
+.. currentmodule:: neighbayes.models
+
+.. autoclass:: SARFlow
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SARFlow.__init__
+      ~SARFlow.fit
+      ~SARFlow.fitted_values
+      ~SARFlow.posterior_predictive
+      ~SARFlow.residuals
+      ~SARFlow.spatial_diagnostics
+      ~SARFlow.spatial_diagnostics_decision
+      ~SARFlow.spatial_effects
+      ~SARFlow.summary
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SARFlow.inference_data
+      ~SARFlow.pymc_model
+   
+   

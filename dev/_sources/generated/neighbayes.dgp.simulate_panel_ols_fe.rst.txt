@@ -1,0 +1,6 @@
+﻿neighbayes.dgp.simulate\_panel\_ols\_fe
+=======================================
+
+.. currentmodule:: neighbayes.dgp
+
+.. autofunction:: simulate_panel_ols_fe

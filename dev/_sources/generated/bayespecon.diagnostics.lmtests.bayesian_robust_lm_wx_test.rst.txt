@@ -1,6 +1,0 @@
-﻿bayespecon.diagnostics.lmtests.bayesian\_robust\_lm\_wx\_test
-=============================================================
-
-.. currentmodule:: bayespecon.diagnostics.lmtests
-
-.. autofunction:: bayesian_robust_lm_wx_test

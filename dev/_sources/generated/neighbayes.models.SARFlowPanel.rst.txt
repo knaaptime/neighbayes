@@ -1,0 +1,37 @@
+﻿neighbayes.models.SARFlowPanel
+==============================
+
+.. currentmodule:: neighbayes.models
+
+.. autoclass:: SARFlowPanel
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SARFlowPanel.__init__
+      ~SARFlowPanel.fit
+      ~SARFlowPanel.fitted_values
+      ~SARFlowPanel.posterior_predictive
+      ~SARFlowPanel.residuals
+      ~SARFlowPanel.spatial_diagnostics
+      ~SARFlowPanel.spatial_diagnostics_decision
+      ~SARFlowPanel.spatial_effects
+      ~SARFlowPanel.summary
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SARFlowPanel.inference_data
+      ~SARFlowPanel.pymc_model
+   
+   

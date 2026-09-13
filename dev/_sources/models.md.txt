@@ -1,5 +1,22 @@
 # Supported Models
 
+
+## Model suite
+
+The package organizes models along three column dimensions — **likelihood** (linear / non-linear), **temporal structure** (cross-section / panel), and **outcome structure** (single / flow). Each cell lists the spatial structures implemented for that combination.
+
+| | Linear · Cross-section | Linear · Panel | Non-linear · Cross-section | Non-linear · Panel |
+|---|---|---|---|---|
+| **Single** | Aspatial, SLX, SAR, SEM, SDM, SDEM | Aspatial, SLX, SAR, SEM, SDM, SDEM | Aspatial, SAR, SEM, SDM | SAR, SEM |
+| **Flow** | Aspatial, SAR, SEM | Aspatial, SAR, SEM | Aspatial, SAR | Aspatial, SAR |
+
+Panel models come in fixed-effects and random-effects variants, and the linear
+panel family additionally has dynamic (lagged-dependent-variable) forms. Every
+spatial flow model has a **separable** counterpart that pins
+$\rho_w = -\rho_d \rho_o$; the non-linear flow cell covers both negative
+binomial and Poisson observation models. The sections below list every class
+individually.
+
 ## Cross Sectional Models
 
 ### OLS
@@ -100,9 +117,16 @@ $$y_{it} = \phi y_{i,t-1} + x_{it}' \beta + W x_{it}' \theta + a_i + \tau_t + \e
 
 ## Non-Linear Models
 
-### Spatial Probit
+### SARProbit
 
 $$y^* = \rho W y^* + X\beta + a + \varepsilon, \quad \varepsilon \sim \mathcal{N}(0, I), \quad y_i = \mathbf{1}[y_i^* > 0]$$
+
+Note the $a$ term: this is a **region-random-effects** specification, in which
+$\rho$ acts on region-level latent utilities and observations are nested within
+regions via `region_ids`. It is not the standard spatial probit of the LeSage
+toolbox. For spatial binary outcomes prefer the Pólya–Gamma logit classes
+(`SARLogit`, `SARLogitStructural`, `SEMLogit`), which are conjugate and have a
+Gibbs sampler.
 
 ### Tobit (SAR Tobit)
 
@@ -136,7 +160,7 @@ $$y_i \sim \operatorname{NegBin}(\mu_i, \alpha), \quad \eta = \rho W \eta + X\be
 
 Includes latent $\sigma$ — structural form with explicit noise. Gibbs sampling only (PG augmentation).
 
-### ZINBSAR
+### SARZINB
 
 $$y_i \sim \operatorname{ZINB}(\mu_i, \alpha, \pi), \quad \mu = \exp(\eta), \quad \eta = (I - \rho W)^{-1} X\beta$$
 
@@ -154,17 +178,26 @@ $$y_i \sim \operatorname{NegBin}(\mu_i, \alpha), \quad \log \boldsymbol{\mu} = X
 
 Non-spatial negative binomial baseline.
 
-### SARSpatialLogit
+### SARLogit (Reduced Form)
 
-$$y_i \sim \operatorname{Bernoulli}(p_i), \quad \operatorname{logit}(p) = \rho W \operatorname{logit}(p) + X\beta$$
+$$y_i \sim \operatorname{Bernoulli}(p_i), \quad \eta = (I - \rho W)^{-1}(X\beta + \nu), \quad \nu \sim \mathcal{N}(0, I)$$
 
-Spatial lag on the log-odds. Pólya–Gamma Gibbs sampler.
+Spatial lag on the latent log-odds, written with the multiplier applied to the
+mean. Pólya–Gamma Gibbs sampler only — no NUTS path.
 
-### SEMSpatialLogit
+### SARLogitStructural (Structural Form)
 
-$$y_i \sim \operatorname{Bernoulli}(p_i), \quad \operatorname{logit}(p) = X\beta + u, \quad u = \lambda W u + \varepsilon$$
+$$y_i \sim \operatorname{Bernoulli}(p_i), \quad \eta = \rho W \eta + X\beta + \nu, \quad \nu \sim \mathcal{N}(0, I)$$
 
-Spatial error on the log-odds. Pólya–Gamma Gibbs sampler.
+The same model as `SARLogit`, parameterised without inverting $(I - \rho W)$.
+Pólya–Gamma Gibbs sampler only.
+
+### SEMLogit
+
+$$y_i \sim \operatorname{Bernoulli}(p_i), \quad \eta = X\beta + u, \quad u = \lambda W u + \nu, \quad \nu \sim \mathcal{N}(0, I)$$
+
+Spatial error on the latent log-odds. The logit link fixes $\sigma^2 = 1$, so it
+does not appear in the posterior. Pólya–Gamma Gibbs sampler only.
 
 ## Flow Models
 
@@ -193,6 +226,21 @@ $$y_{ij} \sim \operatorname{NegBin}(\mu_{ij}, \alpha), \quad \log \boldsymbol{\m
 ### SARNegBinFlowSeparable
 
 $$y_{ij} \sim \operatorname{NegBin}(\mu_{ij}, \alpha), \quad \log \boldsymbol{\mu} = A(\boldsymbol{\rho})^{-1} X\beta, \quad \rho_w = -\rho_d \rho_o$$
+
+### SARPoissonFlow
+
+$$y_{ij} \sim \operatorname{Poisson}(\mu_{ij}), \quad \log \boldsymbol{\mu} = A(\boldsymbol{\rho})^{-1} X\beta$$
+
+No dispersion parameter. Sampled by auxiliary-mixture Gibbs
+(Frühwirth-Schnatter & Wagner 2006) rather than Pólya–Gamma, which admits no
+exact Poisson representation.
+
+### SARPoissonFlowSeparable
+
+$$y_{ij} \sim \operatorname{Poisson}(\mu_{ij}), \quad \log \boldsymbol{\mu} = A(\boldsymbol{\rho})^{-1} X\beta, \quad \rho_w = -\rho_d \rho_o$$
+
+The recommended Poisson flow model — the separable restriction removes the
+weakly-identified $\rho$ ridge of the unrestricted variant.
 
 ### SEMFlow
 
@@ -238,35 +286,108 @@ $$y_t = X_t\beta + u_t, \quad u_t = \lambda_d W_d u_t + \lambda_o W_o u_t + \lam
 
 $$y_t = X_t\beta + u_t, \quad u_t = \lambda_d W_d u_t + \lambda_o W_o u_t - \lambda_d \lambda_o W_w u_t + \varepsilon_t, \quad \varepsilon_t \sim \mathcal{N}(0, \sigma^2 I_N)$$
 
+## Specification Tests
+
+Lagrange-Multiplier tests for choosing a spatial specification. Each statistic
+is evaluated at every posterior draw, giving a posterior distribution rather
+than a point estimate. Call them directly from
+`neighbayes.diagnostics.lmtests`, or through `spatial_diagnostics()` and
+`spatial_diagnostics_decision()` on any fitted model.
+
+| Test | $H_0$ | Alternative | df | Null model |
+|------|-------|-------------|----|----|
+| LM-Lag | $\rho = 0$ | SAR | 1 | OLS |
+| LM-Error | $\lambda = 0$ | SEM | 1 | OLS |
+| LM-WX | $\gamma = 0$ | SLX | $k_{wx}$ | SAR |
+| LM-SDM (joint) | $\rho = \gamma = 0$ | SDM | $1 + k_{wx}$ | OLS |
+| LM-SLX-Error (joint) | $\lambda = \gamma = 0$ | SDEM | $1 + k_{wx}$ | OLS |
+| LM-WX-SEM | $\gamma = 0$ in SEM | SDEM | $k_{wx}$ | SEM |
+| LM-Error-SDM | $\lambda = 0$ in SDM | SDARAR | 1 | SDM |
+| LM-Lag-SDEM | $\rho = 0$ in SDEM | SDARAR | 1 | SDEM |
+| Robust LM-Lag | $\rho = 0$, robust to $\lambda$ | SAR vs SEM | 1 | OLS |
+| Robust LM-Error | $\lambda = 0$, robust to $\rho$ | SEM vs SAR | 1 | OLS |
+| Robust LM-Lag-SDM | $\rho = 0$, robust to $\gamma$ | SDM | 1 | SLX |
+| Robust LM-WX | $\gamma = 0$, robust to $\rho$ | SDM | $k_{wx}$ | SAR |
+| Robust LM-Error-SDEM | $\lambda = 0$, robust to $\gamma$ | SDEM | 1 | SLX |
+
+The robust variants use the **Neyman orthogonal score** of Doğan, Taşpınar &
+Bera (2021), which removes the correlation between the test score and the
+nuisance score:
+
+$$g_\psi^* = g_\psi - J_{\psi\phi \cdot \sigma}\,J_{\phi\phi\cdot\sigma}^{-1}\,g_\phi.$$
+
+The same machinery extends to balanced panels — with a $T$ multiplier on the
+information matrix, under the `bayesian_panel_lm_*` prefix — and to
+origin–destination flow models on Kronecker weights $W_d$, $W_o$, $W_w$, under
+`bayesian_lm_flow_*`.
+
+### Sources
+
+- Doğan, O., Taşpınar, S., Bera, A.K. (2021). "A Bayesian robust chi-squared
+  test for testing simple hypotheses." *Journal of Econometrics*, 222(2),
+  933–958.
+- Koley, M., Bera, A.K. (2024). "To Use, or Not to Use the Spatial Durbin
+  Model? – That Is the Question." *Spatial Economic Analysis*, 19(1), 30–56.
+- Bera, A.K., Yoon, M.J. (1993). "Specification testing with locally
+  misspecified alternatives." *Econometric Theory*, 9(4), 649–658.
+- Anselin, L., Bera, A.K., Florax, R., Yoon, M.J. (1996). "Simple diagnostic
+  tests for spatial dependence." *Regional Science and Urban Economics*, 26(1),
+  77–104.
+- LeSage, J.P., Pace, R.K. (2008). "Spatial Econometric Modeling of
+  Origin–Destination Flows." *Journal of Regional Science*, 48(5), 941–967.
+
 ## Sampling Backends
 
-### NUTS (default)
+### Choosing a sampler
 
-All models support NUTS (No-U-Turn Sampler) via PyMC by default. NUTS handles arbitrary posterior geometries but can be slow for spatial models due to the banana-shaped posterior created by the spatial Jacobian.
+`fit()` takes `sampler={"gibbs", "nuts", None}`, and `None` — the default —
+**selects Gibbs whenever the model has a registered Gibbs sampler, and NUTS
+otherwise.** For SAR/SEM/SDM/SDEM, the count families, the ZINB model and the
+Gaussian panel families, that means Gibbs unless you ask for something else.
+
+NUTS is not universally available. The Pólya–Gamma logit classes
+(`SARLogit`, `SARLogitStructural`, `SEMLogit`) and the auxiliary-mixture
+Poisson flow classes build no PyMC graph at all, and `fit(sampler="nuts")`
+raises `NotImplementedError`. Robust (Student-t) models are the mirror case:
+no Gibbs sampler supports them, so `robust=True` requires NUTS.
+
+`target_accept` is NUTS-only and raises `TypeError` if passed with Gibbs.
+
+### Execution backends
+
+For any Gibbs sampler, `gibbs_backend` selects the execution path:
+
+| Value | Behaviour |
+|---|---|
+| `"auto"` | **default** — JAX when installed and supported by the family, else NumPy |
+| `"jax"` | the sweep JIT-compiled into one XLA kernel; chains vectorised under `jax.vmap`, controlled by `chain_method` |
+| `"numpy"` | pure NumPy/SciPy; chains as separate processes via `joblib`, controlled by `n_jobs` |
+
+Both backends implement the same sampler and target the same posterior.
 
 ### Gibbs Sampler (Gaussian models)
 
-Gaussian cross-sectional models (SAR, SEM, SDM, SDEM) support a custom block-Gibbs sampler via `sampler="gibbs"`:
-
-```python
-model = SAR(y=y, X=X, W=W)
-idata = model.fit(sampler="gibbs", draws=2000, tune=1000, chains=4)
-```
-
-The Gibbs sampler exploits conditional conjugacy with a 3-block strategy:
+Gaussian cross-sectional models (SAR, SEM, SDM, SDEM) and the Gaussian panel
+families exploit conditional conjugacy with a 3-block strategy:
 
 | Block | Full conditional | Update |
 |---|---|---|
 | β \| ρ, σ², y | Normal | Direct draw (conjugate) |
 | σ² \| β, ρ, y | Inverse-Gamma | Direct draw (conjugate) |
-| ρ/λ \| β, σ², y | 1-D non-conjugate | Slice sampling or MALA |
+| ρ/λ \| β, σ², y | 1-D non-conjugate | Adaptive slice sampling |
 
-Two execution backends are available:
+SAR and SDM update the spatial parameter with β and σ² integrated out
+(a collapsed conditional); SEM and SDEM update it conditional on them.
 
-- **NumPy** (`gibbs_method="numpy"`, default): Adaptive slice sampling for ρ/λ. Pure Python/NumPy, no JAX dependency.
-- **JAX** (`gibbs_method="jax"`): Full-JIT compilation via `@eqx.filter_jit`. Uses MALA (gradient-guided) or RW-MH for ρ/λ. Requires JAX and equinox.
+```python
+model = SAR(y=y, X=X, W=W)
+idata = model.fit(draws=2000, tune=1000, chains=4)   # Gibbs, by default
+```
 
-See the [Gibbs Sampler User Guide](user-guide/gibbs_sampler.ipynb) for details.
+The family accepts two options beyond the shared `fit()` arguments:
+`slice_width` (initial slice interval for ρ/λ) and `chain_method` (JAX
+backend chain mapping). See the
+[Gibbs sampler how-to](how-to/gibbs_sampler.ipynb) for details.
 
 ### Gibbs Sampler (SAR Negative Binomial)
 
@@ -286,14 +407,14 @@ The reduced form has no latent σ² — spatial dependence enters only through t
 | ρ \| ω, y | 1-D non-conjugate | Adaptive slice sampling (β marginalised) |
 | α \| y, η | 1-D non-conjugate | Slice sampling on log(α) |
 
-`SARNegBinStructural` (structural form) adds latent η and σ² blocks via a separate Gibbs sampler in `bayespecon.samplers.negbin`.
+`SARNegBinStructural` (structural form) adds latent η and σ² blocks via a separate Gibbs sampler in `neighbayes.samplers.negbin`.
 
 ### Gibbs Sampler (NB flow models)
 
 NB flow models (`SARNegBinFlow`, `SARNegBinFlowSeparable`, `NegBinFlow`) support a Pólya–Gamma Gibbs sampler via `sampler="gibbs"`:
 
 ```python
-model = SARNegBinFlow(y=y_int, G=G, X=X)
+model = SARNegBinFlow(y_int, X, G)   # positional: (y, X, W)
 idata = model.fit(sampler="gibbs", draws=2000, tune=1000, chains=4)
 ```
 
@@ -310,16 +431,56 @@ For the unrestricted model (`SARNegBinFlow`), each ρ parameter (ρ_d, ρ_o, ρ_
 
 ## Log-Determinant Methods
 
-The spatial Jacobian $\log|I - \rho W|$ is evaluated at every MCMC draw. `bayespecon` supports several methods, auto-selected by problem size:
+The spatial Jacobian $\log|I - \rho W|$ is evaluated at every MCMC draw, and is
+the term that makes large problems expensive. `logdet_method` is set on the
+**model** constructor, not on `fit()`, and both samplers honour it. Leaving it
+at `None` auto-selects by size, by whether $W$ is symmetric, and by how much
+fill-in a sparse factorization would incur.
 
-| Method | Auto-select range | Precompute | Per-ρ cost | Description |
-|--------|-------------------|------------|------------|-------------|
-| `eigenvalue` | n ≤ 500 | O(n³) | O(n) | Exact eigenvalue decomposition |
-| `chebyshev` | 500 < n ≤ 2000 | O(n³) | O(m) | Deterministic Chebyshev from exact eigenvalues |
-| `cheb_stochastic` | n > 2000 | O(nnz·p) | O(m) | Stochastic Chebyshev (Han et al. 2015), geometric convergence |
-| `cheb_cholesky` | opt-in | O(m·chol) | O(m) | Exact sparse Cholesky at Chebyshev nodes |
-| `aaa` | directed flow W | O(m·LU) | O(m) | AAA rational approximation (handles non-symmetric W) |
-| `slq` | opt-in | O(nnz·k) | O(m) | Stochastic Lanczos Quadrature, D-symmetrised |
-| `resolvent` | unrestricted flow models | — | O(LU) | Resolvent-Kronecker gradient sampler for the 3-ρ flow logdet |
+### Auto-selection
 
-Override with `logdet_method="..."` on any model constructor. Cutoffs are configurable via `BAYESPECON_LOGDET_EIGEN_MAX_N` (default 500) and `BAYESPECON_LOGDET_CHEB_MAX_N` (default 60000).
+| $n$ | $W$ | Chosen | Why |
+|---|---|---|---|
+| ≤ 500 | any | `eigenvalue` | one $O(n^3)$ eigendecomposition, then $O(n)$ per ρ — exact and cheap at this size |
+| ≤ 60000 | symmetric | `chol_aaa` | sparse Cholesky at adaptively-chosen AAA support points; exact, root-exponential convergence |
+| ≤ 60000 | non-symmetric | `aaa` | the same rational scheme over sparse LU (KLU), for directed graphs — k-nearest-neighbour, travel time, migration |
+| > 60000 | any | `cheb_stochastic` | stochastic Chebyshev expansion; no factorization, at the cost of stochastic error |
+
+**Fill-in guard.** Size alone does not predict factorization cost — a dense or
+hub-dominated graph blows up under Cholesky regardless of $n$. Before
+committing to an exact path the selector estimates
+$\mathrm{nnz}(W^2)/\mathrm{nnz}(W)$ in $O(\mathrm{nnz})$; if that exceeds 20 it
+warns and falls back to `cheb_stochastic`. A KNN-50 graph or a fully dense $W$
+at moderate $n$ takes that branch.
+
+### The full set
+
+| Method | Exact | Notes |
+|---|---|---|
+| `eigenvalue` | ✅ | full eigendecomposition; the reference answer at small $n$ |
+| `chol_aaa` | ✅ | CHOLMOD factorizations at AAA support points; auto choice for symmetric $W$ |
+| `aaa` | ✅ | AAA rational approximation over sparse LU; handles non-symmetric $W$ |
+| `cheb_cholesky` | ✅ | sparse Cholesky at Chebyshev nodes |
+| `lu_cheb` | ✅ | sparse LU at Chebyshev nodes |
+| `chebyshev` | ✅ | deterministic Chebyshev from exact eigenvalues |
+| `cholmod` | ✅ | JAX-native sparse CHOLMOD; requires `sparsax` |
+| `grid_spline` | ≈ | spline interpolation over a precomputed ρ grid |
+| `cheb_stochastic` | ✗ | stochastic Chebyshev (Han et al. 2015); auto choice above the cutoff |
+| `slq` | ✗ | Stochastic Lanczos Quadrature, D-symmetrised |
+| `traces` | ✗ | truncated trace series; legacy, retained for the flow NUTS path |
+
+Flow models take an additional value, `"resolvent"`, which is their default for
+the unrestricted three-ρ case: it samples via the resolvent-Kronecker gradient
+rather than evaluating a scalar log-determinant.
+
+Cutoffs are configurable through the environment:
+`NEIGHBAYES_LOGDET_EIGEN_MAX_N` (default 500),
+`NEIGHBAYES_LOGDET_CHEB_MAX_N` (default 60000), and
+`NEIGHBAYES_LOGDET_MAX_FILLIN_RATIO` (default 20).
+
+The constructor reports the valid names on a bad value, so the list above can
+be checked against any installation:
+
+```python
+SAR(y=y, X=X, W=W, logdet_method="?")   # ValueError lists every valid option
+```

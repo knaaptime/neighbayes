@@ -1,0 +1,6 @@
+﻿neighbayes.graph.flow\_design\_matrix\_asymmetric
+=================================================
+
+.. currentmodule:: neighbayes.graph
+
+.. autofunction:: flow_design_matrix_asymmetric

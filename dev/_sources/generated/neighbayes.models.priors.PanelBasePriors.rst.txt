@@ -1,0 +1,33 @@
+﻿neighbayes.models.priors.PanelBasePriors
+========================================
+
+.. currentmodule:: neighbayes.models.priors
+
+.. autoclass:: PanelBasePriors
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~PanelBasePriors.__init__
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~PanelBasePriors.beta_mu
+      ~PanelBasePriors.beta_sigma
+      ~PanelBasePriors.nu
+      ~PanelBasePriors.sigma2_alpha
+      ~PanelBasePriors.sigma2_beta
+      ~PanelBasePriors.sigma_sigma
+   
+   

@@ -1,0 +1,31 @@
+﻿neighbayes.models.priors.SEMLogitGibbsPriors
+============================================
+
+.. currentmodule:: neighbayes.models.priors
+
+.. autoclass:: SEMLogitGibbsPriors
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SEMLogitGibbsPriors.__init__
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SEMLogitGibbsPriors.beta_mu
+      ~SEMLogitGibbsPriors.beta_sigma
+      ~SEMLogitGibbsPriors.lam_lower
+      ~SEMLogitGibbsPriors.lam_upper
+   
+   

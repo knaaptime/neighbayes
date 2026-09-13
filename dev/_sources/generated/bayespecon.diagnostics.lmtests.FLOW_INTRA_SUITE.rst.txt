@@ -1,6 +1,0 @@
-﻿bayespecon.diagnostics.lmtests.FLOW\_INTRA\_SUITE
-=================================================
-
-.. currentmodule:: bayespecon.diagnostics.lmtests
-
-.. autodata:: FLOW_INTRA_SUITE

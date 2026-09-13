@@ -1,0 +1,6 @@
+﻿neighbayes.diagnostics.lmtests.NEGBIN\_SUITE
+============================================
+
+.. currentmodule:: neighbayes.diagnostics.lmtests
+
+.. autodata:: NEGBIN_SUITE

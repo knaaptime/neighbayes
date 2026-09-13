@@ -1,6 +1,0 @@
-﻿bayespecon.dgp.simulate\_sdm\_tobit
-===================================
-
-.. currentmodule:: bayespecon.dgp
-
-.. autofunction:: simulate_sdm_tobit

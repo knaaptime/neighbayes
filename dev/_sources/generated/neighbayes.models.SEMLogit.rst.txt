@@ -1,0 +1,37 @@
+﻿neighbayes.models.SEMLogit
+==========================
+
+.. currentmodule:: neighbayes.models
+
+.. autoclass:: SEMLogit
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SEMLogit.__init__
+      ~SEMLogit.fit
+      ~SEMLogit.fitted_probabilities
+      ~SEMLogit.fitted_values
+      ~SEMLogit.residuals
+      ~SEMLogit.spatial_diagnostics
+      ~SEMLogit.spatial_diagnostics_decision
+      ~SEMLogit.spatial_effects
+      ~SEMLogit.summary
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SEMLogit.inference_data
+      ~SEMLogit.pymc_model
+   
+   

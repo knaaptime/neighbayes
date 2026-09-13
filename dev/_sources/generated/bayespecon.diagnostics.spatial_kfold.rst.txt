@@ -1,6 +1,0 @@
-﻿bayespecon.diagnostics.spatial\_kfold
-=====================================
-
-.. currentmodule:: bayespecon.diagnostics
-
-.. autofunction:: spatial_kfold

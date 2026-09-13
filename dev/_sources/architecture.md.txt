@@ -1,6 +1,6 @@
 # Architecture
 
-This page describes how `bayespecon` is put together and why. It is aimed at
+This page describes how `neighbayes` is put together and why. It is aimed at
 contributors, and at users who want to know what the library is doing on their behalf
 before they trust a posterior. For the models themselves see
 [Supported Models](models), and for measured numbers see
@@ -51,7 +51,7 @@ know nothing about which sampler will be used until `fit()` is called.
 
 A model class carries almost no code. It states what it *is* through class attributes,
 and inherits the behaviour from `SharedSpatialMethods` in
-[`models/_base/_shared.py`](https://github.com/pysal/bayespecon/blob/main/bayespecon/models/_base/_shared.py).
+[`models/_base/_shared.py`](https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py).
 The whole of `SAR`'s structural definition is:
 
 ```python
@@ -85,7 +85,7 @@ Cross-sectional and panel models differ in only a few operations: what the spati
 means, what operand the log-determinant factory receives, and what the symbolic sparse
 operator looks like inside a PyMC model. Those three are isolated behind the
 `SpatialStructure` strategy in
-[`models/_base/_structure.py`](https://github.com/pysal/bayespecon/blob/main/bayespecon/models/_base/_structure.py):
+[`models/_base/_structure.py`](https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_structure.py):
 
 :::{list-table}
 :header-rows: 1
@@ -112,7 +112,7 @@ cross-sectional counterparts without re-implementation.
 ### Priors mirror model inheritance
 
 Priors are frozen dataclasses in
-[`models/priors.py`](https://github.com/pysal/bayespecon/blob/main/bayespecon/models/priors.py),
+[`models/priors.py`](https://github.com/pysal/neighbayes/blob/main/neighbayes/models/priors.py),
 and their inheritance graph tracks the models': `SDMPriors` extends `SARPriors`,
 `SDEMPriors` extends `SEMPriors`, and `SARNegBinPriors` extends both `SARPriors` and
 `NegBinPriors`. A model declares its prior class as `_priors_cls` and users override
@@ -139,7 +139,7 @@ the common practice of factorising a dense grid and splining between the results
 available as a plain Python float (for the NumPy Gibbs sampler), as a vectorised array
 operation, as a gradient, as a PyTensor symbolic expression (for PyMC and NUTS), and
 under JAX. The factories in
-[`_logdet/_factories.py`](https://github.com/pysal/bayespecon/blob/main/bayespecon/_logdet/_factories.py)
+[`_logdet/_factories.py`](https://github.com/pysal/neighbayes/blob/main/neighbayes/_logdet/_factories.py)
 emit each of these from the same precomputed data:
 
 :::{list-table}
@@ -179,7 +179,7 @@ the choice outright.
 ## Sampler dispatch
 
 Sampler selection is a module-level dict keyed by `(likelihood, structure)` in
-[`samplers/_registry.py`](https://github.com/pysal/bayespecon/blob/main/bayespecon/samplers/_registry.py)
+[`samplers/_registry.py`](https://github.com/pysal/neighbayes/blob/main/neighbayes/samplers/_registry.py)
 — no plugin system and no entry points, because three structures times seven likelihoods
 is well below the size at which anything fancier pays for itself. A model names its key
 as `_gibbs_key`; a model with no entry simply has no Gibbs sampler, and `fit()` routes
@@ -237,7 +237,7 @@ working default rather than an error:
 - **Sparse solves** prefer KLU, then UMFPACK (both from `scikit-sparse`), then SciPy's
   SuperLU, with a one-time advisory warning when it falls back so the performance loss
   is visible.
-- **A dense LAPACK fast path** handles small problems: below `BAYESPECON_KRON_DENSE_MAX`
+- **A dense LAPACK fast path** handles small problems: below `NEIGHBAYES_KRON_DENSE_MAX`
   (512), `lu_factor` on a dense $I - \rho W$ beats `splu`, because SuperLU spends most of
   its time in symbolic-factorisation overhead at that size while `dgetrf` is a single
   BLAS-3 kernel. One factorisation serves both the forward and adjoint solves.
@@ -250,7 +250,7 @@ function bodies for the same reason.
 
 ## Every model has a simulator
 
-`bayespecon.dgp` mirrors `bayespecon.models`: each model has a generator that samples
+`neighbayes.dgp` mirrors `neighbayes.models`: each model has a generator that samples
 from its data-generating process. This is a deliberate testing strategy rather than a
 convenience. Bayesian spatial models have no closed-form answer to check against, so
 correctness is established by simulating data with known parameters and confirming the
@@ -283,19 +283,19 @@ without touching model code:
 
 * - variable
   - effect
-* - `BAYESPECON_LOGDET_EIGEN_MAX_N`
+* - `NEIGHBAYES_LOGDET_EIGEN_MAX_N`
   - largest `n` auto-routed to exact eigendecomposition (default 500)
-* - `BAYESPECON_LOGDET_CHEB_MAX_N`
+* - `NEIGHBAYES_LOGDET_CHEB_MAX_N`
   - largest `n` auto-routed to an exact interpolating method (default 60000)
-* - `BAYESPECON_SPARSE_BACKEND`
+* - `NEIGHBAYES_SPARSE_BACKEND`
   - force a sparse solver instead of auto-detecting
-* - `BAYESPECON_SPARSE_STRICT`
+* - `NEIGHBAYES_SPARSE_STRICT`
   - raise instead of falling back when the requested backend is unavailable
-* - `BAYESPECON_KRON_DENSE_MAX`
+* - `NEIGHBAYES_KRON_DENSE_MAX`
   - largest `n` using dense LAPACK over SuperLU (default 512)
-* - `BAYESPECON_OP_INSTRUMENT`
+* - `NEIGHBAYES_OP_INSTRUMENT`
   - record per-operation timings for profiling
 :::
 
-All of these are read at the point of use except `BAYESPECON_OP_INSTRUMENT`, which is
+All of these are read at the point of use except `NEIGHBAYES_OP_INSTRUMENT`, which is
 snapshotted at import time in `_config.py`.

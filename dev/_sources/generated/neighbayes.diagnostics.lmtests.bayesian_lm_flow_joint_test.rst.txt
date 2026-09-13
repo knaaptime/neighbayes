@@ -1,0 +1,6 @@
+﻿neighbayes.diagnostics.lmtests.bayesian\_lm\_flow\_joint\_test
+==============================================================
+
+.. currentmodule:: neighbayes.diagnostics.lmtests
+
+.. autofunction:: bayesian_lm_flow_joint_test

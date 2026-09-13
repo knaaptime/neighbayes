@@ -1,0 +1,566 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "0",
+   "metadata": {},
+   "source": [
+    "# How to run Bayesian LM specification tests\n",
+    "\n",
+    "You have a spatial dataset and need to decide which model to fit: is the\n",
+    "dependence in the outcome (a lag), in the errors, in the neighbours'\n",
+    "covariates, or some combination? The Lagrange-Multiplier tests answer that\n",
+    "before you commit to a specification.\n",
+    "\n",
+    "`neighbayes` evaluates each LM statistic at every posterior draw, so you get a\n",
+    "posterior distribution of the statistic rather than a single point. The full\n",
+    "inventory of tests, their null hypotheses and degrees of freedom, and the\n",
+    "Neyman-orthogonal construction behind the robust variants are in\n",
+    "[Supported Models](../models.md)."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "1",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import warnings\n",
+    "\n",
+    "import libpysal\n",
+    "import matplotlib.pyplot as plt\n",
+    "import numpy as np\n",
+    "import pandas as pd\n",
+    "\n",
+    "from neighbayes.diagnostics.lmtests import (\n",
+    "    bayesian_lm_error_sdm_test,\n",
+    "    bayesian_lm_error_test,\n",
+    "    bayesian_lm_lag_sdem_test,\n",
+    "    bayesian_lm_lag_test,\n",
+    "    bayesian_lm_sdm_joint_test,\n",
+    "    bayesian_lm_slx_error_joint_test,\n",
+    "    bayesian_lm_wx_sem_test,\n",
+    "    bayesian_lm_wx_test,\n",
+    "    bayesian_robust_lm_error_sdem_test,\n",
+    "    bayesian_robust_lm_error_test,\n",
+    "    bayesian_robust_lm_lag_sdm_test,\n",
+    "    bayesian_robust_lm_lag_test,\n",
+    "    bayesian_robust_lm_wx_test,\n",
+    ")\n",
+    "from neighbayes.models import OLS, SAR, SDEM, SDM, SEM, SLX\n",
+    "\n",
+    "warnings.filterwarnings(\"ignore\", category=FutureWarning)\n",
+    "warnings.filterwarnings(\"ignore\", category=UserWarning)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "2",
+   "metadata": {},
+   "source": [
+    "## Set up data and weights\n",
+    "\n",
+    "We create a simple spatial DGP with known parameters to validate the tests. Under the null hypothesis (no spatial effects), the Bayesian LM statistics should be small with high p-values."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "3",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import geopandas as gpd\n",
+    "from libpysal.graph import Graph\n",
+    "from libpysal.weights import Rook\n",
+    "\n",
+    "# Generate data under H0: no spatial effects\n",
+    "np.random.seed(42)\n",
+    "\n",
+    "# Load Columbus dataset for spatial weights\n",
+    "columbus_path = libpysal.examples.get_path(\"columbus.shp\")\n",
+    "gdf = gpd.read_file(columbus_path)\n",
+    "\n",
+    "# Create a Graph (modern libpysal API) for neighbayes models\n",
+    "# Row-standardize the graph so spatial models work correctly\n",
+    "g = Graph.build_contiguity(gdf, rook=True).transform(\"r\")\n",
+    "n = g.n\n",
+    "\n",
+    "# Legacy W for spreg comparison\n",
+    "w_spreg = Rook.from_shapefile(columbus_path)\n",
+    "w_spreg.transform = \"r\"\n",
+    "\n",
+    "# Get sparse and dense W matrices\n",
+    "W_sparse = g.sparse.tocsr().astype(np.float64)\n",
+    "W_dense = np.array(W_sparse.todense())\n",
+    "\n",
+    "# Design matrix\n",
+    "k = 3\n",
+    "X = np.column_stack([np.ones(n), np.random.normal(size=(n, k - 1))])\n",
+    "beta_true = np.array([1.0, 2.0, -1.5])\n",
+    "y = X @ beta_true + np.random.normal(scale=1.0, size=n)\n",
+    "\n",
+    "print(f\"W shape: {W_sparse.shape}, nnz: {W_sparse.nnz}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "4",
+   "metadata": {},
+   "source": [
+    "## Fit the null models the tests need\n",
+    "\n",
+    "The Bayesian LM tests require posterior draws from the **null model** (the model under H₀). Different tests use different null models:\n",
+    "\n",
+    "- **LM-WX test**: SAR model (includes ρ but not γ)\n",
+    "- **LM-SDM joint test**: OLS model (no spatial params)\n",
+    "- **LM-SLX-Error joint test**: OLS model (no spatial params)\n",
+    "- **Robust LM-Lag-SDM**: SLX model (includes γ but not ρ)\n",
+    "- **Robust LM-WX**: SAR model (includes ρ but not γ)\n",
+    "- **Robust LM-Error-SDEM**: SLX model (includes γ but not λ)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "5",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Fit OLS model (null for joint tests)\n",
+    "ols_model = OLS(y=y, X=X, W=g)\n",
+    "ols_model.fit(draws=5000, tune=5000, chains=4, random_seed=42)\n",
+    "\n",
+    "# Fit SAR model (null for LM-WX and robust LM-WX)\n",
+    "sar_model = SAR(y=y, X=X, W=g)\n",
+    "sar_model.fit(draws=5000, tune=5000, chains=4, random_seed=42)\n",
+    "\n",
+    "# Fit SLX model (null for robust LM-Lag-SDM and robust LM-Error-SDEM)\n",
+    "slx_model = SLX(y=y, X=X, W=g)\n",
+    "slx_model.fit(draws=5000, tune=5000, chains=4, random_seed=42)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "6",
+   "metadata": {},
+   "source": [
+    "## Test for a lag, an error, or lagged covariates\n",
+    "\n",
+    "These tests assume the nuisance parameters are correctly specified (zero). They are the Bayesian analogues of the classical LM tests from Koley & Bera (2024)."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "7",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Fit the SEM null required by LM-WX-SEM (Bayesian analogue of Koley–Bera 2024).\n",
+    "sem_model = SEM(y=y, X=X, W=g)\n",
+    "sem_model.fit(draws=2500, tune=2500, chains=2, random_seed=42)\n",
+    "\n",
+    "# Non-robust Bayesian LM tests evaluated at the appropriate null model.\n",
+    "non_robust_results = pd.DataFrame(\n",
+    "    [\n",
+    "        bayesian_lm_lag_test(ols_model).to_series(),\n",
+    "        bayesian_lm_error_test(ols_model).to_series(),\n",
+    "        bayesian_lm_wx_test(sar_model).to_series(),\n",
+    "        bayesian_lm_wx_sem_test(sem_model).to_series(),\n",
+    "        bayesian_lm_sdm_joint_test(ols_model).to_series(),\n",
+    "        bayesian_lm_slx_error_joint_test(ols_model).to_series(),\n",
+    "    ],\n",
+    "    index=[\n",
+    "        \"LM-Lag\",\n",
+    "        \"LM-Error\",\n",
+    "        \"LM-WX\",\n",
+    "        \"LM-WX-SEM\",\n",
+    "        \"LM-SDM Joint\",\n",
+    "        \"LM-SLX-Error Joint\",\n",
+    "    ],\n",
+    ")\n",
+    "\n",
+    "non_robust_results"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "8",
+   "metadata": {},
+   "source": [
+    "## Use the robust variants when both channels may be present\n",
+    "\n",
+    "These tests use the **Neyman orthogonal score adjustment** from Dogan et al. (2021, Proposition 3) to ensure robustness against local misspecification in the nuisance parameter. This is the key innovation over the classical Bera-Yoon (1993) approach.\n",
+    "\n",
+    "The adjustment removes the correlation between the test parameter score and the nuisance parameter score:\n",
+    "\n",
+    "$$g_\\psi^* = g_\\psi - J_{\\psi\\phi \\cdot \\sigma} \\, J_{\\phi\\phi \\cdot \\sigma}^{-1} \\, g_\\phi$$\n",
+    "\n",
+    "where $J_{\\cdot \\cdot \\cdot \\sigma}$ denotes information matrix blocks partitioned on $\\sigma^2$."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "9",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Robust Bayesian LM tests (Neyman orthogonal score)\n",
+    "robust_results = pd.DataFrame(\n",
+    "    [\n",
+    "        bayesian_robust_lm_lag_test(ols_model).to_series(),\n",
+    "        bayesian_robust_lm_error_test(ols_model).to_series(),\n",
+    "        bayesian_robust_lm_lag_sdm_test(slx_model).to_series(),\n",
+    "        bayesian_robust_lm_wx_test(sar_model).to_series(),\n",
+    "        bayesian_robust_lm_error_sdem_test(slx_model).to_series(),\n",
+    "    ],\n",
+    "    index=[\n",
+    "        \"Robust LM-Lag\",\n",
+    "        \"Robust LM-Error\",\n",
+    "        \"Robust LM-Lag-SDM\",\n",
+    "        \"Robust LM-WX\",\n",
+    "        \"Robust LM-Error-SDEM\",\n",
+    "    ],\n",
+    ")\n",
+    "\n",
+    "robust_results"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "10",
+   "metadata": {},
+   "source": [
+    "## Read the whole posterior, not just the point statistic\n",
+    "\n",
+    "A key advantage of the Bayesian approach is that we get a **full posterior distribution** of the LM statistic, not just a point estimate. This allows us to compute credible intervals and posterior probabilities."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "11",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from scipy import stats as sp_stats\n",
+    "\n",
+    "# Show six representative posterior LM distributions (a mix of non-robust and\n",
+    "# robust variants).  Each panel overlays the chi-squared 95% reference and the\n",
+    "# posterior mean.\n",
+    "panels = [\n",
+    "    (\"LM-Lag\", bayesian_lm_lag_test(ols_model)),\n",
+    "    (\"LM-Error\", bayesian_lm_error_test(ols_model)),\n",
+    "    (\"LM-WX\", bayesian_lm_wx_test(sar_model)),\n",
+    "    (\"LM-SDM Joint\", bayesian_lm_sdm_joint_test(ols_model)),\n",
+    "    (\"Robust LM-WX\", bayesian_robust_lm_wx_test(sar_model)),\n",
+    "    (\"Robust LM-Lag-SDM\", bayesian_robust_lm_lag_sdm_test(slx_model)),\n",
+    "]\n",
+    "\n",
+    "fig, axes = plt.subplots(2, 3, figsize=(15, 8))\n",
+    "for ax, (name, res) in zip(axes.flat, panels):\n",
+    "    ax.hist(res.lm_samples, bins=50, density=True, alpha=0.7, color=\"steelblue\")\n",
+    "    chi2_ref = sp_stats.chi2.ppf(0.95, res.df)\n",
+    "    ax.axvline(\n",
+    "        chi2_ref,\n",
+    "        color=\"red\",\n",
+    "        linestyle=\"--\",\n",
+    "        label=f\"$\\\\chi^2_{{0.95,\\\\,df={res.df}}}$ = {chi2_ref:.2f}\",\n",
+    "    )\n",
+    "    ax.axvline(res.mean, color=\"black\", linestyle=\"-\", label=f\"Mean = {res.mean:.2f}\")\n",
+    "    ax.set_title(name)\n",
+    "    ax.legend(fontsize=8)\n",
+    "\n",
+    "plt.suptitle(\"Posterior Distributions of Bayesian LM Statistics\", fontsize=14)\n",
+    "plt.tight_layout()\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "12",
+   "metadata": {},
+   "source": [
+    "## Get a recommendation instead of a table\n",
+    "\n",
+    "Every fitted spatial model exposes `spatial_diagnostics()` and `spatial_diagnostics_decision()`.\n",
+    "The registry on each class wires the *correct* tests for its specification:\n",
+    "\n",
+    "- **OLS** → `LM-Lag`, `LM-Error`, `LM-SDM-Joint`, `LM-SLX-Error-Joint`, `Robust-LM-Lag`, `Robust-LM-Error`\n",
+    "- **SAR** → `LM-Error`, `LM-WX`, `Robust-LM-WX`\n",
+    "- **SEM** → `LM-Lag`, `LM-WX`\n",
+    "- **SLX** → `LM-Lag`, `LM-Error`, `Robust-LM-Lag-SDM`, `Robust-LM-Error-SDEM`\n",
+    "- **SDM** → `LM-Error-SDM` (uses correct $e = y - \\rho Wy - X\\beta - WX\\gamma$ residuals)\n",
+    "- **SDEM** → `LM-Lag-SDEM` (uses $(I-\\lambda W)$-filtered residuals)\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "13",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Method-based API: one call returns all wired tests as a DataFrame\n",
+    "ols_model.spatial_diagnostics()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "14",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# The decision routine walks the appropriate tests and returns a recommendation\n",
+    "print(\"OLS recommends:\")\n",
+    "ols_model.spatial_diagnostics_decision()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "15",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "print(\"SAR recommends:\")\n",
+    "sar_model.spatial_diagnostics_decision()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "16",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "print(\"SLX recommends:\")\n",
+    "slx_model.spatial_diagnostics_decision()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "17",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# SDM/SDEM-aware tests require fitted SDM / SDEM models so the residuals\n",
+    "# include the correct spatial filters.\n",
+    "sdm_model = SDM(y=y, X=X, W=g)\n",
+    "sdm_model.fit(draws=2000, tune=2000, chains=2, random_seed=42)\n",
+    "\n",
+    "sdem_model = SDEM(y=y, X=X, W=g)\n",
+    "sdem_model.fit(draws=2000, tune=2000, chains=2, random_seed=42)\n",
+    "\n",
+    "pd.DataFrame(\n",
+    "    [\n",
+    "        bayesian_lm_error_sdm_test(sdm_model).to_series(),\n",
+    "        bayesian_lm_lag_sdem_test(sdem_model).to_series(),\n",
+    "    ],\n",
+    "    index=[\"LM-Error-SDM\", \"LM-Lag-SDEM\"],\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "18",
+   "metadata": {},
+   "source": [
+    "## Run the same tests on panel data\n",
+    "\n",
+    "The same Bayesian LM machinery extends to balanced spatial panels.  Tests of\n",
+    "the form `bayesian_panel_lm_*` and `bayesian_panel_robust_lm_*` are wired into\n",
+    "every panel model (`OLSPanelFE`, `SARPanelFE`, `SLXPanelFE`, …) and surfaced\n",
+    "through the same `spatial_diagnostics()` / `spatial_diagnostics_decision()`\n",
+    "methods.\n",
+    "\n",
+    "Below we simulate a small balanced panel ($N = 81$, $T = 4$) from the panel\n",
+    "fixed-effects OLS DGP and run the full diagnostic table."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "19",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from neighbayes.dgp.panel_fe import simulate_panel_sar_fe\n",
+    "from neighbayes.dgp.utils import rook_grid_weights\n",
+    "from neighbayes.models import OLSPanelFE\n",
+    "\n",
+    "# 9x9 rook grid (N=81), T=4 — small enough to fit quickly but large enough for\n",
+    "# the LM tests to behave well.\n",
+    "N_panel, T_panel = 81, 4\n",
+    "W_panel_dense, W_panel_graph = rook_grid_weights(int(np.sqrt(N_panel)))\n",
+    "\n",
+    "# Simulate from a SAR-FE DGP with moderate spatial dependence so the LM-Lag\n",
+    "# direction is clearly significant.\n",
+    "panel_sim = simulate_panel_sar_fe(\n",
+    "    N=N_panel,\n",
+    "    T=T_panel,\n",
+    "    rho=0.4,\n",
+    "    beta=np.array([1.0, 2.0]),\n",
+    "    W=W_panel_graph,\n",
+    "    seed=11,\n",
+    ")\n",
+    "\n",
+    "panel_model = OLSPanelFE(\n",
+    "    y=panel_sim[\"y\"],\n",
+    "    X=panel_sim[\"X\"],\n",
+    "    W=W_panel_graph,\n",
+    "    N=N_panel,\n",
+    "    T=T_panel,\n",
+    "    effects=3,  # two-way fixed effects (unit + time)\n",
+    ")\n",
+    "panel_model.fit(draws=600, tune=600, chains=2, random_seed=11, progressbar=False)\n",
+    "\n",
+    "panel_model.spatial_diagnostics()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "20",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "print(\n",
+    "    f\"Panel decision tree (DGP = SAR-FE) recommends: {panel_model.spatial_diagnostics_decision(alpha=0.05, format='model')}\"\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "21",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "panel_model.spatial_diagnostics_decision(\n",
+    "    alpha=0.05,\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "22",
+   "metadata": {},
+   "source": [
+    "## Run them on origin–destination flows\n",
+    "\n",
+    "Origin–destination flow models in `neighbayes.models.flow` use Kronecker\n",
+    "weight matrices $W_d, W_o, W_w$ for destination, origin, and network\n",
+    "spillovers respectively.  The Bayesian LM family for flows tests each\n",
+    "direction separately (`bayesian_lm_flow_dest_test`,\n",
+    "`bayesian_lm_flow_orig_test`, `bayesian_lm_flow_network_test`,\n",
+    "`bayesian_lm_flow_intra_test`) plus a joint test\n",
+    "(`bayesian_lm_flow_joint_test`).  Robust variants are available for the\n",
+    "destination, origin, and network directions.\n",
+    "\n",
+    "The registry on `OLSFlow` wires the full set; `SARFlow` (which already includes\n",
+    "all three lag terms) wires the robust variants for marginal-extension testing."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "23",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from neighbayes.dgp.flows import generate_flow_data\n",
+    "from neighbayes.models import OLSFlow, SARFlow\n",
+    "\n",
+    "# Simulate a small SAR flow DGP on n=8 spatial units (N = 64 OD cells).\n",
+    "flow_data = generate_flow_data(\n",
+    "    n=8,\n",
+    "    rho_d=0.35,\n",
+    "    rho_o=0.25,\n",
+    "    rho_w=0.10,\n",
+    "    beta_d=[1.0, -0.5],\n",
+    "    beta_o=[0.5, 0.3],\n",
+    "    sigma=1.0,\n",
+    "    seed=42,\n",
+    ")\n",
+    "\n",
+    "y_flow = np.log(flow_data[\"y_vec\"])  # latent SAR scale (DGP default is lognormal)\n",
+    "X_flow = flow_data[\"X\"]\n",
+    "G_flow = flow_data[\"G\"]\n",
+    "\n",
+    "ols_flow = OLSFlow(y_flow, X_flow, G_flow, col_names=flow_data[\"col_names\"])\n",
+    "ols_flow.fit(draws=600, tune=600, chains=2, random_seed=42, progressbar=False)\n",
+    "\n",
+    "ols_flow.spatial_diagnostics()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "24",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "flow_data.keys()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "25",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Fit the SAR flow alternative; its diagnostic registry consists of the robust\n",
+    "# (Neyman-orthogonal) marginal-extension tests.\n",
+    "sar_flow = SARFlow(y_flow, X_flow, G_flow, col_names=flow_data[\"col_names\"])\n",
+    "sar_flow.fit(draws=600, tune=600, chains=2, random_seed=42, progressbar=False)\n",
+    "\n",
+    "sar_flow.spatial_diagnostics()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "26",
+   "metadata": {},
+   "source": [
+    "## See also\n",
+    "\n",
+    "- [Supported Models](../models.md) — the full test inventory, null hypotheses,\n",
+    "  degrees of freedom, and the Neyman-orthogonal score\n",
+    "- [LM tests vs `spreg`](../validation/lm_tests_spreg_comparison.ipynb) —\n",
+    "  cross-implementation check against the classical statistics\n",
+    "- [LM decision-tree recovery](../validation/lm_tests_dgp_recovery.ipynb) —\n",
+    "  whether the tree lands on the model that generated the data\n",
+    "- [How to run spatial block cross-validation](spatial_cv_demo.ipynb) — the\n",
+    "  out-of-sample counterpart to specification testing"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "bayespreg",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.14.4"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

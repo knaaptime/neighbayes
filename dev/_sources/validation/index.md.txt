@@ -7,23 +7,9 @@
 
 
 `spreg` Comparison <cross_sectional_spreg_comparison>
-MATLAB Toolkit Comparison <faithfulness_bayespecon>
-Elhorst Panel Replication <jgsy2024_replication_bayespecon>
+MATLAB Toolkit Comparison <faithfulness_neighbayes>
+Elhorst Panel Replication <jgsy2024_replication_neighbayes>
+LM Tests vs `spreg` <lm_tests_spreg_comparison>
+LM Decision-Tree Recovery <lm_tests_dgp_recovery>
 
-```
-
-```{toctree}
-:hidden:
-:caption: API
-:maxdepth: 1
-
-API reference <api>
-```
-
-```{toctree}
-:hidden:
-:caption: References
-:maxdepth: 1
-
-References <references>
 ```

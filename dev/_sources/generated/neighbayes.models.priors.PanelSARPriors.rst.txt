@@ -1,0 +1,35 @@
+﻿neighbayes.models.priors.PanelSARPriors
+=======================================
+
+.. currentmodule:: neighbayes.models.priors
+
+.. autoclass:: PanelSARPriors
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~PanelSARPriors.__init__
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~PanelSARPriors.beta_mu
+      ~PanelSARPriors.beta_sigma
+      ~PanelSARPriors.nu
+      ~PanelSARPriors.rho_lower
+      ~PanelSARPriors.rho_upper
+      ~PanelSARPriors.sigma2_alpha
+      ~PanelSARPriors.sigma2_beta
+      ~PanelSARPriors.sigma_sigma
+   
+   

@@ -1,6 +1,0 @@
-﻿bayespecon.diagnostics.lmtests.OLS\_SUITE
-=========================================
-
-.. currentmodule:: bayespecon.diagnostics.lmtests
-
-.. autodata:: OLS_SUITE

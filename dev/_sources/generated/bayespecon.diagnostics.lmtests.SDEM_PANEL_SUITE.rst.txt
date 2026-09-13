@@ -1,6 +1,0 @@
-﻿bayespecon.diagnostics.lmtests.SDEM\_PANEL\_SUITE
-=================================================
-
-.. currentmodule:: bayespecon.diagnostics.lmtests
-
-.. autodata:: SDEM_PANEL_SUITE

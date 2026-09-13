@@ -1,6 +1,0 @@
-﻿bayespecon.diagnostics.lmtests.SEM\_PANEL\_DYNAMIC\_SUITE
-=========================================================
-
-.. currentmodule:: bayespecon.diagnostics.lmtests
-
-.. autodata:: SEM_PANEL_DYNAMIC_SUITE

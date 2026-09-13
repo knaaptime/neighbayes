@@ -1,0 +1,36 @@
+﻿neighbayes.models.priors.PanelSARREPriors
+=========================================
+
+.. currentmodule:: neighbayes.models.priors
+
+.. autoclass:: PanelSARREPriors
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~PanelSARREPriors.__init__
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~PanelSARREPriors.beta_mu
+      ~PanelSARREPriors.beta_sigma
+      ~PanelSARREPriors.nu
+      ~PanelSARREPriors.rho_lower
+      ~PanelSARREPriors.rho_upper
+      ~PanelSARREPriors.sigma2_alpha
+      ~PanelSARREPriors.sigma2_beta
+      ~PanelSARREPriors.sigma_alpha_sigma
+      ~PanelSARREPriors.sigma_sigma
+   
+   

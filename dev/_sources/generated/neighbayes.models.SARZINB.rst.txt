@@ -1,0 +1,38 @@
+﻿neighbayes.models.SARZINB
+=========================
+
+.. currentmodule:: neighbayes.models
+
+.. autoclass:: SARZINB
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SARZINB.__init__
+      ~SARZINB.corridor_probabilities
+      ~SARZINB.fit
+      ~SARZINB.fitted_values
+      ~SARZINB.residuals
+      ~SARZINB.spatial_diagnostics
+      ~SARZINB.spatial_diagnostics_decision
+      ~SARZINB.spatial_effects
+      ~SARZINB.summary
+      ~SARZINB.zero_attribution
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SARZINB.inference_data
+      ~SARZINB.pymc_model
+   
+   

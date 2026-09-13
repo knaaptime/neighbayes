@@ -1,0 +1,304 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Getting Started with `neighbayes`\n",
+    "\n",
+    "This notebook walks through a complete spatial econometric workflow:\n",
+    "\n",
+    "1. Simulate spatial data from a known DGP\n",
+    "2. Fit a baseline OLS model\n",
+    "3. Run Bayesian LM diagnostics to test for spatial dependence\n",
+    "4. Use the decision tree to select a better model\n",
+    "5. Fit the recommended SAR model\n",
+    "6. Compute direct, indirect, and total spatial effects\n",
+    "7. Peek at the underlying PyMC model for customization"
+   ],
+   "id": "0"
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import libpysal\n",
+    "\n",
+    "from neighbayes.dgp import simulate_sar\n",
+    "\n",
+    "gdf = simulate_sar(n=20, beta=[1, 0.4, 2.5], rho=0.6, create_gdf=True)"
+   ],
+   "id": "1"
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "gdf"
+   ],
+   "id": "2"
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "gdf.plot(\"X_1\").set_title(\"X1\")"
+   ],
+   "id": "3"
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "gdf.plot(\"y\").set_title(\"y\")"
+   ],
+   "id": "4"
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 1. Create a Spatial Weights Matrix\n",
+    "\n",
+    "Spatial econometric models require a spatial weights matrix $W$ that encodes the spatial relationships between observations. Here we use Rook contiguity (regions that share a boundary or vertex are neighbors)."
+   ],
+   "id": "5"
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "G = libpysal.graph.Graph.build_contiguity(gdf, rook=False).transform(\"r\")"
+   ],
+   "id": "6"
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 2. Fit a Baseline OLS Model\n",
+    "\n",
+    "We start with a non-spatial OLS regression to establish a baseline.\n",
+    "\n",
+    "$$ y = X\\beta + \\varepsilon, \\quad \\varepsilon \\sim \\mathcal{N}(0, \\sigma^2 I) $$"
+   ],
+   "id": "7"
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# remove the intercept since we have one (-1)\n",
+    "form = \"y ~ -1 + X_0 + X_1 + X_2\""
+   ],
+   "id": "8"
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from neighbayes.models import OLS\n",
+    "\n",
+    "ols = OLS(formula=form, W=G, data=gdf)\n",
+    "ols.fit(draws=1000, tune=500, chains=2, random_seed=42)\n",
+    "ols.summary()"
+   ],
+   "id": "9"
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "Notice all the estimated beta parameters are biased upward."
+   ],
+   "id": "10"
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Use `arviz` to inspect fit\n",
+    "\n",
+    "the `fit` method attaches an `inference_data` object to each model that can be used directly with `arviz` functions"
+   ],
+   "id": "11"
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import arviz as az\n",
+    "\n",
+    "az.plot_forest(ols.inference_data)"
+   ],
+   "id": "12"
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "az.plot_trace(ols.inference_data)"
+   ],
+   "id": "13"
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 3. Run Bayesian LM Diagnostics\n",
+    "\n",
+    "The `spatial_diagnostics()` method runs a battery of Bayesian LM tests (Doğan, Taşpınar \\& Bera 2021) that check whether spatial dependence is present in the residuals.\n",
+    "\n",
+    "- **LM-Lag**: Tests $H_0: \\rho = 0$ (no spatial lag on $y$)\n",
+    "- **LM-Error**: Tests $H_0: \\lambda = 0$ (no spatial error correlation)\n",
+    "- **LM-SDM-Joint**: Joint test for $\\rho = 0$ and $\\gamma = 0$\n",
+    "- **Robust-LM-Lag / Robust-LM-Error**: Neyman-orthogonal robust versions"
+   ],
+   "id": "14"
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "diag = ols.spatial_diagnostics()\n",
+    "diag"
+   ],
+   "id": "15"
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 4. Model Selection Decision Tree\n",
+    "\n",
+    "The `spatial_diagnostics_decision()` method walks a Koley \\& Bera decision tree using the Bayesian p-values above and recommends the next model to fit."
+   ],
+   "id": "16"
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "decision = ols.spatial_diagnostics_decision(alpha=0.05, format=\"ascii\")\n",
+    "print(decision)"
+   ],
+   "id": "17"
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "ols.spatial_diagnostics_decision(alpha=0.05)"
+   ],
+   "id": "18"
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 5. Fit the Recommended SAR Model\n",
+    "\n",
+    "If the diagnostics suggest spatial dependence, we fit a Spatial Autoregressive (SAR) model:\n",
+    "\n",
+    "$$ y = \\rho W y + X\\beta + \\varepsilon, \\quad \\varepsilon \\sim \\mathcal{N}(0, \\sigma^2 I) $$\n",
+    "\n",
+    "The likelihood includes the Jacobian $\\log|I - \\rho W|$ so that posterior inference on $\\rho$ is exact."
+   ],
+   "id": "19"
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from neighbayes.models import SAR\n",
+    "\n",
+    "sar = SAR(formula=form, W=G, data=gdf)\n",
+    "sar.fit(draws=2000, tune=100, chains=4, random_seed=42)\n",
+    "sar.summary()"
+   ],
+   "id": "20"
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "az.plot_trace(sar.inference_data)"
+   ],
+   "id": "21"
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## 6. Compute Spatial Effects\n",
+    "\n",
+    "For the SAR model, a change in $X$ propagates through the spatial multiplier $(I - \\rho W)^{-1}$. The effects decompose into:\n",
+    "\n",
+    "- **Direct**: Effect of $X_i$ on $y_i$ (own-region)\n",
+    "- **Indirect**: Effect of $X_j$ on $y_i$ for $j \\neq i$ (spillover)\n",
+    "- **Total**: Direct + Indirect"
+   ],
+   "id": "22"
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "effects = sar.spatial_effects()\n",
+    "effects"
+   ],
+   "id": "23"
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "bayespreg",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.14.4"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 4
+}

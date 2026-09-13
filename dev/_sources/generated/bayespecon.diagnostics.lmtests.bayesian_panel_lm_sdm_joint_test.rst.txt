@@ -1,6 +1,0 @@
-﻿bayespecon.diagnostics.lmtests.bayesian\_panel\_lm\_sdm\_joint\_test
-====================================================================
-
-.. currentmodule:: bayespecon.diagnostics.lmtests
-
-.. autofunction:: bayesian_panel_lm_sdm_joint_test

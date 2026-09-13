@@ -1,0 +1,37 @@
+﻿neighbayes.models.priors.SARNegBinPriors
+========================================
+
+.. currentmodule:: neighbayes.models.priors
+
+.. autoclass:: SARNegBinPriors
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SARNegBinPriors.__init__
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SARNegBinPriors.alpha_nu
+      ~SARNegBinPriors.alpha_sigma
+      ~SARNegBinPriors.beta_mu
+      ~SARNegBinPriors.beta_sigma
+      ~SARNegBinPriors.nu
+      ~SARNegBinPriors.rho_lower
+      ~SARNegBinPriors.rho_upper
+      ~SARNegBinPriors.sigma2_alpha
+      ~SARNegBinPriors.sigma2_beta
+      ~SARNegBinPriors.sigma_sigma
+   
+   

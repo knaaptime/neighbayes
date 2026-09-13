@@ -1,0 +1,31 @@
+﻿neighbayes.models.priors.LogitGibbsPriors
+=========================================
+
+.. currentmodule:: neighbayes.models.priors
+
+.. autoclass:: LogitGibbsPriors
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~LogitGibbsPriors.__init__
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~LogitGibbsPriors.beta_mu
+      ~LogitGibbsPriors.beta_sigma
+      ~LogitGibbsPriors.rho_lower
+      ~LogitGibbsPriors.rho_upper
+   
+   

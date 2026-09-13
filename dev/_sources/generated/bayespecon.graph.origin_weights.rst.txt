@@ -1,6 +1,0 @@
-﻿bayespecon.graph.origin\_weights
-================================
-
-.. currentmodule:: bayespecon.graph
-
-.. autofunction:: origin_weights

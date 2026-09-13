@@ -1,0 +1,6 @@
+﻿neighbayes.diagnostics.lmtests.get\_diagnostic\_suite
+=====================================================
+
+.. currentmodule:: neighbayes.diagnostics.lmtests
+
+.. autofunction:: get_diagnostic_suite

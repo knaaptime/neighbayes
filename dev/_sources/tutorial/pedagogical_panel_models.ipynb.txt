@@ -1,0 +1,768 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "0",
+   "metadata": {},
+   "source": [
+    "# Spatial panel models: a walkthrough\n",
+    "\n",
+    "By the end of this lesson you will have built a balanced panel, fitted the\n",
+    "fixed-effects and random-effects families to it, compared them, and used the\n",
+    "panel specification tests to decide which one the data support.\n",
+    "\n",
+    "It assumes you have been through\n",
+    "[the cross-sectional walkthrough](pedagogical_spatial_models.ipynb); the models\n",
+    "here are its panel counterparts. Work through the cells in order."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "1",
+   "metadata": {},
+   "source": [
+    "A panel stacks the same units across periods, which adds two things the\n",
+    "cross-sectional models did not have: unit effects $a_i$ and time effects\n",
+    "$\\tau_t$. The `effects` argument controls which are included.\n",
+    "\n",
+    "The equations for each class are in [Supported Models](../models.md)."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "2",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import arviz as az\n",
+    "import matplotlib.pyplot as plt\n",
+    "import numpy as np\n",
+    "import pandas as pd\n",
+    "from libpysal.graph import Graph\n",
+    "\n",
+    "from neighbayes import dgp\n",
+    "from neighbayes.models import (\n",
+    "    OLSPanelFE,\n",
+    "    OLSPanelRE,\n",
+    "    SARPanelFE,\n",
+    "    SARPanelRE,\n",
+    "    SDEMPanelFE,\n",
+    "    SDMPanelFE,\n",
+    "    SEMPanelFE,\n",
+    "    SEMPanelRE,\n",
+    ")\n",
+    "\n",
+    "az.style.use(\"arviz-white\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "3",
+   "metadata": {},
+   "source": [
+    "## Build the panel\n",
+    "\n",
+    "For pedagogy, we generate synthetic panel data from the `neighbayes.dgp` module on a regular polygon grid and then assemble a formula-ready DataFrame.\n",
+    ""
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "4",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Generate base geometry via cross-sectional DGP, then simulate panel data via panel DGP.\n",
+    "rng = np.random.default_rng(2026)\n",
+    "xcols = [\"poverty\", \"rev_rating\", \"num_spots\", \"crowded\"]\n",
+    "ycol = \"price_pp\"\n",
+    "\n",
+    "base_gdf = dgp.simulate_sar(n=20, seed=2026, create_gdf=True, geometry_type=\"polygon\")\n",
+    "W = Graph.build_contiguity(base_gdf, rook=False).transform(\"r\")\n",
+    "N = len(base_gdf)\n",
+    "T = 4\n",
+    "beta = np.array([1.5, -0.8, 0.6, 0.4, -0.5], dtype=float)\n",
+    "\n",
+    "panel_sim = dgp.simulate_panel_sar_fe(\n",
+    "    N=N,\n",
+    "    T=T,\n",
+    "    rho=0.35,\n",
+    "    beta=beta,\n",
+    "    sigma=1.0,\n",
+    "    sigma_alpha=0.5,\n",
+    "    rng=rng,\n",
+    "    W=W,\n",
+    ")\n",
+    "\n",
+    "panel = pd.DataFrame(\n",
+    "    {\n",
+    "        \"unit\": panel_sim[\"unit\"],\n",
+    "        \"time\": panel_sim[\"time\"],\n",
+    "        ycol: panel_sim[\"y\"],\n",
+    "    }\n",
+    ")\n",
+    "for j, name in enumerate(xcols, start=1):\n",
+    "    panel[name] = panel_sim[\"X\"][:, j]"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "5",
+   "metadata": {},
+   "source": [
+    "## A helper to keep the fits short"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "6",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def fit_panel_model(\n",
+    "    model_cls, formula, data, W, effects=3, draws=2000, tune=1000, chains=2, seed=42\n",
+    "):\n",
+    "    \"\"\"Fit a panel model and return (model, summary, effects_df).\n",
+    "\n",
+    "    Uses minimal MCMC settings for pedagogical demonstration.\n",
+    "    Increase draws/tune for real analyses.\n",
+    "    \"\"\"\n",
+    "    m = model_cls(\n",
+    "        formula=formula,\n",
+    "        data=data,\n",
+    "        W=W,\n",
+    "        unit_col=\"unit\",\n",
+    "        time_col=\"time\",\n",
+    "        effects=effects,\n",
+    "    )\n",
+    "    m.fit(\n",
+    "        draws=draws,\n",
+    "        tune=tune,\n",
+    "        chains=chains,\n",
+    "        random_seed=seed,\n",
+    "        progressbar=True,\n",
+    "    )\n",
+    "    summary = m.summary(round_to=3)\n",
+    "    effects_df = pd.DataFrame(m.spatial_effects())\n",
+    "    return m, summary, effects_df\n",
+    "\n",
+    "\n",
+    "def diagnostics_table(idata, var_names):\n",
+    "    \"\"\"Show key MCMC diagnostics for the given parameters.\"\"\"\n",
+    "    cols = [\"mean\", \"sd\", \"ess_bulk\", \"ess_tail\", \"r_hat\"]\n",
+    "    return az.summary(idata, var_names=var_names, round_to=3)[cols]\n",
+    "\n",
+    "\n",
+    "def show_trace(idata, var_names, title):\n",
+    "    \"\"\"Plot trace plots for the given parameters.\"\"\"\n",
+    "    az.plot_trace(idata, var_names=var_names)\n",
+    "    plt.suptitle(title, y=1.02)\n",
+    "    plt.tight_layout()\n",
+    "    plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "7",
+   "metadata": {},
+   "source": [
+    "## Start without any spatial term"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "8",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "formula = \"price_pp ~ poverty + rev_rating + num_spots + crowded\"\n",
+    "ols_panel, summary_ols, effects_ols = fit_panel_model(\n",
+    "    OLSPanelFE, formula, panel, W, effects=3\n",
+    ")\n",
+    "display(summary_ols)\n",
+    "display(effects_ols)\n",
+    "display(diagnostics_table(ols_panel.inference_data, [\"beta\", \"sigma\"]))\n",
+    "show_trace(ols_panel.inference_data, [\"sigma\"], \"OLSPanelFE trace\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "9",
+   "metadata": {},
+   "source": [
+    "## Add a spatial lag on the outcome"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "10",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "sar_panel, summary_sar, effects_sar = fit_panel_model(\n",
+    "    SARPanelFE, formula, panel, W, effects=3\n",
+    ")\n",
+    "display(summary_sar)\n",
+    "display(effects_sar)\n",
+    "display(diagnostics_table(sar_panel.inference_data, [\"rho\", \"beta\", \"sigma\"]))\n",
+    "show_trace(sar_panel.inference_data, [\"rho\", \"sigma\"], \"SARPanelFE trace\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "11",
+   "metadata": {},
+   "source": [
+    "## Try spatial structure in the errors instead"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "12",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "sem_panel, summary_sem, effects_sem = fit_panel_model(\n",
+    "    SEMPanelFE, formula, panel, W, effects=3\n",
+    ")\n",
+    "display(summary_sem)\n",
+    "display(effects_sem)\n",
+    "display(diagnostics_table(sem_panel.inference_data, [\"lam\", \"beta\", \"sigma\"]))\n",
+    "show_trace(sem_panel.inference_data, [\"lam\", \"sigma\"], \"SEMPanelFE trace\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "13",
+   "metadata": {},
+   "source": [
+    "## Combine both channels"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "14",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "sdm_panel, summary_sdm, effects_sdm = fit_panel_model(\n",
+    "    SDMPanelFE, formula, panel, W, effects=3\n",
+    ")\n",
+    "display(summary_sdm)\n",
+    "display(effects_sdm)\n",
+    "display(diagnostics_table(sdm_panel.inference_data, [\"rho\", \"beta\", \"sigma\"]))\n",
+    "show_trace(sdm_panel.inference_data, [\"rho\", \"sigma\"], \"SDMPanelFE trace\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "15",
+   "metadata": {},
+   "source": [
+    "## The error-side combination"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "16",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "sdem_panel, summary_sdem, effects_sdem = fit_panel_model(\n",
+    "    SDEMPanelFE, formula, panel, W, effects=3\n",
+    ")\n",
+    "display(summary_sdem)\n",
+    "display(effects_sdem)\n",
+    "display(diagnostics_table(sdem_panel.inference_data, [\"lam\", \"beta\", \"sigma\"]))\n",
+    "show_trace(sdem_panel.inference_data, [\"lam\", \"sigma\"], \"SDEMPanelFE trace\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "17",
+   "metadata": {},
+   "source": [
+    "### Check the chains before comparing anything\n",
+    "\n",
+    "Panel SAR/SDEM models inherit the slow-mixing behaviour of $\\rho$\n",
+    "(or $\\lambda$) documented by Wolf, Anselin & Arribas-Bel (2018)\n",
+    "{cite:p}`wolf2018StochasticEfficiency`. The\n",
+    "`spatial_mcmc_diagnostic` helper checks ESS, sampler yield, $\\hat{R}$,\n",
+    "and HPDI stability for the spatial scalar.\n",
+    ""
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "18",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from neighbayes.diagnostics import spatial_mcmc_diagnostic\n",
+    "\n",
+    "spatial_mcmc_diagnostic(sdm_panel, emit_warnings=False).to_frame()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "19",
+   "metadata": {},
+   "source": [
+    "## Swap fixed effects for random effects\n",
+    "\n",
+    "The random-effects models replace deterministic unit fixed effects with latent unit intercepts $\\alpha_i \\sim N(0, \\sigma_\\alpha^2)$. That lets the notebook estimate the variance of unit heterogeneity directly and compare FE and RE behavior on the same synthetic balanced panel."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "20",
+   "metadata": {},
+   "source": [
+    "### The non-spatial random-effects baseline"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "21",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "ols_panel_re, summary_ols_re, effects_ols_re = fit_panel_model(\n",
+    "    OLSPanelRE, formula, panel, W, effects=0\n",
+    ")\n",
+    "display(summary_ols_re)\n",
+    "display(effects_ols_re)\n",
+    "display(\n",
+    "    diagnostics_table(ols_panel_re.inference_data, [\"beta\", \"sigma\", \"sigma_alpha\"])\n",
+    ")\n",
+    "show_trace(ols_panel_re.inference_data, [\"sigma\", \"sigma_alpha\"], \"OLSPanelRE trace\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "22",
+   "metadata": {},
+   "source": [
+    "### Random effects with a spatial lag"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "23",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "sar_panel_re, summary_sar_re, effects_sar_re = fit_panel_model(\n",
+    "    SARPanelRE, formula, panel, W, effects=0\n",
+    ")\n",
+    "display(summary_sar_re)\n",
+    "display(effects_sar_re)\n",
+    "display(\n",
+    "    diagnostics_table(\n",
+    "        sar_panel_re.inference_data, [\"rho\", \"beta\", \"sigma\", \"sigma_alpha\"]\n",
+    "    )\n",
+    ")\n",
+    "show_trace(\n",
+    "    sar_panel_re.inference_data, [\"rho\", \"sigma\", \"sigma_alpha\"], \"SARPanelRE trace\"\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "24",
+   "metadata": {},
+   "source": [
+    "### Random effects with spatial errors"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "25",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "sem_panel_re, summary_sem_re, effects_sem_re = fit_panel_model(\n",
+    "    SEMPanelRE, formula, panel, W, effects=0\n",
+    ")\n",
+    "display(summary_sem_re)\n",
+    "display(effects_sem_re)\n",
+    "display(\n",
+    "    diagnostics_table(\n",
+    "        sem_panel_re.inference_data, [\"lam\", \"beta\", \"sigma\", \"sigma_alpha\"]\n",
+    "    )\n",
+    ")\n",
+    "show_trace(\n",
+    "    sem_panel_re.inference_data, [\"lam\", \"sigma\", \"sigma_alpha\"], \"SEMPanelRE trace\"\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "26",
+   "metadata": {},
+   "source": [
+    "## Compare what you have fitted"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "27",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Collect all fitted panel models for comparison\n",
+    "panel_models = {\n",
+    "    \"OLSPanelFE\": ols_panel,\n",
+    "    \"SARPanelFE\": sar_panel,\n",
+    "    \"SEMPanelFE\": sem_panel,\n",
+    "    \"SDMPanelFE\": sdm_panel,\n",
+    "    \"SDEMPanelFE\": sdem_panel,\n",
+    "    \"OLSPanelRE\": ols_panel_re,\n",
+    "    \"SARPanelRE\": sar_panel_re,\n",
+    "    \"SEMPanelRE\": sem_panel_re,\n",
+    "}\n",
+    "idata_dict = {name: m.inference_data for name, m in panel_models.items()}\n",
+    "\n",
+    "# WAIC and LOO comparison\n",
+    "for ic in (\"waic\", \"loo\"):\n",
+    "    try:\n",
+    "        cmp = az.compare(idata_dict, ic=ic, method=\"BB-pseudo-BMA\")\n",
+    "        print(f\"\\n{ic.upper()} comparison\")\n",
+    "        display(cmp)\n",
+    "    except Exception as e:\n",
+    "        print(f\"{ic.upper()} comparison not available: {type(e).__name__}: {e}\")\n",
+    "\n",
+    "# Per-model IC table\n",
+    "rows = []\n",
+    "for name, model in panel_models.items():\n",
+    "    idata = model.inference_data\n",
+    "    row = {\"model\": name}\n",
+    "    try:\n",
+    "        waic_res = az.waic(idata)\n",
+    "        row[\"elpd_waic\"] = float(waic_res.elpd_waic)\n",
+    "        row[\"p_waic\"] = float(waic_res.p_waic)\n",
+    "    except Exception:\n",
+    "        row[\"elpd_waic\"] = np.nan\n",
+    "        row[\"p_waic\"] = np.nan\n",
+    "    try:\n",
+    "        loo_res = az.loo(idata)\n",
+    "        row[\"elpd_loo\"] = float(loo_res.elpd_loo)\n",
+    "        row[\"p_loo\"] = float(loo_res.p_loo)\n",
+    "    except Exception:\n",
+    "        row[\"elpd_loo\"] = np.nan\n",
+    "        row[\"p_loo\"] = np.nan\n",
+    "    rows.append(row)\n",
+    "\n",
+    "pd.DataFrame(rows).sort_values(\"model\").reset_index(drop=True)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "28",
+   "metadata": {},
+   "source": [
+    "## Let the tests pick the specification\n",
+    "\n",
+    "The `neighbayes.diagnostics` module provides a full suite of Bayesian Lagrange Multiplier (LM) tests for panel models, following the framework of Dogan et al. (2021) with panel-specific formulas from Anselin (2008), Elhorst (2014), and Koley & Bera (2024).\n",
+    "\n",
+    "These tests help answer the question: *which spatial panel specification is most appropriate?* They test for omitted spatial lag ($\\rho$), spatial error ($\\lambda$), and spatially lagged covariates ($\\gamma$), both individually and jointly, with robust variants that account for the presence of other spatial effects.\n",
+    "\n",
+    "The decision tree mirrors the classical Anselin (1988) / Koley-Bera (2024) approach, but uses the full posterior distribution rather than point estimates — yielding Bayesian p-values and credible intervals for each LM statistic."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "29",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from neighbayes.diagnostics.lmtests import (\n",
+    "    bayesian_panel_lm_error_test,\n",
+    "    bayesian_panel_lm_lag_test,\n",
+    "    bayesian_panel_lm_sdm_joint_test,\n",
+    "    bayesian_panel_lm_slx_error_joint_test,\n",
+    "    bayesian_panel_lm_wx_test,\n",
+    "    bayesian_panel_robust_lm_error_sdem_test,\n",
+    "    bayesian_panel_robust_lm_error_test,\n",
+    "    bayesian_panel_robust_lm_lag_sdm_test,\n",
+    "    bayesian_panel_robust_lm_lag_test,\n",
+    "    bayesian_panel_robust_lm_wx_test,\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "30",
+   "metadata": {},
+   "source": [
+    "### The standard tests\n",
+    "\n",
+    "The four standard panel LM tests use the OLS panel model as the null. They test for spatial lag, spatial error, and joint SDM/SDEM alternatives."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "31",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Standard panel LM tests (from OLS null)\n",
+    "panel_standard = pd.DataFrame(\n",
+    "    [\n",
+    "        bayesian_panel_lm_lag_test(ols_panel).to_series(),\n",
+    "        bayesian_panel_lm_error_test(ols_panel).to_series(),\n",
+    "        bayesian_panel_lm_sdm_joint_test(ols_panel).to_series(),\n",
+    "        bayesian_panel_lm_slx_error_joint_test(ols_panel).to_series(),\n",
+    "    ],\n",
+    "    index=[\"LM-Lag\", \"LM-Error\", \"LM-SDM Joint\", \"LM-SLX-Error Joint\"],\n",
+    ")\n",
+    "\n",
+    "panel_standard"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "32",
+   "metadata": {},
+   "source": [
+    "### The robust variants\n",
+    "\n",
+    "The robust variants (Elhorst, 2014) test one spatial effect while accounting for the possible local presence of the other. For example, the robust LM-Lag tests for $\\rho$ robust to $\\lambda$, and vice versa."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "33",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Robust panel LM tests (from OLS null)\n",
+    "panel_robust = pd.DataFrame(\n",
+    "    [\n",
+    "        bayesian_panel_robust_lm_lag_test(ols_panel).to_series(),\n",
+    "        bayesian_panel_robust_lm_error_test(ols_panel).to_series(),\n",
+    "    ],\n",
+    "    index=[\"Robust LM-Lag\", \"Robust LM-Error\"],\n",
+    ")\n",
+    "\n",
+    "panel_robust"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "34",
+   "metadata": {},
+   "source": [
+    "### Durbin-aware variants\n",
+    "\n",
+    "These tests address the Koley & Bera (2024) decision tree for choosing between SAR/SEM and SDM/SDEM specifications. They require fitting intermediate models (SAR or SLX) as the alternative model.\n",
+    "\n",
+    "- **LM-WX** (from SAR null): Should we extend SAR → SDM by adding $\\gamma$?\n",
+    "- **Robust LM-Lag-SDM** (from SLX null): Should we extend SLX → SDM by adding $\\rho$, robust to $\\gamma$?\n",
+    "- **Robust LM-WX** (from SAR null): Should we extend SAR → SDM by adding $\\gamma$, robust to $\\rho$?\n",
+    "- **Robust LM-Error-SDEM** (from SLX null): Should we extend SLX → SDEM by adding $\\lambda$, robust to $\\gamma$?\n",
+    "\n",
+    "We need to fit an SLX panel model first to serve as the null for the robust SDM/SDEM tests."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "35",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from neighbayes.models import SLXPanelFE\n",
+    "\n",
+    "slx_panel, summary_slx, effects_slx = fit_panel_model(\n",
+    "    SLXPanelFE, formula, panel, W, effects=3\n",
+    ")\n",
+    "display(summary_slx)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "36",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# SDM/SDEM variant panel LM tests\n",
+    "panel_sdem = pd.DataFrame(\n",
+    "    [\n",
+    "        bayesian_panel_lm_wx_test(sar_panel).to_series(),\n",
+    "        bayesian_panel_robust_lm_lag_sdm_test(slx_panel).to_series(),\n",
+    "        bayesian_panel_robust_lm_wx_test(sar_panel).to_series(),\n",
+    "        bayesian_panel_robust_lm_error_sdem_test(slx_panel).to_series(),\n",
+    "    ],\n",
+    "    index=[\"LM-WX\", \"Robust LM-Lag-SDM\", \"Robust LM-WX\", \"Robust LM-Error-SDEM\"],\n",
+    ")\n",
+    "\n",
+    "panel_sdem"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "37",
+   "metadata": {},
+   "source": [
+    "### Reading the decision tree\n",
+    "\n",
+    "The panel LM tests follow the same decision logic as the classical Anselin/Koley-Bera approach, but with Bayesian p-values:\n",
+    "\n",
+    "| Scenario | Significant? | Interpretation |\n",
+    "|---|---|---|\n",
+    "| LM-Lag ✓, LM-Error ✗ | Lag only | Choose SAR panel |\n",
+    "| LM-Lag ✗, LM-Error ✓ | Error only | Choose SEM panel |\n",
+    "| Both significant → check robust tests | | |\n",
+    "| Robust LM-Lag ✓, Robust LM-Error ✗ | Lag dominates | Choose SAR panel |\n",
+    "| Robust LM-Lag ✗, Robust LM-Error ✓ | Error dominates | Choose SEM panel |\n",
+    "| Both robust significant | Both effects | Consider SDM or SDEM |\n",
+    "| Joint LM-SDM ✓ | SDM preferred over OLS | Fit SDM panel |\n",
+    "| Joint LM-SLX-Error ✓ | SDEM preferred over OLS | Fit SDEM panel |\n",
+    "| LM-WX ✓ (from SAR) | WX effects present | Extend SAR → SDM |\n",
+    "| Robust LM-Lag-SDM ✓ (from SLX) | Lag needed beyond WX | Extend SLX → SDM |\n",
+    "| Robust LM-WX ✓ (from SAR) | WX needed beyond lag | Extend SAR → SDM |\n",
+    "| Robust LM-Error-SDEM ✓ (from SLX) | Error needed beyond WX | Extend SLX → SDEM |\n",
+    "\n",
+    "A Bayesian p-value below 0.05 (or a threshold you choose) indicates evidence against the null hypothesis. The `credible_interval` field shows the posterior uncertainty in the LM statistic itself."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "38",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from scipy import stats as sp_stats\n",
+    "\n",
+    "# All panel LM tests in a single table\n",
+    "all_panel = pd.concat([panel_standard, panel_robust, panel_sdem])\n",
+    "\n",
+    "# Add chi-squared reference values\n",
+    "all_panel[\"chi2_ref_95\"] = all_panel[\"df\"].apply(lambda df: sp_stats.chi2.ppf(0.95, df))\n",
+    "\n",
+    "all_panel"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "39",
+   "metadata": {},
+   "source": [
+    "- LM-Lag is highly significant (p=0.002) — correctly detecting the spatial lag used in the DGP\n",
+    "\n",
+    "- Robust LM-Lag remains significant (p=0.039) while Robust LM-Error is not (p=0.66) — pointing to SAR over SEM\n",
+    "\n",
+    "- Joint LM-SDM and Joint LM-SLX-Error are both significant — suggesting spatial structure beyond OLS\n",
+    "\n",
+    "- LM-WX from SAR null is not significant (p=0.17) — the DGP had no WX effects, so SAR is sufficient\n",
+    "\n",
+    "- Robust LM-Error-SDEM is marginally significant (p=0.036) — slight error signal when WX is present"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "40",
+   "metadata": {},
+   "source": [
+    "## Get a recommendation from any fitted model\n",
+    "\n",
+    "Every fitted panel model exposes `spatial_diagnostics()` (a tidy DataFrame of all wired tests) and `spatial_diagnostics_decision()` (a recommended specification). The registries are class-aware, so the right tests are run for each model.\n",
+    ""
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "41",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "ols_panel.spatial_diagnostics()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "42",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "print(\n",
+    "    \"OLS panel recommends:\",\n",
+    ")\n",
+    "ols_panel.spatial_diagnostics_decision()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "43",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "print(\"SAR panel recommends:\")\n",
+    "sar_panel.spatial_diagnostics_decision()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "44",
+   "metadata": {},
+   "source": [
+    "## Where to go next\n",
+    "\n",
+    "This lesson used small draw counts so it runs quickly. For real work raise\n",
+    "`draws` and `tune`, and if you see divergences or tree-depth warnings raise\n",
+    "`target_accept` to 0.95–0.99. It is also worth checking that your conclusions\n",
+    "survive a change of fixed-effects specification (`effects=0/1/2/3`) and of\n",
+    "priors.\n",
+    "\n",
+    "- [How to run Bayesian LM specification tests](../how-to/bayesian_lmtests.ipynb)\n",
+    "- [How to fit spatial tobit panel models](../how-to/tobit_panel_models.ipynb) —\n",
+    "  panels with censored outcomes\n",
+    "- [How to set priors](../how-to/priors.ipynb) — the `Panel*Priors` classes\n",
+    "- [Supported Models](../models.md) — every panel class and its equations"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "bayespreg",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.14.4"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

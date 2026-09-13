@@ -1,6 +1,0 @@
-﻿bayespecon.dgp.simulate\_sar
-============================
-
-.. currentmodule:: bayespecon.dgp
-
-.. autofunction:: simulate_sar

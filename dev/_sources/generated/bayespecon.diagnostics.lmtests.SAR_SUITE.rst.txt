@@ -1,6 +1,0 @@
-﻿bayespecon.diagnostics.lmtests.SAR\_SUITE
-=========================================
-
-.. currentmodule:: bayespecon.diagnostics.lmtests
-
-.. autodata:: SAR_SUITE

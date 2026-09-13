@@ -1,6 +1,0 @@
-﻿bayespecon.dgp.simulate\_sar\_negbin
-====================================
-
-.. currentmodule:: bayespecon.dgp
-
-.. autofunction:: simulate_sar_negbin

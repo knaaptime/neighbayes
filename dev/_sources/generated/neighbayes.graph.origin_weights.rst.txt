@@ -1,0 +1,6 @@
+﻿neighbayes.graph.origin\_weights
+================================
+
+.. currentmodule:: neighbayes.graph
+
+.. autofunction:: origin_weights

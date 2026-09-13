@@ -1,0 +1,33 @@
+﻿neighbayes.models.priors.ReducedGibbsPriors
+===========================================
+
+.. currentmodule:: neighbayes.models.priors
+
+.. autoclass:: ReducedGibbsPriors
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~ReducedGibbsPriors.__init__
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~ReducedGibbsPriors.alpha_nu
+      ~ReducedGibbsPriors.alpha_sigma
+      ~ReducedGibbsPriors.beta_mu
+      ~ReducedGibbsPriors.beta_sigma
+      ~ReducedGibbsPriors.rho_lower
+      ~ReducedGibbsPriors.rho_upper
+   
+   

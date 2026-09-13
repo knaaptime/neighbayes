@@ -1,6 +1,0 @@
-﻿bayespecon.diagnostics.spatial\_mcmc\_diagnostic
-================================================
-
-.. currentmodule:: bayespecon.diagnostics
-
-.. autofunction:: spatial_mcmc_diagnostic

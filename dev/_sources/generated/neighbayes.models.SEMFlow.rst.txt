@@ -1,0 +1,37 @@
+﻿neighbayes.models.SEMFlow
+=========================
+
+.. currentmodule:: neighbayes.models
+
+.. autoclass:: SEMFlow
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SEMFlow.__init__
+      ~SEMFlow.fit
+      ~SEMFlow.fitted_values
+      ~SEMFlow.posterior_predictive
+      ~SEMFlow.residuals
+      ~SEMFlow.spatial_diagnostics
+      ~SEMFlow.spatial_diagnostics_decision
+      ~SEMFlow.spatial_effects
+      ~SEMFlow.summary
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SEMFlow.inference_data
+      ~SEMFlow.pymc_model
+   
+   

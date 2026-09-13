@@ -1,0 +1,35 @@
+﻿neighbayes.models.priors.SEMPriors
+==================================
+
+.. currentmodule:: neighbayes.models.priors
+
+.. autoclass:: SEMPriors
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SEMPriors.__init__
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SEMPriors.beta_mu
+      ~SEMPriors.beta_sigma
+      ~SEMPriors.lam_lower
+      ~SEMPriors.lam_upper
+      ~SEMPriors.nu
+      ~SEMPriors.sigma2_alpha
+      ~SEMPriors.sigma2_beta
+      ~SEMPriors.sigma_sigma
+   
+   

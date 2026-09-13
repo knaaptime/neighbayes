@@ -1,0 +1,36 @@
+﻿neighbayes.models.SARPanelRE
+============================
+
+.. currentmodule:: neighbayes.models
+
+.. autoclass:: SARPanelRE
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SARPanelRE.__init__
+      ~SARPanelRE.fit
+      ~SARPanelRE.fitted_values
+      ~SARPanelRE.residuals
+      ~SARPanelRE.spatial_diagnostics
+      ~SARPanelRE.spatial_diagnostics_decision
+      ~SARPanelRE.spatial_effects
+      ~SARPanelRE.summary
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SARPanelRE.inference_data
+      ~SARPanelRE.pymc_model
+   
+   

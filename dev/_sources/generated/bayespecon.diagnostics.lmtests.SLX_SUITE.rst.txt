@@ -1,6 +1,0 @@
-﻿bayespecon.diagnostics.lmtests.SLX\_SUITE
-=========================================
-
-.. currentmodule:: bayespecon.diagnostics.lmtests
-
-.. autodata:: SLX_SUITE

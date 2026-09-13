@@ -1,0 +1,6 @@
+﻿neighbayes.dgp.simulate\_spatial\_probit
+========================================
+
+.. currentmodule:: neighbayes.dgp
+
+.. autofunction:: simulate_spatial_probit

@@ -1,0 +1,35 @@
+﻿neighbayes.models.priors.PanelSLXDynamicPriors
+==============================================
+
+.. currentmodule:: neighbayes.models.priors
+
+.. autoclass:: PanelSLXDynamicPriors
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~PanelSLXDynamicPriors.__init__
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~PanelSLXDynamicPriors.beta_mu
+      ~PanelSLXDynamicPriors.beta_sigma
+      ~PanelSLXDynamicPriors.nu
+      ~PanelSLXDynamicPriors.phi_lower
+      ~PanelSLXDynamicPriors.phi_upper
+      ~PanelSLXDynamicPriors.sigma2_alpha
+      ~PanelSLXDynamicPriors.sigma2_beta
+      ~PanelSLXDynamicPriors.sigma_sigma
+   
+   

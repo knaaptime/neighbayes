@@ -1,6 +1,0 @@
-﻿bayespecon.graph.flow\_design\_matrix
-=====================================
-
-.. currentmodule:: bayespecon.graph
-
-.. autofunction:: flow_design_matrix

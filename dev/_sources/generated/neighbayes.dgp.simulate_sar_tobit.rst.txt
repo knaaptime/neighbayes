@@ -1,0 +1,6 @@
+﻿neighbayes.dgp.simulate\_sar\_tobit
+===================================
+
+.. currentmodule:: neighbayes.dgp
+
+.. autofunction:: simulate_sar_tobit

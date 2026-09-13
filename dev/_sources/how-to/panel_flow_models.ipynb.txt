@@ -1,0 +1,317 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "0",
+   "metadata": {},
+   "source": [
+    "# How to estimate panel flow models\n",
+    "\n",
+    "Origin–destination flows observed over several periods — trade by year,\n",
+    "commuting by quarter. Four classes: `SARFlowPanel` and `SARFlowSeparablePanel`\n",
+    "for continuous flows, `SARNegBinFlowPanel` and `SARNegBinFlowSeparablePanel`\n",
+    "for counts.\n",
+    "\n",
+    "Two things differ from the cross-sectional case and both will bite if missed:\n",
+    "you must pass `T`, and the Gaussian classes expect the outcome on the **latent\n",
+    "SAR scale**, so a lognormal outcome goes in as `log(y)`. Equations and\n",
+    "constructor arguments are in [Supported Models](../models.md)."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "1",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import contextlib\n",
+    "import io\n",
+    "import time\n",
+    "\n",
+    "import arviz as az\n",
+    "import numpy as np\n",
+    "import pandas as pd\n",
+    "\n",
+    "from neighbayes.dgp.flows import (\n",
+    "    generate_panel_flow_data,\n",
+    "    generate_panel_flow_data_separable,\n",
+    "    generate_panel_negbin_flow_data,\n",
+    "    generate_panel_negbin_flow_data_separable,\n",
+    ")\n",
+    "from neighbayes.models import (\n",
+    "    SARFlowPanel,\n",
+    "    SARFlowSeparablePanel,\n",
+    "    SARNegBinFlowPanel,\n",
+    "    SARNegBinFlowSeparablePanel,\n",
+    ")\n",
+    "\n",
+    "T = 3\n",
+    "RHO_D, RHO_O, RHO_W = 0.20, 0.15, 0.05\n",
+    "DGP = dict(n=12, T=T, seed=0, rho_d=RHO_D, rho_o=RHO_O, beta_d=[1.0], beta_o=[0.4])\n",
+    "FIT = dict(draws=800, tune=800, chains=4, random_seed=0, progressbar=False)\n",
+    "\n",
+    "\n",
+    "def fit_timed(model, **kw):\n",
+    "    start = time.perf_counter()\n",
+    "    with (\n",
+    "        contextlib.redirect_stdout(io.StringIO()),\n",
+    "        contextlib.redirect_stderr(io.StringIO()),\n",
+    "    ):\n",
+    "        idata = model.fit(**kw)\n",
+    "    return idata, time.perf_counter() - start\n",
+    "\n",
+    "\n",
+    "def report(label, idata, secs, params=(\"rho_d\", \"rho_o\")):\n",
+    "    ess = az.ess(idata, var_names=list(params))\n",
+    "    rhat = az.rhat(idata, var_names=list(params))\n",
+    "    row = {\"seconds\": secs}\n",
+    "    for p in params:\n",
+    "        row[p] = float(idata.posterior[p].mean())\n",
+    "    row[\"min ess\"] = float(min(float(ess[p]) for p in params))\n",
+    "    row[\"max rhat\"] = float(max(float(rhat[p]) for p in params))\n",
+    "    return pd.Series(row, name=label)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "2",
+   "metadata": {},
+   "source": [
+    "## Fit continuous flows\n",
+    "\n",
+    "The DGP returns lognormal flows, so the model gets `log(y)`. `effects=0` fits a\n",
+    "pooled panel; the flow panel classes take the same `effects` argument as the\n",
+    "other panel families."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "3",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "data = generate_panel_flow_data(rho_w=RHO_W, sigma=0.5, **DGP)\n",
+    "G, X, names = data[\"G\"], data[\"X\"], data[\"col_names\"]\n",
+    "\n",
+    "print(f\"periods      : {T}\")\n",
+    "print(f\"flows/period : {len(data['y']) // T}\")\n",
+    "print(f\"true rho     : rho_d={RHO_D}, rho_o={RHO_O}, rho_w={RHO_W}\")\n",
+    "\n",
+    "model_free = SARFlowPanel(\n",
+    "    y=np.log(data[\"y\"]), W=G, X=X, T=T, col_names=names, effects=0\n",
+    ")\n",
+    "idata_free, secs_free = fit_timed(model_free, **FIT)\n",
+    "\n",
+    "az.summary(idata_free, var_names=[\"rho_d\", \"rho_o\", \"rho_w\", \"sigma\"]).round(3)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "4",
+   "metadata": {},
+   "source": [
+    "Look at `ess_bulk` and `r_hat` on the three ρ before anything else. They\n",
+    "will be poor, and that is the model rather than the sampler: with $\\rho_d$,\n",
+    "$\\rho_o$ and $\\rho_w$ all free they trade off along a nearly flat ridge that\n",
+    "one-at-a-time updates cannot traverse."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "5",
+   "metadata": {},
+   "source": [
+    "## Prefer the separable model\n",
+    "\n",
+    "`SARFlowSeparablePanel` pins $\\rho_w = -\\rho_d\\rho_o$, which removes the ridge\n",
+    "outright. Same data, same draws."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "6",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "data_sep = generate_panel_flow_data_separable(sigma=0.5, **DGP)\n",
+    "model_sep = SARFlowSeparablePanel(\n",
+    "    y=np.log(data_sep[\"y\"]),\n",
+    "    W=data_sep[\"G\"],\n",
+    "    X=data_sep[\"X\"],\n",
+    "    T=T,\n",
+    "    col_names=data_sep[\"col_names\"],\n",
+    "    effects=0,\n",
+    ")\n",
+    "idata_sep, secs_sep = fit_timed(model_sep, **FIT)\n",
+    "\n",
+    "pd.DataFrame(\n",
+    "    [\n",
+    "        report(\"SARFlowPanel (3 free rho)\", idata_free, secs_free),\n",
+    "        report(\"SARFlowSeparablePanel\", idata_sep, secs_sep),\n",
+    "    ]\n",
+    ").round(3)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "7",
+   "metadata": {},
+   "source": [
+    "The separable model buys well over an order of magnitude in effective\n",
+    "samples for less time. **Reach for it by default**, and use the unrestricted\n",
+    "model only when $\\rho_w$ is itself the object of interest — in which case expect\n",
+    "to run far longer chains and to check convergence carefully.\n",
+    "\n",
+    "You can confirm the restriction is exactly enforced rather than merely\n",
+    "encouraged:"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "8",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "identity_error = float(\n",
+    "    np.max(\n",
+    "        np.abs(\n",
+    "            idata_sep.posterior[\"rho_w\"].values\n",
+    "            + idata_sep.posterior[\"rho_d\"].values * idata_sep.posterior[\"rho_o\"].values\n",
+    "        )\n",
+    "    )\n",
+    ")\n",
+    "print(\n",
+    "    f\"max |rho_w + rho_d*rho_o| = {identity_error:.2e}   (deterministic, not sampled)\"\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "9",
+   "metadata": {},
+   "source": [
+    "## Fit flow counts\n",
+    "\n",
+    "The negative binomial panel classes take integer counts directly — no log\n",
+    "transform — and add a dispersion parameter `alpha`. They default to the\n",
+    "reduced-form Pólya–Gamma Gibbs sampler, and are currently **pooled-only**\n",
+    "(`effects=0`)."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "10",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "nb = generate_panel_negbin_flow_data(rho_w=RHO_W, alpha=2.0, **DGP)\n",
+    "nb_sep = generate_panel_negbin_flow_data_separable(alpha=2.0, **DGP)\n",
+    "\n",
+    "model_nb = SARNegBinFlowPanel(\n",
+    "    y=nb[\"y\"], W=nb[\"G\"], X=nb[\"X\"], T=T, col_names=nb[\"col_names\"], effects=0\n",
+    ")\n",
+    "idata_nb, secs_nb = fit_timed(model_nb, **FIT)\n",
+    "\n",
+    "model_nb_sep = SARNegBinFlowSeparablePanel(\n",
+    "    y=nb_sep[\"y\"],\n",
+    "    W=nb_sep[\"G\"],\n",
+    "    X=nb_sep[\"X\"],\n",
+    "    T=T,\n",
+    "    col_names=nb_sep[\"col_names\"],\n",
+    "    effects=0,\n",
+    ")\n",
+    "idata_nb_sep, secs_nb_sep = fit_timed(model_nb_sep, **FIT)\n",
+    "\n",
+    "pd.DataFrame(\n",
+    "    [\n",
+    "        report(\"SARNegBinFlowPanel\", idata_nb, secs_nb),\n",
+    "        report(\"SARNegBinFlowSeparablePanel\", idata_nb_sep, secs_nb_sep),\n",
+    "    ]\n",
+    ").round(3)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "11",
+   "metadata": {},
+   "source": [
+    "## What to check before trusting the output\n",
+    "\n",
+    "`r_hat` and `ess_bulk` on every ρ, and — for the count models — on `alpha` too.\n",
+    "\n",
+    ":::{warning} These panels are far too small to identify ρ\n",
+    "The examples above use a 12-unit grid over 3 periods so the docs build in under\n",
+    "a minute. At that size the spatial parameters of a flow model are **not\n",
+    "identified**, and the point estimates below will not match the values the data\n",
+    "were generated from — some come back with the wrong sign, and they move\n",
+    "substantially from one random seed to the next while `r_hat` stays at 1.00 and\n",
+    "`ess_bulk` runs into the thousands.\n",
+    "\n",
+    "Good convergence diagnostics say the sampler explored the posterior faithfully.\n",
+    "They say nothing about whether that posterior is concentrated near the truth.\n",
+    "Read the credible intervals, notice how wide they are, and size your data\n",
+    "accordingly — the count flow models want thousands of flows per period before\n",
+    "ρ_d and ρ_o separate.\n",
+    ":::"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "12",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "pd.DataFrame(\n",
+    "    [\n",
+    "        report(\"Gaussian, 3 free rho\", idata_free, secs_free),\n",
+    "        report(\"Gaussian, separable\", idata_sep, secs_sep),\n",
+    "        report(\"NegBin, 3 free rho\", idata_nb, secs_nb),\n",
+    "        report(\"NegBin, separable\", idata_nb_sep, secs_nb_sep),\n",
+    "    ]\n",
+    ").round(3)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "13",
+   "metadata": {},
+   "source": [
+    "## See also\n",
+    "\n",
+    "- [How to estimate origin–destination flow models](flow_models.ipynb) — the\n",
+    "  cross-sectional versions, with the effects decomposition in full\n",
+    "- [How to estimate Poisson origin–destination flow models](poisson_flow.ipynb)\n",
+    "  — counts without a dispersion parameter\n",
+    "- [Supported Models](../models.md) — equations and the full flow class list\n",
+    "- [How to set priors](priors.ipynb)"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "bayespreg",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.14.4"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}
