@@ -60,16 +60,22 @@ class TestAdequacy:
         region = (0.95, 0.96)
         pre = rook.aaa_fit(-0.99, 0.99, AAA_PILOT_NODES)
         assert not rook.aaa_adequate(pre, region)[0]
-        pre, nodes, check = rook.aaa_refine(pre, AAA_PILOT_NODES, region, -0.99, 0.99, 64)
+        pre, nodes, check = rook.aaa_refine(
+            pre, AAA_PILOT_NODES, region, -0.99, 0.99, 64
+        )
         assert check.passed
-        assert nodes > AAA_PILOT_NODES and (nodes - AAA_PILOT_NODES) % AAA_NODE_STEP == 0
+        assert (
+            nodes > AAA_PILOT_NODES and (nodes - AAA_PILOT_NODES) % AAA_NODE_STEP == 0
+        )
         assert check.nodes == nodes and check.support_points == len(pre.support_points)
         assert rook.last_pre is pre and rook.last_nodes == nodes
 
     def test_refinement_stops_at_the_cap(self, rook):
         region = (0.989, 0.99)
         pre = rook.aaa_fit(-0.99, 0.99, AAA_PILOT_NODES)
-        _, nodes, check = rook.aaa_refine(pre, AAA_PILOT_NODES, region, -0.99, 0.99, AAA_PILOT_NODES + 4)
+        _, nodes, check = rook.aaa_refine(
+            pre, AAA_PILOT_NODES, region, -0.99, 0.99, AAA_PILOT_NODES + 4
+        )
         assert nodes <= AAA_PILOT_NODES + 4
         assert not check.passed
 
@@ -89,7 +95,9 @@ class TestAdequacy:
         d = np.linalg.norm(pts[:, None, :] - pts[None, :, :], axis=-1)
         np.fill_diagonal(d, np.inf)
         idx = np.argpartition(d, k, axis=1)[:, :k]
-        A = sp.csr_matrix((np.ones(n * k), (np.repeat(np.arange(n), k), idx.ravel())), shape=(n, n))
+        A = sp.csr_matrix(
+            (np.ones(n * k), (np.repeat(np.arange(n), k), idx.ravel())), shape=(n, n)
+        )
         W = sp.csr_matrix(sp.diags(1.0 / np.asarray(A.sum(axis=1)).ravel()) @ A)
         knn = LogdetRefitter(W, "aaa")
         pre = knn.aaa_fit(-0.99, 0.99, AAA_PILOT_NODES)

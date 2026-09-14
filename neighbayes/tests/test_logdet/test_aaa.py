@@ -718,7 +718,9 @@ class TestSpuriousPoles:
         # analytic; the fitted approximant must not keep it.
         from neighbayes._logdet._aaa import aaa_poles, chol_aaa_logdet_precompute
 
-        pre = chol_aaa_logdet_precompute(_rook_W(50), rho_min=-0.99, rho_max=0.99, n_coarse=16)
+        pre = chol_aaa_logdet_precompute(
+            _rook_W(50), rho_min=-0.99, rho_max=0.99, n_coarse=16
+        )
         assert np.all(np.abs(aaa_poles(pre.support_points, pre.weights)) >= 1.0)
 
     def test_cleanup_removes_the_raw_fits_pole(self):
@@ -751,7 +753,9 @@ class TestSpuriousPoles:
 
         W = _rook_W(50)
         reach = [
-            aaa_reach(chol_aaa_logdet_precompute(W, rho_min=-0.99, rho_max=0.99, n_coarse=m))[0]
+            aaa_reach(
+                chol_aaa_logdet_precompute(W, rho_min=-0.99, rho_max=0.99, n_coarse=m)
+            )[0]
             for m in (14, 18, 22)
         ]
         assert 0.0 < reach[2] < reach[1] < reach[0] < 0.1

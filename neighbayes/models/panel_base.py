@@ -881,7 +881,10 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
 
         method = self._logdet_bounds.method
         sampler_builds_logdet = sampler_builds_evaluators(
-            method, self._W_sparse_NT is not None, self.logdet_refit, self.logdet_aaa_check
+            method,
+            self._W_sparse_NT is not None,
+            self.logdet_refit,
+            self.logdet_aaa_check,
         )
 
         gibbs_kwargs: dict[str, Any] = dict(

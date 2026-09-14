@@ -37,7 +37,9 @@ def W():
 def test_sampler_builds_evaluators():
     assert sampler_builds_evaluators("chol_aaa", True, refit=False, aaa_check=True)
     assert sampler_builds_evaluators("cheb_cholesky", True, refit=True, aaa_check=False)
-    assert not sampler_builds_evaluators("cheb_cholesky", True, refit=False, aaa_check=True)
+    assert not sampler_builds_evaluators(
+        "cheb_cholesky", True, refit=False, aaa_check=True
+    )
     assert not sampler_builds_evaluators("eigenvalue", True, refit=True, aaa_check=True)
     assert not sampler_builds_evaluators("chol_aaa", False, refit=True, aaa_check=True)
 
@@ -111,7 +113,9 @@ def test_panel_uses_the_per_period_block(W):
     assert ev.scalar_fn(0.4) == pytest.approx(exact, rel=1e-4)
 
 
-@pytest.mark.skipif(sys.platform.startswith("win"), reason="jaxlib unavailable on Windows")
+@pytest.mark.skipif(
+    sys.platform.startswith("win"), reason="jaxlib unavailable on Windows"
+)
 def test_jax_params_keep_their_shape_across_the_adaptation(W):
     wj = WarmupJacobian(W, "chol_aaa", refit=False)
     first = wj.initial(tune=100, jax=True)

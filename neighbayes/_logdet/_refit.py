@@ -452,7 +452,11 @@ class LogdetRefitter:
             return pre, pre.order, pre.err_est
         from ._aaa import _adaptive_n_coarse
 
-        nodes = int(n_coarse) if n_coarse is not None else _adaptive_n_coarse(rho_min, rho_max)
+        nodes = (
+            int(n_coarse)
+            if n_coarse is not None
+            else _adaptive_n_coarse(rho_min, rho_max)
+        )
         pre = ctx.fit_on(rho_min=rho_min, rho_max=rho_max, n_coarse=nodes)
         self.last_pre, self.last_nodes = pre, nodes
         return pre, len(pre.support_points), float("nan")
@@ -547,15 +551,27 @@ class LogdetRefitter:
             ctx = self._build_context()
             try:
                 if self.method == "chol_aaa":
-                    lam = eigsh(sp.csc_matrix(ctx.W_sym), k=3, sigma=-1.001, which="LM",
-                                return_eigenvectors=False)
+                    lam = eigsh(
+                        sp.csc_matrix(ctx.W_sym),
+                        k=3,
+                        sigma=-1.001,
+                        which="LM",
+                        return_eigenvectors=False,
+                    )
                 else:
-                    lam = eigs(sp.csc_matrix(ctx.W_sp), k=6, sigma=-1.001, which="LM",
-                               return_eigenvectors=False)
+                    lam = eigs(
+                        sp.csc_matrix(ctx.W_sp),
+                        k=6,
+                        sigma=-1.001,
+                        which="LM",
+                        return_eigenvectors=False,
+                    )
                 sing = 1.0 / np.asarray(lam, dtype=complex)
                 self._sigma_left = complex(sing[np.argmin(np.abs(sing + 1.0))])
             except Exception:  # noqa: BLE001 - any eigensolver failure falls back
-                _log.info("logdet AAA check: eigensolver failed; using -1 as the left singularity.")
+                _log.info(
+                    "logdet AAA check: eigensolver failed; using -1 as the left singularity."
+                )
                 self._sigma_left = complex(-1.0)
         return self._sigma_left
 
@@ -592,7 +608,9 @@ class LogdetRefitter:
             ok_left = _side(abs(lo - s_left), left)
         return bool(ok_right and ok_left), (right, left)
 
-    def aaa_refine(self, pre, n_coarse: int, region, rho_min: float, rho_max: float, max_nodes: int):
+    def aaa_refine(
+        self, pre, n_coarse: int, region, rho_min: float, rho_max: float, max_nodes: int
+    ):
         """Add nodes to an AAA fit until :meth:`aaa_adequate` passes or ``max_nodes`` binds.
 
         Returns ``(precompute, n_coarse, AAACheck)``.  Each rebuild factorizes at
@@ -632,7 +650,11 @@ class LogdetRefitter:
                 )
             coeffs = np.zeros(cap, dtype=np.float64)
             coeffs[:order] = pre.coeffs
-            return (jnp.asarray(coeffs), jnp.float64(pre.rho_min), jnp.float64(pre.rho_max))
+            return (
+                jnp.asarray(coeffs),
+                jnp.float64(pre.rho_min),
+                jnp.float64(pre.rho_max),
+            )
         order = len(pre.support_points)
         if order > cap:
             raise ValueError(
@@ -685,7 +707,9 @@ class LogdetRefitter:
         ensure_x64()
 
         cap = int(capacity)
-        pre, order, err_est = self._fit(rho_min, rho_max, cap=cap, tol=tol, n_coarse=n_coarse)
+        pre, order, err_est = self._fit(
+            rho_min, rho_max, cap=cap, tol=tol, n_coarse=n_coarse
+        )
         if order > cap:
             raise ValueError(
                 f"Refit needs {order} terms but the parameter capacity is {cap}."

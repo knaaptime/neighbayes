@@ -72,7 +72,9 @@ def _rho(idata) -> np.ndarray:
 
 @pytest.mark.parametrize("backend", BACKENDS)
 class TestAAANodeCheck:
-    def test_on_by_default_and_keeps_the_pilot_away_from_the_singularity(self, mid, backend):
+    def test_on_by_default_and_keeps_the_pilot_away_from_the_singularity(
+        self, mid, backend
+    ):
         idata = _fit(mid, backend)
         assert idata.attrs["logdet_aaa_nodes"] == 14
         assert idata.attrs["logdet_aaa_check_passed"] == 1
@@ -119,7 +121,10 @@ def test_panel_fe_runs_refit_and_check():
 
     A = sp.eye(N, format="csc") - 0.5 * sp.csc_matrix(W)
     y = np.concatenate(
-        [spsolve(A, 2.0 * X[t * N:(t + 1) * N, 0] + rng.normal(size=N)) for t in range(T)]
+        [
+            spsolve(A, 2.0 * X[t * N : (t + 1) * N, 0] + rng.normal(size=N))
+            for t in range(T)
+        ]
     )
     model = SARPanelFE(y=y, X=X, W=W, N=N, T=T, effects=1, logdet_method="chol_aaa")
     idata = model.fit(

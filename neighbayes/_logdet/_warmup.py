@@ -60,7 +60,8 @@ def sampler_builds_evaluators(
     if not has_W or method is None:
         return False
     return bool(
-        (refit and method in REFITTABLE_METHODS) or (aaa_check and method in AAA_METHODS)
+        (refit and method in REFITTABLE_METHODS)
+        or (aaa_check and method in AAA_METHODS)
     )
 
 
@@ -250,7 +251,11 @@ class WarmupJacobian:
             if window is not None:
                 pre, order, err_est = fitter._fit(window[0], window[1], cap=cap)
                 self.window = fitter._window(
-                    pre, order, err_est, lo_p, hi_p,
+                    pre,
+                    order,
+                    err_est,
+                    lo_p,
+                    hi_p,
                     (int(np.size(warmup_draws)), self.refit_pad_sd),
                 )
                 self._interval = (float(pre.rho_min), float(pre.rho_max))
@@ -275,8 +280,14 @@ class WarmupJacobian:
             idata.attrs["logdet_aaa_nodes"] = int(chk.nodes)
             idata.attrs["logdet_aaa_support_points"] = int(chk.support_points)
             if chk.region is not None:
-                idata.attrs["logdet_aaa_region"] = [float(chk.region[0]), float(chk.region[1])]
-                idata.attrs["logdet_aaa_reach"] = [float(chk.reach[0]), float(chk.reach[1])]
+                idata.attrs["logdet_aaa_region"] = [
+                    float(chk.region[0]),
+                    float(chk.region[1]),
+                ]
+                idata.attrs["logdet_aaa_reach"] = [
+                    float(chk.reach[0]),
+                    float(chk.reach[1]),
+                ]
                 idata.attrs["logdet_aaa_check_passed"] = int(chk.passed)
         info = self.window
         if info is None:
@@ -285,7 +296,9 @@ class WarmupJacobian:
         idata.attrs["logdet_refit_order"] = info.order
         idata.attrs["logdet_refit_pad_sd"] = info.pad_sd
         idata.attrs["logdet_refit_err_est"] = info.err_est
-        msg = boundary_warning(np.asarray(retained_draws, dtype=np.float64).ravel(), info)
+        msg = boundary_warning(
+            np.asarray(retained_draws, dtype=np.float64).ravel(), info
+        )
         if msg is not None:
             warnings.warn(msg, RuntimeWarning, stacklevel=3)
 

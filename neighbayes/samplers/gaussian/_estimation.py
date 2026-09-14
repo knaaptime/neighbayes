@@ -379,7 +379,9 @@ class GibbsEstimation:
                 "Use chain_method='vectorized' for JAX-native parallelism."
             )
         if chain_method != "vectorized":
-            raise ValueError(f"Unknown chain_method {chain_method!r}; use 'vectorized'.")
+            raise ValueError(
+                f"Unknown chain_method {chain_method!r}; use 'vectorized'."
+            )
 
         self.warmup_jacobian = None
         # Build JAX-native logdet function
