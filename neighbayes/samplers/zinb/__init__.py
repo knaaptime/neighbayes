@@ -24,7 +24,7 @@ __all__ = [
 #
 # Gibbs-only (no NUTS build).  Both backends fit the *same* reduced-form ZINB
 # (reduced-form SAR-logit selection + reduced-form SAR-NB count): "numpy"
-# (CHOLMOD) and "jax" (device-parallel, sparsax-KLU + pgjax).  ``auto``
+# (CHOLMOD) and "jax" (thread-parallel, sparsax-KLU + pgjax).  ``auto``
 # prefers jax (fastest for cross-section).
 
 

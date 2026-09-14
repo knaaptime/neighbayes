@@ -312,9 +312,8 @@ class SEMLogit(SpatialModel):
         # Define the per-chain function
         _use_jax_full = sample_method in ("jax_dense", "cholmod_jax")
 
-        # JAX dense path: run all chains together via jax.vmap so the
-        # Gibbs step JITs once and every chain executes inside one
-        # fused XLA program.
+        # JAX dense path: the Gibbs step compiles once and the chains run in
+        # parallel threads (see run_chains_chunked).
         if _use_jax_full:
             if return_eta:
                 raise NotImplementedError(

@@ -12,9 +12,10 @@ Pace 2009).
 
 Architecture
 ------------
-The sampler uses a Python loop that calls a JIT-compiled Gibbs step
-for each iteration.  PG draws use ``pgjax.pg_sample`` (exact Devroye
-sampler, on-device) when installed; otherwise the ``polyagamma`` C
+Each chain runs JIT-compiled chunks of Gibbs sweeps (a ``lax.scan``)
+from its own thread, so chains run in parallel on separate cores (see
+:func:`..._utils._jax_utils.run_chains_chunked`).  PG draws use
+``pgjax.pg_sample`` (on-device) when installed; otherwise the ``polyagamma`` C
 extension is called via ``jax.pure_callback``.  Both produce exact
 PG(h, z) draws for any h (integer or non-integer), eliminating the
 systematic mean bias of the truncated Gamma-series approximation that
@@ -97,63 +98,36 @@ def _make_sparse_solvers(sparse_ctx):
 
     Returns ``(solve, matvec_W)`` where
 
-    - ``solve(rho, rhs)`` → ``(I − ρW)⁻¹ rhs`` via ``sparsax.lu_solve`` (KLU),
+    - ``solve(rho, rhs)`` → ``(I − ρW)⁻¹ rhs`` via sparsax's sparse LU,
     - ``matvec_W(v)`` → ``W @ v`` via BCOO.
 
-    ``sparsax.lu_solve`` (SuiteSparse KLU) is vmap-safe *and* reuses its
+    The LU is KLU or UMFPACK, whichever :func:`.._utils._sparsax_lu.sparsax_lu`
+    measures faster on this pattern.  Both are vmap-safe *and* reuse their
     numeric factorization: the fill-reducing analysis is cached by pattern, and
-    a content-addressed LU factor cache keyed on ``Ax`` means the m+1 solves of
-    a Krylov basis at a fixed ρ pay one ``klu_factor`` and m cheap solves — per
-    chain — even under ``jax.vmap`` over chains.  See ``set_lu_cache_size`` — the
-    factor cache must be ≥ the chain count for the reuse to land.
+    a content-addressed factor cache keyed on ``Ax`` means the m+1 solves of a
+    Krylov basis at a fixed ρ pay one factorization and m cheap solves per
+    chain.  See ``set_sparsax_lu_cache_size``: the factor cache must hold at
+    least one factor per chain for the reuse to land.
     """
     import jax.numpy as jnp
-    import sparsax
+
+    from .._utils._sparsax_lu import sparsax_lu
 
     Ai = jnp.asarray(sparse_ctx["Ai"], jnp.int32)
     Aj = jnp.asarray(sparse_ctx["Aj"], jnp.int32)
     eye_vals = jnp.asarray(sparse_ctx["eye_vals"])
     w_vals = jnp.asarray(sparse_ctx["w_vals"])
     W_bcoo = sparse_ctx["W_bcoo"]
+    # Route on a mid-range ρ; the probe must factorize a nonsingular matrix.
+    lu_solve = sparsax_lu(Ai, Aj, eye_vals - 0.5 * w_vals, W_bcoo.shape[0]).solve
 
     def solve(rho, rhs):
-        return sparsax.lu_solve(Ai, Aj, eye_vals - rho * w_vals, rhs)
+        return lu_solve(Ai, Aj, eye_vals - rho * w_vals, rhs)
 
     def matvec_W(v):
         return W_bcoo @ v
 
     return solve, matvec_W
-
-
-def _run_chains_device_parallel(
-    warm_one, draw_one, state0, warm_keys, draw_keys, chains, tune
-):
-    """Drive per-chain warmup + draws across CPU devices.
-
-    Uses ``jax.pmap`` — one chain per CPU device, i.e. true multi-core
-    parallelism, the analogue of the NumPy path's joblib processes but faster —
-    when enough host devices are available (see
-    :func:`neighbayes._auto_configure_cpu_devices`), otherwise falls back to
-    ``jax.jit(jax.vmap(...))`` on a single device.
-
-    ``vmap`` alone runs on one device and only benefits from XLA's intra-op
-    threading, which barely helps the small-op Gibbs sweep — so it loses to the
-    process-parallel NumPy backend.  ``pmap`` maps each chain to its own device
-    and overtakes it.  (Auto-parallel ``jit`` + ``in_shardings`` is *worse* here:
-    the exact PG host callback pins to device 0, forcing the SPMD partitioner to
-    gather every chain to device 0 each sweep.)
-
-    Returns the stacked draw traces (whatever ``draw_one`` returns), leading
-    axis = chains.
-    """
-    import jax
-
-    ndev = jax.local_device_count()
-    if chains > 1 and ndev >= chains:
-        state = jax.pmap(warm_one)(state0, warm_keys) if tune > 0 else state0
-        return jax.pmap(draw_one)(state, draw_keys)
-    state = jax.jit(jax.vmap(warm_one))(state0, warm_keys) if tune > 0 else state0
-    return jax.jit(jax.vmap(draw_one))(state, draw_keys)
 
 
 def _build_krylov_basis_jax(solve1, X_jax, matvec_W, n, k, degree):
@@ -386,6 +360,7 @@ def _slice_sample_rho_jax(
     key,
     X_jax=None,
     solve_at=None,
+    return_steps=False,
 ):
     """1-D slice sampler for ρ using jax.lax.while_loop.
 
@@ -407,11 +382,16 @@ def _slice_sample_rho_jax(
     X_jax, solve_at :
         Passed to the log-density for the direct sparse-solve fallback
         when candidates are outside the Krylov radius.
+    return_steps : bool, default False
+        Also return the left and right step-out counts, which drive the
+        warmup width adaptation.
 
     Returns
     -------
     rho_new : jax.numpy.ndarray (scalar)
         New ρ value.
+    steps_left, steps_right : jax.numpy.ndarray (scalar)
+        Step-out counts; returned only when ``return_steps``.
     """
     import jax
     import jax.numpy as jnp
@@ -451,10 +431,10 @@ def _slice_sample_rho_jax(
         return (L_val > rho_lower) & (log_density(L_val) > log_u)
 
     def step_out_left_body(carry):
-        L_val, _ = carry
-        return (jnp.maximum(L_val - w, rho_lower), jnp.float64(0.0))
+        L_val, count = carry
+        return (jnp.maximum(L_val - w, rho_lower), count + 1.0)
 
-    L_final, _ = jax.lax.while_loop(
+    L_final, steps_left = jax.lax.while_loop(
         step_out_left_cond, step_out_left_body, (L, jnp.float64(0.0))
     )
 
@@ -464,10 +444,10 @@ def _slice_sample_rho_jax(
         return (R_val < rho_upper) & (log_density(R_val) > log_u)
 
     def step_out_right_body(carry):
-        R_val, _ = carry
-        return (jnp.minimum(R_val + w, rho_upper), jnp.float64(0.0))
+        R_val, count = carry
+        return (jnp.minimum(R_val + w, rho_upper), count + 1.0)
 
-    R_final, _ = jax.lax.while_loop(
+    R_final, steps_right = jax.lax.while_loop(
         step_out_right_cond, step_out_right_body, (R, jnp.float64(0.0))
     )
 
@@ -495,6 +475,8 @@ def _slice_sample_rho_jax(
         (L_final, R_final, key, rho_current, jnp.bool_(False)),
     )
 
+    if return_steps:
+        return rho_new, steps_left, steps_right
     return rho_new
 
 
@@ -554,13 +536,13 @@ def _make_reduced_gibbs_step(
     gibbs_step : callable
         A JIT-compiled function with signature::
 
-            gibbs_step(state, key, slice_width) -> (new_state, accept)
+            gibbs_step(state, key, slice_width) -> (new_state, eta, rho_steps)
 
-        where ``state`` is a dict with keys ``beta``, ``rho``,
-        ``alpha``, ``omega``, ``key`` is a JAX PRNG key,
-        ``slice_width`` is a ``jnp.float64`` stepping-out width,
-        and ``accept`` is always ``jnp.float64(1.0)`` (slice
-        sampling always accepts).
+        where ``state`` is a dict with keys ``beta``, ``rho``, ``alpha``,
+        ``omega``, ``V_stack``, ``rho_basis``; ``key`` is a JAX PRNG key;
+        ``slice_width`` is the ρ slice's stepping-out width; ``eta`` is the
+        fitted latent field at the new state; and ``rho_steps`` is the
+        ``(left, right)`` pair of step-out counts from the ρ slice.
     """
     import jax
     import jax.numpy as jnp
@@ -635,7 +617,7 @@ def _make_reduced_gibbs_step(
         _drho_check = rho - rho_basis_prev
 
         # Clamp ρ away from the singular boundary before building the Krylov
-        # basis — sparsax KLU fails on near-singular I − ρW (ρ ≈ ±1).
+        # basis — sparsax's LU fails on near-singular I − ρW (ρ ≈ ±1).
         # Matches the NumPy path's try/except fallback to ρ = 0.
         _rho_safe = jnp.clip(rho, -0.995, 0.995)
 
@@ -676,7 +658,7 @@ def _make_reduced_gibbs_step(
         # actual convergence radius, and the sparsax direct solve evaluates
         # candidates outside that region.  This matches the NumPy path's
         # conditional fallback and lets the sampler traverse the full ρ support.
-        rho_new = _slice_sample_rho_jax(
+        rho_new, steps_left, steps_right = _slice_sample_rho_jax(
             rho_current=rho,
             V_stack=V_stack,
             rho_basis=rho_basis,
@@ -693,6 +675,7 @@ def _make_reduced_gibbs_step(
             key=key_rho,
             X_jax=X_jax,
             solve_at=lambda rho_val, rhs: _solve(rho_val, rhs),
+            return_steps=True,
         )
 
         # ── Block 2: β | ρ, ω, α, y — conjugate normal ──
@@ -772,8 +755,9 @@ def _make_reduced_gibbs_step(
         # Return the fitted latent η = (I−ρ_new W)⁻¹Xβ_new so the runner can form
         # the pointwise NB log-likelihood on-device (reusing the sweep's solve),
         # instead of a post-hoc per-draw host-solve loop (which dwarfed the
-        # sampling cost — 0.46 ms/draw).
-        return new_state, eta_new
+        # sampling cost — 0.46 ms/draw).  The ρ slice's step-out counts drive
+        # the runner's warmup width adaptation.
+        return new_state, eta_new, (steps_left, steps_right)
 
     return gibbs_step
 
@@ -925,11 +909,9 @@ def run_chains_jax_reduced(
 ) -> list[dict]:
     """Run multiple reduced-form SAR-NB Gibbs chains using JAX.
 
-    Uses ``jax.pure_callback`` to call the exact C extension for PG
-    draws, which produces exact PG(h, z) draws for any h (integer or
-    non-integer).  This eliminates the systematic bias of the
-    Gamma-series approximation that caused α to collapse over many
-    Gibbs iterations.
+    Chains run in parallel, one thread per chain, each an ordinary ``jax.jit``
+    program (see :func:`..._utils._jax_utils.run_chains_chunked`).  PG draws
+    are exact for any h (see :func:`..._utils._jax_utils.make_pg_draw`).
 
     Parameters
     ----------
@@ -946,7 +928,10 @@ def run_chains_jax_reduced(
     krylov_degree : int, default 8
     krylov_dmax : float, default 0.15
     slice_width : float, default 0.2
-        Stepping-out width for the ρ slice sampler.
+        Initial stepping-out width for the ρ slice sampler.  Each chain adapts
+        it during warmup by the NumPy path's rule
+        (:func:`.._utils._jax_slice.adapt_slice_width`) and keeps it fixed for
+        the draws.
 
     Returns
     -------
@@ -968,24 +953,20 @@ def run_chains_jax_reduced(
     X_jax = jnp.asarray(X, dtype=jnp.float64)
     sparse_ctx = _build_sparse_ctx(W_sparse, n)
 
-    # sparsax's KLU factor cache must hold at least one factor per chain (each
+    # sparsax's LU factor cache must hold at least one factor per chain (each
     # chain has its own ρ) for the Krylov basis to reuse the factorization
-    # across its m+1 solves under vmap; size generously to also cover the
-    # separate ρ_new (X̃) solve and occasional slice fallbacks per sweep.
-    import sparsax
+    # across its m+1 solves; size generously to also cover the separate ρ_new
+    # (X̃) solve and occasional slice fallbacks per sweep.
+    from .._utils._sparsax_lu import set_sparsax_lu_cache_size
 
-    sparsax.set_lu_cache_size(max(32, 6 * chains))
+    set_sparsax_lu_cache_size(max(32, 6 * chains))
 
     slice_width_jax = jnp.float64(slice_width)
 
     if jax_seeds is None:
         jax_seeds = list(range(chains))
 
-    # Build the Gibbs step once; all chains run together under jax.vmap.  The
-    # step is vmap-safe because its non-symmetric solves use sparsax.lu_solve
-    # (SuiteSparse KLU): vmap-safe and factor-reusing, so the basis costs one
-    # klu_factor + m solves per chain.  This matches logit's
-    # run_chains_jax_vectorized (which uses sparsax's Cholesky for SPD W).
+    # Build the Gibbs step once; every chain runs the same compiled program.
     gibbs_step = _make_reduced_gibbs_step(
         y_jax=y_jax,
         X_jax=X_jax,
@@ -999,65 +980,38 @@ def run_chains_jax_reduced(
         krylov_reuse=krylov_reuse,
     )
 
-    # Stack per-chain inits into a batched pytree (leading axis = chain).
-    # V_stack and rho_basis are initialized to zeros — the first sweep always
-    # rebuilds because |rho_init - 0| > reuse_threshold.
+    # V_stack and rho_basis start at zero — the first sweep always rebuilds the
+    # basis because |rho_init - 0| > reuse_threshold.
     _V_init = jnp.zeros((krylov_degree + 1, n, k), dtype=jnp.float64)
-    state0 = {
-        "beta": jnp.asarray(np.stack([i.beta for i in inits]), dtype=jnp.float64),
-        "rho": jnp.asarray([float(i.rho) for i in inits], dtype=jnp.float64),
-        "alpha": jnp.asarray([float(i.alpha) for i in inits], dtype=jnp.float64),
-        "omega": jnp.asarray(np.stack([i.omega for i in inits]), dtype=jnp.float64),
-        "V_stack": jnp.broadcast_to(_V_init, (chains,) + _V_init.shape),
-        "rho_basis": jnp.zeros(chains, dtype=jnp.float64),
-    }
-    warm_keys = jnp.stack([jax.random.PRNGKey(int(s)) for s in jax_seeds])
-    draw_keys = jnp.stack(
-        [jax.random.fold_in(jax.random.PRNGKey(int(s)), 1) for s in jax_seeds]
-    )
+    states = [
+        {
+            "beta": jnp.asarray(i.beta, dtype=jnp.float64),
+            "rho": jnp.float64(float(i.rho)),
+            "alpha": jnp.float64(float(i.alpha)),
+            "omega": jnp.asarray(i.omega, dtype=jnp.float64),
+            "V_stack": _V_init,
+            "rho_basis": jnp.float64(0.0),
+            "slice_width": slice_width_jax,
+        }
+        for i in inits
+    ]
+    warm_keys = [jax.random.PRNGKey(int(s)) for s in jax_seeds]
+    draw_keys = [jax.random.fold_in(jax.random.PRNGKey(int(s)), 1) for s in jax_seeds]
 
-    def _warm_chunk(s, key, n_iters):
-        def body(_, carry):
-            st, kk = carry
-            kk, sk = jax.random.split(kk)
-            st, _ = gibbs_step(st, sk, slice_width_jax)
-            return (st, kk)
+    from .._utils._jax_slice import adapt_slice_width
+    from .._utils._jax_utils import run_chains_chunked
 
-        st, _ = jax.lax.fori_loop(0, n_iters, body, (s, key))
-        return st
-
-    def _draw_chunk(s, key, n_iters):
-        def body(carry, _):
-            st, kk = carry
-            kk, sk = jax.random.split(kk)
-            st, eta = gibbs_step(st, sk, slice_width_jax)
-            return (st, kk), (st["rho"], st["beta"], st["alpha"], eta)
-
-        (s_final, k_final), traces = jax.lax.scan(body, (s, key), None, length=n_iters)
-        # traces: tuple of (n_iters, ...) arrays
-        return s_final, k_final, traces
-
-    # Chunked warmup: update the progress bar between chunks so it
-    # advances during the (potentially long) JIT-compiled warmup phase
-    # rather than sitting at 0 until the end.
-    adapt_window = max(50, tune // 10) if tune > 0 else 50
-    _fn_cache: dict[tuple, object] = {}
-
-    # One chain per CPU device (pmap) when enough host devices exist,
-    # otherwise jit(vmap).  Mirrors the logit runner's _pv.
-    _use_pmap = chains > 1 and jax.local_device_count() >= chains
-
-    def _pv(f):
-        return jax.pmap(f) if _use_pmap else jax.jit(jax.vmap(f))
-
-    def _get_fn(kind: str, n_iters: int):
-        key = (kind, n_iters)
-        if key not in _fn_cache:
-            if kind == "warm":
-                _fn_cache[key] = _pv(lambda s_, k_: _warm_chunk(s_, k_, n_iters))
-            else:
-                _fn_cache[key] = _pv(lambda s_, k_: _draw_chunk(s_, k_, n_iters))
-        return _fn_cache[key]
+    def _sweep(st, key, tuning):
+        width = st["slice_width"]
+        core = {name: value for name, value in st.items() if name != "slice_width"}
+        core, eta, (steps_left, steps_right) = gibbs_step(core, key, width)
+        width = adapt_slice_width(width, steps_left, steps_right, tuning)
+        return dict(core, slice_width=width), (
+            core["rho"],
+            core["beta"],
+            core["alpha"],
+            eta,
+        )
 
     with GibbsProgressBarManager(
         chains=chains,
@@ -1070,41 +1024,20 @@ def run_chains_jax_reduced(
             for c in range(chains):
                 pm.start_chain(c)
 
-        # ── Phase 1: warmup — chunked fori_loop ──
-        state = state0
-        keys = warm_keys
-        iter_done = 0
-        while iter_done < tune:
-            step = min(adapt_window, tune - iter_done)
-            fn = _get_fn("warm", step)
-            state = fn(state, keys)
-            jax.block_until_ready(state["rho"])
-            iter_done += step
+        def _progress(i, tuning):
             if pm is not None:
                 for c in range(chains):
-                    pm.update(c, iter_done - 1, tuning=True)
+                    pm.update(c, i, tuning=tuning)
 
-        # ── Phase 2: post-warmup draws — chunked scan ──
-        draw_window = max(50, draws // 10) if draws > 0 else 50
-        keys = draw_keys
-        iter_done = 0
-        trace_parts = []  # list of (rho, beta, alpha, eta) per chunk
-        while iter_done < draws:
-            step = min(draw_window, draws - iter_done)
-            fn = _get_fn("draw", step)
-            state, keys, traces = fn(state, keys)
-            jax.block_until_ready(traces[0])
-            trace_parts.append(traces)
-            iter_done += step
-            if pm is not None:
-                for c in range(chains):
-                    pm.update(c, tune + iter_done - 1, tuning=False)
-
-        # Concatenate chunk traces
-        rho_all = np.concatenate([np.asarray(t[0]) for t in trace_parts], axis=1)
-        beta_all = np.concatenate([np.asarray(t[1]) for t in trace_parts], axis=1)
-        alpha_all = np.concatenate([np.asarray(t[2]) for t in trace_parts], axis=1)
-        eta_all = np.concatenate([np.asarray(t[3]) for t in trace_parts], axis=1)
+        _, (rho_all, beta_all, alpha_all, eta_all) = run_chains_chunked(
+            _sweep,
+            states,
+            warm_keys,
+            draw_keys,
+            tune=tune,
+            draws=draws,
+            on_chunk=_progress,
+        )
 
     # Pointwise NB log-likelihood from the fitted η collected during sampling —
     # no post-hoc solves (matching how the NumPy path reuses its sweep η).

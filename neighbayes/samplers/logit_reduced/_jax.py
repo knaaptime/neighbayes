@@ -1,8 +1,8 @@
 r"""JAX reduced-form SAR-logit Pólya–Gamma Gibbs sampler.
 
 Reuses the reduced-form SAR-NB machinery (``..negbin_reduced._jax``): the sparse
-``(I−ρW)⁻¹`` solve (sparsax KLU, never densified), the shift-invert Krylov
-basis, the device-parallel (pmap) runner.  Only the Pólya–Gamma augmentation
+``(I−ρW)⁻¹`` solve (sparsax LU, never densified), the shift-invert Krylov
+basis, the thread-parallel chain runner.  Only the Pólya–Gamma augmentation
 differs — Bernoulli (h = 1, κ = y − ½, working response κ/ω, no α) instead of
 Negative-Binomial.
 """
@@ -168,6 +168,11 @@ def _make_reduced_logit_gibbs_step(
 
     @jax.jit
     def gibbs_step(state, key, slice_width):
+        """One sweep; returns ``(new_state, η, (steps_left, steps_right))``.
+
+        The step-out counts come from the ρ slice and drive the runner's warmup
+        width adaptation.
+        """
         beta = state["beta"]
         rho = state["rho"]
         key_rho, key_beta, key_pg = jax.random.split(key, 3)
@@ -178,7 +183,7 @@ def _make_reduced_logit_gibbs_step(
         _drho_check = rho - rho_basis_prev
 
         # Clamp ρ away from the singular boundary before building the Krylov
-        # basis — sparsax KLU fails on near-singular I − ρW (ρ ≈ ±1).
+        # basis — sparsax's LU fails on near-singular I − ρW (ρ ≈ ±1).
         _rho_safe = jnp.clip(rho, -0.995, 0.995)
 
         def _rebuild_basis(_):
@@ -221,8 +226,8 @@ def _make_reduced_logit_gibbs_step(
                 solve_at=lambda rho_val, rhs: _solve(rho_val, rhs),
             )
 
-        rho_new, _ = jax_slice_sample_1d(
-            _dens, rho, rho_lo, rho_hi, key=key_rho, w=slice_width
+        rho_new, _, steps_left, steps_right = jax_slice_sample_1d(
+            _dens, rho, rho_lo, rho_hi, key=key_rho, w=slice_width, return_steps=True
         )
 
         # ── Block 2: β | ρ, ω, y — conjugate normal ──
@@ -270,7 +275,8 @@ def _make_reduced_logit_gibbs_step(
             "V_stack": V_stack,
             "rho_basis": rho_basis,
         }
-        return new_state, eta_new  # η for the on-device Bernoulli log-lik
+        # η feeds the on-device Bernoulli log-likelihood.
+        return new_state, eta_new, (steps_left, steps_right)
 
     return gibbs_step
 
@@ -293,18 +299,18 @@ def run_chains_jax_reduced_logit(
     progressbar=False,
     krylov_reuse=True,
 ):
-    """Run the reduced-form SAR-logit PG-Gibbs sampler (device-parallel).
+    """Run the reduced-form SAR-logit PG-Gibbs sampler (chains in parallel threads).
 
     Returns one dict per chain with keys ``rho``, ``beta``, ``log_lik``.
+    ``slice_width`` is the initial ρ slice width; each chain adapts it during
+    warmup and holds it for the draws.
     """
     import jax
     import jax.numpy as jnp
 
     from ..._jax_dispatch import ensure_x64
-    from ..negbin_reduced._jax import (
-        _build_sparse_ctx,
-        _run_chains_device_parallel,
-    )
+    from .._utils._jax_utils import run_chains_chunked
+    from ..negbin_reduced._jax import _build_sparse_ctx
 
     ensure_x64()
     chains = len(inits)
@@ -313,11 +319,10 @@ def run_chains_jax_reduced_logit(
     X_jax = jnp.asarray(X, dtype=jnp.float64)
     sparse_ctx = _build_sparse_ctx(W_sparse, n)
 
-    import sparsax
+    from .._utils._sparsax_lu import set_sparsax_lu_cache_size
 
-    sparsax.set_lu_cache_size(max(32, 6 * chains))
+    set_sparsax_lu_cache_size(max(32, 6 * chains))
 
-    slice_width_jax = jnp.float64(slice_width)
     if jax_seeds is None:
         jax_seeds = list(range(chains))
 
@@ -335,44 +340,32 @@ def run_chains_jax_reduced_logit(
     )
 
     _V_init = jnp.zeros((krylov_degree + 1, n, k), dtype=jnp.float64)
-    state0 = {
-        "beta": jnp.asarray(np.stack([i.beta for i in inits]), dtype=jnp.float64),
-        "rho": jnp.asarray([float(i.rho) for i in inits], dtype=jnp.float64),
-        "omega": jnp.asarray(np.stack([i.omega for i in inits]), dtype=jnp.float64),
-        "V_stack": jnp.broadcast_to(_V_init, (chains,) + _V_init.shape),
-        "rho_basis": jnp.zeros(chains, dtype=jnp.float64),
-    }
-    warm_keys = jnp.stack([jax.random.PRNGKey(int(s)) for s in jax_seeds])
-    draw_keys = jnp.stack(
-        [jax.random.fold_in(jax.random.PRNGKey(int(s)), 1) for s in jax_seeds]
+    states = [
+        {
+            "beta": jnp.asarray(i.beta, dtype=jnp.float64),
+            "rho": jnp.float64(float(i.rho)),
+            "omega": jnp.asarray(i.omega, dtype=jnp.float64),
+            "V_stack": _V_init,
+            "rho_basis": jnp.float64(0.0),
+            "slice_width": jnp.float64(slice_width),
+        }
+        for i in inits
+    ]
+    warm_keys = [jax.random.PRNGKey(int(s)) for s in jax_seeds]
+    draw_keys = [jax.random.fold_in(jax.random.PRNGKey(int(s)), 1) for s in jax_seeds]
+
+    from .._utils._jax_slice import adapt_slice_width
+
+    def _sweep(st, key, tuning):
+        width = st["slice_width"]
+        core = {name: value for name, value in st.items() if name != "slice_width"}
+        core, eta, (steps_left, steps_right) = gibbs_step(core, key, width)
+        width = adapt_slice_width(width, steps_left, steps_right, tuning)
+        return dict(core, slice_width=width), (core["rho"], core["beta"], eta)
+
+    _, (rho_all, beta_all, eta_all) = run_chains_chunked(
+        _sweep, states, warm_keys, draw_keys, tune=tune, draws=draws
     )
-
-    def _warm_one(s, key):
-        def body(_, carry):
-            st, kk = carry
-            kk, sk = jax.random.split(kk)
-            st, _ = gibbs_step(st, sk, slice_width_jax)
-            return (st, kk)
-
-        st, _ = jax.lax.fori_loop(0, tune, body, (s, key))
-        return st
-
-    def _draw_one(s, key):
-        def body(carry, _):
-            st, kk = carry
-            kk, sk = jax.random.split(kk)
-            st, eta = gibbs_step(st, sk, slice_width_jax)
-            return (st, kk), (st["rho"], st["beta"], eta)
-
-        _, traces = jax.lax.scan(body, (s, key), None, length=draws)
-        return traces
-
-    rho_all, beta_all, eta_all = _run_chains_device_parallel(
-        _warm_one, _draw_one, state0, warm_keys, draw_keys, chains, tune
-    )
-    rho_all = np.asarray(rho_all)
-    beta_all = np.asarray(beta_all)
-    eta_all = np.asarray(eta_all)
 
     # Pointwise Bernoulli-logit log-likelihood from the fitted η (no post-hoc solves).
     from ._core import _logit_loglik_pointwise

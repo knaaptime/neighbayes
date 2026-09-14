@@ -266,7 +266,7 @@ def _make_gibbs_step_with_data(
             return Ax + diag_vals
 
     @eqx.filter_jit
-    def gibbs_step(state, key):
+    def gibbs_step(state, key, slice_width=0.2, return_steps=False):
         """One complete Gibbs sweep: ω → η → β → σ² → ρ (slice) → α (slice).
 
         Parameters
@@ -275,6 +275,10 @@ def _make_gibbs_step_with_data(
             Current state.
         key : jax.random.PRNGKey
             JAX random key.
+        slice_width : float or jax.numpy.float64, default 0.2
+            Stepping-out width for the ρ slice sampler.
+        return_steps : bool, default False
+            Also return the ρ slice's ``(left, right)`` step-out counts.
 
         Returns
         -------
@@ -282,6 +286,8 @@ def _make_gibbs_step_with_data(
             Updated state.
         accept : bool
             Always True (slice sampling has no rejection step).
+        steps : tuple of jax.numpy scalars
+            Step-out counts; returned only when ``return_steps``.
         """
         eta = state.eta
         beta = state.beta
@@ -421,10 +427,9 @@ def _make_gibbs_step_with_data(
                     # operands, so the direct factorization would run on every
                     # candidate and the basis would be pure added work (measured
                     # 0.84x end-to-end).  `cond` genuinely branches here because
-                    # chains are mapped with `pmap` — one chain per CPU device,
-                    # configured at import by `_auto_configure_cpu_devices` — and
-                    # each device runs real control flow.  Under `vmap` it would
-                    # lower back to `select`; see the `_use_pmap` gate below.
+                    # each chain runs as its own `jit` program (see
+                    # `run_chains_in_threads`); under `vmap` it would lower back
+                    # to `select`.
                     m, log_det_P, quad_r = jax.lax.cond(
                         within, _from_basis, _direct, operand=None
                     )
@@ -455,13 +460,14 @@ def _make_gibbs_step_with_data(
             return logdet_W - 0.5 * log_det_P + 0.5 * quad_r + log_prior
 
         # ── Slice sampling for ρ (shared JAX helper) ──
-        rho_new, _ = jax_slice_sample_1d(
+        rho_new, _, steps_left, steps_right = jax_slice_sample_1d(
             log_density_rho,
             rho,
             rho_lower_jax,
             rho_upper_jax,
             key=key_rho,
-            w=jnp.float64(0.2),
+            w=slice_width,
+            return_steps=True,
         )
 
         rho_new = jnp.clip(rho_new, rho_lower_jax, rho_upper_jax)
@@ -493,6 +499,8 @@ def _make_gibbs_step_with_data(
             omega=omega_new,
             alpha=alpha_new,
         )
+        if return_steps:
+            return new_state, accept, (steps_left, steps_right)
         return new_state, accept
 
     return gibbs_step
@@ -922,10 +930,9 @@ def run_chain_jax(
 
 
 # ---------------------------------------------------------------------------
-# Vectorized multi-chain runner: jax.vmap over chains so all chains share
-# one JIT-compiled Gibbs program and execute together as a single XLA
-# kernel.  Mirrors the SAR-logit implementation in
-# ``neighbayes/samplers/logit/_jax.py``.
+# Multi-chain runner: chains run in parallel threads, each an ordinary jit
+# program sharing one compiled Gibbs step (see ``run_chains_chunked``).
+# Mirrors the SAR-logit runner in ``neighbayes/samplers/logit/_jax.py``.
 # ---------------------------------------------------------------------------
 
 
@@ -948,56 +955,6 @@ def _nb_loglik_pointwise_jax_op(y_jax, eta, alpha):
         + y_jax * log_mu_ratio
         + alpha * log_alpha_ratio
     )
-
-
-def _run_chain_nb_warmup(gibbs_step, init_state, key, n_iters):
-    """Run ``n_iters`` Gibbs steps and return only the final state + key.
-
-    Uses :func:`jax.lax.fori_loop` so no per-iteration traces are
-    materialized — memory cost is independent of ``n_iters``.
-    The final PRNG key is returned so chunked runs can resume from a
-    deterministic point without breaking the chain.
-    """
-    import jax
-
-    def body(_, carry):
-        state, k = carry
-        k, step_key = jax.random.split(k)
-        state, _ = gibbs_step(state, step_key)
-        return (state, k)
-
-    final_state, final_key = jax.lax.fori_loop(0, n_iters, body, (init_state, key))
-    return final_state, final_key
-
-
-def _run_chain_nb_draws(gibbs_step, y_jax, init_state, key, n_iters):
-    """Scan ``n_iters`` post-warmup steps for SAR-NB.
-
-    Returns the final state, the final PRNG key, and stacked traces of
-    ``rho``, ``beta``, ``sigma2``, ``alpha``, ``eta_norm`` and
-    per-observation ``log_lik``.
-    """
-    import jax
-
-    def body(carry, _):
-        state, k = carry
-        k, step_key = jax.random.split(k)
-        state, _ = gibbs_step(state, step_key)
-        log_lik = _nb_loglik_pointwise_jax_op(y_jax, state.eta, state.alpha)
-        eta_norm = state.eta @ state.eta
-        return (state, k), (
-            state.rho,
-            state.beta,
-            state.sigma2,
-            state.alpha,
-            eta_norm,
-            log_lik,
-        )
-
-    (final_state, final_key), traces = jax.lax.scan(
-        body, (init_state, key), None, length=n_iters
-    )
-    return final_state, final_key, traces
 
 
 def _stack_nb_inits(inits):
@@ -1040,11 +997,11 @@ def run_chains_jax_vectorized(
     krylov_degree: int = 0,
     krylov_dmax: float = 0.4,
 ) -> list[dict]:
-    """Run multiple SAR-NB Gibbs chains in parallel via ``jax.vmap``.
+    """Run multiple SAR-NB Gibbs chains in parallel.
 
-    All chains execute together on a single device as one fused XLA
-    program — there is no Python loop over chains, and the Gibbs step
-    is JIT-compiled only once.
+    Chains run in parallel threads, each an ordinary ``jax.jit`` program, and
+    the Gibbs step is compiled once (see
+    :func:`.._utils._jax_utils.run_chains_chunked`).
 
     Parameters mirror :func:`run_chain_jax`, except ``init`` is replaced
     by a list of per-chain initial states and ``return_eta`` is not
@@ -1099,7 +1056,29 @@ def run_chains_jax_vectorized(
     master_key = jax.random.PRNGKey(int(jax_seeds[0]))
     warmup_keys = jax.random.split(master_key, chains)
 
+    from .._utils._jax_slice import adapt_slice_width
+    from .._utils._jax_utils import run_chains_chunked
     from .._utils._progress import GibbsProgressBarManager
+
+    draw_keys = jax.random.split(jax.random.fold_in(master_key, 1), chains)
+
+    def _sweep(carry, key, tuning):
+        # The slice starts at width 0.2, as in the NumPy sampler, and adapts
+        # during warmup.
+        state, width = carry
+        state, _, (steps_left, steps_right) = gibbs_step(
+            state, key, width, return_steps=True
+        )
+        width = adapt_slice_width(width, steps_left, steps_right, tuning)
+        log_lik = _nb_loglik_pointwise_jax_op(y_jax, state.eta, state.alpha)
+        return (state, width), (
+            state.rho,
+            state.beta,
+            state.sigma2,
+            state.alpha,
+            state.eta @ state.eta,
+            log_lik,
+        )
 
     with GibbsProgressBarManager(
         chains=chains,
@@ -1112,86 +1091,23 @@ def run_chains_jax_vectorized(
             for c in range(chains):
                 pm.start_chain(c)
 
-        warmup_chunk = max(1, tune // 20) if tune > 0 else 1
-        draws_chunk = max(1, draws // 20) if draws > 0 else 1
-
-        # One chain per CPU device (pmap) when enough host devices exist — the
-        # better JAX chain-parallelism (vs vmap on one device).  It does NOT beat
-        # the NumPy backend here: the structural SAR-NB is *solve-heavy* (a spatial
-        # solve per slice candidate — KLU for asymmetric W, CHOLMOD for
-        # d-symmetrizable W), and SuiteSparse serializes concurrent solves (it
-        # parallelizes across processes, as NumPy/joblib does, not threads).  pmap's
-        # win over NumPy is specific to arithmetic-heavy samplers whose solve is a
-        # small fraction of the sweep (e.g. the reduced-form SAR-NB).
-        _use_pmap = chains > 1 and jax.local_device_count() >= chains
-
-        def _pv(f):
-            return jax.pmap(f) if _use_pmap else jax.jit(jax.vmap(f))
-
-        warmup_step = _pv(
-            lambda s_, k_: _run_chain_nb_warmup(gibbs_step, s_, k_, warmup_chunk)
-        )
-        draws_step = _pv(
-            lambda s_, k_: _run_chain_nb_draws(gibbs_step, y_jax, s_, k_, draws_chunk)
-        )
-
-        # ── Phase 1: warmup ──
-        state = init_states
-        keys = warmup_keys
-        iter_done = 0
-        while iter_done < tune:
-            step = min(warmup_chunk, tune - iter_done)
-            if step == warmup_chunk:
-                state, keys = warmup_step(state, keys)
-            else:
-                state, keys = _pv(
-                    lambda s_, k_: _run_chain_nb_warmup(gibbs_step, s_, k_, step)
-                )(state, keys)
-            jax.block_until_ready(state.rho)
-            iter_done += step
+        def _progress(i, tuning):
             if pm is not None:
                 for c in range(chains):
-                    pm.update(c, iter_done - 1, tuning=True)
+                    pm.update(c, i, tuning=tuning)
 
-        final_warm_states = state
-
-        # ── Phase 2: post-warmup draws ──
-        draw_keys = jax.random.split(jax.random.fold_in(master_key, 1), chains)
-        state = final_warm_states
-        keys = draw_keys
-        rho_chunks: list[np.ndarray] = []
-        beta_chunks: list[np.ndarray] = []
-        sigma2_chunks: list[np.ndarray] = []
-        alpha_chunks: list[np.ndarray] = []
-        eta_chunks: list[np.ndarray] = []
-        ll_chunks: list[np.ndarray] = []
-        iter_done = 0
-        while iter_done < draws:
-            step = min(draws_chunk, draws - iter_done)
-            if step == draws_chunk:
-                state, keys, traces = draws_step(state, keys)
-            else:
-                state, keys, traces = _pv(
-                    lambda s_, k_: _run_chain_nb_draws(gibbs_step, y_jax, s_, k_, step)
-                )(state, keys)
-            rhos_c, betas_c, sigma2s_c, alphas_c, eta_c, ll_c = traces
-            rho_chunks.append(np.asarray(rhos_c))
-            beta_chunks.append(np.asarray(betas_c))
-            sigma2_chunks.append(np.asarray(sigma2s_c))
-            alpha_chunks.append(np.asarray(alphas_c))
-            eta_chunks.append(np.asarray(eta_c))
-            ll_chunks.append(np.asarray(ll_c))
-            iter_done += step
-            if pm is not None:
-                for c in range(chains):
-                    pm.update(c, tune + iter_done - 1, tuning=False)
-
-        rhos = np.concatenate(rho_chunks, axis=1)
-        betas = np.concatenate(beta_chunks, axis=1)
-        sigma2s = np.concatenate(sigma2_chunks, axis=1)
-        alphas = np.concatenate(alpha_chunks, axis=1)
-        eta_norms = np.concatenate(eta_chunks, axis=1)
-        log_liks = np.concatenate(ll_chunks, axis=1)
+        _, (rhos, betas, sigma2s, alphas, eta_norms, log_liks) = run_chains_chunked(
+            _sweep,
+            [
+                (jax.tree.map(lambda a, c=c: a[c], init_states), jnp.float64(0.2))
+                for c in range(chains)
+            ],
+            list(warmup_keys),
+            list(draw_keys),
+            tune=tune,
+            draws=draws,
+            on_chunk=_progress,
+        )
 
     thin_slice = slice(None, None, thin) if thin > 1 else slice(None)
     results = []

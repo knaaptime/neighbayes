@@ -25,7 +25,7 @@ def _batched_sar_mean(W_sp, rho_f, rhs, n):
     r"""Batched latent mean ``mu[i] = (I - rho_f[i] W)^{-1} rhs[i]``.
 
     Host-side reconstruction (one solve per posterior draw) used by the Tobit
-    log-likelihood rebuilders.  Prefers sparsax's cached KLU — the fixed
+    log-likelihood rebuilders.  Prefers sparsax's cached LU — the fixed
     ``(I - rho W)`` sparsity pattern is analyzed once and reused across draws
     (only the values rescale with ``rho``) — and falls back to a per-draw scipy
     sparse solve when sparsax is unavailable.
@@ -54,9 +54,9 @@ def _batched_sar_mean(W_sp, rho_f, rhs, n):
 
     if _sparsax_available():
         import jax.numpy as jnp
-        import sparsax
 
         from ..._jax_dispatch import ensure_x64
+        from ...samplers._utils._sparsax_lu import sparsax_lu
 
         ensure_x64()
         # Fixed COO pattern for (I - ρW): merge the I and W patterns so a single
@@ -79,10 +79,11 @@ def _batched_sar_mean(W_sp, rho_f, rhs, n):
         Aj = jnp.asarray(const_coo.col, dtype=jnp.int32)
         const_vals = jnp.asarray(const_coo.data, dtype=jnp.float64)
         w_vals = jnp.asarray(w_coo.data, dtype=jnp.float64)
+        lu_solve = sparsax_lu(Ai, Aj, const_vals - 0.5 * w_vals, n).solve
         for i in range(s):
             Ax = const_vals - float(rho_f[i]) * w_vals
             mu[i] = np.asarray(
-                sparsax.lu_solve(Ai, Aj, Ax, jnp.asarray(rhs[i])), dtype=np.float64
+                lu_solve(Ai, Aj, Ax, jnp.asarray(rhs[i])), dtype=np.float64
             )
         return mu
 

@@ -412,9 +412,9 @@ class SARZINB(SpatialModel):
         backend : {"numpy", "jax"}
             Execution backend — both fit the *same* reduced-form ZINB (reduced
             SAR-logit selection + reduced SAR-NB count).  ``"jax"`` (the default
-            via ``"auto"``) runs a fully device-parallel (pmap) sampler with
-            sparsax-KLU solves and on-device Pólya-Gamma, one chain per CPU
-            device; ``"numpy"`` uses the CHOLMOD 9-block Gibbs.
+            via ``"auto"``) runs the chains in parallel threads with
+            sparsax-KLU solves and on-device Pólya-Gamma; ``"numpy"`` uses the
+            CHOLMOD 9-block Gibbs.
         timeout : float or None
             Maximum wall-clock seconds for parallel chains.
 
@@ -455,9 +455,9 @@ class SARZINB(SpatialModel):
             alpha_nu=self.priors.get("alpha_nu", 3.0),
         )
 
-        # ── JAX device-parallel path ──
+        # ── JAX path ──
         # Both equations reduced-form (Krylov-only slice, sparsax-KLU solves,
-        # on-device Pólya-Gamma via pgjax, one chain per CPU device via pmap).
+        # on-device Pólya-Gamma via pgjax, chains in parallel threads).
         # The NumPy path (below) fits the identical reduced-form model.
         if backend == "jax":
             from ...samplers.zinb._jax import run_chains_jax_zinb

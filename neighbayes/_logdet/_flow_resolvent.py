@@ -301,7 +301,8 @@ def flow_logdet_grad(
 
         if _sparsax_available():
             import jax.numpy as jnp
-            import sparsax
+
+            from neighbayes.samplers._utils._sparsax_lu import sparsax_lu
 
             ensure_x64()
             rows, cols, const_vals, coef_d, coef_o, coef_w = kron._resolvent_T_pattern()
@@ -311,8 +312,9 @@ def flow_logdet_grad(
                 const_vals - rho_d * coef_d - rho_o * coef_o - rho_w * coef_w,
                 dtype=jnp.float64,
             )
+            lu_solve = sparsax_lu(Ai, Aj, Ax, kron.N).solve
             Xt = np.asarray(
-                sparsax.lu_solve(Ai, Aj, Ax, jnp.asarray(probes, dtype=jnp.float64)),
+                lu_solve(Ai, Aj, Ax, jnp.asarray(probes, dtype=jnp.float64)),
                 dtype=np.float64,
             )
             for p in range(P):
@@ -506,7 +508,7 @@ def _make_flow_kron_jax(kron: FlowKron, probes: np.ndarray, n_quad: int = 8):
             "Install with: pip install sparsax"
         )
 
-    import sparsax
+    from neighbayes.samplers._utils._sparsax_lu import sparsax_lu
 
     n = kron.n
 
@@ -528,6 +530,11 @@ def _make_flow_kron_jax(kron: FlowKron, probes: np.ndarray, n_quad: int = 8):
     _coef_d = jnp.asarray(coef_d, dtype=jnp.float64)
     _coef_o = jnp.asarray(coef_o, dtype=jnp.float64)
     _coef_w = jnp.asarray(coef_w, dtype=jnp.float64)
+    # KLU or UMFPACK, whichever is faster on this pattern, probed at ρ = 0.2 in
+    # each direction (inside the stable region).
+    lu_solve = sparsax_lu(
+        Ai, Aj, _const_vals - 0.2 * (_coef_d + _coef_o + _coef_w), kron.N
+    ).solve
 
     # Frozen probes as JAX array
     probes_jax = jnp.asarray(probes, dtype=jnp.float64)  # (N, P)
@@ -560,7 +567,7 @@ def _make_flow_kron_jax(kron: FlowKron, probes: np.ndarray, n_quad: int = 8):
         """Hutchinson resolvent gradient at (rd, ro, rw)."""
         Ax = _const_vals - rd * _coef_d - ro * _coef_o - rw * _coef_w
         # Batched solve: all P probes at once → (N, P)
-        Xt = sparsax.lu_solve(Ai, Aj, Ax, probes_jax)
+        Xt = lu_solve(Ai, Aj, Ax, probes_jax)
 
         # Accumulate x̃ᵀ (W_k z) for each probe, each k
         # Using vmap over probes for the contractions

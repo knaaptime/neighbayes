@@ -193,7 +193,7 @@ def _make_gibbs_step_with_data(
             return Ax + diag_vals
 
     @eqx.filter_jit
-    def gibbs_step(state, key, slice_width):
+    def gibbs_step(state, key, slice_width, return_steps=False):
         """One complete Gibbs sweep: ω → η → β → ρ (slice).
 
         Parameters
@@ -204,6 +204,8 @@ def _make_gibbs_step_with_data(
             JAX random key.
         slice_width : jax.numpy.float64
             Stepping-out width for the ρ slice sampler.
+        return_steps : bool, default False
+            Also return the ρ slice's ``(left, right)`` step-out counts.
 
         Returns
         -------
@@ -211,6 +213,8 @@ def _make_gibbs_step_with_data(
             Updated state.
         accept : jax.numpy.float64
             Always 1.0 (slice sampling always accepts).
+        steps : tuple of jax.numpy scalars
+            Step-out counts; returned only when ``return_steps``.
         """
         eta = state.eta
         beta = state.beta
@@ -391,13 +395,14 @@ def _make_gibbs_step_with_data(
             )
 
         # ── Slice sampling for ρ (shared JAX helper) ──
-        rho_new, _ = jax_slice_sample_1d(
+        rho_new, _, steps_left, steps_right = jax_slice_sample_1d(
             log_density_rho,
             rho,
             rho_lower_jax,
             rho_upper_jax,
             key=key_rho,
             w=slice_width,
+            return_steps=True,
         )
 
         new_state = JAXLogitGibbsState(
@@ -406,6 +411,8 @@ def _make_gibbs_step_with_data(
             rho=rho_new,
             omega=omega_new,
         )
+        if return_steps:
+            return new_state, jnp.float64(1.0), (steps_left, steps_right)
         return new_state, jnp.float64(1.0)  # slice always accepts
 
     return gibbs_step
@@ -696,8 +703,12 @@ def _make_gibbs_step_with_data_sem(
             return Ax + diag_vals
 
     @eqx.filter_jit
-    def gibbs_step(state, key, slice_width):
-        """One complete SEM-logit Gibbs sweep: ω → η → β → λ (slice)."""
+    def gibbs_step(state, key, slice_width, return_steps=False):
+        """One complete SEM-logit Gibbs sweep: ω → η → β → λ (slice).
+
+        With ``return_steps`` it also returns the λ slice's ``(left, right)``
+        step-out counts.
+        """
         eta = state.eta
         beta = state.beta
         lam = state.lam
@@ -863,13 +874,14 @@ def _make_gibbs_step_with_data_sem(
             )
 
         # ── Slice sampling for λ (shared JAX helper) ──
-        lam_new, _ = jax_slice_sample_1d(
+        lam_new, _, steps_left, steps_right = jax_slice_sample_1d(
             log_density_lam,
             lam,
             lam_lower_jax,
             lam_upper_jax,
             key=key_lam,
             w=slice_width,
+            return_steps=True,
         )
 
         new_state = JAXSEMLogitGibbsState(
@@ -878,6 +890,8 @@ def _make_gibbs_step_with_data_sem(
             lam=lam_new,
             omega=omega_new,
         )
+        if return_steps:
+            return new_state, jnp.float64(1.0), (steps_left, steps_right)
         return new_state, jnp.float64(1.0)  # slice always accepts
 
     return gibbs_step
@@ -1050,18 +1064,12 @@ def run_chain_jax_sem(
 
 
 # ===========================================================================
-# Vectorized multi-chain runners (jax.vmap)
+# Multi-chain runners
 # ===========================================================================
 #
-# These runners execute all chains in parallel on a single device via
-# ``jax.vmap`` over a ``jax.lax.scan``-ed chain.  This is the JAX-native
-# equivalent of multiprocessing and is dramatically faster than calling
-# ``run_chain_jax`` once per chain in a Python loop, because (a) the
-# Gibbs step JITs only once and (b) all chains run as one fused XLA
-# program with no per-iteration Python overhead.
-#
-# Mirrors the pattern in ``neighbayes.samplers.gaussian._jax``
-# (``run_chains_jax_gibbs_vectorized``).
+# Chains run in parallel threads, each an ordinary ``jax.jit`` program sharing
+# one compiled Gibbs step (see ``run_chains_chunked``).  ``jax.pmap`` and
+# ``jax.vmap`` are both slower here; ``run_chains_in_threads`` records why.
 
 
 def _logit_loglik_pointwise_jax_op(y_jax, eta):
@@ -1074,88 +1082,6 @@ def _logit_loglik_pointwise_jax_op(y_jax, eta):
     import jax.numpy as jnp
 
     return y_jax * eta - jnp.logaddexp(0.0, eta)
-
-
-def _run_chain_logit_warmup(gibbs_step, init_state, key, n_iters, slice_width):
-    """Run ``n_iters`` Gibbs steps and return only the final state + key.
-
-    Uses :func:`jax.lax.fori_loop` so no per-iteration traces are
-    materialized — memory cost is independent of ``n_iters``.
-    The final PRNG key is returned so chunked runs can resume from a
-    deterministic point without breaking the chain.
-    """
-    import jax
-
-    def body(_, carry):
-        state, k = carry
-        k, step_key = jax.random.split(k)
-        state, _ = gibbs_step(state, step_key, slice_width)
-        return (state, k)
-
-    final_state, final_key = jax.lax.fori_loop(0, n_iters, body, (init_state, key))
-    return final_state, final_key
-
-
-def _run_chain_logit_draws_sar(
-    gibbs_step, y_jax, init_state, key, n_iters, slice_width
-):
-    """Scan ``n_iters`` steps for SAR-logit, storing per-iter traces.
-
-    Returns the final state, the final PRNG key, and stacked traces of
-    ``rho``, ``beta``, ``eta_norm``, and per-observation ``log_lik``.
-    """
-    import jax
-    import jax.numpy as jnp
-
-    def body(carry, _):
-        state, k, accept_sum = carry
-        k, step_key = jax.random.split(k)
-        state, accept = gibbs_step(state, step_key, slice_width)
-        log_lik = _logit_loglik_pointwise_jax_op(y_jax, state.eta)
-        eta_norm = state.eta @ state.eta
-        return (state, k, accept_sum + accept), (
-            state.rho,
-            state.beta,
-            eta_norm,
-            log_lik,
-            accept,
-        )
-
-    (
-        (final_state, final_key, total_accept),
-        (rhos, betas, eta_norms, log_liks, accepts),
-    ) = jax.lax.scan(body, (init_state, key, jnp.float64(0.0)), None, length=n_iters)
-    accept_rate = total_accept / jnp.float64(n_iters)
-    return final_state, final_key, rhos, betas, eta_norms, log_liks, accept_rate
-
-
-def _run_chain_logit_draws_sem(
-    gibbs_step, y_jax, init_state, key, n_iters, slice_width
-):
-    """Scan ``n_iters`` steps for SEM-logit; ``lam`` instead of ``rho``."""
-    import jax
-    import jax.numpy as jnp
-
-    def body(carry, _):
-        state, k, accept_sum = carry
-        k, step_key = jax.random.split(k)
-        state, accept = gibbs_step(state, step_key, slice_width)
-        log_lik = _logit_loglik_pointwise_jax_op(y_jax, state.eta)
-        eta_norm = state.eta @ state.eta
-        return (state, k, accept_sum + accept), (
-            state.lam,
-            state.beta,
-            eta_norm,
-            log_lik,
-            accept,
-        )
-
-    (
-        (final_state, final_key, total_accept),
-        (lams, betas, eta_norms, log_liks, accepts),
-    ) = jax.lax.scan(body, (init_state, key, jnp.float64(0.0)), None, length=n_iters)
-    accept_rate = total_accept / jnp.float64(n_iters)
-    return final_state, final_key, lams, betas, eta_norms, log_liks, accept_rate
 
 
 def _stack_chain_inits(inits, state_cls, scalar_field):
@@ -1201,11 +1127,11 @@ def run_chains_jax_vectorized(
     krylov_degree: int = 0,
     krylov_dmax: float = 0.4,
 ) -> list[dict]:
-    """Run multiple SAR-logit Gibbs chains in parallel via ``jax.vmap``.
+    """Run multiple SAR-logit Gibbs chains in parallel.
 
-    All chains execute together on a single device as one fused XLA
-    program — there is no Python loop over chains, and the Gibbs step
-    is JIT-compiled only once.
+    Chains run in parallel threads, each an ordinary ``jax.jit`` program, and
+    the Gibbs step is compiled once (see
+    :func:`.._utils._jax_utils.run_chains_chunked`).
 
     Parameters
     ----------
@@ -1276,43 +1202,22 @@ def run_chains_jax_vectorized(
     master_key = jax.random.PRNGKey(int(jax_seeds[0]))
     warmup_keys = jax.random.split(master_key, chains)
 
+    from .._utils._jax_slice import adapt_slice_width
+    from .._utils._jax_utils import run_chains_chunked
     from .._utils._progress import GibbsProgressBarManager
 
-    # Slice width for ρ — fixed at 0.2 (slice is robust to width choice)
-    slice_width_arr = jnp.full(chains, jnp.float64(0.2))
+    draw_keys = jax.random.split(jax.random.fold_in(master_key, 1), chains)
 
-    # ── Phase 1: warmup — fori_loop ──
-    # The iteration count must be a Python int (not a JAX traced value)
-    # because jax.lax.fori_loop requires a concrete length.
-    adapt_window = max(50, tune // 10) if tune > 0 else 50
-
-    # One chain per CPU device (pmap) when enough host devices exist — the better
-    # JAX chain-parallelism (measured ~1.5x over vmap here).  It does NOT beat the
-    # NumPy backend for SAR/SEM-logit, though: this sampler is *solve-heavy* (a
-    # spatial solve per slice candidate — KLU for asymmetric W, CHOLMOD for
-    # d-symmetrizable W), and SuiteSparse serializes concurrent solves (it
-    # parallelizes across processes, as NumPy/joblib does, not threads).  pmap's
-    # win over NumPy is specific to arithmetic-heavy samplers whose solve is a
-    # small fraction of the sweep (e.g. the reduced-form SAR-NB).
-    _use_pmap = chains > 1 and jax.local_device_count() >= chains
-
-    def _pv(f):
-        return jax.pmap(f) if _use_pmap else jax.jit(jax.vmap(f))
-
-    def _make_warmup_fn(n_iters: int):
-        """Create a device-parallel warmup function with baked-in iter count."""
-        return _pv(
-            lambda s_, k_, w_: _run_chain_logit_warmup(gibbs_step, s_, k_, n_iters, w_)
+    def _sweep(carry, key, tuning):
+        # The slice starts at width 0.2, as in the NumPy sampler, and adapts
+        # during warmup.
+        state, width = carry
+        state, _, (steps_left, steps_right) = gibbs_step(
+            state, key, width, return_steps=True
         )
-
-    # Pre-compile the main warmup function for the standard window size
-    warmup_fn = _make_warmup_fn(adapt_window)
-    _warmup_cache: dict[int, object] = {adapt_window: warmup_fn}
-
-    def _get_warmup_fn(n_iters: int):
-        if n_iters not in _warmup_cache:
-            _warmup_cache[n_iters] = _make_warmup_fn(n_iters)
-        return _warmup_cache[n_iters]
+        width = adapt_slice_width(width, steps_left, steps_right, tuning)
+        log_lik = _logit_loglik_pointwise_jax_op(y_jax, state.eta)
+        return (state, width), (state.rho, state.beta, state.eta @ state.eta, log_lik)
 
     with GibbsProgressBarManager(
         chains=chains,
@@ -1325,47 +1230,23 @@ def run_chains_jax_vectorized(
             for c in range(chains):
                 pm.start_chain(c)
 
-        # ── Phase 1: warmup ──
-        state = init_states
-        keys = warmup_keys
-        iter_done = 0
-        while iter_done < tune:
-            step = min(adapt_window, tune - iter_done)
-            fn = _get_warmup_fn(step)
-            state, keys = fn(state, keys, slice_width_arr)
-            jax.block_until_ready(state.rho)
-            iter_done += step
-
+        def _progress(i, tuning):
             if pm is not None:
                 for c in range(chains):
-                    pm.update(c, iter_done - 1, tuning=True)
+                    pm.update(c, i, tuning=tuning)
 
-        final_warm_states = state
-
-        # ── Phase 2: post-warmup draws — single scan ──
-        draw_keys = jax.random.split(jax.random.fold_in(master_key, 1), chains)
-
-        draws_fn = _pv(
-            lambda s_, k_, w_: _run_chain_logit_draws_sar(
-                gibbs_step, y_jax, s_, k_, draws, w_
-            )
+        _, (rhos, betas, eta_norms, log_liks) = run_chains_chunked(
+            _sweep,
+            [
+                (jax.tree.map(lambda a, c=c: a[c], init_states), jnp.float64(0.2))
+                for c in range(chains)
+            ],
+            list(warmup_keys),
+            list(draw_keys),
+            tune=tune,
+            draws=draws,
+            on_chunk=_progress,
         )
-
-        state, keys, rhos, betas, eta_norms, log_liks, accept_rates = draws_fn(
-            final_warm_states, draw_keys, slice_width_arr
-        )
-        jax.block_until_ready(state.rho)
-
-        if pm is not None:
-            for c in range(chains):
-                pm.update(c, tune + draws - 1, tuning=False)
-
-    # Convert to numpy
-    rhos = np.asarray(rhos)
-    betas = np.asarray(betas)
-    eta_norms = np.asarray(eta_norms)
-    log_liks = np.asarray(log_liks)
-    accept_rates = np.asarray(accept_rates)
 
     # Thin and pack as per-chain dicts
     thin_slice = slice(None, None, thin) if thin > 1 else slice(None)
@@ -1377,7 +1258,7 @@ def run_chains_jax_vectorized(
                 "beta": betas[c, thin_slice].copy(),
                 "eta_norm": eta_norms[c, thin_slice].copy(),
                 "log_lik": log_liks[c, thin_slice].copy(),
-                "mh_accept_rate": float(accept_rates[c]),
+                "mh_accept_rate": 1.0,
             }
         )
     return results
@@ -1404,7 +1285,7 @@ def run_chains_jax_sem_vectorized(
     krylov_degree: int = 0,
     krylov_dmax: float = 0.4,
 ) -> list[dict]:
-    """Run multiple SEM-logit Gibbs chains in parallel via ``jax.vmap``.
+    """Run multiple SEM-logit Gibbs chains in parallel.
 
     See :func:`run_chains_jax_vectorized` for the SAR-logit analogue
     and shared design rationale.  Returns per-chain dicts keyed on
@@ -1449,38 +1330,22 @@ def run_chains_jax_sem_vectorized(
     master_key = jax.random.PRNGKey(int(jax_seeds[0]))
     warmup_keys = jax.random.split(master_key, chains)
 
+    from .._utils._jax_slice import adapt_slice_width
+    from .._utils._jax_utils import run_chains_chunked
     from .._utils._progress import GibbsProgressBarManager
 
-    # Slice width for λ — fixed at 0.2 (slice is robust to width choice)
-    slice_width_arr = jnp.full(chains, jnp.float64(0.2))
-    adapt_window = max(50, tune // 10) if tune > 0 else 50
+    draw_keys = jax.random.split(jax.random.fold_in(master_key, 1), chains)
 
-    # One chain per CPU device (pmap) when enough host devices exist — the better
-    # JAX chain-parallelism (measured ~1.5x over vmap here).  It does NOT beat the
-    # NumPy backend for SAR/SEM-logit, though: this sampler is *solve-heavy* (a
-    # spatial solve per slice candidate — KLU for asymmetric W, CHOLMOD for
-    # d-symmetrizable W), and SuiteSparse serializes concurrent solves (it
-    # parallelizes across processes, as NumPy/joblib does, not threads).  pmap's
-    # win over NumPy is specific to arithmetic-heavy samplers whose solve is a
-    # small fraction of the sweep (e.g. the reduced-form SAR-NB).
-    _use_pmap = chains > 1 and jax.local_device_count() >= chains
-
-    def _pv(f):
-        return jax.pmap(f) if _use_pmap else jax.jit(jax.vmap(f))
-
-    def _make_warmup_fn(n_iters: int):
-        """Create a device-parallel warmup function with baked-in iter count."""
-        return _pv(
-            lambda s_, k_, w_: _run_chain_logit_warmup(gibbs_step, s_, k_, n_iters, w_)
+    def _sweep(carry, key, tuning):
+        # The slice starts at width 0.2, as in the NumPy sampler, and adapts
+        # during warmup.
+        state, width = carry
+        state, _, (steps_left, steps_right) = gibbs_step(
+            state, key, width, return_steps=True
         )
-
-    warmup_fn = _make_warmup_fn(adapt_window)
-    _warmup_cache: dict[int, object] = {adapt_window: warmup_fn}
-
-    def _get_warmup_fn(n_iters: int):
-        if n_iters not in _warmup_cache:
-            _warmup_cache[n_iters] = _make_warmup_fn(n_iters)
-        return _warmup_cache[n_iters]
+        width = adapt_slice_width(width, steps_left, steps_right, tuning)
+        log_lik = _logit_loglik_pointwise_jax_op(y_jax, state.eta)
+        return (state, width), (state.lam, state.beta, state.eta @ state.eta, log_lik)
 
     with GibbsProgressBarManager(
         chains=chains,
@@ -1493,47 +1358,23 @@ def run_chains_jax_sem_vectorized(
             for c in range(chains):
                 pm.start_chain(c)
 
-        # ── Phase 1: warmup ──
-        state = init_states
-        keys = warmup_keys
-        iter_done = 0
-        while iter_done < tune:
-            step = min(adapt_window, tune - iter_done)
-            fn = _get_warmup_fn(step)
-            state, keys = fn(state, keys, slice_width_arr)
-            jax.block_until_ready(state.lam)
-            iter_done += step
-
+        def _progress(i, tuning):
             if pm is not None:
                 for c in range(chains):
-                    pm.update(c, iter_done - 1, tuning=True)
+                    pm.update(c, i, tuning=tuning)
 
-        final_warm_states = state
-
-        # ── Phase 2: post-warmup draws — single scan ──
-        draw_keys = jax.random.split(jax.random.fold_in(master_key, 1), chains)
-
-        draws_fn = _pv(
-            lambda s_, k_, w_: _run_chain_logit_draws_sem(
-                gibbs_step, y_jax, s_, k_, draws, w_
-            )
+        _, (lams, betas, eta_norms, log_liks) = run_chains_chunked(
+            _sweep,
+            [
+                (jax.tree.map(lambda a, c=c: a[c], init_states), jnp.float64(0.2))
+                for c in range(chains)
+            ],
+            list(warmup_keys),
+            list(draw_keys),
+            tune=tune,
+            draws=draws,
+            on_chunk=_progress,
         )
-
-        state, keys, lams, betas, eta_norms, log_liks, accept_rates = draws_fn(
-            final_warm_states, draw_keys, slice_width_arr
-        )
-        jax.block_until_ready(state.lam)
-
-        if pm is not None:
-            for c in range(chains):
-                pm.update(c, tune + draws - 1, tuning=False)
-
-    # Convert to numpy
-    lams = np.asarray(lams)
-    betas = np.asarray(betas)
-    eta_norms = np.asarray(eta_norms)
-    log_liks = np.asarray(log_liks)
-    accept_rates = np.asarray(accept_rates)
 
     thin_slice = slice(None, None, thin) if thin > 1 else slice(None)
     results = []
@@ -1544,7 +1385,7 @@ def run_chains_jax_sem_vectorized(
                 "beta": betas[c, thin_slice].copy(),
                 "eta_norm": eta_norms[c, thin_slice].copy(),
                 "log_lik": log_liks[c, thin_slice].copy(),
-                "mh_accept_rate": float(accept_rates[c]),
+                "mh_accept_rate": 1.0,
             }
         )
     return results

@@ -11,9 +11,9 @@ Composes the two reduced-form jax samplers already built:
   zeros contribute nothing: ``ω_cnt = ε`` and the working ``y`` is set to ``α``
   so ``κ = 0`` there);
 
-linked by the latent indicator ``z``.  Both equations use sparsax-KLU solves
-(never densified), the on-device Pólya-Gamma draw (pgjax), and run each chain on
-its own CPU device via ``jax.pmap``.
+linked by the latent indicator ``z``.  Both equations use sparsax-LU solves
+(never densified), the on-device Pólya-Gamma draw (pgjax), and run the chains in
+parallel threads.
 """
 
 from __future__ import annotations
@@ -87,7 +87,13 @@ def _make_zinb_gibbs_step(
     from .._utils._jax_utils import conjugate_normal as _conjugate_normal
 
     @jax.jit
-    def gibbs_step(state, key, slice_width):
+    def gibbs_step(state, key, slice_widths):
+        """One sweep; ``slice_widths`` is ``(λ width, ρ width)``.
+
+        Returns ``(new_state, trace, steps)``, where ``steps`` holds the λ and ρ
+        slices' ``(left, right)`` step-out counts for warmup width adaptation.
+        """
+        w_lam, w_rho = slice_widths
         gamma = state["gamma"]
         lam = state["lam"]
         beta = state["beta"]
@@ -103,7 +109,7 @@ def _make_zinb_gibbs_step(
         V_sel = _build_krylov_basis_jax(
             lambda rhs: _solve_sel(lam, rhs), Z_jax, _matvec_Wsel, n, p, _deg
         )
-        lam_new, _ = jax_slice_sample_1d(
+        lam_new, _, lam_left, lam_right = jax_slice_sample_1d(
             # ``solve_at`` is what lets the slice leave the Krylov radius.
             # Without it every out-of-radius candidate evaluates to −inf and
             # λ is confined to a window around its current value each sweep —
@@ -126,7 +132,8 @@ def _make_zinb_gibbs_step(
             lam_lo,
             lam_hi,
             key=kλ,
-            w=slice_width,
+            w=w_lam,
+            return_steps=True,
         )
         # Z̃ = (I−λ_new W_sel)⁻¹Z: Krylov basis inside the safe radius, direct
         # sparsax solve outside it (the slice can now land there).
@@ -164,7 +171,7 @@ def _make_zinb_gibbs_step(
         V_cnt = _build_krylov_basis_jax(
             lambda rhs: _solve_cnt(rho, rhs), X_jax, _matvec_Wcnt, n, k, _deg
         )
-        rho_new, _ = jax_slice_sample_1d(
+        rho_new, _, rho_left, rho_right = jax_slice_sample_1d(
             lambda rv: _rho_log_density_marginal_jax(
                 rv,
                 V_cnt,
@@ -183,7 +190,8 @@ def _make_zinb_gibbs_step(
             rho_lo,
             rho_hi,
             key=kρ,
-            w=slice_width,
+            w=w_rho,
+            return_steps=True,
         )
         _drho = rho_new - rho
         Xtilde = jax.lax.cond(
@@ -234,7 +242,8 @@ def _make_zinb_gibbs_step(
             "alpha": alpha,
             "z": z,
         }
-        return new_state, (lam, gamma, rho, beta, alpha, eta_sel, eta_cnt)
+        trace = (lam, gamma, rho, beta, alpha, eta_sel, eta_cnt)
+        return new_state, trace, ((lam_left, lam_right), (rho_left, rho_right))
 
     return gibbs_step
 
@@ -258,11 +267,14 @@ def run_chains_jax_zinb(
     jax_seeds=None,
     progressbar=True,
 ):
-    """Run the reduced-form ZINB PG-Gibbs sampler (device-parallel).
+    """Run the reduced-form ZINB PG-Gibbs sampler (chains in parallel threads).
 
     Returns one dict per chain with keys ``lam``, ``gamma``, ``rho``, ``beta``,
     ``alpha``, ``log_lik``, ``pi_mean``.  ``log_lik`` is the **marginal**
     ZINB log-pmf of ``y`` with the latent allocation integrated out.
+
+    ``slice_width`` is the initial width of the λ and ρ slices; each chain
+    adapts both during warmup and holds them for the draws.
 
     ``d`` (``= 1(y > 0)``) is unused — the selection equation is fit against
     the latent allocation ``z`` — and is kept only for signature parity with
@@ -287,12 +299,11 @@ def run_chains_jax_zinb(
     sel_ctx = _build_sparse_ctx(W_sel_sparse, n)
     cnt_ctx = _build_sparse_ctx(W_cnt_sparse, n)
 
-    import sparsax
+    from .._utils._sparsax_lu import set_sparsax_lu_cache_size
 
     # two patterns (W_sel, W_cnt) x chains x a few distinct rho/lam per sweep
-    sparsax.set_lu_cache_size(max(64, 12 * chains))
+    set_sparsax_lu_cache_size(max(64, 12 * chains))
 
-    slice_width_jax = jnp.float64(slice_width)
     if jax_seeds is None:
         jax_seeds = list(range(chains))
 
@@ -318,51 +329,27 @@ def run_chains_jax_zinb(
         "rho": jnp.asarray([float(i.rho) for i in inits], dtype=jnp.float64),
         "alpha": jnp.asarray([float(i.alpha) for i in inits], dtype=jnp.float64),
         "z": jnp.asarray(np.stack([np.asarray(i.z, dtype=np.float64) for i in inits])),
+        "slice_widths": (jnp.full(chains, slice_width, dtype=jnp.float64),) * 2,
     }
     warm_keys = jnp.stack([jax.random.PRNGKey(int(s)) for s in jax_seeds])
     draw_keys = jnp.stack(
         [jax.random.fold_in(jax.random.PRNGKey(int(s)), 1) for s in jax_seeds]
     )
 
-    # Warmup and draws run in *chunks* rather than one fori_loop/scan, so the
-    # progress bar has somewhere to tick.  A single fused loop is marginally
-    # faster but reports nothing for the whole run, which is why
-    # ``progressbar`` used to be accepted here and silently ignored.  Mirrors
-    # the chunking in ``negbin_reduced._jax.run_chains_jax_reduced``.
-    def _warm_chunk(s, key, n_iters):
-        def body(_, carry):
-            st, kk = carry
-            kk, sk = jax.random.split(kk)
-            st, _ = gibbs_step(st, sk, slice_width_jax)
-            return (st, kk)
+    # Chains run in parallel threads, in compiled chunks, and the progress bar
+    # advances between chunks (see run_chains_chunked).
+    from .._utils._jax_slice import adapt_slice_width
+    from .._utils._jax_utils import run_chains_chunked
 
-        return jax.lax.fori_loop(0, n_iters, body, (s, key))
-
-    def _draw_chunk(s, key, n_iters):
-        def body(carry, _):
-            st, kk = carry
-            kk, sk = jax.random.split(kk)
-            st, tr = gibbs_step(st, sk, slice_width_jax)
-            return (st, kk), tr
-
-        (st, kk), traces = jax.lax.scan(body, (s, key), None, length=n_iters)
-        return st, kk, traces
-
-    _use_pmap = chains > 1 and jax.local_device_count() >= chains
-
-    def _pv(f):
-        return jax.pmap(f) if _use_pmap else jax.jit(jax.vmap(f))
-
-    _fn_cache = {}
-
-    def _get_fn(kind, n_iters):
-        key = (kind, n_iters)
-        if key not in _fn_cache:
-            if kind == "warm":
-                _fn_cache[key] = _pv(lambda s_, k_: _warm_chunk(s_, k_, n_iters))
-            else:
-                _fn_cache[key] = _pv(lambda s_, k_: _draw_chunk(s_, k_, n_iters))
-        return _fn_cache[key]
+    def _sweep(st, key, tuning):
+        widths = st["slice_widths"]
+        core = {name: v for name, v in st.items() if name != "slice_widths"}
+        core, trace, steps = gibbs_step(core, key, widths)
+        widths = tuple(
+            adapt_slice_width(w, left, right, tuning)
+            for w, (left, right) in zip(widths, steps)
+        )
+        return dict(core, slice_widths=widths), trace
 
     with GibbsProgressBarManager(
         chains=chains,
@@ -375,45 +362,25 @@ def run_chains_jax_zinb(
             for c in range(chains):
                 pm.start_chain(c)
 
-        # ── Phase 1: warmup ──
-        state = state0
-        keys = warm_keys
-        warm_window = max(1, tune // 20) if tune > 0 else 1
-        iter_done = 0
-        while iter_done < tune:
-            step = min(warm_window, tune - iter_done)
-            state, keys = _get_fn("warm", step)(state, keys)
-            jax.block_until_ready(state["rho"])
-            iter_done += step
+        def _progress(i, tuning):
             if pm is not None:
                 for c in range(chains):
-                    pm.update(c, iter_done - 1, tuning=True)
+                    pm.update(c, i, tuning=tuning)
 
-        # ── Phase 2: post-warmup draws ──
-        keys = draw_keys
-        draw_window = max(50, draws // 10) if draws > 0 else 50
-        iter_done = 0
-        trace_parts = []
-        while iter_done < draws:
-            step = min(draw_window, draws - iter_done)
-            state, keys, traces = _get_fn("draw", step)(state, keys)
-            jax.block_until_ready(traces[0])
-            trace_parts.append(traces)
-            iter_done += step
-            if pm is not None:
-                for c in range(chains):
-                    pm.update(c, tune + iter_done - 1, tuning=False)
+        _, traces = run_chains_chunked(
+            _sweep,
+            [
+                jax.tree_util.tree_map(lambda a, c=c: a[c], state0)
+                for c in range(chains)
+            ],
+            list(warm_keys),
+            list(draw_keys),
+            tune=tune,
+            draws=draws,
+            on_chunk=_progress,
+        )
 
-    def _cat(i):
-        return np.concatenate([np.asarray(t[i]) for t in trace_parts], axis=1)
-
-    lam_all = _cat(0)
-    gamma_all = _cat(1)
-    rho_all = _cat(2)
-    beta_all = _cat(3)
-    alpha_all = _cat(4)
-    etasel_all = _cat(5)
-    etacnt_all = _cat(6)
+    lam_all, gamma_all, rho_all, beta_all, alpha_all, etasel_all, etacnt_all = traces
 
     sl = slice(None, None, thin) if thin > 1 else slice(None)
     y_np = np.asarray(y, dtype=np.float64)

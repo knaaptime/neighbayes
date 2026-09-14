@@ -261,7 +261,7 @@ class CachedSparseSolver:
 
     repeatedly for many values of ``θ`` (posterior draws, ρ-grid search,
     posterior-predictive replications) with a **fixed** sparsity pattern —
-    only the numeric values rescale.  sparsax's ``lu_solve`` caches the
+    only the numeric values rescale.  sparsax's sparse LU caches the
     fill-reducing symbolic analysis keyed on the ``(Ai, Aj)`` COO indices,
     so calls sharing a pattern pay the symbolic cost once and each later
     call is just a numeric refactor + triangular solves.
@@ -384,11 +384,13 @@ class CachedSparseSolver:
         self._const_jax = None
         self._w_jax_list = None
         self._has_lu_factor = False
+        self._lu = None
         if self._use_sparsax:
             import jax.numpy as jnp
             import sparsax as sparsax_mod
 
             from ..._jax_dispatch import ensure_x64
+            from ._sparsax_lu import sparsax_lu
 
             ensure_x64()
             self._Ai_jax = jnp.asarray(self.Ai, dtype=jnp.int32)
@@ -399,6 +401,12 @@ class CachedSparseSolver:
             ]
             self._has_lu_factor = hasattr(sparsax_mod, "lu_factor") and hasattr(
                 sparsax_mod, "lu_solve_factor"
+            )
+            # KLU or UMFPACK, whichever is faster on this pattern, probed at
+            # A = I - Σ_k (0.5 / K) W_k, inside the stable region.
+            probe_coeffs = [-0.5 / max(len(mats), 1)] * len(mats)
+            self._lu = sparsax_lu(
+                self._Ai_jax, self._Aj_jax, self._assemble_Ax(probe_coeffs), self.n
             )
         # Last (coeffs -> LU token) pair, so back-to-back solves at the same
         # θ (e.g. several RHS blocks per posterior draw) skip the refactor.
@@ -414,12 +422,10 @@ class CachedSparseSolver:
 
     def _token(self, coeffs):
         """Return an LU token for ``A(θ)``, reusing the last one when θ repeats."""
-        import sparsax
-
         key = tuple(float(c) for c in coeffs)
         if self._last_token is not None and key == self._last_coeffs:
             return self._last_token
-        token = sparsax.lu_factor(
+        token = self._lu.factor(
             self._Ai_jax, self._Aj_jax, self._assemble_Ax(coeffs), self.n
         )
         self._last_coeffs = key
@@ -449,20 +455,19 @@ class CachedSparseSolver:
             rhs_np = rhs_np[:, None]
         if self._use_sparsax:
             import jax.numpy as jnp
-            import sparsax
 
             b = jnp.asarray(rhs_np)
             if self._has_lu_factor:
                 # One numeric factorization, then every RHS column solved
                 # against the held token.
                 out = np.asarray(
-                    sparsax.lu_solve_factor(self._token(coeffs), b), dtype=np.float64
+                    self._lu.solve_factor(self._token(coeffs), b), dtype=np.float64
                 )
             else:
                 # Older sparsax: lu_solve still takes a 2-D RHS and caches
                 # the symbolic analysis on (Ai, Aj).
                 out = np.asarray(
-                    sparsax.lu_solve(
+                    self._lu.solve(
                         self._Ai_jax, self._Aj_jax, self._assemble_Ax(coeffs), b
                     ),
                     dtype=np.float64,
@@ -511,12 +516,11 @@ class CachedSparseSolver:
             rhs_np = rhs_np[:, None]
         if self._use_sparsax and self._has_lu_factor:
             import jax.numpy as jnp
-            import sparsax
 
             if self._last_token is None:
                 raise RuntimeError("factorize() must be called before solve_factored()")
             out = np.asarray(
-                sparsax.lu_solve_factor(self._last_token, jnp.asarray(rhs_np)),
+                self._lu.solve_factor(self._last_token, jnp.asarray(rhs_np)),
                 dtype=np.float64,
             )
         else:
@@ -531,15 +535,13 @@ class CachedSparseSolver:
         For :math:`A = I - \rho W` with ``ρ`` inside the stability range the
         determinant is positive, so this is :math:`\log\det(I-\rho W)` — the
         SAR Jacobian term, free from a factorization the sampler already
-        needed.  Valid for asymmetric ``W``: KLU's LU carries the determinant
+        needed.  Valid for asymmetric ``W``: the LU carries the determinant
         just as Cholesky does for the symmetric case.
         """
         if self._use_sparsax and self._has_lu_factor:
-            import sparsax
-
             if self._last_token is None:
                 raise RuntimeError("factorize() must be called before logdet()")
-            return float(sparsax.lu_logdet_factor(self._last_token))
+            return float(self._lu.logdet_factor(self._last_token))
         if getattr(self, "_splu", None) is None:
             raise RuntimeError("factorize() must be called before logdet()")
         return float(np.sum(np.log(np.abs(self._splu.U.diagonal()))))
@@ -559,9 +561,10 @@ class KluSarSolver:
     which is only worth its cost when ``W`` is symmetric: for asymmetric
     ``W`` it squares the condition number and :math:`W^\top W` carries
     several times the nonzeros of ``W`` (two-hop fill-in), so the Cholesky
-    is both slower and less accurate than an LU of ``A`` itself.  KLU
-    factorizes the unsymmetric ``A`` once per ρ and additionally hands back
-    :math:`\log\det A` for free via :meth:`logdet`.
+    is both slower and less accurate than an LU of ``A`` itself.  A sparse LU
+    (KLU or UMFPACK, whichever measures faster) factorizes the unsymmetric
+    ``A`` once per ρ and additionally hands back :math:`\log\det A` for free
+    via :meth:`logdet`.
 
     Parameters
     ----------

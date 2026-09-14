@@ -1589,29 +1589,30 @@ def _sar_null_lambda_info(
     W_csc = W_sparse.tocsc()
 
     # One sparse factorization, reused for every solve below.  Prefer
-    # sparsax's KLU (faster than scipy SuperLU for these structured systems)
+    # sparsax's LU (KLU or UMFPACK, whichever measures faster on this pattern)
     # when available, falling back to the configured scikit-sparse / scipy
-    # backend.  sparsax's ``lu_factor`` + ``lu_solve_factor`` pair lets the
-    # numeric factor be reused across all chunked column solves; the
-    # scikit-sparse / scipy backends do the same via ``factor.solve``.
+    # backend.  sparsax's factor + solve-factor pair lets the numeric factor be
+    # reused across all chunked column solves; the scikit-sparse / scipy
+    # backends do the same via ``factor.solve``.
     from neighbayes._jax_dispatch import _sparsax_available
 
     if _sparsax_available():
         import jax.numpy as jnp
-        import sparsax
 
         from neighbayes._jax_dispatch import ensure_x64
+        from neighbayes.samplers._utils._sparsax_lu import sparsax_lu
 
         ensure_x64()
         _A_coo = A_csc.tocoo()
         _Ai = jnp.asarray(_A_coo.row, dtype=jnp.int32)
         _Aj = jnp.asarray(_A_coo.col, dtype=jnp.int32)
         _Ax = jnp.asarray(_A_coo.data, dtype=jnp.float64)
-        _factor = sparsax.lu_factor(_Ai, _Aj, _Ax, n)
+        _lu = sparsax_lu(_Ai, _Aj, _Ax, n)
+        _factor = _lu.factor(_Ai, _Aj, _Ax, n)
 
         def solve(rhs):
             return np.asarray(
-                sparsax.lu_solve_factor(_factor, np.asarray(rhs, dtype=np.float64)),
+                _lu.solve_factor(_factor, np.asarray(rhs, dtype=np.float64)),
                 dtype=np.float64,
             )
     else:

@@ -13,7 +13,7 @@ Krylov-accelerable.  The Pólya–Gamma augmentation yields fully conjugate
 Gibbs updates for β and ρ (via a collapsed slice sampler).
 
 Both backends fit the same model: ``gibbs_backend="jax"`` (the default via
-``"auto"``) runs each chain on its own CPU device via ``jax.pmap``;
+``"auto"``) runs the chains in parallel threads, one ``jax.jit`` program each;
 ``"numpy"`` uses the CHOLMOD factorization path.  For the *structural*
 latent-field SAR-logit, use :class:`SARLogitStructural`.
 
@@ -229,7 +229,7 @@ class SARLogit(SpatialModel):
             Show per-chain progress bars.
         backend : {"numpy", "jax"}
             Execution backend.  ``"jax"`` (the default via ``"auto"``) runs
-            each chain on its own CPU device via ``jax.pmap``; ``"numpy"``
+            the chains in parallel threads, one ``jax.jit`` program each; ``"numpy"``
             uses the CHOLMOD factorization path with adaptive slice sampling.
         init_jitter : float, default 0.1
             Std-dev of the Gaussian jitter applied to the profile-loglik
@@ -280,7 +280,7 @@ class SARLogit(SpatialModel):
         rng = np.random.default_rng(random_seed)
         chain_seeds = [int(s) for s in rng.integers(0, 2**31, size=chains)]
 
-        # ── JAX device-parallel path ──
+        # ── JAX path (chains in parallel threads) ──
         if backend == "jax":
             chain_inits = [
                 self._initialize_from_ols(np.random.default_rng(s)) for s in chain_seeds

@@ -423,10 +423,9 @@ def _make_solver(
 # ---------------------------------------------------------------------------
 
 # Default Krylov degree and maximum |Δρ| for polynomial approximation.
-# The JAX Gibbs path is Krylov-only (no per-candidate direct solve under
-# jax.vmap), so its ρ step is bounded to ``krylov_dmax``.  A wider dmax (with
-# enough degree to keep the Horner approximation accurate) restores mixing.
-# The NumPy path keeps its conditional direct-solve fallback for |Δρ| > dmax.
+# Beyond ``krylov_dmax`` (or the basis' own convergence radius) both backends
+# fall back to a direct solve per slice candidate, so a wide dmax — with enough
+# degree to keep the Horner approximation accurate — keeps those solves rare.
 _KRYLOV_DEGREE_DEFAULT = 12
 _KRYLOV_DMAX_DEFAULT = 0.4
 

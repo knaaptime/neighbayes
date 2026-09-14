@@ -192,18 +192,19 @@ class SARNegBin(SpatialModel):
         backend : {"numpy", "jax"}
             Execution backend.  ``"numpy"`` uses the CHOLMOD/SPLU
             factorization path with adaptive slice sampling for ρ (the
-            default); ``"jax"`` uses the JAX-accelerated dense path with
+            default); ``"jax"`` uses the JAX-accelerated sparse path with
             slice+Krylov sampling (requires float64; viable for n ≲ 10 000).
         init_jitter : float, default 0.1
             Std-dev of the Gaussian jitter applied to the profile-loglik
             initial state.
-        slice_width : float, default 0.2
-            Stepping-out width for the ρ slice sampler (JAX path).
-        krylov_degree : int, default 8
+        slice_width : float, default 0.4
+            Initial stepping-out width for the ρ slice sampler (JAX path),
+            adapted during warmup and fixed for the draws.
+        krylov_degree : int, default 12
             Krylov basis degree for the shift-invert polynomial
             approximation of :math:`(I - \rho W)^{-1} X` inside the ρ-slice
             density.  Used by both backends.
-        krylov_dmax : float, default 0.15
+        krylov_dmax : float, default 0.4
             Maximum :math:`|\Delta\rho|` for which the Krylov basis is used.
             Used by both backends.
         n_rho_omega_cycles : int, default 1
@@ -251,7 +252,7 @@ class SARNegBin(SpatialModel):
         W_csc = self._W_sparse.tocsc()
         X = np.ascontiguousarray(self._X, dtype=np.float64)
 
-        # ── JAX dense path ──
+        # ── JAX sparse path ──
         if backend == "jax":
             from ...samplers.negbin_reduced._jax import run_chains_jax_reduced
 

@@ -18,7 +18,7 @@ autodiff-capable — the enabling piece for a GPU-friendly flow backend.
 The crucial invariant is that **the sparsity pattern of ``A`` is constant**
 across ``\rho`` (it is the structural union of ``I, W_d, W_o, W_w``).  We
 build that shared pattern once and carry four value vectors aligned to it, so
-each solve only rescales values and calls ``sparsax.lu_solve`` — the
+each solve only rescales values and calls sparsax's LU solve — the
 symbolic factorization (AMD ordering + elimination tree) is never redone.
 
 Keeping this alongside the numpy host path is intentional: sparsax shines on
@@ -110,19 +110,27 @@ def build_sar_pattern(W: sp.spmatrix, n: int) -> dict:
     }
 
 
+def _max_steps(acc, new):
+    """Elementwise maximum of two ``(left, right)`` step-out count pairs."""
+    import jax.numpy as jnp
+
+    return (jnp.maximum(acc[0], new[0]), jnp.maximum(acc[1], new[1]))
+
+
 def make_flow_solve(pattern: dict):
     """Build a JIT-compiled ``solve(ρ_d, ρ_o, ρ_w, rhs) -> A(ρ)⁻¹ rhs``.
 
-    Uses ``sparsax.lu_solve`` (SuiteSparse KLU): the fill-reducing analysis is
-    cached by the shared pattern, so each call only rebuilds the value vector
-    ``Ax(ρ)``.  ``rhs`` may be a vector ``(N,)`` or matrix ``(N, k)`` (batched
-    solve — used for ``X̃ = A⁻¹X``).
+    Uses sparsax's sparse LU (KLU or UMFPACK, whichever
+    :func:`.._utils._sparsax_lu.sparsax_lu` measures faster): the fill-reducing
+    analysis is cached by the shared pattern, so each call only rebuilds the
+    value vector ``Ax(ρ)``.  ``rhs`` may be a vector ``(N,)`` or matrix
+    ``(N, k)`` (batched solve — used for ``X̃ = A⁻¹X``).
     """
     import jax
     import jax.numpy as jnp
-    import sparsax
 
     from ..._jax_dispatch import ensure_x64
+    from .._utils._sparsax_lu import sparsax_lu
 
     ensure_x64()
 
@@ -132,11 +140,15 @@ def make_flow_solve(pattern: dict):
     wd_vals = jnp.asarray(pattern["wd_vals"])
     wo_vals = jnp.asarray(pattern["wo_vals"])
     ww_vals = jnp.asarray(pattern["ww_vals"])
+    # Route on ρ = 0.2 in each direction, inside the stable region.
+    lu_solve = sparsax_lu(
+        Ai, Aj, eye_vals - 0.2 * (wd_vals + wo_vals + ww_vals), pattern["N"]
+    ).solve
 
     @jax.jit
     def solve(rho_d, rho_o, rho_w, rhs):
         Ax = eye_vals - rho_d * wd_vals - rho_o * wo_vals - rho_w * ww_vals
-        return sparsax.lu_solve(Ai, Aj, Ax, rhs)
+        return lu_solve(Ai, Aj, Ax, rhs)
 
     return solve
 
@@ -161,17 +173,18 @@ def _make_flow_solvers(ctx):
     """Build sparse-LU solve closures for ``A(ρ_d,ρ_o,ρ_w) = I−ρ_dWd−ρ_oWo−ρ_wWw``.
 
     Returns ``(solve, matvec)`` where ``solve(ρ_d,ρ_o,ρ_w,rhs)`` →
-    ``A(ρ)⁻¹ rhs`` via ``sparsax.lu_solve`` (SuiteSparse KLU) and ``matvec``
-    is a dict ``{"d","o","w"}`` of sparse (BCOO) lag matvecs.
+    ``A(ρ)⁻¹ rhs`` via sparsax's sparse LU and ``matvec`` is a dict
+    ``{"d","o","w"}`` of sparse (BCOO) lag matvecs.
 
-    ``sparsax.lu_solve`` is vmap-safe and reuses its numeric factorization via
-    a content-addressed cache: the m+1 solves of a Krylov basis at a fixed
-    (ρ_d,ρ_o,ρ_w) pay one ``klu_factor`` and m cheap solves — per chain — even
-    under ``jax.vmap`` over chains, which stays vmap-safe under ``jit(vmap(...))``;
-    see ``set_lu_cache_size``.
+    The LU is KLU or UMFPACK, whichever :func:`.._utils._sparsax_lu.sparsax_lu`
+    measures faster on this pattern.  Both reuse their numeric factorization
+    via a content-addressed cache: the m+1 solves of a Krylov basis at a fixed
+    (ρ_d,ρ_o,ρ_w) pay one factorization and m cheap solves per chain; see
+    ``set_sparsax_lu_cache_size``.
     """
     import jax.numpy as jnp
-    import sparsax
+
+    from .._utils._sparsax_lu import sparsax_lu
 
     Ai = jnp.asarray(ctx["Ai"], jnp.int32)
     Aj = jnp.asarray(ctx["Aj"], jnp.int32)
@@ -180,10 +193,14 @@ def _make_flow_solvers(ctx):
     wo_vals = jnp.asarray(ctx["wo_vals"])
     ww_vals = jnp.asarray(ctx["ww_vals"])
     Wd_bcoo, Wo_bcoo, Ww_bcoo = ctx["Wd_bcoo"], ctx["Wo_bcoo"], ctx["Ww_bcoo"]
+    # Route on ρ = 0.2 in each direction, inside the stable region.
+    lu_solve = sparsax_lu(
+        Ai, Aj, eye_vals - 0.2 * (wd_vals + wo_vals + ww_vals), ctx["N"]
+    ).solve
 
     def solve(rho_d, rho_o, rho_w, rhs):
         Ax = eye_vals - rho_d * wd_vals - rho_o * wo_vals - rho_w * ww_vals
-        return sparsax.lu_solve(Ai, Aj, Ax, rhs)
+        return lu_solve(Ai, Aj, Ax, rhs)
 
     matvec = {
         "d": lambda v: Wd_bcoo @ v,
@@ -295,10 +312,12 @@ def _make_flow_gibbs_step(
     ):
         """One ρ_k slice with a W_k-direction basis at the current A_0.
 
-        Krylov-only (``solve_at=None``): candidates outside the Krylov radius are
-        rejected rather than evaluated with a direct solve.  The bounded ρ_k
-        step this induces is offset by a wider ``krylov_dmax`` with enough degree
-        to stay accurate.
+        Candidates inside the Krylov radius are evaluated from the basis; those
+        outside it take a direct sparse solve of ``A(ρ)⁻¹X`` with the candidate
+        in ρ_k's slot, as in the NumPy sampler.  Rejecting them instead would
+        confine each slice to a window around the basis center, a
+        state-dependent truncation that does not leave the conditional
+        invariant.
 
         Basis reuse: when all three ρ's are within ``_reuse_threshold`` of
         the basis center, the previous sweep's basis is reused.
@@ -337,9 +356,13 @@ def _make_flow_gibbs_step(
         # Python string, so this selects at trace time.
         rho_basis_k = {"d": rd_b, "o": ro_b, "w": rw_b}[wkey]
 
+        def _with_candidate(v):
+            """(ρ_d, ρ_o, ρ_w) with the candidate ``v`` in ρ_k's slot."""
+            return {"d": (v, ro, rw), "o": (rd, v, rw), "w": (rd, ro, v)}[wkey]
+
         lo, hi = _wall_bounds(other_abs)
 
-        rho_new = _slice_sample_rho_jax(
+        rho_new, steps_left, steps_right = _slice_sample_rho_jax(
             rho_current=rho_k,
             V_stack=V_stack,
             rho_basis=rho_basis_k,
@@ -354,13 +377,21 @@ def _make_flow_gibbs_step(
             krylov_dmax=dmax,
             slice_width=slice_width,
             key=key,
-            X_jax=None,
-            solve_at=None,
+            X_jax=X_jax,
+            solve_at=lambda v, rhs: solve(*_with_candidate(v), rhs),
+            return_steps=True,
         )
-        return rho_new, V_stack, rd_b, ro_b, rw_b
+        return rho_new, (steps_left, steps_right), V_stack, rd_b, ro_b, rw_b
 
     @jax.jit
-    def gibbs_step(state, key, slice_width):
+    def gibbs_step(state, key, slice_widths):
+        """One sweep; ``slice_widths`` holds the ρ_d, ρ_o and ρ_w slice widths.
+
+        Returns ``(new_state, η, steps)``, where ``steps`` holds each ρ slice's
+        ``(left, right)`` step-out counts (the maximum over the sweep's cycles)
+        for warmup width adaptation.
+        """
+        w_d, w_o, w_w = slice_widths
         beta = state["beta"]
         rd, ro, rw = state["rho_d"], state["rho_o"], state["rho_w"]
         alpha = state["alpha"]
@@ -377,9 +408,11 @@ def _make_flow_gibbs_step(
         key, kpg = jax.random.split(key)
         omega = _draw_omega(y_jax, alpha, eta, kpg)
 
+        no_steps = (jnp.float64(0.0), jnp.float64(0.0))
+        steps_d = steps_o = steps_w = no_steps
         for cyc in range(n_cycles):
             key, kd, ko, kw, kb = jax.random.split(key, 5)
-            rd, Vd, rd_b, ro_b_d, rw_b_d = _slice_one(
+            rd, s_d, Vd, rd_b, ro_b_d, rw_b_d = _slice_one(
                 rd,
                 rd,
                 ro,
@@ -388,14 +421,15 @@ def _make_flow_gibbs_step(
                 jnp.abs(ro) + jnp.abs(rw),
                 omega,
                 alpha,
-                slice_width,
+                w_d,
                 kd,
                 V_stack_prev=Vd_prev,
                 rd_basis=rd_b_prev,
                 ro_basis=ro_b_prev,
                 rw_basis=rw_b_prev,
             )
-            ro, Vo, rd_b_o, ro_b, rw_b_o = _slice_one(
+            steps_d = _max_steps(steps_d, s_d)
+            ro, s_o, Vo, rd_b_o, ro_b, rw_b_o = _slice_one(
                 ro,
                 rd,
                 ro,
@@ -404,14 +438,15 @@ def _make_flow_gibbs_step(
                 jnp.abs(rd) + jnp.abs(rw),
                 omega,
                 alpha,
-                slice_width,
+                w_o,
                 ko,
                 V_stack_prev=Vo_prev,
                 rd_basis=rd_b_prev,
                 ro_basis=ro_b_prev,
                 rw_basis=rw_b_prev,
             )
-            rw, Vw, rd_b_w, ro_b_w, rw_b = _slice_one(
+            steps_o = _max_steps(steps_o, s_o)
+            rw, s_w, Vw, rd_b_w, ro_b_w, rw_b = _slice_one(
                 rw,
                 rd,
                 ro,
@@ -420,13 +455,14 @@ def _make_flow_gibbs_step(
                 jnp.abs(rd) + jnp.abs(ro),
                 omega,
                 alpha,
-                slice_width,
+                w_w,
                 kw,
                 V_stack_prev=Vw_prev,
                 rd_basis=rd_b_prev,
                 ro_basis=ro_b_prev,
                 rw_basis=rw_b_prev,
             )
+            steps_w = _max_steps(steps_w, s_w)
 
             # β step needs X̃ = A(ρ_new)⁻¹X at the just-updated (ρ_d,ρ_o,ρ_w);
             # all three moved, so no single basis covers it — one direct solve.
@@ -443,20 +479,24 @@ def _make_flow_gibbs_step(
         # Return the fitted latent η so the runner forms the pointwise NB
         # log-likelihood on-device (reusing the sweep's solve) instead of a
         # post-hoc per-draw host-solve loop.
-        return {
-            "beta": beta,
-            "rho_d": rd,
-            "rho_o": ro,
-            "rho_w": rw,
-            "alpha": alpha,
-            "omega": omega,
-            "V_stack_d": Vd,
-            "V_stack_o": Vo,
-            "V_stack_w": Vw,
-            "rd_basis": rd_b,
-            "ro_basis": ro_b,
-            "rw_basis": rw_b,
-        }, eta
+        return (
+            {
+                "beta": beta,
+                "rho_d": rd,
+                "rho_o": ro,
+                "rho_w": rw,
+                "alpha": alpha,
+                "omega": omega,
+                "V_stack_d": Vd,
+                "V_stack_o": Vo,
+                "V_stack_w": Vw,
+                "rd_basis": rd_b,
+                "ro_basis": ro_b,
+                "rw_basis": rw_b,
+            },
+            eta,
+            (steps_d, steps_o, steps_w),
+        )
 
     return gibbs_step
 
@@ -484,11 +524,11 @@ def run_chains_jax_flow(
 ):
     """Run the unrestricted flow NB Gibbs sampler on the JAX backend.
 
-    All chains run together under ``jax.vmap``.  The non-symmetric LU solve goes
-    through ``sparsax.lu_solve`` (SuiteSparse KLU) — vmap-safe with numeric
-    factor-reuse under ``jit(vmap(...))``.  The three ρ slices are Krylov-only
-    (no per-candidate direct solve under vmap).  ``W`` is never densified; the
-    exact PG draw uses the host callback.
+    Chains run in parallel threads (see
+    :func:`.._utils._jax_utils.run_chains_chunked`).  The non-symmetric LU solve
+    goes through sparsax (KLU or UMFPACK, whichever is faster on the pattern)
+    with numeric factor reuse.  ``W`` is never densified.  Each ρ slice starts
+    at ``slice_width`` and adapts its own width during warmup.
 
     Returns one dict per chain with keys ``rho_d``, ``rho_o``, ``rho_w``,
     ``beta``, ``alpha``, ``log_lik``.
@@ -504,7 +544,6 @@ def run_chains_jax_flow(
     y_jax = jnp.asarray(y, dtype=jnp.float64)
     X_jax = jnp.asarray(X, dtype=jnp.float64)
     ctx = build_flow_ctx(Wd, Wo, Ww, N)
-    sw = jnp.float64(slice_width)
 
     gibbs_step = _make_flow_gibbs_step(
         y_jax,
@@ -524,79 +563,59 @@ def run_chains_jax_flow(
     if jax_seeds is None:
         jax_seeds = list(range(chains))
 
-    # sparsax's KLU factor cache must hold each chain's distinct factors live
-    # across the sweep's several solves (η, the 3 directional bases, X̃) for the
-    # vmapped reuse to land; size generously per chain.
-    import sparsax
+    # sparsax's LU factor cache must hold each chain's distinct factors live
+    # across the sweep's several solves (η, the 3 directional bases, X̃).
+    from .._utils._sparsax_lu import set_sparsax_lu_cache_size
 
-    sparsax.set_lu_cache_size(max(32, 8 * chains))
+    set_sparsax_lu_cache_size(max(32, 8 * chains))
 
-    # All chains run together under jax.vmap — vmap-safe now that the LU solve is
-    # sparsax.lu_solve (factor-reusing) and the ρ slices are Krylov-only.
     _V_init = jnp.zeros((krylov_degree + 1, N, k), dtype=jnp.float64)
-    state0 = {
-        "beta": jnp.asarray(np.stack([i.beta for i in inits]), dtype=jnp.float64),
-        "rho_d": jnp.asarray([float(i.rho_d) for i in inits], dtype=jnp.float64),
-        "rho_o": jnp.asarray([float(i.rho_o) for i in inits], dtype=jnp.float64),
-        "rho_w": jnp.asarray(
-            [float(i.rho_w if i.rho_w is not None else 0.0) for i in inits],
-            dtype=jnp.float64,
-        ),
-        "alpha": jnp.asarray([float(i.alpha) for i in inits], dtype=jnp.float64),
-        "omega": jnp.asarray(np.stack([i.omega for i in inits]), dtype=jnp.float64),
-        "V_stack_d": jnp.broadcast_to(_V_init, (chains,) + _V_init.shape),
-        "V_stack_o": jnp.broadcast_to(_V_init, (chains,) + _V_init.shape),
-        "V_stack_w": jnp.broadcast_to(_V_init, (chains,) + _V_init.shape),
-        "rd_basis": jnp.zeros(chains, dtype=jnp.float64),
-        "ro_basis": jnp.zeros(chains, dtype=jnp.float64),
-        "rw_basis": jnp.zeros(chains, dtype=jnp.float64),
-    }
-    warm_keys = jnp.stack([jax.random.PRNGKey(int(s)) for s in jax_seeds])
-    draw_keys = jnp.stack(
-        [jax.random.fold_in(jax.random.PRNGKey(int(s)), 1) for s in jax_seeds]
-    )
+    states = [
+        {
+            "beta": jnp.asarray(i.beta, dtype=jnp.float64),
+            "rho_d": jnp.float64(float(i.rho_d)),
+            "rho_o": jnp.float64(float(i.rho_o)),
+            "rho_w": jnp.float64(float(i.rho_w if i.rho_w is not None else 0.0)),
+            "alpha": jnp.float64(float(i.alpha)),
+            "omega": jnp.asarray(i.omega, dtype=jnp.float64),
+            "V_stack_d": _V_init,
+            "V_stack_o": _V_init,
+            "V_stack_w": _V_init,
+            "rd_basis": jnp.float64(0.0),
+            "ro_basis": jnp.float64(0.0),
+            "rw_basis": jnp.float64(0.0),
+            "slice_widths": (jnp.float64(slice_width),) * 3,
+        }
+        for i in inits
+    ]
+    warm_keys = [jax.random.PRNGKey(int(s)) for s in jax_seeds]
+    draw_keys = [jax.random.fold_in(jax.random.PRNGKey(int(s)), 1) for s in jax_seeds]
 
-    def _warm_one(s, key):
-        def body(_, carry):
-            st, kk = carry
-            kk, sk = jax.random.split(kk)
-            st, _ = gibbs_step(st, sk, sw)
-            return (st, kk)
+    from .._utils._jax_slice import adapt_slice_width
+    from .._utils._jax_utils import run_chains_chunked
 
-        st, _ = jax.lax.fori_loop(0, tune, body, (s, key))
-        return st
+    def _sweep(st, key, tuning):
+        widths = st["slice_widths"]
+        core = {name: v for name, v in st.items() if name != "slice_widths"}
+        core, eta, steps = gibbs_step(core, key, widths)
+        widths = tuple(
+            adapt_slice_width(w, left, right, tuning)
+            for w, (left, right) in zip(widths, steps)
+        )
+        trace = (core["rho_d"], core["rho_o"], core["rho_w"])
+        trace += (core["beta"], core["alpha"], eta)
+        return dict(core, slice_widths=widths), trace
 
-    def _draw_one(s, key):
-        def body(carry, _):
-            st, kk = carry
-            kk, sk = jax.random.split(kk)
-            st, eta = gibbs_step(st, sk, sw)
-            return (st, kk), (
-                st["rho_d"],
-                st["rho_o"],
-                st["rho_w"],
-                st["beta"],
-                st["alpha"],
-                eta,
-            )
-
-        _, traces = jax.lax.scan(body, (s, key), None, length=draws)
-        return traces
-
-    # One chain per CPU device (pmap) when available, else vmap — see
-    # negbin_reduced._jax._run_chains_device_parallel.
-    from ._jax import _run_chains_device_parallel
-
-    rd_all, ro_all, rw_all, beta_all, alpha_all, eta_all = _run_chains_device_parallel(
-        _warm_one, _draw_one, state0, warm_keys, draw_keys, chains, tune
+    _, (rd_all, ro_all, rw_all, beta_all, alpha_all, eta_all) = run_chains_chunked(
+        _sweep, states, warm_keys, draw_keys, tune=tune, draws=draws
     )
     sl = slice(None, None, thin) if thin > 1 else slice(None)
-    rd_all = np.asarray(rd_all)[:, sl]
-    ro_all = np.asarray(ro_all)[:, sl]
-    rw_all = np.asarray(rw_all)[:, sl]
-    beta_all = np.asarray(beta_all)[:, sl]
-    alpha_all = np.asarray(alpha_all)[:, sl]
-    eta_all = np.asarray(eta_all)[:, sl]  # (chains, n_keep, N)
+    rd_all = rd_all[:, sl]
+    ro_all = ro_all[:, sl]
+    rw_all = rw_all[:, sl]
+    beta_all = beta_all[:, sl]
+    alpha_all = alpha_all[:, sl]
+    eta_all = eta_all[:, sl]  # (chains, n_keep, N)
 
     # Pointwise NB log-likelihood from the fitted η collected during sampling —
     # no post-hoc per-draw solves.
@@ -636,20 +655,24 @@ def _build_sar_solver_jax(W_csc, n):
 
     Returns ``solve(rho, rhs)`` where ``rhs`` is ``(n,)`` or ``(n, m)``.
     The symbolic analysis is cached by sparsax keyed on the constant
-    COO pattern, so only the numeric factorization is redone per ρ.
+    COO pattern, so only the numeric factorization is redone per ρ.  The LU is
+    KLU or UMFPACK, whichever :func:`.._utils._sparsax_lu.sparsax_lu` measures
+    faster on the pattern.
     """
     import jax.numpy as jnp
-    import sparsax
+
+    from .._utils._sparsax_lu import sparsax_lu
 
     pat = build_sar_pattern(W_csc.tocsr(), n)
     Ai = jnp.asarray(pat["Ai"], jnp.int32)
     Aj = jnp.asarray(pat["Aj"], jnp.int32)
     eye_vals = jnp.asarray(pat["eye_vals"])
     w_vals = jnp.asarray(pat["w_vals"])
+    lu_solve = sparsax_lu(Ai, Aj, eye_vals - 0.5 * w_vals, n).solve
 
     def solve(rho, rhs):
         Ax = eye_vals - rho * w_vals
-        return sparsax.lu_solve(Ai, Aj, Ax, rhs)
+        return lu_solve(Ai, Aj, Ax, rhs)
 
     return solve
 
@@ -870,7 +893,17 @@ def _make_flow_sep_gibbs_step(
         slice_width,
         key,
     ):
-        """One ρ_k slice with Kronecker Krylov basis + reuse."""
+        """One ρ_k slice with Kronecker Krylov basis + reuse.
+
+        Candidates outside the Krylov radius take a direct Kronecker solve with
+        the candidate in ρ_k's slot, as in the NumPy sampler, rather than being
+        rejected (which would truncate the slice to a state-dependent window).
+        """
+
+        def _solve_at(v, rhs):
+            if direction == "rho_d":
+                return _kron_solve(v, ro, rhs)
+            return _kron_solve(rd, v, rhs)
 
         def _rebuild(_):
             V, rb = _kron_krylov_basis(rd, ro, direction)
@@ -886,31 +919,36 @@ def _make_flow_sep_gibbs_step(
             operand=None,
         )
 
-        return (
-            _slice_sample_rho_jax(
-                rho_current=rho_k,
-                V_stack=V_stack,
-                rho_basis=rho_basis,
-                omega=omega,
-                y_jax=y_jax,
-                alpha=alpha,
-                V0_inv_diag=V0_inv_diag,
-                mu0=mu0,
-                intercept_col=-1,
-                rho_lower=rho_lo,
-                rho_upper=rho_hi,
-                krylov_dmax=dmax,
-                slice_width=slice_width,
-                key=key,
-                X_jax=None,
-                solve_at=None,
-            ),
-            V_stack,
-            rho_basis,
+        rho_new, steps_left, steps_right = _slice_sample_rho_jax(
+            rho_current=rho_k,
+            V_stack=V_stack,
+            rho_basis=rho_basis,
+            omega=omega,
+            y_jax=y_jax,
+            alpha=alpha,
+            V0_inv_diag=V0_inv_diag,
+            mu0=mu0,
+            intercept_col=-1,
+            rho_lower=rho_lo,
+            rho_upper=rho_hi,
+            krylov_dmax=dmax,
+            slice_width=slice_width,
+            key=key,
+            X_jax=X_jax,
+            solve_at=_solve_at,
+            return_steps=True,
         )
+        return rho_new, (steps_left, steps_right), V_stack, rho_basis
 
     @jax.jit
-    def gibbs_step(state, key, slice_width):
+    def gibbs_step(state, key, slice_widths):
+        """One sweep; ``slice_widths`` holds the ρ_d and ρ_o slice widths.
+
+        Returns ``(new_state, η, steps)``, where ``steps`` holds each ρ slice's
+        ``(left, right)`` step-out counts (the maximum over the sweep's cycles)
+        for warmup width adaptation.
+        """
+        w_d, w_o = slice_widths
         beta = state["beta"]
         rd, ro = state["rho_d"], state["rho_o"]
         alpha = state["alpha"]
@@ -925,10 +963,12 @@ def _make_flow_sep_gibbs_step(
         key, kpg = jax.random.split(key)
         omega = _draw_omega(y_jax, alpha, eta, kpg)
 
+        no_steps = (jnp.float64(0.0), jnp.float64(0.0))
+        steps_d = steps_o = no_steps
         for cyc in range(n_cycles):
             key, kd, ko, kb = jax.random.split(key, 4)
 
-            rd, Vd, rd_basis = _slice_rho_k(
+            rd, s_d, Vd, rd_basis = _slice_rho_k(
                 rd,
                 "rho_d",
                 rd,
@@ -937,13 +977,14 @@ def _make_flow_sep_gibbs_step(
                 alpha,
                 Vd_prev,
                 rd_basis_prev,
-                slice_width,
+                w_d,
                 kd,
             )
+            steps_d = _max_steps(steps_d, s_d)
             Vd_prev = Vd
             rd_basis_prev = rd_basis
 
-            ro, Vo, ro_basis = _slice_rho_k(
+            ro, s_o, Vo, ro_basis = _slice_rho_k(
                 ro,
                 "rho_o",
                 rd,
@@ -952,9 +993,10 @@ def _make_flow_sep_gibbs_step(
                 alpha,
                 Vo_prev,
                 ro_basis_prev,
-                slice_width,
+                w_o,
                 ko,
             )
+            steps_o = _max_steps(steps_o, s_o)
             Vo_prev = Vo
             ro_basis_prev = ro_basis
 
@@ -969,17 +1011,21 @@ def _make_flow_sep_gibbs_step(
         key, ka = jax.random.split(key)
         alpha = _sample_alpha_jax_reduced(eta, y_jax, alpha, alpha_sigma, alpha_nu, ka)
 
-        return {
-            "beta": beta,
-            "rho_d": rd,
-            "rho_o": ro,
-            "alpha": alpha,
-            "omega": omega,
-            "V_stack_d": Vd_prev,
-            "rho_basis_d": rd_basis_prev,
-            "V_stack_o": Vo_prev,
-            "rho_basis_o": ro_basis_prev,
-        }, eta
+        return (
+            {
+                "beta": beta,
+                "rho_d": rd,
+                "rho_o": ro,
+                "alpha": alpha,
+                "omega": omega,
+                "V_stack_d": Vd_prev,
+                "rho_basis_d": rd_basis_prev,
+                "V_stack_o": Vo_prev,
+                "rho_basis_o": ro_basis_prev,
+            },
+            eta,
+            (steps_d, steps_o),
+        )
 
     return gibbs_step
 
@@ -1006,7 +1052,7 @@ def run_chains_jax_flow_separable(
     """Run the separable flow NB Gibbs sampler on the JAX backend.
 
     The separable Kronecker model (``ρ_w = -ρ_d·ρ_o``) factors the ``N×N``
-    system into two ``n×n`` solves, each using a sparsax KLU factorization
+    system into two ``n×n`` solves, each using a sparsax LU factorization
     on the regional weights pattern.  Each ρ_k slice uses a Krylov basis
     on the n×n system with cross-sweep reuse via ``jax.lax.cond``.
 
@@ -1042,60 +1088,53 @@ def run_chains_jax_flow_separable(
     if jax_seeds is None:
         jax_seeds = list(range(chains))
 
-    import sparsax
+    from .._utils._sparsax_lu import set_sparsax_lu_cache_size
 
-    sparsax.set_lu_cache_size(max(32, 8 * chains))
+    set_sparsax_lu_cache_size(max(32, 8 * chains))
 
-    sw = jnp.float64(slice_width)
     _V_init = jnp.zeros((krylov_degree + 1, n * n, k), dtype=jnp.float64)
 
-    state0 = {
-        "beta": jnp.asarray(np.stack([i.beta for i in inits]), dtype=jnp.float64),
-        "rho_d": jnp.asarray([float(i.rho_d) for i in inits], dtype=jnp.float64),
-        "rho_o": jnp.asarray([float(i.rho_o) for i in inits], dtype=jnp.float64),
-        "alpha": jnp.asarray([float(i.alpha) for i in inits], dtype=jnp.float64),
-        "omega": jnp.asarray(np.stack([i.omega for i in inits]), dtype=jnp.float64),
-        "V_stack_d": jnp.broadcast_to(_V_init, (chains,) + _V_init.shape),
-        "rho_basis_d": jnp.zeros(chains, dtype=jnp.float64),
-        "V_stack_o": jnp.broadcast_to(_V_init, (chains,) + _V_init.shape),
-        "rho_basis_o": jnp.zeros(chains, dtype=jnp.float64),
-    }
-    warm_keys = jnp.stack([jax.random.PRNGKey(int(s)) for s in jax_seeds])
-    draw_keys = jnp.stack(
-        [jax.random.fold_in(jax.random.PRNGKey(int(s)), 1) for s in jax_seeds]
-    )
+    states = [
+        {
+            "beta": jnp.asarray(i.beta, dtype=jnp.float64),
+            "rho_d": jnp.float64(float(i.rho_d)),
+            "rho_o": jnp.float64(float(i.rho_o)),
+            "alpha": jnp.float64(float(i.alpha)),
+            "omega": jnp.asarray(i.omega, dtype=jnp.float64),
+            "V_stack_d": _V_init,
+            "rho_basis_d": jnp.float64(0.0),
+            "V_stack_o": _V_init,
+            "rho_basis_o": jnp.float64(0.0),
+            "slice_widths": (jnp.float64(slice_width),) * 2,
+        }
+        for i in inits
+    ]
+    warm_keys = [jax.random.PRNGKey(int(s)) for s in jax_seeds]
+    draw_keys = [jax.random.fold_in(jax.random.PRNGKey(int(s)), 1) for s in jax_seeds]
 
-    def _warm_one(s, key):
-        def body(_, carry):
-            st, kk = carry
-            kk, sk = jax.random.split(kk)
-            st, _ = gibbs_step(st, sk, sw)
-            return (st, kk)
+    from .._utils._jax_slice import adapt_slice_width
+    from .._utils._jax_utils import run_chains_chunked
 
-        st, _ = jax.lax.fori_loop(0, tune, body, (s, key))
-        return st
+    def _sweep(st, key, tuning):
+        widths = st["slice_widths"]
+        core = {name: v for name, v in st.items() if name != "slice_widths"}
+        core, eta, steps = gibbs_step(core, key, widths)
+        widths = tuple(
+            adapt_slice_width(w, left, right, tuning)
+            for w, (left, right) in zip(widths, steps)
+        )
+        trace = (core["rho_d"], core["rho_o"], core["beta"], core["alpha"], eta)
+        return dict(core, slice_widths=widths), trace
 
-    def _draw_one(s, key):
-        def body(carry, _):
-            st, kk = carry
-            kk, sk = jax.random.split(kk)
-            st, eta = gibbs_step(st, sk, sw)
-            return (st, kk), (st["rho_d"], st["rho_o"], st["beta"], st["alpha"], eta)
-
-        _, traces = jax.lax.scan(body, (s, key), None, length=draws)
-        return traces
-
-    from ._jax import _run_chains_device_parallel
-
-    rd_all, ro_all, beta_all, alpha_all, eta_all = _run_chains_device_parallel(
-        _warm_one, _draw_one, state0, warm_keys, draw_keys, chains, tune
+    _, (rd_all, ro_all, beta_all, alpha_all, eta_all) = run_chains_chunked(
+        _sweep, states, warm_keys, draw_keys, tune=tune, draws=draws
     )
     sl = slice(None, None, thin) if thin > 1 else slice(None)
-    rd_all = np.asarray(rd_all)[:, sl]
-    ro_all = np.asarray(ro_all)[:, sl]
-    beta_all = np.asarray(beta_all)[:, sl]
-    alpha_all = np.asarray(alpha_all)[:, sl]
-    eta_all = np.asarray(eta_all)[:, sl]
+    rd_all = rd_all[:, sl]
+    ro_all = ro_all[:, sl]
+    beta_all = beta_all[:, sl]
+    alpha_all = alpha_all[:, sl]
+    eta_all = eta_all[:, sl]
     rw_all = -rd_all * ro_all  # separable constraint
 
     y_np = np.asarray(y, dtype=np.float64)

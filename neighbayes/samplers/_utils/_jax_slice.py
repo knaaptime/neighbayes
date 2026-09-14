@@ -29,6 +29,7 @@ def jax_slice_sample_1d(
     w=1.0,
     max_steps_out=50,
     max_shrink_iters=200,
+    return_steps=False,
 ):
     """Draw one sample from a univariate distribution via slice sampling.
 
@@ -52,6 +53,9 @@ def jax_slice_sample_1d(
         Maximum number of stepping-out iterations per side.
     max_shrink_iters : int, default 200
         Maximum number of shrinkage iterations (safety limit).
+    return_steps : bool, default False
+        Also return the left and right stepping-out counts, which drive warmup
+        width adaptation (:func:`adapt_slice_width`).
 
     Returns
     -------
@@ -59,6 +63,8 @@ def jax_slice_sample_1d(
         New sample point.
     log_density_new : jax.numpy scalar
         Log-density evaluated at ``x_new``.
+    steps_left, steps_right : jax.numpy scalar
+        Stepping-out counts; returned only when ``return_steps``.
     """
     # Split key for all random draws needed
     key, key_u, key_Lu, key_Ru = jax.random.split(key, 4)
@@ -86,7 +92,7 @@ def jax_slice_sample_1d(
         ld_L_new = log_density(L_new)
         return L_new, ld_L_new, i + 1
 
-    L, _, _ = jax.lax.while_loop(
+    L, _, steps_left = jax.lax.while_loop(
         _step_left_cond,
         _step_left_body,
         (L, log_density(L), jnp.array(0)),
@@ -103,7 +109,7 @@ def jax_slice_sample_1d(
         ld_R_new = log_density(R_new)
         return R_new, ld_R_new, i + 1
 
-    R, _, _ = jax.lax.while_loop(
+    R, _, steps_right = jax.lax.while_loop(
         _step_right_cond,
         _step_right_body,
         (R, log_density(R), jnp.array(0)),
@@ -151,6 +157,8 @@ def jax_slice_sample_1d(
         (L, R, x_init, ld_init, jnp.array(0)),
     )
 
+    if return_steps:
+        return x_new, ld_new, steps_left, steps_right
     return x_new, ld_new
 
 
@@ -363,3 +371,30 @@ def jax_slice_sample_1d_adaptive(
     )
 
     return x_new, ld_new, L_final, R_final, steps_out
+
+
+def adapt_slice_width(width, steps_left, steps_right, tuning=True):
+    """Tune a slice width from one draw's stepping-out counts (JAX-traceable).
+
+    The NumPy samplers' rule (:func:`._slice.update_slice_width`), with its
+    constants taken from :class:`._slice.SliceWidthState`: widen when either
+    side needed more than ``target_steps`` step-outs, narrow when neither side
+    needed any, and clamp to ``[w_min, w_max]``.  ``tuning``, a traced boolean,
+    gates the update, so a sweep can call this unconditionally and hold the
+    width fixed after warmup.
+
+    Every step-out and every rejected shrinkage proposal costs a log-density
+    evaluation.  A width far wider than the posterior spends them shrinking; a
+    far narrower one spends them stepping out.
+    """
+    from ._slice import SliceWidthState
+
+    rule = SliceWidthState()
+    grow = jnp.maximum(steps_left, steps_right) > rule.target_steps
+    shrink = (steps_left == 0) & (steps_right == 0)
+    tuned = jnp.where(
+        grow,
+        width * rule.expand_factor,
+        jnp.where(shrink, width * rule.shrink_factor, width),
+    )
+    return jnp.where(tuning, jnp.clip(tuned, rule.w_min, rule.w_max), width)

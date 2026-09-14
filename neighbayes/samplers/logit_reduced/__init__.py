@@ -12,8 +12,8 @@ enters the *linear predictor*, so the ``|I − ρW|`` Jacobian cancels when β i
 marginalized out and the system is *linear* in ρ.  That makes the ρ conditional
 Krylov-accelerable and the sweep arithmetic-heavy.  It reuses the reduced-NB
 machinery almost verbatim — the shift-invert Krylov basis, the CHOLMOD
-normal-equations solver (NumPy) / sparsax sparse-LU (JAX), and the device-parallel
-``jax.pmap`` runner.
+normal-equations solver (NumPy) / sparsax sparse-LU (JAX), and the thread-parallel
+chain runner.
 
 Differences from the count model: the Pólya–Gamma draw uses h = 1 (Bernoulli),
 the working response is κ/ω with κ = y − ½ (no ``log α`` offset), and there is no
@@ -39,7 +39,7 @@ __all__ = [
 # ---------------------------------------------------------------------------
 #
 # Gibbs-only (no NUTS build).  The canonical ``SARLogit`` model.  ``auto``
-# prefers the ``jax`` device-parallel path (fastest for cross-section models);
+# prefers the ``jax`` thread-parallel path (fastest for cross-section models);
 # the NumPy (CHOLMOD) path is available via ``gibbs_backend="numpy"``.
 
 

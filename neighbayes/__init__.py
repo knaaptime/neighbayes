@@ -16,35 +16,7 @@ Import a model class from the ``models`` submodule::
         from neighbayes.models import SAR
 """
 
-import os as _os
-import sys as _sys
 from importlib.metadata import PackageNotFoundError, version
-
-
-def _auto_configure_cpu_devices() -> None:
-    """Expose multiple CPU devices so the JAX Gibbs backends can run each chain
-    on its own device (``pmap``) for true multi-core parallelism.
-
-    JAX's CPU backend defaults to a *single* device, so ``vmap``-over-chains
-    executes on one core and loses to the NumPy path's joblib *processes*.
-    Mapping one chain per CPU device (``pmap``) is the analogue of those
-    processes — and, with JAX's per-core efficiency, it *beats* the NumPy
-    backend.  The device count must be chosen before JAX initializes, via
-    ``--xla_force_host_platform_device_count``; we set it at import unless JAX is
-    already loaded or the user configured it explicitly.
-    """
-    if "jax" in _sys.modules:
-        return  # too late: JAX already initialized — the Gibbs path falls back to vmap
-    flags = _os.environ.get("XLA_FLAGS", "")
-    if "xla_force_host_platform_device_count" in flags:
-        return  # respect an explicit user setting
-    n = min(_os.cpu_count() or 4, 16)
-    _os.environ["XLA_FLAGS"] = (
-        f"{flags} --xla_force_host_platform_device_count={n}".strip()
-    )
-
-
-_auto_configure_cpu_devices()
 
 import lazy_loader as _lazy
 

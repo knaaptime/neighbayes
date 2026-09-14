@@ -341,10 +341,8 @@ class SARNegBinStructural(SpatialModel):
         # eliminating Python→JAX dispatch overhead (~30ms/call × 6 calls).
         _use_jax_full = sample_method in ("jax_dense", "cholmod_jax")
 
-        # JAX dense path: run every chain together via jax.vmap.  This
-        # JITs the Gibbs step once and executes all chains as a single
-        # fused XLA program (much faster than driving the per-chain
-        # Python loop ``chains`` times, and avoids joblib re-JIT cost).
+        # JAX dense path: the Gibbs step compiles once and the chains run in
+        # parallel threads (see run_chains_chunked), avoiding joblib re-JIT cost.
         if _use_jax_full:
             if return_eta:
                 raise NotImplementedError(

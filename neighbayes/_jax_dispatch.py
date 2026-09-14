@@ -335,19 +335,21 @@ def register_jax_dispatch() -> bool:
         return M.T.reshape(-1)
 
     def _kron_sparsax_ctx(op):
-        """sparsax KLU context for the separable-Kronecker regional solves.
+        """sparsax LU context for the separable-Kronecker regional solves.
 
         ``Ld = I − ρ_d W`` and ``Lo = I − ρ_o W`` are sparse (``W`` is sparse),
-        so we solve them with sparsax's KLU (asymmetric sparse LU) instead of
-        forming a dense ``n×n`` and calling ``jsla.solve``.  Both share the
-        ``I ∪ W`` pattern, whose fill-reducing analysis sparsax computes once
-        and caches (content-addressed), reusing it across forward
-        (``solve`` → ``lu_solve(Ai, Aj, ·)``) and adjoint
+        so we solve them with sparsax's asymmetric sparse LU (KLU or UMFPACK,
+        whichever :func:`~neighbayes.samplers._utils._sparsax_lu.sparsax_lu`
+        measures faster) instead of forming a dense ``n×n`` and calling
+        ``jsla.solve``.  Both share the ``I ∪ W`` pattern, whose fill-reducing
+        analysis sparsax computes once and caches (content-addressed), reusing
+        it across forward (``solve`` → ``lu_solve(Ai, Aj, ·)``) and adjoint
         (``tsolve`` → ``lu_solve(Aj, Ai, ·)``, the transpose via swapped COO
         indices) right-hand sides.  ``W`` is never densified.
         """
-        import sparsax
         from jax.experimental import sparse as jsparse
+
+        from .samplers._utils._sparsax_lu import sparsax_lu
 
         n = op._n
         eye = sp.eye(n, format="coo", dtype=np.float64)
@@ -368,11 +370,13 @@ def register_jax_dispatch() -> bool:
         w_vals = jnp.asarray(w_c.data, dtype=jnp.float64)
         W_bcoo = jsparse.BCOO.from_scipy_sparse(op._W.tocsr())
 
+        lu_solve = sparsax_lu(Ai, Aj, eye_vals - 0.5 * w_vals, n).solve
+
         def solve(Ax, rhs):  # L x = rhs
-            return sparsax.lu_solve(Ai, Aj, Ax, rhs)
+            return lu_solve(Ai, Aj, Ax, rhs)
 
         def tsolve(Ax, rhs):  # Lᵀ x = rhs (transpose via swapped COO indices)
-            return sparsax.lu_solve(Aj, Ai, Ax, rhs)
+            return lu_solve(Aj, Ai, Ax, rhs)
 
         return n, eye_vals, w_vals, solve, tsolve, W_bcoo
 
@@ -989,7 +993,7 @@ def register_jax_dispatch() -> bool:
                 # D-symmetrize W: raises ValueError if not symmetrizable.
                 W_sym_sp = _d_symmetrize(op._W)  # csc_matrix, symmetric
             except ValueError:
-                # Directed / non-symmetrizable W → sparsax KLU (asymmetric LU).
+                # Directed / non-symmetrizable W → sparsax LU (KLU or UMFPACK).
                 # Fixed COO pattern for A(ρ) = I − ρW over the I ∪ W union; W is
                 # never densified (O(nnz)).  sparsax caches the analysis.
                 eye_coo = sp.eye(n, format="coo", dtype=np.float64)
@@ -1011,8 +1015,12 @@ def register_jax_dispatch() -> bool:
                 const_vals = jnp.asarray(eye_c.data, dtype=jnp.float64)
                 w_vals = jnp.asarray(w_c.data, dtype=jnp.float64)
 
+                from .samplers._utils._sparsax_lu import sparsax_lu
+
+                lu_solve = sparsax_lu(Ai, Aj, const_vals - 0.5 * w_vals, n).solve
+
                 def sparse_sar_solve(rho, b):
-                    return _chj.lu_solve(Ai, Aj, const_vals - rho * w_vals, b)
+                    return lu_solve(Ai, Aj, const_vals - rho * w_vals, b)
 
                 return sparse_sar_solve
 
