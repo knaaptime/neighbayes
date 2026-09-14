@@ -79,7 +79,7 @@ class TestRefitDoesNotMoveThePosterior:
         """Any shift must be inside Monte Carlo error."""
         import arviz as az
 
-        base_idata, base = _fit(data, backend)
+        base_idata, base = _fit(data, backend, logdet_refit=False)
         ref_idata, ref = _fit(data, backend, logdet_refit=True)
 
         ess_b = float(az.ess(base_idata, var_names=["rho"])["rho"])
@@ -91,7 +91,7 @@ class TestRefitDoesNotMoveThePosterior:
 
     def test_window_contains_the_unrefitted_posterior(self, data, backend):
         """A window that clipped real mass would bias the answer."""
-        _, base = _fit(data, backend)
+        _, base = _fit(data, backend, logdet_refit=False)
         idata, _ = _fit(data, backend, logdet_refit=True)
         lo, hi = idata.attrs["logdet_refit_window"]
         q_lo, q_hi = np.quantile(base, [0.0005, 0.9995])
@@ -118,8 +118,12 @@ class TestRefitDoesNotMoveThePosterior:
         prior_width = PRIORS["rho_upper"] - PRIORS["rho_lower"]
         assert prior_width / (hi - lo) >= MIN_NARROWING
 
-    def test_off_by_default_and_records_nothing(self, data, backend):
+    def test_on_by_default(self, data, backend):
         idata, _ = _fit(data, backend)
+        assert "logdet_refit_window" in idata.attrs
+
+    def test_off_records_nothing(self, data, backend):
+        idata, _ = _fit(data, backend, logdet_refit=False)
         assert "logdet_refit_window" not in idata.attrs
 
 
