@@ -135,8 +135,9 @@ class SpatialModel(SharedSpatialMethods, ABC):
         logdet_method: str | None = None,
         robust: bool = False,
         w_vars: Optional[list] = None,
-        logdet_refit: bool = False,
+        logdet_refit: bool = True,
         logdet_refit_pad_sd: float = 10.0,
+        logdet_aaa_check: bool = True,
     ):
         # Resolve typed priors (dataclass) and dict view.
         from .priors import BasePriors, priors_as_dict, resolve_priors
@@ -148,6 +149,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
         self.robust = robust
         self.logdet_refit = bool(logdet_refit)
         self.logdet_refit_pad_sd = float(logdet_refit_pad_sd)
+        self.logdet_aaa_check = bool(logdet_aaa_check)
 
         self._idata: Optional[az.InferenceData] = None
         self._pymc_model: Optional[pm.Model] = None
@@ -502,33 +504,32 @@ class SpatialModel(SharedSpatialMethods, ABC):
         )
 
         # --- Build Gibbs sampler kwargs ---
-        # Must agree exactly with GibbsEstimation._make_refitter, which decides
-        # whether a refitter is actually created.
-        from .._logdet._refit import REFITTABLE_METHODS
+        from .._logdet._warmup import sampler_builds_evaluators
 
-        refit_active = (
-            self.logdet_refit
-            and self._W_sparse is not None
-            and self._logdet_bounds.method in REFITTABLE_METHODS
+        sampler_builds_logdet = sampler_builds_evaluators(
+            self._logdet_bounds.method,
+            self._W_sparse is not None,
+            self.logdet_refit,
+            self.logdet_aaa_check,
         )
         gibbs_kwargs: dict[str, Any] = dict(
             y=self._y,
             X=Z,
             W_sparse=self._W_sparse,
             priors=priors,
-            # With the refit on, the sampler builds a cheap scouting interpolant
-            # for warmup and replaces it partway through.  Forcing these lazy
-            # properties here would build a full-accuracy interpolant on the
-            # prior interval that nothing ever evaluates — on the full stability
-            # region that is 117 sparse Cholesky factorizations discarded.
-            logdet_fn=None if refit_active else self._logdet_numpy_fn,
-            logdet_vec_fn=None if refit_active else self._logdet_numpy_vec_fn,
+            # With the refit or the AAA node check on, the sampler builds its own
+            # interpolant for warmup and replaces it partway through if needed.
+            # Forcing these lazy properties here would build an interpolant on
+            # the prior interval that nothing ever evaluates.
+            logdet_fn=None if sampler_builds_logdet else self._logdet_numpy_fn,
+            logdet_vec_fn=None if sampler_builds_logdet else self._logdet_numpy_vec_fn,
             feature_names=feature_names,
             model_type=self._model_type,
             W_eigs=self._logdet_eigs,
             logdet_method=self._logdet_bounds.method,
             logdet_refit=self.logdet_refit,
             logdet_refit_pad_sd=self.logdet_refit_pad_sd,
+            logdet_aaa_check=self.logdet_aaa_check,
         )
         # SAR/SDM need Wy; SEM/SDEM do not
         if self._jacobian_param == "rho":

@@ -99,6 +99,38 @@ MIN_NARROWING = 1.25
 #: collapse the window — and hence the sampler's support — onto a point.
 MIN_WINDOW_WIDTH = 1e-6
 
+#: The AAA methods, whose node count the warmup check sets.
+AAA_METHODS = frozenset({"aaa", "chol_aaa"})
+
+#: Nodes of the AAA fit warmup starts on, before the posterior is located (7
+#: support points).  In the calibration sweeps this count kept the bias an
+#: estimate of ρ carries under 1e-4 for every true ``|ρ| ≤ 0.9``.
+AAA_PILOT_NODES = 14
+
+#: Nodes added each time the check fails: two more support points.
+AAA_NODE_STEP = 4
+
+#: A fit passes when the posterior region lies at least this many reaches from the
+#: nearest singularity (see :func:`~._aaa.aaa_reach`).  No fit in the calibration
+#: sweeps with at least :data:`AAA_MIN_SUPPORT` support points and no spurious pole
+#: carried a bias of 1e-4 beyond this ratio.
+AAA_REACH_FACTOR = 4.0
+
+#: Fewest support points a fit may pass with.
+AAA_MIN_SUPPORT = 7
+
+#: A side of the posterior region lying at least this far from its singularity
+#: passes with :data:`AAA_MIN_SUPPORT` support points, whatever the reach.  In the
+#: calibration sweeps 14 nodes kept the bias under 1e-4 wherever the estimate lay at
+#: least 0.1 from the nearest singularity, on every matrix.  The reach test is a
+#: sufficient condition calibrated near the singularities; far from a singularity it
+#: would demand poles the fit does not need.
+AAA_FAR_DISTANCE = 0.1
+
+#: Half-width of the posterior region the check protects, in warmup standard
+#: deviations around the warmup mean.
+AAA_CHECK_PAD_SD = 4.0
+
 
 @dataclass(frozen=True)
 class RefitWindow:
@@ -127,6 +159,17 @@ class RefitWindow:
             f"[{self.rho_min:.4f}, {self.rho_max:.4f}] "
             f"({self.order} nodes, ±{self.pad_sd:g} sd)"
         )
+
+
+@dataclass(frozen=True)
+class AAACheck:
+    """The outcome of the warmup AAA node check."""
+
+    nodes: int
+    support_points: int
+    region: tuple[float, float] | None
+    reach: tuple[float, float]
+    passed: bool
 
 
 def refit_window(
@@ -161,6 +204,33 @@ def refit_window(
     lo = max(float(draws.min()) - pad, float(prior_min), -0.99)
     hi = min(float(draws.max()) + pad, float(prior_max), 0.99)
     if hi - lo < MIN_WINDOW_WIDTH:
+        return None
+    return lo, hi
+
+
+def aaa_check_region(
+    rho_draws,
+    rho_min: float,
+    rho_max: float,
+    pad_sd: float = AAA_CHECK_PAD_SD,
+) -> tuple[float, float] | None:
+    """The ρ region the AAA node check protects, or ``None`` if the draws are unusable.
+
+    The warmup mean plus and minus ``pad_sd`` warmup standard deviations,
+    intersected with the interpolant's interval.  A chain still drifting has a
+    wide spread and so a wide region, which errs toward more nodes.
+    """
+    draws = np.asarray(rho_draws, dtype=np.float64).ravel()
+    draws = draws[np.isfinite(draws)]
+    if draws.size < 20:
+        return None
+    sd = float(draws.std(ddof=1))
+    if not np.isfinite(sd):
+        return None
+    mean = float(draws.mean())
+    lo = max(mean - pad_sd * sd, float(rho_min))
+    hi = min(mean + pad_sd * sd, float(rho_max))
+    if hi < lo:
         return None
     return lo, hi
 
@@ -248,6 +318,22 @@ class LogdetRefitter:
         self.tol = float(tol)
         self.scout_tol = float(scout_tol)
         self._context = None
+        # The most recent AAA fit and its node count, which the warmup node
+        # check starts from, and the left singularity once it has been located.
+        self.last_pre = None
+        self.last_nodes = 0
+        self._sigma_left = None
+
+    def __getstate__(self):
+        """Pickle without the factorization context.
+
+        The context holds a live CHOLMOD or KLU factor, which cannot be pickled.
+        It is a cache that the next fit rebuilds, so a copy sent to a worker
+        process leaves it behind.
+        """
+        state = self.__dict__.copy()
+        state["_context"] = None
+        return state
 
     @property
     def supported(self) -> bool:
@@ -333,8 +419,8 @@ class LogdetRefitter:
 
             n = int(self.W_sparse.shape[0])
             return int(cheb_order_for_tolerance(prior_min, prior_max, n))
-        # AAA selects m ≤ n_coarse // 2 support points; ``_adaptive_n_coarse``
-        # floors at 16 and caps at 96 (tilt-targeted recalibration 2026-09-11).
+        # AAA selects m ≤ n_coarse // 2 support points, and ``_adaptive_n_coarse``
+        # returns at most 18 nodes; 32 leaves room for a fit that adds nodes.
         return 32
 
     def _fit(
@@ -343,12 +429,15 @@ class LogdetRefitter:
         rho_max: float,
         cap: int | None = None,
         tol: float | None = None,
+        n_coarse: int | None = None,
     ):
         """Fit on ``[rho_min, rho_max]``; the one place a context is invoked.
 
         Returns ``(precompute, order, err_est)``.  ``cap``, when given, is a
         hard ceiling on the order — see :meth:`capacity`.  ``tol`` overrides the
         instance target, which is how the scouting fit gets its looser one.
+        ``n_coarse`` sets the number of factorizations of an AAA fit; by default
+        it is the interval's static count.
         """
         ctx = self._build_context()
         if self.method in ("cheb_cholesky", "lu_cheb"):
@@ -361,7 +450,11 @@ class LogdetRefitter:
                 order = min(order, int(cap))
             pre = ctx.coeffs_on(rho_min, rho_max, order=order)
             return pre, pre.order, pre.err_est
-        pre = ctx.fit_on(rho_min=rho_min, rho_max=rho_max)
+        from ._aaa import _adaptive_n_coarse
+
+        nodes = int(n_coarse) if n_coarse is not None else _adaptive_n_coarse(rho_min, rho_max)
+        pre = ctx.fit_on(rho_min=rho_min, rho_max=rho_max, n_coarse=nodes)
+        self.last_pre, self.last_nodes = pre, nodes
         return pre, len(pre.support_points), float("nan")
 
     def scout_order(self, prior_min: float, prior_max: float) -> int:
@@ -429,6 +522,130 @@ class LogdetRefitter:
             err_est=float(err_est),
         )
 
+    # ------------------------------------------------------------------
+    # AAA node check
+    # ------------------------------------------------------------------
+
+    def aaa_fit(self, rho_min: float, rho_max: float, n_coarse: int):
+        """Fit AAA on ``[rho_min, rho_max]`` from ``n_coarse`` factorizations."""
+        pre, _, _ = self._fit(rho_min, rho_max, n_coarse=n_coarse)
+        return pre
+
+    def left_singularity(self) -> complex:
+        """The singularity ``1/λ`` of the Jacobian nearest ``ρ = -1``.
+
+        Found by shift-invert Lanczos near ``λ = -1`` (Arnoldi for directed
+        ``W``), at the cost of one sparse factorization.  It is ``-1`` for a
+        bipartite graph or one with an isolated pair of neighbors, and farther
+        out otherwise.  Falls back to ``-1``, the nearest a singularity can lie,
+        if the eigensolver fails.
+        """
+        if self._sigma_left is None:
+            import scipy.sparse as sp
+            from scipy.sparse.linalg import eigs, eigsh
+
+            ctx = self._build_context()
+            try:
+                if self.method == "chol_aaa":
+                    lam = eigsh(sp.csc_matrix(ctx.W_sym), k=3, sigma=-1.001, which="LM",
+                                return_eigenvectors=False)
+                else:
+                    lam = eigs(sp.csc_matrix(ctx.W_sp), k=6, sigma=-1.001, which="LM",
+                               return_eigenvectors=False)
+                sing = 1.0 / np.asarray(lam, dtype=complex)
+                self._sigma_left = complex(sing[np.argmin(np.abs(sing + 1.0))])
+            except Exception:  # noqa: BLE001 - any eigensolver failure falls back
+                _log.info("logdet AAA check: eigensolver failed; using -1 as the left singularity.")
+                self._sigma_left = complex(-1.0)
+        return self._sigma_left
+
+    def aaa_adequate(self, pre, region) -> tuple[bool, tuple[float, float]]:
+        """Whether an AAA fit resolves the Jacobian over ``region``, and its reach.
+
+        The fit passes when it keeps at least :data:`AAA_MIN_SUPPORT` support
+        points and, on each side, ``region`` lies at least
+        :data:`AAA_FAR_DISTANCE` from the singularity there or at least
+        :data:`AAA_REACH_FACTOR` reaches from it.  Row-standardized ``W`` has
+        spectral radius 1, so the right singularity is ``ρ = 1`` and every other
+        one lies on or outside the unit circle.  The left side is tested first
+        against ``-1``, the nearest a singularity there can lie, and the
+        eigensolver of :meth:`left_singularity` runs only when that test fails.
+        A side nearer than :data:`AAA_FAR_DISTANCE` with no pole fails.
+        """
+        from ._aaa import aaa_reach
+
+        lo, hi = float(region[0]), float(region[1])
+        right, left = aaa_reach(pre, -1.0)
+        if len(pre.support_points) < AAA_MIN_SUPPORT:
+            return False, (right, left)
+
+        def _side(distance: float, reach: float) -> bool:
+            if distance >= AAA_FAR_DISTANCE:
+                return True
+            return bool(np.isfinite(reach) and distance >= AAA_REACH_FACTOR * reach)
+
+        ok_right = _side(1.0 - hi, right)
+        ok_left = _side(lo + 1.0, left)
+        if ok_right and not ok_left:
+            s_left = self.left_singularity()
+            _, left = aaa_reach(pre, s_left)
+            ok_left = _side(abs(lo - s_left), left)
+        return bool(ok_right and ok_left), (right, left)
+
+    def aaa_refine(self, pre, n_coarse: int, region, rho_min: float, rho_max: float, max_nodes: int):
+        """Add nodes to an AAA fit until :meth:`aaa_adequate` passes or ``max_nodes`` binds.
+
+        Returns ``(precompute, n_coarse, AAACheck)``.  Each rebuild factorizes at
+        every node of the larger grid, since the Chebyshev grids do not nest.
+        """
+        ok, reach = self.aaa_adequate(pre, region)
+        while not ok and n_coarse + AAA_NODE_STEP <= max_nodes:
+            n_coarse += AAA_NODE_STEP
+            pre = self.aaa_fit(rho_min, rho_max, n_coarse)
+            ok, reach = self.aaa_adequate(pre, region)
+        check = AAACheck(
+            nodes=int(n_coarse),
+            support_points=len(pre.support_points),
+            region=(float(region[0]), float(region[1])),
+            reach=(float(reach[0]), float(reach[1])),
+            passed=bool(ok),
+        )
+        return pre, n_coarse, check
+
+    def params_from(self, pre, capacity: int):
+        """A fitted interpolant as fixed-shape JAX arrays, zero-padded to ``capacity``.
+
+        The pytree has the same structure and shapes for every fit of a run, so
+        substituting one into a compiled step triggers no retrace.
+        """
+        from .._jax_dispatch import ensure_x64
+
+        ensure_x64()
+        import jax.numpy as jnp
+
+        cap = int(capacity)
+        if self.method in ("cheb_cholesky", "lu_cheb"):
+            order = int(pre.order)
+            if order > cap:
+                raise ValueError(
+                    f"Refit needs {order} terms but the parameter capacity is {cap}."
+                )
+            coeffs = np.zeros(cap, dtype=np.float64)
+            coeffs[:order] = pre.coeffs
+            return (jnp.asarray(coeffs), jnp.float64(pre.rho_min), jnp.float64(pre.rho_max))
+        order = len(pre.support_points)
+        if order > cap:
+            raise ValueError(
+                f"The AAA fit keeps {order} support points but the parameter capacity is {cap}."
+            )
+        z = np.full(cap, self._AAA_PAD_Z, dtype=np.float64)
+        f = np.zeros(cap, dtype=np.float64)
+        w = np.zeros(cap, dtype=np.float64)
+        z[:order] = pre.support_points
+        f[:order] = pre.support_values
+        w[:order] = pre.weights
+        return (jnp.asarray(z), jnp.asarray(f), jnp.asarray(w))
+
     def jax_params(
         self,
         rho_min: float,
@@ -441,6 +658,7 @@ class LogdetRefitter:
         pad_sd: float = float("nan"),
         with_numpy_fns: bool = False,
         tol: float | None = None,
+        n_coarse: int | None = None,
     ):
         """Interpolant parameters as fixed-shape JAX arrays, plus the window.
 
@@ -465,31 +683,15 @@ class LogdetRefitter:
         from .._jax_dispatch import ensure_x64
 
         ensure_x64()
-        import jax.numpy as jnp
 
         cap = int(capacity)
-        pre, order, err_est = self._fit(rho_min, rho_max, cap=cap, tol=tol)
+        pre, order, err_est = self._fit(rho_min, rho_max, cap=cap, tol=tol, n_coarse=n_coarse)
         if order > cap:
             raise ValueError(
                 f"Refit needs {order} terms but the parameter capacity is {cap}."
             )
 
-        if self.method in ("cheb_cholesky", "lu_cheb"):
-            coeffs = np.zeros(cap, dtype=np.float64)
-            coeffs[:order] = pre.coeffs
-            params = (
-                jnp.asarray(coeffs),
-                jnp.float64(pre.rho_min),
-                jnp.float64(pre.rho_max),
-            )
-        else:
-            z = np.full(cap, self._AAA_PAD_Z, dtype=np.float64)
-            f = np.zeros(cap, dtype=np.float64)
-            w = np.zeros(cap, dtype=np.float64)
-            z[:order] = pre.support_points
-            f[:order] = pre.support_values
-            w[:order] = pre.weights
-            params = (jnp.asarray(z), jnp.asarray(f), jnp.asarray(w))
+        params = self.params_from(pre, cap)
 
         prior = (
             rho_min if prior_min is None else prior_min,
