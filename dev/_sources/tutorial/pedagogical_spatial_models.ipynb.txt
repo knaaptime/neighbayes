@@ -154,8 +154,7 @@
    "id": "8",
    "metadata": {},
    "source": [
-    "## The models, one at a time\n",
-    ""
+    "## The models, one at a time\n"
    ]
   },
   {
@@ -163,8 +162,7 @@
    "id": "9",
    "metadata": {},
    "source": [
-    "### Start with OLS, and see what it misses\n",
-    ""
+    "### Start with OLS, and see what it misses\n"
    ]
   },
   {
@@ -228,8 +226,7 @@
     "\n",
     "* `beta` captures local covariate effects.\n",
     "* `theta` captures neighbor-covariate spillovers.\n",
-    "* No spatial lag on $y$, so no autoregressive propagation through outcomes.\n",
-    ""
+    "* No spatial lag on $y$, so no autoregressive propagation through outcomes.\n"
    ]
   },
   {
@@ -277,8 +274,7 @@
     "Interpretation:\n",
     "\n",
     "* $\\rho$ controls feedback from neighboring outcomes.\n",
-    "* Effects are amplified through $(I - \\rho W)^{-1}$, so direct and indirect impacts differ from raw $\\beta$.\n",
-    ""
+    "* Effects are amplified through $(I - \\rho W)^{-1}$, so direct and indirect impacts differ from raw $\\beta$.\n"
    ]
   },
   {
@@ -335,8 +331,7 @@
     "Interpretation:\n",
     "\n",
     "* Spatial dependence is moved to latent shocks rather than outcome feedback.\n",
-    "* Useful when omitted spatial factors induce correlated residuals.\n",
-    ""
+    "* Useful when omitted spatial factors induce correlated residuals.\n"
    ]
   },
   {
@@ -384,8 +379,7 @@
     "Interpretation:\n",
     "\n",
     "* Includes both outcome feedback and neighbor-covariate channels.\n",
-    "* Often used as a flexible nesting model for SAR/SLX.\n",
-    ""
+    "* Often used as a flexible nesting model for SAR/SLX.\n"
    ]
   },
   {
@@ -433,8 +427,7 @@
     "Interpretation:\n",
     "\n",
     "* Neighbor covariates matter directly (through $WX$),\n",
-    "* and unmodeled shocks are spatially correlated (through $u$).\n",
-    ""
+    "* and unmodeled shocks are spatially correlated (through $u$).\n"
    ]
   },
   {
@@ -481,8 +474,7 @@
     "{cite:p}`wolf2018StochasticEfficiency`. The\n",
     "`spatial_mcmc_diagnostic` helper checks effective sample size, sampler\n",
     "yield, $\\hat{R}$, and HPDI stability for the spatial parameter and\n",
-    "warns when any threshold is violated.\n",
-    ""
+    "warns when any threshold is violated.\n"
    ]
   },
   {
@@ -554,8 +546,7 @@
    "id": "36",
    "metadata": {},
    "source": [
-    "## Compare what you have fitted\n",
-    ""
+    "## Compare what you have fitted\n"
    ]
   },
   {
@@ -666,8 +657,7 @@
     "\n",
     "In practice, prefer the method API: `model.spatial_diagnostics()` runs the tests wired to that model class, and `model.spatial_diagnostics_decision()` returns a recommended specification.\n",
     "\n",
-    "Each returns a `BayesianLMTestResult` with posterior summary statistics and a Bayesian p-value.\n",
-    ""
+    "Each returns a `BayesianLMTestResult` with posterior summary statistics and a Bayesian p-value.\n"
    ]
   },
   {
@@ -692,8 +682,7 @@
     "This cell compares posterior means/intervals for the spatial scalar where present:\n",
     "\n",
     "* `rho` in SAR/SDM\n",
-    "* `lam` in SEM/SDEM\n",
-    ""
+    "* `lam` in SEM/SDEM\n"
    ]
   },
   {

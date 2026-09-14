@@ -1898,7 +1898,7 @@ the latent scale, so we fit on <code class="docutils literal notranslate"><span 
 <div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Gibbs sampling <span style="font-weight: bold">(</span>flow<span style="font-weight: bold">)</span>: <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span> chains for <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> tune and <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> draw iterations <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span> x <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> = <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">8</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> draws total<span style="font-weight: bold">)</span>
 </pre>
 </div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 82s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">98</span> draws/s<span style="font-weight: bold">)</span>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 57s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">139</span> draws/s<span style="font-weight: bold">)</span>
 </pre>
 </div></div>
 </div>
@@ -2073,7 +2073,7 @@ y_sep summary:  min=-9.82  mean=-3.48  max=1.70
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 2 jobs)
 NUTS: [rho_d, rho_o, beta, sigma]
-Sampling 4 chains for 1_000 tune and 1_000 draw iterations (4_000 + 4_000 draws total) took 14 seconds.
+Sampling 4 chains for 1_000 tune and 1_000 draw iterations (4_000 + 4_000 draws total) took 10 seconds.
 </code></pre></div>
 </div>
 <div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
@@ -2094,8 +2094,8 @@ Sampling 4 chains for 1_000 tune and 1_000 draw iterations (4_000 + 4_000 draws 
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>=== SARFlowSeparable: spatial autoregressive parameters ===
         mean     sd  hdi_3%  hdi_97%  mcse_mean  mcse_sd  ess_bulk  ess_tail  r_hat
-rho_d  0.375  0.049   0.281    0.464      0.001    0.001    3317.0    2623.0    1.0
-rho_o  0.240  0.065   0.119    0.364      0.001    0.001    2464.0    2689.0    1.0
+rho_d  0.378  0.050   0.282    0.469      0.001    0.001    3839.0    3234.0    1.0
+rho_o  0.238  0.066   0.114    0.357      0.001    0.001    2925.0    2724.0    1.0
 
 True values:  rho_d=0.4  rho_o=0.3  (rho_w = -rho_d*rho_o = -0.1200 is derived)
 </code></pre></div>
@@ -2116,7 +2116,7 @@ True values:  rho_d=0.4  rho_o=0.3  (rho_w = -rho_d*rho_o = -0.1200 is derived)
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/1f5941fc0d2980c3e45fa66f8ff9a402a9edbc40937f2de5e894ca6c396ff0f6.png" src="../_images/1f5941fc0d2980c3e45fa66f8ff9a402a9edbc40937f2de5e894ca6c396ff0f6.png" />
+<img alt="../_images/510bec9214fbb09c301dfdb2dd9887a9aa28257595ec927a5863c8b15f45e58a.png" src="../_images/510bec9214fbb09c301dfdb2dd9887a9aa28257595ec927a5863c8b15f45e58a.png" />
 </div>
 </div>
 <div class="cell docutils container">
@@ -2135,7 +2135,7 @@ True values:  rho_d=0.4  rho_o=0.3  (rho_w = -rho_d*rho_o = -0.1200 is derived)
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/2e62b36b38c4ce96a01b63228ab04680e1986e63ff0913d85ad9c134e99a0e15.png" src="../_images/2e62b36b38c4ce96a01b63228ab04680e1986e63ff0913d85ad9c134e99a0e15.png" />
+<img alt="../_images/209b69b5d132b2251d70a6b43a1d4bf8ac01d3086cc0e8fcf243479c024fe424.png" src="../_images/209b69b5d132b2251d70a6b43a1d4bf8ac01d3086cc0e8fcf243479c024fe424.png" />
 </div>
 </div>
 <h2 id="understand-what-is-in-the-design-matrix">Understand what is in the design matrix<a class="headerlink" href="#understand-what-is-in-the-design-matrix" title="Link to this heading">¶</a></h2>
@@ -2758,10 +2758,9 @@ expressions in Table 83.1 (with <span class="math notranslate nohighlight">\(A =
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma]
-Sampling 2 chains for 200 tune and 200 draw iterations (400 + 400 draws total) took 5 seconds.
+Sampling 2 chains for 200 tune and 200 draw iterations (400 + 400 draws total) took 4 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
-The effective sample size per chain is smaller than 100 for some parameters.  A higher number is needed for reliable rhat and ess computation. See https://arxiv.org/abs/1903.08008 for details
 </code></pre></div>
 </div>
 <div class="output text_html"><div>
@@ -2804,55 +2803,55 @@ The effective sample size per chain is smaller than 100 for some parameters.  A 
       <th>x0</th>
       <th>combined</th>
       <th>origin</th>
-      <td>0.6554</td>
-      <td>0.5256</td>
-      <td>0.7917</td>
+      <td>0.6489</td>
+      <td>0.5080</td>
+      <td>0.7943</td>
       <td>0.000</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>combined</th>
       <th>origin</th>
-      <td>0.4811</td>
-      <td>0.3406</td>
-      <td>0.6222</td>
+      <td>0.4855</td>
+      <td>0.3404</td>
+      <td>0.6386</td>
       <td>0.000</td>
     </tr>
     <tr>
       <th>x0</th>
       <th>combined</th>
       <th>destination</th>
-      <td>1.2122</td>
-      <td>1.0769</td>
-      <td>1.3197</td>
+      <td>1.2085</td>
+      <td>1.0696</td>
+      <td>1.3379</td>
       <td>0.000</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>combined</th>
       <th>destination</th>
-      <td>-0.6877</td>
-      <td>-0.8571</td>
-      <td>-0.5347</td>
+      <td>-0.6843</td>
+      <td>-0.8176</td>
+      <td>-0.5414</td>
       <td>0.000</td>
     </tr>
     <tr>
       <th>x0</th>
       <th>combined</th>
       <th>intra</th>
-      <td>0.0976</td>
-      <td>0.0712</td>
-      <td>0.1274</td>
+      <td>0.0978</td>
+      <td>0.0633</td>
+      <td>0.1324</td>
       <td>0.000</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>combined</th>
       <th>intra</th>
-      <td>-0.0128</td>
-      <td>-0.0456</td>
-      <td>0.0183</td>
-      <td>0.465</td>
+      <td>-0.0130</td>
+      <td>-0.0518</td>
+      <td>0.0211</td>
+      <td>0.505</td>
     </tr>
     <tr>
       <th>x0</th>
@@ -2876,19 +2875,19 @@ The effective sample size per chain is smaller than 100 for some parameters.  A 
       <th>x0</th>
       <th>combined</th>
       <th>total</th>
-      <td>1.9652</td>
-      <td>1.7819</td>
-      <td>2.1414</td>
+      <td>1.9552</td>
+      <td>1.7695</td>
+      <td>2.1701</td>
       <td>0.000</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>combined</th>
       <th>total</th>
-      <td>-0.2193</td>
-      <td>-0.4356</td>
-      <td>0.0131</td>
-      <td>0.065</td>
+      <td>-0.2117</td>
+      <td>-0.4458</td>
+      <td>0.0099</td>
+      <td>0.055</td>
     </tr>
   </tbody>
 </table>
@@ -2916,8 +2915,8 @@ rho_o  0.145  0.063   0.017    0.249     256.0   1.01
 
 SARFlowSeparable           r_hat&lt;1.01: True   ess_bulk&gt;400: True
         mean     sd  hdi_3%  hdi_97%  ess_bulk  r_hat
-rho_d  0.375  0.049   0.281    0.464    3317.0    1.0
-rho_o  0.240  0.065   0.119    0.364    2464.0    1.0
+rho_d  0.378  0.050   0.282    0.469    3839.0    1.0
+rho_o  0.238  0.066   0.114    0.357    2925.0    1.0
 </code></pre></div>
 </div>
 </div>
@@ -3038,7 +3037,7 @@ ESS, sampler yield, <span class="math notranslate nohighlight">\(\hat{R}\)</span
 <div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Gibbs sampling <span style="font-weight: bold">(</span>flow<span style="font-weight: bold">)</span>: <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span> chains for <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> tune and <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> draw iterations <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span> x <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> = <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">8</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> draws total<span style="font-weight: bold">)</span>
 </pre>
 </div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 79s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">101</span> draws/s<span style="font-weight: bold">)</span>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 55s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">144</span> draws/s<span style="font-weight: bold">)</span>
 </pre>
 </div></div>
 </div>
@@ -3066,8 +3065,8 @@ ESS, sampler yield, <span class="math notranslate nohighlight">\(\hat{R}\)</span
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>LOO-CV model comparison:
                     elpd_loo      p_loo  elpd_diff    weight         se  warning
-SARFlowSeparable -561.551362  10.505349   0.000000  0.634184  13.890855    False
-SARFlow (3 ρ)    -561.849743  11.090395   0.298381  0.365816  14.347747    False
+SARFlowSeparable -561.687181  10.626593   0.000000  0.569767  13.891622    False
+SARFlow (3 ρ)    -561.849743  11.090395   0.162562  0.430233  14.347747    False
 </code></pre></div>
 </div>
 </div>
@@ -3104,7 +3103,7 @@ SARFlow (3 ρ)    -561.849743  11.090395   0.298381  0.365816  14.347747    Fals
 <div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Gibbs sampling <span style="font-weight: bold">(</span>flow<span style="font-weight: bold">)</span>: <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span> chains for <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> tune and <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">800</span> draw iterations <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span> x <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">800</span> = <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">7</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">200</span> draws total<span style="font-weight: bold">)</span>
 </pre>
 </div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 76s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">95</span> draws/s<span style="font-weight: bold">)</span>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 54s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">133</span> draws/s<span style="font-weight: bold">)</span>
 </pre>
 </div><div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>=== SARFlow (restrict_positive=False) ===
                   mean     sd  hdi_3%  hdi_97%  r_hat

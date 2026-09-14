@@ -79,8 +79,7 @@
     "| β_d | [1.0, −0.5] |\n",
     "| β_o | [0.5, 0.3] |\n",
     "| σ | 1.0 |\n",
-    "| γ_dist (log_distance coef.) | −0.5 (default) |\n",
-    ""
+    "| γ_dist (log_distance coef.) | −0.5 (default) |\n"
    ]
   },
   {
@@ -538,8 +537,7 @@
     "design matrix by hand via `flow_design_matrix`, pass `dist=...`\n",
     "together with `log_distance=True` to include the same column.\n",
     "\n",
-    "You can also pass a pre-built `pd.DataFrame` directly as `X` — column names are inferred automatically.\n",
-    ""
+    "You can also pass a pre-built `pd.DataFrame` directly as `X` — column names are inferred automatically.\n"
    ]
   },
   {
@@ -598,8 +596,7 @@
     "\n",
     "When `intra_*` columns are present the destination shock also carries\n",
     "$\\beta_\\text{intra}$ at the diagonal cell, since the design matrix sets\n",
-    "`X_intra = intra_indicator · X_dest`.\n",
-    ""
+    "`X_intra = intra_indicator · X_dest`.\n"
    ]
   },
   {
@@ -990,8 +987,7 @@
     "\n",
     "The marginal statistic is $LM_g = (s_g^{(i)})^2 / J_{ii}$ ($\\chi^2_1$); the\n",
     "joint statistic is $g_g^\\top J^{-1} g_g$ ($\\chi^2_3$). The Bayesian\n",
-    "$p$-value reports $1 - F_{\\chi^2_{\\text{df}}}(\\overline{LM})$.\n",
-    ""
+    "$p$-value reports $1 - F_{\\chi^2_{\\text{df}}}(\\overline{LM})$.\n"
    ]
   },
   {
@@ -1092,8 +1088,7 @@
     "The separable variants pin $\\rho_w = -\\rho_d\\rho_o$, which removes the\n",
     "weakly-identified three-$\\rho$ ridge; prefer them unless $\\rho_w$ is itself\n",
     "the object of interest. Full equations, constructor signatures and the\n",
-    "log-determinant options are in [Supported Models](../models.md).\n",
-    ""
+    "log-determinant options are in [Supported Models](../models.md).\n"
    ]
   },
   {

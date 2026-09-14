@@ -35,8 +35,7 @@
    "source": [
     "## Set up data with a known answer\n",
     "\n",
-    "We simulate from a SAR data-generating process on a regular grid so the \"correct\" model is known in advance. A well-behaved CV criterion should prefer the SAR over the misspecified OLS, SLX, and SEM alternatives.\n",
-    ""
+    "We simulate from a SAR data-generating process on a regular grid so the \"correct\" model is known in advance. A well-behaved CV criterion should prefer the SAR over the misspecified OLS, SLX, and SEM alternatives.\n"
    ]
   },
   {
@@ -87,8 +86,7 @@
    "source": [
     "## Fit the models you want to compare\n",
     "\n",
-    "We fit four candidates — only the SAR matches the DGP — using short MCMC runs sufficient for a pedagogical example.\n",
-    ""
+    "We fit four candidates — only the SAR matches the DGP — using short MCMC runs sufficient for a pedagogical example.\n"
    ]
   },
   {
@@ -126,8 +124,7 @@
    "source": [
     "## Score them out of sample\n",
     "\n",
-    "`spatial_kfold` derives 5 spatial blocks from the cell centroids via KMeans, refits each model on each train fold, and accumulates the held-out elpd. Higher elpd is better.\n",
-    ""
+    "`spatial_kfold` derives 5 spatial blocks from the cell centroids via KMeans, refits each model on each train fold, and accumulates the held-out elpd. Higher elpd is better.\n"
    ]
   },
   {
@@ -182,8 +179,7 @@
     "\n",
     "Install with `pip install geovalidate`.\n",
     "\n",
-    "Below we re-run CV using `HilbertKFold`, which interleaves observations along a Hilbert curve so every fold covers the entire study area — typically a more balanced design than KMeans blocking.\n",
-    ""
+    "Below we re-run CV using `HilbertKFold`, which interleaves observations along a Hilbert curve so every fold covers the entire study area — typically a more balanced design than KMeans blocking.\n"
    ]
   },
   {

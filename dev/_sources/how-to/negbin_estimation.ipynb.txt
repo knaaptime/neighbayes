@@ -28,10 +28,9 @@
     "import time\n",
     "\n",
     "import arviz as az\n",
-    "import pandas as pd\n",
     "\n",
     "from neighbayes.dgp import simulate_sar_negbin\n",
-    "from neighbayes.models import SARNegBin, SARNegBinStructural"
+    "from neighbayes.models import SARNegBin"
    ]
   },
   {

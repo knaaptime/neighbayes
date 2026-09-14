@@ -1827,11 +1827,11 @@ Profiling backend=nutpie...
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 2 jobs)
 NUTS: [lam, beta, sigma2]
-Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws total) took 10 seconds.
+Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws total) took 8 seconds.
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 2 jobs)
 NUTS: [lam, beta, sigma2]
-Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws total) took 10 seconds.
+Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws total) took 7 seconds.
 /home/runner/micromamba/envs/test/lib/python3.14/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
   from .autonotebook import tqdm as notebook_tqdm
 </code></pre></div>
@@ -1871,7 +1871,7 @@ Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws tota
       <th>0</th>
       <td>nutpie</td>
       <td>True</td>
-      <td>5.310</td>
+      <td>3.588</td>
       <td>0.449</td>
       <td>0.049</td>
       <td>0.692</td>
@@ -1884,7 +1884,7 @@ Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws tota
       <th>1</th>
       <td>numpyro</td>
       <td>True</td>
-      <td>10.612</td>
+      <td>6.831</td>
       <td>0.448</td>
       <td>0.048</td>
       <td>0.693</td>
@@ -1897,7 +1897,7 @@ Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws tota
       <th>2</th>
       <td>numba</td>
       <td>True</td>
-      <td>13.667</td>
+      <td>9.511</td>
       <td>0.451</td>
       <td>0.051</td>
       <td>0.693</td>
@@ -1910,7 +1910,7 @@ Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws tota
       <th>3</th>
       <td>c</td>
       <td>True</td>
-      <td>26.817</td>
+      <td>18.434</td>
       <td>0.451</td>
       <td>0.051</td>
       <td>0.693</td>
@@ -1954,7 +1954,7 @@ Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws tota
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/986cd5aa23cd842915f10e3b3640ffb6ad2b1a0827b5c18ebf33dfb93b73d916.png" src="../_images/986cd5aa23cd842915f10e3b3640ffb6ad2b1a0827b5c18ebf33dfb93b73d916.png" />
+<img alt="../_images/ccc660299336510ccb9e8880e9f219504f25769f4b315b41ddae4151368d4d32.png" src="../_images/ccc660299336510ccb9e8880e9f219504f25769f4b315b41ddae4151368d4d32.png" />
 </div>
 </div>
 <h2 id="log-likelihood-equivalence-across-backends">Log-likelihood equivalence across backends<a class="headerlink" href="#log-likelihood-equivalence-across-backends" title="Link to this heading">¶</a></h2>
@@ -2184,7 +2184,7 @@ Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws tota
       <td>-278.149779</td>
       <td>4.460481</td>
       <td>0.000000e+00</td>
-      <td>5.000000e-01</td>
+      <td>0.5</td>
       <td>11.969022</td>
       <td>0.000000e+00</td>
       <td>False</td>
@@ -2195,10 +2195,10 @@ Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws tota
       <td>1</td>
       <td>-278.149779</td>
       <td>4.460481</td>
-      <td>1.650484e-10</td>
-      <td>5.000000e-01</td>
+      <td>4.297629e-11</td>
+      <td>0.5</td>
       <td>11.969022</td>
-      <td>1.041621e-10</td>
+      <td>2.031208e-11</td>
       <td>False</td>
       <td>log</td>
     </tr>
@@ -2207,8 +2207,8 @@ Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws tota
       <td>2</td>
       <td>-278.175221</td>
       <td>4.498922</td>
-      <td>2.544176e-02</td>
-      <td>5.551115e-17</td>
+      <td>2.544175e-02</td>
+      <td>0.0</td>
       <td>12.005298</td>
       <td>5.208505e-02</td>
       <td>False</td>

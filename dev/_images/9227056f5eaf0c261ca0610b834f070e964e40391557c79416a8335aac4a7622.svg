@@ -75,7 +75,7 @@
 <title>n3</title>
 <ellipse fill="#ffd966" stroke="#b58900" stroke-width="2" cx="476.67" cy="-240.54" rx="77.85" ry="27.24"/>
 <text xml:space="preserve" text-anchor="middle" x="476.67" y="-243.59" font-family="Helvetica,sans-Serif" font-size="11.00" fill="#1a1a1a">Robust&#45;LM&#45;Error</text>
-<text xml:space="preserve" text-anchor="middle" x="476.67" y="-230.09" font-family="Helvetica,sans-Serif" font-size="11.00" fill="#1a1a1a">p=0.002</text>
+<text xml:space="preserve" text-anchor="middle" x="476.67" y="-230.09" font-family="Helvetica,sans-Serif" font-size="11.00" fill="#1a1a1a">p=0.001</text>
 </g>
 <!-- n2&#45;&gt;n3 -->
 <g id="edge3" class="edge">

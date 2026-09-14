@@ -1671,7 +1671,7 @@ GM_Error
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 4 chains for 1_000 tune and 1_000 draw iterations (4_000 + 4_000 draws total) took 15 seconds.
+Sampling 4 chains for 1_000 tune and 1_000 draw iterations (4_000 + 4_000 draws total) took 11 seconds.
 /home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
   W_arr = np.asarray(W, dtype=np.float64)
 </code></pre></div>
@@ -2169,8 +2169,8 @@ Impacts computed using the 'simple' method.
       <td>SDM</td>
       <td>CONSTANT</td>
       <td>23.621707</td>
-      <td>17.045361</td>
-      <td>6.576346</td>
+      <td>17.045362</td>
+      <td>6.576345</td>
     </tr>
     <tr>
       <th>10</th>
@@ -2240,41 +2240,41 @@ Impacts computed using the 'simple' method.
       <th>18</th>
       <td>SLX</td>
       <td>CONSTANT</td>
-      <td>29.978742</td>
+      <td>30.744956</td>
       <td>27.727885</td>
-      <td>2.250857</td>
+      <td>3.017072</td>
     </tr>
     <tr>
       <th>19</th>
       <td>SLX</td>
       <td>CRIME</td>
-      <td>-0.579939</td>
+      <td>-0.594658</td>
       <td>-0.590675</td>
-      <td>0.010737</td>
+      <td>-0.003983</td>
     </tr>
     <tr>
       <th>20</th>
       <td>SLX</td>
       <td>INC</td>
-      <td>0.745974</td>
+      <td>0.698021</td>
       <td>0.742442</td>
-      <td>0.003532</td>
+      <td>-0.044421</td>
     </tr>
     <tr>
       <th>21</th>
       <td>SLX</td>
       <td>W_CRIME</td>
-      <td>0.354822</td>
+      <td>0.359472</td>
       <td>0.390156</td>
-      <td>-0.035335</td>
+      <td>-0.030685</td>
     </tr>
     <tr>
       <th>22</th>
       <td>SLX</td>
       <td>W_INC</td>
-      <td>0.390795</td>
+      <td>0.407302</td>
       <td>0.486179</td>
-      <td>-0.095384</td>
+      <td>-0.078877</td>
     </tr>
   </tbody>
 </table>
@@ -2324,29 +2324,29 @@ Impacts computed using the 'simple' method.
       <th>0</th>
       <td>SLX</td>
       <td>INC</td>
-      <td>0.745974</td>
-      <td>0.390795</td>
-      <td>1.136769</td>
+      <td>0.698021</td>
+      <td>0.407302</td>
+      <td>1.105322</td>
       <td>0.742442</td>
       <td>0.486179</td>
       <td>1.228621</td>
-      <td>0.003532</td>
-      <td>-0.095384</td>
-      <td>-0.091852</td>
+      <td>-0.044421</td>
+      <td>-0.078877</td>
+      <td>-0.123299</td>
     </tr>
     <tr>
       <th>1</th>
       <td>SLX</td>
       <td>CRIME</td>
-      <td>-0.579939</td>
-      <td>0.354822</td>
-      <td>-0.225117</td>
+      <td>-0.594658</td>
+      <td>0.359472</td>
+      <td>-0.235186</td>
       <td>-0.590675</td>
       <td>0.390156</td>
       <td>-0.200519</td>
-      <td>0.010737</td>
-      <td>-0.035335</td>
-      <td>-0.024598</td>
+      <td>-0.003983</td>
+      <td>-0.030685</td>
+      <td>-0.034668</td>
     </tr>
     <tr>
       <th>2</th>
@@ -2509,7 +2509,7 @@ for Jupyter support
   warnings.warn('install "ipywidgets" for Jupyter support')
 </pre>
 </div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 3s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">3</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">675</span> draws/s<span style="font-weight: bold">)</span>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 2s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">996</span> draws/s<span style="font-weight: bold">)</span>
 </pre>
 </div><div class="output text_html"><div>
 <style scoped>
@@ -2543,62 +2543,62 @@ for Jupyter support
   <tbody>
     <tr>
       <th>rho</th>
-      <td>0.521</td>
-      <td>0.028</td>
-      <td>0.470</td>
-      <td>0.573</td>
+      <td>0.500</td>
+      <td>0.029</td>
+      <td>0.445</td>
+      <td>0.553</td>
       <td>0.000</td>
       <td>0.000</td>
-      <td>7940.0</td>
-      <td>5027.0</td>
+      <td>7931.0</td>
+      <td>5840.0</td>
       <td>1.0</td>
     </tr>
     <tr>
       <th>sigma</th>
-      <td>1.055</td>
+      <td>1.049</td>
       <td>0.019</td>
-      <td>1.019</td>
-      <td>1.089</td>
+      <td>1.015</td>
+      <td>1.085</td>
       <td>0.000</td>
       <td>0.000</td>
-      <td>8232.0</td>
-      <td>7768.0</td>
+      <td>7505.0</td>
+      <td>7530.0</td>
       <td>1.0</td>
     </tr>
     <tr>
       <th>sigma2</th>
-      <td>1.114</td>
+      <td>1.102</td>
       <td>0.039</td>
-      <td>1.038</td>
-      <td>1.186</td>
+      <td>1.029</td>
+      <td>1.176</td>
       <td>0.000</td>
       <td>0.000</td>
-      <td>8232.0</td>
-      <td>7768.0</td>
+      <td>7505.0</td>
+      <td>7530.0</td>
       <td>1.0</td>
     </tr>
     <tr>
       <th>Intercept</th>
-      <td>0.929</td>
-      <td>0.063</td>
-      <td>0.811</td>
-      <td>1.046</td>
+      <td>1.019</td>
+      <td>0.065</td>
+      <td>0.894</td>
+      <td>1.136</td>
       <td>0.001</td>
       <td>0.001</td>
-      <td>7899.0</td>
-      <td>6049.0</td>
+      <td>8057.0</td>
+      <td>6587.0</td>
       <td>1.0</td>
     </tr>
     <tr>
       <th>X_1</th>
-      <td>-1.019</td>
+      <td>-1.005</td>
       <td>0.027</td>
-      <td>-1.071</td>
-      <td>-0.970</td>
+      <td>-1.056</td>
+      <td>-0.954</td>
       <td>0.000</td>
       <td>0.000</td>
-      <td>7918.0</td>
-      <td>7774.0</td>
+      <td>7956.0</td>
+      <td>8098.0</td>
       <td>1.0</td>
     </tr>
   </tbody>
@@ -2662,17 +2662,17 @@ for Jupyter support
   <tbody>
     <tr>
       <th>X_1</th>
-      <td>-1.069919</td>
-      <td>-1.127152</td>
-      <td>-1.012516</td>
+      <td>-1.050731</td>
+      <td>-1.108002</td>
+      <td>-0.993866</td>
       <td>0.0</td>
-      <td>-1.063089</td>
-      <td>-1.32339</td>
-      <td>-0.842319</td>
+      <td>-0.965905</td>
+      <td>-1.206168</td>
+      <td>-0.762767</td>
       <td>0.0</td>
-      <td>-2.133008</td>
-      <td>-2.428283</td>
-      <td>-1.88006</td>
+      <td>-2.016637</td>
+      <td>-2.288592</td>
+      <td>-1.7827</td>
       <td>0.0</td>
     </tr>
   </tbody>
@@ -2710,29 +2710,29 @@ SUMMARY OF OUTPUT: SPATIAL TWO STAGE LEAST SQUARES
 Data set            :     unknown
 Weights matrix      :     unknown
 Dependent Variable  :           y                Number of Observations:        1600
-Mean dependent var  :      2.0494                Number of Variables   :           3
-S.D. dependent var  :      1.5807                Degrees of Freedom    :        1597
-Pseudo R-squared    :      0.5517
-Spatial Pseudo R-squared:  0.4716
+Mean dependent var  :      2.0540                Number of Variables   :           3
+S.D. dependent var  :      1.5381                Degrees of Freedom    :        1597
+Pseudo R-squared    :      0.5313
+Spatial Pseudo R-squared:  0.4583
 
 ------------------------------------------------------------------------------------
             Variable     Coefficient       Std.Error     z-Statistic     Probability
 ------------------------------------------------------------------------------------
-            CONSTANT         1.03521         0.10902         9.49524         0.00000
-                 X_1        -1.02301         0.02693       -37.98774         0.00000
-                 W_y         0.46878         0.05168         9.07061         0.00000
+            CONSTANT         1.13508         0.11100        10.22632         0.00000
+                 X_1        -1.01039         0.02751       -36.73110         0.00000
+                 W_y         0.44297         0.05260         8.42152         0.00000
 ------------------------------------------------------------------------------------
 Instrumented: W_y
 Instruments: W_X_1
 
 DIAGNOSTICS FOR SPATIAL DEPENDENCE
 TEST                              DF         VALUE           PROB
-Anselin-Kelejian Test             1          0.785           0.3758
+Anselin-Kelejian Test             1          1.002           0.3167
 
 SPATIAL LAG MODEL IMPACTS
 Impacts computed using the 'simple' method.
             Variable         Direct        Indirect          Total
-                 X_1        -1.0230         -0.9028         -1.9258
+                 X_1        -1.0104         -0.8035         -1.8139
 ================================ END OF REPORT =====================================
 </code></pre></div>
 </div>
