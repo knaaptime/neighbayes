@@ -62,6 +62,7 @@ def _run_binary_gibbs(
     lanczos_deg=15,
     krylov_degree=0,
     krylov_dmax=0.4,
+    log_likelihood=False,
 ):
     """Registry runner for cross-section binary (logit) Pólya-Gamma Gibbs."""
     return model._fit_gibbs(
@@ -79,6 +80,7 @@ def _run_binary_gibbs(
         lanczos_deg=lanczos_deg,
         krylov_degree=krylov_degree,
         krylov_dmax=krylov_dmax,
+        log_likelihood=log_likelihood,
     )
 
 
@@ -96,4 +98,5 @@ register(
         "krylov_degree",
         "krylov_dmax",
     },
+    skips_log_likelihood=True,
 )

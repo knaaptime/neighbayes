@@ -521,6 +521,7 @@ def run_chains_jax_flow(
     progressbar=False,
     slice_width=0.4,
     krylov_reuse=True,
+    store_log_lik=True,
 ):
     """Run the unrestricted flow NB Gibbs sampler on the JAX backend.
 
@@ -603,19 +604,24 @@ def run_chains_jax_flow(
             for w, (left, right) in zip(widths, steps)
         )
         trace = (core["rho_d"], core["rho_o"], core["rho_w"])
-        trace += (core["beta"], core["alpha"], eta)
+        trace += (core["beta"], core["alpha"])
+        if store_log_lik:  # η is traced only to build the log-likelihood
+            trace += (eta,)
         return dict(core, slice_widths=widths), trace
 
-    _, (rd_all, ro_all, rw_all, beta_all, alpha_all, eta_all) = run_chains_chunked(
+    _, traces = run_chains_chunked(
         _sweep, states, warm_keys, draw_keys, tune=tune, draws=draws
     )
+    rd_all, ro_all, rw_all, beta_all, alpha_all = traces[:5]
+    eta_all = traces[5] if store_log_lik else None
     sl = slice(None, None, thin) if thin > 1 else slice(None)
     rd_all = rd_all[:, sl]
     ro_all = ro_all[:, sl]
     rw_all = rw_all[:, sl]
     beta_all = beta_all[:, sl]
     alpha_all = alpha_all[:, sl]
-    eta_all = eta_all[:, sl]  # (chains, n_keep, N)
+    if store_log_lik:
+        eta_all = eta_all[:, sl]  # (chains, n_keep, N)
 
     # Pointwise NB log-likelihood from the fitted η collected during sampling —
     # no post-hoc per-draw solves.
@@ -623,15 +629,17 @@ def run_chains_jax_flow(
     results = []
     for c in range(chains):
         alpha_s = alpha_all[c]
-        mu = np.exp(np.clip(eta_all[c], -30.0, 30.0))  # (n_keep, N)
-        a = alpha_s[:, None]
-        log_lik = (
-            gammaln(y_np + a)
-            - gammaln(a)
-            - gammaln(y_np + 1.0)
-            + y_np * np.log(np.maximum(mu / (mu + a), 1e-300))
-            + a * np.log(np.maximum(a / (mu + a), 1e-300))
-        )
+        log_lik = None
+        if store_log_lik:
+            mu = np.exp(np.clip(eta_all[c], -30.0, 30.0))  # (n_keep, N)
+            a = alpha_s[:, None]
+            log_lik = (
+                gammaln(y_np + a)
+                - gammaln(a)
+                - gammaln(y_np + 1.0)
+                + y_np * np.log(np.maximum(mu / (mu + a), 1e-300))
+                + a * np.log(np.maximum(a / (mu + a), 1e-300))
+            )
         results.append(
             {
                 "rho_d": rd_all[c],
@@ -1048,6 +1056,7 @@ def run_chains_jax_flow_separable(
     jax_seeds=None,
     progressbar=False,
     slice_width=0.4,
+    store_log_lik=True,
 ):
     """Run the separable flow NB Gibbs sampler on the JAX backend.
 
@@ -1123,33 +1132,40 @@ def run_chains_jax_flow_separable(
             adapt_slice_width(w, left, right, tuning)
             for w, (left, right) in zip(widths, steps)
         )
-        trace = (core["rho_d"], core["rho_o"], core["beta"], core["alpha"], eta)
+        trace = (core["rho_d"], core["rho_o"], core["beta"], core["alpha"])
+        if store_log_lik:  # η is traced only to build the log-likelihood
+            trace += (eta,)
         return dict(core, slice_widths=widths), trace
 
-    _, (rd_all, ro_all, beta_all, alpha_all, eta_all) = run_chains_chunked(
+    _, traces = run_chains_chunked(
         _sweep, states, warm_keys, draw_keys, tune=tune, draws=draws
     )
+    rd_all, ro_all, beta_all, alpha_all = traces[:4]
+    eta_all = traces[4] if store_log_lik else None
     sl = slice(None, None, thin) if thin > 1 else slice(None)
     rd_all = rd_all[:, sl]
     ro_all = ro_all[:, sl]
     beta_all = beta_all[:, sl]
     alpha_all = alpha_all[:, sl]
-    eta_all = eta_all[:, sl]
+    if store_log_lik:
+        eta_all = eta_all[:, sl]
     rw_all = -rd_all * ro_all  # separable constraint
 
     y_np = np.asarray(y, dtype=np.float64)
     results = []
     for c in range(chains):
         alpha_s = alpha_all[c]
-        mu = np.exp(np.clip(eta_all[c], -30.0, 30.0))
-        a = alpha_s[:, None]
-        log_lik = (
-            gammaln(y_np + a)
-            - gammaln(a)
-            - gammaln(y_np + 1.0)
-            + y_np * np.log(np.maximum(mu / (mu + a), 1e-300))
-            + a * np.log(np.maximum(a / (mu + a), 1e-300))
-        )
+        log_lik = None
+        if store_log_lik:
+            mu = np.exp(np.clip(eta_all[c], -30.0, 30.0))
+            a = alpha_s[:, None]
+            log_lik = (
+                gammaln(y_np + a)
+                - gammaln(a)
+                - gammaln(y_np + 1.0)
+                + y_np * np.log(np.maximum(mu / (mu + a), 1e-300))
+                + a * np.log(np.maximum(a / (mu + a), 1e-300))
+            )
         results.append(
             {
                 "rho_d": rd_all[c],

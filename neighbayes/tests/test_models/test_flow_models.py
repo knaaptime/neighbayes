@@ -1406,7 +1406,14 @@ class TestFlowLogLikelihood:
             col_names=self.gauss["col_names"],
             restrict_positive=True,
         )
-        idata = m.fit(draws=30, tune=30, chains=1, progressbar=False, random_seed=0)
+        idata = m.fit(
+            draws=30,
+            tune=30,
+            chains=1,
+            progressbar=False,
+            random_seed=0,
+            idata_kwargs={"log_likelihood": True},
+        )
         self._check_loo(idata)
 
     def test_sar_flow_separable_loglik(self):
@@ -1418,7 +1425,14 @@ class TestFlowLogLikelihood:
             self.G,
             col_names=self.gauss["col_names"],
         )
-        idata = m.fit(draws=30, tune=30, chains=1, progressbar=False, random_seed=0)
+        idata = m.fit(
+            draws=30,
+            tune=30,
+            chains=1,
+            progressbar=False,
+            random_seed=0,
+            idata_kwargs={"log_likelihood": True},
+        )
         self._check_loo(idata)
 
     def test_ols_flow_loglik(self):
@@ -1430,7 +1444,14 @@ class TestFlowLogLikelihood:
             self.G,
             col_names=self.gauss["col_names"],
         )
-        idata = m.fit(draws=30, tune=30, chains=1, progressbar=False, random_seed=0)
+        idata = m.fit(
+            draws=30,
+            tune=30,
+            chains=1,
+            progressbar=False,
+            random_seed=0,
+            idata_kwargs={"log_likelihood": True},
+        )
         self._check_loo(idata)
 
     def test_compare_flow_models(self):
@@ -1458,7 +1479,14 @@ class TestFlowLogLikelihood:
             self.G,
             col_names=self.gauss["col_names"],
         )
-        kw = dict(draws=40, tune=40, chains=1, progressbar=False, random_seed=0)
+        kw = dict(
+            draws=40,
+            tune=40,
+            chains=1,
+            progressbar=False,
+            random_seed=0,
+            idata_kwargs={"log_likelihood": True},
+        )
         idata_sar = m_sar.fit(**kw)
         idata_sep = m_sep.fit(**kw)
         idata_ols = m_ols.fit(**kw)

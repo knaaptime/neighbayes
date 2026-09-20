@@ -345,8 +345,13 @@ def _run_chain(
     thin: int = 1,
     rng: Optional[np.random.Generator] = None,
     init: Optional[FlowPoissonGibbsState] = None,
+    store_log_lik: bool = True,
 ) -> dict[str, np.ndarray]:
-    """Run one chain; ``cache.separable`` selects the ρ parameterization."""
+    """Run one chain; ``cache.separable`` selects the ρ parameterization.
+
+    ``store_log_lik=False`` skips the pointwise log-likelihood (one value per
+    draw and flow) and returns ``None`` under ``"log_lik"``.
+    """
     rng = np.random.default_rng() if rng is None else rng
     y = np.asarray(y, dtype=np.float64)
     X = np.asarray(X, dtype=np.float64)
@@ -362,7 +367,7 @@ def _run_chain(
         "rho_d": np.empty(n_keep),
         "rho_o": np.empty(n_keep),
         "rho_w": np.empty(n_keep),
-        "log_lik": np.empty((n_keep, y.size)),
+        "log_lik": np.empty((n_keep, y.size)) if store_log_lik else None,
     }
 
     rho_names = ("rho_d", "rho_o") if separable else ("rho_d", "rho_o", "rho_w")
@@ -454,12 +459,13 @@ def _run_chain(
         )
 
         if sweep >= tune and (sweep - tune) % thin == 0 and idx < n_keep:
-            eta_f = U @ state.beta
             out["beta"][idx] = state.beta
             out["rho_d"][idx] = state.rho_d
             out["rho_o"][idx] = state.rho_o
             out["rho_w"][idx] = rho_w_new
-            out["log_lik"][idx] = _poisson_loglik_pointwise(y, eta_f)
+            if store_log_lik:
+                eta_f = U @ state.beta
+                out["log_lik"][idx] = _poisson_loglik_pointwise(y, eta_f)
             idx += 1
 
     return out
@@ -474,18 +480,40 @@ def _poisson_loglik_pointwise(y: np.ndarray, eta: np.ndarray) -> np.ndarray:
 
 
 def run_chain_unrestricted(
-    y, X, cache, priors, draws, tune, *, thin=1, rng=None, init=None
+    y, X, cache, priors, draws, tune, *, thin=1, rng=None, init=None, store_log_lik=True
 ) -> dict[str, np.ndarray]:
     """Run one chain of the unrestricted (3-ρ) flow Poisson sampler."""
     if cache.separable:
         raise ValueError("cache.separable is True; use run_chain_separable")
-    return _run_chain(y, X, cache, priors, draws, tune, thin=thin, rng=rng, init=init)
+    return _run_chain(
+        y,
+        X,
+        cache,
+        priors,
+        draws,
+        tune,
+        thin=thin,
+        rng=rng,
+        init=init,
+        store_log_lik=store_log_lik,
+    )
 
 
 def run_chain_separable(
-    y, X, cache, priors, draws, tune, *, thin=1, rng=None, init=None
+    y, X, cache, priors, draws, tune, *, thin=1, rng=None, init=None, store_log_lik=True
 ) -> dict[str, np.ndarray]:
     """Run one chain of the separable (2-ρ Kronecker) flow Poisson sampler."""
     if not cache.separable:
         raise ValueError("cache.separable is False; use run_chain_unrestricted")
-    return _run_chain(y, X, cache, priors, draws, tune, thin=thin, rng=rng, init=init)
+    return _run_chain(
+        y,
+        X,
+        cache,
+        priors,
+        draws,
+        tune,
+        thin=thin,
+        rng=rng,
+        init=init,
+        store_log_lik=store_log_lik,
+    )

@@ -394,6 +394,7 @@ class SARZINB(SpatialModel):
         progressbar: bool = True,
         backend: str = "numpy",
         timeout: float | None = None,
+        log_likelihood: bool = False,
     ) -> az.InferenceData:
         """Sample posterior via 9-block Pólya–Gamma Gibbs.
 
@@ -483,6 +484,7 @@ class SARZINB(SpatialModel):
                 thin=thin,
                 jax_seeds=chain_seeds,
                 progressbar=progressbar,
+                store_log_lik=log_likelihood,
             )
 
             stacked = {
@@ -492,11 +494,15 @@ class SARZINB(SpatialModel):
                 "beta": np.stack([c["beta"] for c in chain_results], axis=0),
                 "alpha": np.stack([c["alpha"] for c in chain_results], axis=0),
             }
-            log_lik = np.stack([c["log_lik"] for c in chain_results], axis=0)
+            log_lik = (
+                np.stack([c["log_lik"] for c in chain_results], axis=0)
+                if log_likelihood
+                else None
+            )
 
             idata = gibbs_to_inference_data(
                 posterior_samples=stacked,
-                log_likelihood={"obs": log_lik},
+                log_likelihood={"obs": log_lik} if log_likelihood else None,
                 observed_data={"obs": self._y_int},
                 coords={
                     "sel_coefficient": list(self._sel_feature_names),
@@ -610,6 +616,7 @@ class SARZINB(SpatialModel):
                 rng=chain_rng,
                 chain_id=progress_chain_id,
                 progress_manager=progress_manager,
+                store_log_lik=log_likelihood,
             )
 
         chain_results = run_chains(
@@ -633,11 +640,15 @@ class SARZINB(SpatialModel):
             "beta": np.stack([c["beta"] for c in chain_results], axis=0),
             "alpha": np.stack([c["alpha"] for c in chain_results], axis=0),
         }
-        log_lik = np.stack([c["log_lik"] for c in chain_results], axis=0)
+        log_lik = (
+            np.stack([c["log_lik"] for c in chain_results], axis=0)
+            if log_likelihood
+            else None
+        )
 
         idata = gibbs_to_inference_data(
             posterior_samples=stacked,
-            log_likelihood={"obs": log_lik},
+            log_likelihood={"obs": log_lik} if log_likelihood else None,
             observed_data={"obs": self._y_int},
             coords={
                 "sel_coefficient": list(self._sel_feature_names),

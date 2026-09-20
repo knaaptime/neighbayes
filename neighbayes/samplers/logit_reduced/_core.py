@@ -307,6 +307,7 @@ def run_chain(
     rng: np.random.Generator | None = None,
     chain_id: int = 0,
     progress_manager: object | None = None,
+    store_log_lik: bool = True,
 ) -> dict[str, np.ndarray]:
     """Run one chain of the reduced-form SAR-logit PG-Gibbs sampler.
 
@@ -325,7 +326,7 @@ def run_chain(
 
     rho_samples = np.empty(n_keep, dtype=np.float64)
     beta_samples = np.empty((n_keep, k), dtype=np.float64)
-    log_lik_samples = np.empty((n_keep, n), dtype=np.float64)
+    log_lik_samples = np.empty((n_keep, n), dtype=np.float64) if store_log_lik else None
 
     state = ReducedLogitGibbsState(
         beta=np.asarray(init.beta, dtype=np.float64).copy(),
@@ -481,7 +482,8 @@ def run_chain(
             if idx < n_keep:
                 rho_samples[idx] = state.rho
                 beta_samples[idx] = state.beta
-                log_lik_samples[idx] = _logit_loglik_pointwise(y, eta)
+                if store_log_lik:
+                    log_lik_samples[idx] = _logit_loglik_pointwise(y, eta)
 
         if progress_manager is not None:
             progress_manager.update(chain_id, i, tuning=i < tune)

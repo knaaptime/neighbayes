@@ -66,6 +66,11 @@ class GibbsEntry:
         Whether the Gibbs sampler supports a robust (Student-t) likelihood.
         When ``False`` the base ``fit()`` raises a clear ``NotImplementedError``
         for ``robust=True`` models instead of each runner re-checking.
+    skips_log_likelihood
+        Whether ``run`` accepts ``log_likelihood=`` and skips computing the
+        pointwise log-likelihood when it is ``False``.  Every family stores it
+        only on request (:func:`run_entry`); for the others the group is
+        computed and then dropped.
     """
 
     run: GibbsRunner
@@ -73,6 +78,7 @@ class GibbsEntry:
     auto_backend: str = "jax"
     options: frozenset[str] = field(default_factory=frozenset)
     supports_robust: bool = False
+    skips_log_likelihood: bool = False
 
 
 _REGISTRY: dict[tuple[str, str], GibbsEntry] = {}
@@ -87,6 +93,7 @@ def register(
     auto_backend: str | None = None,
     options=(),
     supports_robust: bool = False,
+    skips_log_likelihood: bool = False,
 ) -> GibbsEntry:
     """Register (once) the Gibbs runner for ``(likelihood, structure)``.
 
@@ -119,6 +126,7 @@ def register(
         auto_backend=auto_backend,
         options=frozenset(options),
         supports_robust=supports_robust,
+        skips_log_likelihood=bool(skips_log_likelihood),
     )
     _REGISTRY[key] = entry
     return entry
@@ -184,3 +192,18 @@ def pop_options(sample_kwargs: dict, entry: GibbsEntry) -> dict:
             f"{sorted(sample_kwargs)}"
         )
     return opts
+
+
+def run_entry(entry: GibbsEntry, model, *, log_likelihood: bool, **kwargs):
+    """Run ``entry`` and store the pointwise log-likelihood only when requested.
+
+    Matches PyMC, where ``idata_kwargs={"log_likelihood": True}`` opts in: the
+    array holds one value per draw, chain, and observation (16 GB at
+    n = 250,000 with 4 × 2,000 draws), and only LOO/WAIC read it.
+    """
+    if entry.skips_log_likelihood:
+        kwargs["log_likelihood"] = bool(log_likelihood)
+    idata = entry.run(model, **kwargs)
+    if not log_likelihood and "log_likelihood" in idata.groups():
+        del idata["log_likelihood"]
+    return idata

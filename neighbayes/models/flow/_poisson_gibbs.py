@@ -27,6 +27,7 @@ def run_poisson_flow_gibbs(
     random_seed: int | None = None,
     progressbar: bool = True,
     n_jobs: int = -1,
+    log_likelihood: bool = False,
 ) -> az.InferenceData:
     """Run the reduced-form auxiliary-mixture sampler for a Poisson flow model.
 
@@ -120,6 +121,7 @@ def run_poisson_flow_gibbs(
             thin=1,
             rng=rng,
             init=_make_init(rng),
+            store_log_lik=log_likelihood,
         )
 
     np_seeds = (
@@ -143,11 +145,13 @@ def run_poisson_flow_gibbs(
         "rho_w": np.stack([c["rho_w"] for c in chain_results], axis=0),
         "beta": np.stack([c["beta"] for c in chain_results], axis=0),
     }
-    log_lik = np.stack([c["log_lik"] for c in chain_results], axis=0)
+    ll = None
+    if log_likelihood:
+        ll = {"obs": np.stack([c["log_lik"] for c in chain_results], axis=0)}
 
     model._idata = gibbs_to_inference_data(
         posterior_samples=posterior_samples,
-        log_likelihood={"obs": log_lik},
+        log_likelihood=ll,
         observed_data={"obs": model._y_int_vec},
         coords={"coefficient": list(model._feature_names)},
         dims={"beta": ["coefficient"]},

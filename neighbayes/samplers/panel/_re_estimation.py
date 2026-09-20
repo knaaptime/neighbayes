@@ -112,6 +112,7 @@ class REGibbsEstimation:
         thin: int = 1,
         n_jobs: int = -1,
         progressbar: bool = True,
+        log_likelihood: bool = False,
     ) -> az.InferenceData:
         """Run Gibbs chains and assemble InferenceData.
 
@@ -178,6 +179,7 @@ class REGibbsEstimation:
                 progressbar=progressbar,
                 chain_id=chain_id_kw if chain_id_kw is not None else chain_id,
                 progress_manager=progress_manager,
+                store_log_lik=log_likelihood,
             )
 
         # Run chains: n_jobs=1 → sequential, n_jobs≠1 → parallel via joblib
@@ -195,7 +197,7 @@ class REGibbsEstimation:
         )
 
         # Assemble InferenceData
-        idata = self._assemble_idata(chain_results)
+        idata = self._assemble_idata(chain_results, log_likelihood=log_likelihood)
         elapsed = time.time() - t_start
         _log.info(
             f"Sampling {chains} chains for {tune} tune and {draws} draw "
@@ -240,6 +242,8 @@ class REGibbsEstimation:
     def _assemble_idata(
         self,
         chain_results: list[dict],
+        *,
+        log_likelihood: bool = False,
     ) -> az.InferenceData:
         """Convert chain output dicts to InferenceData.
 
@@ -280,14 +284,14 @@ class REGibbsEstimation:
             "alpha": ["unit"],
         }
 
-        # Log-likelihood: shape (chains, n_keep, n)
-        log_lik = np.stack(
-            [c["log_lik"] for c in chain_results], axis=0
-        )  # (chains, n_keep, n)
+        # Log-likelihood, shape (chains, n_keep, n), only when requested.
+        ll = None
+        if log_likelihood:
+            ll = {"obs": np.stack([c["log_lik"] for c in chain_results], axis=0)}
 
         idata = gibbs_to_inference_data(
             posterior_samples=posterior_samples,
-            log_likelihood={"obs": log_lik},
+            log_likelihood=ll,
             observed_data={"obs": self.y},
             coords=coords,
             dims=dims,

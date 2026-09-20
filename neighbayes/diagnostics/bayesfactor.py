@@ -837,7 +837,9 @@ def _bic_logml(idata, return_diagnostics=False, model=None):
     """
     if not hasattr(idata, "log_likelihood"):
         raise ValueError(
-            "InferenceData must have a log_likelihood group for BIC approximation."
+            "InferenceData must have a log_likelihood group for BIC approximation. "
+            "It is stored only on request: refit with "
+            "fit(..., idata_kwargs={'log_likelihood': True})."
         )
 
     log_like_group = idata.log_likelihood

@@ -14,6 +14,7 @@ for auto-select).  ``T`` multiplies the result for panel models.
 from __future__ import annotations
 
 import hashlib
+from collections import OrderedDict
 
 import numpy as np
 import scipy.sparse as sp
@@ -58,6 +59,14 @@ def _cheb_precompute_for(method: str):
     )
 
 
+#: Chebyshev-in-ρ coefficients of the stochastic surrogate, keyed by W, interval
+#: and probe count.  A fit asks for them once per evaluator it builds (scalar,
+#: vectorized, JAX, gradient); the precompute is seeded, so the key determines
+#: them and one precompute serves every evaluator.
+_CHEB_STOCHASTIC_COEFFS: OrderedDict[tuple, tuple] = OrderedDict()
+_CHEB_STOCHASTIC_COEFFS_MAXSIZE = 16
+
+
 def _cheb_stochastic_coeffs(W_sparse, rho_min, rho_max, n_probes: int = 50):
     """Stochastic-Chebyshev logdet → Chebyshev-in-ρ coefficients.
 
@@ -81,11 +90,35 @@ def _cheb_stochastic_coeffs(W_sparse, rho_min, rho_max, n_probes: int = 50):
     one O(p²) scalar evaluation each against a precompute measured in hundreds
     of milliseconds, so the extra width is free at setup.
     """
-    from ._chebyshev import cheb_order_for_tolerance
-
+    key = (
+        _logdet_w_signature(W_sparse),
+        float(rho_min),
+        float(rho_max),
+        int(n_probes),
+    )
+    hit = _CHEB_STOCHASTIC_COEFFS.get(key)
+    if hit is not None:
+        _CHEB_STOCHASTIC_COEFFS.move_to_end(key)
+        return hit
     pre = cheb_stochastic_logdet_precompute(
         W_sparse, order=None, rho_min=rho_min, rho_max=rho_max, n_probes=n_probes
     )
+    out = _cheb_stochastic_coeffs_from(pre, rho_min, rho_max)
+    out[0].flags.writeable = False
+    _CHEB_STOCHASTIC_COEFFS[key] = out
+    if len(_CHEB_STOCHASTIC_COEFFS) > _CHEB_STOCHASTIC_COEFFS_MAXSIZE:
+        _CHEB_STOCHASTIC_COEFFS.popitem(last=False)
+    return out
+
+
+def _cheb_stochastic_coeffs_from(pre, rho_min, rho_max):
+    """Chebyshev-in-ρ coefficients of an existing stochastic Chebyshev precompute.
+
+    The degree depends on the interval and ``n`` only, never on the probe count,
+    so a probe pool that grows keeps the same coefficient shape.
+    """
+    from ._chebyshev import cheb_order_for_tolerance
+
     # An explicit cap keeps NEIGHBAYES_LOGDET_NODE_CAP out of this path: that
     # knob matches *factorization* budgets across interpolants, and the refit
     # performs none — its nodes are scalar evaluations of an existing surrogate.
@@ -812,8 +845,9 @@ def _logdet_w_signature(W) -> tuple:
 
 
 def clear_logdet_fn_cache() -> None:
-    """Clear the shared cache of precomputed PyTensor logdet callables."""
+    """Clear the shared caches of logdet callables and stochastic Chebyshev coefficients."""
     _LOGDET_FN_CACHE.clear()
+    _CHEB_STOCHASTIC_COEFFS.clear()
 
 
 def get_cached_logdet_fn(

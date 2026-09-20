@@ -138,6 +138,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
         logdet_refit: bool = True,
         logdet_refit_pad_sd: float = 10.0,
         logdet_aaa_check: bool = True,
+        logdet_probe_check: bool = True,
     ):
         # Resolve typed priors (dataclass) and dict view.
         from .priors import BasePriors, priors_as_dict, resolve_priors
@@ -150,6 +151,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
         self.logdet_refit = bool(logdet_refit)
         self.logdet_refit_pad_sd = float(logdet_refit_pad_sd)
         self.logdet_aaa_check = bool(logdet_aaa_check)
+        self.logdet_probe_check = bool(logdet_probe_check)
 
         self._idata: Optional[az.InferenceData] = None
         self._pymc_model: Optional[pm.Model] = None
@@ -298,9 +300,12 @@ class SpatialModel(SharedSpatialMethods, ABC):
         n_jobs : int, default -1
             Parallel workers for the NumPy Gibbs path (Gibbs only).
         idata_kwargs : dict, optional
-            Passed to ``pm.sample`` (NUTS only).  ``{"log_likelihood": True}``
-            reconstructs the complete Jacobian-corrected pointwise
-            log-likelihood.
+            ``{"log_likelihood": True}`` stores the complete Jacobian-corrected
+            pointwise log-likelihood that ``az.loo`` / ``az.waic`` /
+            ``az.compare`` need, for Gibbs and NUTS alike.  Off by default, as
+            in PyMC: it holds one value per draw, chain, and observation (16 GB
+            at n = 250,000 with 4 × 2,000 draws).  For NUTS the dict is also
+            passed to ``pm.sample``.
         **sample_kwargs
             For NUTS, forwarded to ``pm.sample`` (``nuts_sampler=...``); for
             Gibbs, the family's declared options (an unsupported key raises).
@@ -309,7 +314,12 @@ class SpatialModel(SharedSpatialMethods, ABC):
         -------
         arviz.InferenceData
         """
-        from ..samplers._registry import pop_options, resolve, resolve_backend
+        from ..samplers._registry import (
+            pop_options,
+            resolve,
+            resolve_backend,
+            run_entry,
+        )
 
         gibbs_key = getattr(self, "_gibbs_key", None)
         entry = resolve(*gibbs_key) if gibbs_key is not None else None
@@ -335,8 +345,10 @@ class SpatialModel(SharedSpatialMethods, ABC):
                 )
             backend = resolve_backend(gibbs_backend, entry, jax_ok=jax_available())
             family_opts = pop_options(sample_kwargs, entry)
-            self._idata = entry.run(
+            self._idata = run_entry(
+                entry,
                 self,
+                log_likelihood=bool((idata_kwargs or {}).get("log_likelihood", False)),
                 draws=draws,
                 tune=tune,
                 chains=chains,
@@ -407,6 +419,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
         use_slice: bool = True,
         slice_width: float | None = None,
         chain_method: str | None = None,
+        log_likelihood: bool = False,
     ) -> az.InferenceData:
         """Sample posterior via 3-block Gaussian Gibbs.
 
@@ -511,6 +524,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
             self._W_sparse is not None,
             self.logdet_refit,
             self.logdet_aaa_check,
+            self.logdet_probe_check,
         )
         gibbs_kwargs: dict[str, Any] = dict(
             y=self._y,
@@ -530,6 +544,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
             logdet_refit=self.logdet_refit,
             logdet_refit_pad_sd=self.logdet_refit_pad_sd,
             logdet_aaa_check=self.logdet_aaa_check,
+            logdet_probe_check=self.logdet_probe_check,
         )
         # SAR/SDM need Wy; SEM/SDEM do not
         if self._jacobian_param == "rho":
@@ -548,6 +563,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
             gibbs_method=gibbs_method,
             slice_width=slice_width,
             chain_method=chain_method,
+            log_likelihood=log_likelihood,
         )
         return self._idata
 

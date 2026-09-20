@@ -359,6 +359,7 @@ class TestNegativeBinomialSARFlowGibbs:
             gibbs_backend="jax",
             random_seed=42,
             progressbar=False,
+            idata_kwargs={"log_likelihood": True},
         )
         for v in ("beta", "alpha", "rho_d", "rho_o", "rho_w"):
             assert v in idata.posterior

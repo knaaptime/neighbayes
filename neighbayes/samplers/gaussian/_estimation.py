@@ -25,6 +25,7 @@ import numpy as np
 import scipy.sparse as sp
 
 from ..._lazy_deps import az
+from ..._logdet._probe_check import WarmupProbes
 from ..._logdet._refit import DEFAULT_PAD_SD
 from ..._logdet._warmup import WarmupJacobian
 
@@ -86,6 +87,7 @@ class GibbsEstimation:
         logdet_refit: bool = False,
         logdet_refit_pad_sd: float = DEFAULT_PAD_SD,
         logdet_aaa_check: bool = False,
+        logdet_probe_check: bool = False,
     ):
         self.y = y
         self.X = X
@@ -102,6 +104,7 @@ class GibbsEstimation:
         self.logdet_refit = bool(logdet_refit)
         self.logdet_refit_pad_sd = float(logdet_refit_pad_sd)
         self.logdet_aaa_check = bool(logdet_aaa_check)
+        self.logdet_probe_check = bool(logdet_probe_check)
         self.warmup_jacobian = None
         self.n, self.k = X.shape
 
@@ -128,6 +131,7 @@ class GibbsEstimation:
         gibbs_method: str = "jax",
         slice_width: float | None = None,
         chain_method: str | None = None,
+        log_likelihood: bool = False,
     ) -> az.InferenceData:
         """Run Gibbs chains and assemble InferenceData.
 
@@ -166,13 +170,18 @@ class GibbsEstimation:
             in parallel, vectorized under ``jax.vmap`` on one device, so
             ``"vectorized"`` is the only value.  Ignored for the NumPy path
             (use ``n_jobs`` to control parallelism instead).
+        log_likelihood : bool, default False
+            Store the pointwise log-likelihood (one value per draw and
+            observation) for LOO/WAIC, as PyMC's
+            ``idata_kwargs={"log_likelihood": True}`` does.
 
         Returns
         -------
         az.InferenceData
-            With ``posterior``, ``log_likelihood``, and ``observed_data``
-            groups.
+            With ``posterior`` and ``observed_data`` groups, and
+            ``log_likelihood`` when requested.
         """
+        self.log_likelihood = bool(log_likelihood)
         # Default chain_method for JAX path
         if chain_method is None:
             chain_method = "vectorized" if gibbs_method == "jax" else None
@@ -244,7 +253,7 @@ class GibbsEstimation:
                     # pointwise log-likelihood for them would add an O(n·k) pass
                     # per iteration and an (iters × n) array per chain to pickle
                     # back from every worker.
-                    store_log_lik=not scouting,
+                    store_log_lik=self.log_likelihood and not scouting,
                 )
 
             return _run_one_chain
@@ -471,6 +480,7 @@ class GibbsEstimation:
             logdet_param_fn=param_fn,
             logdet_params=params0,
             refit_hook=refit_hook,
+            log_likelihood=self.log_likelihood,
         )
 
         # Assemble InferenceData
@@ -494,7 +504,25 @@ class GibbsEstimation:
         Construction is lazy, with no factorization until evaluators are built, so
         this is cheap to call unconditionally.
         """
-        if self.W_sparse is None or not (self.logdet_refit or self.logdet_aaa_check):
+        if self.W_sparse is None:
+            return None
+        if self.logdet_probe_check:
+            from ..._logdet._config import resolve_logdet_method
+
+            n_units = self.W_sparse.shape[0] // self.T
+            W = self.W_sparse[:n_units, :n_units] if self.T > 1 else self.W_sparse
+            if resolve_logdet_method(self.logdet_method, n=n_units, W=W) == (
+                "cheb_stochastic"
+            ):
+                wp = WarmupProbes.for_sampler(
+                    self.W_sparse,
+                    T=self.T,
+                    rho_min=self.priors.rho_lower,
+                    rho_max=self.priors.rho_upper,
+                )
+                self.warmup_jacobian = wp
+                return wp
+        if not (self.logdet_refit or self.logdet_aaa_check):
             return None
         wj = WarmupJacobian.for_sampler(
             self.W_sparse,
@@ -678,18 +706,12 @@ class GibbsEstimation:
         coords = {"coefficient": self.feature_names}
         dims = {"beta": ["coefficient"]}
 
-        # Log-likelihood: shape (chains, n_keep, n)
-        log_lik = np.stack(
-            [c["log_lik"] for c in chain_results], axis=0
-        )  # (chains, n_keep, n)
-
-        # Sample stats: per-draw joint log-likelihood and acceptance rate.
-        # ``lp`` is the sum of the pointwise log-likelihood (which already
-        # includes the Jacobian correction for SAR/SEM); broadcasting the
-        # per-chain ``mh_accept_rate`` scalar across draws gives ArviZ a
-        # uniform ``(chain, draw)``-shaped stat without per-step tracking.
-        n_keep = log_lik.shape[1]
-        lp = log_lik.sum(axis=-1)  # (chains, n_keep)
+        # Sample stats: acceptance rate, and — when the pointwise
+        # log-likelihood was stored — its per-draw sum ``lp`` (which includes
+        # the Jacobian correction for SAR/SEM).  Broadcasting the per-chain
+        # ``mh_accept_rate`` scalar across draws gives ArviZ a uniform
+        # ``(chain, draw)``-shaped stat without per-step tracking.
+        n_keep = posterior_samples[spatial_param].shape[1]
         accept_per_chain = np.array(
             [c.get("mh_accept_rate", 1.0) for c in chain_results],
             dtype=np.float64,
@@ -697,11 +719,18 @@ class GibbsEstimation:
         acceptance_rate = np.broadcast_to(
             accept_per_chain[:, None], (len(chain_results), n_keep)
         ).copy()
-        sample_stats = {"lp": lp, "acceptance_rate": acceptance_rate}
+        sample_stats = {"acceptance_rate": acceptance_rate}
+        log_likelihood = None
+        if getattr(self, "log_likelihood", False):
+            log_lik = np.stack(
+                [c["log_lik"] for c in chain_results], axis=0
+            )  # (chains, n_keep, n)
+            sample_stats["lp"] = log_lik.sum(axis=-1)
+            log_likelihood = {"obs": log_lik}
 
         idata = gibbs_to_inference_data(
             posterior_samples=posterior_samples,
-            log_likelihood={"obs": log_lik},
+            log_likelihood=log_likelihood,
             observed_data={"obs": self.y},
             coords=coords,
             dims=dims,
@@ -765,6 +794,7 @@ class GaussianSARGibbs(GibbsEstimation):
         logdet_refit: bool = False,
         logdet_refit_pad_sd: float = DEFAULT_PAD_SD,
         logdet_aaa_check: bool = False,
+        logdet_probe_check: bool = False,
     ):
         super().__init__(
             y=y,
@@ -782,6 +812,7 @@ class GaussianSARGibbs(GibbsEstimation):
             logdet_refit=logdet_refit,
             logdet_refit_pad_sd=logdet_refit_pad_sd,
             logdet_aaa_check=logdet_aaa_check,
+            logdet_probe_check=logdet_probe_check,
         )
 
     def _spatial_param_name(self) -> str:
@@ -836,6 +867,7 @@ class GaussianSEMGibbs(GibbsEstimation):
         logdet_refit: bool = False,
         logdet_refit_pad_sd: float = DEFAULT_PAD_SD,
         logdet_aaa_check: bool = False,
+        logdet_probe_check: bool = False,
     ):
         super().__init__(
             y=y,
@@ -853,6 +885,7 @@ class GaussianSEMGibbs(GibbsEstimation):
             logdet_refit=logdet_refit,
             logdet_refit_pad_sd=logdet_refit_pad_sd,
             logdet_aaa_check=logdet_aaa_check,
+            logdet_probe_check=logdet_probe_check,
         )
 
     def _spatial_param_name(self) -> str:

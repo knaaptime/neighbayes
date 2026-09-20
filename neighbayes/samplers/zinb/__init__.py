@@ -40,6 +40,7 @@ def _run_zinb_gibbs(
     progressbar,
     backend,
     timeout=None,
+    log_likelihood=False,
 ):
     """Registry runner for the zero-inflated SAR NegBin 9-block Gibbs."""
     return model._fit_gibbs(
@@ -52,6 +53,7 @@ def _run_zinb_gibbs(
         progressbar=progressbar,
         backend=backend,
         timeout=timeout,
+        log_likelihood=log_likelihood,
     )
 
 
@@ -62,4 +64,5 @@ register(
     backends={"numpy", "jax"},
     auto_backend="jax",
     options={"timeout"},
+    skips_log_likelihood=True,
 )

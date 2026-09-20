@@ -348,6 +348,7 @@ class SARPanelRE(SpatialPanelModel):
         thin: int = 1,
         n_jobs: int = -1,
         progressbar: bool = True,
+        log_likelihood: bool = False,
     ) -> "az.InferenceData":
         """Sample posterior via 5-block RE Gibbs (β, σ², α, σ_α², ρ).
 
@@ -413,6 +414,7 @@ class SARPanelRE(SpatialPanelModel):
             thin=thin,
             n_jobs=n_jobs,
             progressbar=progressbar,
+            log_likelihood=log_likelihood,
         )
         return self._idata
 
@@ -817,6 +819,7 @@ class SEMPanelRE(SpatialPanelModel):
         thin: int = 1,
         n_jobs: int = -1,
         progressbar: bool = True,
+        log_likelihood: bool = False,
     ) -> "az.InferenceData":
         """Sample posterior via 5-block RE Gibbs (β, σ², α, σ_α², λ).
 
@@ -881,6 +884,7 @@ class SEMPanelRE(SpatialPanelModel):
             thin=thin,
             n_jobs=n_jobs,
             progressbar=progressbar,
+            log_likelihood=log_likelihood,
         )
         return self._idata
 
@@ -1170,6 +1174,7 @@ def _run_gaussian_re(
     n_jobs,
     progressbar,
     backend,
+    log_likelihood=False,
 ):
     """Registry runner for Gaussian panel random-effects Gibbs.
 
@@ -1186,6 +1191,7 @@ def _run_gaussian_re(
         thin=thin,
         n_jobs=n_jobs,
         progressbar=progressbar,
+        log_likelihood=log_likelihood,
     )
 
 
@@ -1194,4 +1200,5 @@ register(
     "panel_re",
     run=_run_gaussian_re,
     backends={"numpy"},
+    skips_log_likelihood=True,
 )

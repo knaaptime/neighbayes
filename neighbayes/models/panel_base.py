@@ -314,6 +314,15 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         recorded in ``idata.attrs["logdet_aaa_nodes"]``.  Off, or on a path
         without a warmup midpoint, the count is fixed by the prior interval:
         14 nodes within ``|ρ| ≤ 0.9``, 18 otherwise.
+    logdet_probe_check : bool, default True
+        For ``"cheb_stochastic"``, set the number of Hutchinson probes from
+        where the posterior lies.  Warmup starts on 50 probes; halfway through,
+        the probes' own spread prices the bias they leave in the posterior mean
+        of the spatial parameter, and the pool grows, to at most 200, until
+        that bias is expected to stay under 0.0225 posterior sd.  The count
+        used is recorded in ``idata.attrs["logdet_probes"]``, with a warning
+        if the cap is reached first.  Probes cost setup time only; the cost of
+        each draw does not depend on how many there are.
     robust : bool, default False
         If True, replace the Normal error with Student-t for robustness
         to heavy-tailed outliers.  The degrees of freedom :math:`\\nu` are
@@ -371,6 +380,7 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         logdet_refit: bool = True,
         logdet_refit_pad_sd: float = 10.0,
         logdet_aaa_check: bool = True,
+        logdet_probe_check: bool = True,
     ):
         if W is None:
             raise ValueError("W is required.")
@@ -385,6 +395,7 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         self.logdet_refit = bool(logdet_refit)
         self.logdet_refit_pad_sd = float(logdet_refit_pad_sd)
         self.logdet_aaa_check = bool(logdet_aaa_check)
+        self.logdet_probe_check = bool(logdet_probe_check)
         self.model = _resolve_effects(effects)
         self.effects = _EFFECTS_NAMES[self.model]
         self.robust = robust
@@ -701,9 +712,12 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         n_jobs : int, default -1
             Parallel workers for the NumPy Gibbs path (Gibbs only).
         idata_kwargs : dict, optional
-            Passed to ``pm.sample`` (NUTS only).  ``{"log_likelihood": True}``
-            reconstructs the complete Jacobian-corrected pointwise
-            log-likelihood.
+            ``{"log_likelihood": True}`` stores the complete Jacobian-corrected
+            pointwise log-likelihood that ``az.loo`` / ``az.waic`` /
+            ``az.compare`` need, for Gibbs and NUTS alike.  Off by default, as
+            in PyMC: it holds one value per draw, chain, and observation (16 GB
+            at n = 250,000 with 4 × 2,000 draws).  For NUTS the dict is also
+            passed to ``pm.sample``.
         **sample_kwargs
             For NUTS, forwarded to ``pm.sample`` (``target_accept``,
             ``nuts_sampler="blackjax"``/``"numpyro"``/``"nutpie"``, ...).  For
@@ -715,7 +729,12 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         arviz.InferenceData
             Posterior samples and diagnostics.
         """
-        from ..samplers._registry import pop_options, resolve, resolve_backend
+        from ..samplers._registry import (
+            pop_options,
+            resolve,
+            resolve_backend,
+            run_entry,
+        )
 
         entry = resolve(*self._gibbs_key) if self._gibbs_key is not None else None
         if sampler is None:
@@ -734,8 +753,10 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
                 )
             backend = resolve_backend(gibbs_backend, entry, jax_ok=jax_available())
             family_opts = pop_options(sample_kwargs, entry)
-            self._idata = entry.run(
+            self._idata = run_entry(
+                entry,
                 self,
+                log_likelihood=bool((idata_kwargs or {}).get("log_likelihood", False)),
                 draws=draws,
                 tune=tune,
                 chains=chains,
@@ -827,6 +848,7 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         gibbs_method: str = "numpy",
         slice_width: float | None = None,
         chain_method: str | None = None,
+        log_likelihood: bool = False,
     ) -> az.InferenceData:
         """Sample a Gaussian FE panel posterior via 3-block Gaussian Gibbs.
 
@@ -885,6 +907,7 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
             self._W_sparse_NT is not None,
             self.logdet_refit,
             self.logdet_aaa_check,
+            self.logdet_probe_check,
         )
 
         gibbs_kwargs: dict[str, Any] = dict(
@@ -904,6 +927,7 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
             logdet_refit=self.logdet_refit,
             logdet_refit_pad_sd=self.logdet_refit_pad_sd,
             logdet_aaa_check=self.logdet_aaa_check,
+            logdet_probe_check=self.logdet_probe_check,
         )
         # SAR/SDM need Wy; SEM/SDEM do not.
         if self._jacobian_param == "rho":
@@ -922,6 +946,7 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
             gibbs_method=gibbs_method,
             slice_width=slice_width,
             chain_method=chain_method,
+            log_likelihood=log_likelihood,
         )
         return self._idata
 

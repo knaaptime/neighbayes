@@ -212,6 +212,7 @@ class SARLogit(SpatialModel):
         krylov_dmax: float = _KRYLOV_DMAX_DEFAULT,
         krylov_reuse: bool = True,
         timeout: float | None = None,
+        log_likelihood: bool = False,
     ) -> az.InferenceData:
         r"""Sample the reduced-form posterior via Pólya–Gamma block Gibbs.
 
@@ -307,6 +308,7 @@ class SARLogit(SpatialModel):
                 jax_seeds=chain_seeds,
                 progressbar=progressbar,
                 krylov_reuse=krylov_reuse,
+                store_log_lik=log_likelihood,
             )
         else:
             # ── NumPy / CHOLMOD path ──
@@ -350,6 +352,7 @@ class SARLogit(SpatialModel):
                     rng=chain_rng,
                     chain_id=chain_id_kw if chain_id_kw is not None else chain_id,
                     progress_manager=progress_manager,
+                    store_log_lik=log_likelihood,
                 )
 
             chain_results = run_chains(
@@ -370,11 +373,15 @@ class SARLogit(SpatialModel):
             "rho": np.stack([c["rho"] for c in chain_results], axis=0),
             "beta": np.stack([c["beta"] for c in chain_results], axis=0),
         }
-        log_lik = np.stack([c["log_lik"] for c in chain_results], axis=0)
+        log_lik = (
+            np.stack([c["log_lik"] for c in chain_results], axis=0)
+            if log_likelihood
+            else None
+        )
 
         idata = gibbs_to_inference_data(
             posterior_samples=posterior_samples,
-            log_likelihood={"obs": log_lik},
+            log_likelihood={"obs": log_lik} if log_likelihood else None,
             observed_data={"obs": y},
             coords={"coefficient": list(self._feature_names)},
             dims={"beta": ["coefficient"]},

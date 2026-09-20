@@ -374,6 +374,7 @@ class TestProgressForwarding:
             rng=None,
             progress_manager=None,
             chain_id=0,
+            store_log_lik=True,
         ):
             seen["progress_manager"] = progress_manager
             seen["chain_id"] = chain_id
@@ -424,6 +425,7 @@ class TestProgressForwarding:
             rng=None,
             progress_manager=None,
             chain_id=0,
+            store_log_lik=True,
         ):
             seen["progress_manager"] = progress_manager
             seen["chain_id"] = chain_id

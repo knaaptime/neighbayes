@@ -459,7 +459,14 @@ class TestFlowPanelLogLikelihood:
             col_names=col_names,
             effects=0,
         )
-        idata = m.fit(draws=20, tune=20, chains=1, progressbar=False, random_seed=0)
+        idata = m.fit(
+            draws=20,
+            tune=20,
+            chains=1,
+            progressbar=False,
+            random_seed=0,
+            idata_kwargs={"log_likelihood": True},
+        )
         self._check_loo(idata, n_obs=n * n * T)
 
     def test_sar_flow_separable_panel_loglik(self):
@@ -474,7 +481,14 @@ class TestFlowPanelLogLikelihood:
             col_names=col_names,
             effects=0,
         )
-        idata = m.fit(draws=20, tune=20, chains=1, progressbar=False, random_seed=0)
+        idata = m.fit(
+            draws=20,
+            tune=20,
+            chains=1,
+            progressbar=False,
+            random_seed=0,
+            idata_kwargs={"log_likelihood": True},
+        )
         self._check_loo(idata, n_obs=n * n * T)
 
     def test_ols_flow_panel_loglik(self):
@@ -482,7 +496,14 @@ class TestFlowPanelLogLikelihood:
         G = _flow_test_graph(n)
         y, X, col_names = _panel_flow_stack(n=n, T=T, k=2, seed=0)
         m = OLSFlowPanel(y=y, W=G, X=X, T=T, col_names=col_names, effects=0)
-        idata = m.fit(draws=20, tune=20, chains=1, progressbar=False, random_seed=0)
+        idata = m.fit(
+            draws=20,
+            tune=20,
+            chains=1,
+            progressbar=False,
+            random_seed=0,
+            idata_kwargs={"log_likelihood": True},
+        )
         self._check_loo(idata, n_obs=n * n * T)
 
     def test_compare_flow_panel_models(self):
@@ -491,7 +512,14 @@ class TestFlowPanelLogLikelihood:
         n, T = 4, 2
         G = _flow_test_graph(n)
         y, X, col_names = _panel_flow_stack(n=n, T=T, k=2, seed=0)
-        kw = dict(draws=30, tune=30, chains=1, progressbar=False, random_seed=0)
+        kw = dict(
+            draws=30,
+            tune=30,
+            chains=1,
+            progressbar=False,
+            random_seed=0,
+            idata_kwargs={"log_likelihood": True},
+        )
         m_sar = SARFlowPanel(
             y=y,
             W=G,

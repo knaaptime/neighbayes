@@ -51,17 +51,23 @@ _NO_REACH = (float("nan"), float("nan"))
 
 
 def sampler_builds_evaluators(
-    method: str | None, has_W: bool, refit: bool, aaa_check: bool
+    method: str | None,
+    has_W: bool,
+    refit: bool,
+    aaa_check: bool,
+    probe_check: bool = False,
 ) -> bool:
     """Whether a Gibbs sampler with these settings builds its own log-determinant evaluators.
 
-    When it does, evaluators a model built for it would never be evaluated.
+    When it does, evaluators a model built for it would never be evaluated.  The
+    probe check (:mod:`._probe_check`) builds its own for ``cheb_stochastic``.
     """
     if not has_W or method is None:
         return False
     return bool(
         (refit and method in REFITTABLE_METHODS)
         or (aaa_check and method in AAA_METHODS)
+        or (probe_check and method == "cheb_stochastic")
     )
 
 

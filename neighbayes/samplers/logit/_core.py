@@ -687,6 +687,7 @@ def run_chain(
     rng=None,
     progress_manager=None,
     chain_id: int = 0,
+    store_log_lik: bool = True,
 ) -> dict:
     """Run one chain of the SAR-logit Gibbs sampler.
 
@@ -731,7 +732,7 @@ def run_chain(
     n_keep = draws // thin if thin > 0 else draws
     rho_samples = np.empty(n_keep, dtype=np.float64)
     beta_samples = np.empty((n_keep, k), dtype=np.float64)
-    log_lik_samples = np.empty((n_keep, n), dtype=np.float64)
+    log_lik_samples = np.empty((n_keep, n), dtype=np.float64) if store_log_lik else None
     eta_norm_samples = np.empty(n_keep, dtype=np.float64)
     eta_samples = np.empty((n_keep, n), dtype=np.float64) if return_eta else None
 
@@ -778,7 +779,8 @@ def run_chain(
             if idx < n_keep:
                 rho_samples[idx] = state.rho
                 beta_samples[idx] = state.beta
-                log_lik_samples[idx] = _logit_loglik_pointwise(y, state.eta)
+                if store_log_lik:
+                    log_lik_samples[idx] = _logit_loglik_pointwise(y, state.eta)
                 eta_norm_samples[idx] = float(state.eta @ state.eta)
                 if return_eta:
                     eta_samples[idx] = state.eta
@@ -1476,6 +1478,7 @@ def run_chain_sem(
     rng=None,
     progress_manager=None,
     chain_id: int = 0,
+    store_log_lik: bool = True,
 ) -> dict:
     """Run one chain of the SEM-logit Gibbs sampler.
 
@@ -1520,7 +1523,7 @@ def run_chain_sem(
     n_keep = draws // thin if thin > 0 else draws
     lam_samples = np.empty(n_keep, dtype=np.float64)
     beta_samples = np.empty((n_keep, k), dtype=np.float64)
-    log_lik_samples = np.empty((n_keep, n), dtype=np.float64)
+    log_lik_samples = np.empty((n_keep, n), dtype=np.float64) if store_log_lik else None
     eta_norm_samples = np.empty(n_keep, dtype=np.float64)
     eta_samples = np.empty((n_keep, n), dtype=np.float64) if return_eta else None
 
@@ -1564,7 +1567,8 @@ def run_chain_sem(
             if idx < n_keep:
                 lam_samples[idx] = state.lam
                 beta_samples[idx] = state.beta
-                log_lik_samples[idx] = _logit_loglik_pointwise(y, state.eta)
+                if store_log_lik:
+                    log_lik_samples[idx] = _logit_loglik_pointwise(y, state.eta)
                 eta_norm_samples[idx] = float(state.eta @ state.eta)
                 if return_eta:
                     eta_samples[idx] = state.eta

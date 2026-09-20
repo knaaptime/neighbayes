@@ -453,6 +453,7 @@ def run_chain_jax(
     krylov_dmax: float = 0.4,
     progress_manager=None,
     chain_id: int = 0,
+    store_log_lik: bool = True,
 ):
     """Run one chain of the full-JIT JAX Gibbs sampler for SAR-logit.
 
@@ -542,7 +543,7 @@ def run_chain_jax(
     # Pre-allocate storage
     rho_samples = np.empty(n_keep, dtype=np.float64)
     beta_samples = np.empty((n_keep, k), dtype=np.float64)
-    log_lik_samples = np.empty((n_keep, n), dtype=np.float64)
+    log_lik_samples = np.empty((n_keep, n), dtype=np.float64) if store_log_lik else None
     eta_norm_samples = np.empty(n_keep, dtype=np.float64)
     eta_samples = np.empty((n_keep, n), dtype=np.float64) if return_eta else None
 
@@ -586,7 +587,8 @@ def run_chain_jax(
                 eta_norm_samples[idx] = float(eta_np @ eta_np)
                 if return_eta:
                     eta_samples[idx] = eta_np
-                log_lik_samples[idx] = _logit_loglik_pointwise_jax(y, eta_np)
+                if store_log_lik:
+                    log_lik_samples[idx] = _logit_loglik_pointwise_jax(y, eta_np)
 
         if progress_manager is not None:
             progress_manager.update(chain_id, i, tuning=i < tune)
@@ -918,6 +920,7 @@ def run_chain_jax_sem(
     krylov_dmax: float = 0.4,
     progress_manager=None,
     chain_id: int = 0,
+    store_log_lik: bool = True,
 ):
     """Run one chain of the full-JIT JAX Gibbs sampler for SEM-logit.
 
@@ -999,7 +1002,7 @@ def run_chain_jax_sem(
     # Pre-allocate storage
     lam_samples = np.empty(n_keep, dtype=np.float64)
     beta_samples = np.empty((n_keep, k), dtype=np.float64)
-    log_lik_samples = np.empty((n_keep, n), dtype=np.float64)
+    log_lik_samples = np.empty((n_keep, n), dtype=np.float64) if store_log_lik else None
     eta_norm_samples = np.empty(n_keep, dtype=np.float64)
     eta_samples = np.empty((n_keep, n), dtype=np.float64) if return_eta else None
 
@@ -1042,7 +1045,8 @@ def run_chain_jax_sem(
                 eta_norm_samples[idx] = float(eta_np @ eta_np)
                 if return_eta:
                     eta_samples[idx] = eta_np
-                log_lik_samples[idx] = _logit_loglik_pointwise_jax(y, eta_np)
+                if store_log_lik:
+                    log_lik_samples[idx] = _logit_loglik_pointwise_jax(y, eta_np)
 
         if progress_manager is not None:
             progress_manager.update(chain_id, i, tuning=i < tune)
@@ -1126,6 +1130,7 @@ def run_chains_jax_vectorized(
     sparsax_pattern=None,
     krylov_degree: int = 0,
     krylov_dmax: float = 0.4,
+    store_log_lik: bool = True,
 ) -> list[dict]:
     """Run multiple SAR-logit Gibbs chains in parallel.
 
@@ -1216,8 +1221,10 @@ def run_chains_jax_vectorized(
             state, key, width, return_steps=True
         )
         width = adapt_slice_width(width, steps_left, steps_right, tuning)
-        log_lik = _logit_loglik_pointwise_jax_op(y_jax, state.eta)
-        return (state, width), (state.rho, state.beta, state.eta @ state.eta, log_lik)
+        trace = (state.rho, state.beta, state.eta @ state.eta)
+        if store_log_lik:
+            trace += (_logit_loglik_pointwise_jax_op(y_jax, state.eta),)
+        return (state, width), trace
 
     with GibbsProgressBarManager(
         chains=chains,
@@ -1235,7 +1242,7 @@ def run_chains_jax_vectorized(
                 for c in range(chains):
                     pm.update(c, i, tuning=tuning)
 
-        _, (rhos, betas, eta_norms, log_liks) = run_chains_chunked(
+        _, traces = run_chains_chunked(
             _sweep,
             [
                 (jax.tree.map(lambda a, c=c: a[c], init_states), jnp.float64(0.2))
@@ -1249,6 +1256,8 @@ def run_chains_jax_vectorized(
         )
 
     # Thin and pack as per-chain dicts
+    rhos, betas, eta_norms = traces[:3]
+    log_liks = traces[3] if store_log_lik else None
     thin_slice = slice(None, None, thin) if thin > 1 else slice(None)
     results = []
     for c in range(chains):
@@ -1257,7 +1266,7 @@ def run_chains_jax_vectorized(
                 "rho": rhos[c, thin_slice].copy(),
                 "beta": betas[c, thin_slice].copy(),
                 "eta_norm": eta_norms[c, thin_slice].copy(),
-                "log_lik": log_liks[c, thin_slice].copy(),
+                "log_lik": log_liks[c, thin_slice].copy() if store_log_lik else None,
                 "mh_accept_rate": 1.0,
             }
         )
@@ -1284,6 +1293,7 @@ def run_chains_jax_sem_vectorized(
     sparsax_pattern=None,
     krylov_degree: int = 0,
     krylov_dmax: float = 0.4,
+    store_log_lik: bool = True,
 ) -> list[dict]:
     """Run multiple SEM-logit Gibbs chains in parallel.
 
@@ -1344,8 +1354,10 @@ def run_chains_jax_sem_vectorized(
             state, key, width, return_steps=True
         )
         width = adapt_slice_width(width, steps_left, steps_right, tuning)
-        log_lik = _logit_loglik_pointwise_jax_op(y_jax, state.eta)
-        return (state, width), (state.lam, state.beta, state.eta @ state.eta, log_lik)
+        trace = (state.lam, state.beta, state.eta @ state.eta)
+        if store_log_lik:
+            trace += (_logit_loglik_pointwise_jax_op(y_jax, state.eta),)
+        return (state, width), trace
 
     with GibbsProgressBarManager(
         chains=chains,
@@ -1363,7 +1375,7 @@ def run_chains_jax_sem_vectorized(
                 for c in range(chains):
                     pm.update(c, i, tuning=tuning)
 
-        _, (lams, betas, eta_norms, log_liks) = run_chains_chunked(
+        _, traces = run_chains_chunked(
             _sweep,
             [
                 (jax.tree.map(lambda a, c=c: a[c], init_states), jnp.float64(0.2))
@@ -1376,6 +1388,8 @@ def run_chains_jax_sem_vectorized(
             on_chunk=_progress,
         )
 
+    lams, betas, eta_norms = traces[:3]
+    log_liks = traces[3] if store_log_lik else None
     thin_slice = slice(None, None, thin) if thin > 1 else slice(None)
     results = []
     for c in range(chains):
@@ -1384,7 +1398,7 @@ def run_chains_jax_sem_vectorized(
                 "lam": lams[c, thin_slice].copy(),
                 "beta": betas[c, thin_slice].copy(),
                 "eta_norm": eta_norms[c, thin_slice].copy(),
-                "log_lik": log_liks[c, thin_slice].copy(),
+                "log_lik": log_liks[c, thin_slice].copy() if store_log_lik else None,
                 "mh_accept_rate": 1.0,
             }
         )

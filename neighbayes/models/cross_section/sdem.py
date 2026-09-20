@@ -105,6 +105,15 @@ class SDEM(GaussianLikelihoodMixin, SpatialModel):
         recorded in ``idata.attrs["logdet_aaa_nodes"]``.  Off, or on a path
         without a warmup midpoint, the count is fixed by the prior interval:
         14 nodes within ``|ρ| ≤ 0.9``, 18 otherwise.
+    logdet_probe_check : bool, default True
+        For ``"cheb_stochastic"``, set the number of Hutchinson probes from
+        where the posterior lies.  Warmup starts on 50 probes; halfway through,
+        the probes' own spread prices the bias they leave in the posterior mean
+        of the spatial parameter, and the pool grows, to at most 200, until
+        that bias is expected to stay under 0.0225 posterior sd.  The count
+        used is recorded in ``idata.attrs["logdet_probes"]``, with a warning
+        if the cap is reached first.  Probes cost setup time only; the cost of
+        each draw does not depend on how many there are.
     robust : bool, default False
         If True, replace the Normal disturbance with Student-t. See
         *Robust regression* below.

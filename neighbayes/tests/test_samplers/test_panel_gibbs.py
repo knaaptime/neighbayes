@@ -66,6 +66,7 @@ class TestPanelGibbsDispatch:
             random_seed=42,
             n_jobs=1,
             progressbar=False,
+            idata_kwargs={"log_likelihood": True},
         )
         assert "posterior" in idata.groups()
         assert "rho" in idata.posterior.data_vars
@@ -99,6 +100,7 @@ class TestPanelGibbsDispatch:
             random_seed=42,
             n_jobs=1,
             progressbar=False,
+            idata_kwargs={"log_likelihood": True},
         )
         assert "posterior" in idata.groups()
         assert "lam" in idata.posterior.data_vars

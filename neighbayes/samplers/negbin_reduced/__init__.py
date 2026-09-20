@@ -79,6 +79,7 @@ def _run_count_reduced_gibbs(
     n_rho_omega_cycles=1,
     krylov_reuse=True,
     timeout=None,
+    log_likelihood=False,
 ):
     """Registry runner for reduced-form SAR NegBin Pólya-Gamma Gibbs."""
     return model._fit_gibbs(
@@ -97,6 +98,7 @@ def _run_count_reduced_gibbs(
         n_rho_omega_cycles=n_rho_omega_cycles,
         krylov_reuse=krylov_reuse,
         timeout=timeout,
+        log_likelihood=log_likelihood,
     )
 
 
@@ -115,4 +117,5 @@ register(
         "krylov_reuse",
         "timeout",
     },
+    skips_log_likelihood=True,
 )

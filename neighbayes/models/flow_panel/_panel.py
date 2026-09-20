@@ -683,6 +683,7 @@ class _ResolventFlowPanelMixin:
         n_quad: int = 8,
         progressbar: bool = True,
         n_jobs: int = -1,
+        idata_kwargs: Optional[dict] = None,
         **sample_kwargs,
     ) -> az.InferenceData:
         """Draw samples from the posterior.
@@ -696,6 +697,10 @@ class _ResolventFlowPanelMixin:
             Resolvent sampler parameters (Gibbs path only).
         n_jobs : int, default -1
             Parallel workers for the Gibbs path (``-1`` = all CPUs).
+        idata_kwargs : dict, optional
+            ``{"log_likelihood": True}`` stores the pointwise log-likelihood
+            (one value per draw, chain, and flow-period) for ``az.loo`` /
+            ``az.waic``, on either sampler.  Off by default, as in PyMC.
         """
         if sampler is None:
             sampler = "gibbs"
@@ -707,6 +712,7 @@ class _ResolventFlowPanelMixin:
                 chains=chains,
                 random_seed=random_seed,
                 progressbar=progressbar,
+                idata_kwargs=idata_kwargs,
                 **sample_kwargs,
             )
         elif sampler != "gibbs":
@@ -727,6 +733,9 @@ class _ResolventFlowPanelMixin:
             random_seed=random_seed,
             progressbar=progressbar,
             n_jobs=n_jobs,
+            compute_log_likelihood=bool(
+                (idata_kwargs or {}).get("log_likelihood", False)
+            ),
         )
         return self._idata
 
@@ -1286,6 +1295,7 @@ class SARNegBinFlowPanel(SARFlowPanel):
         attach_log_abs_det: bool = True,
         progressbar: bool = True,
         n_jobs: int = -1,
+        idata_kwargs: Optional[dict] = None,
         **sample_kwargs,
     ) -> az.InferenceData:
         """Sample the NB2 SAR flow panel posterior.
@@ -1299,6 +1309,10 @@ class SARNegBinFlowPanel(SARFlowPanel):
         ``sample_stats["log_abs_det"]`` for diagnostics (never folded into
         ``log_likelihood``); set it ``False`` to skip the per-draw resolvent cost
         at very large ``N``.
+
+        ``idata_kwargs={"log_likelihood": True}`` stores the pointwise
+        log-likelihood (one value per draw, chain, and flow-period) for
+        ``az.loo`` / ``az.waic`` on either sampler; off by default, as in PyMC.
         """
         if sampler == "gibbs":
             idata = self._fit_gibbs(
@@ -1308,6 +1322,7 @@ class SARNegBinFlowPanel(SARFlowPanel):
                 random_seed=random_seed,
                 progressbar=progressbar,
                 n_jobs=n_jobs,
+                log_likelihood=bool((idata_kwargs or {}).get("log_likelihood", False)),
             )
         elif sampler == "nuts":
             idata = super().fit(
@@ -1317,6 +1332,7 @@ class SARNegBinFlowPanel(SARFlowPanel):
                 random_seed=random_seed,
                 sampler="nuts",
                 progressbar=progressbar,
+                idata_kwargs=idata_kwargs,
                 **sample_kwargs,
             )
         else:
@@ -1334,6 +1350,7 @@ class SARNegBinFlowPanel(SARFlowPanel):
         progressbar: bool = True,
         n_jobs: int = -1,
         krylov_reuse: bool = True,
+        log_likelihood: bool = False,
     ) -> az.InferenceData:
         """Sample posterior via reduced-form PG-Gibbs (unrestricted 3-ρ panel)."""
         from ..flow._nb_gibbs import run_negbin_flow_gibbs
@@ -1351,6 +1368,7 @@ class SARNegBinFlowPanel(SARFlowPanel):
             progressbar=progressbar,
             n_jobs=n_jobs,
             krylov_reuse=krylov_reuse,
+            log_likelihood=log_likelihood,
         )
 
     def _compute_spatial_effects_posterior(
@@ -1528,6 +1546,7 @@ class SARNegBinFlowSeparablePanel(SARFlowSeparablePanel):
         attach_log_abs_det: bool = True,
         progressbar: bool = True,
         n_jobs: int = -1,
+        idata_kwargs: Optional[dict] = None,
         **sample_kwargs,
     ) -> az.InferenceData:
         """Sample the separable NB2 SAR flow panel posterior.
@@ -1539,6 +1558,10 @@ class SARNegBinFlowSeparablePanel(SARFlowSeparablePanel):
         (using the separability relation ``ρ_w = −ρ_d ρ_o``) is recorded in
         ``sample_stats["log_abs_det"]`` for diagnostics — not folded into the
         count model's ``log_likelihood``.
+
+        ``idata_kwargs={"log_likelihood": True}`` stores the pointwise
+        log-likelihood (one value per draw, chain, and flow-period) for
+        ``az.loo`` / ``az.waic`` on either sampler; off by default, as in PyMC.
         """
         if sampler == "gibbs":
             idata = self._fit_gibbs(
@@ -1548,6 +1571,7 @@ class SARNegBinFlowSeparablePanel(SARFlowSeparablePanel):
                 random_seed=random_seed,
                 progressbar=progressbar,
                 n_jobs=n_jobs,
+                log_likelihood=bool((idata_kwargs or {}).get("log_likelihood", False)),
             )
         elif sampler == "nuts":
             idata = super().fit(
@@ -1556,6 +1580,7 @@ class SARNegBinFlowSeparablePanel(SARFlowSeparablePanel):
                 chains=chains,
                 random_seed=random_seed,
                 progressbar=progressbar,
+                idata_kwargs=idata_kwargs,
                 **sample_kwargs,
             )
         else:
@@ -1573,6 +1598,7 @@ class SARNegBinFlowSeparablePanel(SARFlowSeparablePanel):
         progressbar: bool = True,
         n_jobs: int = -1,
         krylov_reuse: bool = True,
+        log_likelihood: bool = False,
     ) -> az.InferenceData:
         """Sample posterior via reduced-form PG-Gibbs (separable 2-ρ panel)."""
         from ..flow._nb_gibbs import run_negbin_flow_gibbs
@@ -1590,6 +1616,7 @@ class SARNegBinFlowSeparablePanel(SARFlowSeparablePanel):
             progressbar=progressbar,
             n_jobs=n_jobs,
             krylov_reuse=krylov_reuse,
+            log_likelihood=log_likelihood,
         )
 
     def _compute_spatial_effects_posterior(

@@ -781,6 +781,7 @@ def run_chains_jax_gibbs_vectorized(
     logdet_param_fn=None,
     logdet_params=None,
     refit_hook=None,
+    log_likelihood: bool = True,
 ) -> list[dict]:
     """Run multiple JAX Gibbs chains via ``jax.vmap``.
 
@@ -1078,8 +1079,11 @@ def run_chains_jax_gibbs_vectorized(
         beta_c = np.asarray(betas[c][thin_slice])
         sigma_c = np.sqrt(np.asarray(sigma2s[c][thin_slice]))
 
-        # Pointwise log-likelihood
-        if is_sar:
+        # Pointwise log-likelihood, one value per draw and observation, only
+        # when requested: at n = 250,000 it is 16 GB and ~10 s of a fit.
+        if not log_likelihood:
+            log_lik = None
+        elif is_sar:
             log_lik = sar_pointwise_loglik_vectorized(
                 rho_draws=rho_c,
                 beta_draws=beta_c,

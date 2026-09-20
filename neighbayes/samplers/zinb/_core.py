@@ -293,6 +293,7 @@ def run_zinb_chain(
     rng: np.random.Generator | None = None,
     chain_id: int = 0,
     progress_manager: object | None = None,
+    store_log_lik: bool = True,
 ) -> dict[str, np.ndarray]:
     """Run one chain of the ZINB SAR Gibbs sampler.
 
@@ -351,7 +352,7 @@ def run_zinb_chain(
     rho_samples = np.empty(n_keep, dtype=np.float64)
     beta_samples = np.empty((n_keep, k), dtype=np.float64)
     alpha_samples = np.empty(n_keep, dtype=np.float64)
-    log_lik_samples = np.empty((n_keep, n), dtype=np.float64)
+    log_lik_samples = np.empty((n_keep, n), dtype=np.float64) if store_log_lik else None
     pi_mean_samples = np.empty(n_keep, dtype=np.float64)
 
     # Build sub-priors for the logit and NB blocks
@@ -640,9 +641,10 @@ def run_zinb_chain(
 
                 # Marginal ZINB log-pmf of the observed count, latent
                 # allocation z integrated out.
-                log_lik_samples[idx] = _zinb_loglik_pointwise(
-                    y, state.eta_sel, eta_cnt, state.alpha
-                )
+                if store_log_lik:
+                    log_lik_samples[idx] = _zinb_loglik_pointwise(
+                        y, state.eta_sel, eta_cnt, state.alpha
+                    )
 
                 # Posterior mean corridor activation probability
                 pi_mean_samples[idx] = float(np.mean(_expit(state.eta_sel)))

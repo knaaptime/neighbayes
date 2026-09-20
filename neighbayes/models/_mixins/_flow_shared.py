@@ -117,12 +117,12 @@ class FlowSharedMethods:
             stored posterior. Leaving this False reduces memory and conversion
             overhead for NB flow models.
         idata_kwargs : dict, optional
-            Forwarded to ``pm.sample``.  Defaults to
-            ``{"log_likelihood": True}`` so that ``az.loo`` / ``az.waic`` /
-            ``az.compare`` work out of the box; for SAR flow variants the
-            captured Gaussian log-likelihood is post-processed to add the
-            Jacobian contribution from ``log|I_N - rho_d W_d - rho_o W_o
-            - rho_w W_w|``.
+            Forwarded to ``pm.sample``.  ``{"log_likelihood": True}`` stores
+            the pointwise log-likelihood that ``az.loo`` / ``az.waic`` /
+            ``az.compare`` need; for SAR flow variants the captured Gaussian
+            log-likelihood is post-processed to add the Jacobian contribution
+            from ``log|I_N - rho_d W_d - rho_o W_o - rho_w W_w|``.  Off by
+            default, as in PyMC: it holds one value per draw, chain, and flow.
         progressbar : bool, default True
             Show progress bar during sampling.
         **sample_kwargs
@@ -134,7 +134,6 @@ class FlowSharedMethods:
         arviz.InferenceData
         """
         idata_kwargs = dict(idata_kwargs) if idata_kwargs else {}
-        idata_kwargs.setdefault("log_likelihood", True)
         compute_log_likelihood = bool(idata_kwargs.get("log_likelihood", False))
         nuts_sampler = sample_kwargs.pop("nuts_sampler", "pymc")
         target_accept = sample_kwargs.pop("target_accept", 0.9)
