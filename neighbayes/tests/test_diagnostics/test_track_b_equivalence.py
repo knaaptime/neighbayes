@@ -104,6 +104,113 @@ class TestIterativeSchemeVectorization:
         np.testing.assert_allclose(got, ref, rtol=0, atol=1e-10)
 
 
+class TestIterativeSchemeMCSE:
+    """Pins for the MCSE autocorrelation correction (Micaletto & Vehtari 2025).
+
+    The MCSE's denominator term uses the Vehtari et al. (2021) rank-normalized
+    ESS of the *summand sequence* {D_j} (eq. 4), not the parameter ESS the
+    old implementation fed in from the raw draws.
+    """
+
+    @staticmethod
+    def _ar1_summands(n_chains=4, n_draws=1500, rho=0.95, seed=11):
+        """Autocorrelated bridge-summand values in (chain, draw) layout."""
+        rng = np.random.default_rng(seed)
+        out = np.empty((n_chains, n_draws))
+        for c in range(n_chains):
+            eps = rng.standard_normal(n_draws) * 0.312
+            x = np.empty(n_draws)
+            x[0] = eps[0]
+            for t in range(1, n_draws):
+                x[t] = rho * x[t - 1] + eps[t]
+            out[c] = x
+        return out
+
+    def test_den_ess_is_vehtari_ess_of_summands(self):
+        from arviz import ess as az_ess
+
+        q11, q12, q21, q22 = _make_bridge_inputs()
+        summands = self._ar1_summands()
+        n_chains, n_draws = summands.shape
+        # Feed the summands through the den slot of the scheme: q11 - q12
+        # defines l1, so give q12 = 0 and q11 = flattened summands.
+        res = _run_iterative_scheme(
+            q11=summands.ravel(),
+            q12=np.zeros(summands.size),
+            q21=q21,
+            q22=q22,
+            r0=1.0,
+            tol=1e-10,
+            maxiter=1000,
+            criterion="r",
+            use_neff=True,
+            summand_shape=(n_chains, n_draws),
+        )
+        # The pin: den_ess equals az.ess(method='bulk') on the (chain, draw)
+        # summands — the multi-chain Vehtari ESS — not the nominal N1 and
+        # not the classical single-sequence estimate.
+        assert res["den_ess"] == pytest.approx(
+            float(az_ess(summands, method="bulk")), rel=1e-10
+        )
+
+    def test_summand_ess_differs_from_nominal_when_autocorrelated(self):
+        q11, q12, q21, q22 = _make_bridge_inputs()
+        summands = self._ar1_summands(rho=0.95)
+        res = _run_iterative_scheme(
+            q11=summands.ravel(),
+            q12=np.zeros(summands.size),
+            q21=q21,
+            q22=q22,
+            r0=1.0,
+            tol=1e-10,
+            maxiter=1000,
+            criterion="r",
+            use_neff=True,
+            summand_shape=summands.shape,
+        )
+        assert 0.0 < res["den_ess"] < summands.size * 0.9
+
+    def test_mcse_scales_with_summand_ess(self):
+        """Lower summand ESS -> wider reported MCSE, monotonic direction pin."""
+        q11, q12, q21, q22 = _make_bridge_inputs()
+        mcse_by_rho = {}
+        for rho in (0.0, 0.95):
+            summands = self._ar1_summands(rho=rho)
+            res = _run_iterative_scheme(
+                q11=summands.ravel(),
+                q12=np.zeros(summands.size),
+                q21=q21,
+                q22=q22,
+                r0=1.0,
+                tol=1e-10,
+                maxiter=1000,
+                criterion="r",
+                use_neff=True,
+                summand_shape=summands.shape,
+            )
+            mcse_by_rho[rho] = res["mcse_logml"]
+        # rho=0 draws are i.i.d. -> ESS ~= N -> tighter MCSE than rho=0.95.
+        assert mcse_by_rho[0.95] > mcse_by_rho[0.0]
+
+    def test_logml_unchanged_by_summand_shape(self):
+        """The correction moves only the error bar; logml is invariant."""
+        q11, q12, q21, q22 = _make_bridge_inputs()
+        summands = self._ar1_summands()
+        kw = dict(r0=1.0, tol=1e-10, maxiter=1000, criterion="r", use_neff=True)
+        res_shaped = _run_iterative_scheme(
+            q11=summands.ravel(),
+            q12=np.zeros(summands.size),
+            q21=q21,
+            q22=q22,
+            summand_shape=summands.shape,
+            **kw,
+        )
+        res_flat = _run_iterative_scheme(
+            q11=summands.ravel(), q12=np.zeros(summands.size), q21=q21, q22=q22, **kw
+        )
+        assert res_shaped["logml"] == pytest.approx(res_flat["logml"], rel=1e-12)
+
+
 class TestComputeEssFFT:
     def _reference_ess(self, samples):
         n_params = samples.shape[1]

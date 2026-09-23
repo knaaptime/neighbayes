@@ -35,6 +35,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import multivariate_normal
 
+from .._lazy_deps import az
 from ._native_log_posterior import native_log_posterior
 
 _BAYES_FACTOR_METHODS = {}
@@ -311,6 +312,7 @@ def _run_iterative_scheme(
     criterion: str = "r",
     neff: Optional[float] = None,
     use_neff: bool = True,
+    summand_shape: tuple[int, int] | None = None,
 ) -> dict:
     """Run the iterative bridge sampling scheme (:cite:p:`meng1996SimulatingRatios`, eq. 4.1).
 
@@ -338,13 +340,21 @@ def _run_iterative_scheme(
         Convergence criterion: ``"r"`` for relative change in r,
         ``"logml"`` for relative change in logml.
     neff : float or None
-        Effective sample size.  If None, uses N1.
+        Effective sample size.  If None, uses N1.  Used only for the bridge
+        function weights (``s1``/``s2``), matching the R package.
     use_neff : bool
         Whether to use ESS in the bridge function weights.
+    summand_shape : tuple (n_chains, n_draws) or None
+        Chain/draw layout of the ``q11`` evaluation draws.  When given, the
+        MCSE's autocorrelation correction uses the multi-chain ESS of
+        Vehtari et al. (2021) (rank-normalized bulk ESS) of the final
+        bridge-summand sequence, as prescribed by Micaletto & Vehtari
+        (2025, eq. 4).  When None, the ESS of the flattened summands is
+        used (split-chain form).
 
     Returns
     -------
-    dict with keys: logml, niter, r_vals, mcse_logml, converged
+    dict with keys: logml, niter, r_vals, mcse_logml, converged, den_ess
     """
     N1 = len(q11)
     N2 = len(q21)
@@ -439,9 +449,27 @@ def _run_iterative_scheme(
     var_num = np.var(num_vals)
     var_den = np.var(den_vals)
 
-    if use_neff and neff is not None:
-        var_den_adj = var_den * N1 / neff
+    # Autocorrelation correction for the denominator mean.  In this code's
+    # naming ``den_vals`` are the posterior-side summands {D_j} built from
+    # the MCMC draws (q11/q12) — the proposal-side ``num_vals`` are i.i.d.
+    # and need no correction — so replace the nominal size with the
+    # effective sample size of the summand sequence itself (Micaletto &
+    # Vehtari, 2025, eq. 4): the rank-normalized multi-chain ESS of
+    # Vehtari et al. (2021) when the chain/draw layout is known, else the
+    # split-chain ESS of the flattened summands.  This differs from the R
+    # package, which recomputes coda's single-sequence ESS per iteration;
+    # the logml estimate is identical either way — only the error bar moves.
+    if use_neff:
+        try:
+            if summand_shape is not None and summand_shape[0] > 1:
+                S1_eff = float(az.ess(den_vals.reshape(summand_shape), method="bulk"))
+            else:
+                S1_eff = float(az.ess(np.asarray(den_vals), method="bulk"))
+        except Exception:
+            S1_eff = N1
+        var_den_adj = var_den * N1 / max(S1_eff, 1.0)
     else:
+        S1_eff = N1
         var_den_adj = var_den
 
     var_r = (mean_num**2 / mean_den**2) * (
@@ -458,8 +486,26 @@ def _run_iterative_scheme(
 
     converged = criterion_val <= tol
 
+    # Trust threshold from Micaletto & Vehtari (2025, fig. 5): the MCSE is
+    # well-calibrated below 0.3 and degrades toward the structural cap at
+    # log 3 ≈ 1.05, where the reported value signals saturation rather
+    # than precision.
+    if np.isfinite(mcse_logml) and mcse_logml >= 0.3:
+        warnings.warn(
+            f"Bridge-sampling MCSE of log-ML is {mcse_logml:.2f} (>= 0.3); "
+            "the estimate is not trustworthy at this precision. "
+            "Use more posterior draws or a better proposal "
+            "(Micaletto & Vehtari, 2025).",
+            stacklevel=3,
+        )
+
     return dict(
-        logml=logml, niter=i, r_vals=r_vals, mcse_logml=mcse_logml, converged=converged
+        logml=logml,
+        niter=i,
+        r_vals=r_vals,
+        mcse_logml=mcse_logml,
+        converged=converged,
+        den_ess=S1_eff,
     )
 
 
@@ -538,7 +584,14 @@ def _bridge_logml(
     rng = np.random.default_rng(random_state)
 
     # --- 1. Extract posterior samples (n_draws x n_params) ---
+    # The (chain, draw) shape is preserved so the MCSE's autocorrelation
+    # correction (Micaletto & Vehtari, 2025, eq. 4) can use the multi-chain
+    # ESS of Vehtari et al. (2021) on the bridge summands.
     posterior = idata.posterior
+
+    n_chains = int(posterior.sizes["chain"])
+    n_draws = int(posterior.sizes["draw"])
+    n_posterior = n_chains * n_draws
 
     if constrained_to_unconstrained is not None:
         # Convert constrained posterior samples to unconstrained space
@@ -546,9 +599,6 @@ def _bridge_logml(
         samples = constrained_to_unconstrained(posterior)
     else:
         # Fallback: use posterior samples as-is (assumed already unconstrained)
-        n_chains = posterior.sizes["chain"]
-        n_draws = posterior.sizes["draw"]
-        n_posterior = n_chains * n_draws
         sample_blocks = []
         for var in posterior.data_vars:
             arr = posterior[var].values
@@ -571,8 +621,16 @@ def _bridge_logml(
         )
 
     # --- 2. Split samples: first half for fitting proposal, second for iteration ---
+    # Keep the (chain, draw) layout of the evaluation subset for the MCSE:
+    # the idata stacking is chain-major, so ``N1`` is padded down to a whole
+    # number of chains and the iteration half starts at a chain boundary.
+    # Flattened order is preserved for every existing computation.
     N1 = n_samples // 2
+    chain_pad = N1 % n_chains
+    N1 -= chain_pad
     N2 = n_samples - N1
+    n_iter_chains = n_chains
+    n_iter_draws = N1 // n_chains
     samples_4_fit = samples[:N1]
     samples_4_iter = samples[N1:]
 
@@ -614,6 +672,7 @@ def _bridge_logml(
     niter_reps = []
     mcse_reps = []
     converged_reps = []
+    den_ess_reps = []
 
     for rep in range(repetitions):
         # Draw proposal samples
@@ -657,6 +716,7 @@ def _bridge_logml(
             criterion="r",
             neff=neff,
             use_neff=use_neff,
+            summand_shape=(n_iter_chains, n_iter_draws),
         )
 
         # Phase 2: if not converged, restart with geometric mean
@@ -679,6 +739,7 @@ def _bridge_logml(
                 criterion="logml",
                 neff=neff,
                 use_neff=use_neff,
+                summand_shape=(n_iter_chains, n_iter_draws),
             )
             result2["niter"] = maxiter + result2["niter"]
             result = result2
@@ -687,6 +748,7 @@ def _bridge_logml(
         niter_reps.append(result["niter"])
         mcse_reps.append(result.get("mcse_logml", np.nan))
         converged_reps.append(result.get("converged", False))
+        den_ess_reps.append(result.get("den_ess", np.nan))
 
     # --- 7. Aggregate across repetitions ---
     if repetitions == 1:
@@ -694,11 +756,13 @@ def _bridge_logml(
         niter = niter_reps[0]
         mcse = mcse_reps[0]
         converged = converged_reps[0]
+        den_ess = den_ess_reps[0]
     else:
         logml = float(np.median(logml_reps))
         niter = int(np.max(niter_reps))
         mcse = float(np.median(mcse_reps))
         converged = all(converged_reps)
+        den_ess = float(np.median(den_ess_reps))
 
     diagnostics = dict(
         logml=logml,
@@ -707,6 +771,8 @@ def _bridge_logml(
         N1=N1,
         N2=N2,
         neff=neff,
+        den_ess=den_ess,
+        summand_shape=(n_iter_chains, n_iter_draws),
         tol1=tol1,
         tol2=tol2,
         converged=converged,
