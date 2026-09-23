@@ -20,7 +20,6 @@ from scipy.stats import multivariate_normal
 
 from neighbayes.diagnostics.bayesfactor import (
     _bridge_logml,
-    _logsumexp,
     _nearest_pos_def,
     _run_iterative_scheme,
     bayes_factor_compare_models,
@@ -87,32 +86,6 @@ def _make_simple_linear_idata(n=30, k=2, seed=42):
         observed_data={"y": y},
     )
     return idata
-
-
-# ---------------------------------------------------------------------------
-# Test: _logsumexp
-# ---------------------------------------------------------------------------
-
-
-class TestLogsumexp:
-    def test_basic(self):
-        a = np.array([1.0, 2.0, 3.0])
-        result = _logsumexp(a)
-        expected = np.log(np.sum(np.exp(a)))
-        np.testing.assert_allclose(result, expected, rtol=1e-10)
-
-    def test_large_values(self):
-        a = np.array([1000.0, 1001.0, 1002.0])
-        result = _logsumexp(a)
-        # Should not overflow
-        assert np.isfinite(result)
-        expected = 1002.0 + np.log(np.exp(-2) + np.exp(-1) + 1)
-        np.testing.assert_allclose(result, expected, rtol=1e-10)
-
-    def test_negative_infinity(self):
-        a = np.array([-np.inf, -np.inf])
-        result = _logsumexp(a)
-        assert result == -np.inf
 
 
 # ---------------------------------------------------------------------------

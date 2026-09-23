@@ -906,6 +906,7 @@ def run_chains_jax_reduced(
     krylov_dmax: float = 0.15,
     slice_width: float = 0.2,
     krylov_reuse: bool = True,
+    store_log_lik=True,
 ) -> list[dict]:
     """Run multiple reduced-form SAR-NB Gibbs chains using JAX.
 
@@ -1006,12 +1007,10 @@ def run_chains_jax_reduced(
         core = {name: value for name, value in st.items() if name != "slice_width"}
         core, eta, (steps_left, steps_right) = gibbs_step(core, key, width)
         width = adapt_slice_width(width, steps_left, steps_right, tuning)
-        return dict(core, slice_width=width), (
-            core["rho"],
-            core["beta"],
-            core["alpha"],
-            eta,
-        )
+        trace = (core["rho"], core["beta"], core["alpha"])
+        if store_log_lik:  # η is traced only to build the log-likelihood
+            trace += (eta,)
+        return dict(core, slice_width=width), trace
 
     with GibbsProgressBarManager(
         chains=chains,
@@ -1029,7 +1028,7 @@ def run_chains_jax_reduced(
                 for c in range(chains):
                     pm.update(c, i, tuning=tuning)
 
-        _, (rho_all, beta_all, alpha_all, eta_all) = run_chains_chunked(
+        _, traces = run_chains_chunked(
             _sweep,
             states,
             warm_keys,
@@ -1039,6 +1038,9 @@ def run_chains_jax_reduced(
             on_chunk=_progress,
         )
 
+    rho_all, beta_all, alpha_all = traces[:3]
+    eta_all = traces[3] if store_log_lik else None
+
     # Pointwise NB log-likelihood from the fitted η collected during sampling —
     # no post-hoc solves (matching how the NumPy path reuses its sweep η).
     from scipy.special import gammaln
@@ -1047,17 +1049,19 @@ def run_chains_jax_reduced(
     y_np = np.asarray(y, dtype=np.float64)
     chain_results = []
     for c in range(chains):
-        eta_c = eta_all[c, sl]  # (n_keep, n)
         alpha_samples = alpha_all[c, sl]
-        mu = np.exp(np.clip(eta_c, -30.0, 30.0))
-        a = alpha_samples[:, None]
-        log_lik = (
-            gammaln(y_np + a)
-            - gammaln(a)
-            - gammaln(y_np + 1.0)
-            + y_np * np.log(np.maximum(mu / (mu + a), 1e-300))
-            + a * np.log(np.maximum(a / (mu + a), 1e-300))
-        )
+        log_lik = None
+        if store_log_lik:
+            eta_c = eta_all[c, sl]  # (n_keep, n)
+            mu = np.exp(np.clip(eta_c, -30.0, 30.0))
+            a = alpha_samples[:, None]
+            log_lik = (
+                gammaln(y_np + a)
+                - gammaln(a)
+                - gammaln(y_np + 1.0)
+                + y_np * np.log(np.maximum(mu / (mu + a), 1e-300))
+                + a * np.log(np.maximum(a / (mu + a), 1e-300))
+            )
         chain_results.append(
             {
                 "rho": rho_all[c, sl],

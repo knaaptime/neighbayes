@@ -603,32 +603,23 @@ class TestAdaptiveNCoarse:
     coarse-grid nodes.  These tests pin the corrected, adaptive behavior.
     """
 
-    def test_adaptive_narrow_interval_floor_20(self):
-        # Default [0.1, 0.8]: clear of the ±1 singularities; the rate term
-        # asks 4, the uniform 20-node floor binds (sup-norm there ~3e-10).
-        assert _adaptive_n_coarse(0.1, 0.8) == 20
+    def test_interval_within_0_9_draws_14(self):
+        # Within |ρ| ≤ 0.9 an estimate lies at least 0.1 from the nearest
+        # singularity; 14 nodes (7 support points) kept the ML bias in ρ under
+        # 1e-4 there on every weights matrix in the calibration sweeps.
+        assert _adaptive_n_coarse(0.1, 0.8) == 14
+        assert _adaptive_n_coarse(-0.9, 0.9) == 14
 
-    def test_adaptive_wide_intervals_floor_at_20(self):
-        # The tilt-targeted recalibration (aaa_full_interval_small_budget) showed
-        # the old 16/ln(ρ_B) constant overshot: what a posterior can resolve is
-        # the *tilt* of the error over a 95% window, and the full stability
-        # region needs only ~20-24 nodes for that — not the 96 the cap forced.
-        # Wide intervals now draw the 20-node floor (sup-norm stays O(1e-4)
-        # there, so even worst-case concentration inside a window is ~17x
-        # under the 1.8e-3 tilt threshold).
-        assert _adaptive_n_coarse(-0.5, 0.95) == 20
-        assert _adaptive_n_coarse(-0.95, 0.95) == 20
-        # Narrow but hugging the singularity → the rate term lifts above the
-        # floor: [0.85, 0.99] has ln ρ_B ≈ 0.53, ⌈3.4/0.53⌉ = 7 → floor 20.
-        assert _adaptive_n_coarse(0.85, 0.99) == 20
+    def test_interval_past_0_9_draws_18(self):
+        # 18 nodes (9 support points) covered true ρ out to |ρ| = 0.98.
+        assert _adaptive_n_coarse(-0.5, 0.95) == 18
+        assert _adaptive_n_coarse(-0.95, 0.5) == 18
+        assert _adaptive_n_coarse(0.85, 0.99) == 18
+        assert _adaptive_n_coarse(-0.99, 0.99) == 18
 
-    def test_adaptive_full_stability_region_draws_24(self):
-        # ⌈3.4 / ln(1.1526)⌉ = 24 — the tilt-adequate budget measured on the
-        # full interval (worst design rook 10k clears 1.8×10⁻³ at 20; 24 sits
-        # ~7× below the threshold).  The old rule asked 113 and clamped to 96,
-        # a 4-5× setup overshoot buying sup-norm accuracy no posterior spends
-        # (sup-norm there is O(0.1-2) at every budget tested).
-        assert _adaptive_n_coarse(-0.99, 0.99) == 24
+    def test_node_cap_env_var(self, monkeypatch):
+        monkeypatch.setenv("NEIGHBAYES_LOGDET_NODE_CAP", "12")
+        assert _adaptive_n_coarse(-0.99, 0.99) == 12
 
     def test_n_coarse_equals_lu_factorization_count(self):
         """`_aaa_algorithm_lazy` evaluates exactly n_coarse times (one LU each)."""
@@ -667,7 +658,7 @@ class TestAdaptiveNCoarse:
         assert counter["n"] == 12
 
     def test_default_precompute_uses_adaptive(self, monkeypatch):
-        """With n_coarse unset, the default interval factorizes 20 times."""
+        """With n_coarse unset, the default interval factorizes 14 times."""
         import neighbayes._logdet._aaa as aaa_mod
 
         W = _knn_W(200, k=6)
@@ -684,8 +675,8 @@ class TestAdaptiveNCoarse:
             return wrapped
 
         monkeypatch.setattr(aaa_mod, "_make_reusable_lu_logdet", counting_factory)
-        aaa_logdet_precompute(W, rho_min=0.1, rho_max=0.8)  # adaptive → 20 (floor)
-        assert counter["n"] == 20
+        aaa_logdet_precompute(W, rho_min=0.1, rho_max=0.8)  # adaptive → 14
+        assert counter["n"] == 14
 
 
 class TestWideIntervalAccuracy:
@@ -696,8 +687,75 @@ class TestWideIntervalAccuracy:
         n = W.shape[0]
         eye = sp.eye(n, format="csc")
         Wc = sp.csc_matrix(W)
-        pre = aaa_logdet_precompute(W, rho_min=-0.95, rho_max=0.95)  # adaptive → 30
+        # A fixed budget of 20 factorizations, so the test measures the algorithm's
+        # pointwise accuracy on a wide interval.  The default count targets the
+        # bias an estimate of ρ carries, not pointwise error (see
+        # ``_adaptive_n_coarse``), and returns 18 here.
+        pre = aaa_logdet_precompute(W, rho_min=-0.95, rho_max=0.95, n_coarse=20)
         for rho in (-0.9, -0.5, 0.0, 0.5, 0.9):
             exact = np.linalg.slogdet((eye - rho * Wc).toarray())[1]
             approx = aaa_logdet_eval(pre, rho)
             assert abs(approx - exact) < 1e-5, f"rho={rho}: {approx} vs {exact}"
+
+
+def _rook_W(side: int):
+    """Row-standardized rook contiguity on a side × side lattice."""
+    import scipy.sparse as sp
+
+    path = sp.diags([np.ones(side - 1), np.ones(side - 1)], [-1, 1])
+    eye = sp.eye(side)
+    A = (sp.kron(path, eye) + sp.kron(eye, path)).tocsr()
+    deg = np.asarray(A.sum(axis=1)).ravel()
+    return (sp.diags(1.0 / deg) @ A).tocsr()
+
+
+class TestSpuriousPoles:
+    """Poles inside the unit disk approximate no singularity and are removed."""
+
+    def test_fit_has_no_pole_inside_unit_disk(self):
+        # On a 50 × 50 rook lattice the raw AAA fit at 16 nodes on the full
+        # stability region places a pole at ρ ≈ -0.29, where the Jacobian is
+        # analytic; the fitted approximant must not keep it.
+        from neighbayes._logdet._aaa import aaa_poles, chol_aaa_logdet_precompute
+
+        pre = chol_aaa_logdet_precompute(
+            _rook_W(50), rho_min=-0.99, rho_max=0.99, n_coarse=16
+        )
+        assert np.all(np.abs(aaa_poles(pre.support_points, pre.weights)) >= 1.0)
+
+    def test_cleanup_removes_the_raw_fits_pole(self):
+        from neighbayes._logdet._aaa import (
+            CholAAAContext,
+            _aaa_algorithm,
+            _remove_spurious_poles,
+            aaa_poles,
+        )
+
+        ctx = CholAAAContext(_rook_W(50))
+        lo, hi, m = -0.99, 0.99, 16
+        k = np.arange(1, m + 1)
+        z = 0.5 * (hi - lo) * np.cos((2 * k - 1) * np.pi / (2 * m)) + 0.5 * (hi + lo)
+        f = np.array([ctx.logdet_at(r) for r in z])
+        sp_z, sp_f, w = _aaa_algorithm(z, f, tol=1e-13, max_iter=30)
+        assert np.any(np.abs(aaa_poles(sp_z, w)) < 1.0)
+        sp_z, sp_f, w = _remove_spurious_poles(z, f, sp_z, sp_f, w)
+        assert np.all(np.abs(aaa_poles(sp_z, w)) >= 1.0)
+        # The cleaned fit still interpolates the function to the accuracy of a
+        # clean fit with one support point fewer.
+        grid = np.linspace(-0.9, 0.9, 41)
+        exact = np.array([ctx.logdet_at(r) for r in grid])
+        diff = grid[:, None] - sp_z[None, :]
+        approx = (w / diff) @ sp_f / (w / diff).sum(axis=1)
+        assert np.max(np.abs(approx - exact)) < 0.05
+
+    def test_reach_shrinks_as_nodes_are_added(self):
+        from neighbayes._logdet._aaa import aaa_reach, chol_aaa_logdet_precompute
+
+        W = _rook_W(50)
+        reach = [
+            aaa_reach(
+                chol_aaa_logdet_precompute(W, rho_min=-0.99, rho_max=0.99, n_coarse=m)
+            )[0]
+            for m in (14, 18, 22)
+        ]
+        assert 0.0 < reach[2] < reach[1] < reach[0] < 0.1

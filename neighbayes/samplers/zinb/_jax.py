@@ -266,6 +266,7 @@ def run_chains_jax_zinb(
     slice_width=0.4,
     jax_seeds=None,
     progressbar=True,
+    store_log_lik=True,
 ):
     """Run the reduced-form ZINB PG-Gibbs sampler (chains in parallel threads).
 
@@ -349,6 +350,11 @@ def run_chains_jax_zinb(
             adapt_slice_width(w, left, right, tuning)
             for w, (left, right) in zip(widths, steps)
         )
+        if not store_log_lik:
+            # Keep the per-draw mean selection probability, not the two
+            # length-n linear predictors the log-likelihood would need.
+            eta_sel = trace[5]
+            trace = trace[:5] + (jnp.mean(1.0 / (1.0 + jnp.exp(-eta_sel))),)
         return dict(core, slice_widths=widths), trace
 
     with GibbsProgressBarManager(
@@ -380,18 +386,27 @@ def run_chains_jax_zinb(
             on_chunk=_progress,
         )
 
-    lam_all, gamma_all, rho_all, beta_all, alpha_all, etasel_all, etacnt_all = traces
+    lam_all, gamma_all, rho_all, beta_all, alpha_all = traces[:5]
+    if store_log_lik:
+        etasel_all, etacnt_all = traces[5:]
+    else:
+        pi_all = traces[5]
 
     sl = slice(None, None, thin) if thin > 1 else slice(None)
     y_np = np.asarray(y, dtype=np.float64)
     results = []
     for c in range(chains):
-        eta_sel = etasel_all[c, sl]
-        eta_cnt = etacnt_all[c, sl]
-        a = alpha_all[c, sl][:, None]
-        # Marginal ZINB log-pmf of the observed count, latent z integrated
-        # out — the same helper the NumPy backend stores.
-        log_lik = _zinb_loglik_pointwise(y_np, eta_sel, eta_cnt, a)
+        log_lik = None
+        if store_log_lik:
+            eta_sel = etasel_all[c, sl]
+            eta_cnt = etacnt_all[c, sl]
+            a = alpha_all[c, sl][:, None]
+            # Marginal ZINB log-pmf of the observed count, latent z integrated
+            # out — the same helper the NumPy backend stores.
+            log_lik = _zinb_loglik_pointwise(y_np, eta_sel, eta_cnt, a)
+            pi_mean = (1.0 / (1.0 + np.exp(-eta_sel))).mean(axis=1)
+        else:
+            pi_mean = np.asarray(pi_all[c, sl])
         results.append(
             {
                 "lam": lam_all[c, sl],
@@ -400,7 +415,7 @@ def run_chains_jax_zinb(
                 "beta": beta_all[c, sl],
                 "alpha": alpha_all[c, sl],
                 "log_lik": log_lik,
-                "pi_mean": (1.0 / (1.0 + np.exp(-eta_sel))).mean(axis=1),
+                "pi_mean": pi_mean,
             }
         )
     return results

@@ -87,7 +87,13 @@ class TestSeparableRecovery:
             col_names=sep_data["col_names"],
         )
         idata = m.fit(
-            draws=100, tune=80, chains=2, random_seed=2, progressbar=False, n_jobs=1
+            draws=100,
+            tune=80,
+            chains=2,
+            random_seed=2,
+            progressbar=False,
+            n_jobs=1,
+            idata_kwargs={"log_likelihood": True},
         )
         assert set(idata.posterior.data_vars) == {"beta", "rho_d", "rho_o", "rho_w"}
         # No dispersion parameter: Poisson has no free variance.

@@ -286,6 +286,43 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         (``"chebyshev"``, ``"slq"``) and the environment variables
         controlling the cutoffs are documented on the cross-sectional
         ``SpatialModel`` base class.
+    logdet_refit : bool, default True
+        Rebuild the log-determinant interpolant halfway through warmup, on
+        the range the chains have found rather than the interval implied by
+        the prior.  A warmup posterior is typically one to two orders of
+        magnitude narrower than the prior, which needs far fewer interpolation
+        nodes and drives the approximation error over the posterior's support
+        down to the factorization's roundoff floor.  Applies to
+        ``"cheb_cholesky"``, ``"lu_cheb"``, ``"aaa"`` and ``"chol_aaa"``;
+        ignored otherwise.
+
+        The interpolant is only valid on its interval, so the refit window
+        becomes the sampler's support.  The window is padded by
+        ``logdet_refit_pad_sd`` warmup standard deviations, recorded in
+        ``idata.attrs["logdet_refit_window"]``, and a warning is raised if
+        the retained draws ever reach an edge the refit introduced.
+    logdet_refit_pad_sd : float, default 10.0
+        Padding for the refit window, in warmup posterior standard
+        deviations.  At the default the truncated tail is ~1e-23 under
+        normality, and the padding costs a node or two at most.
+    logdet_aaa_check : bool, default True
+        For the AAA methods (``"aaa"``, ``"chol_aaa"``), set the number of
+        exact factorizations from where the posterior lies.  Warmup starts on a
+        14-node fit; halfway through, nodes are added only if the warmup
+        posterior lies closer to a singularity of the Jacobian than four times
+        the distance at which the fit's poles resolve it.  The count used is
+        recorded in ``idata.attrs["logdet_aaa_nodes"]``.  Off, or on a path
+        without a warmup midpoint, the count is fixed by the prior interval:
+        14 nodes within ``|ρ| ≤ 0.9``, 18 otherwise.
+    logdet_probe_check : bool, default True
+        For ``"cheb_stochastic"``, set the number of Hutchinson probes from
+        where the posterior lies.  Warmup starts on 50 probes; halfway through,
+        the probes' own spread prices the bias they leave in the posterior mean
+        of the spatial parameter, and the pool grows, to at most 200, until
+        that bias is expected to stay under 0.0225 posterior sd.  The count
+        used is recorded in ``idata.attrs["logdet_probes"]``, with a warning
+        if the cap is reached first.  Probes cost setup time only; the cost of
+        each draw does not depend on how many there are.
     robust : bool, default False
         If True, replace the Normal error with Student-t for robustness
         to heavy-tailed outliers.  The degrees of freedom :math:`\\nu` are
@@ -340,6 +377,10 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         logdet_method: str | None = None,
         robust: bool = False,
         w_vars: Optional[list] = None,
+        logdet_refit: bool = True,
+        logdet_refit_pad_sd: float = 10.0,
+        logdet_aaa_check: bool = True,
+        logdet_probe_check: bool = True,
     ):
         if W is None:
             raise ValueError("W is required.")
@@ -351,6 +392,10 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         self.priors_obj = resolve_priors(priors, _priors_cls)
         self.priors = priors_as_dict(self.priors_obj)
         self.logdet_method = logdet_method
+        self.logdet_refit = bool(logdet_refit)
+        self.logdet_refit_pad_sd = float(logdet_refit_pad_sd)
+        self.logdet_aaa_check = bool(logdet_aaa_check)
+        self.logdet_probe_check = bool(logdet_probe_check)
         self.model = _resolve_effects(effects)
         self.effects = _EFFECTS_NAMES[self.model]
         self.robust = robust
@@ -667,9 +712,12 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         n_jobs : int, default -1
             Parallel workers for the NumPy Gibbs path (Gibbs only).
         idata_kwargs : dict, optional
-            Passed to ``pm.sample`` (NUTS only).  ``{"log_likelihood": True}``
-            reconstructs the complete Jacobian-corrected pointwise
-            log-likelihood.
+            ``{"log_likelihood": True}`` stores the complete Jacobian-corrected
+            pointwise log-likelihood that ``az.loo`` / ``az.waic`` /
+            ``az.compare`` need, for Gibbs and NUTS alike.  Off by default, as
+            in PyMC: it holds one value per draw, chain, and observation (16 GB
+            at n = 250,000 with 4 × 2,000 draws).  For NUTS the dict is also
+            passed to ``pm.sample``.
         **sample_kwargs
             For NUTS, forwarded to ``pm.sample`` (``target_accept``,
             ``nuts_sampler="blackjax"``/``"numpyro"``/``"nutpie"``, ...).  For
@@ -681,7 +729,12 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         arviz.InferenceData
             Posterior samples and diagnostics.
         """
-        from ..samplers._registry import pop_options, resolve, resolve_backend
+        from ..samplers._registry import (
+            pop_options,
+            resolve,
+            resolve_backend,
+            run_entry,
+        )
 
         entry = resolve(*self._gibbs_key) if self._gibbs_key is not None else None
         if sampler is None:
@@ -700,8 +753,10 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
                 )
             backend = resolve_backend(gibbs_backend, entry, jax_ok=jax_available())
             family_opts = pop_options(sample_kwargs, entry)
-            self._idata = entry.run(
+            self._idata = run_entry(
+                entry,
                 self,
+                log_likelihood=bool((idata_kwargs or {}).get("log_likelihood", False)),
                 draws=draws,
                 tune=tune,
                 chains=chains,
@@ -793,6 +848,7 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         gibbs_method: str = "numpy",
         slice_width: float | None = None,
         chain_method: str | None = None,
+        log_likelihood: bool = False,
     ) -> az.InferenceData:
         """Sample a Gaussian FE panel posterior via 3-block Gaussian Gibbs.
 
@@ -843,18 +899,35 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
             rho_upper=self._logdet_bounds.rho_max,
         )
 
+        from .._logdet._warmup import sampler_builds_evaluators
+
+        method = self._logdet_bounds.method
+        sampler_builds_logdet = sampler_builds_evaluators(
+            method,
+            self._W_sparse_NT is not None,
+            self.logdet_refit,
+            self.logdet_aaa_check,
+            self.logdet_probe_check,
+        )
+
         gibbs_kwargs: dict[str, Any] = dict(
             y=self._y,
             X=Z,
             W_sparse=self._W_sparse_NT,
             priors=priors,
-            logdet_fn=self._logdet_numpy_fn,
-            logdet_vec_fn=self._logdet_numpy_vec_fn,
+            # With the refit or the AAA node check on, the sampler builds its own
+            # interpolant for warmup; building one here would be discarded.
+            logdet_fn=None if sampler_builds_logdet else self._logdet_numpy_fn,
+            logdet_vec_fn=None if sampler_builds_logdet else self._logdet_numpy_vec_fn,
             feature_names=feature_names,
             model_type=self._model_type,
             W_eigs=self._logdet_eigs,
-            logdet_method=self._logdet_bounds.method,
+            logdet_method=method,
             T=self._T,
+            logdet_refit=self.logdet_refit,
+            logdet_refit_pad_sd=self.logdet_refit_pad_sd,
+            logdet_aaa_check=self.logdet_aaa_check,
+            logdet_probe_check=self.logdet_probe_check,
         )
         # SAR/SDM need Wy; SEM/SDEM do not.
         if self._jacobian_param == "rho":
@@ -873,6 +946,7 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
             gibbs_method=gibbs_method,
             slice_width=slice_width,
             chain_method=chain_method,
+            log_likelihood=log_likelihood,
         )
         return self._idata
 

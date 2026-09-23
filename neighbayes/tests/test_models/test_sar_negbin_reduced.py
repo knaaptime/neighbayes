@@ -127,7 +127,13 @@ def test_reduced_fit_returns_inference_data():
     y = rng.poisson(mu)
 
     model = bp.models.SARNegBin(y=y, X=X, W=W)
-    idata = model.fit(draws=30, tune=30, chains=2, random_seed=0)
+    idata = model.fit(
+        draws=30,
+        tune=30,
+        chains=2,
+        random_seed=0,
+        idata_kwargs={"log_likelihood": True},
+    )
 
     assert isinstance(idata, az.InferenceData)
     assert "posterior" in idata.groups()

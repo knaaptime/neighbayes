@@ -181,6 +181,7 @@ class SARNegBinStructural(SpatialModel):
         lanczos_deg: int = 15,
         krylov_degree: int = 0,
         krylov_dmax: float = 0.4,
+        log_likelihood: bool = False,
     ) -> az.InferenceData:
         """Sample posterior via Pólya–Gamma block Gibbs.
 
@@ -372,6 +373,7 @@ class SARNegBinStructural(SpatialModel):
                 sparsax_pattern=sparsax_pattern,
                 krylov_degree=krylov_degree,
                 krylov_dmax=krylov_dmax,
+                store_log_lik=log_likelihood,
             )
         else:
 
@@ -408,6 +410,7 @@ class SARNegBinStructural(SpatialModel):
                     rng=rng,
                     chain_id=chain_id_kw if chain_id_kw is not None else chain_id,
                     progress_manager=progress_manager,
+                    store_log_lik=log_likelihood,
                 )
 
             # Run chains.  Non-JAX paths parallelize across chains when
@@ -455,11 +458,15 @@ class SARNegBinStructural(SpatialModel):
             dims["eta"] = ["obs_id"]
 
         # Log-likelihood: shape (chains, n_keep, n)
-        log_lik = np.stack([c["log_lik"] for c in chain_results], axis=0)
+        log_lik = (
+            np.stack([c["log_lik"] for c in chain_results], axis=0)
+            if log_likelihood
+            else None
+        )
 
         idata = gibbs_to_inference_data(
             posterior_samples=posterior_samples,
-            log_likelihood={"obs": log_lik},
+            log_likelihood={"obs": log_lik} if log_likelihood else None,
             observed_data={"obs": y},
             coords=coords,
             dims=dims,

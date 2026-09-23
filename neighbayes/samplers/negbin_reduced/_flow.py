@@ -747,6 +747,7 @@ def run_chain_unrestricted(
     rng: np.random.Generator | None = None,
     chain_id: int = 0,
     progress_manager: object | None = None,
+    store_log_lik: bool = True,
 ) -> dict[str, np.ndarray]:
     """Run one chain of the reduced-form flow NB Gibbs sampler (unrestricted).
 
@@ -786,7 +787,8 @@ def run_chain_unrestricted(
     rho_w_samples = np.empty(n_keep, dtype=np.float64)
     beta_samples = np.empty((n_keep, k), dtype=np.float64)
     alpha_samples = np.empty(n_keep, dtype=np.float64)
-    log_lik_samples = np.empty((n_keep, N), dtype=np.float64)
+    # One value per draw and flow; skipped unless requested (``None``).
+    log_lik_samples = np.empty((n_keep, N), dtype=np.float64) if store_log_lik else None
 
     state = FlowReducedGibbsState(
         beta=np.asarray(init.beta, dtype=np.float64).copy(),
@@ -944,7 +946,8 @@ def run_chain_unrestricted(
                 rho_w_samples[idx] = state.rho_w
                 beta_samples[idx] = state.beta
                 alpha_samples[idx] = state.alpha
-                log_lik_samples[idx] = _nb_loglik_pointwise(y, eta, state.alpha)
+                if store_log_lik:
+                    log_lik_samples[idx] = _nb_loglik_pointwise(y, eta, state.alpha)
 
         if progress_manager is not None:
             progress_manager.update(chain_id, i, tuning=i < tune)
@@ -978,6 +981,7 @@ def run_chain_separable(
     rng: np.random.Generator | None = None,
     chain_id: int = 0,
     progress_manager: object | None = None,
+    store_log_lik: bool = True,
 ) -> dict[str, np.ndarray]:
     """Run one chain of the reduced-form flow NB Gibbs sampler (separable).
 
@@ -1018,7 +1022,8 @@ def run_chain_separable(
     rho_w_samples = np.empty(n_keep, dtype=np.float64)
     beta_samples = np.empty((n_keep, k), dtype=np.float64)
     alpha_samples = np.empty(n_keep, dtype=np.float64)
-    log_lik_samples = np.empty((n_keep, N), dtype=np.float64)
+    # One value per draw and flow; skipped unless requested (``None``).
+    log_lik_samples = np.empty((n_keep, N), dtype=np.float64) if store_log_lik else None
 
     state = FlowReducedGibbsState(
         beta=np.asarray(init.beta, dtype=np.float64).copy(),
@@ -1196,7 +1201,8 @@ def run_chain_separable(
                 rho_w_samples[idx] = -state.rho_d * state.rho_o
                 beta_samples[idx] = state.beta
                 alpha_samples[idx] = state.alpha
-                log_lik_samples[idx] = _nb_loglik_pointwise(y, eta, state.alpha)
+                if store_log_lik:
+                    log_lik_samples[idx] = _nb_loglik_pointwise(y, eta, state.alpha)
 
         if progress_manager is not None:
             progress_manager.update(chain_id, i, tuning=i < tune)

@@ -776,6 +776,7 @@ def run_chain_jax(
     pg_n_terms: int = 25,
     n_probes: int = 5,
     lanczos_deg: int = 15,
+    store_log_lik: bool = True,
 ):
     """Run one chain of the full-JIT JAX Gibbs sampler.
 
@@ -866,7 +867,7 @@ def run_chain_jax(
     beta_samples = np.empty((n_keep, k), dtype=np.float64)
     sigma_samples = np.empty(n_keep, dtype=np.float64)
     alpha_samples = np.empty(n_keep, dtype=np.float64)
-    log_lik_samples = np.empty((n_keep, n), dtype=np.float64)
+    log_lik_samples = np.empty((n_keep, n), dtype=np.float64) if store_log_lik else None
     eta_norm_samples = np.empty(n_keep, dtype=np.float64)
     eta_samples = np.empty((n_keep, n), dtype=np.float64) if return_eta else None
 
@@ -910,9 +911,10 @@ def run_chain_jax(
                 eta_norm_samples[idx] = float(eta_np @ eta_np)
                 if return_eta:
                     eta_samples[idx] = eta_np
-                log_lik_samples[idx] = _nb_loglik_pointwise_jax(
-                    y, eta_np, float(state.alpha)
-                )
+                if store_log_lik:
+                    log_lik_samples[idx] = _nb_loglik_pointwise_jax(
+                        y, eta_np, float(state.alpha)
+                    )
 
     result = {
         "rho": rho_samples,
@@ -996,6 +998,7 @@ def run_chains_jax_vectorized(
     sparsax_pattern=None,
     krylov_degree: int = 0,
     krylov_dmax: float = 0.4,
+    store_log_lik: bool = True,
 ) -> list[dict]:
     """Run multiple SAR-NB Gibbs chains in parallel.
 
@@ -1070,15 +1073,16 @@ def run_chains_jax_vectorized(
             state, key, width, return_steps=True
         )
         width = adapt_slice_width(width, steps_left, steps_right, tuning)
-        log_lik = _nb_loglik_pointwise_jax_op(y_jax, state.eta, state.alpha)
-        return (state, width), (
+        trace = (
             state.rho,
             state.beta,
             state.sigma2,
             state.alpha,
             state.eta @ state.eta,
-            log_lik,
         )
+        if store_log_lik:
+            trace += (_nb_loglik_pointwise_jax_op(y_jax, state.eta, state.alpha),)
+        return (state, width), trace
 
     with GibbsProgressBarManager(
         chains=chains,
@@ -1096,7 +1100,7 @@ def run_chains_jax_vectorized(
                 for c in range(chains):
                     pm.update(c, i, tuning=tuning)
 
-        _, (rhos, betas, sigma2s, alphas, eta_norms, log_liks) = run_chains_chunked(
+        _, traces = run_chains_chunked(
             _sweep,
             [
                 (jax.tree.map(lambda a, c=c: a[c], init_states), jnp.float64(0.2))
@@ -1109,6 +1113,8 @@ def run_chains_jax_vectorized(
             on_chunk=_progress,
         )
 
+    rhos, betas, sigma2s, alphas, eta_norms = traces[:5]
+    log_liks = traces[5] if store_log_lik else None
     thin_slice = slice(None, None, thin) if thin > 1 else slice(None)
     results = []
     for c in range(chains):
@@ -1119,7 +1125,7 @@ def run_chains_jax_vectorized(
                 "sigma": np.sqrt(sigma2s[c, thin_slice]).copy(),
                 "alpha": alphas[c, thin_slice].copy(),
                 "eta_norm": eta_norms[c, thin_slice].copy(),
-                "log_lik": log_liks[c, thin_slice].copy(),
+                "log_lik": log_liks[c, thin_slice].copy() if store_log_lik else None,
                 "mh_accept_rate": 1.0,
             }
         )

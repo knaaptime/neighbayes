@@ -829,6 +829,7 @@ class TestInferenceDataCompat:
             random_seed=42,
             n_jobs=1,
             progressbar=False,
+            idata_kwargs={"log_likelihood": True},
         )
 
     def test_idata_groups(self, sar_idata):
@@ -970,6 +971,7 @@ class TestJAXGaussianGibbs:
             n_jobs=1,
             progressbar=False,
             gibbs_backend="jax",
+            idata_kwargs={"log_likelihood": True},
         )
         loo = az.loo(idata)
         assert np.isfinite(loo.elpd_loo)

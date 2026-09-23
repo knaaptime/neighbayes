@@ -171,6 +171,7 @@ class SARNegBin(SpatialModel):
         n_rho_omega_cycles: int = 1,
         krylov_reuse: bool = True,
         timeout: float | None = None,
+        log_likelihood: bool = False,
     ) -> "az.InferenceData":
         r"""Sample the reduced-form posterior via Pólya-Gamma block Gibbs.
 
@@ -333,6 +334,7 @@ class SARNegBin(SpatialModel):
                 krylov_dmax=krylov_dmax,
                 slice_width=slice_width,
                 krylov_reuse=krylov_reuse,
+                store_log_lik=log_likelihood,
             )
 
             # Stack chains
@@ -341,11 +343,15 @@ class SARNegBin(SpatialModel):
                 "beta": np.stack([s["beta"] for s in chain_results], axis=0),
                 "alpha": np.stack([s["alpha"] for s in chain_results], axis=0),
             }
-            log_lik = np.stack([s["log_lik"] for s in chain_results], axis=0)
+            log_lik = (
+                np.stack([s["log_lik"] for s in chain_results], axis=0)
+                if log_likelihood
+                else None
+            )
 
             idata = gibbs_to_inference_data(
                 posterior_samples=stacked,
-                log_likelihood={"obs": log_lik},
+                log_likelihood={"obs": log_lik} if log_likelihood else None,
                 observed_data={"obs": self._y_int},
                 coords={
                     "coefficient": list(self._feature_names),
@@ -482,6 +488,7 @@ class SARNegBin(SpatialModel):
                 rng=chain_rng,
                 chain_id=chain_id_kw if chain_id_kw is not None else chain_id,
                 progress_manager=progress_manager,
+                store_log_lik=log_likelihood,
             )
 
         chain_samples = run_chains(
@@ -503,11 +510,15 @@ class SARNegBin(SpatialModel):
             "beta": np.stack([s["beta"] for s in chain_samples], axis=0),
             "alpha": np.stack([s["alpha"] for s in chain_samples], axis=0),
         }
-        log_lik = np.stack([s["log_lik"] for s in chain_samples], axis=0)
+        log_lik = (
+            np.stack([s["log_lik"] for s in chain_samples], axis=0)
+            if log_likelihood
+            else None
+        )
 
         idata = gibbs_to_inference_data(
             posterior_samples=stacked,
-            log_likelihood={"obs": log_lik},
+            log_likelihood={"obs": log_lik} if log_likelihood else None,
             observed_data={"obs": self._y_int},
             coords={
                 "coefficient": list(self._feature_names),

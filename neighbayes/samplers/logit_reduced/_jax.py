@@ -298,6 +298,7 @@ def run_chains_jax_reduced_logit(
     jax_seeds=None,
     progressbar=False,
     krylov_reuse=True,
+    store_log_lik=True,
 ):
     """Run the reduced-form SAR-logit PG-Gibbs sampler (chains in parallel threads).
 
@@ -361,11 +362,16 @@ def run_chains_jax_reduced_logit(
         core = {name: value for name, value in st.items() if name != "slice_width"}
         core, eta, (steps_left, steps_right) = gibbs_step(core, key, width)
         width = adapt_slice_width(width, steps_left, steps_right, tuning)
-        return dict(core, slice_width=width), (core["rho"], core["beta"], eta)
+        trace = (core["rho"], core["beta"])
+        if store_log_lik:  # η is traced only to build the log-likelihood
+            trace += (eta,)
+        return dict(core, slice_width=width), trace
 
-    _, (rho_all, beta_all, eta_all) = run_chains_chunked(
+    _, traces = run_chains_chunked(
         _sweep, states, warm_keys, draw_keys, tune=tune, draws=draws
     )
+    rho_all, beta_all = traces[:2]
+    eta_all = traces[2] if store_log_lik else None
 
     # Pointwise Bernoulli-logit log-likelihood from the fitted η (no post-hoc solves).
     from ._core import _logit_loglik_pointwise
@@ -374,8 +380,10 @@ def run_chains_jax_reduced_logit(
     y_np = np.asarray(y, dtype=np.float64)
     results = []
     for c in range(chains):
-        eta_c = eta_all[c, sl]  # (n_keep, n)
-        log_lik = _logit_loglik_pointwise(y_np, eta_c)
+        log_lik = None
+        if store_log_lik:
+            eta_c = eta_all[c, sl]  # (n_keep, n)
+            log_lik = _logit_loglik_pointwise(y_np, eta_c)
         results.append(
             {
                 "rho": rho_all[c, sl],

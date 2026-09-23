@@ -75,17 +75,17 @@ class SEM(GaussianLikelihoodMixin, SpatialModel):
         rational approximation); ``"cheb_stochastic"`` for ``n > 60000``.
         Explicit opt-ins: ``"chebyshev"`` (Barry-Pace) and ``"slq"``
         (stochastic Lanczos quadrature).
-    logdet_refit : bool, default False
-        Rebuild the log-determinant interpolant partway through warmup, on
+    logdet_refit : bool, default True
+        Rebuild the log-determinant interpolant halfway through warmup, on
         the range the chains have found rather than the interval implied by
-        the prior.  A post-warmup range is typically one to two orders of
-        magnitude narrower, which needs far fewer interpolation nodes and
-        drives the approximation error over the posterior's support down to
-        the factorization's roundoff floor.  Applies to ``"cheb_cholesky"``
-        and ``"aaa"``; ignored otherwise.
+        the prior.  A warmup posterior is typically one to two orders of
+        magnitude narrower than the prior, which needs far fewer interpolation
+        nodes and drives the approximation error over the posterior's support
+        down to the factorization's roundoff floor.  Applies to
+        ``"cheb_cholesky"``, ``"lu_cheb"``, ``"aaa"`` and ``"chol_aaa"``;
+        ignored otherwise.
 
-        Off by default because it is not free of consequences: the
-        interpolant is only valid on its interval, so the refit window
+        The interpolant is only valid on its interval, so the refit window
         becomes the sampler's support.  The window is padded by
         ``logdet_refit_pad_sd`` warmup standard deviations, recorded in
         ``idata.attrs["logdet_refit_window"]``, and a warning is raised if
@@ -94,6 +94,24 @@ class SEM(GaussianLikelihoodMixin, SpatialModel):
         Padding for the refit window, in warmup posterior standard
         deviations.  At the default the truncated tail is ~1e-23 under
         normality, and the padding costs a node or two at most.
+    logdet_aaa_check : bool, default True
+        For the AAA methods (``"aaa"``, ``"chol_aaa"``), set the number of
+        exact factorizations from where the posterior lies.  Warmup starts on a
+        14-node fit; halfway through, nodes are added only if the warmup
+        posterior lies closer to a singularity of the Jacobian than four times
+        the distance at which the fit's poles resolve it.  The count used is
+        recorded in ``idata.attrs["logdet_aaa_nodes"]``.  Off, or on a path
+        without a warmup midpoint, the count is fixed by the prior interval:
+        14 nodes within ``|ρ| ≤ 0.9``, 18 otherwise.
+    logdet_probe_check : bool, default True
+        For ``"cheb_stochastic"``, set the number of Hutchinson probes from
+        where the posterior lies.  Warmup starts on 50 probes; halfway through,
+        the probes' own spread prices the bias they leave in the posterior mean
+        of the spatial parameter, and the pool grows, to at most 200, until
+        that bias is expected to stay under 0.0225 posterior sd.  The count
+        used is recorded in ``idata.attrs["logdet_probes"]``, with a warning
+        if the cap is reached first.  Probes cost setup time only; the cost of
+        each draw does not depend on how many there are.
     robust : bool, default False
         If True, replace the Normal disturbance with Student-t. See
         *Robust regression* below.

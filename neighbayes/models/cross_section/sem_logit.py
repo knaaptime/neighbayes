@@ -192,6 +192,7 @@ class SEMLogit(SpatialModel):
         lanczos_deg: int = 15,
         krylov_degree: int = 0,
         krylov_dmax: float = 0.4,
+        log_likelihood: bool = False,
     ) -> az.InferenceData:
         """Sample posterior via Pólya–Gamma block Gibbs.
 
@@ -343,6 +344,7 @@ class SEMLogit(SpatialModel):
                 sparsax_pattern=sparsax_pattern,
                 krylov_degree=krylov_degree,
                 krylov_dmax=krylov_dmax,
+                store_log_lik=log_likelihood,
             )
         else:
 
@@ -364,6 +366,7 @@ class SEMLogit(SpatialModel):
                     rng=rng,
                     progress_manager=progress_manager,
                     chain_id=progress_chain_id,
+                    store_log_lik=log_likelihood,
                 )
 
             # Non-JAX paths parallelize across chains when the user
@@ -407,11 +410,15 @@ class SEMLogit(SpatialModel):
             dims["eta"] = ["obs_id"]
 
         # Log-likelihood: shape (chains, n_keep, n)
-        log_lik = np.stack([c["log_lik"] for c in chain_results], axis=0)
+        log_lik = (
+            np.stack([c["log_lik"] for c in chain_results], axis=0)
+            if log_likelihood
+            else None
+        )
 
         idata = gibbs_to_inference_data(
             posterior_samples=posterior_samples,
-            log_likelihood={"obs": log_lik},
+            log_likelihood={"obs": log_lik} if log_likelihood else None,
             observed_data={"obs": y},
             coords=coords,
             dims=dims,

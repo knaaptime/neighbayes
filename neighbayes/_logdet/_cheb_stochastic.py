@@ -73,7 +73,7 @@ so it is **off by default** (``n_deflate=0``).
 from __future__ import annotations
 
 import warnings
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 import scipy.sparse as sp
@@ -413,28 +413,36 @@ def _chebyshev_moments(
         caller may override ``μ̂_1 = tr(A)`` with its exact value.
     """
     U = rng.standard_normal((n, n_probes))
-    utu = np.einsum("ij,ij->j", U, U)
+    Q = _probe_moments(matvec, U, order)
 
-    # μ_0 = tr(T_0(A)) = tr(I) = n (exact)
+    # μ_0 = tr(T_0(A)) = tr(I) = n (exact); μ̂_j = (n / k) Σ_l Q[j, l].
     moments = np.zeros(order + 1, dtype=np.float64)
     moments[0] = float(n)
-
-    # Three-term recurrence: v_0 = U, v_1 = A @ U
-    v_prev = U
-    v_curr = matvec(U)  # (n, n_probes) — 1st batched matvec
-    moments[1] = n * np.mean(np.einsum("ij,ij->j", U, v_curr) / utu)
-
-    for j in range(1, order):
-        # v_{j+1} = 2 A v_j - v_{j-1}
-        v_next = 2.0 * matvec(v_curr) - v_prev  # batched matvec
-
-        # μ̂_{j+1} = (n / k) * Σ ω^T v_{j+1} / ‖ω‖²
-        moments[j + 1] = n * np.mean(np.einsum("ij,ij->j", U, v_next) / utu)
-
-        v_prev = v_curr
-        v_curr = v_next
-
+    for j in range(1, order + 1):
+        moments[j] = n * np.mean(Q[j])
     return moments
+
+
+def _probe_moments(matvec, U: np.ndarray, order: int) -> np.ndarray:
+    """Each probe's ``ωᵀ T_j(A) ω / ‖ω‖²`` for ``j = 0, .., order``.
+
+    Returns ``Q`` of shape ``(order + 1, k)`` for the ``k`` columns of ``U``;
+    the Hutchinson moment estimate is ``n`` times the mean of row ``j``.  The
+    recurrence computes every probe's value anyway, so keeping them is free,
+    and it is what lets a probe pool grow and measure its own spread
+    (:class:`ChebStochasticPool`).
+    """
+    utu = np.einsum("ij,ij->j", U, U)
+    Q = np.empty((order + 1, U.shape[1]), dtype=np.float64)
+    Q[0] = 1.0
+    v_prev = U
+    v_curr = matvec(U)
+    Q[1] = np.einsum("ij,ij->j", U, v_curr) / utu
+    for j in range(1, order):
+        v_next = 2.0 * matvec(v_curr) - v_prev
+        Q[j + 1] = np.einsum("ij,ij->j", U, v_next) / utu
+        v_prev, v_curr = v_curr, v_next
+    return Q
 
 
 def _cheb_recurrence(x: np.ndarray, order: int) -> np.ndarray:
@@ -822,3 +830,296 @@ def cheb_stochastic_logdet_eval_vec(
 
     # logdet_i = Σ c_j · μ_j  (c₀ already includes /2 convention)
     return all_coeffs @ pre.moments
+
+
+# ---------------------------------------------------------------------------
+# Probe pools: the probe count sized by the estimator's own spread
+# ---------------------------------------------------------------------------
+
+#: Probes a pool starts with: the fixed estimator's count, so sizing a pool only
+#: ever adds probes.  A smaller start saves setup time alone, since per-draw cost
+#: does not depend on the count, and the saving is small (0.8 s against 3.2 s for
+#: 50 at n = 490,000).  It also leaves the spread estimated from too few probes:
+#: starting from 12, 17% of validation runs at ρ = 0.9 exceeded 0.045 posterior
+#: sd, against none starting from 50.
+DEFAULT_PROBE_MIN = 50
+
+#: Largest pool.  It also sizes the Chebyshev order, so truncation stays under
+#: the probe noise at every size the pool can grow to.
+DEFAULT_PROBE_MAX = 200
+
+#: Target for the expected |bias| of the posterior mean of ρ, in posterior
+#: standard deviations: 1/√500, the Monte Carlo error of a posterior mean with
+#: an effective sample size of 500.
+DEFAULT_PROBE_BAR = 0.045
+
+#: Safety divisor on the bar.  The spread is estimated from the probes in hand,
+#: and the pool stops on the first estimate under the target, so the realized
+#: bias runs somewhat above the prediction.
+DEFAULT_PROBE_Z = 2.0
+
+#: E|N(0, 1)|, which turns the standard deviation of the bias into its mean size.
+_ABS_NORMAL = float(np.sqrt(2.0 / np.pi))
+
+
+@dataclass(frozen=True)
+class ChebStochasticPool:
+    """Per-probe stochastic Chebyshev moments that can grow.
+
+    The same estimator as :func:`cheb_stochastic_logdet_precompute`, with each
+    probe's moments kept rather than averaged away.  Probe ``l`` is drawn from
+    its own stream, ``default_rng([seed, l])``, so a pool of ``s`` probes is the
+    same however it grew, and growing one runs the recurrence on new probes only.
+
+    Attributes
+    ----------
+    probe_moments : np.ndarray, shape (order + 1, n_probes)
+        Each probe's ``ωᵀ T_j(W̃) ω / ‖ω‖²``.
+    exact_moments : np.ndarray, shape (n_exact + 1,)
+        Probe-free ``μ_0 .. μ_d`` that replace the estimates (control variates).
+    lam_min, lam_max, order, n, n_exact
+        As in :class:`ChebStochasticPrecompute`.
+    seed : int
+        Root of the per-probe streams.
+    W_tilde : scipy.sparse.csr_matrix
+        The rescaled operator, kept so the pool can grow.
+    """
+
+    probe_moments: np.ndarray
+    exact_moments: np.ndarray
+    lam_min: float
+    lam_max: float
+    order: int
+    n: int
+    n_exact: int
+    seed: int
+    W_tilde: sp.csr_matrix = field(repr=False, compare=False)
+
+    @property
+    def n_probes(self) -> int:
+        """Number of probes in the pool."""
+        return int(self.probe_moments.shape[1])
+
+
+def _pool_probes(seed: int, start: int, stop: int, n: int) -> np.ndarray:
+    """Probes ``start .. stop - 1`` of a pool, as columns of an ``(n, k)`` block."""
+    U = np.empty((n, stop - start), dtype=np.float64)
+    for col, idx in enumerate(range(start, stop)):
+        U[:, col] = np.random.default_rng([seed, idx]).standard_normal(n)
+    return U
+
+
+def cheb_stochastic_pool(
+    W,
+    n_probes: int = DEFAULT_PROBE_MIN,
+    *,
+    max_probes: int = DEFAULT_PROBE_MAX,
+    rho_min: float | None = None,
+    rho_max: float | None = None,
+    n_exact: int | None = -1,
+    max_degree: float = DEFAULT_MAX_DEGREE,
+    lam_min: float | None = None,
+    lam_max: float | None = None,
+    seed: int = 0,
+) -> ChebStochasticPool:
+    """Start a probe pool for ``log|I - ρW|`` with ``n_probes`` probes.
+
+    Spectral bounds and exact moments are those of
+    :func:`cheb_stochastic_logdet_precompute`.  The order is sized against the
+    noise of ``max_probes`` probes, so truncation stays under the probe noise at
+    every size the pool can grow to.  Deflation is not offered: it changes the
+    operator the probes see.
+    """
+    if sp.issparse(W) or hasattr(W, "format"):
+        W_sp = sp.csr_matrix(W, dtype=np.float64)
+    else:
+        W_sp = sp.csr_matrix(np.asarray(W, dtype=np.float64))
+    n = W_sp.shape[0]
+    if lam_min is None or lam_max is None:
+        est_min, est_max = _estimate_spectral_bounds(
+            W_sp, rng=np.random.default_rng(seed)
+        )
+        lam_min = est_min if lam_min is None else lam_min
+        lam_max = est_max if lam_max is None else lam_max
+    lo = -1.0 if rho_min is None else float(rho_min)
+    hi = 1.0 if rho_max is None else float(rho_max)
+    order = cheb_stochastic_order(
+        lo, hi, n, n_probes=max_probes, lam_min=lam_min, lam_max=lam_max
+    )
+    spread = lam_max - lam_min
+    W_tilde = (2.0 / spread) * W_sp - ((lam_max + lam_min) / spread) * sp.eye(
+        n, format="csr"
+    )
+    W_tilde = W_tilde.tocsr()
+
+    depth = min(_resolve_exact_depth(W_sp, n_exact, max_degree), order)
+    if depth > 1:
+        exact = _exact_cheb_moments(W_sp, depth, lam_min, lam_max)
+    else:
+        exact = np.array([float(n), float(W_tilde.diagonal().sum())])[: depth + 1]
+
+    U = _pool_probes(seed, 0, int(n_probes), n)
+    Q = _probe_moments(lambda B: W_tilde @ B, U, order)
+    return ChebStochasticPool(
+        probe_moments=Q,
+        exact_moments=exact,
+        lam_min=float(lam_min),
+        lam_max=float(lam_max),
+        order=int(order),
+        n=int(n),
+        n_exact=int(depth),
+        seed=int(seed),
+        W_tilde=W_tilde,
+    )
+
+
+def grow_pool(pool: ChebStochasticPool, n_probes: int) -> ChebStochasticPool:
+    """The pool with probes appended up to ``n_probes`` (itself if it has them)."""
+    have = pool.n_probes
+    if int(n_probes) <= have:
+        return pool
+    U = _pool_probes(pool.seed, have, int(n_probes), pool.n)
+    Q = _probe_moments(lambda B: pool.W_tilde @ B, U, pool.order)
+    return replace(pool, probe_moments=np.concatenate([pool.probe_moments, Q], axis=1))
+
+
+def pool_precompute(pool: ChebStochasticPool) -> ChebStochasticPrecompute:
+    """The estimator over every probe in the pool, for the ordinary evaluators."""
+    moments = pool.n * pool.probe_moments.mean(axis=1)
+    moments[0] = float(pool.n)
+    moments[: pool.n_exact + 1] = pool.exact_moments
+    return ChebStochasticPrecompute(
+        moments=moments,
+        lam_min=pool.lam_min,
+        lam_max=pool.lam_max,
+        order=pool.order,
+        n=pool.n,
+        n_exact=pool.n_exact,
+    )
+
+
+def _log_cheb_coeffs_vec(
+    rho: np.ndarray, lam_min: float, lam_max: float, order: int
+) -> np.ndarray:
+    """:func:`_log_cheb_coeffs` for an array of ρ, as an ``(R, order + 1)`` array."""
+    hi = (1.0 - _POLE_MARGIN) / lam_max if lam_max > 0.0 else np.inf
+    lo = (1.0 - _POLE_MARGIN) / lam_min if lam_min < 0.0 else -np.inf
+    r = np.clip(np.asarray(rho, dtype=np.float64), lo, hi)
+    a = 1.0 - r * (lam_max + lam_min) / 2.0
+    b = r * (lam_max - lam_min) / 2.0
+    k = np.arange(order + 1)
+    x_nodes = np.cos(np.pi * k / order)
+    with np.errstate(divide="ignore"):
+        f = np.log(np.abs(a[:, None] - b[:, None] * x_nodes[None, :]))
+    w = np.ones(order + 1, dtype=np.float64)
+    w[0] = w[-1] = 0.5
+    basis = np.cos(np.pi * np.outer(k, k) / order)
+    coeffs = (2.0 / order) * (f * w) @ basis.T
+    coeffs[:, 0] /= 2.0
+    coeffs[np.abs(b) < 1e-300] = 0.0
+    return coeffs
+
+
+def pool_probe_bias(
+    pool: ChebStochasticPool, rho_draws, *, T: int = 1, max_draws: int = 4000
+) -> np.ndarray | None:
+    """Each probe's first-order shift of the posterior mean of ρ, in posterior sd.
+
+    A log-density error ``e(ρ)`` moves the posterior mean by ``Cov(ρ, e(ρ))`` to
+    first order.  Posterior draws of ρ estimate that covariance directly, with
+    equal weights, since the draws already carry the posterior; weighting them
+    by the density again would sample its square and understate the spread by
+    ``1 − 1/√2``.  Probe ``l``'s error is its own estimate of the
+    log-determinant; the exact moments shift every probe equally and drop out.
+    The bias of an ``s``-probe estimate then has standard deviation
+    ``std(q)/√s``.  Returns ``None`` when the draws have no spread.
+    """
+    rho = np.asarray(rho_draws, dtype=np.float64).ravel()
+    rho = rho[np.isfinite(rho)]
+    if rho.size > max_draws:
+        rho = rho[np.linspace(0, rho.size - 1, max_draws).astype(int)]
+    sd = float(rho.std()) if rho.size > 1 else 0.0
+    if not sd > 0.0:
+        return None
+    d = pool.n_exact + 1
+    C = _log_cheb_coeffs_vec(rho, pool.lam_min, pool.lam_max, pool.order)
+    P = (float(T) * pool.n) * (C[:, d:] @ pool.probe_moments[d:])
+    return ((rho - rho.mean()) @ (P - P.mean(axis=0))) / (rho.size * sd)
+
+
+def probes_needed(
+    q: np.ndarray,
+    bar: float = DEFAULT_PROBE_BAR,
+    z: float = DEFAULT_PROBE_Z,
+) -> int:
+    """Probes at which the expected |bias| of the posterior mean falls to ``bar / z``.
+
+    ``E|bias| = √(2/π) · std(q) / √s``, solved for ``s``.  The error is taken
+    against the exact log-determinant, so no finite-pool correction applies.
+    """
+    spread = float(np.std(q, ddof=1)) if len(q) > 1 else 0.0
+    return int(np.ceil((_ABS_NORMAL * z * spread / bar) ** 2))
+
+
+@dataclass(frozen=True)
+class ProbeCheck:
+    """How a probe pool was sized against the posterior of ρ.
+
+    Attributes
+    ----------
+    n_probes : int
+        Probes in the pool after sizing; the estimator uses all of them.
+    spread : float
+        ``std(q)``: standard deviation of one probe's shift of the posterior
+        mean, in posterior sd.
+    bias : float
+        Expected |bias| of the posterior mean at ``n_probes``, in posterior sd.
+    bar, z : float
+        The target, met when ``bias <= bar / z``.
+    capped : bool
+        Whether the pool stopped at its maximum short of the target.
+    """
+
+    n_probes: int
+    spread: float
+    bias: float
+    bar: float
+    z: float
+    capped: bool
+
+
+def size_pool(
+    pool: ChebStochasticPool,
+    rho_draws,
+    *,
+    bar: float = DEFAULT_PROBE_BAR,
+    z: float = DEFAULT_PROBE_Z,
+    max_probes: int = DEFAULT_PROBE_MAX,
+    T: int = 1,
+) -> tuple[ChebStochasticPool, ProbeCheck | None]:
+    """Grow ``pool`` until its own spread says it holds enough probes.
+
+    Each round re-estimates the spread from every probe in hand, so the count
+    settles as the estimate firms up; the pool only grows, so the loop ends at
+    the target or at ``max_probes``.  Returns the pool and the check, or the
+    pool unchanged and ``None`` when the draws cannot price the probes.
+    """
+    while True:
+        q = pool_probe_bias(pool, rho_draws, T=T)
+        if q is None:
+            return pool, None
+        need = probes_needed(q, bar, z)
+        if min(need, int(max_probes)) <= pool.n_probes:
+            break
+        pool = grow_pool(pool, min(need, int(max_probes)))
+    spread = float(np.std(q, ddof=1))
+    s = pool.n_probes
+    check = ProbeCheck(
+        n_probes=s,
+        spread=spread,
+        bias=_ABS_NORMAL * spread / np.sqrt(s),
+        bar=float(bar),
+        z=float(z),
+        capped=bool(need > s),
+    )
+    return pool, check

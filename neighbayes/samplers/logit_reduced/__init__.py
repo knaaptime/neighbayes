@@ -60,6 +60,7 @@ def _run_binary_reduced_gibbs(
     krylov_dmax=0.4,
     krylov_reuse=True,
     timeout=None,
+    log_likelihood=False,
 ):
     """Registry runner for the reduced-form SAR-logit Pólya-Gamma Gibbs."""
     return model._fit_gibbs(
@@ -77,6 +78,7 @@ def _run_binary_reduced_gibbs(
         krylov_dmax=krylov_dmax,
         krylov_reuse=krylov_reuse,
         timeout=timeout,
+        log_likelihood=log_likelihood,
     )
 
 
@@ -94,4 +96,5 @@ register(
         "krylov_reuse",
         "timeout",
     },
+    skips_log_likelihood=True,
 )

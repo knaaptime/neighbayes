@@ -1074,6 +1074,7 @@ def run_chain(
     chain_id: int | None = None,
     progress_manager=None,
     chain_id_kw: int | None = None,
+    store_log_lik: bool = True,
 ) -> dict[str, np.ndarray]:
     """Run one chain of the PG-Gibbs sampler.
 
@@ -1121,7 +1122,7 @@ def run_chain(
     beta_samples = np.empty((n_keep, k), dtype=np.float64)
     sigma_samples = np.empty(n_keep, dtype=np.float64)
     alpha_samples = np.empty(n_keep, dtype=np.float64)
-    log_lik_samples = np.empty((n_keep, n), dtype=np.float64)
+    log_lik_samples = np.empty((n_keep, n), dtype=np.float64) if store_log_lik else None
     eta_norm_samples = np.empty(n_keep, dtype=np.float64)  # ||η||² for diagnostics
     eta_samples = np.empty((n_keep, n), dtype=np.float64) if return_eta else None
 
@@ -1184,7 +1185,10 @@ def run_chain(
                 beta_samples[idx] = state.beta
                 sigma_samples[idx] = np.sqrt(state.sigma2)  # store σ, not σ²
                 alpha_samples[idx] = state.alpha
-                log_lik_samples[idx] = _nb_loglik_pointwise(y, state.eta, state.alpha)
+                if store_log_lik:
+                    log_lik_samples[idx] = _nb_loglik_pointwise(
+                        y, state.eta, state.alpha
+                    )
                 eta_norm_samples[idx] = float(state.eta @ state.eta)
                 if return_eta:
                     eta_samples[idx] = state.eta

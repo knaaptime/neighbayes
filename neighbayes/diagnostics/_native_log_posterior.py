@@ -34,14 +34,9 @@ from __future__ import annotations
 from typing import Callable, Optional
 
 import numpy as np
-from scipy.special import gammaln
+from scipy.special import expit, gammaln, log_expit
 
 __all__ = ["native_log_posterior"]
-
-
-def _log_sigmoid(u: np.ndarray) -> np.ndarray:
-    """``log(sigmoid(u))`` without overflow — i.e. ``-softplus(-u)``."""
-    return -np.logaddexp(0.0, -u)
 
 
 def _normal_logp(eps: np.ndarray, sigma2: float) -> float:
@@ -155,11 +150,11 @@ def native_log_posterior(
         if spatial_name is not None:
             u = float(theta_flat[0])
             offset = 1
-            s = 1.0 / (1.0 + np.exp(-u))
+            s = expit(u)
             val = lo + (hi - lo) * s
             # Uniform log-density (−log(hi−lo)) plus the interval transform's
             # log-Jacobian (log((hi−lo)·s·(1−s))); the width cancels exactly.
-            total += float(_log_sigmoid(np.array(u)) + _log_sigmoid(np.array(-u)))
+            total += float(log_expit(u) + log_expit(-u))
         else:
             val = 0.0
 

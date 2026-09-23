@@ -2,7 +2,8 @@
 
 These lock the *structural* ``fit()`` contract — the exact set of posterior
 variables each model produces under each sampler, and that Gibbs attaches a
-``log_likelihood`` group — on the **current** code, so the registry / one-``fit()``
+``log_likelihood`` group when asked (``idata_kwargs={"log_likelihood": True}``)
+and none by default, as PyMC does — on the **current** code, so the registry / one-``fit()``
 migration must reproduce it exactly.  They assert structure, not draws, so they
 are insensitive to RNG-order changes (the roadmap's rule).
 
@@ -68,9 +69,22 @@ def _graph():
     return W_to_graph(_W_DENSE)
 
 
+#: Gibbs contract fits request the pointwise log-likelihood, so the opt-in is
+#: pinned for every family; ``test_gibbs_log_likelihood_is_opt_in`` pins the
+#: default.
+_LL = {"log_likelihood": True}
+
+
 def _fit_varnames(model, sampler):
+    kw = {"idata_kwargs": _LL} if sampler == "gibbs" else {}
     idata = model.fit(
-        sampler=sampler, draws=6, tune=6, chains=1, progressbar=False, random_seed=1
+        sampler=sampler,
+        draws=6,
+        tune=6,
+        chains=1,
+        progressbar=False,
+        random_seed=1,
+        **kw,
     )
     return set(idata.posterior.data_vars), ("log_likelihood" in idata.groups())
 
@@ -107,7 +121,7 @@ def test_gaussian_xs_fit_contract(name, ctor, data_fn, expected, sampler):
     varnames, has_ll = _fit_varnames(model, sampler)
     assert varnames == expected, f"{name} [{sampler}]: {sorted(varnames)}"
     if sampler == "gibbs":
-        assert has_ll, f"{name} gibbs should attach a log_likelihood group"
+        assert has_ll, f"{name} gibbs should attach a log_likelihood group on request"
 
 
 # ---------------------------------------------------------------------------
@@ -171,12 +185,13 @@ def test_gaussian_panel_fe_fit_contract(name, ctor, data_fn, expected, sampler):
     )
     if sampler == "gibbs":
         kwargs["n_jobs"] = 1
+        kwargs["idata_kwargs"] = _LL
     idata = model.fit(**kwargs)
     varnames = set(idata.posterior.data_vars)
     has_ll = "log_likelihood" in idata.groups()
     assert varnames == expected, f"{name} [{sampler}]: {sorted(varnames)}"
     if sampler == "gibbs":
-        assert has_ll, f"{name} gibbs should attach a log_likelihood group"
+        assert has_ll, f"{name} gibbs should attach a log_likelihood group on request"
 
 
 # ---------------------------------------------------------------------------
@@ -227,12 +242,13 @@ def test_gaussian_panel_re_fit_contract(name, ctor, data_fn, expected, sampler):
     )
     if sampler == "gibbs":
         kwargs["n_jobs"] = 1
+        kwargs["idata_kwargs"] = _LL
     idata = model.fit(**kwargs)
     varnames = set(idata.posterior.data_vars)
     has_ll = "log_likelihood" in idata.groups()
     assert varnames == expected, f"{name} [{sampler}]: {sorted(varnames)}"
     if sampler == "gibbs":
-        assert has_ll, f"{name} gibbs should attach a log_likelihood group"
+        assert has_ll, f"{name} gibbs should attach a log_likelihood group on request"
 
 
 # ---------------------------------------------------------------------------
@@ -282,10 +298,13 @@ def test_binary_xs_fit_contract(name):
         n_jobs=1,
         progressbar=False,
         random_seed=1,
+        idata_kwargs=_LL,
     )
     varnames = set(idata.posterior.data_vars)
     assert varnames == expected, f"{name} [gibbs]: {sorted(varnames)}"
-    assert "log_likelihood" in idata.groups(), f"{name} gibbs should attach log_lik"
+    assert "log_likelihood" in idata.groups(), (
+        f"{name} gibbs should attach log_lik on request"
+    )
 
 
 def test_sarlogit_numpy_backend_fit_contract():
@@ -301,6 +320,7 @@ def test_sarlogit_numpy_backend_fit_contract():
         n_jobs=1,
         progressbar=False,
         random_seed=1,
+        idata_kwargs=_LL,
     )
     assert set(idata.posterior.data_vars) == {"beta", "rho"}
     assert "log_likelihood" in idata.groups()
@@ -370,11 +390,14 @@ def test_count_xs_fit_contract(name, ctor, zi, expected, sampler):
     )
     if sampler == "gibbs":
         kwargs["n_jobs"] = 1
+        kwargs["idata_kwargs"] = _LL
     idata = model.fit(**kwargs)
     varnames = set(idata.posterior.data_vars)
     assert varnames == expected, f"{name} [{sampler}]: {sorted(varnames)}"
     if sampler == "gibbs":
-        assert "log_likelihood" in idata.groups(), f"{name} gibbs should attach log_lik"
+        assert "log_likelihood" in idata.groups(), (
+            f"{name} gibbs should attach log_lik on request"
+        )
 
 
 @pytest.mark.requires_jax
@@ -397,7 +420,55 @@ def test_zinb_jax_backend_fit_contract():
         n_jobs=1,
         progressbar=False,
         random_seed=1,
+        idata_kwargs=_LL,
     )
     varnames = set(idata.posterior.data_vars)
     assert varnames == {"beta", "rho", "alpha", "gamma", "lam"}, sorted(varnames)
     assert "log_likelihood" in idata.groups()
+
+
+# ---------------------------------------------------------------------------
+# Default: no pointwise log-likelihood unless requested
+# ---------------------------------------------------------------------------
+
+
+def _default_cases():
+    rng = np.random.default_rng(0)
+    y, X = make_sar_data(rng, _W_DENSE)
+    yield "SAR", lambda: SAR(y=y, X=X, W=_graph()), {}
+    yp, Xp, _ = make_panel_sar_data(
+        np.random.default_rng(1), _W_PANEL, PANEL_N, PANEL_T
+    )
+    yield (
+        "SARPanelFE",
+        lambda: SARPanelFE(
+            y=yp, X=Xp, W=_panel_graph(), N=PANEL_N, T=PANEL_T, effects=1
+        ),
+        {"n_jobs": 1},
+    )
+    yield (
+        "SARPanelRE",
+        lambda: SARPanelRE(y=yp, X=Xp, W=_panel_graph(), N=PANEL_N, T=PANEL_T),
+        {"n_jobs": 1},
+    )
+    yb, Xb = _binary_xy()
+    yield "SARLogit", lambda: SARLogit(y=yb, X=Xb, W=_binary_graph()), {"n_jobs": 1}
+    yc, Xc = _count_xy(zero_inflate=False)
+    yield "SARNegBin", lambda: SARNegBin(y=yc, X=Xc, W=_count_graph()), {"n_jobs": 1}
+
+
+@pytest.mark.parametrize(
+    "name,build,extra", [pytest.param(*c, id=c[0]) for c in _default_cases()]
+)
+@pytest.mark.filterwarnings("ignore:SAR Negative Binomial:UserWarning")
+def test_gibbs_log_likelihood_is_opt_in(name, build, extra):
+    idata = build().fit(
+        sampler="gibbs",
+        draws=6,
+        tune=6,
+        chains=1,
+        progressbar=False,
+        random_seed=1,
+        **extra,
+    )
+    assert "log_likelihood" not in idata.groups(), name

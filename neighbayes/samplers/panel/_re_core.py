@@ -958,6 +958,7 @@ def run_re_chain(
     progressbar: bool = True,
     chain_id: int = 0,
     progress_manager: object | None = None,
+    store_log_lik: bool = True,
 ) -> dict[str, np.ndarray]:
     """Run one chain of the RE panel Gibbs sampler.
 
@@ -1013,7 +1014,7 @@ def run_re_chain(
     sigma_samples = np.empty(n_keep, dtype=np.float64)
     alpha_samples = np.empty((n_keep, N), dtype=np.float64)
     sigma_alpha_samples = np.empty(n_keep, dtype=np.float64)
-    log_lik_samples = np.empty((n_keep, n), dtype=np.float64)
+    log_lik_samples = np.empty((n_keep, n), dtype=np.float64) if store_log_lik else None
 
     # Copy initial state
     state = REGibbsState(
@@ -1154,21 +1155,26 @@ def run_re_chain(
             # that the per-obs contributions sum to the joint log-density
             # used by NUTS).  Matches the convention in
             # ``run_gaussian_chain`` and the SAR NUTS post-sample path.
-            alpha_exp = state.alpha[unit_idx]
-            if model_type in ("sar", "sdm"):
-                resid = y - state.rho * Wy - X @ state.beta - alpha_exp
-            else:
-                resid_raw = y - X @ state.beta - alpha_exp
-                resid = resid_raw - state.rho * (cache.W_sparse @ resid_raw)
-            sigma = np.sqrt(state.sigma2)
-            ll = -0.5 * (resid / sigma) ** 2 - np.log(sigma) - 0.5 * np.log(2.0 * np.pi)
-            # T·log|I - ρ W_N| spread across all n = N·T observations.
-            # ``cache.logdet_fn`` was built with the panel's T, so this
-            # returns the total log-Jacobian.
-            jacobian = cache.logdet_fn(state.rho)
-            ll = ll + jacobian / n
-            ll = np.where(np.isfinite(ll), ll, -1e10)
-            log_lik_samples[j] = ll
+            if store_log_lik:
+                alpha_exp = state.alpha[unit_idx]
+                if model_type in ("sar", "sdm"):
+                    resid = y - state.rho * Wy - X @ state.beta - alpha_exp
+                else:
+                    resid_raw = y - X @ state.beta - alpha_exp
+                    resid = resid_raw - state.rho * (cache.W_sparse @ resid_raw)
+                sigma = np.sqrt(state.sigma2)
+                ll = (
+                    -0.5 * (resid / sigma) ** 2
+                    - np.log(sigma)
+                    - 0.5 * np.log(2.0 * np.pi)
+                )
+                # T·log|I - ρ W_N| spread across all n = N·T observations.
+                # ``cache.logdet_fn`` was built with the panel's T, so this
+                # returns the total log-Jacobian.
+                jacobian = cache.logdet_fn(state.rho)
+                ll = ll + jacobian / n
+                ll = np.where(np.isfinite(ll), ll, -1e10)
+                log_lik_samples[j] = ll
 
         # Progress bar
         if progressbar and progress_manager is None:

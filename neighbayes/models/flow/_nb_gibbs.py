@@ -28,6 +28,7 @@ def run_negbin_flow_gibbs(
     n_jobs: int = -1,
     gibbs_backend: str = "numpy",
     krylov_reuse: bool = True,
+    log_likelihood: bool = False,
 ) -> az.InferenceData:
     """Run the reduced-form PG-Gibbs sampler for an NB SAR flow model.
 
@@ -137,6 +138,7 @@ def run_negbin_flow_gibbs(
             rng=rng,
             chain_id=chain_id,
             progress_manager=progress_manager,
+            store_log_lik=log_likelihood,
         )
         if separable:
             return run_chain_separable(W_csc=W_csc, n=model._n, **common)
@@ -171,6 +173,7 @@ def run_negbin_flow_gibbs(
                 n_cycles=cache.n_rho_omega_cycles,
                 jax_seeds=seeds,
                 progressbar=progressbar,
+                store_log_lik=log_likelihood,
             )
         else:
             from ...samplers.negbin_reduced._flow_jax import run_chains_jax_flow
@@ -190,6 +193,7 @@ def run_negbin_flow_gibbs(
                 jax_seeds=seeds,
                 progressbar=progressbar,
                 krylov_reuse=krylov_reuse,
+                store_log_lik=log_likelihood,
             )
     else:
         from ...samplers._utils._seeds import spawn_chain_seeds
@@ -217,13 +221,15 @@ def run_negbin_flow_gibbs(
         "beta": np.stack([c["beta"] for c in chain_results], axis=0),
         "alpha": np.stack([c["alpha"] for c in chain_results], axis=0),
     }
-    log_lik = np.stack([c["log_lik"] for c in chain_results], axis=0)
+    ll = None
+    if log_likelihood:
+        ll = {"obs": np.stack([c["log_lik"] for c in chain_results], axis=0)}
     coords = {"coefficient": list(model._feature_names)}
     dims = {"beta": ["coefficient"]}
 
     model._idata = gibbs_to_inference_data(
         posterior_samples=posterior_samples,
-        log_likelihood={"obs": log_lik},
+        log_likelihood=ll,
         observed_data={"obs": model._y_int_vec},
         coords=coords,
         dims=dims,

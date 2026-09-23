@@ -28,9 +28,8 @@ For very large ``n`` (>20,000), use ``cheb_stochastic`` (avoids
 factorization entirely).
 
 **Cost**: ``n_coarse`` sparse LU factorizations + ``O(m)`` per-ρ
-evaluation, where ``n_coarse`` is the coarse-grid size (adaptive: 20–24 on
-every interval the tilt sweep serves, floor 20 and cap 96 — see
-:func:`_adaptive_n_coarse`) and
+evaluation, where ``n_coarse`` is the coarse-grid size (14 when the interval
+stays within ``|ρ| ≤ 0.9``, 18 otherwise — see :func:`_adaptive_n_coarse`) and
 ``m ≤ n_coarse // 2`` is the number of AAA support points actually selected.
 All ``I - ρW`` share one sparsity pattern, so KLU's symbolic analysis is
 computed once and reused for every subsequent numeric factorization (measured
@@ -47,6 +46,7 @@ import warnings
 from dataclasses import dataclass
 
 import numpy as np
+import scipy.linalg as sla
 import scipy.sparse as sp
 
 
@@ -671,96 +671,118 @@ def _aaa_algorithm(
 
 
 def _adaptive_n_coarse(rho_min: float, rho_max: float) -> int:
-    """Choose the coarse-grid size (= number of exact LU factorizations).
+    """Choose the coarse-grid size (= number of exact factorizations).
 
-    Each coarse-grid point costs one sparse LU factorization, so ``n_coarse``
-    directly sets the setup cost.  The AAA support count ``m`` (a subset of the
-    grid, capped at ``n_coarse // 2``) is what determines accuracy, and both
-    grow as the interval widens toward the ``ρ = ±1`` logdet singularities.
+    Each coarse-grid point costs one sparse factorization, and AAA keeps at most
+    half of them as support points.  The count is set by the bias the
+    interpolant induces in an estimate of ρ, which depends on how close the
+    estimate lies to a singularity of the Jacobian.  Row-standardized ``W`` has
+    spectral radius 1, directed or not, so every singularity ``1/λ`` lies on or
+    outside the unit circle and one sits at ``ρ = 1``; an estimate at ``ρ`` lies
+    at least ``1 - |ρ|`` from the nearest singularity.
 
-    The target is *posterior relevance*, not functional sup-norm exactness:
-    what a sampler can resolve is the variation of the error over a realistic
-    95% posterior window — the *tilt*.  The calibration experiment
-    (``experiments/aaa_full_interval_small_budget.py`` +
-    ``results/aaa_full_interval_small_budget.csv``, rook + knn, n ∈ {2500,
-    10000}, tilt threshold 1.8×10⁻³ log-units, the incumbent's
-    demonstrated-invisible slope-tilt) shows the required budget is nearly
-    flat in the Bernstein rate on the tilt axis: the full stability region
-    ``[-0.99, 0.99]`` — the interval an MCMC sampler actually has to serve —
-    needs only ~20 (worst design, rook 10k; 24 clears it by ~7×) versus 16 on
-    the narrow default ``[0.1, 0.8]``.  The previous ``16/ln ρ_B`` rule asked
-    for 113 on the full interval and hit the cap at 96 — a 4–5× setup-cost
-    overshoot that buys nothing a posterior can spend, since the sup-norm
-    there stays O(0.1–2) even at 96 nodes regardless.
+    AAA's poles cluster toward each singularity, and the distance from the
+    singularity to the nearest pole (the *reach*, :func:`aaa_reach`) shrinks as
+    support points are added.  In calibration sweeps over eleven weights
+    matrices (rook lattices; queen and distance-band contiguity on block groups
+    and tracts; directed k-NN graphs), 14 nodes (7 support points) kept the
+    maximum-likelihood bias in ρ under 1e-4 for every true ``|ρ| ≤ 0.9``, and 18
+    nodes (9 support points) for every true ``|ρ| ≤ 0.98``, once spurious poles
+    were removed (:func:`_remove_spurious_poles`).
 
-    The rule keeps the inverse-``ln ρ_B`` shape with a tilt-calibrated
-    constant 3.4 and raises the floor from 8 to 20 — the minimum budget the
-    sweep shows to be tilt-adequate anywhere (worst design, rook 10k, clears
-    the threshold at 20):
+    Without an estimate in hand the count reads the interval's outer edge: 14
+    nodes when the interval stays within ``|ρ| ≤ 0.9``, 18 otherwise.  With an
+    estimate, :func:`aaa_reach` gives a sharper test: in the same sweeps a fit
+    with at least 7 support points and no pole inside the unit disk carried a
+    bias under 1e-4 wherever the estimate lay more than four reaches from the
+    nearest singularity.
 
-    - full ``[-0.99, 0.99]``: ⌈3.4/0.142⌉ = 24 (tilt 2.5×10⁻⁴, ~7× under
-      threshold)
-    - wide ``[-0.5, 0.95]``: ⌈3.4/0.369⌉ = 10 → floor 20 (sup-norm 1×10⁻⁴,
-      so even worst-case concentration of that error inside a posterior
-      window stays ~17× under the tilt threshold)
-    - near-singular narrow ``[0.85, 0.99]``: ⌈3.4/0.528⌉ = 7 → floor 20
-      (sup-norm 1.6×10⁻³ < threshold as an upper bound on tilt; the actual
-      tilt is far lower because the error concentrates at the interval edge,
-      away from the posterior windows)
-    - narrow default ``[0.1, 0.8]``: ⌈3.4/1.024⌉ = 4 → floor 20 (sup-norm
-      ~3×10⁻¹⁰, a hair under the incumbent 16's 2.7×10⁻⁹)
-
-    The floor replacing the old cap-as-default matters for wide intervals:
-    ``[-0.5, 0.95]`` had drifted to 44 under the roundoff-floor-targeted
-    constant and ``[-0.99, 0.99]`` sat at the 96 cap; both now draw 20–24,
-    matching what the tilt sweep shows is needed.
-
-    An earlier version of this docstring described a ~1e-7--1e-8 "floor where
-    AAA saturates" past ~96 nodes.  That floor was an artefact of the greedy
-    loop's stopping rule, which was scaled by ``max|f| = O(n)`` and so cut the
-    fit short on large problems; see :func:`_aaa_algorithm`.  With an absolute
-    tolerance and best-iterate retention the delivered error keeps falling with
-    the node count and the non-monotonicity is gone.
-
-    The cap still binds only on intervals that hug ``±1`` more closely than
-    ``[-0.99, 0.99]`` (``ln ρ_B < 3.4/96 ≈ 0.0354``, i.e. intervals within
-    ~0.0177 of the singularity).  A post-warmup refit narrows ``[rho_min,
-    rho_max]``, which raises the Bernstein rate; the floor 20 keeps the
-    narrow-refit budget at the minimum tilt-adequate level while the rate term
-    allows it to grow again for refit windows that themselves hug ``±1``.
-
-    This mirrors :func:`~._chebyshev.cheb_order_for_tolerance`, which sizes the
-    Chebyshev order the same way.  At matched node counts on the full interval
-    AAA is three to four orders more accurate than the polynomial, and stays
-    ahead at every count tested up to 128.
-
-    Parameters
-    ----------
-    rho_min, rho_max : float
-        The ρ approximation interval.
-
-    Returns
-    -------
-    int
-        Number of Chebyshev-spaced coarse-grid points (LU factorizations).
+    ``NEIGHBAYES_LOGDET_NODE_CAP``, when set, caps the count.
     """
-    from ._chebyshev import bernstein_rho
+    edge = max(abs(float(rho_min)), abs(float(rho_max)))
+    n_coarse = 14 if edge <= 0.9 else 18
+    cap = os.getenv("NEIGHBAYES_LOGDET_NODE_CAP")
+    return min(n_coarse, int(cap)) if cap else n_coarse
 
-    # Tilt-calibrated inverse-Bernstein rule with a uniform 20-node floor.
-    # The constant 3.4 places the full stability interval at 24
-    # nodes, where the measured tilt is 2.5×10⁻⁴ — ~7× below the 1.8×10⁻³
-    # posterior-resolution threshold — and the floor 20 is the minimum
-    # tilt-adequate budget the sweep shows anywhere (rook 10k clears the
-    # threshold at 20).  It rescues the wide-interval cases whose extra nodes
-    # bought sup-norm accuracy no posterior can spend (``[-0.5, 0.95]`` at
-    # 44, ``[-0.99, 0.99]`` at the 96 cap).
-    rho_b = bernstein_rho(rho_min, rho_max)
-    if not np.isfinite(rho_b) or rho_b <= 1.0:
-        _c0 = os.getenv("NEIGHBAYES_LOGDET_NODE_CAP")
-        return int(_c0) if _c0 else 96
-    _c = os.getenv("NEIGHBAYES_LOGDET_NODE_CAP")
-    hi = int(_c) if _c else 96
-    return int(np.clip(int(np.ceil(3.4 / np.log(rho_b))), 20, hi))
+
+def aaa_poles(support_points, weights) -> np.ndarray:
+    """Poles of the barycentric rational with these support points and weights.
+
+    They are the finite eigenvalues of the arrowhead pencil
+    ``([[0, wᵀ], [1, diag(z)]], diag(0, 1, …, 1))`` [@nakatsukasa2018].
+    """
+    z = np.asarray(support_points, dtype=np.float64)
+    w = np.asarray(weights, dtype=np.float64)
+    s = len(z)
+    if s < 2:
+        return np.empty(0, dtype=complex)
+    E = np.zeros((s + 1, s + 1))
+    E[0, 1:] = w
+    E[1:, 0] = 1.0
+    E[1:, 1:] = np.diag(z)
+    B = np.eye(s + 1)
+    B[0, 0] = 0.0
+    ev = sla.eigvals(E, B)
+    return ev[np.isfinite(ev)]
+
+
+def _remove_spurious_poles(z, f, sp_z, sp_f, w, radius: float = 1.0):
+    """Remove support points that produce poles inside ``|ρ| < radius``, and refit.
+
+    ``log|I - ρW|`` for row-standardized ``W`` is analytic in the open unit disk,
+    so a pole there approximates no singularity: it is a Froissart doublet,
+    whatever its residue.  The residue test of [@nakatsukasa2018] (residues
+    below 1e-13) misses the doublets AAA produces on this function, whose
+    residues reach 0.2 and which bias an estimate of ρ lying near them.  Each is
+    removed by deleting the support point nearest to it and re-solving the
+    Loewner least-squares problem on the remaining samples, so no new function
+    values are needed.
+    """
+    z = np.asarray(z, dtype=np.float64)
+    f = np.asarray(f, dtype=np.float64)
+    sp_z = np.asarray(sp_z, dtype=np.float64)
+    sp_f = np.asarray(sp_f, dtype=np.float64)
+    w = np.asarray(w, dtype=np.float64)
+    for _ in range(len(sp_z)):
+        bad = aaa_poles(sp_z, w)
+        bad = bad[np.abs(bad) < radius]
+        if bad.size == 0:
+            break
+        keep = np.ones(len(sp_z), dtype=bool)
+        for q in bad:
+            keep[np.argmin(np.abs(sp_z - q))] = False
+        if keep.sum() < 2:
+            break
+        sp_z, sp_f = sp_z[keep], sp_f[keep]
+        rest = ~np.isin(z, sp_z)
+        A = (f[rest][:, None] - sp_f[None, :]) / (z[rest][:, None] - sp_z[None, :])
+        w = np.linalg.svd(A, full_matrices=False)[2][-1]
+    return sp_z, sp_f, w
+
+
+def aaa_reach(pre: AAAPrecompute, sigma_left: complex = -1.0) -> tuple[float, float]:
+    """How close the approximant's poles come to the singularities at each end.
+
+    Returns ``(right, left)``: the distance from ``ρ = 1`` to the nearest pole
+    outside the unit disk with positive real part, and from ``sigma_left`` to the
+    nearest such pole with negative real part.  ``sigma_left`` is the
+    singularity nearest ``ρ = -1``: ``-1`` for a bipartite graph or one with an
+    isolated pair of neighbors, ``1/λ_min`` for symmetrizable ``W`` in general.
+    Either distance is ``nan`` when no pole lies on that side.
+
+    The reach measures how finely the fit resolves the function near a
+    singularity.  In the calibration sweeps described in
+    :func:`_adaptive_n_coarse`, an estimate lying more than four reaches from
+    the nearest singularity carried a bias under 1e-4 whenever the fit had at
+    least 7 support points and no pole inside the unit disk.
+    """
+    p = aaa_poles(pre.support_points, pre.weights)
+    p = p[np.abs(p) >= 1.0]
+    right = p[p.real > 0]
+    left = p[p.real < 0]
+    r = float(np.abs(right - 1.0).min()) if right.size else float("nan")
+    lft = float(np.abs(left - sigma_left).min()) if left.size else float("nan")
+    return r, lft
 
 
 def _aaa_algorithm_lazy(
@@ -769,6 +791,7 @@ def _aaa_algorithm_lazy(
     tol: float = 1e-13,
     max_iter: int = 30,
     n_coarse: int = 30,
+    spurious_radius: float | None = 1.0,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Lazy AAA: evaluates ``eval_fn`` at a small coarse grid, not the full sample grid.
 
@@ -794,6 +817,10 @@ def _aaa_algorithm_lazy(
         Maximum number of support points.
     n_coarse : int, default 30
         Number of Chebyshev-spaced evaluation points for the coarse phase.
+    spurious_radius : float or None, default 1.0
+        Poles inside ``|ρ| < spurious_radius`` are removed after the fit by
+        :func:`_remove_spurious_poles`, at no extra evaluations.  ``None`` keeps
+        the raw AAA fit.
 
     Returns
     -------
@@ -815,6 +842,10 @@ def _aaa_algorithm_lazy(
 
     # Run standard AAA on the coarse grid (uses true values for Loewner LSQ)
     sp_z, sp_f, w = _aaa_algorithm(z_coarse, f_coarse, tol=tol, max_iter=max_iter)
+    if spurious_radius is not None:
+        sp_z, sp_f, w = _remove_spurious_poles(
+            z_coarse, f_coarse, sp_z, sp_f, w, radius=spurious_radius
+        )
 
     return sp_z, sp_f, w
 
