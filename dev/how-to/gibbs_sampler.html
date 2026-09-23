@@ -1552,7 +1552,7 @@ A NUTS run carries <code class="docutils literal notranslate"><span class="pre">
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>sample_stats: ['acceptance_rate', 'lp']
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>sample_stats: ['acceptance_rate']
 ran Gibbs
 </code></pre></div>
 </div>
@@ -1592,7 +1592,7 @@ tuning difference — and this is the cheapest validation available.</p>
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 2 jobs)
 NUTS: [rho, beta, sigma2]
-Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 11 seconds.
+Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 15 seconds.
 </code></pre></div>
 </div>
 <div class="output text_html"><div>
@@ -1621,12 +1621,12 @@ Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws 
     <tr>
       <th>rho</th>
       <td>0.4041</td>
-      <td>0.4068</td>
+      <td>0.4105</td>
     </tr>
     <tr>
       <th>sigma</th>
       <td>10.5043</td>
-      <td>10.5059</td>
+      <td>10.5068</td>
     </tr>
   </tbody>
 </table>
@@ -1673,21 +1673,21 @@ Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws 
   <tbody>
     <tr>
       <th>Gibbs</th>
-      <td>3.357</td>
+      <td>4.382</td>
       <td>7514.982</td>
-      <td>2238.801</td>
+      <td>1714.982</td>
       <td>6721.629</td>
-      <td>2002.452</td>
+      <td>1533.932</td>
       <td>1.001</td>
     </tr>
     <tr>
       <th>NUTS</th>
-      <td>14.027</td>
-      <td>4277.488</td>
-      <td>304.942</td>
-      <td>5020.918</td>
-      <td>357.941</td>
-      <td>1.001</td>
+      <td>20.021</td>
+      <td>3989.158</td>
+      <td>199.248</td>
+      <td>4820.380</td>
+      <td>240.765</td>
+      <td>1.000</td>
     </tr>
   </tbody>
 </table>
@@ -1770,20 +1770,20 @@ path’s vectorised chains (<code class="docutils literal notranslate"><span cla
   <tbody>
     <tr>
       <th>numpy</th>
-      <td>2.288</td>
+      <td>3.387</td>
       <td>8206.235</td>
-      <td>3587.343</td>
+      <td>2422.59</td>
       <td>6931.595</td>
-      <td>3030.136</td>
+      <td>2046.299</td>
       <td>1.001</td>
     </tr>
     <tr>
       <th>jax</th>
-      <td>2.540</td>
+      <td>3.317</td>
       <td>7514.982</td>
-      <td>2958.147</td>
+      <td>2265.75</td>
       <td>6721.629</td>
-      <td>2645.857</td>
+      <td>2026.556</td>
       <td>1.001</td>
     </tr>
   </tbody>
@@ -1818,11 +1818,11 @@ sampler adapts from there during warmup.</p>
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>draws kept per chain with thin=2: 1000
 </code></pre></div>
 </div>
-<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>seconds             2.515
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>seconds             3.714
 ess rho          3587.911
-ess/sec rho      1426.610
+ess/sec rho       966.077
 ess sigma        3983.721
-ess/sec sigma    1583.990
+ess/sec sigma    1072.652
 max rhat            1.001
 Name: slice_width=0.25, thin=2, dtype: float64
 </code></pre></div>
@@ -1913,22 +1913,22 @@ On a small problem the exact answer is free, so there is no excuse not to.</p>
       <th>eigenvalue</th>
       <td>0.4041</td>
       <td>0.1252</td>
-      <td>2.4612</td>
+      <td>3.3891</td>
       <td>7514.9820</td>
     </tr>
     <tr>
       <th>chebyshev</th>
       <td>0.4033</td>
       <td>0.1252</td>
-      <td>2.7833</td>
+      <td>3.6700</td>
       <td>7709.4712</td>
     </tr>
     <tr>
       <th>cheb_stochastic</th>
-      <td>0.4038</td>
-      <td>0.1258</td>
-      <td>6.8026</td>
-      <td>7843.4809</td>
+      <td>0.4042</td>
+      <td>0.1245</td>
+      <td>3.8732</td>
+      <td>7708.9704</td>
     </tr>
   </tbody>
 </table>

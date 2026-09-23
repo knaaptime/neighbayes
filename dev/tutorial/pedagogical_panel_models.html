@@ -1850,6 +1850,8 @@ cross-sectional models did not have: unit effects <span class="math notranslate 
         <span class="n">chains</span><span class="o">=</span><span class="n">chains</span><span class="p">,</span>
         <span class="n">random_seed</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span>
         <span class="n">progressbar</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="c1"># Stored only on request (as in PyMC); az.loo / az.waic need it.</span>
+        <span class="n">idata_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s2">"log_likelihood"</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
     <span class="p">)</span>
     <span class="n">summary</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="n">round_to</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
     <span class="n">effects_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">spatial_effects</span><span class="p">())</span>
@@ -1890,9 +1892,9 @@ cross-sectional models did not have: unit effects <span class="math notranslate 
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 4 seconds.
+Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 6 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
-/tmp/ipykernel_10833/3906709728.py:39: UserWarning: The figure layout has changed to tight
+/tmp/ipykernel_11040/2713454824.py:41: UserWarning: The figure layout has changed to tight
   plt.tight_layout()
 </code></pre></div>
 </div>
@@ -2183,7 +2185,7 @@ for Jupyter support
     </tr>
   </tbody>
 </table>
-</div></div><img alt="../_images/d0874af412464978e6eadeee68a2031475af64f41a8b8373cb35b3fdf0664f9f.png" src="../_images/d0874af412464978e6eadeee68a2031475af64f41a8b8373cb35b3fdf0664f9f.png" />
+</div></div><img alt="../_images/3601cecf8c315384ad99c7004fc2a611493d8cd060915f1d3bf97d7a6e182690.png" src="../_images/3601cecf8c315384ad99c7004fc2a611493d8cd060915f1d3bf97d7a6e182690.png" />
 </div>
 </div>
 <h2 id="add-a-spatial-lag-on-the-outcome">Add a spatial lag on the outcome<a class="headerlink" href="#add-a-spatial-lag-on-the-outcome" title="Link to this heading">¶</a></h2>
@@ -2202,7 +2204,7 @@ for Jupyter support
 <div class="cell_output docutils container">
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
   W_arr = np.asarray(W, dtype=np.float64)
-/tmp/ipykernel_10833/3906709728.py:39: UserWarning: The figure layout has changed to tight
+/tmp/ipykernel_11040/2713454824.py:41: UserWarning: The figure layout has changed to tight
   plt.tight_layout()
 </code></pre></div>
 </div>
@@ -2213,7 +2215,7 @@ for Jupyter support
   warnings.warn('install "ipywidgets" for Jupyter support')
 </pre>
 </div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 3s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">332</span> draws/s<span style="font-weight: bold">)</span>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 3s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">736</span> draws/s<span style="font-weight: bold">)</span>
 </pre>
 </div><div class="output text_html"><div>
 <style scoped>
@@ -2517,7 +2519,7 @@ for Jupyter support
     </tr>
   </tbody>
 </table>
-</div></div><img alt="../_images/0153db2d7a12661ac2f83b407cc7a00c9cedf73c6525091306ff550b3db145cb.png" src="../_images/0153db2d7a12661ac2f83b407cc7a00c9cedf73c6525091306ff550b3db145cb.png" />
+</div></div><img alt="../_images/8343412ed9db8f8132d2dac1ddef8a30f932e57e20dbb754a41dfb1bc2569566.png" src="../_images/8343412ed9db8f8132d2dac1ddef8a30f932e57e20dbb754a41dfb1bc2569566.png" />
 </div>
 </div>
 <h2 id="try-spatial-structure-in-the-errors-instead">Try spatial structure in the errors instead<a class="headerlink" href="#try-spatial-structure-in-the-errors-instead" title="Link to this heading">¶</a></h2>
@@ -2536,7 +2538,7 @@ for Jupyter support
 <div class="cell_output docutils container">
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
   W_arr = np.asarray(W, dtype=np.float64)
-/tmp/ipykernel_10833/3906709728.py:39: UserWarning: The figure layout has changed to tight
+/tmp/ipykernel_11040/2713454824.py:41: UserWarning: The figure layout has changed to tight
   plt.tight_layout()
 </code></pre></div>
 </div>
@@ -2547,7 +2549,7 @@ for Jupyter support
   warnings.warn('install "ipywidgets" for Jupyter support')
 </pre>
 </div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 3s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">317</span> draws/s<span style="font-weight: bold">)</span>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 4s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">517</span> draws/s<span style="font-weight: bold">)</span>
 </pre>
 </div><div class="output text_html"><div>
 <style scoped>
@@ -2851,7 +2853,7 @@ for Jupyter support
     </tr>
   </tbody>
 </table>
-</div></div><img alt="../_images/4a44edfe836dc86731c35d3643944a527ba17518075b9a67b39429c9fce0c3ff.png" src="../_images/4a44edfe836dc86731c35d3643944a527ba17518075b9a67b39429c9fce0c3ff.png" />
+</div></div><img alt="../_images/aae7380c67dfceba1ffb594f7412e95b5c9db53b1b78747b5ce122f690724a64.png" src="../_images/aae7380c67dfceba1ffb594f7412e95b5c9db53b1b78747b5ce122f690724a64.png" />
 </div>
 </div>
 <h2 id="combine-both-channels">Combine both channels<a class="headerlink" href="#combine-both-channels" title="Link to this heading">¶</a></h2>
@@ -2870,7 +2872,7 @@ for Jupyter support
 <div class="cell_output docutils container">
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
   W_arr = np.asarray(W, dtype=np.float64)
-/tmp/ipykernel_10833/3906709728.py:39: UserWarning: The figure layout has changed to tight
+/tmp/ipykernel_11040/2713454824.py:41: UserWarning: The figure layout has changed to tight
   plt.tight_layout()
 </code></pre></div>
 </div>
@@ -2881,7 +2883,7 @@ for Jupyter support
   warnings.warn('install "ipywidgets" for Jupyter support')
 </pre>
 </div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 3s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">291</span> draws/s<span style="font-weight: bold">)</span>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 4s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">708</span> draws/s<span style="font-weight: bold">)</span>
 </pre>
 </div><div class="output text_html"><div>
 <style scoped>
@@ -3265,7 +3267,7 @@ for Jupyter support
     </tr>
   </tbody>
 </table>
-</div></div><img alt="../_images/c47ebaa6d0858b0f0bafc6fa9dad86cdf55286f2fc356d17f4abc53c67ec8cdb.png" src="../_images/c47ebaa6d0858b0f0bafc6fa9dad86cdf55286f2fc356d17f4abc53c67ec8cdb.png" />
+</div></div><img alt="../_images/22c3f399edd7b2a44b7aa55396eab5d666425a25bc8b4389039950ec90b0f7c0.png" src="../_images/22c3f399edd7b2a44b7aa55396eab5d666425a25bc8b4389039950ec90b0f7c0.png" />
 </div>
 </div>
 <h2 id="the-error-side-combination">The error-side combination<a class="headerlink" href="#the-error-side-combination" title="Link to this heading">¶</a></h2>
@@ -3284,7 +3286,7 @@ for Jupyter support
 <div class="cell_output docutils container">
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
   W_arr = np.asarray(W, dtype=np.float64)
-/tmp/ipykernel_10833/3906709728.py:39: UserWarning: The figure layout has changed to tight
+/tmp/ipykernel_11040/2713454824.py:41: UserWarning: The figure layout has changed to tight
   plt.tight_layout()
 </code></pre></div>
 </div>
@@ -3295,7 +3297,7 @@ for Jupyter support
   warnings.warn('install "ipywidgets" for Jupyter support')
 </pre>
 </div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 3s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">042</span> draws/s<span style="font-weight: bold">)</span>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 4s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">514</span> draws/s<span style="font-weight: bold">)</span>
 </pre>
 </div><div class="output text_html"><div>
 <style scoped>
@@ -3679,7 +3681,7 @@ for Jupyter support
     </tr>
   </tbody>
 </table>
-</div></div><img alt="../_images/f4f94f3445666256e7a02af53dcdd301b0198d2e971a6da5ef829321755c9f8c.png" src="../_images/f4f94f3445666256e7a02af53dcdd301b0198d2e971a6da5ef829321755c9f8c.png" />
+</div></div><img alt="../_images/ac8d26e3d9e6fe12025b1e4295233487d14310009d76a8dea6c5aad09bb93c15.png" src="../_images/ac8d26e3d9e6fe12025b1e4295233487d14310009d76a8dea6c5aad09bb93c15.png" />
 </div>
 </div>
 <h3 id="check-the-chains-before-comparing-anything">Check the chains before comparing anything<a class="headerlink" href="#check-the-chains-before-comparing-anything" title="Link to this heading">¶</a></h3>
@@ -3770,9 +3772,9 @@ and HPDI stability for the spatial scalar.</p>
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2, sigma_alpha, alpha]
-Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 6 seconds.
+Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 8 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
-/tmp/ipykernel_10833/3906709728.py:39: UserWarning: The figure layout has changed to tight
+/tmp/ipykernel_11040/2713454824.py:41: UserWarning: The figure layout has changed to tight
   plt.tight_layout()
 </code></pre></div>
 </div>
@@ -3815,61 +3817,61 @@ for Jupyter support
       <th>Intercept</th>
       <td>2.365</td>
       <td>0.040</td>
-      <td>2.296</td>
-      <td>2.446</td>
+      <td>2.291</td>
+      <td>2.442</td>
       <td>0.001</td>
       <td>0.001</td>
-      <td>2508.240</td>
-      <td>2884.135</td>
-      <td>1.001</td>
+      <td>2259.265</td>
+      <td>2510.368</td>
+      <td>1.000</td>
     </tr>
     <tr>
       <th>poverty</th>
-      <td>-0.775</td>
-      <td>0.028</td>
-      <td>-0.831</td>
-      <td>-0.726</td>
+      <td>-0.776</td>
+      <td>0.027</td>
+      <td>-0.828</td>
+      <td>-0.724</td>
       <td>0.000</td>
       <td>0.000</td>
-      <td>6447.029</td>
-      <td>2963.385</td>
+      <td>5004.498</td>
+      <td>2982.361</td>
       <td>1.000</td>
     </tr>
     <tr>
       <th>rev_rating</th>
-      <td>0.604</td>
-      <td>0.028</td>
-      <td>0.552</td>
-      <td>0.656</td>
+      <td>0.605</td>
+      <td>0.027</td>
+      <td>0.553</td>
+      <td>0.654</td>
       <td>0.000</td>
       <td>0.000</td>
-      <td>6508.077</td>
-      <td>2698.771</td>
+      <td>5142.169</td>
+      <td>2830.256</td>
       <td>1.000</td>
     </tr>
     <tr>
       <th>num_spots</th>
-      <td>0.434</td>
-      <td>0.028</td>
-      <td>0.380</td>
-      <td>0.484</td>
+      <td>0.433</td>
+      <td>0.029</td>
+      <td>0.381</td>
+      <td>0.490</td>
       <td>0.000</td>
       <td>0.000</td>
-      <td>5919.819</td>
-      <td>3136.648</td>
-      <td>1.001</td>
+      <td>6042.893</td>
+      <td>2648.999</td>
+      <td>1.000</td>
     </tr>
     <tr>
       <th>crowded</th>
-      <td>-0.554</td>
-      <td>0.027</td>
-      <td>-0.606</td>
-      <td>-0.507</td>
+      <td>-0.555</td>
+      <td>0.026</td>
+      <td>-0.605</td>
+      <td>-0.506</td>
       <td>0.000</td>
       <td>0.000</td>
-      <td>5738.965</td>
-      <td>3188.795</td>
-      <td>1.000</td>
+      <td>4757.733</td>
+      <td>2931.135</td>
+      <td>1.001</td>
     </tr>
     <tr>
       <th>...</th>
@@ -3886,62 +3888,62 @@ for Jupyter support
     <tr>
       <th>alpha[398]</th>
       <td>0.656</td>
-      <td>0.393</td>
-      <td>-0.051</td>
-      <td>1.428</td>
+      <td>0.395</td>
+      <td>-0.047</td>
+      <td>1.431</td>
       <td>0.005</td>
-      <td>0.006</td>
-      <td>6398.043</td>
-      <td>2767.495</td>
+      <td>0.007</td>
+      <td>5231.769</td>
+      <td>2972.787</td>
       <td>1.001</td>
     </tr>
     <tr>
       <th>alpha[399]</th>
-      <td>-0.348</td>
+      <td>-0.341</td>
       <td>0.400</td>
-      <td>-1.119</td>
-      <td>0.384</td>
-      <td>0.004</td>
+      <td>-1.088</td>
+      <td>0.416</td>
+      <td>0.005</td>
       <td>0.007</td>
-      <td>8588.225</td>
-      <td>2825.133</td>
-      <td>1.001</td>
+      <td>6824.768</td>
+      <td>2923.986</td>
+      <td>1.000</td>
     </tr>
     <tr>
       <th>sigma2</th>
-      <td>1.053</td>
-      <td>0.041</td>
-      <td>0.976</td>
-      <td>1.131</td>
+      <td>1.055</td>
+      <td>0.043</td>
+      <td>0.979</td>
+      <td>1.142</td>
       <td>0.001</td>
       <td>0.001</td>
-      <td>3687.663</td>
-      <td>3014.526</td>
-      <td>1.001</td>
+      <td>3839.567</td>
+      <td>2647.755</td>
+      <td>1.000</td>
     </tr>
     <tr>
       <th>sigma_alpha</th>
-      <td>0.606</td>
+      <td>0.607</td>
       <td>0.038</td>
-      <td>0.540</td>
-      <td>0.683</td>
+      <td>0.536</td>
+      <td>0.678</td>
       <td>0.001</td>
       <td>0.001</td>
-      <td>1567.664</td>
-      <td>2034.005</td>
-      <td>1.001</td>
+      <td>1371.388</td>
+      <td>1926.880</td>
+      <td>1.000</td>
     </tr>
     <tr>
       <th>sigma</th>
-      <td>1.026</td>
-      <td>0.020</td>
-      <td>0.988</td>
-      <td>1.063</td>
+      <td>1.027</td>
+      <td>0.021</td>
+      <td>0.989</td>
+      <td>1.069</td>
       <td>0.000</td>
       <td>0.000</td>
-      <td>3687.663</td>
-      <td>3014.526</td>
-      <td>1.001</td>
+      <td>3839.567</td>
+      <td>2647.755</td>
+      <td>1.000</td>
     </tr>
   </tbody>
 </table>
@@ -3996,62 +3998,62 @@ for Jupyter support
   <tbody>
     <tr>
       <th>poverty</th>
-      <td>-0.775114</td>
-      <td>-0.830151</td>
-      <td>-0.721091</td>
+      <td>-0.776356</td>
+      <td>-0.830161</td>
+      <td>-0.722252</td>
       <td>0.0</td>
       <td>0.0</td>
       <td>0.0</td>
       <td>0.0</td>
       <td>0.0</td>
-      <td>-0.775114</td>
-      <td>-0.830151</td>
-      <td>-0.721091</td>
+      <td>-0.776356</td>
+      <td>-0.830161</td>
+      <td>-0.722252</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>rev_rating</th>
-      <td>0.604485</td>
-      <td>0.549726</td>
-      <td>0.658455</td>
+      <td>0.604710</td>
+      <td>0.551565</td>
+      <td>0.658261</td>
       <td>0.0</td>
       <td>0.0</td>
       <td>0.0</td>
       <td>0.0</td>
       <td>0.0</td>
-      <td>0.604485</td>
-      <td>0.549726</td>
-      <td>0.658455</td>
+      <td>0.604710</td>
+      <td>0.551565</td>
+      <td>0.658261</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>num_spots</th>
-      <td>0.433511</td>
-      <td>0.380726</td>
-      <td>0.488656</td>
+      <td>0.433469</td>
+      <td>0.375984</td>
+      <td>0.490176</td>
       <td>0.0</td>
       <td>0.0</td>
       <td>0.0</td>
       <td>0.0</td>
       <td>0.0</td>
-      <td>0.433511</td>
-      <td>0.380726</td>
-      <td>0.488656</td>
+      <td>0.433469</td>
+      <td>0.375984</td>
+      <td>0.490176</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>crowded</th>
-      <td>-0.554354</td>
-      <td>-0.606157</td>
-      <td>-0.502989</td>
+      <td>-0.554702</td>
+      <td>-0.605972</td>
+      <td>-0.502649</td>
       <td>0.0</td>
       <td>0.0</td>
       <td>0.0</td>
       <td>0.0</td>
       <td>0.0</td>
-      <td>-0.554354</td>
-      <td>-0.606157</td>
-      <td>-0.502989</td>
+      <td>-0.554702</td>
+      <td>-0.605972</td>
+      <td>-0.502649</td>
       <td>0.0</td>
     </tr>
   </tbody>
@@ -4086,61 +4088,61 @@ for Jupyter support
       <th>beta[Intercept]</th>
       <td>2.365</td>
       <td>0.040</td>
-      <td>2508.240</td>
-      <td>2884.135</td>
-      <td>1.001</td>
+      <td>2259.265</td>
+      <td>2510.368</td>
+      <td>1.000</td>
     </tr>
     <tr>
       <th>beta[poverty]</th>
-      <td>-0.775</td>
-      <td>0.028</td>
-      <td>6447.029</td>
-      <td>2963.385</td>
+      <td>-0.776</td>
+      <td>0.027</td>
+      <td>5004.498</td>
+      <td>2982.361</td>
       <td>1.000</td>
     </tr>
     <tr>
       <th>beta[rev_rating]</th>
-      <td>0.604</td>
-      <td>0.028</td>
-      <td>6508.077</td>
-      <td>2698.771</td>
+      <td>0.605</td>
+      <td>0.027</td>
+      <td>5142.169</td>
+      <td>2830.256</td>
       <td>1.000</td>
     </tr>
     <tr>
       <th>beta[num_spots]</th>
-      <td>0.434</td>
-      <td>0.028</td>
-      <td>5919.819</td>
-      <td>3136.648</td>
-      <td>1.001</td>
-    </tr>
-    <tr>
-      <th>beta[crowded]</th>
-      <td>-0.554</td>
-      <td>0.027</td>
-      <td>5738.965</td>
-      <td>3188.795</td>
+      <td>0.433</td>
+      <td>0.029</td>
+      <td>6042.893</td>
+      <td>2648.999</td>
       <td>1.000</td>
     </tr>
     <tr>
-      <th>sigma</th>
-      <td>1.026</td>
-      <td>0.020</td>
-      <td>3687.663</td>
-      <td>3014.526</td>
+      <th>beta[crowded]</th>
+      <td>-0.555</td>
+      <td>0.026</td>
+      <td>4757.733</td>
+      <td>2931.135</td>
       <td>1.001</td>
     </tr>
     <tr>
+      <th>sigma</th>
+      <td>1.027</td>
+      <td>0.021</td>
+      <td>3839.567</td>
+      <td>2647.755</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
       <th>sigma_alpha</th>
-      <td>0.606</td>
+      <td>0.607</td>
       <td>0.038</td>
-      <td>1567.664</td>
-      <td>2034.005</td>
-      <td>1.001</td>
+      <td>1371.388</td>
+      <td>1926.880</td>
+      <td>1.000</td>
     </tr>
   </tbody>
 </table>
-</div></div><img alt="../_images/b4b1a543087826f46198c1f8e7f7bb3fe199ef346dcdf3880f7d2d1b441d8673.png" src="../_images/b4b1a543087826f46198c1f8e7f7bb3fe199ef346dcdf3880f7d2d1b441d8673.png" />
+</div></div><img alt="../_images/ef8df8d5db9b8c4bd279e9acac97fdd5c685a42ef3e9efe3366a8aff2e805910.png" src="../_images/ef8df8d5db9b8c4bd279e9acac97fdd5c685a42ef3e9efe3366a8aff2e805910.png" />
 </div>
 </div>
 <h3 id="random-effects-with-a-spatial-lag">Random effects with a spatial lag<a class="headerlink" href="#random-effects-with-a-spatial-lag" title="Link to this heading">¶</a></h3>
@@ -4170,7 +4172,7 @@ for Jupyter support
   warnings.warn('install "ipywidgets" for Jupyter support')
 </pre>
 </div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 5s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">189</span> draws/s<span style="font-weight: bold">)</span>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 6s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">029</span> draws/s<span style="font-weight: bold">)</span>
 </pre>
 </div><div class="output text_html"><div>
 <style scoped>
@@ -4539,11 +4541,11 @@ for Jupyter support
     </tr>
   </tbody>
 </table>
-</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_10833/3906709728.py:39: UserWarning: The figure layout has changed to tight
+</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_11040/2713454824.py:41: UserWarning: The figure layout has changed to tight
   plt.tight_layout()
 </code></pre></div>
 </div>
-<img alt="../_images/29f23444e5159c1b123740f8927331fe34db7b808088d2c4e7f0affec4b9ff7d.png" src="../_images/29f23444e5159c1b123740f8927331fe34db7b808088d2c4e7f0affec4b9ff7d.png" />
+<img alt="../_images/34dff3e8ffd10c17844e764e5d7684ae920b82580407da63704e92ba64d0cfea.png" src="../_images/34dff3e8ffd10c17844e764e5d7684ae920b82580407da63704e92ba64d0cfea.png" />
 </div>
 </div>
 <h3 id="random-effects-with-spatial-errors">Random effects with spatial errors<a class="headerlink" href="#random-effects-with-spatial-errors" title="Link to this heading">¶</a></h3>
@@ -4573,7 +4575,7 @@ for Jupyter support
   warnings.warn('install "ipywidgets" for Jupyter support')
 </pre>
 </div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 59s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">101</span> draws/s<span style="font-weight: bold">)</span>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 60s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">100</span> draws/s<span style="font-weight: bold">)</span>
 </pre>
 </div><div class="output text_html"><div>
 <style scoped>
@@ -4942,11 +4944,11 @@ for Jupyter support
     </tr>
   </tbody>
 </table>
-</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_10833/3906709728.py:39: UserWarning: The figure layout has changed to tight
+</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_11040/2713454824.py:41: UserWarning: The figure layout has changed to tight
   plt.tight_layout()
 </code></pre></div>
 </div>
-<img alt="../_images/52a5b76909a13673420592ac0141a3b247b1e4ae2f14950e790c48887c6d0c6c.png" src="../_images/52a5b76909a13673420592ac0141a3b247b1e4ae2f14950e790c48887c6d0c6c.png" />
+<img alt="../_images/9fc82fadbd6762b15b9929b484cb1c119909951707e5e7ebcdf56d48e4a885ee.png" src="../_images/9fc82fadbd6762b15b9929b484cb1c119909951707e5e7ebcdf56d48e4a885ee.png" />
 </div>
 </div>
 <h2 id="compare-what-you-have-fitted">Compare what you have fitted<a class="headerlink" href="#compare-what-you-have-fitted" title="Link to this heading">¶</a></h2>
@@ -5000,11 +5002,26 @@ for Jupyter support
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>WAIC comparison not available: TypeError: Encountered error in ELPD computation of compare.
-LOO comparison not available: TypeError: Encountered error in ELPD computation of compare.
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>WAIC comparison
+
+LOO comparison
 </code></pre></div>
 </div>
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/arviz/stats/stats.py:1652: UserWarning: For one or more samples the posterior variance of the log predictive densities exceeds 0.4. This could be indication of WAIC starting to fail. 
+See http://arxiv.org/abs/1507.04544 for details
+  warnings.warn(
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/arviz/stats/stats.py:1652: UserWarning: For one or more samples the posterior variance of the log predictive densities exceeds 0.4. This could be indication of WAIC starting to fail. 
+See http://arxiv.org/abs/1507.04544 for details
+  warnings.warn(
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/arviz/stats/stats.py:1652: UserWarning: For one or more samples the posterior variance of the log predictive densities exceeds 0.4. This could be indication of WAIC starting to fail. 
+See http://arxiv.org/abs/1507.04544 for details
+  warnings.warn(
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/arviz/stats/stats.py:782: UserWarning: Estimated shape parameter of Pareto distribution is greater than 0.70 for one or more samples. You should consider using a more robust model, this is because importance sampling is less likely to work well if the marginal posterior and LOO posterior are very different. This is more likely to happen with a non-robust model and highly influential observations.
+  warnings.warn(
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/arviz/stats/stats.py:1652: UserWarning: For one or more samples the posterior variance of the log predictive densities exceeds 0.4. This could be indication of WAIC starting to fail. 
+See http://arxiv.org/abs/1507.04544 for details
+  warnings.warn(
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/arviz/stats/stats.py:1652: UserWarning: For one or more samples the posterior variance of the log predictive densities exceeds 0.4. This could be indication of WAIC starting to fail. 
 See http://arxiv.org/abs/1507.04544 for details
   warnings.warn(
 /home/runner/micromamba/envs/test/lib/python3.14/site-packages/arviz/stats/stats.py:782: UserWarning: Estimated shape parameter of Pareto distribution is greater than 0.70 for one or more samples. You should consider using a more robust model, this is because importance sampling is less likely to work well if the marginal posterior and LOO posterior are very different. This is more likely to happen with a non-robust model and highly influential observations.
@@ -5015,6 +5032,262 @@ See http://arxiv.org/abs/1507.04544 for details
 </code></pre></div>
 </div>
 <div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>rank</th>
+      <th>elpd_waic</th>
+      <th>p_waic</th>
+      <th>elpd_diff</th>
+      <th>weight</th>
+      <th>se</th>
+      <th>dse</th>
+      <th>warning</th>
+      <th>scale</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>SARPanelFE</th>
+      <td>0</td>
+      <td>-2038.577542</td>
+      <td>5.609328</td>
+      <td>0.000000</td>
+      <td>7.014523e-01</td>
+      <td>28.708250</td>
+      <td>0.000000</td>
+      <td>False</td>
+      <td>log</td>
+    </tr>
+    <tr>
+      <th>SDEMPanelFE</th>
+      <td>1</td>
+      <td>-2040.256513</td>
+      <td>9.273478</td>
+      <td>1.678971</td>
+      <td>2.343934e-01</td>
+      <td>28.514335</td>
+      <td>1.853606</td>
+      <td>False</td>
+      <td>log</td>
+    </tr>
+    <tr>
+      <th>SDMPanelFE</th>
+      <td>2</td>
+      <td>-2042.259395</td>
+      <td>10.622915</td>
+      <td>3.681853</td>
+      <td>2.927269e-02</td>
+      <td>28.561430</td>
+      <td>1.701954</td>
+      <td>False</td>
+      <td>log</td>
+    </tr>
+    <tr>
+      <th>SEMPanelFE</th>
+      <td>3</td>
+      <td>-2047.964342</td>
+      <td>5.521389</td>
+      <td>9.386800</td>
+      <td>3.488160e-02</td>
+      <td>28.623646</td>
+      <td>5.204167</td>
+      <td>False</td>
+      <td>log</td>
+    </tr>
+    <tr>
+      <th>OLSPanelFE</th>
+      <td>4</td>
+      <td>-2079.904130</td>
+      <td>4.986191</td>
+      <td>41.326588</td>
+      <td>8.513419e-13</td>
+      <td>28.388909</td>
+      <td>7.241989</td>
+      <td>False</td>
+      <td>log</td>
+    </tr>
+    <tr>
+      <th>SEMPanelRE</th>
+      <td>5</td>
+      <td>-2406.219824</td>
+      <td>213.855654</td>
+      <td>367.642282</td>
+      <td>3.025732e-140</td>
+      <td>27.963351</td>
+      <td>15.351028</td>
+      <td>True</td>
+      <td>log</td>
+    </tr>
+    <tr>
+      <th>SARPanelRE</th>
+      <td>6</td>
+      <td>-2417.012674</td>
+      <td>241.991474</td>
+      <td>378.435132</td>
+      <td>2.482245e-148</td>
+      <td>28.628896</td>
+      <td>14.098763</td>
+      <td>True</td>
+      <td>log</td>
+    </tr>
+    <tr>
+      <th>OLSPanelRE</th>
+      <td>7</td>
+      <td>-2435.912344</td>
+      <td>221.025615</td>
+      <td>397.334802</td>
+      <td>2.184738e-154</td>
+      <td>27.887856</td>
+      <td>15.529539</td>
+      <td>True</td>
+      <td>log</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>rank</th>
+      <th>elpd_loo</th>
+      <th>p_loo</th>
+      <th>elpd_diff</th>
+      <th>weight</th>
+      <th>se</th>
+      <th>dse</th>
+      <th>warning</th>
+      <th>scale</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>SARPanelFE</th>
+      <td>0</td>
+      <td>-2038.585481</td>
+      <td>5.617267</td>
+      <td>0.000000</td>
+      <td>7.105658e-01</td>
+      <td>27.417723</td>
+      <td>0.000000</td>
+      <td>False</td>
+      <td>log</td>
+    </tr>
+    <tr>
+      <th>SDEMPanelFE</th>
+      <td>1</td>
+      <td>-2040.270129</td>
+      <td>9.287095</td>
+      <td>1.684648</td>
+      <td>2.268332e-01</td>
+      <td>27.302882</td>
+      <td>1.853606</td>
+      <td>False</td>
+      <td>log</td>
+    </tr>
+    <tr>
+      <th>SDMPanelFE</th>
+      <td>2</td>
+      <td>-2042.276606</td>
+      <td>10.640126</td>
+      <td>3.691125</td>
+      <td>3.138727e-02</td>
+      <td>27.341661</td>
+      <td>1.702040</td>
+      <td>False</td>
+      <td>log</td>
+    </tr>
+    <tr>
+      <th>SEMPanelFE</th>
+      <td>3</td>
+      <td>-2047.972136</td>
+      <td>5.529183</td>
+      <td>9.386655</td>
+      <td>3.121372e-02</td>
+      <td>27.433629</td>
+      <td>5.204221</td>
+      <td>False</td>
+      <td>log</td>
+    </tr>
+    <tr>
+      <th>OLSPanelFE</th>
+      <td>4</td>
+      <td>-2079.911109</td>
+      <td>4.993170</td>
+      <td>41.325628</td>
+      <td>1.520601e-11</td>
+      <td>27.136560</td>
+      <td>7.242057</td>
+      <td>False</td>
+      <td>log</td>
+    </tr>
+    <tr>
+      <th>SEMPanelRE</th>
+      <td>5</td>
+      <td>-2410.628637</td>
+      <td>218.264467</td>
+      <td>372.043156</td>
+      <td>8.851938e-143</td>
+      <td>27.894570</td>
+      <td>15.389298</td>
+      <td>False</td>
+      <td>log</td>
+    </tr>
+    <tr>
+      <th>SARPanelRE</th>
+      <td>6</td>
+      <td>-2423.398409</td>
+      <td>248.377209</td>
+      <td>384.812928</td>
+      <td>1.400705e-150</td>
+      <td>28.283250</td>
+      <td>14.154059</td>
+      <td>True</td>
+      <td>log</td>
+    </tr>
+    <tr>
+      <th>OLSPanelRE</th>
+      <td>7</td>
+      <td>-2440.769414</td>
+      <td>225.882685</td>
+      <td>402.183933</td>
+      <td>1.734770e-157</td>
+      <td>27.734948</td>
+      <td>15.573600</td>
+      <td>False</td>
+      <td>log</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><div class="output text_html"><div>
 <style scoped>
     .dataframe tbody tr th:only-of-type {
         vertical-align: middle;
@@ -5043,18 +5316,18 @@ See http://arxiv.org/abs/1507.04544 for details
     <tr>
       <th>0</th>
       <td>OLSPanelFE</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
+      <td>-2079.904130</td>
+      <td>4.986191</td>
+      <td>-2079.911109</td>
+      <td>4.993170</td>
     </tr>
     <tr>
       <th>1</th>
       <td>OLSPanelRE</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
+      <td>-2435.912344</td>
+      <td>221.025615</td>
+      <td>-2440.769414</td>
+      <td>225.882685</td>
     </tr>
     <tr>
       <th>2</th>
@@ -5190,10 +5463,10 @@ See http://arxiv.org/abs/1507.04544 for details
   <tbody>
     <tr>
       <th>LM-Lag</th>
-      <td>[99.45028099952695, 98.08482547180212, 97.8912...</td>
+      <td>[99.45028099952852, 98.08482547180277, 97.8912...</td>
       <td>97.881683</td>
       <td>97.862513</td>
-      <td>(94.44791628079415, 101.28603408034664)</td>
+      <td>(94.44791628079572, 101.2860340803456)</td>
       <td>0.0</td>
       <td>bayesian_panel_lm_lag</td>
       <td>1</td>
@@ -5204,10 +5477,10 @@ See http://arxiv.org/abs/1507.04544 for details
     </tr>
     <tr>
       <th>LM-Error</th>
-      <td>[79.58463074513537, 76.24639509085847, 77.3960...</td>
+      <td>[79.58463074514462, 76.24639509084777, 77.3960...</td>
       <td>75.972187</td>
       <td>75.885695</td>
-      <td>(69.89075182119662, 82.23746242697511)</td>
+      <td>(69.89075182120564, 82.23746242698276)</td>
       <td>0.0</td>
       <td>bayesian_panel_lm_error</td>
       <td>1</td>
@@ -5218,10 +5491,10 @@ See http://arxiv.org/abs/1507.04544 for details
     </tr>
     <tr>
       <th>LM-SDM Joint</th>
-      <td>[105.47923498379322, 103.76857996550068, 103.9...</td>
+      <td>[105.47923498379659, 103.76857996549884, 103.9...</td>
       <td>103.530858</td>
       <td>103.517443</td>
-      <td>(99.62997775461804, 107.3791337171455)</td>
+      <td>(99.62997775461925, 107.37913371716107)</td>
       <td>0.0</td>
       <td>bayesian_panel_lm_sdm_joint</td>
       <td>5</td>
@@ -5232,10 +5505,10 @@ See http://arxiv.org/abs/1507.04544 for details
     </tr>
     <tr>
       <th>LM-SLX-Error Joint</th>
-      <td>[107.43166839872744, 103.8752953738189, 104.71...</td>
+      <td>[107.4316683987358, 103.87529537381018, 104.71...</td>
       <td>103.539252</td>
       <td>103.492433</td>
-      <td>(96.54065550588284, 110.70548908098732)</td>
+      <td>(96.54065550587737, 110.70548908099882)</td>
       <td>0.0</td>
       <td>bayesian_panel_lm_slx_error_joint</td>
       <td>5</td>
@@ -5299,10 +5572,10 @@ See http://arxiv.org/abs/1507.04544 for details
   <tbody>
     <tr>
       <th>Robust LM-Lag</th>
-      <td>[23.73143859057564, 26.22805513913058, 25.2135...</td>
+      <td>[23.73143859059572, 26.228055139114666, 25.213...</td>
       <td>25.068137</td>
       <td>25.008977</td>
-      <td>(21.76749461134972, 28.68414296132763)</td>
+      <td>(21.76749461135069, 28.684142961328458)</td>
       <td>5.533977e-07</td>
       <td>bayesian_panel_robust_lm_lag</td>
       <td>1</td>
@@ -5312,10 +5585,10 @@ See http://arxiv.org/abs/1507.04544 for details
     </tr>
     <tr>
       <th>Robust LM-Error</th>
-      <td>[2.9349513733973485, 3.2437168171803386, 3.118...</td>
+      <td>[2.9349513733997736, 3.2437168171783064, 3.118...</td>
       <td>3.100266</td>
       <td>3.092949</td>
-      <td>(2.692063439861215, 3.547469929299063)</td>
+      <td>(2.6920634398612817, 3.547469929299094)</td>
       <td>7.827952e-02</td>
       <td>bayesian_panel_robust_lm_error</td>
       <td>1</td>
@@ -5351,7 +5624,7 @@ See http://arxiv.org/abs/1507.04544 for details
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 4 seconds.
+Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 6 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 </code></pre></div>
 </div>
@@ -5398,7 +5671,7 @@ for Jupyter support
       <td>-0.713</td>
       <td>0.000</td>
       <td>0.000</td>
-      <td>7667.145</td>
+      <td>7667.164</td>
       <td>3104.120</td>
       <td>1.000</td>
     </tr>
@@ -5458,7 +5731,7 @@ for Jupyter support
       <td>0.360</td>
       <td>0.001</td>
       <td>0.001</td>
-      <td>7770.926</td>
+      <td>7770.948</td>
       <td>3074.759</td>
       <td>1.000</td>
     </tr>
@@ -5569,10 +5842,10 @@ for Jupyter support
   <tbody>
     <tr>
       <th>LM-WX</th>
-      <td>[6.607204571260999, 2.3349461371021416, 3.0760...</td>
+      <td>[6.607204571261003, 2.3349461371021487, 3.0760...</td>
       <td>3.236343</td>
       <td>2.872526</td>
-      <td>(2.1689271054323083, 6.168183447401245)</td>
+      <td>(2.1689271054323145, 6.168183447401251)</td>
       <td>0.519081</td>
       <td>bayesian_panel_lm_wx</td>
       <td>4</td>
@@ -5586,10 +5859,10 @@ for Jupyter support
     </tr>
     <tr>
       <th>Robust LM-Lag-SDM</th>
-      <td>[18.229432656142798, 44.60427627089717, 10.601...</td>
+      <td>[18.229432660300585, 44.60427627494347, 10.601...</td>
       <td>88.346727</td>
-      <td>40.622036</td>
-      <td>(0.08899929123810192, 446.4166971663643)</td>
+      <td>40.622027</td>
+      <td>(0.08900064788692091, 446.41669722828914)</td>
       <td>0.000000</td>
       <td>bayesian_panel_robust_lm_lag_sdm</td>
       <td>1</td>
@@ -5603,10 +5876,10 @@ for Jupyter support
     </tr>
     <tr>
       <th>Robust LM-WX</th>
-      <td>[15.512997648949614, 2.6456674197013443, 6.127...</td>
+      <td>[15.512997648949645, 2.6456674197013514, 6.127...</td>
       <td>6.038667</td>
       <td>5.237568</td>
-      <td>(2.379177744262189, 14.042965623549563)</td>
+      <td>(2.3791777442621926, 14.042965623549597)</td>
       <td>0.196279</td>
       <td>bayesian_panel_robust_lm_wx</td>
       <td>4</td>
@@ -5620,10 +5893,10 @@ for Jupyter support
     </tr>
     <tr>
       <th>Robust LM-Error-SDEM</th>
-      <td>[26.036920324921045, 56.396909611502835, 16.83...</td>
+      <td>[26.03692032926369, 56.39690961515288, 16.8327...</td>
       <td>90.137026</td>
-      <td>41.179525</td>
-      <td>(0.080114919704039, 451.41704115617483)</td>
+      <td>41.179515</td>
+      <td>(0.08011491968920745, 451.4170412286323)</td>
       <td>0.000000</td>
       <td>bayesian_panel_robust_lm_error_sdem</td>
       <td>1</td>
@@ -5753,10 +6026,10 @@ for Jupyter support
   <tbody>
     <tr>
       <th>LM-Lag</th>
-      <td>[99.45028099952695, 98.08482547180212, 97.8912...</td>
+      <td>[99.45028099952852, 98.08482547180277, 97.8912...</td>
       <td>97.881683</td>
       <td>97.862513</td>
-      <td>(94.44791628079415, 101.28603408034664)</td>
+      <td>(94.44791628079572, 101.2860340803456)</td>
       <td>0.000000e+00</td>
       <td>bayesian_panel_lm_lag</td>
       <td>1</td>
@@ -5771,10 +6044,10 @@ for Jupyter support
     </tr>
     <tr>
       <th>LM-Error</th>
-      <td>[79.58463074513537, 76.24639509085847, 77.3960...</td>
+      <td>[79.58463074514462, 76.24639509084777, 77.3960...</td>
       <td>75.972187</td>
       <td>75.885695</td>
-      <td>(69.89075182119662, 82.23746242697511)</td>
+      <td>(69.89075182120564, 82.23746242698276)</td>
       <td>0.000000e+00</td>
       <td>bayesian_panel_lm_error</td>
       <td>1</td>
@@ -5789,10 +6062,10 @@ for Jupyter support
     </tr>
     <tr>
       <th>LM-SDM Joint</th>
-      <td>[105.47923498379322, 103.76857996550068, 103.9...</td>
+      <td>[105.47923498379659, 103.76857996549884, 103.9...</td>
       <td>103.530858</td>
       <td>103.517443</td>
-      <td>(99.62997775461804, 107.3791337171455)</td>
+      <td>(99.62997775461925, 107.37913371716107)</td>
       <td>0.000000e+00</td>
       <td>bayesian_panel_lm_sdm_joint</td>
       <td>5</td>
@@ -5807,10 +6080,10 @@ for Jupyter support
     </tr>
     <tr>
       <th>LM-SLX-Error Joint</th>
-      <td>[107.43166839872744, 103.8752953738189, 104.71...</td>
+      <td>[107.4316683987358, 103.87529537381018, 104.71...</td>
       <td>103.539252</td>
       <td>103.492433</td>
-      <td>(96.54065550588284, 110.70548908098732)</td>
+      <td>(96.54065550587737, 110.70548908099882)</td>
       <td>0.000000e+00</td>
       <td>bayesian_panel_lm_slx_error_joint</td>
       <td>5</td>
@@ -5825,10 +6098,10 @@ for Jupyter support
     </tr>
     <tr>
       <th>Robust LM-Lag</th>
-      <td>[23.73143859057564, 26.22805513913058, 25.2135...</td>
+      <td>[23.73143859059572, 26.228055139114666, 25.213...</td>
       <td>25.068137</td>
       <td>25.008977</td>
-      <td>(21.76749461134972, 28.68414296132763)</td>
+      <td>(21.76749461135069, 28.684142961328458)</td>
       <td>5.533977e-07</td>
       <td>bayesian_panel_robust_lm_lag</td>
       <td>1</td>
@@ -5843,10 +6116,10 @@ for Jupyter support
     </tr>
     <tr>
       <th>Robust LM-Error</th>
-      <td>[2.9349513733973485, 3.2437168171803386, 3.118...</td>
+      <td>[2.9349513733997736, 3.2437168171783064, 3.118...</td>
       <td>3.100266</td>
       <td>3.092949</td>
-      <td>(2.692063439861215, 3.547469929299063)</td>
+      <td>(2.6920634398612817, 3.547469929299094)</td>
       <td>7.827952e-02</td>
       <td>bayesian_panel_robust_lm_error</td>
       <td>1</td>
@@ -5861,10 +6134,10 @@ for Jupyter support
     </tr>
     <tr>
       <th>LM-WX</th>
-      <td>[6.607204571260999, 2.3349461371021416, 3.0760...</td>
+      <td>[6.607204571261003, 2.3349461371021487, 3.0760...</td>
       <td>3.236343</td>
       <td>2.872526</td>
-      <td>(2.1689271054323083, 6.168183447401245)</td>
+      <td>(2.1689271054323145, 6.168183447401251)</td>
       <td>5.190811e-01</td>
       <td>bayesian_panel_lm_wx</td>
       <td>4</td>
@@ -5879,10 +6152,10 @@ for Jupyter support
     </tr>
     <tr>
       <th>Robust LM-Lag-SDM</th>
-      <td>[18.229432656142798, 44.60427627089717, 10.601...</td>
+      <td>[18.229432660300585, 44.60427627494347, 10.601...</td>
       <td>88.346727</td>
-      <td>40.622036</td>
-      <td>(0.08899929123810192, 446.4166971663643)</td>
+      <td>40.622027</td>
+      <td>(0.08900064788692091, 446.41669722828914)</td>
       <td>0.000000e+00</td>
       <td>bayesian_panel_robust_lm_lag_sdm</td>
       <td>1</td>
@@ -5897,10 +6170,10 @@ for Jupyter support
     </tr>
     <tr>
       <th>Robust LM-WX</th>
-      <td>[15.512997648949614, 2.6456674197013443, 6.127...</td>
+      <td>[15.512997648949645, 2.6456674197013514, 6.127...</td>
       <td>6.038667</td>
       <td>5.237568</td>
-      <td>(2.379177744262189, 14.042965623549563)</td>
+      <td>(2.3791777442621926, 14.042965623549597)</td>
       <td>1.962791e-01</td>
       <td>bayesian_panel_robust_lm_wx</td>
       <td>4</td>
@@ -5915,10 +6188,10 @@ for Jupyter support
     </tr>
     <tr>
       <th>Robust LM-Error-SDEM</th>
-      <td>[26.036920324921045, 56.396909611502835, 16.83...</td>
+      <td>[26.03692032926369, 56.39690961515288, 16.8327...</td>
       <td>90.137026</td>
-      <td>41.179525</td>
-      <td>(0.080114919704039, 451.41704115617483)</td>
+      <td>41.179515</td>
+      <td>(0.08011491968920745, 451.4170412286323)</td>
       <td>0.000000e+00</td>
       <td>bayesian_panel_robust_lm_error_sdem</td>
       <td>1</td>

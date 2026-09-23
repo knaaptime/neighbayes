@@ -2118,32 +2118,32 @@ SAR-NB:    y=(49,), X=(49, 3)
 Model: SAR-Logit
 ============================================================
   Running SAR-Logit/Gibbs-NumPy...
-7.8s  ρ̂/λ̂=-0.1344  r̂=1.000  ESS=4495
+11.1s  ρ̂/λ̂=-0.1344  r̂=1.000  ESS=4495
   Running SAR-Logit/Gibbs-JAX...
-3.0s  ρ̂/λ̂=-0.1303  r̂=1.000  ESS=4793
+2.7s  ρ̂/λ̂=-0.1303  r̂=1.000  ESS=4793
 
 ============================================================
 Model: SEM-Logit
 ============================================================
   Running SEM-Logit/Gibbs-NumPy...
-12.6s  ρ̂/λ̂=0.0512  r̂=1.010  ESS=638
+17.1s  ρ̂/λ̂=0.0512  r̂=1.010  ESS=638
   Running SEM-Logit/Gibbs-JAX...
-2.6s  ρ̂/λ̂=0.0468  r̂=1.010  ESS=666
+2.1s  ρ̂/λ̂=0.0468  r̂=1.010  ESS=666
 
 ============================================================
 Model: SAR-NB
 ============================================================
   Running SAR-NB/Gibbs-NumPy...
-7.0s  ρ̂/λ̂=0.4288  r̂=1.000  ESS=1217
+10.6s  ρ̂/λ̂=0.4288  r̂=1.000  ESS=1217
   Running SAR-NB/Gibbs-JAX...
-2.0s  ρ̂/λ̂=0.4235  r̂=1.000  ESS=1204
+2.5s  ρ̂/λ̂=0.4235  r̂=1.000  ESS=1204
 
 Done! 6 configurations profiled.
 </code></pre></div>
 </div>
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/samplers/negbin_reduced/__init__.py:84: UserWarning: SAR Negative Binomial models require large samples for reliable spatial parameter recovery. With n=49, posterior estimates of ρ and α may be severely attenuated. n ≥ 900 is recommended.
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/samplers/negbin_reduced/__init__.py:85: UserWarning: SAR Negative Binomial models require large samples for reliable spatial parameter recovery. With n=49, posterior estimates of ρ and α may be severely attenuated. n ≥ 900 is recommended.
   return model._fit_gibbs(
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/samplers/negbin_reduced/__init__.py:84: UserWarning: SAR Negative Binomial models require large samples for reliable spatial parameter recovery. With n=49, posterior estimates of ρ and α may be severely attenuated. n ≥ 900 is recommended.
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/samplers/negbin_reduced/__init__.py:85: UserWarning: SAR Negative Binomial models require large samples for reliable spatial parameter recovery. With n=49, posterior estimates of ρ and α may be severely attenuated. n ≥ 900 is recommended.
   return model._fit_gibbs(
 </code></pre></div>
 </div>
@@ -2196,86 +2196,86 @@ Done! 6 configurations profiled.
 <div class="cell_output docutils container">
 <div class="output text_html"><style type="text/css">
 </style>
-<table id="T_75f57">
+<table id="T_3487c">
   <thead>
     <tr>
       <th class="blank level0" >&nbsp;</th>
-      <th id="T_75f57_level0_col0" class="col_heading level0 col0" >Model</th>
-      <th id="T_75f57_level0_col1" class="col_heading level0 col1" >Sampler</th>
-      <th id="T_75f57_level0_col2" class="col_heading level0 col2" >Time (s)</th>
-      <th id="T_75f57_level0_col3" class="col_heading level0 col3" >Intercept</th>
-      <th id="T_75f57_level0_col4" class="col_heading level0 col4" >ρ̂/λ̂</th>
-      <th id="T_75f57_level0_col5" class="col_heading level0 col5" >max R̂</th>
-      <th id="T_75f57_level0_col6" class="col_heading level0 col6" >min ESS</th>
-      <th id="T_75f57_level0_col7" class="col_heading level0 col7" >α̂</th>
+      <th id="T_3487c_level0_col0" class="col_heading level0 col0" >Model</th>
+      <th id="T_3487c_level0_col1" class="col_heading level0 col1" >Sampler</th>
+      <th id="T_3487c_level0_col2" class="col_heading level0 col2" >Time (s)</th>
+      <th id="T_3487c_level0_col3" class="col_heading level0 col3" >Intercept</th>
+      <th id="T_3487c_level0_col4" class="col_heading level0 col4" >ρ̂/λ̂</th>
+      <th id="T_3487c_level0_col5" class="col_heading level0 col5" >max R̂</th>
+      <th id="T_3487c_level0_col6" class="col_heading level0 col6" >min ESS</th>
+      <th id="T_3487c_level0_col7" class="col_heading level0 col7" >α̂</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <th id="T_75f57_level0_row0" class="row_heading level0 row0" >0</th>
-      <td id="T_75f57_row0_col0" class="data row0 col0" >SAR-Logit</td>
-      <td id="T_75f57_row0_col1" class="data row0 col1" >Gibbs-NumPy</td>
-      <td id="T_75f57_row0_col2" class="data row0 col2" >7.8</td>
-      <td id="T_75f57_row0_col3" class="data row0 col3" >0.7735</td>
-      <td id="T_75f57_row0_col4" class="data row0 col4" >-0.1344</td>
-      <td id="T_75f57_row0_col5" class="data row0 col5" >1.000000</td>
-      <td id="T_75f57_row0_col6" class="data row0 col6" >4495</td>
-      <td id="T_75f57_row0_col7" class="data row0 col7" >nan</td>
+      <th id="T_3487c_level0_row0" class="row_heading level0 row0" >0</th>
+      <td id="T_3487c_row0_col0" class="data row0 col0" >SAR-Logit</td>
+      <td id="T_3487c_row0_col1" class="data row0 col1" >Gibbs-NumPy</td>
+      <td id="T_3487c_row0_col2" class="data row0 col2" >11.1</td>
+      <td id="T_3487c_row0_col3" class="data row0 col3" >0.7735</td>
+      <td id="T_3487c_row0_col4" class="data row0 col4" >-0.1344</td>
+      <td id="T_3487c_row0_col5" class="data row0 col5" >1.000000</td>
+      <td id="T_3487c_row0_col6" class="data row0 col6" >4495</td>
+      <td id="T_3487c_row0_col7" class="data row0 col7" >nan</td>
     </tr>
     <tr>
-      <th id="T_75f57_level0_row1" class="row_heading level0 row1" >1</th>
-      <td id="T_75f57_row1_col0" class="data row1 col0" >SAR-Logit</td>
-      <td id="T_75f57_row1_col1" class="data row1 col1" >Gibbs-JAX</td>
-      <td id="T_75f57_row1_col2" class="data row1 col2" >3.0</td>
-      <td id="T_75f57_row1_col3" class="data row1 col3" >0.7613</td>
-      <td id="T_75f57_row1_col4" class="data row1 col4" >-0.1303</td>
-      <td id="T_75f57_row1_col5" class="data row1 col5" >1.000000</td>
-      <td id="T_75f57_row1_col6" class="data row1 col6" >4793</td>
-      <td id="T_75f57_row1_col7" class="data row1 col7" >nan</td>
+      <th id="T_3487c_level0_row1" class="row_heading level0 row1" >1</th>
+      <td id="T_3487c_row1_col0" class="data row1 col0" >SAR-Logit</td>
+      <td id="T_3487c_row1_col1" class="data row1 col1" >Gibbs-JAX</td>
+      <td id="T_3487c_row1_col2" class="data row1 col2" >2.7</td>
+      <td id="T_3487c_row1_col3" class="data row1 col3" >0.7613</td>
+      <td id="T_3487c_row1_col4" class="data row1 col4" >-0.1303</td>
+      <td id="T_3487c_row1_col5" class="data row1 col5" >1.000000</td>
+      <td id="T_3487c_row1_col6" class="data row1 col6" >4793</td>
+      <td id="T_3487c_row1_col7" class="data row1 col7" >nan</td>
     </tr>
     <tr>
-      <th id="T_75f57_level0_row2" class="row_heading level0 row2" >2</th>
-      <td id="T_75f57_row2_col0" class="data row2 col0" >SEM-Logit</td>
-      <td id="T_75f57_row2_col1" class="data row2 col1" >Gibbs-NumPy</td>
-      <td id="T_75f57_row2_col2" class="data row2 col2" >12.6</td>
-      <td id="T_75f57_row2_col3" class="data row2 col3" >-0.1776</td>
-      <td id="T_75f57_row2_col4" class="data row2 col4" >0.0512</td>
-      <td id="T_75f57_row2_col5" class="data row2 col5" >1.010000</td>
-      <td id="T_75f57_row2_col6" class="data row2 col6" >638</td>
-      <td id="T_75f57_row2_col7" class="data row2 col7" >nan</td>
+      <th id="T_3487c_level0_row2" class="row_heading level0 row2" >2</th>
+      <td id="T_3487c_row2_col0" class="data row2 col0" >SEM-Logit</td>
+      <td id="T_3487c_row2_col1" class="data row2 col1" >Gibbs-NumPy</td>
+      <td id="T_3487c_row2_col2" class="data row2 col2" >17.1</td>
+      <td id="T_3487c_row2_col3" class="data row2 col3" >-0.1776</td>
+      <td id="T_3487c_row2_col4" class="data row2 col4" >0.0512</td>
+      <td id="T_3487c_row2_col5" class="data row2 col5" >1.010000</td>
+      <td id="T_3487c_row2_col6" class="data row2 col6" >638</td>
+      <td id="T_3487c_row2_col7" class="data row2 col7" >nan</td>
     </tr>
     <tr>
-      <th id="T_75f57_level0_row3" class="row_heading level0 row3" >3</th>
-      <td id="T_75f57_row3_col0" class="data row3 col0" >SEM-Logit</td>
-      <td id="T_75f57_row3_col1" class="data row3 col1" >Gibbs-JAX</td>
-      <td id="T_75f57_row3_col2" class="data row3 col2" >2.6</td>
-      <td id="T_75f57_row3_col3" class="data row3 col3" >-0.1783</td>
-      <td id="T_75f57_row3_col4" class="data row3 col4" >0.0468</td>
-      <td id="T_75f57_row3_col5" class="data row3 col5" >1.010000</td>
-      <td id="T_75f57_row3_col6" class="data row3 col6" >666</td>
-      <td id="T_75f57_row3_col7" class="data row3 col7" >nan</td>
+      <th id="T_3487c_level0_row3" class="row_heading level0 row3" >3</th>
+      <td id="T_3487c_row3_col0" class="data row3 col0" >SEM-Logit</td>
+      <td id="T_3487c_row3_col1" class="data row3 col1" >Gibbs-JAX</td>
+      <td id="T_3487c_row3_col2" class="data row3 col2" >2.1</td>
+      <td id="T_3487c_row3_col3" class="data row3 col3" >-0.1783</td>
+      <td id="T_3487c_row3_col4" class="data row3 col4" >0.0468</td>
+      <td id="T_3487c_row3_col5" class="data row3 col5" >1.010000</td>
+      <td id="T_3487c_row3_col6" class="data row3 col6" >666</td>
+      <td id="T_3487c_row3_col7" class="data row3 col7" >nan</td>
     </tr>
     <tr>
-      <th id="T_75f57_level0_row4" class="row_heading level0 row4" >4</th>
-      <td id="T_75f57_row4_col0" class="data row4 col0" >SAR-NB</td>
-      <td id="T_75f57_row4_col1" class="data row4 col1" >Gibbs-NumPy</td>
-      <td id="T_75f57_row4_col2" class="data row4 col2" >7.0</td>
-      <td id="T_75f57_row4_col3" class="data row4 col3" >2.1803</td>
-      <td id="T_75f57_row4_col4" class="data row4 col4" >0.4288</td>
-      <td id="T_75f57_row4_col5" class="data row4 col5" >1.000000</td>
-      <td id="T_75f57_row4_col6" class="data row4 col6" >1217</td>
-      <td id="T_75f57_row4_col7" class="data row4 col7" >4.77</td>
+      <th id="T_3487c_level0_row4" class="row_heading level0 row4" >4</th>
+      <td id="T_3487c_row4_col0" class="data row4 col0" >SAR-NB</td>
+      <td id="T_3487c_row4_col1" class="data row4 col1" >Gibbs-NumPy</td>
+      <td id="T_3487c_row4_col2" class="data row4 col2" >10.6</td>
+      <td id="T_3487c_row4_col3" class="data row4 col3" >2.1803</td>
+      <td id="T_3487c_row4_col4" class="data row4 col4" >0.4288</td>
+      <td id="T_3487c_row4_col5" class="data row4 col5" >1.000000</td>
+      <td id="T_3487c_row4_col6" class="data row4 col6" >1217</td>
+      <td id="T_3487c_row4_col7" class="data row4 col7" >4.77</td>
     </tr>
     <tr>
-      <th id="T_75f57_level0_row5" class="row_heading level0 row5" >5</th>
-      <td id="T_75f57_row5_col0" class="data row5 col0" >SAR-NB</td>
-      <td id="T_75f57_row5_col1" class="data row5 col1" >Gibbs-JAX</td>
-      <td id="T_75f57_row5_col2" class="data row5 col2" >2.0</td>
-      <td id="T_75f57_row5_col3" class="data row5 col3" >2.2004</td>
-      <td id="T_75f57_row5_col4" class="data row5 col4" >0.4235</td>
-      <td id="T_75f57_row5_col5" class="data row5 col5" >1.000000</td>
-      <td id="T_75f57_row5_col6" class="data row5 col6" >1204</td>
-      <td id="T_75f57_row5_col7" class="data row5 col7" >4.80</td>
+      <th id="T_3487c_level0_row5" class="row_heading level0 row5" >5</th>
+      <td id="T_3487c_row5_col0" class="data row5 col0" >SAR-NB</td>
+      <td id="T_3487c_row5_col1" class="data row5 col1" >Gibbs-JAX</td>
+      <td id="T_3487c_row5_col2" class="data row5 col2" >2.5</td>
+      <td id="T_3487c_row5_col3" class="data row5 col3" >2.2004</td>
+      <td id="T_3487c_row5_col4" class="data row5 col4" >0.4235</td>
+      <td id="T_3487c_row5_col5" class="data row5 col5" >1.000000</td>
+      <td id="T_3487c_row5_col6" class="data row5 col6" >1204</td>
+      <td id="T_3487c_row5_col7" class="data row5 col7" >4.80</td>
     </tr>
   </tbody>
 </table>
@@ -2340,24 +2340,24 @@ Done! 6 configurations profiled.
   <tbody>
     <tr>
       <th>SAR-Logit</th>
-      <td>2.99</td>
-      <td>7.78</td>
-      <td>0.38</td>
-      <td>2.60</td>
+      <td>2.69</td>
+      <td>11.13</td>
+      <td>0.24</td>
+      <td>4.14</td>
     </tr>
     <tr>
       <th>SAR-NB</th>
-      <td>2.01</td>
-      <td>6.96</td>
-      <td>0.29</td>
-      <td>3.46</td>
+      <td>2.49</td>
+      <td>10.59</td>
+      <td>0.24</td>
+      <td>4.25</td>
     </tr>
     <tr>
       <th>SEM-Logit</th>
-      <td>2.62</td>
-      <td>12.61</td>
-      <td>0.21</td>
-      <td>4.81</td>
+      <td>2.13</td>
+      <td>17.08</td>
+      <td>0.12</td>
+      <td>8.02</td>
     </tr>
   </tbody>
 </table>
@@ -2410,11 +2410,11 @@ Done! 6 configurations profiled.
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/samplers/negbin_reduced/__init__.py:84: UserWarning: SAR Negative Binomial models require large samples for reliable spatial parameter recovery. With n=49, posterior estimates of ρ and α may be severely attenuated. n ≥ 900 is recommended.
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/samplers/negbin_reduced/__init__.py:85: UserWarning: SAR Negative Binomial models require large samples for reliable spatial parameter recovery. With n=49, posterior estimates of ρ and α may be severely attenuated. n ≥ 900 is recommended.
   return model._fit_gibbs(
 </code></pre></div>
 </div>
-<img alt="../_images/dfa09a3f68e0359fd68579e2491aba871c3210f6e483a37a709e8479763258a4.png" src="../_images/dfa09a3f68e0359fd68579e2491aba871c3210f6e483a37a709e8479763258a4.png" />
+<img alt="../_images/55e5de89a3f7b877768c47e841d476c897e3c6765f4891f56beaf4ca1980c0f6.png" src="../_images/55e5de89a3f7b877768c47e841d476c897e3c6765f4891f56beaf4ca1980c0f6.png" />
 </div>
 </div>
 <h2 id="ess-per-second-comparison">7. ESS per Second Comparison<a class="headerlink" href="#ess-per-second-comparison" title="Link to this heading">¶</a></h2>
@@ -2495,21 +2495,21 @@ Done! 6 configurations profiled.
   <tbody>
     <tr>
       <th>SAR-Logit</th>
-      <td>2152.8</td>
-      <td>854.6</td>
-      <td>2.5</td>
+      <td>2392.9</td>
+      <td>597.4</td>
+      <td>4.0</td>
     </tr>
     <tr>
       <th>SAR-NB</th>
-      <td>842.8</td>
-      <td>265.9</td>
-      <td>3.2</td>
+      <td>680.3</td>
+      <td>174.8</td>
+      <td>3.9</td>
     </tr>
     <tr>
       <th>SEM-Logit</th>
-      <td>1732.8</td>
-      <td>336.6</td>
-      <td>5.1</td>
+      <td>2131.5</td>
+      <td>248.5</td>
+      <td>8.6</td>
     </tr>
   </tbody>
 </table>
@@ -2576,19 +2576,19 @@ Done! 6 configurations profiled.
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>n = 25 (side=5)
-  Gibbs-NumPy: 5.6s
-  Gibbs-JAX: 1.9s
-
-n = 49 (side=7)
-  Gibbs-NumPy: 5.6s
-  Gibbs-JAX: 2.0s
-
-n = 100 (side=10)
-  Gibbs-NumPy: 5.7s
+  Gibbs-NumPy: 8.8s
   Gibbs-JAX: 2.5s
 
+n = 49 (side=7)
+  Gibbs-NumPy: 8.5s
+  Gibbs-JAX: 2.1s
+
+n = 100 (side=10)
+  Gibbs-NumPy: 9.3s
+  Gibbs-JAX: 2.7s
+
 n = 225 (side=15)
-  Gibbs-NumPy: 6.2s
+  Gibbs-NumPy: 10.4s
   Gibbs-JAX: 3.6s
 
 Scaling benchmark complete.
@@ -2621,7 +2621,7 @@ Scaling benchmark complete.
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/95f59d5aee719dcd0462e052bb4efd1d760609edc23baa11140082b9d56ce21b.png" src="../_images/95f59d5aee719dcd0462e052bb4efd1d760609edc23baa11140082b9d56ce21b.png" />
+<img alt="../_images/4cf80f196be255f62c22d77a3f76a8061f82acd8e408c07af051887d5da31cb6.png" src="../_images/4cf80f196be255f62c22d77a3f76a8061f82acd8e408c07af051887d5da31cb6.png" />
 </div>
 </div>
 <h2 id="summary">9. Summary<a class="headerlink" href="#summary" title="Link to this heading">¶</a></h2>

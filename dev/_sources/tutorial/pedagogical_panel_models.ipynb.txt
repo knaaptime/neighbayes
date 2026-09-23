@@ -143,6 +143,8 @@
     "        chains=chains,\n",
     "        random_seed=seed,\n",
     "        progressbar=True,\n",
+    "        # Stored only on request (as in PyMC); az.loo / az.waic need it.\n",
+    "        idata_kwargs={\"log_likelihood\": True},\n",
     "    )\n",
     "    summary = m.summary(round_to=3)\n",
     "    effects_df = pd.DataFrame(m.spatial_effects())\n",
