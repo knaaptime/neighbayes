@@ -133,6 +133,7 @@ def make_sar_joint_logdensity(
     """
     import jax
     import jax.numpy as jnp
+    from jax.nn import log_sigmoid
     from jax.scipy.special import gammaln
 
     ensure_x64()
@@ -161,10 +162,6 @@ def make_sar_joint_logdensity(
 
     half_log_2pi = 0.5 * jnp.log(2.0 * jnp.pi)
 
-    def _log_sigmoid(x):
-        # numerically stable log(sigmoid(x)) = -softplus(-x)
-        return -jnp.logaddexp(0.0, -x)
-
     def logdensity_fn(theta):
         beta = theta[:k]
         tau = theta[k]
@@ -175,7 +172,7 @@ def make_sar_joint_logdensity(
             s = jax.nn.sigmoid(u)
             rho = lo + (hi - lo) * s
             resid = y_j - rho * Wy_j - X_j @ beta
-            jac_rho = log_width + _log_sigmoid(u) + _log_sigmoid(-u)
+            jac_rho = log_width + log_sigmoid(u) + log_sigmoid(-u)
             logdet = logdet_fn(rho)
         else:
             resid = y_j - X_j @ beta

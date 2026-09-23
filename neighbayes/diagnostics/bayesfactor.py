@@ -115,17 +115,14 @@ def compile_log_posterior(pymc_model) -> tuple[Callable, list[str], dict, Callab
     input_names = [v.name for v in value_vars]
 
     # Build mapping from constrained (free_RV) names to unconstrained (value_var) names
-    # and record the transform type for each parameter.
+    # and record the transform object for each parameter.
     constrained_to_unconstrained_name = {}
-    transform_types = {}  # constrained_name -> transform type string
+    transform_types = {}  # constrained_name -> transform object or None
     for fv in free_vars:
         vv = pymc_model.rvs_to_values[fv]
         t = pymc_model.rvs_to_transforms.get(fv)
         constrained_to_unconstrained_name[fv.name] = vv.name
-        if t is None:
-            transform_types[fv.name] = "identity"
-        else:
-            transform_types[fv.name] = type(t).__name__
+        transform_types[fv.name] = t
 
     # Build shape/size info using the model's initial point, which reliably
     # resolves shapes for all parameters including those created with dims=
@@ -151,25 +148,6 @@ def compile_log_posterior(pymc_model) -> tuple[Callable, list[str], dict, Callab
                     break
         param_shapes[name] = shape
         param_sizes[name] = int(np.prod(shape)) if shape else 1
-
-    # Extract interval bounds for Interval/IntervalTransform transforms
-    # (e.g., rho in [-1, 1]).  PyMC's class name is "IntervalTransform" but
-    # some versions may use "Interval"; check both.
-    interval_bounds = {}  # constrained_name -> (lower, upper)
-    for fv in free_vars:
-        t = pymc_model.rvs_to_transforms.get(fv)
-        if t is not None and type(t).__name__ in ("Interval", "IntervalTransform"):
-            # Extract bounds from the distribution's owner inputs
-            # For Uniform(lower, upper), inputs are: rng, size, lower, upper
-            owner = fv.owner
-            try:
-                lower = float(owner.inputs[2].eval())
-                upper = float(owner.inputs[3].eval())
-                interval_bounds[fv.name] = (lower, upper)
-            except Exception:
-                # Fallback: try to get bounds from args_fn
-                # This may not work for all distributions
-                pass
 
     def log_posterior(theta_flat: np.ndarray) -> float:
         """Evaluate log p(y|θ)p(θ) at a flat parameter vector.
@@ -213,8 +191,7 @@ def compile_log_posterior(pymc_model) -> tuple[Callable, list[str], dict, Callab
         blocks = []
         for fv in free_vars:
             constrained_name = fv.name
-            constrained_to_unconstrained_name[constrained_name]
-            transform_type = transform_types[constrained_name]
+            transform = transform_types[constrained_name]
 
             # Get constrained samples from posterior
             arr = posterior[constrained_name].values  # (chain, draw, ...)
@@ -223,51 +200,13 @@ def compile_log_posterior(pymc_model) -> tuple[Callable, list[str], dict, Callab
             else:
                 arr = arr.reshape(n_total, -1)
 
-            # Apply transform: constrained -> unconstrained
-            if transform_type == "identity":
-                # No transform needed
-                pass
-            elif transform_type == "LogTransform":
-                # forward: log(x)
-                arr = np.log(arr)
-            elif transform_type in ("Interval", "IntervalTransform"):
-                # forward: log((x - lower) / (upper - x))
-                lower, upper = interval_bounds[constrained_name]
-                arr = np.log((arr - lower) / (upper - arr))
-            elif transform_type == "LowerBound":
-                # forward: log(x - lower)
-                # LowerBoundTransform stores the lower bound
-                # This is less common but handle it
-                lower = interval_bounds.get(constrained_name, (None, None))[0]
-                if lower is not None:
-                    arr = np.log(arr - lower)
-                else:
-                    # No bound metadata available — emit a warning before
-                    # falling back to the lower=0 assumption (correct for
-                    # HalfNormal/HalfCauchy/Exponential but wrong if the
-                    # variable was constructed with a non-zero lower bound
-                    # via, e.g., ``pm.Bound(lower=2.5)`` or a custom
-                    # ``Transform`` subclass).
-                    import warnings as _warnings
-
-                    _warnings.warn(
-                        f"LowerBound transform for '{constrained_name}' "
-                        "has no recorded bound; assuming lower=0. If the "
-                        "actual lower bound is non-zero this will bias the "
-                        "marginal-likelihood Jacobian.",
-                        stacklevel=3,
-                    )
-                    arr = np.log(arr)
-            elif transform_type == "LogExpM1":
-                # forward: log(exp(x) - 1), used by some distributions
-                # (constrained -> unconstrained)
-                arr = np.log(np.expm1(arr))
-            else:
-                raise ValueError(
-                    f"Unsupported transform type '{transform_type}' for "
-                    f"parameter '{constrained_name}'. Supported types: "
-                    "identity, LogTransform, Interval, LowerBound, LogExpM1."
-                )
+            # Apply transform: constrained -> unconstrained.
+            # Delegate to the transform object's own ``forward()`` — the same
+            # method PyMC applies when building initial points — passing the
+            # RV's distribution inputs, exactly PyMC's calling convention.
+            # ``None`` means the variable was never transformed (identity).
+            if transform is not None:
+                arr = np.asarray(transform.forward(arr, *fv.owner.inputs).eval())
 
             blocks.append(arr)
 
@@ -280,14 +219,6 @@ def compile_log_posterior(pymc_model) -> tuple[Callable, list[str], dict, Callab
 # ---------------------------------------------------------------------------
 # Utility: numerically stable helpers
 # ---------------------------------------------------------------------------
-
-
-def _logsumexp(a: np.ndarray) -> float:
-    """Numerically stable log-sum-exp."""
-    a_max = np.max(a)
-    if np.isinf(a_max):
-        return a_max
-    return a_max + np.log(np.sum(np.exp(a - a_max)))
 
 
 def _compute_ess(samples: np.ndarray) -> float:
@@ -452,12 +383,12 @@ def _run_iterative_scheme(
         l2_shifted = l2 - lstar
         l1_shifted = l1 - lstar
 
-        # Optimal bridge function, vectorized.  ``_logsumexp`` over a
+        # Optimal bridge function, vectorized.  logsumexp over a
         # two-element array is exactly ``np.logaddexp``; broadcasting the
         # scalar ``log_s2_r`` collapses the per-sample Python loops (run
         # every one of up to ``maxiter`` iterations) into a single
         # vectorized call each — identical values, O(N) numpy instead of
-        # O(N) Python-level ``_logsumexp`` allocations.
+        # O(N) Python-level logsumexp allocations.
         log_num = l2_shifted - np.logaddexp(log_s1 + l2_shifted, log_s2_r)
         log_den = l1_shifted - np.logaddexp(log_s1 + l1_shifted, log_s2_r)
 

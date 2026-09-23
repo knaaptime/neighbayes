@@ -7,7 +7,7 @@ LM statistics) are provably unchanged.
 
 Covered:
 
-* ``_run_iterative_scheme`` — the per-sample ``_logsumexp`` Python loops are
+* ``_run_iterative_scheme`` — the per-sample logsumexp Python loops are
   replaced by broadcast ``np.logaddexp`` calls.
 * ``_compute_ess`` — the dense O(n^2) ``np.correlate`` autocovariance is
   replaced by an FFT (O(n log n)).
@@ -21,10 +21,10 @@ from __future__ import annotations
 import numpy as np
 import pytest
 import scipy.sparse as sp
+from scipy.special import logsumexp
 
 from neighbayes.diagnostics.bayesfactor import (
     _compute_ess,
-    _logsumexp,
     _run_iterative_scheme,
 )
 from neighbayes.diagnostics.lmtests.cross_sectional import _sar_null_lambda_info
@@ -33,7 +33,7 @@ from neighbayes.diagnostics.lmtests.cross_sectional import _sar_null_lambda_info
 def _reference_iterative_scheme(
     q11, q12, q21, q22, r0, tol, maxiter, criterion, neff, use_neff
 ):
-    """Pre-vectorization reference: per-sample ``_logsumexp`` loops."""
+    """Pre-vectorization reference: per-sample ``scipy.special.logsumexp`` loops."""
     N1 = len(q11)
     N2 = len(q21)
     l1 = q11 - q12
@@ -55,13 +55,13 @@ def _reference_iterative_scheme(
         l1_shifted = l1 - lstar
         log_num = np.array(
             [
-                l2_shifted[j] - _logsumexp(np.array([log_s1 + l2_shifted[j], log_s2_r]))
+                l2_shifted[j] - logsumexp(np.array([log_s1 + l2_shifted[j], log_s2_r]))
                 for j in range(N2)
             ]
         )
         log_den = np.array(
             [
-                l1_shifted[j] - _logsumexp(np.array([log_s1 + l1_shifted[j], log_s2_r]))
+                l1_shifted[j] - logsumexp(np.array([log_s1 + l1_shifted[j], log_s2_r]))
                 for j in range(N1)
             ]
         )
