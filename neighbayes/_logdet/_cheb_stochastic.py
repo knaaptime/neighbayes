@@ -142,46 +142,42 @@ def _estimate_spectral_bounds(
     n_iters: int = 10,
     rng: np.random.Generator | None = None,
 ) -> tuple[float, float]:
-    """Estimate [λ_min, λ_max] of W.
+    """Enclosing bracket [λ_min, λ_max] for the spectrum of W.
 
-    For row-standardized W, λ_max = 1 (Perron) and |λ| ≤ ‖W‖_∞ = 1
-    (Gershgorin), so the conservative bracket [-1, 1] is always valid.
-    We use power iteration to tighten λ_max, and Gershgorin for λ_min.
+    The Chebyshev expansion needs a bracket that *encloses* the spectrum:
+    T_j grows without bound outside [-1, 1], and a bracket wider than 1/ρ
+    places the singularity of log(1 - ρλ) inside the expansion interval,
+    which destroys accuracy as ρ nears the boundary.  Gershgorin's theorem
+    gives |λ| ≤ min(‖W‖_∞, ‖W‖_1), a valid enclosing bound in O(nnz), and
+    exactly 1 for row-standardized W.
 
-    Looseness in the bracket costs convergence rate (more Chebyshev terms
-    needed) but never correctness — the Chebyshev expansion still converges
-    on the larger interval, just slower.
+    An earlier version tightened λ_max by a Rayleigh quotient after a few
+    power-iteration steps.  On a non-normal W (row-standardized graphs with
+    hubs) that quotient can exceed the spectral radius (1.07 on a lattice
+    with hubs of degree 2,000), and the bias it caused reached five posterior
+    standard deviations at ρ = 0.95.
 
     Parameters
     ----------
     W : sp.csr_matrix
         Spatial weights matrix.
     n_iters : int, default 10
-        Power iteration steps for λ_max refinement.
+        Unused; kept for signature compatibility.
     rng : np.random.Generator, optional
+        Advanced by one length-n normal draw, as the power-iteration start did,
+        so that seeded probe streams are unchanged across versions.
     """
-    n = W.shape[0]
-
-    # Power iteration for λ_max
-    if rng is None:
-        rng = np.random.default_rng()
-    v = rng.standard_normal(n)
-    v /= np.linalg.norm(v)
-    for _ in range(n_iters):
-        v = W @ v
-        norm = np.linalg.norm(v)
-        if norm < 1e-300:
-            break
-        v /= norm
-    lam_max = float(np.real(v @ (W @ v)))
-
-    # For row-standardized W, λ_max = 1 (Perron).  Be slightly conservative.
-    lam_max = max(lam_max, 1.0)
-
-    # Gershgorin bound: |λ| ≤ ‖W‖_∞ = max row sum = 1 for row-standardized
-    # Conservative: lam_min = -lam_max
+    if rng is not None:
+        rng.standard_normal(W.shape[0])
+    Wa = abs(sp.csr_matrix(W))
+    row = float(np.asarray(Wa.sum(axis=1)).max()) if Wa.nnz else 0.0
+    col = float(np.asarray(Wa.sum(axis=0)).max()) if Wa.nnz else 0.0
+    lam_max = min(row, col)
+    # Row-standardized W: exactly 1 (Perron root).  Guard round-off in the sums.
+    if abs(lam_max - 1.0) < 1e-12:
+        lam_max = 1.0
+    lam_max = max(lam_max, 1e-12)
     lam_min = -lam_max
-
     return lam_min, lam_max
 
 
