@@ -613,3 +613,35 @@ class TestOrderSelection:
             warnings.simplefilter("error")
             pre = cheb_stochastic_logdet_precompute(W, order=15, n_probes=8, n_exact=4)
         assert pre.n_exact == 4
+
+
+def _hub_graph(side=100, n_hubs=25, degree=2000, seed=0):
+    """Row-standardized lattice with hub nodes: strongly non-normal W."""
+    rng = np.random.default_rng(seed)
+    n = side * side
+    idx = np.arange(n).reshape(side, side)
+    i = np.concatenate([idx[:, :-1].ravel(), idx[:-1].ravel()])
+    j = np.concatenate([idx[:, 1:].ravel(), idx[1:].ravel()])
+    hi = np.repeat(np.arange(n, n + n_hubs), degree)
+    hj = np.concatenate([rng.choice(n, degree, replace=False) for _ in range(n_hubs)])
+    i, j = np.concatenate([i, hi]), np.concatenate([j, hj])
+    N = n + n_hubs
+    A = sp.csr_matrix((np.ones(len(i)), (i, j)), shape=(N, N))
+    A = A + A.T
+    d = np.asarray(A.sum(axis=1)).ravel()
+    return sp.csr_matrix(sp.diags(1.0 / d) @ A)
+
+
+def test_spectral_bounds_enclose_without_overshoot_on_nonnormal_W():
+    """The bracket must enclose the spectrum and, for row-stochastic W, equal [-1, 1].
+
+    A Rayleigh quotient of a non-normal W can exceed its spectral radius; a
+    bracket wider than 1/rho puts the log singularity inside the expansion
+    interval and destroys accuracy near the boundary.
+    """
+    from neighbayes._logdet._cheb_stochastic import _estimate_spectral_bounds
+
+    W = _hub_graph()
+    for seed in range(20):
+        lo, hi = _estimate_spectral_bounds(W, rng=np.random.default_rng(seed))
+        assert (lo, hi) == (-1.0, 1.0)
