@@ -270,7 +270,7 @@ def test_inferencedata_carries_jacobian_and_loglik():
         logdet_value_and_grad=vg,
         random_seed=1,
     )
-    assert "log_likelihood" in idata.groups() and "sample_stats" in idata.groups()
+    assert "log_likelihood" in idata.children and "sample_stats" in idata.children
     assert idata.sample_stats["log_abs_det"].shape == (2, 200)
     assert idata.log_likelihood["obs"].shape == (2, 200, 15 * 15)
     # az.loo consumes the pointwise log-likelihood without error.
@@ -366,7 +366,7 @@ def test_compute_log_likelihood_false_omits_group_keeps_jacobian():
         random_seed=1,
         compute_log_likelihood=False,
     )
-    assert "log_likelihood" not in idata.groups()
+    assert "log_likelihood" not in idata.children
     assert "log_abs_det" in idata.sample_stats.data_vars
 
 
@@ -383,18 +383,20 @@ def test_attach_flow_log_abs_det_is_diagnostic_not_loglik():
     nchain, ndraw = 2, 4
     rd, ro, rw = 0.3, 0.2, -0.05
     idata = az.from_dict(
-        posterior={
-            "rho_d": rd * np.ones((nchain, ndraw)),
-            "rho_o": ro * np.ones((nchain, ndraw)),
-            "rho_w": rw * np.ones((nchain, ndraw)),
-            "beta": np.random.default_rng(0).standard_normal((nchain, ndraw, 2)),
+        {
+            "posterior": {
+                "rho_d": rd * np.ones((nchain, ndraw)),
+                "rho_o": ro * np.ones((nchain, ndraw)),
+                "rho_w": rw * np.ones((nchain, ndraw)),
+                "beta": np.random.default_rng(0).standard_normal((nchain, ndraw, 2)),
+            }
         },
         coords={"coefficient": ["const", "x1"]},
         dims={"beta": ["coefficient"]},
     )
     attach_flow_log_abs_det(idata, W, T=1)
-    assert "sample_stats" in idata.groups()
-    assert "log_likelihood" not in idata.groups()  # never pollutes the count LOO
+    assert "sample_stats" in idata.children
+    assert "log_likelihood" not in idata.children  # never pollutes the count LOO
     lad1 = idata.sample_stats["log_abs_det"].values
     assert lad1.shape == (nchain, ndraw)
 
@@ -419,13 +421,13 @@ def test_attach_flow_log_abs_det_skips_aspatial_posterior():
 
     W, y, X = _directed_flow_data(n=10, seed=0)
     idata = az.from_dict(
-        posterior={"alpha": np.ones((2, 3)), "beta": np.zeros((2, 3, 2))},
+        {"posterior": {"alpha": np.ones((2, 3)), "beta": np.zeros((2, 3, 2))}},
         coords={"coefficient": ["const", "x1"]},
         dims={"beta": ["coefficient"]},
     )
     attach_flow_log_abs_det(idata, W, T=1)  # must not raise
     assert "log_abs_det" not in (
-        idata.sample_stats.data_vars if "sample_stats" in idata.groups() else {}
+        idata.sample_stats.data_vars if "sample_stats" in idata.children else {}
     )
 
 

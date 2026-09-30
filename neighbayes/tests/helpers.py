@@ -12,6 +12,7 @@ import numpy as np
 import pandas as pd
 import pytest
 import scipy.sparse as sp
+import xarray as xr
 from libpysal.graph import Graph
 
 from neighbayes import dgp
@@ -777,10 +778,10 @@ def set_posterior_means(model, beta: np.ndarray, rho: float | None = None) -> No
     }
     if rho is not None:
         posterior["rho"] = np.array([[rho]], dtype=float)
-    model._idata = az.from_dict(posterior=posterior)
+    model._idata = az.from_dict({"posterior": posterior})
 
 
-def make_idata(samples_by_var: dict[str, np.ndarray]) -> az.InferenceData:
+def make_idata(samples_by_var: dict[str, np.ndarray]) -> xr.DataTree:
     """Build an InferenceData from a dict of arrays.
 
     Each array is treated as posterior draws. Arrays with one dimension are
@@ -792,4 +793,4 @@ def make_idata(samples_by_var: dict[str, np.ndarray]) -> az.InferenceData:
         if arr.ndim == 1:
             arr = arr[None, ...]
         posterior[k] = arr
-    return az.from_dict(posterior=posterior)
+    return az.from_dict({"posterior": posterior})

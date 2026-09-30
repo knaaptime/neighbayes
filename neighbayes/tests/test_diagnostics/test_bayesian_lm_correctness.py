@@ -84,7 +84,7 @@ def _idata(**posterior):
             out[name] = arr[None, :]  # (chain=1, draw)
         else:
             out[name] = arr[None, :, :]  # (chain=1, draw, k)
-    return az.from_dict(posterior=out)
+    return az.from_dict({"posterior": out})
 
 
 def _mock_ols(y, X, WX, W_sp, T_ww, beta_hat, sigma_hat=1.0, draws=1):

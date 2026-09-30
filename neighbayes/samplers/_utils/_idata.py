@@ -1,6 +1,6 @@
-"""Assemble arviz.InferenceData from Gibbs sampler output.
+"""Assemble xarray.DataTree from Gibbs sampler output.
 
-Model-agnostic: takes a dict of arrays and metadata, returns InferenceData
+Model-agnostic: takes a dict of arrays and metadata, returns DataTree
 with proper warmup/posterior split, log-likelihood, and observed data.
 """
 
@@ -10,7 +10,7 @@ from typing import Sequence
 
 import numpy as np
 
-from ..._lazy_deps import az
+from ..._lazy_deps import az, xr
 
 
 def gibbs_to_inference_data(
@@ -22,8 +22,8 @@ def gibbs_to_inference_data(
     coords: dict[str, Sequence] | None = None,
     dims: dict[str, list[str]] | None = None,
     sample_stats: dict[str, np.ndarray] | None = None,
-) -> az.InferenceData:
-    """Build InferenceData from Gibbs sampler chain output.
+) -> xr.DataTree:
+    """Build an ArviZ ``DataTree`` from Gibbs sampler chain output.
 
     Parameters
     ----------
@@ -47,57 +47,31 @@ def gibbs_to_inference_data(
 
     Returns
     -------
-    az.InferenceData
+    xr.DataTree
         With ``posterior``, ``warmup_posterior`` (if provided),
         ``log_likelihood`` (if provided), ``observed_data`` (if provided),
         and ``sample_stats`` (if provided) groups.
     """
-    idata_kwargs: dict = {}
-    if coords is not None:
-        idata_kwargs["coords"] = coords
-    if dims is not None:
-        idata_kwargs["dims"] = dims
-
-    # Build posterior group
-    idata = az.from_dict(
-        posterior=posterior_samples,
-        **idata_kwargs,
-    )
-
-    # Add warmup group if provided
+    groups: dict[str, dict[str, np.ndarray]] = {"posterior": posterior_samples}
     if warmup_samples is not None:
-        warmup_idata = az.from_dict(
-            posterior=warmup_samples,
-            **idata_kwargs,
-        )
-        idata.add_groups({"warmup_posterior": warmup_idata.posterior})
-
-    # Add log_likelihood group
+        groups["warmup_posterior"] = warmup_samples
     if log_likelihood is not None:
-        ll_idata = az.from_dict(
-            log_likelihood=log_likelihood,
-            **idata_kwargs,
-        )
-        idata.add_groups({"log_likelihood": ll_idata.log_likelihood})
+        groups["log_likelihood"] = log_likelihood
+    if sample_stats is not None:
+        groups["sample_stats"] = sample_stats
+    idata = az.from_dict(groups, coords=coords, dims=dims)
 
-    # Add observed_data group
+    # Observed data carries no chain/draw dimensions, so it is attached as its
+    # own node rather than passed through from_dict's sample-dim conventions.
     if observed_data is not None:
-        import xarray as xr
+        import xarray
 
-        obs_dict = {}
+        obs = {}
         for name, arr in observed_data.items():
             arr = np.asarray(arr)
-            if arr.ndim == 1:
-                obs_dict[name] = xr.DataArray(arr, dims=["obs_dim"])
-            else:
-                obs_dict[name] = xr.DataArray(arr)
-        idata.add_groups({"observed_data": xr.Dataset(obs_dict)})
-
-    # Add sample_stats group
-    if sample_stats is not None:
-        stats_idata = az.from_dict(
-            sample_stats=sample_stats,
-        )
-        idata.add_groups({"sample_stats": stats_idata.sample_stats})
+            obs[name] = xarray.DataArray(
+                arr, dims=["obs_dim"] if arr.ndim == 1 else None
+            )
+        idata["observed_data"] = xarray.DataTree(xarray.Dataset(obs))
 
     return idata

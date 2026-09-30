@@ -66,7 +66,7 @@ _KINDS = {
 
 class _Refit:
     def __init__(self, posterior):
-        self.inference_data = az.from_dict(posterior=posterior)
+        self.inference_data = az.from_dict({"posterior": posterior})
 
 
 @pytest.mark.parametrize("name", list(_PINNED_ELPD))

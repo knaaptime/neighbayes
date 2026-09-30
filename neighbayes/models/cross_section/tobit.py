@@ -17,7 +17,7 @@ import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 from pytensor import sparse as pts
 
-from ..._lazy_deps import az, pm
+from ..._lazy_deps import pm, xr
 from .._base._shared import _tobit_pointwise_loglik, _write_log_likelihood_to_idata
 from ..base import SpatialModel
 from ..priors import SARTobitPriors, SDMTobitPriors, SEMTobitPriors
@@ -323,7 +323,7 @@ class SARTobit(_SpatialTobitBase):
         structural = spla.spsolve(A, self._X @ beta)
         return np.maximum(self.censoring, structural)
 
-    def _postprocess_idata(self, idata: az.InferenceData) -> az.InferenceData:
+    def _postprocess_idata(self, idata: xr.DataTree) -> xr.DataTree:
         """Attach the complete pointwise Tobit log-likelihood for IC metrics.
 
         The SAR Tobit model expresses both the residual log-likelihood and the
@@ -333,7 +333,7 @@ class SARTobit(_SpatialTobitBase):
         matching left-tail log-CDF for censored ones) with the structural
         latent mean :math:`\\mu = (I - \\rho W)^{-1} X\\beta`.
         """
-        if "log_likelihood" in idata.groups() and "obs" in idata.log_likelihood:
+        if "log_likelihood" in idata.children and "obs" in idata.log_likelihood:
             return idata
         rho = idata.posterior["rho"].values
         beta = idata.posterior["beta"].values
@@ -469,7 +469,7 @@ class SEMTobit(_SpatialTobitBase):
         beta = self._posterior_mean("beta")
         return np.maximum(self.censoring, self._X @ beta)
 
-    def _postprocess_idata(self, idata: az.InferenceData) -> az.InferenceData:
+    def _postprocess_idata(self, idata: xr.DataTree) -> xr.DataTree:
         """Attach the complete pointwise Tobit log-likelihood for IC metrics.
 
         The SEM Tobit model expresses both the error log-likelihood and the
@@ -478,7 +478,7 @@ class SEMTobit(_SpatialTobitBase):
         formula with structural latent mean :math:`\\mu = X\\beta` (the spatial
         filter operates on the error term and is absorbed into the Jacobian).
         """
-        if "log_likelihood" in idata.groups() and "obs" in idata.log_likelihood:
+        if "log_likelihood" in idata.children and "obs" in idata.log_likelihood:
             return idata
         lam = idata.posterior["lam"].values
         beta = idata.posterior["beta"].values
@@ -623,7 +623,7 @@ class SDMTobit(_SpatialTobitBase):
         structural = spla.spsolve(A, Z @ beta)
         return np.maximum(self.censoring, structural)
 
-    def _postprocess_idata(self, idata: az.InferenceData) -> az.InferenceData:
+    def _postprocess_idata(self, idata: xr.DataTree) -> xr.DataTree:
         """Attach the complete pointwise Tobit log-likelihood for IC metrics.
 
         The SDM Tobit model expresses both the residual log-likelihood and the
@@ -633,7 +633,7 @@ class SDMTobit(_SpatialTobitBase):
         :math:`\\mu = (I - \\rho W)^{-1} (X\\beta + WX\\theta)`, where the
         stacked design ``Z = [X, WX]`` carries the Durbin lags.
         """
-        if "log_likelihood" in idata.groups() and "obs" in idata.log_likelihood:
+        if "log_likelihood" in idata.children and "obs" in idata.log_likelihood:
             return idata
         rho = idata.posterior["rho"].values
         beta = idata.posterior["beta"].values

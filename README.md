@@ -7,8 +7,9 @@
 [`formulaic`](https://matthew.wardrop.casa/formulaic/latest/) and a PySAL
 [`Graph`](https://pysal.org/libpysal/stable/generated/libpysal.graph.Graph.html)
 (or any `scipy.sparse` matrix) for the spatial weights $W$; `fit()` returns an
-`arviz.InferenceData`, so the standard posterior tooling (`az.plot_trace`,
-`az.compare`, `az.loo`) works without translation (though exercise caution as WAIC/LOO diagnostics aren't valid for spatial models).
+ArviZ `DataTree` (an `xarray.DataTree`), so the standard posterior tooling
+(`az.plot_trace_dist`, `az.compare`, `az.loo`) works without translation (though
+exercise caution as LOO diagnostics aren't valid for spatial models).
 
 ```python
 import libpysal

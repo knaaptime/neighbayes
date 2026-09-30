@@ -869,7 +869,9 @@ class TestRobustGibbsVsNUTS:
         )
         # The NUTS run is the reference, so check it before blaming Gibbs.
         rhat = az.rhat(nuts, var_names=[param, "sigma", "beta"])
-        assert float(rhat.to_array().max()) < 1.01, "NUTS reference did not converge"
+        assert float(rhat.ds.to_dataarray().max()) < 1.01, (
+            "NUTS reference did not converge"
+        )
         for name in (param, "sigma", "beta"):
             a = nuts.posterior[name].values.reshape(-1, *nuts.posterior[name].shape[2:])
             b = gibbs.posterior[name].values.reshape(a.shape)
@@ -951,9 +953,9 @@ class TestInferenceDataCompat:
         )
 
     def test_idata_groups(self, sar_idata):
-        assert "posterior" in sar_idata.groups()
-        assert "log_likelihood" in sar_idata.groups()
-        assert "observed_data" in sar_idata.groups()
+        assert "posterior" in sar_idata.children
+        assert "log_likelihood" in sar_idata.children
+        assert "observed_data" in sar_idata.children
 
     def test_posterior_vars(self, sar_idata):
         assert "rho" in sar_idata.posterior.data_vars
@@ -970,11 +972,7 @@ class TestInferenceDataCompat:
 
     def test_loo_works(self, sar_idata):
         loo = az.loo(sar_idata)
-        assert np.isfinite(loo.elpd_loo)
-
-    def test_waic_works(self, sar_idata):
-        waic = az.waic(sar_idata)
-        assert np.isfinite(waic.elpd_waic)
+        assert np.isfinite(loo.elpd)
 
     def test_summary_works(self, sar_idata):
         summary = az.summary(sar_idata)
@@ -1013,7 +1011,7 @@ class TestJAXGaussianGibbs:
             progressbar=False,
             gibbs_backend="jax",
         )
-        assert "posterior" in idata.groups()
+        assert "posterior" in idata.children
         assert "rho" in idata.posterior.data_vars
         assert "sigma" in idata.posterior.data_vars
         assert float(idata.posterior["rho"].mean()) != 0  # not stuck at init
@@ -1092,7 +1090,7 @@ class TestJAXGaussianGibbs:
             idata_kwargs={"log_likelihood": True},
         )
         loo = az.loo(idata)
-        assert np.isfinite(loo.elpd_loo)
+        assert np.isfinite(loo.elpd)
 
     def test_chebyshev_logdet_with_jax(self):
         """Chebyshev logdet method should work with JAX path."""
@@ -1401,7 +1399,7 @@ class TestChainParallelism:
             n_jobs=1,
             progressbar=False,
         )
-        assert "posterior" in idata.groups()
+        assert "posterior" in idata.children
         assert idata.posterior["beta"].shape[0] == 2  # 2 chains
 
     def test_parallel_numpy(self):
@@ -1420,7 +1418,7 @@ class TestChainParallelism:
             n_jobs=2,
             progressbar=False,
         )
-        assert "posterior" in idata.groups()
+        assert "posterior" in idata.children
         assert idata.posterior["beta"].shape[0] == 2  # 2 chains
 
     def test_parallel_numpy_all_cpus(self):
@@ -1439,7 +1437,7 @@ class TestChainParallelism:
             n_jobs=-1,
             progressbar=False,
         )
-        assert "posterior" in idata.groups()
+        assert "posterior" in idata.children
         assert idata.posterior["beta"].shape[0] == 2  # 2 chains
 
     def test_vectorized_jax(self):
@@ -1460,7 +1458,7 @@ class TestChainParallelism:
             gibbs_backend="jax",
             chain_method="vectorized",
         )
-        assert "posterior" in idata.groups()
+        assert "posterior" in idata.children
         assert idata.posterior["beta"].shape[0] == 2  # 2 chains
 
     def test_jax_default_is_vectorized(self):
@@ -1480,7 +1478,7 @@ class TestChainParallelism:
             progressbar=False,
             gibbs_backend="jax",
         )
-        assert "posterior" in idata.groups()
+        assert "posterior" in idata.children
         assert idata.posterior["beta"].shape[0] == 2  # 2 chains
 
     def test_parallel_jax_raises(self):

@@ -49,7 +49,7 @@ import numpy as np
 import pytensor.tensor as pt
 import scipy.sparse as sp
 
-from ..._lazy_deps import az, pm
+from ..._lazy_deps import pm, xr
 from ...samplers._utils._slice import SliceWidthState
 from ...samplers.negbin_reduced import (  # noqa: F401 — import side-effect registers the Gibbs entry
     ReducedGibbsCache,
@@ -172,7 +172,7 @@ class SARNegBin(SpatialModel):
         krylov_reuse: bool = True,
         timeout: float | None = None,
         log_likelihood: bool = False,
-    ) -> "az.InferenceData":
+    ) -> "xr.DataTree":
         r"""Sample the reduced-form posterior via Pólya-Gamma block Gibbs.
 
         Parameters
@@ -217,7 +217,7 @@ class SARNegBin(SpatialModel):
 
         Returns
         -------
-        arviz.InferenceData
+        xarray.DataTree
             Posterior draws of ``rho``, ``beta``, ``alpha`` and pointwise
             ``log_likelihood`` for the observed counts.
         """

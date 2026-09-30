@@ -8,6 +8,7 @@ import scipy.sparse as sp
 from pytensor.graph.basic import Apply
 
 from ._backend import (
+    _CachedSolverOpMixin,
     _DenseLU,
     _kron_dense_max,
     _make_cached_sparse_solver,
@@ -17,7 +18,7 @@ from ._backend import (
 from ._instrument import _op_id_counter
 
 
-class _SparseSARVJPOp(pt.Op):
+class _SparseSARVJPOp(_CachedSolverOpMixin, pt.Op):
     r"""Vector-Jacobian product for :class:`SparseSARSolveOp`.
 
     Computes partial derivatives of a scalar loss :math:`L` with respect to
@@ -114,16 +115,16 @@ class _SparseSARVJPOp(pt.Op):
         # dL/db = v
         outputs[1][0] = np.asarray(v, dtype=np.float64)
 
-    def infer_shape(self, fgraph, node, input_shapes):
+    def infer_shape(self, node, input_shapes):
         eta_shape = input_shapes[1]
         return [(), eta_shape]
 
-    def grad(self, inputs, output_grads):
+    def pullback(self, inputs, outputs, output_grads):
         # Second-order gradients not required for NUTS.
         return [pt.zeros_like(inp) for inp in inputs]
 
 
-class SparseSARSolveOp(pt.Op):
+class SparseSARSolveOp(_CachedSolverOpMixin, pt.Op):
     r"""Differentiable sparse solve :math:`\eta = (I - \rho W)^{-1} b`.
 
     Wraps :func:`scipy.sparse.linalg.splu` as a pytensor
@@ -269,10 +270,10 @@ class SparseSARSolveOp(pt.Op):
             float(rho_val), np.asarray(b, dtype=np.float64)
         )
 
-    def infer_shape(self, fgraph, node, input_shapes):
+    def infer_shape(self, node, input_shapes):
         return [input_shapes[1]]
 
-    def L_op(self, inputs, outputs, output_grads):
+    def pullback(self, inputs, outputs, output_grads):
         r"""Compute VJPs via the adjoint method.
 
         Delegates to :class:`_SparseSARVJPOp`.

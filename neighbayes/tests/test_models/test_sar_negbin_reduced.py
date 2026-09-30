@@ -10,14 +10,15 @@ from __future__ import annotations
 import arviz as az
 import numpy as np
 import pytest
+import xarray as xr
 
 import neighbayes as bp
 from neighbayes.tests.helpers import W_to_graph, make_line_W
 
 
-def _idata(vars_dict: dict[str, np.ndarray]) -> az.InferenceData:
+def _idata(vars_dict: dict[str, np.ndarray]) -> xr.DataTree:
     payload = {k: np.asarray(v)[None, ...] for k, v in vars_dict.items()}
-    return az.from_dict(posterior=payload)
+    return az.from_dict({"posterior": payload})
 
 
 def _count_data(seed: int = 101, n: int = 10):
@@ -135,10 +136,10 @@ def test_reduced_fit_returns_inference_data():
         idata_kwargs={"log_likelihood": True},
     )
 
-    assert isinstance(idata, az.InferenceData)
-    assert "posterior" in idata.groups()
-    assert "log_likelihood" in idata.groups()
-    assert "observed_data" in idata.groups()
+    assert isinstance(idata, xr.DataTree)
+    assert "posterior" in idata.children
+    assert "log_likelihood" in idata.children
+    assert "observed_data" in idata.children
     # Reduced-form posterior must NOT contain σ or z.
     assert "sigma" not in idata.posterior.data_vars
     assert "z" not in idata.posterior.data_vars
@@ -163,7 +164,7 @@ def test_reduced_fit_default_is_gibbs():
     model = bp.models.SARNegBin(y=y, X=X, W=W)
     # Default call (no sampler kwarg) should use Gibbs
     idata = model.fit(draws=10, tune=10, chains=1, random_seed=0)
-    assert isinstance(idata, az.InferenceData)
+    assert isinstance(idata, xr.DataTree)
     assert "rho" in idata.posterior.data_vars
     assert "alpha" in idata.posterior.data_vars
 

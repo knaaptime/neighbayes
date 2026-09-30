@@ -6,6 +6,7 @@ import arviz as az
 import numpy as np
 import pytest
 import scipy.sparse as sp
+import xarray as xr
 
 from neighbayes import dgp
 from neighbayes.models.cross_section.sar_logit import SARLogit
@@ -28,9 +29,9 @@ def _binary_data(seed: int = 101):
     return y, X, W
 
 
-def _idata(vars_dict: dict[str, np.ndarray]) -> az.InferenceData:
+def _idata(vars_dict: dict[str, np.ndarray]) -> xr.DataTree:
     payload = {k: np.asarray(v)[None, ...] for k, v in vars_dict.items()}
-    return az.from_dict(posterior=payload)
+    return az.from_dict({"posterior": payload})
 
 
 # ---------------------------------------------------------------------------

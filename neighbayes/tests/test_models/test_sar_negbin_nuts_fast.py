@@ -10,15 +10,16 @@ import arviz as az
 import numpy as np
 import pymc as pm
 import pytest
+import xarray as xr
 
 from neighbayes import dgp
 from neighbayes.models import SARNegBin
 from neighbayes.tests.helpers import W_to_graph, _as_sparse, make_line_W
 
 
-def _idata(vars_dict: dict[str, np.ndarray]) -> az.InferenceData:
+def _idata(vars_dict: dict[str, np.ndarray]) -> xr.DataTree:
     payload = {k: np.asarray(v)[None, ...] for k, v in vars_dict.items()}
-    return az.from_dict(posterior=payload)
+    return az.from_dict({"posterior": payload})
 
 
 def _count_data(seed: int = 101):
@@ -305,7 +306,7 @@ def test_sar_negbin_fit_nuts_routes_to_nuts_path(monkeypatch):
 
     def _fake_fit_nuts(self, **kwargs):
         called_with.update(kwargs)
-        self._idata = az.from_dict(posterior={"rho": np.array([[0.1]])})
+        self._idata = az.from_dict({"posterior": {"rho": np.array([[0.1]])}})
         return self._idata, False
 
     monkeypatch.setattr(SpatialModel, "_fit_nuts", _fake_fit_nuts)

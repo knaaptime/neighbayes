@@ -86,7 +86,7 @@ def _fit_varnames(model, sampler):
         random_seed=1,
         **kw,
     )
-    return set(idata.posterior.data_vars), ("log_likelihood" in idata.groups())
+    return set(idata.posterior.data_vars), ("log_likelihood" in idata.children)
 
 
 # name -> (ctor, data_fn, expected_varnames, samplers, gibbs_has_ll)
@@ -188,7 +188,7 @@ def test_gaussian_panel_fe_fit_contract(name, ctor, data_fn, expected, sampler):
         kwargs["idata_kwargs"] = _LL
     idata = model.fit(**kwargs)
     varnames = set(idata.posterior.data_vars)
-    has_ll = "log_likelihood" in idata.groups()
+    has_ll = "log_likelihood" in idata.children
     assert varnames == expected, f"{name} [{sampler}]: {sorted(varnames)}"
     if sampler == "gibbs":
         assert has_ll, f"{name} gibbs should attach a log_likelihood group on request"
@@ -245,7 +245,7 @@ def test_gaussian_panel_re_fit_contract(name, ctor, data_fn, expected, sampler):
         kwargs["idata_kwargs"] = _LL
     idata = model.fit(**kwargs)
     varnames = set(idata.posterior.data_vars)
-    has_ll = "log_likelihood" in idata.groups()
+    has_ll = "log_likelihood" in idata.children
     assert varnames == expected, f"{name} [{sampler}]: {sorted(varnames)}"
     if sampler == "gibbs":
         assert has_ll, f"{name} gibbs should attach a log_likelihood group on request"
@@ -302,7 +302,7 @@ def test_binary_xs_fit_contract(name):
     )
     varnames = set(idata.posterior.data_vars)
     assert varnames == expected, f"{name} [gibbs]: {sorted(varnames)}"
-    assert "log_likelihood" in idata.groups(), (
+    assert "log_likelihood" in idata.children, (
         f"{name} gibbs should attach log_lik on request"
     )
 
@@ -323,7 +323,7 @@ def test_sarlogit_numpy_backend_fit_contract():
         idata_kwargs=_LL,
     )
     assert set(idata.posterior.data_vars) == {"beta", "rho"}
-    assert "log_likelihood" in idata.groups()
+    assert "log_likelihood" in idata.children
 
 
 # ---------------------------------------------------------------------------
@@ -395,7 +395,7 @@ def test_count_xs_fit_contract(name, ctor, zi, expected, sampler):
     varnames = set(idata.posterior.data_vars)
     assert varnames == expected, f"{name} [{sampler}]: {sorted(varnames)}"
     if sampler == "gibbs":
-        assert "log_likelihood" in idata.groups(), (
+        assert "log_likelihood" in idata.children, (
             f"{name} gibbs should attach log_lik on request"
         )
 
@@ -424,7 +424,7 @@ def test_zinb_jax_backend_fit_contract():
     )
     varnames = set(idata.posterior.data_vars)
     assert varnames == {"beta", "rho", "alpha", "gamma", "lam"}, sorted(varnames)
-    assert "log_likelihood" in idata.groups()
+    assert "log_likelihood" in idata.children
 
 
 # ---------------------------------------------------------------------------
@@ -471,4 +471,4 @@ def test_gibbs_log_likelihood_is_opt_in(name, build, extra):
         random_seed=1,
         **extra,
     )
-    assert "log_likelihood" not in idata.groups(), name
+    assert "log_likelihood" not in idata.children, name

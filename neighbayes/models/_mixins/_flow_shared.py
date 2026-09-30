@@ -35,7 +35,7 @@ from ..._backends.sampler_helpers import (
     prepare_compile_kwargs,
     prepare_idata_kwargs,
 )
-from ..._lazy_deps import az, pm
+from ..._lazy_deps import pm, xr
 
 
 class FlowSharedMethods:
@@ -144,7 +144,7 @@ class FlowSharedMethods:
         idata_kwargs: Optional[dict] = None,
         progressbar: bool = True,
         **sample_kwargs,
-    ) -> "az.InferenceData":
+    ) -> "xr.DataTree":
         """Draw samples from the posterior via PyMC NUTS.
 
         Parameters
@@ -163,7 +163,7 @@ class FlowSharedMethods:
             overhead for NB flow models.
         idata_kwargs : dict, optional
             Forwarded to ``pm.sample``.  ``{"log_likelihood": True}`` stores
-            the pointwise log-likelihood that ``az.loo`` / ``az.waic`` /
+            the pointwise log-likelihood that ``az.loo`` /
             ``az.compare`` need; for SAR flow variants the captured Gaussian
             log-likelihood is post-processed to add the Jacobian contribution
             from ``log|I_N - rho_d W_d - rho_o W_o - rho_w W_w|``.  Off by
@@ -176,7 +176,7 @@ class FlowSharedMethods:
 
         Returns
         -------
-        arviz.InferenceData
+        xarray.DataTree
         """
         idata_kwargs = dict(idata_kwargs) if idata_kwargs else {}
         compute_log_likelihood = bool(idata_kwargs.get("log_likelihood", False))
@@ -297,7 +297,7 @@ class FlowSharedMethods:
         observed-RV log densities, so the ``pm.Potential("jacobian", ...)``
         contribution from ``log|I_N - rho_d W_d - rho_o W_o - rho_w W_w|``
         is added post-hoc to the stored log-likelihood so that
-        ``az.loo`` / ``az.waic`` / ``az.compare`` operate on the full
+        ``az.loo`` / ``az.compare`` operate on the full
         joint log-likelihood.
         """
         if idata is None or not hasattr(idata, "log_likelihood"):

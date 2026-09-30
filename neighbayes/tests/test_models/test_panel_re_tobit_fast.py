@@ -6,6 +6,7 @@ import arviz as az
 import numpy as np
 import pandas as pd
 import pytest
+import xarray as xr
 
 from neighbayes.models import (
     OLSPanelRE,
@@ -17,9 +18,9 @@ from neighbayes.models import (
 from neighbayes.tests.helpers import W_to_graph, make_line_W
 
 
-def _idata(vars_dict: dict[str, np.ndarray]) -> az.InferenceData:
+def _idata(vars_dict: dict[str, np.ndarray]) -> xr.DataTree:
     payload = {k: np.asarray(v)[None, ...] for k, v in vars_dict.items()}
-    return az.from_dict(posterior=payload)
+    return az.from_dict({"posterior": payload})
 
 
 def _panel_data(seed: int = 30):

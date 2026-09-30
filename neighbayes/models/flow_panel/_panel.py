@@ -18,7 +18,7 @@ import pandas as pd
 import pytensor.tensor as pt
 import scipy.sparse as sp
 
-from ..._lazy_deps import az, pm
+from ..._lazy_deps import pm, xr
 from ..._logdet import (
     make_flow_separable_logdet,
     make_flow_separable_logdet_numpy,
@@ -92,7 +92,7 @@ class FlowPanelModel(FlowSharedMethods, SpatialPanelModel):
             raise ValueError("effects must be one of {0,1,2,3}.")
 
         self._is_row_std = True  # Graph is assumed row-standardized
-        self._idata: Optional[az.InferenceData] = None
+        self._idata: Optional[xr.DataTree] = None
         self._pymc_model: Optional[pm.Model] = None
 
         # Validate and extract n x n W
@@ -594,7 +594,7 @@ class _ResolventFlowPanelMixin:
         n_jobs: int = -1,
         idata_kwargs: Optional[dict] = None,
         **sample_kwargs,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Draw samples from the posterior.
 
         Parameters
@@ -608,8 +608,8 @@ class _ResolventFlowPanelMixin:
             Parallel workers for the Gibbs path (``-1`` = all CPUs).
         idata_kwargs : dict, optional
             ``{"log_likelihood": True}`` stores the pointwise log-likelihood
-            (one value per draw, chain, and flow-period) for ``az.loo`` /
-            ``az.waic``, on either sampler.  Off by default, as in PyMC.
+            (one value per draw, chain, and flow-period) for ``az.loo``,
+            on either sampler.  Off by default, as in PyMC.
         """
         if sampler is None:
             sampler = "gibbs"
@@ -649,7 +649,7 @@ class _ResolventFlowPanelMixin:
         return self._idata
 
     @abstractmethod
-    def _sample_resolvent(self, **kwargs) -> az.InferenceData:
+    def _sample_resolvent(self, **kwargs) -> xr.DataTree:
         """Subclass hook: call the appropriate resolvent sampling function."""
         ...
 
@@ -722,7 +722,7 @@ class SARFlowPanel(_ResolventFlowPanelMixin, FlowPanelModel):
         kwargs.setdefault("logdet_method", "resolvent")
         super().__init__(*args, **kwargs)
 
-    def _sample_resolvent(self, **kwargs) -> az.InferenceData:
+    def _sample_resolvent(self, **kwargs) -> xr.DataTree:
         from ...samplers.gaussian._flow_resolvent import sample_flow_resolvent
 
         return sample_flow_resolvent(
@@ -1207,7 +1207,7 @@ class SARNegBinFlowPanel(SARFlowPanel):
         n_jobs: int = -1,
         idata_kwargs: Optional[dict] = None,
         **sample_kwargs,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Sample the NB2 SAR flow panel posterior.
 
         ``sampler="gibbs"`` (default) runs the reduced-form Pólya–Gamma Gibbs
@@ -1225,7 +1225,7 @@ class SARNegBinFlowPanel(SARFlowPanel):
 
         ``idata_kwargs={"log_likelihood": True}`` stores the pointwise
         log-likelihood (one value per draw, chain, and flow-period) for
-        ``az.loo`` / ``az.waic`` on either sampler; off by default, as in PyMC.
+        ``az.loo`` on either sampler; off by default, as in PyMC.
         """
         if sampler == "gibbs":
             idata = self._fit_gibbs(
@@ -1266,7 +1266,7 @@ class SARNegBinFlowPanel(SARFlowPanel):
         gibbs_backend: str = "numpy",
         krylov_reuse: bool = True,
         log_likelihood: bool = False,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Sample posterior via reduced-form PG-Gibbs (unrestricted 3-ρ panel)."""
         from ..flow._nb_gibbs import run_negbin_flow_gibbs
 
@@ -1465,7 +1465,7 @@ class SARNegBinFlowSeparablePanel(SARFlowSeparablePanel):
         n_jobs: int = -1,
         idata_kwargs: Optional[dict] = None,
         **sample_kwargs,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Sample the separable NB2 SAR flow panel posterior.
 
         ``sampler="gibbs"`` (default) runs the reduced-form Pólya–Gamma Gibbs
@@ -1481,7 +1481,7 @@ class SARNegBinFlowSeparablePanel(SARFlowSeparablePanel):
 
         ``idata_kwargs={"log_likelihood": True}`` stores the pointwise
         log-likelihood (one value per draw, chain, and flow-period) for
-        ``az.loo`` / ``az.waic`` on either sampler; off by default, as in PyMC.
+        ``az.loo`` on either sampler; off by default, as in PyMC.
         """
         if sampler == "gibbs":
             idata = self._fit_gibbs(
@@ -1521,7 +1521,7 @@ class SARNegBinFlowSeparablePanel(SARFlowSeparablePanel):
         gibbs_backend: str = "numpy",
         krylov_reuse: bool = True,
         log_likelihood: bool = False,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Sample posterior via reduced-form PG-Gibbs (separable 2-ρ panel)."""
         from ..flow._nb_gibbs import run_negbin_flow_gibbs
 
@@ -1854,7 +1854,7 @@ class SEMFlowPanel(_ResolventFlowPanelMixin, _SEMFlowPanelMixin, FlowPanelModel)
         super().__init__(y, X, W, T, **kwargs)
         self._init_sem_lags()
 
-    def _sample_resolvent(self, **kwargs) -> az.InferenceData:
+    def _sample_resolvent(self, **kwargs) -> xr.DataTree:
         from ...samplers.gaussian._flow_resolvent import sample_sem_flow_resolvent
 
         return sample_sem_flow_resolvent(

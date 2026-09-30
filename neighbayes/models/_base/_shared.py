@@ -23,7 +23,7 @@ from ..._backends.sampler_helpers import (
     prepare_idata_kwargs,
     use_jax_likelihood,
 )
-from ..._lazy_deps import az, pm
+from ..._lazy_deps import az, pm, xr
 from ..._logdet import (
     make_logdet_fn,
     make_logdet_grad_numpy_vec_fn,
@@ -302,14 +302,14 @@ def _pointwise_gaussian_loglik(
 
 
 def _write_log_likelihood_to_idata(
-    idata: az.InferenceData,
+    idata: xr.DataTree,
     ll_array: np.ndarray,
 ) -> None:
-    """Write a complete pointwise log-likelihood array to InferenceData.
+    """Write a complete pointwise log-likelihood array to DataTree.
 
     Parameters
     ----------
-    idata : az.InferenceData
+    idata : xr.DataTree
         Target inference data object to mutate in place.
     ll_array : np.ndarray
         Array with shape ``(chain, draw, obs)``.
@@ -734,12 +734,12 @@ class SharedSpatialMethods:
         return out
 
     @property
-    def inference_data(self) -> Optional[az.InferenceData]:
-        """Return the ArviZ InferenceData from the most recent fit.
+    def inference_data(self) -> Optional[xr.DataTree]:
+        """Return the ArviZ DataTree from the most recent fit.
 
         Returns
         -------
-        arviz.InferenceData or None
+        xarray.DataTree or None
             The inference data object, or ``None`` if the model has not
             been fit yet.
         """
@@ -752,7 +752,7 @@ class SharedSpatialMethods:
     def _posterior_mean(self, var: str) -> np.ndarray:
         return self._idata.posterior[var].mean(("chain", "draw")).to_numpy()
 
-    def _postprocess_idata(self, idata: az.InferenceData) -> az.InferenceData:
+    def _postprocess_idata(self, idata: xr.DataTree) -> xr.DataTree:
         """Hook to augment ``idata`` after sampling, before it is returned.
 
         The default is a no-op.  Subclasses whose likelihood is expressed via
@@ -779,7 +779,7 @@ class SharedSpatialMethods:
         idata_kwargs: dict[str, Any] | None = None,
         compute_log_likelihood: bool = False,
         sample_kwargs: dict[str, Any] | None = None,
-    ) -> tuple["az.InferenceData", bool]:
+    ) -> tuple["xr.DataTree", bool]:
         """Shared NUTS sampling path used by model-specific ``fit`` methods.
 
         Inspects ``_build_pymc_model`` for optional ``compute_log_likelihood``
@@ -789,7 +789,7 @@ class SharedSpatialMethods:
 
         Returns
         -------
-        tuple[arviz.InferenceData, bool]
+        tuple[xarray.DataTree, bool]
         """
         sample_kwargs = dict(sample_kwargs or {})
         idata_kwargs = dict(idata_kwargs or {})

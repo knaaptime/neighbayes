@@ -7,7 +7,6 @@ dependencies:
   - arviz
   - formulaic
   - pymc
-  - arviz
   - spreg
   - statsmodels
   - geopandas

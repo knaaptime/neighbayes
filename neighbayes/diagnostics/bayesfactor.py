@@ -528,7 +528,7 @@ def _bridge_logml(
 
     Parameters
     ----------
-    idata : arviz.InferenceData
+    idata : xarray.DataTree
         Posterior samples.
     log_posterior : callable
         A function ``f(theta_flat) -> float`` that evaluates the
@@ -815,7 +815,7 @@ def _bic_logml(idata, return_diagnostics=False, model=None):
 
     Parameters
     ----------
-    idata : arviz.InferenceData
+    idata : xarray.DataTree
         Must include ``log_likelihood`` group.
     return_diagnostics : bool, default False
         If True, return a dict with diagnostics.
@@ -823,7 +823,7 @@ def _bic_logml(idata, return_diagnostics=False, model=None):
         A fitted model object with a ``_y`` attribute (the dependent
         variable array).  Used as a fallback to determine the number
         of observations when ``observed_data`` and ``sample_stats``
-        groups are absent from the InferenceData.
+        groups are absent from the DataTree.
 
     Returns
     -------
@@ -834,7 +834,7 @@ def _bic_logml(idata, return_diagnostics=False, model=None):
     """
     if not hasattr(idata, "log_likelihood"):
         raise ValueError(
-            "InferenceData must have a log_likelihood group for BIC approximation. "
+            "DataTree must have a log_likelihood group for BIC approximation. "
             "It is stored only on request: refit with "
             "fit(..., idata_kwargs={'log_likelihood': True})."
         )
@@ -878,7 +878,7 @@ def _bic_logml(idata, return_diagnostics=False, model=None):
         n_obs = len(model._y)
     if n_obs is None:
         raise ValueError(
-            "Cannot determine number of observations. Provide an InferenceData "
+            "Cannot determine number of observations. Provide an DataTree "
             "with observed_data, sample_stats.n_data_points, or log_likelihood "
             "groups, or pass a fitted model object with a _y attribute."
         )
@@ -968,7 +968,7 @@ def bayes_factor_compare_models(
     Parameters
     ----------
     models : list or dict
-        Fitted model objects or InferenceData objects to compare.
+        Fitted model objects or DataTree objects to compare.
 
         - **Fitted model objects** (recommended): Each object must have
           ``inference_data`` and ``pymc_model`` attributes (e.g., a
@@ -977,7 +977,7 @@ def bayes_factor_compare_models(
         - **Dict of {str: model_object}**: Keys are used as model labels
           (unless ``model_labels`` is also provided), matching the
           convention of :func:`arviz.compare`.
-        - **List of InferenceData**: For ``method='bic'``, InferenceData
+        - **List of DataTree**: For ``method='bic'``, DataTree
           objects can be passed directly.  For ``method='bridge'``,
           fitted model objects are required so the log-posterior can be
           compiled automatically.
@@ -997,7 +997,7 @@ def bayes_factor_compare_models(
           compiled automatically.
         - ``'bic'``: BIC approximation (:cite:p:`wagenmakers2007PracticalSolution`).
           Computes :math:`\\log(ML) \\approx -BIC/2`.  Works with either
-          fitted model objects or InferenceData.
+          fitted model objects or DataTree.
         - ``'quadrature'``: exact marginal likelihood for Gaussian OLS, SLX,
           SAR, SDM, SEM and SDEM models (see :func:`log_marginal_likelihood`).
           No Monte Carlo error; the models need not be fit.  Accepts
@@ -1184,7 +1184,7 @@ def bayes_factor_compare_models(
         df = _bayes_factor_frame(logmls, model_labels, log=log, prior_note=prior_note)
         return (df, diagnostics) if return_diagnostics else df
 
-    # Resolve each entry: either a fitted model object or InferenceData
+    # Resolve each entry: either a fitted model object or DataTree
     idata_list = []
     log_posterior_list = []
     constrained_to_unconstrained_list = []
@@ -1230,12 +1230,12 @@ def bayes_factor_compare_models(
                 log_posterior_list.append(None)
                 constrained_to_unconstrained_list.append(None)
         elif hasattr(obj, "posterior"):
-            # Bare InferenceData object
+            # Bare DataTree object
             idata_list.append(obj)
             if method == "bridge":
                 raise ValueError(
                     f"Entry at index {i} ('{model_labels[i]}') is an "
-                    "InferenceData object, but bridge sampling requires a "
+                    "DataTree object, but bridge sampling requires a "
                     "fitted model object with a pymc_model attribute so the "
                     "log-posterior can be compiled automatically.  Pass the "
                     "fitted model object (e.g., sar, sem) instead of its "
@@ -1247,7 +1247,7 @@ def bayes_factor_compare_models(
             raise TypeError(
                 f"Entry at index {i} ('{model_labels[i]}') must be a fitted "
                 "model object (with .inference_data and .pymc_model attributes) "
-                f"or an InferenceData object, got {type(obj).__name__}"
+                f"or an DataTree object, got {type(obj).__name__}"
             )
 
     # Warn about sample size for bridge sampling (Gronau et al., 2017)

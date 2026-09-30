@@ -13,7 +13,7 @@ from formulaic import model_matrix
 from libpysal.graph import Graph
 
 from .._backends.sampler_helpers import jax_available
-from .._lazy_deps import az, pm
+from .._lazy_deps import pm, xr
 from ._base._shared import (
     SharedSpatialMethods,
     _check_row_standardization,
@@ -399,7 +399,7 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         self.model = _resolve_effects(effects)
         self.effects = _EFFECTS_NAMES[self.model]
         self.robust = robust
-        self._idata: Optional[az.InferenceData] = None
+        self._idata: Optional[xr.DataTree] = None
         self._pymc_model: Optional[pm.Model] = None
         self._W_dense_cache: Optional[np.ndarray] = None
 
@@ -683,7 +683,7 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         n_jobs: int = -1,
         idata_kwargs: dict[str, Any] | None = None,
         **sample_kwargs,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Draw samples from the posterior for the panel model.
 
         Mirrors :meth:`SpatialModel.fit`: dispatches to this model's Gibbs
@@ -713,7 +713,7 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
             Parallel workers for the NumPy Gibbs path (Gibbs only).
         idata_kwargs : dict, optional
             ``{"log_likelihood": True}`` stores the complete Jacobian-corrected
-            pointwise log-likelihood that ``az.loo`` / ``az.waic`` /
+            pointwise log-likelihood that ``az.loo`` /
             ``az.compare`` need, for Gibbs and NUTS alike.  Off by default, as
             in PyMC: it holds one value per draw, chain, and observation (16 GB
             at n = 250,000 with 4 × 2,000 draws).  For NUTS the dict is also
@@ -726,7 +726,7 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
 
         Returns
         -------
-        arviz.InferenceData
+        xarray.DataTree
             Posterior samples and diagnostics.
         """
         from ..samplers._registry import (
@@ -795,7 +795,7 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         progressbar: bool,
         idata_kwargs: dict[str, Any] | None,
         sample_kwargs: dict[str, Any],
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Shared NUTS path for panel models: sample, then reconstruct log-lik.
 
         The Jacobian-corrected pointwise log-likelihood is reconstructed only
@@ -849,7 +849,7 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         slice_width: float | None = None,
         chain_method: str | None = None,
         log_likelihood: bool = False,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Sample a Gaussian FE panel posterior via 3-block Gaussian Gibbs.
 
         Generic over the FE families: resolves the Gibbs class from

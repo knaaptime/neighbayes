@@ -27,7 +27,7 @@ import pytensor.tensor as pt
 from pytensor import sparse as pts
 
 from ..._backends.sampler_helpers import use_jax_likelihood
-from ..._lazy_deps import az, pm
+from ..._lazy_deps import pm, xr
 from ...samplers._registry import register
 from ..panel_base import SpatialPanelModel
 from ..priors import (
@@ -349,7 +349,7 @@ class SARPanelRE(SpatialPanelModel):
         n_jobs: int = -1,
         progressbar: bool = True,
         log_likelihood: bool = False,
-    ) -> "az.InferenceData":
+    ) -> "xr.DataTree":
         """Sample posterior via 5-block RE Gibbs (β, σ², α, σ_α², ρ).
 
         NumPy-only; there is no JAX kernel for the RE sampler.
@@ -373,7 +373,7 @@ class SARPanelRE(SpatialPanelModel):
 
         Returns
         -------
-        az.InferenceData
+        xr.DataTree
         """
         if self.robust:
             raise NotImplementedError(
@@ -820,7 +820,7 @@ class SEMPanelRE(SpatialPanelModel):
         n_jobs: int = -1,
         progressbar: bool = True,
         log_likelihood: bool = False,
-    ) -> "az.InferenceData":
+    ) -> "xr.DataTree":
         """Sample posterior via 5-block RE Gibbs (β, σ², α, σ_α², λ).
 
         NumPy-only; there is no JAX kernel for the RE sampler.
@@ -844,7 +844,7 @@ class SEMPanelRE(SpatialPanelModel):
 
         Returns
         -------
-        az.InferenceData
+        xr.DataTree
         """
         if self.robust:
             raise NotImplementedError(

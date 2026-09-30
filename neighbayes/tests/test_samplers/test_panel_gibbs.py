@@ -68,11 +68,11 @@ class TestPanelGibbsDispatch:
             progressbar=False,
             idata_kwargs={"log_likelihood": True},
         )
-        assert "posterior" in idata.groups()
+        assert "posterior" in idata.children
         assert "rho" in idata.posterior.data_vars
         assert "beta" in idata.posterior.data_vars
         assert "sigma" in idata.posterior.data_vars
-        assert "log_likelihood" in idata.groups()
+        assert "log_likelihood" in idata.children
         # Beta should have length equal to non-intercept columns
         assert idata.posterior["beta"].shape[-1] == X.shape[1] - 1
 
@@ -102,11 +102,11 @@ class TestPanelGibbsDispatch:
             progressbar=False,
             idata_kwargs={"log_likelihood": True},
         )
-        assert "posterior" in idata.groups()
+        assert "posterior" in idata.children
         assert "lam" in idata.posterior.data_vars
         assert "beta" in idata.posterior.data_vars
         assert "sigma" in idata.posterior.data_vars
-        assert "log_likelihood" in idata.groups()
+        assert "log_likelihood" in idata.children
         assert idata.posterior["beta"].shape[-1] == X.shape[1] - 1
 
     def test_sar_panel_fe_gibbs_multiple_chains(self):
@@ -497,7 +497,7 @@ class TestPanelGibbsJAX:
             progressbar=False,
             gibbs_backend="jax",
         )
-        assert "posterior" in idata.groups()
+        assert "posterior" in idata.children
         assert "rho" in idata.posterior.data_vars
         assert "beta" in idata.posterior.data_vars
         assert "sigma" in idata.posterior.data_vars
@@ -530,7 +530,7 @@ class TestPanelGibbsJAX:
             progressbar=False,
             gibbs_backend="jax",
         )
-        assert "posterior" in idata.groups()
+        assert "posterior" in idata.children
         assert "lam" in idata.posterior.data_vars
         assert "beta" in idata.posterior.data_vars
         assert "sigma" in idata.posterior.data_vars

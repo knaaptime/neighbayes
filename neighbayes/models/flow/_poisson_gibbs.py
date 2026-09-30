@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..._lazy_deps import az
+from ..._lazy_deps import xr
 
 
 def run_poisson_flow_gibbs(
@@ -28,7 +28,7 @@ def run_poisson_flow_gibbs(
     progressbar: bool = True,
     n_jobs: int = -1,
     log_likelihood: bool = False,
-) -> az.InferenceData:
+) -> xr.DataTree:
     """Run the reduced-form auxiliary-mixture sampler for a Poisson flow model.
 
     Parameters

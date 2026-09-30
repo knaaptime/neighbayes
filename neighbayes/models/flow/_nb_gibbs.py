@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..._lazy_deps import az
+from ..._lazy_deps import xr
 
 
 def run_negbin_flow_gibbs(
@@ -29,13 +29,13 @@ def run_negbin_flow_gibbs(
     gibbs_backend: str = "numpy",
     krylov_reuse: bool = True,
     log_likelihood: bool = False,
-) -> az.InferenceData:
+) -> xr.DataTree:
     """Run the reduced-form PG-Gibbs sampler for an NB SAR flow model.
 
     Builds the cache, priors, and per-chain initial states from ``model``
     attributes, dispatches to :func:`run_chain_unrestricted` (3-rho) or
     :func:`run_chain_separable` (2-rho Kronecker), assembles the
-    posterior into an :class:`arviz.InferenceData`, and stores it on
+    posterior into an :class:`xarray.DataTree`, and stores it on
     ``model._idata``.
 
     Parameters
@@ -245,7 +245,7 @@ def run_negbin_flow_gibbs(
             model_type=model_type,
         )
 
-    # --- Assemble InferenceData ---
+    # --- Assemble DataTree ---
     posterior_samples = {
         "rho_d": np.stack([c["rho_d"] for c in chain_results], axis=0),
         "rho_o": np.stack([c["rho_o"] for c in chain_results], axis=0),

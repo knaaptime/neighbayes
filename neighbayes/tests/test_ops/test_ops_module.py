@@ -119,9 +119,9 @@ class TestSparseFlowSolveOpVJP:
         Wd, Wo, Ww = _flow_weight_mats(W)
         rng = np.random.default_rng(11)
         b_val = rng.normal(size=n * n)
-        rd_val = np.float64(0.2)
-        ro_val = np.float64(-0.1)
-        rw_val = np.float64(0.05)
+        rd_val = np.asarray(0.2)
+        ro_val = np.asarray(-0.1)
+        rw_val = np.asarray(0.05)
 
         solve_op = SparseFlowSolveOp(Wd, Wo, Ww)
 
@@ -177,9 +177,9 @@ class TestSparseFlowSolveMatrixOpVJP:
         Wd, Wo, Ww = _flow_weight_mats(W)
         rng = np.random.default_rng(13)
         B_val = rng.normal(size=(n * n, T))
-        rd_val = np.float64(0.15)
-        ro_val = np.float64(0.1)
-        rw_val = np.float64(-0.05)
+        rd_val = np.asarray(0.15)
+        ro_val = np.asarray(0.1)
+        rw_val = np.asarray(-0.05)
 
         solve_op = SparseFlowSolveMatrixOp(Wd, Wo, Ww)
 
@@ -253,8 +253,8 @@ class TestKroneckerFlowSolveOpVJP:
         W = _ring_W(n)
         rng = np.random.default_rng(2)
         b_val = rng.normal(size=n * n)
-        rd_val = np.float64(0.25)
-        ro_val = np.float64(-0.15)
+        rd_val = np.asarray(0.25)
+        ro_val = np.asarray(-0.15)
 
         solve_op = KroneckerFlowSolveOp(W, n)
 
@@ -329,8 +329,8 @@ class TestKroneckerFlowSolveMatrixOpVJP:
         W = _ring_W(n)
         rng = np.random.default_rng(5)
         B_val = rng.normal(size=(n * n, T))
-        rd_val = np.float64(0.2)
-        ro_val = np.float64(-0.1)
+        rd_val = np.asarray(0.2)
+        ro_val = np.asarray(-0.1)
 
         solve_op = KroneckerFlowSolveMatrixOp(W, n)
 

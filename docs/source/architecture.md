@@ -26,7 +26,7 @@ replaced by an explicit argument — `logdet_method=`, `sampler=`, `gibbs_backen
 `priors=` — and the resolved log-determinant method is recorded on the model as
 `_resolved_logdet_method`. Nothing is chosen in a way you cannot see or change.
 
-**No bespoke result objects.** `fit()` returns an `arviz.InferenceData`. The posterior
+**No bespoke result objects.** `fit()` returns an ArviZ `DataTree` (`xarray.DataTree`). The posterior
 belongs to the wider PyData ecosystem, not to this package.
 
 ## The layers
@@ -190,7 +190,7 @@ know about it:
 
 `run`
 : The callable, which takes the model and resolved controls and returns a **finished**
-  `InferenceData`. Returning finished output rather than raw chains is deliberate: it
+  `DataTree`. Returning finished output rather than raw chains is deliberate: it
   lets class-based families keep their own `fit` and function-based families keep
   `run_chains` + `gibbs_to_inference_data`. The registry unifies dispatch, not sampler
   internals.

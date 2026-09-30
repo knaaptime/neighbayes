@@ -36,7 +36,7 @@ from typing import Optional
 import numpy as np
 import scipy.sparse as sp
 
-from ..._lazy_deps import az
+from ..._lazy_deps import xr
 from ...samplers._utils._idata import gibbs_to_inference_data
 from ...samplers._utils._slice import SliceWidthState
 from ...samplers.gaussian._chain_runner import run_chains
@@ -102,7 +102,7 @@ class SARLogit(SpatialModel):
     cancels, so ρ is Krylov-accelerable).
 
     The sampler bypasses PyMC's NUTS entirely. It produces an
-    ``arviz.InferenceData`` object compatible with all downstream
+    ``xarray.DataTree`` object compatible with all downstream
     diagnostics (``spatial_diagnostics()``, ``spatial_effects()``,
     ``summary()``).
 
@@ -213,7 +213,7 @@ class SARLogit(SpatialModel):
         krylov_reuse: bool = True,
         timeout: float | None = None,
         log_likelihood: bool = False,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         r"""Sample the reduced-form posterior via Pólya–Gamma block Gibbs.
 
         Parameters
@@ -248,7 +248,7 @@ class SARLogit(SpatialModel):
 
         Returns
         -------
-        az.InferenceData
+        xr.DataTree
             With posterior (``rho``, ``beta``), log_likelihood, and
             observed_data groups.
         """
@@ -368,7 +368,7 @@ class SARLogit(SpatialModel):
                 timeout=timeout,
             )
 
-        # Assemble InferenceData (varnames: rho, beta).
+        # Assemble DataTree (varnames: rho, beta).
         posterior_samples = {
             "rho": np.stack([c["rho"] for c in chain_results], axis=0),
             "beta": np.stack([c["beta"] for c in chain_results], axis=0),

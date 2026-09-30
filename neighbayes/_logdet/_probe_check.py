@@ -10,7 +10,7 @@ count and grows where that count falls short.
 :class:`WarmupProbes` offers a Gibbs sampler the steps of
 :class:`._warmup.WarmupJacobian`: the evaluators warmup starts on, one
 adaptation at the warmup midpoint on draws pooled across chains, frozen before
-the first retained draw, and a record on the InferenceData.  Adapting only
+the first retained draw, and a record on the DataTree.  Adapting only
 appends probes, and the Chebyshev-in-ρ series has the same length at any probe
 count, so a compiled JAX step is reused without a retrace.
 """

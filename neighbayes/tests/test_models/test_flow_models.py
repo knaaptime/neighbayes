@@ -1285,7 +1285,7 @@ class TestOLSFlowEffects:
 
 class TestFlowLogLikelihood:
     """Verify ``log_likelihood`` group is attached and usable for model
-    comparison via ``az.loo`` / ``az.waic`` / ``az.compare``."""
+    comparison via ``az.loo`` / ``az.compare``."""
 
     def setup_method(self):
         from neighbayes.dgp.flows import (
@@ -1316,7 +1316,7 @@ class TestFlowLogLikelihood:
         assert ll.shape[2] == self.n * self.n  # N obs
         assert np.isfinite(ll).all()
         loo = az.loo(idata)
-        assert np.isfinite(loo.elpd_loo)
+        assert np.isfinite(loo.elpd)
 
     def test_sar_flow_loglik(self):
         from neighbayes.models.flow import SARFlow

@@ -12,7 +12,7 @@ import scipy.sparse as sp
 from libpysal.graph import Graph
 
 from .._backends.sampler_helpers import jax_available
-from .._lazy_deps import az, pm
+from .._lazy_deps import pm, xr
 from .._logdet import (
     resolve_logdet_bounds,
 )
@@ -112,7 +112,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
     _model_type : str
         Short lowercase model name used as the ``model_type`` argument to
         the Gibbs sampler (e.g. ``"sar"``, ``"sdm"``).  Also used for
-        InferenceData coordinate labels.
+        DataTree coordinate labels.
     """
 
     # --- Declarative model metadata ----------------------------------------
@@ -153,7 +153,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
         self.logdet_aaa_check = bool(logdet_aaa_check)
         self.logdet_probe_check = bool(logdet_probe_check)
 
-        self._idata: Optional[az.InferenceData] = None
+        self._idata: Optional[xr.DataTree] = None
         self._pymc_model: Optional[pm.Model] = None
 
         if formula is not None:
@@ -274,7 +274,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
         n_jobs: int = -1,
         idata_kwargs: dict[str, Any] | None = None,
         **sample_kwargs,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Draw samples from the posterior.
 
         Dispatches to this model's Gibbs sampler (``sampler="gibbs"``) or NUTS
@@ -304,7 +304,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
             Parallel workers for the NumPy Gibbs path (Gibbs only).
         idata_kwargs : dict, optional
             ``{"log_likelihood": True}`` stores the complete Jacobian-corrected
-            pointwise log-likelihood that ``az.loo`` / ``az.waic`` /
+            pointwise log-likelihood that ``az.loo`` /
             ``az.compare`` need, for Gibbs and NUTS alike.  Off by default, as
             in PyMC: it holds one value per draw, chain, and observation (16 GB
             at n = 250,000 with 4 × 2,000 draws).  For NUTS the dict is also
@@ -315,7 +315,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
 
         Returns
         -------
-        arviz.InferenceData
+        xarray.DataTree
         """
         from ..samplers._registry import (
             pop_options,
@@ -420,7 +420,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
         slice_width: float | None = None,
         chain_method: str | None = None,
         log_likelihood: bool = False,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Sample the posterior with the partially collapsed Gaussian Gibbs sampler.
 
         Uses the model's :attr:`_gibbs_class` attribute to resolve the
@@ -456,7 +456,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
 
         Returns
         -------
-        arviz.InferenceData
+        xarray.DataTree
             With ``posterior``, ``log_likelihood``, and ``observed_data``
             groups.
 

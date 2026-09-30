@@ -17,7 +17,7 @@ holds them for any Gibbs sampler, which
 2. runs the first half of warmup on every chain;
 3. passes the settled draws of all chains to :meth:`WarmupJacobian.adapt` and
    resumes every chain under what it returns, if anything;
-4. calls :meth:`WarmupJacobian.record` on the assembled InferenceData.
+4. calls :meth:`WarmupJacobian.record` on the assembled DataTree.
 
 A model asks :func:`sampler_builds_evaluators` whether to hand the sampler
 evaluators of its own, so the model and the sampler never disagree about who

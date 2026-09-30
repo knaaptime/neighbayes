@@ -37,7 +37,7 @@ import pandas as pd
 import pytensor.tensor as pt
 import scipy.sparse as sp
 
-from ..._lazy_deps import az, pm
+from ..._lazy_deps import pm, xr
 from ..._logdet import (
     make_flow_separable_logdet,
     make_flow_separable_logdet_numpy,
@@ -316,7 +316,7 @@ class FlowModel(FlowSharedMethods, SpatialModel):
         self.restrict_positive = restrict_positive
         self.robust = False
         self._is_row_std = True  # W is assumed row-standardized
-        self._idata: Optional[az.InferenceData] = None
+        self._idata: Optional[xr.DataTree] = None
         self._pymc_model: Optional[pm.Model] = None
 
         # Validate and extract the n×n weight matrix (Graph or matrix accepted).
@@ -805,7 +805,7 @@ class SARFlow(FlowModel):
         n_jobs: int = -1,
         idata_kwargs: Optional[dict] = None,
         **sample_kwargs,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Sample the posterior with the resolvent-Kronecker gradient sampler.
 
         MALA-on-ρ within conjugate Gibbs for ``β, σ²``; the flow log-determinant
@@ -821,7 +821,7 @@ class SARFlow(FlowModel):
             :func:`~neighbayes.samplers.gaussian._flow_resolvent.resolve_flow_logdet`.
         idata_kwargs : dict, optional
             ``{"log_likelihood": True}`` stores the pointwise log-likelihood
-            (one value per draw, chain, and flow) for ``az.loo`` / ``az.waic``.
+            (one value per draw, chain, and flow) for ``az.loo``.
             Off by default, as in PyMC.
         """
         from ...samplers.gaussian._flow_resolvent import sample_flow_resolvent
@@ -1112,7 +1112,7 @@ class SARFlowSeparable(FlowModel):
 
 
 def _compute_ols_flow_effects(
-    idata: "az.InferenceData",
+    idata: "xr.DataTree",
     *,
     n: int,
     k_d: int,
@@ -1357,7 +1357,7 @@ class _NegBinFlowMixin:
         attach_log_abs_det: bool = True,
         n_jobs: int = -1,
         **sample_kwargs,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Draw samples from the posterior.
 
         Parameters
@@ -1385,7 +1385,7 @@ class _NegBinFlowMixin:
             stored posterior (NUTS only).
         idata_kwargs : dict, optional
             ``{"log_likelihood": True}`` stores the pointwise log-likelihood
-            (one value per draw, chain, and flow) for ``az.loo`` / ``az.waic``,
+            (one value per draw, chain, and flow) for ``az.loo``,
             on either sampler.  Off by default, as in PyMC.  For NUTS the dict
             is also forwarded to ``pm.sample``.
         progressbar : bool, default True
@@ -1403,7 +1403,7 @@ class _NegBinFlowMixin:
 
         Returns
         -------
-        arviz.InferenceData
+        xarray.DataTree
         """
         if sampler == "gibbs":
             if gibbs_backend not in {"numpy", "jax", "auto"}:
@@ -1571,7 +1571,7 @@ class SARNegBinFlow(_NegBinFlowMixin, SARFlow):
         krylov_reuse: bool = True,
         sample_kwargs: dict[str, Any] | None = None,
         log_likelihood: bool = False,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Sample posterior via reduced-form PG-Gibbs (unrestricted 3-ρ)."""
         from ._nb_gibbs import run_negbin_flow_gibbs
 
@@ -1707,7 +1707,7 @@ class SARNegBinFlowSeparable(_NegBinFlowMixin, SARFlowSeparable):
         krylov_reuse: bool = True,
         sample_kwargs: dict[str, Any] | None = None,
         log_likelihood: bool = False,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Sample posterior via reduced-form PG-Gibbs (separable 2-ρ)."""
         from ._nb_gibbs import run_negbin_flow_gibbs
 
@@ -1807,7 +1807,7 @@ class NegBinFlow(_NegBinFlowMixin, OLSFlow):
         gibbs_backend: str = "numpy",
         sample_kwargs: dict[str, Any] | None = None,
         log_likelihood: bool = False,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Sample posterior via aspatial PG-Gibbs (no spatial parameters).
 
         Three blocks per sweep: ω (Pólya–Gamma), β (conjugate normal),
@@ -1949,7 +1949,7 @@ class NegBinFlow(_NegBinFlowMixin, OLSFlow):
             model_type="nb_flow",
         )
 
-        # --- Assemble InferenceData ---
+        # --- Assemble DataTree ---
         posterior_samples = {
             "beta": np.stack([c["beta"] for c in chain_results], axis=0),
             "alpha": np.stack([c["alpha"] for c in chain_results], axis=0),
@@ -1998,7 +1998,7 @@ class _PoissonFlowMixin:
         n_jobs: int = -1,
         idata_kwargs: Optional[dict] = None,
         **sample_kwargs,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Draw samples from the posterior.
 
         Parameters
@@ -2015,7 +2015,7 @@ class _PoissonFlowMixin:
             Chain-level parallelism.
         idata_kwargs : dict, optional
             ``{"log_likelihood": True}`` stores the pointwise log-likelihood
-            (one value per draw, chain, and flow) for ``az.loo`` / ``az.waic``.
+            (one value per draw, chain, and flow) for ``az.loo``.
             Off by default, as in PyMC.
         """
         if sampler != "gibbs":
@@ -2116,7 +2116,7 @@ class SARPoissonFlow(_PoissonFlowMixin, SARFlow):
         progressbar: bool = True,
         n_jobs: int = -1,
         log_likelihood: bool = False,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Sample via reduced-form auxiliary-mixture Gibbs (unrestricted 3-ρ)."""
         from ._poisson_gibbs import run_poisson_flow_gibbs
 
@@ -2192,7 +2192,7 @@ class SARPoissonFlowSeparable(_PoissonFlowMixin, SARFlowSeparable):
         progressbar: bool = True,
         n_jobs: int = -1,
         log_likelihood: bool = False,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Sample via reduced-form auxiliary-mixture Gibbs (separable 2-ρ)."""
         from ._poisson_gibbs import run_poisson_flow_gibbs
 
@@ -2304,7 +2304,7 @@ class SEMFlow(FlowModel):
         n_jobs: int = -1,
         idata_kwargs: Optional[dict] = None,
         **sample_kwargs,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Sample the SEM-flow posterior.
 
         Uses the resolvent-Kronecker gradient sampler (MALA-on-λ within GLS Gibbs
@@ -2320,7 +2320,7 @@ class SEMFlow(FlowModel):
             :func:`~neighbayes.samplers.gaussian._flow_resolvent.resolve_flow_logdet`.
         idata_kwargs : dict, optional
             ``{"log_likelihood": True}`` stores the pointwise log-likelihood
-            (one value per draw, chain, and flow) for ``az.loo`` / ``az.waic``.
+            (one value per draw, chain, and flow) for ``az.loo``.
             Off by default, as in PyMC.
         """
         if self.logdet_method != "resolvent":

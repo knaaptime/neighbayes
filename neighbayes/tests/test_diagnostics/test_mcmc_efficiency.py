@@ -102,7 +102,7 @@ class TestSpatialMCMCDiagnostic:
         ]  # shape (chain, draw, 1)
         # Pad to (4, 1500, 1) by tiling
         bad_beta_full = np.tile(bad_beta, (2, int(np.ceil(1500 / 200)), 1))[:, :1500, :]
-        idata = az.from_dict({"rho": good_rho, "beta": bad_beta_full})
+        idata = az.from_dict({"posterior": {"rho": good_rho, "beta": bad_beta_full}})
         report = spatial_mcmc_diagnostic(
             _FakeModel(idata), extra_params=["beta"], emit_warnings=False
         )

@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 
-from ..._lazy_deps import az
+from ..._lazy_deps import az, xr
 
 _KIND = {None: "iid", "rho": "lag", "lam": "error"}
 
@@ -102,7 +102,7 @@ class GaussianPredictionMixin:
         *,
         thin: int = 1,
         random_seed: Optional[int] = None,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Posterior predictive distribution of ``y`` at new units.
 
         For each posterior draw the outcome at the new units :math:`O`,
@@ -145,7 +145,7 @@ class GaussianPredictionMixin:
 
         Returns
         -------
-        arviz.InferenceData
+        xarray.DataTree
             A ``predictions`` group with dimensions ``(chain, draw, obs_new)``
             holding ``y`` (posterior predictive draws), ``y_bp`` (the
             conditional mean at each draw; its average over draws is the
@@ -207,11 +207,11 @@ class GaussianPredictionMixin:
 
         coords = {"obs_new": _row_labels(X_new, oos)}
         dims = {k: ["obs_new"] for k in out}
+        # ArviZ applies pred_coords / pred_dims to the predictions groups.
         return az.from_dict(
-            predictions=out,
-            predictions_constant_data={"X_new": Xo},
-            coords={**coords, "coefficient": list(self._feature_names)},
-            dims={**dims, "X_new": ["obs_new", "coefficient"]},
+            {"predictions": out, "predictions_constant_data": {"X_new": Xo}},
+            pred_coords={**coords, "coefficient": list(self._feature_names)},
+            pred_dims={**dims, "X_new": ["obs_new", "coefficient"]},
         )
 
     def predict_in_sample(
@@ -219,7 +219,7 @@ class GaussianPredictionMixin:
         *,
         thin: int = 1,
         random_seed: Optional[int] = None,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Leave-one-out conditional predictive of each fitted unit.
 
         For each unit :math:`i` and posterior draw, the distribution of
@@ -248,7 +248,7 @@ class GaussianPredictionMixin:
 
         Returns
         -------
-        arviz.InferenceData
+        xarray.DataTree
             A ``predictions`` group with dimensions ``(chain, draw, obs)``
             holding ``y`` (draws), ``y_bp`` (the leave-one-out conditional
             mean) and ``y_tc`` (the marginal mean :math:`\\mu`).  Each
@@ -292,9 +292,9 @@ class GaussianPredictionMixin:
                 out["y"][c, d] = m + sd * rng.standard_normal(n)
 
         return az.from_dict(
-            predictions=out,
-            coords={"obs": np.arange(n)},
-            dims={k: ["obs"] for k in out},
+            {"predictions": out},
+            pred_coords={"obs": np.arange(n)},
+            pred_dims={k: ["obs"] for k in out},
         )
 
 

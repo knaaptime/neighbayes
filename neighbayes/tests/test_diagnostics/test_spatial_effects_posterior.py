@@ -83,7 +83,7 @@ def _set_posterior_draws(
         if rho_draws.ndim == 1:
             rho_draws = rho_draws[np.newaxis, :]
         posterior["rho"] = rho_draws
-    model._idata = az.from_dict(posterior=posterior)
+    model._idata = az.from_dict({"posterior": posterior})
 
 
 # ------------------------------------------------------------------

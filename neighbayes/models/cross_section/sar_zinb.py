@@ -48,7 +48,7 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 
-from ..._lazy_deps import az
+from ..._lazy_deps import xr
 from ...samplers._utils._idata import gibbs_to_inference_data
 from ...samplers._utils._slice import SliceWidthState
 from ...samplers.gaussian._chain_runner import run_chains
@@ -395,7 +395,7 @@ class SARZINB(SpatialModel):
         backend: str = "numpy",
         timeout: float | None = None,
         log_likelihood: bool = False,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Sample posterior via 9-block Pólya–Gamma Gibbs.
 
         Parameters
@@ -421,7 +421,7 @@ class SARZINB(SpatialModel):
 
         Returns
         -------
-        arviz.InferenceData
+        xarray.DataTree
             Posterior draws of ``lam``, ``gamma``, ``rho``, ``beta``,
             ``alpha`` and pointwise ``log_likelihood``.
         """

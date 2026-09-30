@@ -51,7 +51,7 @@ def _stub_posterior(model, cls, k, G=4, seed=0):
     }
     if _SPATIAL[cls]:
         post[_SPATIAL[cls]] = rng.uniform(-0.3, 0.8, size=(1, G))
-    model._idata = az.from_dict(posterior=post)
+    model._idata = az.from_dict({"posterior": post})
     return post
 
 
@@ -249,10 +249,12 @@ def test_predictive_interval_coverage_at_true_parameters(cls):
         )
         G = 2000
         model._idata = az.from_dict(
-            posterior={
-                "beta": np.tile([1.0, 2.0], (1, G, 1)),
-                "sigma": np.ones((1, G)),
-                _SPATIAL[cls]: np.full((1, G), 0.6),
+            {
+                "posterior": {
+                    "beta": np.tile([1.0, 2.0], (1, G, 1)),
+                    "sigma": np.ones((1, G)),
+                    _SPATIAL[cls]: np.full((1, G), 0.6),
+                }
             }
         )
         hits.append(_covered(model, gdf, W, oos, rep))

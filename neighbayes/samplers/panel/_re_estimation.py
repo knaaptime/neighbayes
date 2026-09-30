@@ -1,7 +1,7 @@
 """GibbsEstimation-style orchestrator for RE panel Gibbs samplers.
 
 Provides ``GaussianSARREGibbs`` and ``GaussianSEMREGibbs`` classes that
-handle chain running, InferenceData assembly, and method dispatch for
+handle chain running, DataTree assembly, and method dispatch for
 the 5-block RE panel Gibbs sampler (β, σ², α, σ_α², ρ/λ).
 
 The architecture mirrors ``_gibbs_estimation.py`` for the FE (3-block)
@@ -17,7 +17,7 @@ from abc import abstractmethod
 import numpy as np
 import scipy.sparse as sp
 
-from ..._lazy_deps import az
+from ..._lazy_deps import xr
 
 _log = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ class REGibbsEstimation:
     logdet_vec_fn : callable
         Vectorized logdet callable for arrays of rho values.
     feature_names : list of str
-        Names for the columns of X (for InferenceData coords).
+        Names for the columns of X (for DataTree coords).
     model_type : str
         One of "sar", "sem".
     N : int
@@ -113,8 +113,8 @@ class REGibbsEstimation:
         n_jobs: int = -1,
         progressbar: bool = True,
         log_likelihood: bool = False,
-    ) -> az.InferenceData:
-        """Run Gibbs chains and assemble InferenceData.
+    ) -> xr.DataTree:
+        """Run Gibbs chains and assemble DataTree.
 
         Parameters
         ----------
@@ -135,7 +135,7 @@ class REGibbsEstimation:
 
         Returns
         -------
-        az.InferenceData
+        xr.DataTree
             With ``posterior``, ``log_likelihood``, and ``observed_data``
             groups.
         """
@@ -196,7 +196,7 @@ class REGibbsEstimation:
             model_type=f"re_{self.model_type}",
         )
 
-        # Assemble InferenceData
+        # Assemble DataTree
         idata = self._assemble_idata(chain_results, log_likelihood=log_likelihood)
         elapsed = time.time() - t_start
         _log.info(
@@ -241,8 +241,8 @@ class REGibbsEstimation:
         chain_results: list[dict],
         *,
         log_likelihood: bool = False,
-    ) -> az.InferenceData:
-        """Convert chain output dicts to InferenceData.
+    ) -> xr.DataTree:
+        """Convert chain output dicts to DataTree.
 
         Parameters
         ----------
@@ -251,7 +251,7 @@ class REGibbsEstimation:
 
         Returns
         -------
-        az.InferenceData
+        xr.DataTree
         """
         spatial_param = self._spatial_param_name()
 

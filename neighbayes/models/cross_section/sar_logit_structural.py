@@ -30,7 +30,7 @@ from typing import Optional
 import numpy as np
 import scipy.sparse as sp
 
-from ..._lazy_deps import az
+from ..._lazy_deps import xr
 from ...samplers._utils._idata import gibbs_to_inference_data
 from ...samplers._utils._slice import SliceWidthState
 from ...samplers._utils._sparsax_utils import resolve_pg_jax_backend
@@ -91,7 +91,7 @@ class SARLogitStructural(SpatialModel):
     variables to obtain fully conjugate Gibbs updates for η and β.
 
     The sampler bypasses PyMC's NUTS entirely. It produces an
-    ``arviz.InferenceData`` object compatible with all downstream
+    ``xarray.DataTree`` object compatible with all downstream
     diagnostics.  Impacts are reported on the log-odds scale; for
     probability-scale impacts use the reduced-form :class:`SARLogit`.
     """
@@ -203,7 +203,7 @@ class SARLogitStructural(SpatialModel):
         krylov_degree: int = 0,
         krylov_dmax: float = 0.4,
         log_likelihood: bool = False,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Sample posterior via Pólya–Gamma block Gibbs.
 
         Parameters
@@ -242,7 +242,7 @@ class SARLogitStructural(SpatialModel):
 
         Returns
         -------
-        az.InferenceData
+        xr.DataTree
             With posterior, log_likelihood, and observed_data groups.
         """
         y = self._y
@@ -391,7 +391,7 @@ class SARLogitStructural(SpatialModel):
                 model_type="sar_logit_structural",
             )
 
-        # Assemble InferenceData
+        # Assemble DataTree
         param_keys = ["rho"]
         if return_eta:
             param_keys.append("eta")

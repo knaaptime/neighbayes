@@ -561,13 +561,13 @@ def _sample_flow_chains(
     n_quad: int = 8,
     positive: bool = False,
 ):
-    """Run ``chains`` MALA-within-Gibbs chains for a flow target → InferenceData.
+    """Run ``chains`` MALA-within-Gibbs chains for a flow target → DataTree.
 
     ``param_prefix`` is ``"rho"`` (SAR flow) or ``"lam"`` (SEM flow); λ and ρ are
     otherwise interchangeable (same resolvent log-det, same sampler).  The returned
-    ``InferenceData`` carries the per-draw Jacobian ``log|A|`` in ``sample_stats`` and
+    ``DataTree`` carries the per-draw Jacobian ``log|A|`` in ``sample_stats`` and
     — when ``compute_log_likelihood`` — a pointwise ``log_likelihood`` group (Gaussian
-    density + change-of-variables Jacobian) so ``az.loo`` / ``az.waic`` work directly.
+    density + change-of-variables Jacobian) so ``az.loo`` work directly.
 
     When ``parallel=True``, chains are dispatched via ``run_chains`` (joblib
     process-based parallelism with shared-memory progress bars), matching the
@@ -640,11 +640,11 @@ def _sample_flow_chains(
     # Per-draw Jacobian log|A| (= T·log|I_N − W_F|) is always attached so the
     # change-of-variables correction is available on the arviz object.
     sample_stats = {"log_abs_det": _stack("log_abs_det")}
-    log_likelihood = {"obs": _stack("loglik")} if compute_log_likelihood else None
+    groups = {"posterior": posterior, "sample_stats": sample_stats}
+    if compute_log_likelihood:
+        groups["log_likelihood"] = {"obs": _stack("loglik")}
     return az.from_dict(
-        posterior=posterior,
-        sample_stats=sample_stats,
-        log_likelihood=log_likelihood,
+        groups,
         coords={"coefficient": list(coord_names)},
         dims={"beta": ["coefficient"]},
     )
@@ -671,7 +671,7 @@ def sample_flow_resolvent(
     logdet_method: str = "auto",
     restrict_positive: bool = False,
 ):
-    """Sample the unrestricted **SAR** flow posterior → ``arviz.InferenceData``.
+    """Sample the unrestricted **SAR** flow posterior → ``xarray.DataTree``.
 
     Builds a :class:`FlowResolventTarget` from ``(W, y, X)`` and runs ``chains``
     MALA-within-Gibbs chains, packaging ``rho_d, rho_o, rho_w, beta, sigma``.  ``T>1``
@@ -730,7 +730,7 @@ def sample_sem_flow_resolvent(
     logdet_method: str = "auto",
     restrict_positive: bool = False,
 ):
-    """Sample the unrestricted **SEM** flow posterior → ``arviz.InferenceData``.
+    """Sample the unrestricted **SEM** flow posterior → ``xarray.DataTree``.
 
     Same resolvent log-det and sampler as the SAR flow; the data term uses the
     whitened residual ``A(y−Xβ)`` and a GLS ``β`` draw.  ``T>1`` handles the panel.
@@ -905,8 +905,8 @@ def attach_flow_log_abs_det(
 
     lad = (T * vals).reshape(shape)
     da = xr.DataArray(lad, dims=("chain", "draw"), name="log_abs_det")
-    if "sample_stats" in idata.groups():
+    if "sample_stats" in idata.children:
         idata.sample_stats["log_abs_det"] = da
     else:
-        idata.add_groups({"sample_stats": xr.Dataset({"log_abs_det": da})})
+        idata["sample_stats"] = xr.DataTree(xr.Dataset({"log_abs_det": da}))
     return idata

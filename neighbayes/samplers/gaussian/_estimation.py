@@ -1,6 +1,6 @@
 """GibbsEstimation base class for Gaussian spatial Gibbs samplers.
 
-Orchestrates chain running, InferenceData assembly, and method
+Orchestrates chain running, DataTree assembly, and method
 dispatch for the 3-block Gaussian Gibbs sampler (β, σ², ρ/λ).
 
 Two execution backends are supported:
@@ -24,7 +24,7 @@ from abc import abstractmethod
 import numpy as np
 import scipy.sparse as sp
 
-from ..._lazy_deps import az
+from ..._lazy_deps import xr
 from ..._logdet._probe_check import WarmupProbes
 from ..._logdet._refit import DEFAULT_PAD_SD
 from ..._logdet._warmup import WarmupJacobian
@@ -65,7 +65,7 @@ class GibbsEstimation:
     logdet_vec_fn : callable
         Vectorized logdet callable for arrays of rho values.
     feature_names : list of str
-        Names for the columns of X (for InferenceData coords).
+        Names for the columns of X (for DataTree coords).
     model_type : str
         One of "sar", "sem", "sdm", "sdem".
     nu : float or None, default None
@@ -137,8 +137,8 @@ class GibbsEstimation:
         slice_width: float | None = None,
         chain_method: str | None = None,
         log_likelihood: bool = False,
-    ) -> az.InferenceData:
-        """Run Gibbs chains and assemble InferenceData.
+    ) -> xr.DataTree:
+        """Run Gibbs chains and assemble DataTree.
 
         Parameters
         ----------
@@ -182,7 +182,7 @@ class GibbsEstimation:
 
         Returns
         -------
-        az.InferenceData
+        xr.DataTree
             With ``posterior`` and ``observed_data`` groups, and
             ``log_likelihood`` when requested.
         """
@@ -330,7 +330,7 @@ class GibbsEstimation:
             reuse_workers=inits[0] is not None,
         )
 
-        # Assemble InferenceData
+        # Assemble DataTree
         idata = self._assemble_idata(chain_results)
         self._record_refit(idata, chain_results, spatial_param)
         elapsed = time.time() - t_start
@@ -352,8 +352,8 @@ class GibbsEstimation:
         progressbar: bool = True,
         slice_width: float | None = None,
         chain_method: str = "vectorized",
-    ) -> az.InferenceData:
-        """Run JAX JIT Gibbs chains and assemble InferenceData.
+    ) -> xr.DataTree:
+        """Run JAX JIT Gibbs chains and assemble DataTree.
 
         Uses slice sampling for the ρ/λ update, enabling full JIT
         compilation of the Gibbs step.
@@ -383,7 +383,7 @@ class GibbsEstimation:
 
         Returns
         -------
-        az.InferenceData
+        xr.DataTree
         """
         from ._jax import run_chains_jax_gibbs_vectorized
 
@@ -489,7 +489,7 @@ class GibbsEstimation:
             nu=self.nu,
         )
 
-        # Assemble InferenceData
+        # Assemble DataTree
         idata = self._assemble_idata(chain_results)
         self._record_refit(idata, chain_results, spatial_param)
         elapsed = time.time() - t_start
@@ -680,8 +680,8 @@ class GibbsEstimation:
     def _assemble_idata(
         self,
         chain_results: list[dict],
-    ) -> az.InferenceData:
-        """Convert chain output dicts to InferenceData.
+    ) -> xr.DataTree:
+        """Convert chain output dicts to DataTree.
 
         Parameters
         ----------
@@ -690,7 +690,7 @@ class GibbsEstimation:
 
         Returns
         -------
-        az.InferenceData
+        xr.DataTree
         """
         spatial_param = self._spatial_param_name()
 

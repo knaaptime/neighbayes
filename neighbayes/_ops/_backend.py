@@ -296,6 +296,25 @@ def _factor_solve_logdet(A: sp.spmatrix, rhs: np.ndarray) -> tuple[np.ndarray, f
     return x, logdet
 
 
+class _CachedSolverOpMixin:
+    """Pickling for Ops that keep a numeric factor between ``perform`` calls.
+
+    The cached factor (scikit-sparse, SuperLU or LAPACK) cannot be pickled, and
+    PyTensor pickles Ops -- the Numba backend does so to cache compiled graphs
+    that call back into Python.  The cache is dropped from the pickled state and
+    rebuilt on the next ``perform``.
+    """
+
+    _CACHE_ATTRS = ("_cached_solver", "_cached_backend", "_cached_rho", "_cached_rhos")
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        for name in self._CACHE_ATTRS:
+            if name in state:
+                state[name] = None
+        return state
+
+
 class _SparseFactorSolver:
     """Adapter exposing a ``SuperLU``-like ``solve`` over a ``scikit-sparse`` factor.
 

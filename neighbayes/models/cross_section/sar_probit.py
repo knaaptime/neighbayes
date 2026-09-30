@@ -23,7 +23,7 @@ import pytensor.tensor as pt
 from libpysal.graph import Graph
 
 from ..._backends.sampler_helpers import prepare_compile_kwargs, prepare_idata_kwargs
-from ..._lazy_deps import az, pm
+from ..._lazy_deps import pm, xr
 from .._base._shared import SharedSpatialMethods
 from ..priors import SARProbitPriors, priors_as_dict, resolve_priors
 
@@ -130,7 +130,7 @@ class SARProbit(SharedSpatialMethods):
         self.priors_obj = resolve_priors(priors, SARProbitPriors)
         self.priors = priors_as_dict(self.priors_obj)
         self.robust = robust
-        self._idata: Optional[az.InferenceData] = None
+        self._idata: Optional[xr.DataTree] = None
         self._pymc_model: Optional[pm.Model] = None
 
         self._W_dense = self._as_dense_region_W(W)
@@ -281,7 +281,7 @@ class SARProbit(SharedSpatialMethods):
         random_seed: Optional[int] = None,
         progressbar: bool = True,
         **sample_kwargs,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Draw samples from the posterior."""
         nuts_sampler = sample_kwargs.pop("nuts_sampler", "pymc")
         target_accept = sample_kwargs.pop("target_accept", 0.9)

@@ -43,7 +43,7 @@ import pytensor.tensor as pt
 from pytensor import sparse as pts
 
 from ..._backends.sampler_helpers import use_jax_likelihood
-from ..._lazy_deps import az, pm
+from ..._lazy_deps import pm, xr
 from .._base._shared import _tobit_pointwise_loglik, _write_log_likelihood_to_idata
 from ..panel_base import SpatialPanelModel
 from ..priors import PanelSARTobitPriors, PanelSEMTobitPriors
@@ -129,7 +129,7 @@ class SARPanelTobit(_PanelTobitBase):
         y_lat = self._posterior_latent_y_mean()
         return rho * self._sparse_panel_lag(y_lat) + self._X @ beta
 
-    def _postprocess_idata(self, idata: az.InferenceData) -> az.InferenceData:
+    def _postprocess_idata(self, idata: xr.DataTree) -> xr.DataTree:
         """Attach the complete pointwise Tobit log-likelihood for IC metrics.
 
         The SAR panel Tobit model expresses both the residual log-likelihood
@@ -138,7 +138,7 @@ class SARPanelTobit(_PanelTobitBase):
         formula with latent mean :math:`\\mu = \\rho W y^* + X\\beta`; the
         per-period Jacobian is scaled by ``T``.
         """
-        if "log_likelihood" in idata.groups() and "obs" in idata.log_likelihood:
+        if "log_likelihood" in idata.children and "obs" in idata.log_likelihood:
             return idata
         rho = idata.posterior["rho"].values
         beta = idata.posterior["beta"].values
@@ -298,7 +298,7 @@ class SEMPanelTobit(_PanelTobitBase):
         beta = self._posterior_mean("beta")
         return self._X @ beta
 
-    def _postprocess_idata(self, idata: az.InferenceData) -> az.InferenceData:
+    def _postprocess_idata(self, idata: xr.DataTree) -> xr.DataTree:
         """Attach the complete pointwise Tobit log-likelihood for IC metrics.
 
         The SEM panel Tobit model expresses both the error log-likelihood and
@@ -308,7 +308,7 @@ class SEMPanelTobit(_PanelTobitBase):
         with latent mean :math:`\\mu = X\\beta` (the spatial filter is absorbed
         into the ``T``-scaled Jacobian).
         """
-        if "log_likelihood" in idata.groups() and "obs" in idata.log_likelihood:
+        if "log_likelihood" in idata.children and "obs" in idata.log_likelihood:
             return idata
         lam = idata.posterior["lam"].values
         beta = idata.posterior["beta"].values

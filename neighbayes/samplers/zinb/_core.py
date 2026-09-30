@@ -212,7 +212,7 @@ def _sample_z(
 
 
 # ---------------------------------------------------------------------------
-# Pointwise log-likelihood (for InferenceData)
+# Pointwise log-likelihood (for DataTree)
 # ---------------------------------------------------------------------------
 
 
