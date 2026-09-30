@@ -127,7 +127,11 @@ class TestSARNegBinStructuralRecovery:
     """
 
     def test_fit_returns_idata(self, sar_nb_data):
-        """fit() returns InferenceData with expected groups."""
+        """fit() returns a DataTree with the expected groups.
+
+        The pointwise log-likelihood is stored only on request (as in PyMC),
+        so the fit asks for it.
+        """
         y = sar_nb_data["y"]
         X = sar_nb_data["X"]
         W = sar_nb_data["W_graph"]
@@ -140,6 +144,7 @@ class TestSARNegBinStructuralRecovery:
             random_seed=42,
             n_jobs=1,
             progressbar=False,
+            idata_kwargs={"log_likelihood": True},
         )
 
         assert "posterior" in idata

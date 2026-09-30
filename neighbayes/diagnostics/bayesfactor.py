@@ -878,7 +878,7 @@ def _bic_logml(idata, return_diagnostics=False, model=None):
         n_obs = len(model._y)
     if n_obs is None:
         raise ValueError(
-            "Cannot determine number of observations. Provide an DataTree "
+            "Cannot determine number of observations. Provide a DataTree "
             "with observed_data, sample_stats.n_data_points, or log_likelihood "
             "groups, or pass a fitted model object with a _y attribute."
         )
@@ -1234,7 +1234,7 @@ def bayes_factor_compare_models(
             idata_list.append(obj)
             if method == "bridge":
                 raise ValueError(
-                    f"Entry at index {i} ('{model_labels[i]}') is an "
+                    f"Entry at index {i} ('{model_labels[i]}') is a "
                     "DataTree object, but bridge sampling requires a "
                     "fitted model object with a pymc_model attribute so the "
                     "log-posterior can be compiled automatically.  Pass the "
@@ -1247,7 +1247,7 @@ def bayes_factor_compare_models(
             raise TypeError(
                 f"Entry at index {i} ('{model_labels[i]}') must be a fitted "
                 "model object (with .inference_data and .pymc_model attributes) "
-                f"or an DataTree object, got {type(obj).__name__}"
+                f"or a DataTree object, got {type(obj).__name__}"
             )
 
     # Warn about sample size for bridge sampling (Gronau et al., 2017)

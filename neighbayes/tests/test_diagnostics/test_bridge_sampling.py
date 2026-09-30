@@ -344,10 +344,10 @@ class TestBayesFactorCompareModels:
             bayes_factor_compare_models([idata], method="bic", metric="bridge")
 
     def test_bridge_requires_model_object(self):
-        """Bridge method raises ValueError when InferenceData is passed without model object."""
+        """Bridge method raises ValueError when a DataTree is passed without model object."""
         idata, _ = _make_2d_normal_idata(n_samples=1000, seed=42)
         with pytest.raises(
-            ValueError, match="InferenceData.*bridge sampling requires a fitted model"
+            ValueError, match="DataTree.*bridge sampling requires a fitted model"
         ):
             bayes_factor_compare_models([idata], method="bridge", model_labels=["M1"])
 
