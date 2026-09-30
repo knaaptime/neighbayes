@@ -211,6 +211,52 @@ def flow_weight_matrices(G: Graph) -> dict[str, sp.csr_matrix]:
     }
 
 
+def flow_lags(G, V, T: int = 1) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """``(W_d V, W_o V, W_w V)`` without forming the ``N × N`` Kronecker matrices.
+
+    With ``N = n²`` pairs, ``W_d = I⊗W``, ``W_o = W⊗I`` and ``W_w = W⊗W``.  On
+    the flow array ``Y`` (origins × destinations, the row-major order of the
+    flow vec) these are ``YWᵀ``, ``WY`` and ``WYWᵀ``: a few ``n × n`` sparse
+    products instead of matrices with up to ``nnz(W)²`` entries.
+
+    Parameters
+    ----------
+    G : Graph or sparse matrix
+        The ``n × n`` spatial weights.
+    V : ndarray, shape ``(T·N,)`` or ``(T·N, k)``
+        Flow vector(s); for panels, periods stacked time-first.
+    T : int, default 1
+        Number of stacked periods (each lagged separately).
+
+    Returns
+    -------
+    tuple of ndarray
+        Destination, origin and network lags, each shaped like ``V``.
+    """
+    W = _weights_to_csr(G)
+    n = W.shape[0]
+    V = np.asarray(V, dtype=np.float64)
+    shape = V.shape
+    k = int(np.prod(shape[1:])) if V.ndim > 1 else 1
+    # (T, o, d, k) → origins first, all other axes flattened into columns.
+    Y = V.reshape(T, n, n, k).transpose(1, 0, 2, 3).reshape(n, -1)  # [o, (t,d,c)]
+    WY = (W @ Y).reshape(n, T, n, k)  # W acting on origins
+
+    def _right(Z):  # Z[o, t, d, c] → Σ_d' W[d, d'] Z[o, t, d', c]
+        Zd = Z.transpose(2, 0, 1, 3).reshape(n, -1)
+        return (W @ Zd).reshape(n, n, T, k).transpose(1, 2, 0, 3)
+
+    Y4 = Y.reshape(n, T, n, k)
+    lag_d = _right(Y4)
+    lag_o = WY
+    lag_w = _right(WY)
+
+    def _back(Z):
+        return Z.transpose(1, 0, 2, 3).reshape(shape)
+
+    return _back(lag_d), _back(lag_o), _back(lag_w)
+
+
 @dataclass
 class FlowDesignMatrix:
     """Combined design matrix for an O-D flow regression.

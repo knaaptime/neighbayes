@@ -48,8 +48,12 @@ def _queen(side):
     return (sp.diags(1.0 / np.asarray(W.sum(axis=1)).ravel()) @ W).tocsc()
 
 
-def _both_bases(side=16, rho_c=0.3, omega_val=0.5, seed=0):
-    """Build the JAX and NumPy bases over the same P(ρ), plus exact pieces."""
+def _both_bases(side=16, rho_c=0.3, omega_val=0.5, seed=0, numpy=True):
+    """Build the JAX and NumPy bases over the same P(ρ), plus exact pieces.
+
+    ``numpy=False`` builds only the JAX basis (the NumPy one also factors
+    through sparsax when it is installed).
+    """
     import jax
     import jax.numpy as jnp
 
@@ -84,6 +88,8 @@ def _both_bases(side=16, rho_c=0.3, omega_val=0.5, seed=0):
         dmax=DMAX,
     )
 
+    if not numpy:
+        return jax_basis, None, None
     W_sym = (W + W.T).tocsc()
     WtW = (W.T @ W).tocsc()
     base = (sp.eye(n, format="csc") + sp.diags(omega)).tocsc()
@@ -158,10 +164,26 @@ class TestJaxMatchesNumpy:
         cache cannot serve a factor built by another test and deflate the
         count.
         """
+        import time
+
+        import jax
         import sparsax
 
-        before = sparsax.factorization_count()
-        _both_bases(omega_val=0.3717, seed=3)
+        def settled_count():
+            # The counter is process-wide, and work an earlier test dispatched
+            # asynchronously may still be landing: wait until it stops moving.
+            count = sparsax.factorization_count()
+            while True:
+                time.sleep(0.05)
+                now = sparsax.factorization_count()
+                if now == count:
+                    return count
+                count = now
+
+        before = settled_count()
+        # JAX dispatches asynchronously: wait for every factorization to run
+        # before reading the counter.
+        jax.block_until_ready(_both_bases(omega_val=0.3717, seed=3, numpy=False)[0])
         # 1 for P_c + 4 Chebyshev logdet nodes; the degree-12 recurrence and
         # the seed solve all run against the held factor.
         assert sparsax.factorization_count() - before == 1 + 4

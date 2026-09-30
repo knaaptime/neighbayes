@@ -89,8 +89,10 @@ class FlowReducedGibbsCache:
 
     Parameters
     ----------
-    Wd, Wo, Ww : scipy.sparse.csr_matrix, shape (N, N)
-        Flow weight matrices (destination, origin, cross).
+    Wd, Wo, Ww : scipy.sparse.csr_matrix, shape (N, N), or None
+        Flow weight matrices (destination, origin, cross).  Needed only by the
+        unrestricted sampler; the separable one works from ``W_csc`` alone,
+        so pass ``None`` there (``W⊗W`` holds ``nnz(W)²`` entries).
     W_csc : scipy.sparse.csc_matrix, shape (n, n)
         Row-standardized regional weights in CSC format (for the
         separable Kronecker solve and Krylov basis).
@@ -121,9 +123,9 @@ class FlowReducedGibbsCache:
 
     def __init__(
         self,
-        Wd: sp.csr_matrix,
-        Wo: sp.csr_matrix,
-        Ww: sp.csr_matrix,
+        Wd: sp.csr_matrix | None,
+        Wo: sp.csr_matrix | None,
+        Ww: sp.csr_matrix | None,
         W_csc: sp.csc_matrix,
         n: int,
         separable: bool = False,
@@ -150,7 +152,9 @@ class FlowReducedGibbsCache:
         self.n_rho_omega_cycles = n_rho_omega_cycles
         self.positive = positive
         self.T = int(T)
-        self.Nf = int(Wd.shape[0])  # per-period flow count (n²)
+        self.Nf = int(n) * int(n)  # per-period flow count (n²)
+        if not separable and Wd is None:
+            raise ValueError("the unrestricted flow sampler needs Wd, Wo and Ww")
         self.krylov_reuse = krylov_reuse
         self.krylov_reuse_threshold = krylov_reuse_threshold
 
@@ -834,25 +838,28 @@ def run_chain_unrestricted(
         _n_cycles = cache.n_rho_omega_cycles
         Xtilde = None
 
-        # One shift-invert basis per ρ direction, replacing a refactorization
-        # at every slice candidate (~23 per sweep, measured).
-        _bases: dict[str, object] = {}
-        if cache.krylov_degree > 0 and cache.T == 1:
-            for _dir in ("rho_d", "rho_o", "rho_w"):
-                try:
-                    _bases[_dir] = build_unrestricted_krylov_basis(
-                        state.rho_d,
-                        state.rho_o,
-                        state.rho_w,
-                        X,
-                        Wd,
-                        Wo,
-                        Ww,
-                        _dir,
-                        cache.krylov_degree,
-                    )
-                except (RuntimeError, ValueError):
-                    _bases[_dir] = None
+        # One shift-invert basis per ρ direction, replacing a refactorization at
+        # every slice candidate (~23 per sweep, measured).  Each is built right
+        # before its own slice, at the current state: a ρ_k basis depends on the
+        # other two ρ's, and building all three up front evaluated the later
+        # slices at stale values of the earlier ones (a measurable bias).
+        def _basis(_dir):
+            if cache.krylov_degree <= 0 or cache.T != 1:
+                return None
+            try:
+                return build_unrestricted_krylov_basis(
+                    state.rho_d,
+                    state.rho_o,
+                    state.rho_w,
+                    X,
+                    Wd,
+                    Wo,
+                    Ww,
+                    _dir,
+                    cache.krylov_degree,
+                )
+            except (RuntimeError, ValueError):
+                return None
 
         for _cycle in range(_n_cycles):
             # --- ρ_d | ω, α, y (β marginalized) ---
@@ -867,7 +874,7 @@ def run_chain_unrestricted(
                 sweep_idx=i,
                 tune=tune,
                 intercept_col=intercept_col,
-                basis=_bases.get("rho_d"),
+                basis=_basis("rho_d"),
             )
 
             # --- ρ_o | ω, α, y (β marginalized) ---
@@ -882,7 +889,7 @@ def run_chain_unrestricted(
                 sweep_idx=i,
                 tune=tune,
                 intercept_col=intercept_col,
-                basis=_bases.get("rho_o"),
+                basis=_basis("rho_o"),
             )
 
             # --- ρ_w | ω, α, y (β marginalized) ---
@@ -897,7 +904,7 @@ def run_chain_unrestricted(
                 sweep_idx=i,
                 tune=tune,
                 intercept_col=intercept_col,
-                basis=_bases.get("rho_w"),
+                basis=_basis("rho_w"),
             )
 
             # --- β | ρ, ω, α, y ---
@@ -1055,6 +1062,10 @@ def run_chain_separable(
 
     use_krylov = cache.krylov_degree > 0 and cache.T == 1
     krylov_degree = cache.krylov_degree
+    # Never reuse a basis across sweeps: the ρ_d basis is built at (ρ_d, ρ_o) and
+    # ρ_o is re-sliced every sweep, so a reused basis evaluates U at a stale ρ_o
+    # (this biased the ρ posterior; see _flow_jax.py).
+    reuse = False
 
     # Per-chain Krylov basis caches for reuse across sweeps.
     _prev_basis_d = None
@@ -1082,7 +1093,7 @@ def run_chain_separable(
         basis_o = None
         if use_krylov:
             if (
-                cache.krylov_reuse
+                reuse
                 and _prev_basis_d is not None
                 and abs(state.rho_d - _prev_rho_d) < cache.krylov_reuse_threshold
             ):
@@ -1104,7 +1115,7 @@ def run_chain_separable(
                 _prev_rho_d = state.rho_d
 
             if (
-                cache.krylov_reuse
+                reuse
                 and _prev_basis_o is not None
                 and abs(state.rho_o - _prev_rho_o) < cache.krylov_reuse_threshold
             ):

@@ -332,6 +332,21 @@ def lu_cheb_logdet_precompute(
     )
 
 
+def _pattern_factor(ctx):
+    """``ctx``'s CHOLMOD factor for the pattern of ``I - ρ W_sym``, built once.
+
+    The symbolic analysis is done on ``I - ½ W_sym`` (SPD, since the spectrum of
+    ``W_sym`` lies in [-1, 1]) rather than on the first matrix factored: at
+    ρ = 0 sparse arithmetic drops W's entries, and an analysis of the identity
+    would not cover any other ρ.
+    """
+    from ..samplers._utils._spatial_normal import CholmodFactor
+
+    if ctx._factor is None:
+        ctx._factor = CholmodFactor(sp.csc_matrix(ctx._eye - 0.5 * ctx.W_sym))
+    return ctx._factor
+
+
 class CholChebContext(_ChebContextBase):
     """Reusable D-symmetrization and CHOLMOD symbolic analysis for one ``W``.
 
@@ -382,18 +397,12 @@ class CholChebContext(_ChebContextBase):
         instance; every later node — and every later interval — reuses it, since
         the sparsity pattern of ``I - ρW_sym`` does not depend on ρ.
         """
-        from sksparse.cholmod import cho_factor as cholmod_cho_factor
-
         out = np.empty(len(rho_nodes), dtype=np.float64)
+        factor = _pattern_factor(self)
         for i, rho in enumerate(rho_nodes):
-            A = sp.csc_matrix(self._eye - float(rho) * self.W_sym)
-            if self._factor is None:
-                # First node ever: symbolic analysis + numeric factorization.
-                self._factor = cholmod_cho_factor(A)
-            else:
-                # Numeric factorization only — symbolic analysis reused.
-                self._factor.factorize(A)
-            out[i] = self._factor.logdet()
+            # Numeric factorization only — symbolic analysis reused.
+            factor.factorize(sp.csc_matrix(self._eye - float(rho) * self.W_sym))
+            out[i] = factor.logdet()
         return out
 
 

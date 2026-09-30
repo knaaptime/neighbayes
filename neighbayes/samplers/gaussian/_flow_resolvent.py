@@ -43,6 +43,34 @@ from ..._logdet._flow_resolvent import (
 )
 
 
+def resolve_flow_logdet(W, method: str = "auto"):
+    """Pick the unrestricted flow log-determinant backend.
+
+    ``"auto"`` uses the exact trace-moment method
+    (:class:`~neighbayes._logdet._flow_kron_traces.FlowKronTraceLogdet`) when ``W``
+    is undirected (D-symmetrizable, so its spectrum is real and the Chebyshev
+    basis converges up to the stability wall), and the stochastic resolvent
+    estimator (``"jax"``) for directed ``W``.  ``"kron_traces"`` forces the exact
+    method (Taylor basis for directed ``W``, which is slow near the wall).
+
+    Returns ``(logdet_value_and_grad or None, resolved_method)``; ``None`` means
+    each chain's target builds its own resolvent estimator.
+    """
+    if method == "auto":
+        from ..._logdet._config import _is_symmetric_W
+
+        method = "kron_traces" if _is_symmetric_W(W) else "jax"
+    if method == "kron_traces":
+        from ..._logdet._flow_kron_traces import FlowKronTraceLogdet
+
+        return FlowKronTraceLogdet(W), method
+    if method not in ("jax", "numpy"):
+        raise ValueError(
+            f"logdet_method must be 'auto', 'kron_traces', 'jax' or 'numpy', got {method!r}"
+        )
+    return None, method
+
+
 def _default_logdet_value_and_grad(kron, probes):
     """Resolvent value+grad closure sharing frozen probes across a chain.
 
@@ -529,7 +557,7 @@ def _sample_flow_chains(
     compute_log_likelihood: bool = True,
     progressbar: bool = True,
     n_jobs: int = -1,
-    logdet_method: str = "jax",
+    logdet_method: str = "auto",
     n_quad: int = 8,
     positive: bool = False,
 ):
@@ -556,6 +584,11 @@ def _sample_flow_chains(
     from .._utils._seeds import spawn_chain_seeds
 
     seeds = spawn_chain_seeds(random_seed, chains)
+
+    if logdet_value_and_grad is None:
+        # Built once and shared by every chain: the exact method's trace moments
+        # are the one-time cost.
+        logdet_value_and_grad, logdet_method = resolve_flow_logdet(W, logdet_method)
 
     def _chain_fn(chain_id, seed, progress_manager=None, chain_id_kw=0):
         target = target_cls(
@@ -635,16 +668,17 @@ def sample_flow_resolvent(
     compute_log_likelihood: bool = True,
     progressbar: bool = True,
     n_jobs: int = -1,
-    logdet_method: str = "jax",
+    logdet_method: str = "auto",
     restrict_positive: bool = False,
 ):
     """Sample the unrestricted **SAR** flow posterior → ``arviz.InferenceData``.
 
     Builds a :class:`FlowResolventTarget` from ``(W, y, X)`` and runs ``chains``
     MALA-within-Gibbs chains, packaging ``rho_d, rho_o, rho_w, beta, sigma``.  ``T>1``
-    handles the panel (stacked over ``T`` periods; log-det scaled by ``T``).  Pass
-    ``logdet_value_and_grad`` to override the resolvent log-det backend (e.g. an exact
-    one for small problems / testing).  With ``restrict_positive`` the flat ρ prior is
+    handles the panel (stacked over ``T`` periods; log-det scaled by ``T``).
+    ``logdet_method`` selects the log-det backend (see :func:`resolve_flow_logdet`;
+    ``"auto"`` is exact for undirected ``W``); ``logdet_value_and_grad`` overrides it
+    with any ``(ρ_d, ρ_o, ρ_w) -> (value, grad)`` callable.  With ``restrict_positive`` the flat ρ prior is
     truncated to ``ρ_k ≥ 0`` (the model-level positivity constraint).  The per-draw
     Jacobian ``log|A|`` is attached in ``sample_stats``; with
     ``compute_log_likelihood`` (default) a pointwise ``log_likelihood`` group
@@ -693,7 +727,7 @@ def sample_sem_flow_resolvent(
     compute_log_likelihood: bool = True,
     progressbar: bool = True,
     n_jobs: int = -1,
-    logdet_method: str = "jax",
+    logdet_method: str = "auto",
     restrict_positive: bool = False,
 ):
     """Sample the unrestricted **SEM** flow posterior → ``arviz.InferenceData``.

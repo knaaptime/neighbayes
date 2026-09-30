@@ -1103,14 +1103,11 @@ class CholAAAContext:
 
     def logdet_at(self, rho: float) -> float:
         """Exact ``log|I - ρW|`` by sparse Cholesky, reusing symbolic analysis."""
-        from sksparse.cholmod import cho_factor as cholmod_cho_factor
+        from ._chol_cheb import _pattern_factor
 
-        A = sp.csc_matrix(self._eye - float(rho) * self.W_sym)
-        if self._factor is None:
-            self._factor = cholmod_cho_factor(A)
-        else:
-            self._factor.factorize(A)
-        return float(self._factor.logdet())
+        factor = _pattern_factor(self)
+        factor.factorize(sp.csc_matrix(self._eye - float(rho) * self.W_sym))
+        return float(factor.logdet())
 
     def fit_on(
         self,

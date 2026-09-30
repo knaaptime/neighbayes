@@ -5,7 +5,10 @@ from __future__ import annotations
 import importlib
 import importlib.util
 import os
+import threading
+import time
 import warnings
+from collections import OrderedDict
 from functools import lru_cache
 
 import numpy as np
@@ -85,17 +88,13 @@ def _select_sparse_backend() -> str:
 
     Notes
     -----
-    Unlike the log-determinant coarse grid — where
-    :class:`~neighbayes._logdet._aaa._ReusableLULogdet` times KLU against
-    UMFPACK and keeps the winner — ``auto`` here does **not** measure.  That
-    crossover was established on *factorization*, and this selector feeds
-    repeated *solves* (:func:`_solve_sparse_vector`,
-    :func:`_solve_sparse_matrix`, :class:`_SparseFactorSolver`, and the flow
-    resolvent's ``P`` probe vectors per call), where the backends' relative
-    standing has not been measured and iterative-refinement settings differ.
-    ``umfpack`` is exposed so that comparison can be run, and so dense weights
-    can be routed by hand; promoting it into ``auto`` should follow the
-    measurement, not precede it.
+    Under ``auto`` the returned name is ``"klu"``, but
+    :func:`_sparse_factor` then times KLU against UMFPACK on the first
+    factorization of each sparsity pattern and keeps the faster (see
+    :func:`_refactor`).  The crossover is size-dependent: with the symbolic
+    analysis reused, KLU is 2× faster than UMFPACK at ``n = 10,000`` (k-NN,
+    k = 8) and UMFPACK 1.6–1.8× faster at ``n = 160,000``.  Naming a backend
+    explicitly disables the probe.
     """
     requested = os.environ.get("NEIGHBAYES_SPARSE_BACKEND", "auto").strip().lower()
     strict = os.environ.get("NEIGHBAYES_SPARSE_STRICT", "0").strip().lower() in {
@@ -139,23 +138,106 @@ def _select_sparse_backend() -> str:
 
 @lru_cache(maxsize=1)
 def _get_klu_factor():
-    """Import and return ``sksparse.klu.klu_factor``."""
-    return importlib.import_module("sksparse.klu").klu_factor
+    """Import and return ``sksparse.klu.KLUFactor``."""
+    return importlib.import_module("sksparse.klu").KLUFactor
 
 
 @lru_cache(maxsize=1)
 def _get_umf_factor():
-    """Import and return ``sksparse.umfpack.umf_factor``."""
-    return importlib.import_module("sksparse.umfpack").umf_factor
+    """Import and return ``sksparse.umfpack.UMFFactor``."""
+    return importlib.import_module("sksparse.umfpack").UMFFactor
+
+
+_FACTOR_CLASSES = {"klu": _get_klu_factor, "umfpack": _get_umf_factor}
+
+# Working factors per thread, keyed on sparsity pattern (LRU).  Each holds one
+# symbolic analysis and is refactored in place for every new set of values, so
+# a repeated pattern pays the analysis once — 1.3–2.3× cheaper per call than a
+# fresh factorization.  Thread-local, so concurrent callers never share one.
+_FACTOR_CACHE_SIZE = 16
+_factor_cache = threading.local()
+
+# ``auto`` prefers UMFPACK over KLU only when it is clearly faster: UMFPACK's
+# per-call cost varies more, and KLU wins at every size up to ~40,000.
+_UMF_PROBE_MARGIN = 0.8
+
+
+def _auto_backend_requested() -> bool:
+    requested = os.environ.get("NEIGHBAYES_SPARSE_BACKEND", "auto").strip().lower()
+    return requested in {"", "auto"}
+
+
+def _pattern_key(A_csc, backend: str):
+    return (
+        backend,
+        A_csc.shape,
+        A_csc.nnz,
+        hash(A_csc.indptr.tobytes()),
+        hash(A_csc.indices.tobytes()),
+    )
+
+
+def _new_working_factor(A_csc, backend: str):
+    """``(backend, factor)`` for a new pattern, numerically factored at ``A_csc``.
+
+    Under ``auto`` with both bindings importable, KLU and UMFPACK are each
+    factored once and the faster kept.
+    """
+    candidates = [backend]
+    if backend == "klu" and _auto_backend_requested() and _umfpack_available():
+        candidates.append("umfpack")
+    timed = []
+    for name in candidates:
+        factor = _FACTOR_CLASSES[name]()(A_csc)  # symbolic analysis
+        t0 = time.perf_counter()
+        factor.factorize(A_csc)
+        timed.append((time.perf_counter() - t0, name, factor))
+    if len(timed) == 2 and timed[1][0] < _UMF_PROBE_MARGIN * timed[0][0]:
+        return timed[1][1], timed[1][2]
+    return timed[0][1], timed[0][2]
+
+
+def _refactor(A_csc, backend: str):
+    """This thread's working factor for ``A_csc``'s pattern, refactored at ``A_csc``.
+
+    The factor is shared by every later call on the same pattern and thread;
+    callers that keep it past their next factorization must copy it (as
+    :func:`_sparse_factor` does).
+    """
+    if backend not in _FACTOR_CLASSES:
+        raise ValueError(f"Unknown sparse backend: {backend!r}")
+    if not A_csc.has_sorted_indices:
+        A_csc = A_csc.sorted_indices()
+    cache = getattr(_factor_cache, "entries", None)
+    if cache is None:
+        cache = _factor_cache.entries = OrderedDict()
+    key = _pattern_key(A_csc, backend)
+    entry = cache.get(key)
+    if entry is not None and (
+        np.array_equal(entry[0], A_csc.indptr)
+        and np.array_equal(entry[1], A_csc.indices)
+    ):
+        cache.move_to_end(key)
+        factor = entry[2]
+        factor.factorize(A_csc)
+        return factor
+    _, factor = _new_working_factor(A_csc, backend)
+    cache[key] = (A_csc.indptr.copy(), A_csc.indices.copy(), factor)
+    if len(cache) > _FACTOR_CACHE_SIZE:
+        cache.popitem(last=False)
+    return factor
 
 
 def _sparse_factor(A_csc, backend: str):
-    """Factorize ``A_csc`` with the requested SuiteSparse backend."""
-    if backend == "klu":
-        return _get_klu_factor()(A_csc)
-    if backend == "umfpack":
-        return _get_umf_factor()(A_csc)
-    raise ValueError(f"Unknown sparse backend: {backend!r}")
+    """Factorize ``A_csc`` with the requested SuiteSparse backend.
+
+    Reuses the symbolic analysis of an earlier call with the same sparsity
+    pattern (:func:`_refactor`) and returns a private copy of the numeric
+    factor, so the caller may hold it across later factorizations.  Under
+    ``auto`` the factor may be UMFPACK's even though ``backend`` is ``"klu"``;
+    both expose ``solve``.
+    """
+    return _refactor(A_csc, backend).copy()
 
 
 def _is_suitesparse(backend: str) -> bool:
@@ -168,7 +250,7 @@ def _solve_sparse_vector(A: sp.spmatrix, rhs: np.ndarray) -> np.ndarray:
     backend = _select_sparse_backend()
     rhs64 = np.asarray(rhs, dtype=np.float64)
     if _is_suitesparse(backend):
-        factor = _sparse_factor(A.tocsc(), backend)
+        factor = _refactor(A.tocsc(), backend)
         return np.asarray(factor.solve(rhs64), dtype=np.float64)
     lu = sp.linalg.splu(A.tocsc())
     return np.asarray(lu.solve(rhs64), dtype=np.float64)
@@ -181,7 +263,7 @@ def _solve_sparse_matrix(A: sp.spmatrix, rhs: np.ndarray) -> np.ndarray:
     if _is_suitesparse(backend):
         # KLU and UMFPACK factors both accept a 2-D RHS directly (single
         # factorization, batched solve).
-        factor = _sparse_factor(A.tocsc(), backend)
+        factor = _refactor(A.tocsc(), backend)
         return np.asarray(factor.solve(rhs64), dtype=np.float64)
     lu = sp.linalg.splu(A.tocsc())
     return np.asarray(lu.solve(rhs64), dtype=np.float64)
@@ -192,7 +274,7 @@ def _factor_solve_logdet(A: sp.spmatrix, rhs: np.ndarray) -> tuple[np.ndarray, f
 
     Uses a ``scikit-sparse`` backend (KLU or UMFPACK) when available, falling
     back to scipy SuperLU.  The logdet comes from UMFPACK's own determinant
-    routine where that backend is selected, and from the factor diagonals
+    routine where that backend factored ``A``, and from the factor diagonals
     otherwise; see :mod:`neighbayes._logdet._aaa` for why the distinction is
     worth making.
     """
@@ -202,9 +284,10 @@ def _factor_solve_logdet(A: sp.spmatrix, rhs: np.ndarray) -> tuple[np.ndarray, f
     if _is_suitesparse(backend):
         from .._logdet._aaa import _lu_logdet_from_factor, _umf_logdet_from_factor
 
-        factor = _sparse_factor(A_csc, backend)
+        factor = _refactor(A_csc, backend)
         x = np.asarray(factor.solve(rhs64), dtype=np.float64)
-        if backend == "umfpack":
+        # Dispatch on the factor, not the name: auto may have chosen UMFPACK.
+        if hasattr(factor, "slogdet"):
             return x, _umf_logdet_from_factor(factor)
         return x, _lu_logdet_from_factor(factor)
     lu = sp.linalg.splu(A_csc)

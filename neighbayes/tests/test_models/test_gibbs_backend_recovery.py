@@ -534,13 +534,11 @@ def test_backends_agree(request, model_name, fixture_name, tols):
 # Separable NB flow
 # ----------------------------------------------------------------------
 #
-# This one is not decoration.  Until 2026-09-03 the JAX flow backend was
-# simply wrong: ``_kron_solve_jax`` returned ``vec(Hᵀ)`` and both Kronecker
-# matvecs applied a stray transpose, so the sampler fit a permuted system
-# and reported rho_d = -0.21 against a true +0.35 with R-hat = 1.00 —
-# converged, and wrong.  The operators are pinned directly in
-# ``test_kron_krylov_matvec.py``; this test is the end-to-end backstop, and
-# the only recovery coverage the flow JAX path has.
+# This one is not decoration.  An earlier JAX flow kernel fit a permuted
+# system (a transposed Kronecker solve) and reported rho_d = -0.21 against a
+# true +0.35 with R-hat = 1.00 — converged, and wrong.  The structured JAX
+# kernels are pinned against dense algebra in ``test_flow_structured.py``;
+# this test is the end-to-end backstop that both backends agree.
 
 
 @pytest.fixture(scope="module")

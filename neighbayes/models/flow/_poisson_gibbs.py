@@ -61,9 +61,11 @@ def run_poisson_flow_gibbs(
     W_csc = model._W_sparse.tocsc()
 
     cache_kwargs: dict = dict(
-        Wd=model._Wd,
-        Wo=model._Wo,
-        Ww=model._Ww,
+        # The separable sampler works from the n×n W alone; building the
+        # N×N Kronecker weights (W⊗W has nnz(W)² entries) is unrestricted-only.
+        Wd=None if separable else model._Wd,
+        Wo=None if separable else model._Wo,
+        Ww=None if separable else model._Ww,
         W_csc=W_csc,
         n=model._n,
         separable=separable,

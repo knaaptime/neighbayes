@@ -871,86 +871,112 @@ class TestFlowSpatialEffectsAndPPC:
 # ---------------------------------------------------------------------------
 
 
+def _reference_masks(n):
+    """Dense boolean LeSage masks (N, n) — test-only reference."""
+    N = n * n
+    flat = np.arange(N)
+    o_idx, d_idx = np.divmod(flat, n)
+    j = np.arange(n)
+    dmask = (d_idx[:, None] == j) & (o_idx[:, None] != j)
+    omask = (o_idx[:, None] == j) & (d_idx[:, None] != j)
+    imask = (o_idx[:, None] == j) & (d_idx[:, None] == j)
+    return dmask, omask, imask
+
+
+def _reference_unit_sums(W, rd, ro, rw):
+    """Masked response sums by dense n² × n² solves — test-only reference."""
+    import scipy.sparse as sp_local
+
+    W = sp_local.csr_matrix(W)
+    n = W.shape[0]
+    N = n * n
+    eye = sp_local.eye(n)
+    A = (
+        sp_local.eye(N)
+        - rd * sp_local.kron(eye, W)
+        - ro * sp_local.kron(W, eye)
+        - rw * sp_local.kron(W, W)
+    ).tocsc()
+    lu = sp_local.linalg.splu(A)
+    dmask, omask, imask = _reference_masks(n)
+    out = []
+    for shock in (dmask | imask, omask | imask, imask):
+        T = lu.solve(shock.astype(float))
+        out.append([T.sum(), T[imask].sum(), T[omask].sum(), T[dmask].sum()])
+    return np.array(out) / N
+
+
+def _ring_W(n, row_standardize=True):
+    import scipy.sparse as sp_local
+
+    A = sp_local.diags(np.ones(n - 1), 1) + sp_local.diags(np.ones(n - 1), -1)
+    A = A + sp_local.csr_matrix(([1.0, 1.0], ([0, n - 1], [n - 1, 0])), shape=(n, n))
+    if row_standardize:
+        return sp_local.diags(1.0 / np.asarray(A.sum(1)).ravel()) @ A
+    return 0.4 * A
+
+
 class TestFlowEffectsLeSageDecomposition:
     """Verify spatial_effects matches the LeSage (2008) calc_effects.m reference."""
 
-    def test_helper_zero_rho_closed_form(self):
+    @pytest.mark.parametrize("row_standardize", [True, False])
+    @pytest.mark.parametrize(
+        "rhos",
+        [(0.4, 0.3, 0.1), (0.4, 0.3, -0.12), (-0.3, 0.5, 0.15), (0.2, 0.15, -0.03)],
+    )
+    def test_moment_sums_match_dense_solve(self, rhos, row_standardize):
+        """W-only moment series equals the dense n²×n² solve, for any W."""
+        from neighbayes.models.flow import _flow_effect_sums, _FlowEffectMoments
+
+        W = _ring_W(7, row_standardize)
+        got = _flow_effect_sums(_FlowEffectMoments(W), *rhos)[0]
+        np.testing.assert_allclose(got, _reference_unit_sums(W, *rhos), atol=1e-12)
+
+    def test_zero_rho_closed_form(self):
         """With A = I, effects collapse to closed-form expressions."""
         from neighbayes.models.flow import (
-            _build_flow_effect_masks,
-            _compute_flow_effects_lesage,
+            _compute_flow_effects,
+            _flow_effect_sums,
+            _FlowEffectMoments,
         )
 
-        n, k = 4, 2
-        dmask, omask, imask = _build_flow_effect_masks(n)
-        beta_d = np.array([2.0, -1.0])
-        beta_o = np.array([0.5, 3.0])
-        res = _compute_flow_effects_lesage(
-            lambda rhs: rhs,
-            dmask,
-            omask,
-            imask,
-            beta_d,
-            beta_o,
-            n,
-            k,
-        )
-        for p in range(k):
-            bd, bo = beta_d[p], beta_o[p]
-            assert np.isclose(res["total"][p], bd + bo)
-            assert np.isclose(res["intra"][p], (bd + bo) / n)
-            assert np.isclose(res["origin"][p], (n - 1) / n * bo)
-            assert np.isclose(res["destination"][p], (n - 1) / n * bd)
-            assert np.isclose(res["network"][p], 0.0)
+        n = 4
+        sums = _flow_effect_sums(_FlowEffectMoments(_ring_W(n)), 0.0, 0.0, 0.0)
+        beta_d = np.array([[2.0, -1.0]])
+        beta_o = np.array([[0.5, 3.0]])
+        res = _compute_flow_effects(sums, beta_d, beta_o)
+        for p in range(2):
+            bd, bo = beta_d[0, p], beta_o[0, p]
+            assert np.isclose(res["total"][0, p], bd + bo)
+            assert np.isclose(res["intra"][0, p], (bd + bo) / n)
+            assert np.isclose(res["origin"][0, p], (n - 1) / n * bo)
+            assert np.isclose(res["destination"][0, p], (n - 1) / n * bd)
+            assert np.isclose(res["network"][0, p], 0.0)
 
-    def test_helper_total_identity(self):
-        """total == origin + destination + intra + network for arbitrary A."""
-        import scipy.sparse as sp_local
-
+    def test_total_identity(self):
+        """total == origin + destination + intra + network."""
         from neighbayes.models.flow import (
-            _build_flow_effect_masks,
-            _compute_flow_effects_lesage,
+            _compute_flow_effects,
+            _flow_effect_sums,
+            _FlowEffectMoments,
         )
 
-        n, k = 4, 2
-        N = n * n
-        dmask, omask, imask = _build_flow_effect_masks(n)
-        # Random invertible A.
         rng = np.random.default_rng(0)
-        M = rng.standard_normal((N, N))
-        A = np.eye(N) + 0.05 * M
-        lu = sp_local.linalg.splu(sp_local.csc_matrix(A))
-
-        def solve(rhs):
-            return lu.solve(rhs)
-
-        beta_d = np.array([2.0, -1.0])
-        beta_o = np.array([0.5, 3.0])
-        res = _compute_flow_effects_lesage(
-            solve,
-            dmask,
-            omask,
-            imask,
-            beta_d,
-            beta_o,
-            n,
-            k,
+        sums = _flow_effect_sums(
+            _FlowEffectMoments(_ring_W(6)), [0.3, -0.2], [0.2, 0.4], [0.1, -0.1]
         )
-        for p in range(k):
-            s = (
-                res["origin"][p]
-                + res["destination"][p]
-                + res["intra"][p]
-                + res["network"][p]
-            )
-            assert np.isclose(res["total"][p], s)
+        res = _compute_flow_effects(
+            sums, rng.standard_normal((2, 2)), rng.standard_normal((2, 2))
+        )
+        s = res["origin"] + res["destination"] + res["intra"] + res["network"]
+        np.testing.assert_allclose(res["total"], s)
 
     def test_calc_effects_reference_match(self):
-        """End-to-end sanity: spatial_effects matches a hand-rolled LeSage solve at posterior means."""
+        """End-to-end: spatial_effects matches a hand-rolled LeSage solve at one draw."""
         import scipy.sparse as sp_local
 
         from neighbayes.dgp.flows import generate_flow_data
-        from neighbayes.models.flow import SARFlow, _build_flow_effect_masks
+        from neighbayes.models.flow import SARFlow
 
         n = 4
         data = generate_flow_data(
@@ -963,7 +989,6 @@ class TestFlowEffectsLeSageDecomposition:
             sigma=1.0,
             seed=3,
         )
-        G = data["G"]
         model = SARFlow(
             data["y_vec"],
             data["X"],
@@ -972,15 +997,12 @@ class TestFlowEffectsLeSageDecomposition:
         )
         model.fit(draws=20, tune=20, chains=1, progressbar=False, random_seed=0)
 
-        post = model.spatial_effects(return_posterior_samples=True)
-        df, samples = post
-        # Reference computation: rebuild for one draw and compare.
-        rho_d = float(model.inference_data.posterior["rho_d"].values.reshape(-1)[0])
-        rho_o = float(model.inference_data.posterior["rho_o"].values.reshape(-1)[0])
-        rho_w = float(model.inference_data.posterior["rho_w"].values.reshape(-1)[0])
-        beta = model.inference_data.posterior["beta"].values.reshape(
-            -1, len(model._feature_names)
-        )[0]
+        _, samples = model.spatial_effects(return_posterior_samples=True)
+        post = model.inference_data.posterior
+        rho_d = float(post["rho_d"].values.reshape(-1)[0])
+        rho_o = float(post["rho_o"].values.reshape(-1)[0])
+        rho_w = float(post["rho_w"].values.reshape(-1)[0])
+        beta = post["beta"].values.reshape(-1, len(model._feature_names))[0]
         k = model._k
         beta_d = beta[2 : 2 + k]
         beta_o = beta[2 + k : 2 + 2 * k]
@@ -988,7 +1010,7 @@ class TestFlowEffectsLeSageDecomposition:
         beta_intra = beta[2 + 2 * k : 2 + 3 * k]
 
         N = n * n
-        dmask, omask, imask = _build_flow_effect_masks(n)
+        dmask, omask, imask = _reference_masks(n)
         Wd = sp_local.kron(sp_local.eye(n), model._W_sparse, format="csr")
         Wo = sp_local.kron(model._W_sparse, sp_local.eye(n), format="csr")
         Ww = sp_local.kron(model._W_sparse, model._W_sparse, format="csr")
@@ -1014,73 +1036,6 @@ class TestFlowEffectsLeSageDecomposition:
             assert np.isclose(samples["origin"][0, p], ref_origin)
             assert np.isclose(samples["destination"][0, p], ref_dest)
             assert np.isclose(samples["network"][0, p], ref_network)
-
-    def test_separable_matches_unrestricted(self):
-        """SARFlowSeparable effects ≈ SARFlow effects when rho_w = -rho_d * rho_o."""
-        import scipy.sparse as sp_local
-
-        from neighbayes.dgp.flows import generate_flow_data
-        from neighbayes.models.flow import (
-            SARFlow,
-            SARFlowSeparable,
-            _build_flow_effect_masks,
-            _compute_flow_effects_lesage,
-        )
-
-        n = 4
-        data = generate_flow_data(
-            n=n,
-            rho_d=0.2,
-            rho_o=0.15,
-            rho_w=-0.2 * 0.15,
-            beta_d=[1.0],
-            beta_o=[0.5],
-            sigma=1.0,
-            seed=4,
-        )
-        G = data["G"]
-        # Compute reference effects directly with both code paths at the same parameter point.
-        from neighbayes._ops import kron_solve_matrix
-
-        rd, ro = 0.2, 0.15
-        rw = -rd * ro
-        dmask, omask, imask = _build_flow_effect_masks(n)
-        N = n * n
-        Wd = sp_local.kron(sp_local.eye(n), G.sparse.tocsr(), format="csr")
-        Wo = sp_local.kron(G.sparse.tocsr(), sp_local.eye(n), format="csr")
-        Ww = sp_local.kron(G.sparse.tocsr(), G.sparse.tocsr(), format="csr")
-        A = (sp_local.eye(N) - rd * Wd - ro * Wo - rw * Ww).tocsc()
-        lu = sp_local.linalg.splu(A)
-
-        I_n = sp_local.eye(n, format="csr")
-        Ld = (I_n - rd * G.sparse.tocsr()).tocsr()
-        Lo = (I_n - ro * G.sparse.tocsr()).tocsr()
-
-        beta_d = np.array([1.0])
-        beta_o = np.array([0.5])
-
-        res_general = _compute_flow_effects_lesage(
-            lambda r: lu.solve(r),
-            dmask,
-            omask,
-            imask,
-            beta_d,
-            beta_o,
-            n,
-            1,
-        )
-        res_kron = _compute_flow_effects_lesage(
-            lambda r: kron_solve_matrix(Lo, Ld, r, n),
-            dmask,
-            omask,
-            imask,
-            beta_d,
-            beta_o,
-            n,
-            1,
-        )
-        for key in res_general:
-            np.testing.assert_allclose(res_general[key], res_kron[key], atol=1e-10)
 
 
 class TestFlowPanelSpatialEffectsAndPPC:
@@ -1147,79 +1102,46 @@ class TestFlowPanelSpatialEffectsAndPPC:
 class TestFlowEffectsAsymmetricAndIntra:
     """Tests for the new asymmetric Xo/Xd shocks and beta_intra contribution."""
 
-    def test_helper_intra_shock_includes_beta_intra(self):
-        """β_intra adds (β_intra)/n to the intra effect on the dest side under A=I."""
+    def test_intra_shock_includes_beta_intra(self):
+        """β_intra adds β_intra/n to the intra effect on the dest side under A=I."""
         from neighbayes.models.flow import (
-            _build_flow_effect_masks,
-            _compute_flow_effects_lesage,
+            _compute_flow_effects,
+            _flow_effect_sums,
+            _FlowEffectMoments,
         )
 
-        n, k = 4, 1
-        dmask, omask, imask = _build_flow_effect_masks(n)
-        beta_d = np.array([1.0])
-        beta_o = np.array([0.5])
-        beta_intra = np.array([2.0])
-
-        res_with = _compute_flow_effects_lesage(
-            lambda rhs: rhs,
-            dmask,
-            omask,
-            imask,
-            beta_d,
-            beta_o,
-            n,
-            k,
-            beta_intra=beta_intra,
+        n = 4
+        sums = _flow_effect_sums(_FlowEffectMoments(_ring_W(n)), 0.0, 0.0, 0.0)
+        beta_d, beta_o, beta_intra = (
+            np.array([[1.0]]),
+            np.array([[0.5]]),
+            np.array([[2.0]]),
         )
-        res_without = _compute_flow_effects_lesage(
-            lambda rhs: rhs,
-            dmask,
-            omask,
-            imask,
-            beta_d,
-            beta_o,
-            n,
-            k,
-            beta_intra=None,
-        )
+        res_with = _compute_flow_effects(sums, beta_d, beta_o, beta_intra)
+        res_without = _compute_flow_effects(sums, beta_d, beta_o, None)
         # Intra increases by β_intra/n (single perturbed region averaged).
-        assert np.isclose(
-            res_with["intra"][0] - res_without["intra"][0],
-            beta_intra[0] / n,
-        )
+        assert np.isclose(res_with["intra"][0, 0] - res_without["intra"][0, 0], 2.0 / n)
         # Total increases by β_intra/n as well.
-        assert np.isclose(
-            res_with["total"][0] - res_without["total"][0],
-            beta_intra[0] / n,
-        )
+        assert np.isclose(res_with["total"][0, 0] - res_without["total"][0, 0], 2.0 / n)
         # Network unchanged (intra is part of the "owner" region's column).
-        assert np.isclose(res_with["network"][0], res_without["network"][0])
+        assert np.isclose(res_with["network"][0, 0], res_without["network"][0, 0])
 
-    def test_helper_per_side_keys_decompose_combined(self):
+    def test_per_side_keys_decompose_combined(self):
         """combined_eff == dest_eff + orig_eff for every effect type."""
         from neighbayes.models.flow import (
             _EFFECT_KEYS,
-            _build_flow_effect_masks,
-            _compute_flow_effects_lesage,
+            _compute_flow_effects,
+            _flow_effect_sums,
+            _FlowEffectMoments,
         )
 
-        n, k = 5, 2
-        dmask, omask, imask = _build_flow_effect_masks(n)
         rng = np.random.default_rng(7)
-        beta_d = rng.standard_normal(k)
-        beta_o = rng.standard_normal(k)
-        beta_intra = rng.standard_normal(k)
-
-        res = _compute_flow_effects_lesage(
-            lambda rhs: rhs,
-            dmask,
-            omask,
-            imask,
-            beta_d,
-            beta_o,
-            n,
-            k,
-            beta_intra=beta_intra,
+        sums = _flow_effect_sums(_FlowEffectMoments(_ring_W(5)), 0.3, 0.2, 0.1)
+        res = _compute_flow_effects(
+            sums,
+            rng.standard_normal((1, 2)),
+            rng.standard_normal((1, 2)),
+            rng.standard_normal((1, 2)),
         )
         for eff in _EFFECT_KEYS:
             np.testing.assert_allclose(

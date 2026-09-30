@@ -24,10 +24,9 @@ from ..._logdet import (
     make_flow_separable_logdet_numpy,
 )
 from ..._ops import kron_solve_matrix
-from ...graph import _weights_to_csr, flow_trace_blocks, flow_weight_matrices
+from ...graph import _weights_to_csr, flow_lags, flow_trace_blocks
 from .._mixins._flow_shared import FlowSharedMethods
 from ..flow import (
-    _compute_flow_effects_lesage,
     _compute_ols_flow_effects,
 )
 from ..panel_base import SpatialPanelModel, _demean_panel
@@ -221,10 +220,6 @@ class FlowPanelModel(FlowSharedMethods, SpatialPanelModel):
         self._X = self._X
 
         # Build flow weight matrices on N_flow = n^2 system
-        wms = flow_weight_matrices(self._W_sparse)
-        self._Wd: sp.csr_matrix = wms["destination"]
-        self._Wo: sp.csr_matrix = wms["origin"]
-        self._Ww: sp.csr_matrix = wms["network"]
 
         # Cache the symmetric 3x3 Kronecker trace matrix used by Bayesian
         # LM diagnostics on flow models: T[i,j] = tr(W_i' W_j) + tr(W_i W_j)
@@ -232,9 +227,10 @@ class FlowPanelModel(FlowSharedMethods, SpatialPanelModel):
         self._T_flow_traces: np.ndarray = flow_trace_blocks(self._W_sparse)
 
         # Spatial lags on demeaned/stationary panel stack
-        self._Wd_y = self._sparse_flow_panel_lag(self._y, self._Wd)
-        self._Wo_y = self._sparse_flow_panel_lag(self._y, self._Wo)
-        self._Ww_y = self._sparse_flow_panel_lag(self._y, self._Ww)
+        # Matrix-free: W⊗W alone would hold nnz(W)² entries.
+        self._Wd_y, self._Wo_y, self._Ww_y = flow_lags(
+            self._W_sparse, self._y, T=self._T
+        )
 
         # Pre-compute logdet data for separable constraint: log|Lo⊗Ld| = n*f(ρ_d) + n*f(ρ_o).
         # Also keep _W_eigs for backward compatibility.
@@ -292,13 +288,6 @@ class FlowPanelModel(FlowSharedMethods, SpatialPanelModel):
     # helpers (_assemble_A, _A_solver, _solve_A, _attach_complete_log_likelihood,
     # etc.) inherited from FlowSharedMethods — see .._mixins._flow_shared
     # ------------------------------------------------------------------
-
-    def _sparse_flow_panel_lag(
-        self, v: np.ndarray, W_flow: sp.csr_matrix
-    ) -> np.ndarray:
-        """Apply panel flow lag I_T kron W_flow to time-first stacked vector."""
-        chunks = v.reshape(self._T, self._N_flow)
-        return np.asarray((W_flow @ chunks.T).T, dtype=np.float64).reshape(-1)
 
     # ------------------------------------------------------------------
     # Public diagnostics
@@ -505,11 +494,10 @@ class FlowPanelModel(FlowSharedMethods, SpatialPanelModel):
 
         Effects are computed using one-period :math:`n^2 \\times n^2` system
         matrices, which are time-invariant under static panel parameters.  See
-        :func:`~neighbayes.models.flow._compute_flow_effects_lesage` for the
+        :func:`~neighbayes.models.flow._compute_flow_effects` for the
         decomposition.  One sparse :math:`LU` factorization per draw covers all
         :math:`n` shock columns and all :math:`k` predictors.
         """
-        n = self._n
         k_d = self._k_d
         k_o = self._k_o
 
@@ -528,50 +516,15 @@ class FlowPanelModel(FlowSharedMethods, SpatialPanelModel):
             rho_w_draws = rho_w_draws[:n_draws_total]
             beta_draws = beta_draws[:n_draws_total]
 
-        from ..flow import _EFFECT_KEYS
-
-        out: dict[str, np.ndarray] = {}
-        for side in ("dest", "orig"):
-            k_side = k_d if side == "dest" else k_o
-            for eff in _EFFECT_KEYS:
-                out[f"{side}_{eff}"] = np.zeros(
-                    (n_draws_total, k_side), dtype=np.float64
-                )
-        k_combined = k_d + k_o if k_d != k_o else k_d
-        for eff in _EFFECT_KEYS:
-            out[eff] = np.zeros((n_draws_total, k_combined), dtype=np.float64)
-
-        for idx in range(n_draws_total):
-            rd = float(rho_d_draws[idx])
-            ro = float(rho_o_draws[idx])
-            rw = float(rho_w_draws[idx])
-            beta_d_vec = beta_draws[idx, dest_start : dest_start + k_d]
-            beta_o_vec = beta_draws[idx, orig_start : orig_start + k_o]
-            beta_intra_vec = (
-                beta_draws[idx, intra_start : intra_start + k_d] if has_intra else None
-            )
-
-            solver = self._A_solver
-
-            def _solve(
-                rhs: np.ndarray, _s=solver, _rd=rd, _ro=ro, _rw=rw
-            ) -> np.ndarray:
-                return _s.solve([-_rd, -_ro, -_rw], rhs)
-
-            res = _compute_flow_effects_lesage(
-                _solve,
-                *self._flow_effect_masks,
-                beta_d_vec,
-                beta_o_vec,
-                n,
-                k_d,
-                k_o=k_o,
-                beta_intra=beta_intra_vec,
-            )
-            for key, arr in res.items():
-                out[key][idx, : len(arr)] = arr
-
-        return out
+        # Exact LeSage decomposition from W-only moments (no n²-sized arrays).
+        return self._flow_effects_for_draws(
+            rho_d_draws,
+            rho_o_draws,
+            rho_w_draws,
+            beta_draws[:, dest_start : dest_start + k_d],
+            beta_draws[:, orig_start : orig_start + k_o],
+            beta_draws[:, intra_start : intra_start + k_d] if has_intra else None,
+        )
 
     def _compute_flow_effects_kron(
         self,
@@ -587,11 +540,8 @@ class FlowPanelModel(FlowSharedMethods, SpatialPanelModel):
         solves via :func:`~neighbayes._ops.kron_solve_matrix`, exploiting
         :math:`A = L_o \\otimes L_d`.
         """
-        n = self._n
         k_d = self._k_d
         k_o = self._k_o
-        W = self._W_sparse.tocsr()
-        I_n = sp.eye(n, format="csr", dtype=np.float64)
 
         dest_start = 2
         orig_start = 2 + k_d
@@ -607,48 +557,15 @@ class FlowPanelModel(FlowSharedMethods, SpatialPanelModel):
             rho_o_draws = rho_o_draws[:n_draws_total]
             beta_draws = beta_draws[:n_draws_total]
 
-        from ..flow import _EFFECT_KEYS
-
-        out: dict[str, np.ndarray] = {}
-        for side in ("dest", "orig"):
-            k_side = k_d if side == "dest" else k_o
-            for eff in _EFFECT_KEYS:
-                out[f"{side}_{eff}"] = np.zeros(
-                    (n_draws_total, k_side), dtype=np.float64
-                )
-        k_combined = k_d + k_o if k_d != k_o else k_d
-        for eff in _EFFECT_KEYS:
-            out[eff] = np.zeros((n_draws_total, k_combined), dtype=np.float64)
-
-        for idx in range(n_draws_total):
-            rd = float(rho_d_draws[idx])
-            ro = float(rho_o_draws[idx])
-            beta_d_vec = beta_draws[idx, dest_start : dest_start + k_d]
-            beta_o_vec = beta_draws[idx, orig_start : orig_start + k_o]
-            beta_intra_vec = (
-                beta_draws[idx, intra_start : intra_start + k_d] if has_intra else None
-            )
-
-            Ld = (I_n - rd * W).tocsr()
-            Lo = (I_n - ro * W).tocsr()
-
-            def _solve(rhs: np.ndarray, _Lo=Lo, _Ld=Ld, _n=n) -> np.ndarray:
-                return kron_solve_matrix(_Lo, _Ld, rhs, _n)
-
-            res = _compute_flow_effects_lesage(
-                _solve,
-                *self._flow_effect_masks,
-                beta_d_vec,
-                beta_o_vec,
-                n,
-                k_d,
-                k_o=k_o,
-                beta_intra=beta_intra_vec,
-            )
-            for key, arr in res.items():
-                out[key][idx, : len(arr)] = arr
-
-        return out
+        # Exact LeSage decomposition from W-only moments (no n²-sized arrays).
+        return self._flow_effects_for_draws(
+            rho_d_draws,
+            rho_o_draws,
+            -rho_d_draws * rho_o_draws,  # separable: ρ_w = −ρ_d·ρ_o
+            beta_draws[:, dest_start : dest_start + k_d],
+            beta_draws[:, orig_start : orig_start + k_o],
+            beta_draws[:, intra_start : intra_start + k_d] if has_intra else None,
+        )
 
 
 class _ResolventFlowPanelMixin:
@@ -671,7 +588,7 @@ class _ResolventFlowPanelMixin:
         sampler: str | None = None,
         step_size: float = 5e-4,
         n_probes: int = 48,
-        logdet_method: str = "jax",
+        logdet_method: str = "auto",
         n_quad: int = 8,
         progressbar: bool = True,
         n_jobs: int = -1,
@@ -1284,6 +1201,7 @@ class SARNegBinFlowPanel(SARFlowPanel):
         random_seed: Optional[int] = None,
         *,
         sampler: str = "gibbs",
+        gibbs_backend: str = "numpy",
         attach_log_abs_det: bool = True,
         progressbar: bool = True,
         n_jobs: int = -1,
@@ -1302,6 +1220,9 @@ class SARNegBinFlowPanel(SARFlowPanel):
         ``log_likelihood``); set it ``False`` to skip the per-draw resolvent cost
         at very large ``N``.
 
+        The unrestricted Gibbs kernel runs on ``gibbs_backend="numpy"`` only; the
+        JAX kernel is cross-section only.
+
         ``idata_kwargs={"log_likelihood": True}`` stores the pointwise
         log-likelihood (one value per draw, chain, and flow-period) for
         ``az.loo`` / ``az.waic`` on either sampler; off by default, as in PyMC.
@@ -1314,6 +1235,7 @@ class SARNegBinFlowPanel(SARFlowPanel):
                 random_seed=random_seed,
                 progressbar=progressbar,
                 n_jobs=n_jobs,
+                gibbs_backend=gibbs_backend,
                 log_likelihood=bool((idata_kwargs or {}).get("log_likelihood", False)),
             )
         elif sampler == "nuts":
@@ -1341,6 +1263,7 @@ class SARNegBinFlowPanel(SARFlowPanel):
         random_seed: Optional[int] = None,
         progressbar: bool = True,
         n_jobs: int = -1,
+        gibbs_backend: str = "numpy",
         krylov_reuse: bool = True,
         log_likelihood: bool = False,
     ) -> az.InferenceData:
@@ -1359,6 +1282,7 @@ class SARNegBinFlowPanel(SARFlowPanel):
             random_seed=random_seed,
             progressbar=progressbar,
             n_jobs=n_jobs,
+            gibbs_backend=gibbs_backend,
             krylov_reuse=krylov_reuse,
             log_likelihood=log_likelihood,
         )
@@ -1535,6 +1459,7 @@ class SARNegBinFlowSeparablePanel(SARFlowSeparablePanel):
         random_seed: Optional[int] = None,
         *,
         sampler: str = "gibbs",
+        gibbs_backend: str = "numpy",
         attach_log_abs_det: bool = True,
         progressbar: bool = True,
         n_jobs: int = -1,
@@ -1551,6 +1476,9 @@ class SARNegBinFlowSeparablePanel(SARFlowSeparablePanel):
         ``sample_stats["log_abs_det"]`` for diagnostics — not folded into the
         count model's ``log_likelihood``.
 
+        ``gibbs_backend="jax"`` runs the same structured sweep compiled with JAX,
+        chains on threads; ``"numpy"`` (default) runs it on the host.
+
         ``idata_kwargs={"log_likelihood": True}`` stores the pointwise
         log-likelihood (one value per draw, chain, and flow-period) for
         ``az.loo`` / ``az.waic`` on either sampler; off by default, as in PyMC.
@@ -1563,6 +1491,7 @@ class SARNegBinFlowSeparablePanel(SARFlowSeparablePanel):
                 random_seed=random_seed,
                 progressbar=progressbar,
                 n_jobs=n_jobs,
+                gibbs_backend=gibbs_backend,
                 log_likelihood=bool((idata_kwargs or {}).get("log_likelihood", False)),
             )
         elif sampler == "nuts":
@@ -1589,6 +1518,7 @@ class SARNegBinFlowSeparablePanel(SARFlowSeparablePanel):
         random_seed: Optional[int] = None,
         progressbar: bool = True,
         n_jobs: int = -1,
+        gibbs_backend: str = "numpy",
         krylov_reuse: bool = True,
         log_likelihood: bool = False,
     ) -> az.InferenceData:
@@ -1607,6 +1537,7 @@ class SARNegBinFlowSeparablePanel(SARFlowSeparablePanel):
             random_seed=random_seed,
             progressbar=progressbar,
             n_jobs=n_jobs,
+            gibbs_backend=gibbs_backend,
             krylov_reuse=krylov_reuse,
             log_likelihood=log_likelihood,
         )
@@ -1841,49 +1772,15 @@ class NegBinFlowPanel(OLSFlowPanel):
 # ---------------------------------------------------------------------------
 
 
-def _sparse_flow_panel_lag_matrix(
-    M: np.ndarray, W_flow: sp.csr_matrix, T: int, N_flow: int
-) -> np.ndarray:
-    """Apply :math:`I_T \\otimes W_{flow}` to a stacked panel design matrix.
-
-    Parameters
-    ----------
-    M : np.ndarray, shape ``(N_flow * T, p)``
-        Time-first stacked design matrix.
-    W_flow : scipy.sparse matrix, shape ``(N_flow, N_flow)``
-        Flow weight matrix (one of ``W_d``, ``W_o``, ``W_w``).
-    T, N_flow : int
-        Panel dimensions.
-
-    Returns
-    -------
-    np.ndarray, shape ``(N_flow * T, p)``
-        ``W_flow`` applied to each period block independently.
-    """
-    p = M.shape[1] if M.ndim == 2 else 1
-    chunks = M.reshape(T, N_flow, p)
-    out = np.empty_like(chunks)
-    for t in range(T):
-        out[t] = W_flow @ chunks[t]
-    return out.reshape(T * N_flow, p)
-
-
 class _SEMFlowPanelMixin:
     """Shared init helper to precompute design-matrix lags for SEM panel models."""
 
     def _init_sem_lags(self) -> None:
         T = self._T
-        N = self._N_flow
         # Lags of the (already-demeaned) design matrix.  Constants — no
         # parameter dependence, so we precompute once.
-        self._Wd_X: np.ndarray = _sparse_flow_panel_lag_matrix(
-            self._X.astype(np.float64), self._Wd, T, N
-        )
-        self._Wo_X: np.ndarray = _sparse_flow_panel_lag_matrix(
-            self._X.astype(np.float64), self._Wo, T, N
-        )
-        self._Ww_X: np.ndarray = _sparse_flow_panel_lag_matrix(
-            self._X.astype(np.float64), self._Ww, T, N
+        self._Wd_X, self._Wo_X, self._Ww_X = flow_lags(
+            self._W_sparse, self._X.astype(np.float64), T=T
         )
 
 

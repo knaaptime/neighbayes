@@ -432,6 +432,21 @@ class CachedSparseSolver:
         self._last_token = token
         return token
 
+    def _with_token(self, use):
+        """``use(token)`` on the held token, refactoring once if it went stale.
+
+        sparsax keeps only its newest factor tokens (``set_token_cache_size``),
+        so a token held while other solvers factored many times can be released;
+        using it raises "stale factor token".  The held θ is refactored then.
+        """
+        try:
+            return use(self._last_token)
+        except Exception as exc:  # noqa: BLE001 - re-raised unless stale
+            if "stale factor token" not in str(exc):
+                raise
+            coeffs, self._last_token = self._last_coeffs, None
+            return use(self._token(coeffs))
+
     def solve(self, coeffs, rhs):
         """Solve :math:`A(\\theta) x = b` for vector RHS.
 
@@ -460,8 +475,10 @@ class CachedSparseSolver:
             if self._has_lu_factor:
                 # One numeric factorization, then every RHS column solved
                 # against the held token.
+                self._token(coeffs)
                 out = np.asarray(
-                    self._lu.solve_factor(self._token(coeffs), b), dtype=np.float64
+                    self._with_token(lambda tok: self._lu.solve_factor(tok, b)),
+                    dtype=np.float64,
                 )
             else:
                 # Older sparsax: lu_solve still takes a 2-D RHS and caches
@@ -519,8 +536,9 @@ class CachedSparseSolver:
 
             if self._last_token is None:
                 raise RuntimeError("factorize() must be called before solve_factored()")
+            b = jnp.asarray(rhs_np)
             out = np.asarray(
-                self._lu.solve_factor(self._last_token, jnp.asarray(rhs_np)),
+                self._with_token(lambda tok: self._lu.solve_factor(tok, b)),
                 dtype=np.float64,
             )
         else:
@@ -541,7 +559,7 @@ class CachedSparseSolver:
         if self._use_sparsax and self._has_lu_factor:
             if self._last_token is None:
                 raise RuntimeError("factorize() must be called before logdet()")
-            return float(self._lu.logdet_factor(self._last_token))
+            return float(self._with_token(self._lu.logdet_factor))
         if getattr(self, "_splu", None) is None:
             raise RuntimeError("factorize() must be called before logdet()")
         return float(np.sum(np.log(np.abs(self._splu.U.diagonal()))))

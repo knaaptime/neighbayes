@@ -42,8 +42,9 @@ class FlowSharedMethods:
     """Mixin with shared methods for flow and flow-panel models.
 
     Both :class:`FlowModel` and :class:`FlowPanelModel` inherit from this
-    mixin.  Subclasses are expected to set ``self._Wd``, ``self._Wo``,
-    ``self._Ww``, ``self._W_sparse``, and either ``self._N`` (cross-section)
+    mixin.  Subclasses are expected to set ``self._W_sparse`` (the ``n × n``
+    weights; the ``N × N`` flow weights are derived lazily) and either
+    ``self._N`` (cross-section)
     or ``self._N_flow`` (panel) before calling any mixin method.
     """
 
@@ -55,15 +56,47 @@ class FlowSharedMethods:
     # ------------------------------------------------------------------
 
     @cached_property
-    def _flow_effect_masks(self):
-        """``(dmask, omask, imask)`` index masks for the LeSage effects breakdown.
+    def _flow_kron_weights(self) -> dict:
+        """The ``N × N`` flow weights ``I⊗W``, ``W⊗I``, ``W⊗W``, built on first use.
 
-        Built on first use, only when spatial effects are computed: they
-        index ``(N, n)`` shock arrays and are needed nowhere else.
+        ``W⊗W`` holds ``nnz(W)²`` entries, so the constructors never build it:
+        lags use :func:`~neighbayes.graph.flow_lags` and effects use W-only
+        moments.  Only the samplers and PyMC ops that factor the ``N × N``
+        system ask for these.
         """
-        from ..flow._flow import _build_flow_effect_masks
+        from ...graph import flow_weight_matrices
 
-        return _build_flow_effect_masks(self._n)
+        return flow_weight_matrices(self._W_sparse)
+
+    @property
+    def _Wd(self) -> sp.csr_matrix:
+        return self._flow_kron_weights["destination"]
+
+    @property
+    def _Wo(self) -> sp.csr_matrix:
+        return self._flow_kron_weights["origin"]
+
+    @property
+    def _Ww(self) -> sp.csr_matrix:
+        return self._flow_kron_weights["network"]
+
+    @cached_property
+    def _flow_effect_moments(self):
+        """W-only moments for the exact LeSage effects breakdown.
+
+        Built on first use, only when spatial effects are computed; see
+        :class:`~neighbayes.models.flow._flow._FlowEffectMoments`.
+        """
+        from ..flow._flow import _FlowEffectMoments
+
+        return _FlowEffectMoments(self._W_sparse)
+
+    def _flow_effects_for_draws(self, rho_d, rho_o, rho_w, beta_d, beta_o, beta_intra):
+        """LeSage effects for every posterior draw, with no n²-sized arrays."""
+        from ..flow._flow import _compute_flow_effects, _flow_effect_sums
+
+        sums = _flow_effect_sums(self._flow_effect_moments, rho_d, rho_o, rho_w)
+        return _compute_flow_effects(sums, beta_d, beta_o, beta_intra)
 
     @property
     def _flow_system_size(self) -> int:

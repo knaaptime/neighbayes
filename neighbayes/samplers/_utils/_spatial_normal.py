@@ -5,7 +5,8 @@ factorization, conjugate gradient (CG) iterative solve, or Chebyshev
 polynomial approximation.
 
 **Factorization path** (default for moderate n):
-    Uses CHOLMOD (``scikit-sparse``), which is 5–9× faster than
+    Uses CHOLMOD (through ``sparsax`` when installed, else ``scikit-sparse``),
+    which is 5–9× faster than
     ``scipy.sparse.linalg.splu`` for SPD matrices.  CHOLMOD applies a
     fill-reducing permutation P_perm such that
 
@@ -35,11 +36,15 @@ from typing import NamedTuple
 import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
-from sksparse.cholmod import cho_factor as _cholmod_cho_factor
+from sksparse.cholmod import CholeskyFactor as _SkCholeskyFactor
 
 # ---------------------------------------------------------------------------
 # CHOLMOD factorization wrapper
 # ---------------------------------------------------------------------------
+
+
+# CHOLMOD solve modes (cholmod.h): A x = b, L' x = b, and x = P' b.
+_MODE_A, _MODE_LT, _MODE_PT = 0, 5, 8
 
 
 class CholmodFactor:
@@ -51,6 +56,17 @@ class CholmodFactor:
     for the ρ block in the Gibbs sampler, where P_η changes with each
     candidate ρ but always has the same non-zero structure.
 
+    Two backends, chosen once at construction:
+
+    * **sparsax** (when importable) — its NumPy CHOLMOD bindings, which keep
+      one symbolic analysis per pattern and refactor supernodally.
+    * **scikit-sparse** otherwise.  scikit-sparse 0.5's ``factorize`` ends
+      every factorization with a conversion to a simplicial factor, and a
+      refactor of a simplicial factor is itself simplicial — 5× slower than
+      supernodal at n ≈ 160,000.  So the symbolic analysis is kept untouched
+      and each ``factorize`` refactors a copy of it, which runs supernodally
+      whenever the analysis chose that.
+
     Parameters
     ----------
     pattern_matrix : sparse matrix
@@ -60,16 +76,64 @@ class CholmodFactor:
 
     def __init__(self, pattern_matrix: sp.spmatrix) -> None:
         self._pattern_matrix = sp.csc_matrix(pattern_matrix)
-        self._factor = _cholmod_cho_factor(self._pattern_matrix)
+        self._pattern_matrix.sort_indices()
+        self._setup()
+
+    def _setup(self) -> None:
+        from ..._jax_dispatch import _sparsax_available
+
+        P = self._pattern_matrix
+        self._n = P.shape[0]
+        self._sparsax = None
+        if _sparsax_available():
+            import sparsax_cpp
+
+            self._sparsax = sparsax_cpp
+            # The upper triangle in CSC order.  A matrix with the pattern's
+            # exact CSC structure maps to it by one gather (``_upper_pos``);
+            # anything else is matched on sorted (col, row) keys.
+            col = np.repeat(np.arange(self._n), np.diff(P.indptr))
+            upper = P.indices <= col
+            self._indptr, self._indices = P.indptr.copy(), P.indices.copy()
+            self._upper_pos = np.flatnonzero(upper)
+            self._Ai = P.indices[upper].astype(np.int32)
+            self._Aj = col[upper].astype(np.int32)
+            self._keys = self._Aj.astype(np.int64) * self._n + self._Ai
+            self._Ax = np.ascontiguousarray(P.data[upper], dtype=np.float64)
+        else:
+            self._symbolic = _SkCholeskyFactor(P)
+            self._factor = self._symbolic.copy().factorize(P)
 
     def __getstate__(self) -> dict:
         """Support pickling: store pattern matrix, drop C factor."""
         return {"_pattern_matrix": self._pattern_matrix}
 
     def __setstate__(self, state: dict) -> None:
-        """Reconstruct CHOLMOD factor from pattern matrix on unpickle."""
+        """Reconstruct the factorization from the pattern matrix on unpickle."""
         self._pattern_matrix = state["_pattern_matrix"]
-        self._factor = _cholmod_cho_factor(self._pattern_matrix)
+        self._setup()
+
+    def _upper_values(self, matrix: sp.spmatrix) -> np.ndarray:
+        """``matrix``'s upper-triangle values at the pattern's positions."""
+        M = matrix if sp.isspmatrix_csc(matrix) else sp.csc_matrix(matrix)
+        if not M.has_sorted_indices:
+            M = M.sorted_indices()
+        if np.array_equal(M.indptr, self._indptr) and np.array_equal(
+            M.indices, self._indices
+        ):
+            return np.ascontiguousarray(M.data[self._upper_pos], dtype=np.float64)
+        # A different structure — typically a sub-pattern, when sparse
+        # arithmetic dropped explicit zeros: match entries on their keys.
+        col = np.repeat(np.arange(self._n), np.diff(M.indptr))
+        upper = M.indices <= col
+        keys = col[upper].astype(np.int64) * self._n + M.indices[upper]
+        pos = np.searchsorted(self._keys, keys)
+        pos_c = np.minimum(pos, len(self._keys) - 1)
+        if np.any(self._keys[pos_c] != keys):
+            raise ValueError("matrix has entries outside the factor's pattern")
+        out = np.zeros(len(self._keys))
+        out[pos_c] = M.data[upper]
+        return out
 
     def factorize(self, matrix: sp.spmatrix) -> None:
         """Re-factorize with new values (same sparsity pattern).
@@ -80,14 +144,26 @@ class CholmodFactor:
             New SPD matrix with the same sparsity pattern as the
             pattern matrix passed at construction.
         """
-        self._factor.factorize(sp.csc_matrix(matrix))
+        if self._sparsax is not None:
+            # sparsax factors on first use and caches the factor by value.
+            self._Ax = self._upper_values(matrix)
+        else:
+            self._factor = self._symbolic.copy().factorize(sp.csc_matrix(matrix))
+
+    def _solve(self, rhs: np.ndarray, mode: int) -> np.ndarray:
+        rhs = np.ascontiguousarray(rhs, dtype=np.float64)
+        return self._sparsax.solve_np(self._Ai, self._Aj, self._Ax, rhs, mode)
 
     def solve(self, rhs: np.ndarray) -> np.ndarray:
         """Solve P x = rhs."""
+        if self._sparsax is not None:
+            return self._solve(rhs, _MODE_A)
         return self._factor.solve(rhs)
 
     def logdet(self) -> float:
         """Return log|P|."""
+        if self._sparsax is not None:
+            return float(self._sparsax.logdet_np(self._Ai, self._Aj, self._Ax, self._n))
         return self._factor.logdet()
 
     def sample(
@@ -120,9 +196,11 @@ class CholmodFactor:
         x : ndarray of shape (n,)
             Draw from N(m, P⁻¹).
         """
-        m = self._factor.solve(mean_term)
-        n = self._pattern_matrix.shape[0]
-        z = rng.standard_normal(n)
+        m = self.solve(mean_term)
+        z = rng.standard_normal(self._n)
+        if self._sparsax is not None:
+            # w = L^{-T} z in the permuted ordering, then P_permᵀ w.
+            return m + self._solve(self._solve(z, _MODE_LT), _MODE_PT)
         # w = L^{-T} z in the permuted ordering.
         w = self._factor.solve(z, system="Lt")
         # Undo the fill-reducing permutation: draw[perm] = w  ==  P_permᵀ w.

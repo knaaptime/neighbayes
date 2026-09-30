@@ -61,8 +61,11 @@ def run_negbin_flow_gibbs(
         FlowReducedGibbsCache,
         FlowReducedGibbsPriors,
         FlowReducedGibbsState,
-        run_chain_separable,
         run_chain_unrestricted,
+    )
+    from ...samplers.negbin_reduced._flow_structured import (
+        classify_flow_design,
+        run_chain_separable_structured,
     )
     from .._base._shared import gelman_default_beta_prior
 
@@ -73,9 +76,11 @@ def run_negbin_flow_gibbs(
 
     # --- Build cache ---
     cache_kwargs: dict = dict(
-        Wd=model._Wd,
-        Wo=model._Wo,
-        Ww=model._Ww,
+        # The separable sampler works from the n×n W alone; building the
+        # N×N Kronecker weights (W⊗W has nnz(W)² entries) is unrestricted-only.
+        Wd=None if separable else model._Wd,
+        Wo=None if separable else model._Wo,
+        Ww=None if separable else model._Ww,
         W_csc=W_csc,
         n=model._n,
         separable=separable,
@@ -122,6 +127,9 @@ def run_negbin_flow_gibbs(
             omega=np.ones(omega_size, dtype=np.float64) * 0.5,
         )
 
+    # Rank-one / full-rank split of the flow design, shared by every chain.
+    struct = classify_flow_design(X, model._n, T) if separable else None
+
     # --- Chain function ---
     def _chain_fn(chain_id, seed, progress_manager=None, chain_id_kw=0):
         rng = np.random.default_rng(seed)
@@ -141,12 +149,38 @@ def run_negbin_flow_gibbs(
             store_log_lik=log_likelihood,
         )
         if separable:
-            return run_chain_separable(W_csc=W_csc, n=model._n, **common)
+            # Structured sweep (cross-section and panel): n × n solves only,
+            # rank-one design columns integrated out of the ρ updates
+            # (samplers/negbin_reduced/_flow_structured.py).  It replaces the
+            # Krylov-basis kernel, whose cross-sweep basis reuse biased ρ.
+            return run_chain_separable_structured(
+                y,
+                X,
+                W_csc,
+                model._n,
+                priors,
+                init,
+                draws,
+                tune,
+                T=T,
+                rho_lower=priors.rho_lower,
+                rho_upper=priors.rho_upper,
+                rng=rng,
+                chain_id=chain_id,
+                progress_manager=progress_manager,
+                store_log_lik=log_likelihood,
+                struct=struct,
+            )
         return run_chain_unrestricted(
             Wd=model._Wd, Wo=model._Wo, Ww=model._Ww, **common
         )
 
     # --- Run chains ---
+    if gibbs_backend == "jax" and T > 1 and not separable:
+        raise NotImplementedError(
+            "The unrestricted JAX flow Gibbs kernel is cross-section only; fit "
+            "unrestricted panels with gibbs_backend='numpy'."
+        )
     if gibbs_backend == "jax":
         from ...samplers._utils._seeds import seed_sequence_to_int, spawn_chain_seeds
 
@@ -156,23 +190,21 @@ def run_negbin_flow_gibbs(
         inits = [_make_init(np.random.default_rng(s)) for s in seeds]
 
         if separable:
-            from ...samplers.negbin_reduced._flow_jax import (
-                run_chains_jax_flow_separable,
+            # JAX port of the structured sweep (cross-section and panel).
+            from ...samplers.negbin_reduced._flow_structured_jax import (
+                run_chains_jax_flow_structured,
             )
 
-            chain_results = run_chains_jax_flow_separable(
-                y=y,
-                X=X,
-                W_csc=W_csc,
-                n=model._n,
-                priors=priors,
-                inits=inits,
-                draws=draws,
-                tune=tune,
-                krylov_reuse=krylov_reuse,
-                n_cycles=cache.n_rho_omega_cycles,
+            chain_results = run_chains_jax_flow_structured(
+                y,
+                W_csc,
+                model._n,
+                priors,
+                inits,
+                draws,
+                tune,
+                struct=struct,
                 jax_seeds=seeds,
-                progressbar=progressbar,
                 store_log_lik=log_likelihood,
             )
         else:

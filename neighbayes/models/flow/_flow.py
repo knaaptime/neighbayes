@@ -42,170 +42,197 @@ from ..._logdet import (
     make_flow_separable_logdet,
     make_flow_separable_logdet_numpy,
 )
-from ..._ops import kron_solve_matrix, kron_solve_vec
-from ...graph import _weights_to_csr, flow_trace_blocks, flow_weight_matrices
+from ..._ops import kron_solve_vec
+from ...graph import _weights_to_csr, flow_lags, flow_trace_blocks
 from .._mixins._flow_shared import FlowSharedMethods
 from ..base import SpatialModel
-
-
-def _build_flow_effect_masks(n: int):
-    """Index masks ``(rows, cols)`` for the LeSage origin/destination/intra shocks.
-
-    Each mask marks entries of an ``(N, n)`` array, ``N = n²``, column ``j``
-    being the shock for region ``j`` under the LeSage (2008) decomposition:
-
-    - ``dmask``: flows whose destination = j and origin ≠ j (β_d shock).
-    - ``omask``: flows whose origin = j and destination ≠ j (β_o shock).
-    - ``imask``: the intra flow (j, j) (β_d + β_o shock).
-
-    Flow vec ordering is row-major ``arr[o, d].ravel()`` so flat index
-    ``i = o * n + d``.  Returned as ``(rows, cols)`` integer-array tuples, which
-    index an ``(N, n)`` array exactly like a boolean mask (``T[mask]``,
-    ``shock[mask] = v``) but hold O(n²) entries instead of the dense mask's
-    O(n³).
-    """
-    N = n * n
-    flat = np.arange(N)
-    o_idx, d_idx = np.divmod(flat, n)
-    off = o_idx != d_idx
-    rows_off = flat[off]
-    dmask = (rows_off, d_idx[off])
-    omask = (rows_off, o_idx[off])
-    j = np.arange(n)
-    imask = (j * (n + 1), j)
-    return dmask, omask, imask
-
 
 _EFFECT_KEYS = ("origin", "destination", "intra", "network", "total")
 
 
-def _compute_flow_effects_lesage(
-    A_solve,
-    dmask: np.ndarray,
-    omask: np.ndarray,
-    imask: np.ndarray,
+class _FlowEffectMoments:
+    r"""W-only moments behind the exact LeSage flow-effects decomposition.
+
+    With ``Y`` the ``n × n`` flow array (origins × destinations, row-major as
+    in the flow vec), the filter acts as
+    ``L(Y) = ρ_o WY + ρ_d YWᵀ + ρ_w WYWᵀ``.  Left and right multiplication
+    commute, so
+
+    .. math::
+
+        A^{-1}(Y) = \sum_{p,q} C_{pq}\, W^p Y (W^\top)^q, \qquad
+        \sum_{p,q} C_{pq} a^p b^q = \frac{1}{1 - \rho_o a - \rho_d b - \rho_w ab}.
+
+    Applied to the region-``j`` shocks (column ``j``, row ``j`` and cell
+    ``(j, j)``) and summed over ``j``, every masked response sum the effects
+    need reduces to inner products of three vector sequences that depend on
+    ``W`` alone: row sums ``R_p = W^p 1``, column sums ``c_p = (Wᵀ)^p 1`` and
+    diagonals ``d_p = diag(W^p)``.  They are computed once per model and
+    extended on demand; no ``n² × n²`` operator or ``(n², n)`` array is formed.
+    ``diag(W^p)`` is taken in column blocks, so memory stays ``n × block``.
+    """
+
+    #: bytes allowed for one column block of the diag(W^p) recursion
+    _BLOCK_BYTES = 256 * 1024 * 1024
+
+    def __init__(self, W):
+        self.W = sp.csr_matrix(W, dtype=np.float64)
+        self.n = self.W.shape[0]
+        self.w_inf = float(abs(self.W).sum(axis=1).max()) if self.W.nnz else 0.0
+        self.P = -1
+
+    def ensure(self, P: int) -> None:
+        """Compute moments through order ``P`` (recomputing from scratch)."""
+        if P <= self.P:
+            return
+        n, W = self.n, self.W
+        WT = W.T.tocsr()
+        R = np.empty((P + 1, n))
+        C = np.empty((P + 1, n))
+        D = np.empty((P + 1, n))
+        R[0] = C[0] = D[0] = 1.0
+        for p in range(1, P + 1):
+            R[p] = W @ R[p - 1]
+            C[p] = WT @ C[p - 1]
+        block = max(1, min(n, self._BLOCK_BYTES // (8 * n)))
+        for a in range(0, n, block):
+            b = min(n, a + block)
+            cols = np.arange(a, b)
+            Z = np.zeros((n, b - a))
+            Z[cols, np.arange(b - a)] = 1.0
+            for p in range(1, P + 1):
+                Z = W @ Z
+                D[p, a:b] = Z[cols, np.arange(b - a)]
+        self.P = P
+        m = R.sum(axis=1)  # 1ᵀW^p1
+        t = D.sum(axis=1)  # tr(W^p)
+        # (shock, statistic) → (P+1)×(P+1) moment matrix M, so that the sum
+        # for that shock is Σ_pq C_pq M_pq.  Statistics: total, intra,
+        # row j (origin = j, intra included), column j (destination = j).
+        self.mats = np.stack(
+            [
+                # destination shock 1·e_jᵀ: entry [o, d] = R_p[o] (W^q)_{dj}
+                np.outer(m, m),
+                R @ D.T,
+                R @ C.T,
+                np.outer(m, t),
+                # origin shock e_j·1ᵀ: entry [o, d] = (W^p)_{oj} R_q[d]
+                np.outer(m, m),
+                D @ R.T,
+                np.outer(t, m),
+                C @ R.T,
+                # intra shock e_j·e_jᵀ: entry [o, d] = (W^p)_{oj} (W^q)_{dj}
+                C @ C.T,
+                D @ D.T,
+                D @ C.T,
+                C @ D.T,
+            ]
+        )
+
+    def order_for(self, rd, ro, rw, tol: float = 1e-12) -> int:
+        """Series order bounding the neglected tail below ``tol`` (relative)."""
+        w = self.w_inf
+        r = float(
+            np.max((np.abs(ro) + np.abs(rd)) * w + np.abs(rw) * w * w, initial=0.0)
+        )
+        if r >= 1.0:
+            raise ValueError(
+                "Flow effects need |rho_d| + |rho_o| + |rho_w| < 1 (in the "
+                f"max-row-sum norm of W); a posterior draw reaches {r:.4f}."
+            )
+        if r == 0.0:
+            return 1
+        return int(np.clip(np.ceil(np.log(tol * (1.0 - r)) / np.log(r)), 1, 20_000))
+
+
+def _flow_effect_sums(moments: _FlowEffectMoments, rd, ro, rw) -> np.ndarray:
+    """Masked response sums for every draw, shape ``(G, 3, 4)``.
+
+    Axis 1 is the shock (destination ``D+I``, origin ``O+I``, intra ``I``);
+    axis 2 is (total, intra, origin, destination) as in LeSage's
+    ``calc_effects``, each divided by ``N = n²``.  Exact up to the series tail.
+    """
+    rd, ro, rw = (np.atleast_1d(np.asarray(x, dtype=np.float64)) for x in (rd, ro, rw))
+    P = moments.order_for(rd, ro, rw)
+    moments.ensure(P)
+    M = moments.mats[:, : P + 1, : P + 1]  # (12, P+1, P+1)
+    G = rd.shape[0]
+    acc = np.zeros((M.shape[0], G))
+    # C on anti-diagonals k = p + q, indexed by p: C_k[p] = C_{p, k−p}.
+    prev2 = np.zeros((P + 1, G))
+    prev1 = np.zeros((P + 1, G))
+    prev1[0] = 1.0  # k = 0
+    acc += M[:, 0, 0][:, None] * prev1[0][None, :]
+    p_all = np.arange(P + 1)
+    for k in range(1, 2 * P + 1):
+        cur = np.zeros((P + 1, G))
+        cur[1:] += ro * prev1[:-1] + rw * prev2[:-1]  # from (p−1, q) and (p−1, q−1)
+        cur += rd * prev1  # from (p, q−1)
+        valid = (p_all <= k) & (k - p_all <= P)
+        cur[~valid] = 0.0
+        pv = p_all[valid]
+        acc += M[:, pv, k - pv] @ cur[pv]
+        prev2, prev1 = prev1, cur
+    acc /= float(moments.n) ** 2
+    r = acc.reshape(3, 4, G)  # (shock, [total, intra, row j, column j], draw)
+    tot, intra, row, col = r[:, 0], r[:, 1], r[:, 2], r[:, 3]
+    out = np.stack([tot, intra, row - intra, col - intra], axis=1)  # (3, 4, G)
+    return np.transpose(out, (2, 0, 1))
+
+
+def _compute_flow_effects(
+    sums: np.ndarray,
     beta_d: np.ndarray,
     beta_o: np.ndarray,
-    n: int,
-    k_d: int,
-    k_o: int | None = None,
     beta_intra: Optional[np.ndarray] = None,
 ) -> dict[str, np.ndarray]:
-    """Compute scalar LeSage / Thomas-Agnan effects for one posterior draw.
+    """LeSage / Thomas-Agnan scalar effects for every draw.
 
-    Implements the decomposition of Thomas-Agnan & LeSage (2014, §83.5).  For
-    each predictor *p*, two independent shocks are propagated through the
-    spatial filter so that origin-side and destination-side effects can be
-    reported separately when the design uses different attributes for the
-    origin and destination blocks.
-
-    The destination shock places ``β_d^{(p)}`` on every flow whose destination
-    equals region ``j`` (off-diagonal) and ``β_d^{(p)} + β_intra^{(p)}`` on the
-    intraregional flow ``(j, j)``.  The origin shock places ``β_o^{(p)}`` on
-    every flow whose origin equals region ``j``, including ``(j, j)``.  The
-    intra block is tied to the destination side because
-    :func:`neighbayes.graph.flow_design_matrix` constructs
-    ``X_intra = intra_indicator * X_dest``.
-
-    When ``k_d != k_o``, the destination and origin predictors are different
-    variables.  Destination-side effects have length ``k_d``, origin-side
-    effects have length ``k_o``, and combined effects have length
-    ``k_d + k_o`` (concatenated).
+    Implements the decomposition of Thomas-Agnan & LeSage (2014, §83.5).  The
+    destination shock for predictor p places ``β_d`` on every flow whose
+    destination is region ``j`` and ``β_d + β_intra`` on the intra flow
+    ``(j, j)`` (``X_intra`` is built from ``X_dest``); the origin shock places
+    ``β_o`` on every flow whose origin is ``j``.  Both are linear in β, so the
+    response sums are ``β_d·S_{D+I} + β_intra·S_I`` and ``β_o·S_{O+I}`` with the
+    unit-shock sums from :func:`_flow_effect_sums`.
 
     Parameters
     ----------
-    A_solve : callable
-        Function ``A_solve(rhs)`` that solves ``A x = rhs`` for ``rhs`` of shape
-        ``(N, n)`` where ``N = n * n``.  Must accept a 2-D right-hand side.
-    dmask, omask, imask : tuple of ndarray
-        Region-shock ``(rows, cols)`` index masks into an ``(N, n)`` array,
-        from :func:`_build_flow_effect_masks`.
-    beta_d : np.ndarray, shape (k_d,)
-        Destination coefficient vector for one posterior draw.
-    beta_o : np.ndarray, shape (k_o,)
-        Origin coefficient vector for one posterior draw.
-    n : int
-        Number of regions.
-    k_d : int
-        Number of destination-side regional attribute predictors.
-    k_o : int or None
-        Number of origin-side regional attribute predictors.  If ``None``,
-        defaults to ``k_d`` (symmetric case).
-    beta_intra : np.ndarray, optional, shape (k_d,)
-        Coefficients on the ``intra_*`` design block.  If ``None``, treated as
-        zero (legacy behavior).
+    sums : ndarray, shape (G, 3, 4)
+        Output of :func:`_flow_effect_sums`.
+    beta_d, beta_o : ndarray, shape (G, k_d) and (G, k_o)
+    beta_intra : ndarray, shape (G, k_d), optional
+        Coefficients on the ``intra_*`` block; ``None`` means zero.
 
     Returns
     -------
     dict
-        Combined keys ``"origin"``, ``"destination"``, ``"intra"``,
-        ``"network"``, ``"total"`` (each length-``k_d + k_o``) plus the per-side keys
-        ``"dest_<eff>"`` (length ``k_d``) and ``"orig_<eff>"`` (length ``k_o``)
-        for the same five effects.  The combined values equal the concatenation
-        of the corresponding ``dest_*`` and ``orig_*`` arrays.
+        Per-side keys ``"dest_<eff>"`` (G, k_d) and ``"orig_<eff>"`` (G, k_o)
+        and combined keys ``<eff>``: the sum of the two sides when
+        ``k_d == k_o`` (same variables), else their concatenation.
     """
-    if k_o is None:
-        k_o = k_d
-    N = n * n
-    bi = (
-        np.zeros(k_d, dtype=np.float64)
-        if beta_intra is None
-        else np.asarray(beta_intra, dtype=np.float64)
-    )
+    beta_d = np.atleast_2d(beta_d)
+    beta_o = np.atleast_2d(beta_o)
+    k_d, k_o = beta_d.shape[1], beta_o.shape[1]
+    S_DI, S_OI, S_I = sums[:, 0, :], sums[:, 1, :], sums[:, 2, :]  # (G, 4)
+    dest = beta_d[:, :, None] * S_DI[:, None, :]  # (G, k_d, 4)
+    if beta_intra is not None:
+        dest = dest + np.atleast_2d(beta_intra)[:, :, None] * S_I[:, None, :]
+    orig = beta_o[:, :, None] * S_OI[:, None, :]
 
     out: dict[str, np.ndarray] = {}
-
-    def _response_sums(*masks):
-        """Masked sums of ``A⁻¹·shock`` for a unit shock on ``masks``.
-
-        Returns ``(total, intra, origin, destination)``, each divided by N.
-        The shock for predictor p is a linear combination of three unit
-        shocks, so three solves per draw serve every predictor.
-        """
-        shock = np.zeros((N, n), dtype=np.float64)
-        for m in masks:
-            shock[m] = 1.0
-        T = A_solve(shock)
-        return np.array([T.sum(), T[imask].sum(), T[omask].sum(), T[dmask].sum()]) / N
-
-    def _store(side, p, sums):
-        total, intra, origin, dest = sums
-        out[f"{side}_total"][p] = total
-        out[f"{side}_intra"][p] = intra
-        out[f"{side}_origin"][p] = origin
-        out[f"{side}_destination"][p] = dest
-        out[f"{side}_network"][p] = total - origin - dest - intra
-
-    for side, k_side in (("dest", k_d), ("orig", k_o)):
-        for eff in _EFFECT_KEYS:
-            out[f"{side}_{eff}"] = np.empty(k_side, dtype=np.float64)
-
-    # Destination-side shock for predictor p: β_d on flows with destination=j,
-    # plus β_intra at (j, j) since X_intra is built from X_dest — i.e.
-    # β_d·(D + I) + β_intra·I.
-    if k_d:
-        S_DI = _response_sums(dmask, imask)
-        S_I = _response_sums(imask) if np.any(bi) else np.zeros(4)
-        for p in range(k_d):
-            _store("dest", p, float(beta_d[p]) * S_DI + float(bi[p]) * S_I)
-
-    # Origin-side shock: β_o on flows with origin=j, including (j, j).
-    if k_o:
-        S_OI = _response_sums(omask, imask)
-        for p in range(k_o):
-            _store("orig", p, float(beta_o[p]) * S_OI)
-
-    # Combined effects: concatenation of dest and orig (different variables
-    # when k_d != k_o, same variables summed when k_d == k_o).
-    if k_d == k_o:
-        # Symmetric case: sum dest and orig effects (same variables)
-        for eff in _EFFECT_KEYS:
+    for side, arr in (("dest", dest), ("orig", orig)):
+        total, intra, origin, destination = (arr[..., i] for i in range(4))
+        out[f"{side}_total"] = total
+        out[f"{side}_intra"] = intra
+        out[f"{side}_origin"] = origin
+        out[f"{side}_destination"] = destination
+        out[f"{side}_network"] = total - origin - destination - intra
+    for eff in _EFFECT_KEYS:
+        if k_d == k_o:
             out[eff] = out[f"dest_{eff}"] + out[f"orig_{eff}"]
-    else:
-        # Asymmetric case: concatenate dest and orig effects (different variables)
-        for eff in _EFFECT_KEYS:
-            out[eff] = np.concatenate([out[f"dest_{eff}"], out[f"orig_{eff}"]])
-
+        else:
+            out[eff] = np.concatenate([out[f"dest_{eff}"], out[f"orig_{eff}"]], axis=1)
     return out
 
 
@@ -431,19 +458,12 @@ class FlowModel(FlowSharedMethods, SpatialModel):
                 ).real
 
         # Pre-compute spatial lags: Wd_y, Wo_y, Ww_y
-        wms = flow_weight_matrices(self._W_sparse)
-        self._Wd_y: np.ndarray = wms["destination"] @ self._y
-        self._Wo_y: np.ndarray = wms["origin"] @ self._y
-        self._Ww_y: np.ndarray = wms["network"] @ self._y
+        # Matrix-free: W⊗W alone would hold nnz(W)² entries.
+        self._Wd_y, self._Wo_y, self._Ww_y = flow_lags(self._W_sparse, self._y)
 
         # Aliases used by some downstream code and tests
         self._y_vec = self._y
         self._spatial_lag = self._Wd_y
-
-        # Keep N×N sparse weight matrices for effects computation
-        self._Wd: sp.csr_matrix = wms["destination"]
-        self._Wo: sp.csr_matrix = wms["origin"]
-        self._Ww: sp.csr_matrix = wms["network"]
 
         # Cache the symmetric 3x3 Kronecker trace matrix used by Bayesian
         # LM diagnostics: T[i,j] = tr(W_i' W_j) + tr(W_i W_j) for
@@ -779,7 +799,7 @@ class SARFlow(FlowModel):
         *,
         step_size: float = 5e-4,
         n_probes: int = 48,
-        logdet_method: str = "jax",
+        logdet_method: str = "auto",
         n_quad: int = 8,
         progressbar: bool = True,
         n_jobs: int = -1,
@@ -794,6 +814,11 @@ class SARFlow(FlowModel):
 
         Parameters
         ----------
+        logdet_method : {"auto", "kron_traces", "jax", "numpy"}, default "auto"
+            Flow log-determinant backend.  ``"auto"`` is exact (trace moments of
+            ``W``, no ``N × N`` work) for undirected ``W`` and the stochastic
+            resolvent estimator for directed ``W``; see
+            :func:`~neighbayes.samplers.gaussian._flow_resolvent.resolve_flow_logdet`.
         idata_kwargs : dict, optional
             ``{"log_likelihood": True}`` stores the pointwise log-likelihood
             (one value per draw, chain, and flow) for ``az.loo`` / ``az.waic``.
@@ -865,7 +890,6 @@ class SARFlow(FlowModel):
             raise RuntimeError("Model has not been fit yet.  Call fit() first.")
 
         idata = self._idata
-        n = self._n
         k_d = self._k_d
         k_o = self._k_o
 
@@ -891,53 +915,15 @@ class SARFlow(FlowModel):
             rho_w_draws = rho_w_draws[:n_draws_total]
             beta_draws = beta_draws[:n_draws_total]
 
-        out: dict[str, np.ndarray] = {}
-        for side in ("dest", "orig"):
-            k_side = k_d if side == "dest" else k_o
-            for eff in _EFFECT_KEYS:
-                out[f"{side}_{eff}"] = np.zeros(
-                    (n_draws_total, k_side), dtype=np.float64
-                )
-        k_combined = k_d + k_o if k_d != k_o else k_d
-        for eff in _EFFECT_KEYS:
-            out[eff] = np.zeros((n_draws_total, k_combined), dtype=np.float64)
-
-        for idx in range(n_draws_total):
-            rd = float(rho_d_draws[idx])
-            ro = float(rho_o_draws[idx])
-            rw = float(rho_w_draws[idx])
-            beta_d_vec = beta_draws[idx, dest_start : dest_start + k_d]
-            beta_o_vec = beta_draws[idx, orig_start : orig_start + k_o]
-            beta_intra_vec = (
-                beta_draws[idx, intra_start : intra_start + k_d] if has_intra else None
-            )
-
-            # Use the cached symbolic-analysis solver: same (Ai, Aj) pattern
-            # every draw, so only the numeric factorization is redone.  When
-            # sparsax is installed the analysis is computed once and reused;
-            # the scipy ``splu`` fallback still benefits from the cached
-            # pattern assembly.
-            solver = self._A_solver
-
-            def _solve(
-                rhs: np.ndarray, _s=solver, _rd=rd, _ro=ro, _rw=rw
-            ) -> np.ndarray:
-                return _s.solve([-_rd, -_ro, -_rw], rhs)
-
-            res = _compute_flow_effects_lesage(
-                _solve,
-                *self._flow_effect_masks,
-                beta_d_vec,
-                beta_o_vec,
-                n,
-                k_d,
-                k_o=k_o,
-                beta_intra=beta_intra_vec,
-            )
-            for key, arr in res.items():
-                out[key][idx, : len(arr)] = arr
-
-        return out
+        # Exact LeSage decomposition from W-only moments (no n²-sized arrays).
+        return self._flow_effects_for_draws(
+            rho_d_draws,
+            rho_o_draws,
+            rho_w_draws,
+            beta_draws[:, dest_start : dest_start + k_d],
+            beta_draws[:, orig_start : orig_start + k_o],
+            beta_draws[:, intra_start : intra_start + k_d] if has_intra else None,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -1091,11 +1077,8 @@ class SARFlowSeparable(FlowModel):
             raise RuntimeError("Model has not been fit yet.  Call fit() first.")
 
         idata = self._idata
-        n = self._n
         k_d = self._k_d
         k_o = self._k_o
-        W = self._W_sparse.tocsr()
-        I_n = sp.eye(n, format="csr", dtype=np.float64)
 
         rho_d_draws = idata.posterior["rho_d"].values.reshape(-1)
         rho_o_draws = idata.posterior["rho_o"].values.reshape(-1)
@@ -1117,46 +1100,15 @@ class SARFlowSeparable(FlowModel):
             rho_o_draws = rho_o_draws[:n_draws_total]
             beta_draws = beta_draws[:n_draws_total]
 
-        out: dict[str, np.ndarray] = {}
-        for side in ("dest", "orig"):
-            k_side = k_d if side == "dest" else k_o
-            for eff in _EFFECT_KEYS:
-                out[f"{side}_{eff}"] = np.zeros(
-                    (n_draws_total, k_side), dtype=np.float64
-                )
-        k_combined = k_d + k_o if k_d != k_o else k_d
-        for eff in _EFFECT_KEYS:
-            out[eff] = np.zeros((n_draws_total, k_combined), dtype=np.float64)
-
-        for idx in range(n_draws_total):
-            rd = float(rho_d_draws[idx])
-            ro = float(rho_o_draws[idx])
-            beta_d_vec = beta_draws[idx, dest_start : dest_start + k_d]
-            beta_o_vec = beta_draws[idx, orig_start : orig_start + k_o]
-            beta_intra_vec = (
-                beta_draws[idx, intra_start : intra_start + k_d] if has_intra else None
-            )
-
-            Ld = (I_n - rd * W).tocsr()
-            Lo = (I_n - ro * W).tocsr()
-
-            def _solve(rhs: np.ndarray, _Lo=Lo, _Ld=Ld, _n=n) -> np.ndarray:
-                return kron_solve_matrix(_Lo, _Ld, rhs, _n)
-
-            res = _compute_flow_effects_lesage(
-                _solve,
-                *self._flow_effect_masks,
-                beta_d_vec,
-                beta_o_vec,
-                n,
-                k_d,
-                k_o=k_o,
-                beta_intra=beta_intra_vec,
-            )
-            for key, arr in res.items():
-                out[key][idx, : len(arr)] = arr
-
-        return out
+        # Exact LeSage decomposition from W-only moments (no n²-sized arrays).
+        return self._flow_effects_for_draws(
+            rho_d_draws,
+            rho_o_draws,
+            -rho_d_draws * rho_o_draws,  # separable: ρ_w = −ρ_d·ρ_o
+            beta_draws[:, dest_start : dest_start + k_d],
+            beta_draws[:, orig_start : orig_start + k_o],
+            beta_draws[:, intra_start : intra_start + k_d] if has_intra else None,
+        )
 
 
 def _compute_ols_flow_effects(
@@ -1424,10 +1376,10 @@ class _NegBinFlowMixin:
             exact count likelihood (much slower).
         gibbs_backend : {"numpy", "jax", "auto"}, default "numpy"
             Execution backend for the Gibbs sampler (only used when
-            ``sampler="gibbs"``).  ``"jax"`` runs the single-JIT sparsax-sparse
-            chain (unrestricted 3-ρ model only; GPU-friendly); ``"numpy"`` uses
-            the host CHOLMOD/KLU path.  ``"auto"`` currently resolves to
-            ``"numpy"``.  The separable Kronecker model is NumPy-only.
+            ``sampler="gibbs"``).  ``"jax"`` compiles the sweep with JAX and
+            sparsax sparse LU solves, chains on threads; ``"numpy"`` uses the
+            host CHOLMOD/KLU path.  ``"auto"`` currently resolves to
+            ``"numpy"``.
         store_lambda : bool, default False
             If True, include the high-dimensional fitted mean ``lambda`` in the
             stored posterior (NUTS only).
@@ -2335,9 +2287,7 @@ class SEMFlow(FlowModel):
         kwargs.setdefault("logdet_method", "resolvent")
         super().__init__(y, X, W, **kwargs)
         # Precompute lags of the design matrix (constant — no parameter dependence).
-        self._Wd_X: np.ndarray = np.asarray(self._Wd @ self._X, dtype=np.float64)
-        self._Wo_X: np.ndarray = np.asarray(self._Wo @ self._X, dtype=np.float64)
-        self._Ww_X: np.ndarray = np.asarray(self._Ww @ self._X, dtype=np.float64)
+        self._Wd_X, self._Wo_X, self._Ww_X = flow_lags(self._W_sparse, self._X)
 
     def fit(
         self,
@@ -2348,7 +2298,7 @@ class SEMFlow(FlowModel):
         *,
         step_size: float = 5e-4,
         n_probes: int = 48,
-        logdet_method: str = "jax",
+        logdet_method: str = "auto",
         n_quad: int = 8,
         progressbar: bool = True,
         n_jobs: int = -1,
@@ -2363,6 +2313,11 @@ class SEMFlow(FlowModel):
 
         Parameters
         ----------
+        logdet_method : {"auto", "kron_traces", "jax", "numpy"}, default "auto"
+            Flow log-determinant backend.  ``"auto"`` is exact (trace moments of
+            ``W``, no ``N × N`` work) for undirected ``W`` and the stochastic
+            resolvent estimator for directed ``W``; see
+            :func:`~neighbayes.samplers.gaussian._flow_resolvent.resolve_flow_logdet`.
         idata_kwargs : dict, optional
             ``{"log_likelihood": True}`` stores the pointwise log-likelihood
             (one value per draw, chain, and flow) for ``az.loo`` / ``az.waic``.

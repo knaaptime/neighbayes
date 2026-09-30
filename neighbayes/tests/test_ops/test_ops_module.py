@@ -493,7 +493,8 @@ class TestOptionalSparseBackends:
 
             return _F()
 
-        monkeypatch.setattr(ops_mod._backend, "_sparse_factor", _fake_sparse_factor)
+        # Immediate solves use the cached working factor directly (no copy).
+        monkeypatch.setattr(ops_mod._backend, "_refactor", _fake_sparse_factor)
 
         A = sp.csr_matrix(np.array([[2.0, 1.0], [1.0, 2.0]], dtype=np.float64))
         rhs = np.array([1.0, 2.0], dtype=np.float64)
@@ -825,3 +826,47 @@ class TestSparseSARSolveOpNumbaDispatch:
 
         msgs = [str(w.message) for w in caught]
         assert not any("Numba will use object mode to run" in m for m in msgs)
+
+
+class TestSparseFactorCache:
+    """The scikit-sparse fallback reuses one symbolic analysis per pattern."""
+
+    @staticmethod
+    def _system(n=300, seed=0):
+        W = sp.random(n, n, density=0.02, random_state=seed, format="csc")
+        W = sp.diags(1.0 / np.maximum(np.asarray(W.sum(1)).ravel(), 1e-12)) @ W
+        eye = sp.eye(n, format="csc")
+        return lambda rho: (eye - rho * W).tocsc()
+
+    @pytest.mark.parametrize("backend", ["klu", "umfpack"])
+    def test_refactor_reuses_analysis_and_copies_are_private(
+        self, monkeypatch, backend
+    ):
+        pytest.importorskip(f"sksparse.{backend}")
+        from neighbayes._ops import _backend
+
+        monkeypatch.setenv("NEIGHBAYES_SPARSE_BACKEND", backend)
+        A = self._system()
+        b = np.random.default_rng(1).standard_normal(A(0.3).shape[0])
+
+        held = _backend._sparse_factor(A(0.3), backend)
+        work = _backend._refactor(A(0.3), backend)
+        # Same pattern: the working factor is reused, refactored in place.
+        assert _backend._refactor(A(0.6), backend) is work
+        np.testing.assert_allclose(A(0.6) @ work.solve(b), b, atol=1e-12)
+        # The copy handed out earlier still solves at its own values.
+        np.testing.assert_allclose(A(0.3) @ held.solve(b), b, atol=1e-12)
+
+    def test_auto_probe_returns_a_working_factor(self, monkeypatch):
+        pytest.importorskip("sksparse.klu")
+        pytest.importorskip("sksparse.umfpack")
+        from neighbayes._ops import _backend
+
+        monkeypatch.setenv("NEIGHBAYES_SPARSE_BACKEND", "auto")
+        A = self._system(seed=2)
+        b = np.ones(A(0.4).shape[0])
+        x, logdet = _backend._factor_solve_logdet(A(0.4), b)
+        np.testing.assert_allclose(A(0.4) @ x, b, atol=1e-12)
+        np.testing.assert_allclose(
+            logdet, np.linalg.slogdet(A(0.4).toarray())[1], rtol=1e-10
+        )

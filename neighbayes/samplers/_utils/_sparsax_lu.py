@@ -75,18 +75,32 @@ def _has_umfpack() -> bool:
     return hasattr(sparsax, "umf_factor")
 
 
+#: The LU value-cache cap last set here (sparsax's default until then); the
+#: probe shrinks the caps while it runs and restores this.
+_LU_CACHE_SIZE = 32
+
+
 def set_sparsax_lu_cache_size(size: int) -> None:
     """Set the numeric-factor cache size of both sparsax LU backends.
 
     Samplers size the cache before any solver is routed, and solvers on
     different patterns within one fit may route differently, so both caps are
     set.  A cap costs no memory until factors fill it.
+
+    Also bounds sparsax's factor tokens where supported.  A token pins its
+    factor (and keeps it from being recycled), and a solver holds at most its
+    latest one, so a few per cached factor suffice; a solver whose token is
+    released refactors (``CachedSparseSolver._with_token``).
     """
     import sparsax
 
+    global _LU_CACHE_SIZE
+    _LU_CACHE_SIZE = int(size)
     sparsax.set_lu_cache_size(size)
     if _has_umfpack():
         sparsax.set_umf_cache_size(size)
+    if hasattr(sparsax, "set_token_cache_size"):
+        sparsax.set_token_cache_size(max(16, size // 2))
 
 
 def _pinned_backend() -> str | None:
@@ -102,28 +116,33 @@ _NUDGES = itertools.count(1)
 def _probe_seconds(lu: SparsaxLU, Ai, Aj, Ax, n: int, repeats: int = 2) -> float:
     """Seconds for one numeric factorization plus one solve with ``lu``.
 
-    An untimed first call absorbs what a sampler pays once per pattern
-    (dispatch setup and the symbolic analysis), so the timed calls measure the
-    cost paid at every new ρ.  The fastest of ``repeats`` is returned, since
-    interference only ever adds time.
+    Measures the steady state a sampler reaches.  Untimed calls absorb what is
+    paid once per pattern (dispatch setup, the symbolic analysis) and fill the
+    value cache, which :func:`_race` shrinks to one slot; so each timed call
+    evicts a factor and, where the backend can, refactors into it (KLU's
+    ``klu_refactor``, 1.2-1.8x cheaper than a first factorization).  The timed
+    calls use ``solve``, not a token, since a token would pin its factor.  The
+    fastest of ``repeats`` is returned, since interference only ever adds time.
 
-    Each timed call scales the values by a factor no earlier call has used.
-    sparsax caches factors by value, so a reused nudge would time a cache hit,
-    which costs only dispatch and value hashing -- the same for both backends,
-    so the race would be decided by noise.
+    Each call scales the values by a factor no earlier call has used.  sparsax
+    caches factors by value, so a reused nudge would time a cache hit, which
+    costs only dispatch and value hashing -- the same for both backends, so the
+    race would be decided by noise.
     """
     import jax
     import jax.numpy as jnp
 
     b = jnp.ones(n, dtype=jnp.float64)
-    jax.block_until_ready(lu.solve_factor(lu.factor(Ai, Aj, Ax, n), b))
-    best = float("inf")
-    for _ in range(repeats):
+
+    def call():
         Ax_new = jax.block_until_ready(Ax * (1.0 + 1e-9 * next(_NUDGES)))
         start = time.perf_counter()
-        jax.block_until_ready(lu.solve_factor(lu.factor(Ai, Aj, Ax_new, n), b))
-        best = min(best, time.perf_counter() - start)
-    return best
+        jax.block_until_ready(lu.solve(Ai, Aj, Ax_new, b))
+        return time.perf_counter() - start
+
+    call()
+    call()
+    return min(call() for _ in range(repeats))
 
 
 def _race(Ai, Aj, Ax, n: int) -> str:
@@ -133,18 +152,27 @@ def _race(Ai, Aj, Ax, n: int) -> str:
     Ai = jnp.asarray(Ai, dtype=jnp.int32)
     Aj = jnp.asarray(Aj, dtype=jnp.int32)
     Ax = jnp.asarray(Ax, dtype=jnp.float64)
+    import sparsax
+
     timings: dict[str, float] = {}
-    for name in _BACKENDS:
-        try:
-            timings[name] = _probe_seconds(_functions(name), Ai, Aj, Ax, n)
-        except Exception as exc:  # noqa: BLE001 - a failing backend is skipped
-            warnings.warn(
-                f"sparsax {name} failed while probing the LU route "
-                f"({type(exc).__name__}: {exc}); it will not be used for this "
-                "sparsity pattern.",
-                RuntimeWarning,
-                stacklevel=4,
-            )
+    # One-slot value caches, so every timed call recycles (see _probe_seconds).
+    sparsax.set_lu_cache_size(1)
+    sparsax.set_umf_cache_size(1)
+    try:
+        for name in _BACKENDS:
+            try:
+                timings[name] = _probe_seconds(_functions(name), Ai, Aj, Ax, n)
+            except Exception as exc:  # noqa: BLE001 - a failing backend is skipped
+                warnings.warn(
+                    f"sparsax {name} failed while probing the LU route "
+                    f"({type(exc).__name__}: {exc}); it will not be used for this "
+                    "sparsity pattern.",
+                    RuntimeWarning,
+                    stacklevel=4,
+                )
+    finally:
+        sparsax.set_lu_cache_size(_LU_CACHE_SIZE)
+        sparsax.set_umf_cache_size(_LU_CACHE_SIZE)
     if not timings:
         return "klu"
     return min(timings, key=timings.__getitem__)
@@ -175,7 +203,7 @@ def sparsax_lu(Ai, Aj, Ax, n: int, *, backend: str | None = None) -> SparsaxLU:
 
     Notes
     -----
-    The probe costs two factorizations and two solves per backend, once per
+    The probe costs four factorizations and four solves per backend, once per
     pattern per process.  A sampler factorizes thousands of times, and a
     misroute is expensive in both directions: on the scikit-sparse
     measurement in ``_ReusableLULogdet`` (``n = 3,000``), UMFPACK was 18.7×

@@ -105,7 +105,9 @@ def test_repeated_probe_times_real_factorizations(backend):
     lu_mod._probe_seconds(lu, Ai, Aj, Ax, n)
     before = sparsax.factorization_count()
     lu_mod._probe_seconds(lu, Ai, Aj, Ax, n, repeats=2)
-    assert sparsax.factorization_count() - before == 2
+    # Two untimed calls (analysis, cache fill) and two timed ones, each at
+    # values no earlier call used, so every one factorizes.
+    assert sparsax.factorization_count() - before == 2 + 2
 
 
 def test_real_probe_chooses_a_backend():
