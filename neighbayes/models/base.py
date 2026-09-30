@@ -159,9 +159,12 @@ class SpatialModel(SharedSpatialMethods, ABC):
         if formula is not None:
             if data is None:
                 raise ValueError("data must be provided when using formula mode.")
-            self._y, self._X, self._feature_names = self._parse_formula(formula, data)
+            self._y, self._X, self._feature_names, self._model_spec = (
+                self._parse_formula_with_spec(formula, data)
+            )
         elif y is not None and X is not None:
             self._y, self._X, self._feature_names = self._parse_matrices(y, X)
+            self._model_spec = None
         else:
             raise ValueError("Provide either (formula, data) or (y, X).")
 

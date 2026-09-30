@@ -10,12 +10,12 @@ from __future__ import annotations
 
 import numpy as np
 
-from .._mixins import GaussianLikelihoodMixin
+from .._mixins import GaussianLikelihoodMixin, GaussianPredictionMixin
 from ..base import SpatialModel
 from ..priors import SEMPriors
 
 
-class SEM(GaussianLikelihoodMixin, SpatialModel):
+class SEM(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     """Bayesian Spatial Error Model.
 
     Spatial dependence enters through the disturbance via the

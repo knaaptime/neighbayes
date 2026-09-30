@@ -10,12 +10,12 @@ from __future__ import annotations
 
 import numpy as np
 
-from .._mixins import GaussianLikelihoodMixin
+from .._mixins import GaussianLikelihoodMixin, GaussianPredictionMixin
 from ..base import SpatialModel
 from ..priors import SDMPriors
 
 
-class SDM(GaussianLikelihoodMixin, SpatialModel):
+class SDM(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     """Bayesian Spatial Durbin Model.
 
     Combines a spatial lag of :math:`y` with spatial lags of the

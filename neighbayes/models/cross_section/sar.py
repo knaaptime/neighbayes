@@ -10,12 +10,12 @@ from __future__ import annotations
 
 import numpy as np
 
-from .._mixins import GaussianLikelihoodMixin
+from .._mixins import GaussianLikelihoodMixin, GaussianPredictionMixin
 from ..base import SpatialModel
 from ..priors import SARPriors
 
 
-class SAR(GaussianLikelihoodMixin, SpatialModel):
+class SAR(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     """Bayesian Spatial Autoregressive (Spatial Lag) model.
 
     Models a contemporaneous spatial dependence in the dependent

@@ -1191,6 +1191,15 @@ class SharedSpatialMethods:
     def _parse_formula(formula: str, data: pd.DataFrame):
         """Parse formula/data inputs into ``y`` and ``X`` arrays.
 
+        See :meth:`_parse_formula_with_spec`, which also returns the RHS
+        model spec.
+        """
+        return SharedSpatialMethods._parse_formula_with_spec(formula, data)[:3]
+
+    @staticmethod
+    def _parse_formula_with_spec(formula: str, data: pd.DataFrame):
+        """Parse formula/data inputs into ``y`` and ``X`` arrays.
+
         Parameters
         ----------
         formula : str
@@ -1200,8 +1209,10 @@ class SharedSpatialMethods:
 
         Returns
         -------
-        tuple[np.ndarray, np.ndarray, list[str]]
-            Dependent variable, design matrix, and feature names.
+        tuple[np.ndarray, np.ndarray, list[str], formulaic.ModelSpec]
+            Dependent variable, design matrix, feature names, and the RHS
+            model spec, which rebuilds the design for new data with the same
+            transforms and categorical levels.
         """
         lhs_name, rhs = formula.split("~", 1)
         lhs_name = lhs_name.strip()
@@ -1213,7 +1224,7 @@ class SharedSpatialMethods:
         X_arr = np.asarray(X_mm, dtype=np.float64)
 
         y_arr = np.asarray(data[lhs_name], dtype=np.float64)
-        return y_arr, X_arr, feature_names
+        return y_arr, X_arr, feature_names, X_mm.model_spec
 
     @staticmethod
     def _parse_matrices(y, X):

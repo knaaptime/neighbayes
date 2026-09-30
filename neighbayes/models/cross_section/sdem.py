@@ -12,12 +12,12 @@ from __future__ import annotations
 
 import numpy as np
 
-from .._mixins import GaussianLikelihoodMixin
+from .._mixins import GaussianLikelihoodMixin, GaussianPredictionMixin
 from ..base import SpatialModel
 from ..priors import SDEMPriors
 
 
-class SDEM(GaussianLikelihoodMixin, SpatialModel):
+class SDEM(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     """Bayesian Spatial Durbin Error Model.
 
     Combines spatial lags of the regressors :math:`X` with a spatial

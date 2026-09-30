@@ -35,6 +35,7 @@ how-to/flow_models
 how-to/panel_flow_models
 how-to/bayesian_lmtests
 how-to/spatial_cv_demo
+how-to/prediction
 ```
 
 ```{toctree}
