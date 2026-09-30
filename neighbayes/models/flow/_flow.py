@@ -48,27 +48,31 @@ from .._mixins._flow_shared import FlowSharedMethods
 from ..base import SpatialModel
 
 
-def _build_flow_effect_masks(n: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Build (N, n) boolean masks for LeSage origin/destination/intra shocks.
+def _build_flow_effect_masks(n: int):
+    """Index masks ``(rows, cols)`` for the LeSage origin/destination/intra shocks.
 
-    For each region ``j``, column ``j`` flags the flow indices receiving the
-    region-specific shock under the LeSage (2008) effects decomposition:
+    Each mask marks entries of an ``(N, n)`` array, ``N = n²``, column ``j``
+    being the shock for region ``j`` under the LeSage (2008) decomposition:
 
-    - ``dmask[:, j]``: flows whose destination = j and origin ≠ j (β_d shock).
-    - ``omask[:, j]``: flows whose origin = j and destination ≠ j (β_o shock).
-    - ``imask[:, j]``: the intra flow (j, j) (β_d + β_o shock).
+    - ``dmask``: flows whose destination = j and origin ≠ j (β_d shock).
+    - ``omask``: flows whose origin = j and destination ≠ j (β_o shock).
+    - ``imask``: the intra flow (j, j) (β_d + β_o shock).
 
     Flow vec ordering is row-major ``arr[o, d].ravel()`` so flat index
-    ``i = o * n + d``.
+    ``i = o * n + d``.  Returned as ``(rows, cols)`` integer-array tuples, which
+    index an ``(N, n)`` array exactly like a boolean mask (``T[mask]``,
+    ``shock[mask] = v``) but hold O(n²) entries instead of the dense mask's
+    O(n³).
     """
     N = n * n
     flat = np.arange(N)
-    o_idx = flat // n
-    d_idx = flat % n
+    o_idx, d_idx = np.divmod(flat, n)
+    off = o_idx != d_idx
+    rows_off = flat[off]
+    dmask = (rows_off, d_idx[off])
+    omask = (rows_off, o_idx[off])
     j = np.arange(n)
-    dmask = (d_idx[:, None] == j[None, :]) & (o_idx[:, None] != j[None, :])
-    omask = (o_idx[:, None] == j[None, :]) & (d_idx[:, None] != j[None, :])
-    imask = (o_idx[:, None] == j[None, :]) & (d_idx[:, None] == j[None, :])
+    imask = (j * (n + 1), j)
     return dmask, omask, imask
 
 
@@ -113,8 +117,9 @@ def _compute_flow_effects_lesage(
     A_solve : callable
         Function ``A_solve(rhs)`` that solves ``A x = rhs`` for ``rhs`` of shape
         ``(N, n)`` where ``N = n * n``.  Must accept a 2-D right-hand side.
-    dmask, omask, imask : np.ndarray, shape (N, n), dtype bool
-        Region-shock masks from :func:`_build_flow_effect_masks`.
+    dmask, omask, imask : tuple of ndarray
+        Region-shock ``(rows, cols)`` index masks into an ``(N, n)`` array,
+        from :func:`_build_flow_effect_masks`.
     beta_d : np.ndarray, shape (k_d,)
         Destination coefficient vector for one posterior draw.
     beta_o : np.ndarray, shape (k_o,)
@@ -149,48 +154,46 @@ def _compute_flow_effects_lesage(
     )
 
     out: dict[str, np.ndarray] = {}
-    for side in ("dest", "orig"):
-        k_side = k_d if side == "dest" else k_o
+
+    def _response_sums(*masks):
+        """Masked sums of ``A⁻¹·shock`` for a unit shock on ``masks``.
+
+        Returns ``(total, intra, origin, destination)``, each divided by N.
+        The shock for predictor p is a linear combination of three unit
+        shocks, so three solves per draw serve every predictor.
+        """
+        shock = np.zeros((N, n), dtype=np.float64)
+        for m in masks:
+            shock[m] = 1.0
+        T = A_solve(shock)
+        return np.array([T.sum(), T[imask].sum(), T[omask].sum(), T[dmask].sum()]) / N
+
+    def _store(side, p, sums):
+        total, intra, origin, dest = sums
+        out[f"{side}_total"][p] = total
+        out[f"{side}_intra"][p] = intra
+        out[f"{side}_origin"][p] = origin
+        out[f"{side}_destination"][p] = dest
+        out[f"{side}_network"][p] = total - origin - dest - intra
+
+    for side, k_side in (("dest", k_d), ("orig", k_o)):
         for eff in _EFFECT_KEYS:
             out[f"{side}_{eff}"] = np.empty(k_side, dtype=np.float64)
 
-    for p in range(k_d):
-        bd = float(beta_d[p])
-        bint = float(bi[p])
+    # Destination-side shock for predictor p: β_d on flows with destination=j,
+    # plus β_intra at (j, j) since X_intra is built from X_dest — i.e.
+    # β_d·(D + I) + β_intra·I.
+    if k_d:
+        S_DI = _response_sums(dmask, imask)
+        S_I = _response_sums(imask) if np.any(bi) else np.zeros(4)
+        for p in range(k_d):
+            _store("dest", p, float(beta_d[p]) * S_DI + float(bi[p]) * S_I)
 
-        # Destination-side shock: β_d on flows with destination=j, plus β_intra
-        # at (j, j) since X_intra is built from X_dest.
-        shock_d = np.zeros((N, n), dtype=np.float64)
-        shock_d[dmask] = bd
-        shock_d[imask] = bd + bint
-        T_d = A_solve(shock_d)
-        total_d = T_d.sum() / N
-        intra_d = T_d[imask].sum() / N
-        origin_d = T_d[omask].sum() / N
-        dest_d = T_d[dmask].sum() / N
-        out["dest_total"][p] = total_d
-        out["dest_intra"][p] = intra_d
-        out["dest_origin"][p] = origin_d
-        out["dest_destination"][p] = dest_d
-        out["dest_network"][p] = total_d - origin_d - dest_d - intra_d
-
-    for p in range(k_o):
-        bo = float(beta_o[p])
-
-        # Origin-side shock: β_o on flows with origin=j, including (j, j).
-        shock_o = np.zeros((N, n), dtype=np.float64)
-        shock_o[omask] = bo
-        shock_o[imask] = bo
-        T_o = A_solve(shock_o)
-        total_o = T_o.sum() / N
-        intra_o = T_o[imask].sum() / N
-        origin_o = T_o[omask].sum() / N
-        dest_o = T_o[dmask].sum() / N
-        out["orig_total"][p] = total_o
-        out["orig_intra"][p] = intra_o
-        out["orig_origin"][p] = origin_o
-        out["orig_destination"][p] = dest_o
-        out["orig_network"][p] = total_o - origin_o - dest_o - intra_o
+    # Origin-side shock: β_o on flows with origin=j, including (j, j).
+    if k_o:
+        S_OI = _response_sums(omask, imask)
+        for p in range(k_o):
+            _store("orig", p, float(beta_o[p]) * S_OI)
 
     # Combined effects: concatenation of dest and orig (different variables
     # when k_d != k_o, same variables summed when k_d == k_o).
@@ -441,9 +444,6 @@ class FlowModel(FlowSharedMethods, SpatialModel):
         self._Wd: sp.csr_matrix = wms["destination"]
         self._Wo: sp.csr_matrix = wms["origin"]
         self._Ww: sp.csr_matrix = wms["network"]
-
-        # Cache region-shock masks for LeSage effects decomposition.
-        self._dmask, self._omask, self._imask = _build_flow_effect_masks(self._n)
 
         # Cache the symmetric 3x3 Kronecker trace matrix used by Bayesian
         # LM diagnostics: T[i,j] = tr(W_i' W_j) + tr(W_i W_j) for
@@ -926,9 +926,7 @@ class SARFlow(FlowModel):
 
             res = _compute_flow_effects_lesage(
                 _solve,
-                self._dmask,
-                self._omask,
-                self._imask,
+                *self._flow_effect_masks,
                 beta_d_vec,
                 beta_o_vec,
                 n,
@@ -1147,9 +1145,7 @@ class SARFlowSeparable(FlowModel):
 
             res = _compute_flow_effects_lesage(
                 _solve,
-                self._dmask,
-                self._omask,
-                self._imask,
+                *self._flow_effect_masks,
                 beta_d_vec,
                 beta_o_vec,
                 n,

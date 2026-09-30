@@ -863,11 +863,6 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
                 f"{type(self).__name__} does not support Gibbs sampling. "
                 "Use sampler='nuts' (the default)."
             )
-        if self.robust:
-            raise NotImplementedError(
-                "Gibbs sampling is not yet supported for robust (Student-t) "
-                "models. Use sampler='nuts' (the default)."
-            )
 
         import importlib
 
@@ -933,6 +928,10 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         if self._jacobian_param == "rho":
             gibbs_kwargs["Wy"] = self._Wy
 
+        if self.robust:
+            # Student-t errors as a normal scale mixture with the same fixed ν
+            # the NUTS path uses.
+            gibbs_kwargs["nu"] = self._nu
         gibbs = GibbsClass(**gibbs_kwargs)
 
         self._idata = gibbs.fit(

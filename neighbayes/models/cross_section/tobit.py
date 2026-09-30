@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import numpy as np
 import pytensor.tensor as pt
+import scipy.sparse as sp
+import scipy.sparse.linalg as spla
 from pytensor import sparse as pts
 
 from ..._lazy_deps import az, pm
@@ -317,8 +319,8 @@ class SARTobit(_SpatialTobitBase):
         rho = float(self._posterior_mean("rho"))
         beta = self._posterior_mean("beta")
         n = self._y.shape[0]
-        A = np.eye(n) - rho * self._W_dense
-        structural = np.linalg.solve(A, self._X @ beta)
+        A = sp.eye(n, format="csc") - rho * sp.csc_matrix(self._W_sparse)
+        structural = spla.spsolve(A, self._X @ beta)
         return np.maximum(self.censoring, structural)
 
     def _postprocess_idata(self, idata: az.InferenceData) -> az.InferenceData:
@@ -617,8 +619,8 @@ class SDMTobit(_SpatialTobitBase):
         beta = self._posterior_mean("beta")
         Z = np.hstack([self._X, self._WX])
         n = self._y.shape[0]
-        A = np.eye(n) - rho * self._W_dense
-        structural = np.linalg.solve(A, Z @ beta)
+        A = sp.eye(n, format="csc") - rho * sp.csc_matrix(self._W_sparse)
+        structural = spla.spsolve(A, Z @ beta)
         return np.maximum(self.censoring, structural)
 
     def _postprocess_idata(self, idata: az.InferenceData) -> az.InferenceData:

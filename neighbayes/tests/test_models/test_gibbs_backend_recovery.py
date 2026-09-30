@@ -27,6 +27,7 @@ import pytest
 from neighbayes import dgp
 from neighbayes.tests.helpers import (
     W_to_graph,
+    _as_sparse,
     make_rook_W,
     make_sar_logit_data,
     make_sar_logit_structural_data,
@@ -212,7 +213,7 @@ def sar_negbin_data():
     rng = np.random.default_rng(42)
     W = W_to_graph(make_rook_W(SIDE_NB))
     return dgp.simulate_sar_negbin(
-        W=W,
+        W=_as_sparse(W),
         rho=RHO_NB,
         beta=BETA_NB,
         alpha=ALPHA_NB,
@@ -259,7 +260,7 @@ def sar_negbin_struct_data():
     rng = np.random.default_rng(42)
     W = W_to_graph(make_rook_W(SIDE_NB))
     return dgp.simulate_sar_negbin(
-        W=W,
+        W=_as_sparse(W),
         rho=RHO_NB,
         beta=BETA_NB,
         alpha=ALPHA_NB,
@@ -306,7 +307,7 @@ def sar_zinb_data():
     rng = np.random.default_rng(42)
     W = W_to_graph(make_rook_W(SIDE_NB))
     return dgp.simulate_sar_zinb(
-        W=W,
+        W=_as_sparse(W),
         rho=RHO_ZINB,
         lam=LAM_ZINB,
         beta=BETA_ZINB,
@@ -427,7 +428,7 @@ def sar_zinb_small_data():
     ``test_sar_zinb_backends_agree`` with the fixes reverted.
     """
     return dgp.simulate_sar_zinb(
-        n=18,
+        n_side=18,
         rho=RHO_ZINB,
         lam=LAM_ZINB,
         beta=BETA_ZINB,

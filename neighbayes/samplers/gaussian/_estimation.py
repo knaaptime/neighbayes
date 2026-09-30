@@ -68,6 +68,9 @@ class GibbsEstimation:
         Names for the columns of X (for InferenceData coords).
     model_type : str
         One of "sar", "sem", "sdm", "sdem".
+    nu : float or None, default None
+        Student-t degrees of freedom for robust errors, sampled as a normal
+        scale mixture; ``None`` for Gaussian errors.
     """
 
     def __init__(
@@ -88,6 +91,7 @@ class GibbsEstimation:
         logdet_refit_pad_sd: float = DEFAULT_PAD_SD,
         logdet_aaa_check: bool = False,
         logdet_probe_check: bool = False,
+        nu: float | None = None,
     ):
         self.y = y
         self.X = X
@@ -105,6 +109,7 @@ class GibbsEstimation:
         self.logdet_refit_pad_sd = float(logdet_refit_pad_sd)
         self.logdet_aaa_check = bool(logdet_aaa_check)
         self.logdet_probe_check = bool(logdet_probe_check)
+        self.nu = None if nu is None else float(nu)
         self.warmup_jacobian = None
         self.n, self.k = X.shape
 
@@ -481,6 +486,7 @@ class GibbsEstimation:
             logdet_params=params0,
             refit_hook=refit_hook,
             log_likelihood=self.log_likelihood,
+            nu=self.nu,
         )
 
         # Assemble InferenceData
@@ -668,6 +674,7 @@ class GibbsEstimation:
             XTWy=XTWy,
             WXTy=WXTy,
             WXTWy=WXTWy,
+            nu=self.nu,
         )
 
     def _assemble_idata(
@@ -795,6 +802,7 @@ class GaussianSARGibbs(GibbsEstimation):
         logdet_refit_pad_sd: float = DEFAULT_PAD_SD,
         logdet_aaa_check: bool = False,
         logdet_probe_check: bool = False,
+        nu: float | None = None,
     ):
         super().__init__(
             y=y,
@@ -813,6 +821,7 @@ class GaussianSARGibbs(GibbsEstimation):
             logdet_refit_pad_sd=logdet_refit_pad_sd,
             logdet_aaa_check=logdet_aaa_check,
             logdet_probe_check=logdet_probe_check,
+            nu=nu,
         )
 
     def _spatial_param_name(self) -> str:
@@ -868,6 +877,7 @@ class GaussianSEMGibbs(GibbsEstimation):
         logdet_refit_pad_sd: float = DEFAULT_PAD_SD,
         logdet_aaa_check: bool = False,
         logdet_probe_check: bool = False,
+        nu: float | None = None,
     ):
         super().__init__(
             y=y,
@@ -886,6 +896,7 @@ class GaussianSEMGibbs(GibbsEstimation):
             logdet_refit_pad_sd=logdet_refit_pad_sd,
             logdet_aaa_check=logdet_aaa_check,
             logdet_probe_check=logdet_probe_check,
+            nu=nu,
         )
 
     def _spatial_param_name(self) -> str:

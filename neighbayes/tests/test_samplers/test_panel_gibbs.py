@@ -167,8 +167,8 @@ class TestPanelGibbsDispatch:
 class TestPanelGibbsEdgeCases:
     """Edge cases for panel Gibbs."""
 
-    def test_sar_panel_fe_robust_raises(self):
-        """Gibbs should raise for robust SARPanelFE."""
+    def test_sar_panel_fe_robust_gibbs_runs(self):
+        """Robust (Student-t) SARPanelFE samples with Gibbs."""
         from neighbayes.models.panel._fe import SARPanelFE
 
         rng = np.random.default_rng(42)
@@ -185,17 +185,19 @@ class TestPanelGibbsEdgeCases:
         model = SARPanelFE(
             y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, effects=1, robust=True
         )
-        with pytest.raises(NotImplementedError, match="robust"):
-            model.fit(
-                sampler="gibbs",
-                draws=10,
-                tune=5,
-                chains=1,
-                progressbar=False,
-            )
+        idata = model.fit(
+            sampler="gibbs",
+            draws=30,
+            tune=20,
+            chains=1,
+            progressbar=False,
+            idata_kwargs={"log_likelihood": True},
+        )
+        assert "v" not in idata.posterior
+        assert np.all(np.isfinite(idata.log_likelihood["obs"].values))
 
-    def test_sem_panel_fe_robust_raises(self):
-        """Gibbs should raise for robust SEMPanelFE."""
+    def test_sem_panel_fe_robust_gibbs_runs(self):
+        """Robust (Student-t) SEMPanelFE samples with Gibbs."""
         from neighbayes.models.panel._fe import SEMPanelFE
 
         rng = np.random.default_rng(42)
@@ -212,14 +214,16 @@ class TestPanelGibbsEdgeCases:
         model = SEMPanelFE(
             y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, effects=1, robust=True
         )
-        with pytest.raises(NotImplementedError, match="robust"):
-            model.fit(
-                sampler="gibbs",
-                draws=10,
-                tune=5,
-                chains=1,
-                progressbar=False,
-            )
+        idata = model.fit(
+            sampler="gibbs",
+            draws=30,
+            tune=20,
+            chains=1,
+            progressbar=False,
+            idata_kwargs={"log_likelihood": True},
+        )
+        assert "v" not in idata.posterior
+        assert np.all(np.isfinite(idata.log_likelihood["obs"].values))
 
     def test_sar_panel_fe_gibbs_thinning(self):
         """Thinning should reduce kept draws."""

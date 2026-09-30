@@ -27,7 +27,6 @@ from ..._ops import kron_solve_matrix
 from ...graph import _weights_to_csr, flow_trace_blocks, flow_weight_matrices
 from .._mixins._flow_shared import FlowSharedMethods
 from ..flow import (
-    _build_flow_effect_masks,
     _compute_flow_effects_lesage,
     _compute_ols_flow_effects,
 )
@@ -226,9 +225,6 @@ class FlowPanelModel(FlowSharedMethods, SpatialPanelModel):
         self._Wd: sp.csr_matrix = wms["destination"]
         self._Wo: sp.csr_matrix = wms["origin"]
         self._Ww: sp.csr_matrix = wms["network"]
-
-        # Cache region-shock masks for LeSage effects decomposition.
-        self._dmask, self._omask, self._imask = _build_flow_effect_masks(self._n)
 
         # Cache the symmetric 3x3 Kronecker trace matrix used by Bayesian
         # LM diagnostics on flow models: T[i,j] = tr(W_i' W_j) + tr(W_i W_j)
@@ -564,9 +560,7 @@ class FlowPanelModel(FlowSharedMethods, SpatialPanelModel):
 
             res = _compute_flow_effects_lesage(
                 _solve,
-                self._dmask,
-                self._omask,
-                self._imask,
+                *self._flow_effect_masks,
                 beta_d_vec,
                 beta_o_vec,
                 n,
@@ -643,9 +637,7 @@ class FlowPanelModel(FlowSharedMethods, SpatialPanelModel):
 
             res = _compute_flow_effects_lesage(
                 _solve,
-                self._dmask,
-                self._omask,
-                self._imask,
+                *self._flow_effect_masks,
                 beta_d_vec,
                 beta_o_vec,
                 n,

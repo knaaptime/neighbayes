@@ -235,7 +235,7 @@ def test_reduced_nuts_and_gibbs_agree_and_recover_rho():
     from neighbayes.dgp import simulate_sar_negbin
     from neighbayes.models import SARNegBin
 
-    data = simulate_sar_negbin(n=25, rho=0.4, seed=1)
+    data = simulate_sar_negbin(n_side=25, rho=0.4, seed=1)
     y, X, W = data["y"], data["X"], data["W_graph"]
     kwargs = dict(draws=1000, tune=800, chains=2, random_seed=1, progressbar=False)
 
@@ -267,7 +267,7 @@ def test_reduced_nuts_uses_the_resolved_beta_prior():
     from neighbayes.dgp import simulate_sar_negbin
     from neighbayes.models import SARNegBin
 
-    data = simulate_sar_negbin(n=15, rho=0.4, seed=1)
+    data = simulate_sar_negbin(n_side=15, rho=0.4, seed=1)
     model = SARNegBin(y=data["y"], X=data["X"], W=data["W_graph"])
     expected_mu, expected_sigma = model._gelman_default_beta_prior(
         model._X, list(model._feature_names)

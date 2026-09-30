@@ -414,14 +414,11 @@ class SpatialModel(SharedSpatialMethods, ABC):
         n_jobs: int = -1,
         progressbar: bool = True,
         gibbs_method: str = "numpy",
-        mala_step_size: float = 0.05,
-        use_mala: bool = True,
-        use_slice: bool = True,
         slice_width: float | None = None,
         chain_method: str | None = None,
         log_likelihood: bool = False,
     ) -> az.InferenceData:
-        """Sample posterior via 3-block Gaussian Gibbs.
+        """Sample the posterior with the partially collapsed Gaussian Gibbs sampler.
 
         Uses the model's :attr:`_gibbs_class` attribute to resolve the
         appropriate Gibbs sampler class at runtime.  Only models with
@@ -446,15 +443,9 @@ class SpatialModel(SharedSpatialMethods, ABC):
         progressbar : bool, default True
             Show per-chain progress bars.
         gibbs_method : str, default "numpy"
-            Execution backend: ``"numpy"`` for Python-loop Gibbs with
-            adaptive slice sampling, or ``"jax"`` for full-JIT Gibbs
-            with MALA for ρ/λ.
-        mala_step_size : float, default 0.05
-            Initial MALA step size for the JAX path.
-        use_mala : bool, default True
-            If True, use MALA for the ρ/λ update in the JAX path.
-        use_slice : bool, default True
-            If True, use slice sampling for the ρ/λ update.
+            Execution backend (the resolved ``gibbs_backend``): ``"numpy"``
+            for Python-loop Gibbs or ``"jax"`` for full-JIT Gibbs; both
+            slice-sample ρ/λ.
         slice_width : float or None, default None
             Initial step-out width for slice sampling.
         chain_method : str or None, default None
@@ -469,18 +460,12 @@ class SpatialModel(SharedSpatialMethods, ABC):
         Raises
         ------
         NotImplementedError
-            If the model has no Gibbs sampler (``_gibbs_class is None``)
-            or uses a robust (Student-t) likelihood.
+            If the model has no Gibbs sampler (``_gibbs_class is None``).
         """
         if self._gibbs_class is None:
             raise NotImplementedError(
                 f"{type(self).__name__} does not support Gibbs sampling. "
                 f"Use sampler='nuts' (the default)."
-            )
-        if self.robust:
-            raise NotImplementedError(
-                "Gibbs sampling is not yet supported for robust (Student-t) "
-                "models. Use sampler='nuts' (the default)."
             )
 
         # --- Resolve Gibbs class (lazy import to avoid circular deps) ---
@@ -550,6 +535,10 @@ class SpatialModel(SharedSpatialMethods, ABC):
         if self._jacobian_param == "rho":
             gibbs_kwargs["Wy"] = self._Wy
 
+        if self.robust:
+            # Student-t errors as a normal scale mixture with the same fixed ν
+            # the NUTS path uses.
+            gibbs_kwargs["nu"] = self._nu
         gibbs = GibbsClass(**gibbs_kwargs)
 
         self._idata = gibbs.fit(

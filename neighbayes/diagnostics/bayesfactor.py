@@ -998,6 +998,10 @@ def bayes_factor_compare_models(
         - ``'bic'``: BIC approximation (:cite:p:`wagenmakers2007PracticalSolution`).
           Computes :math:`\\log(ML) \\approx -BIC/2`.  Works with either
           fitted model objects or InferenceData.
+        - ``'quadrature'``: exact marginal likelihood for Gaussian OLS, SLX,
+          SAR, SDM, SEM and SDEM models (see :func:`log_marginal_likelihood`).
+          No Monte Carlo error; the models need not be fit.  Accepts
+          ``epsrel``.
 
     prior_note : str, optional
         Optional string describing the priors used (for reporting).
@@ -1165,6 +1169,21 @@ def bayes_factor_compare_models(
     if len(model_labels) != len(model_objects):
         raise ValueError("model_labels must match length of models")
 
+    if method == "quadrature":
+        # Exact, and needs only the model and data: no posterior draws.
+        epsrel = kwargs.pop("epsrel", 1e-10)
+        if kwargs:
+            raise TypeError(
+                f"method='quadrature' got unexpected keyword arguments {sorted(kwargs)}"
+            )
+        diagnostics = {
+            label: log_marginal_likelihood(obj, epsrel=epsrel, return_diagnostics=True)
+            for label, obj in zip(model_labels, model_objects)
+        }
+        logmls = [diagnostics[label]["logml"] for label in model_labels]
+        df = _bayes_factor_frame(logmls, model_labels, log=log, prior_note=prior_note)
+        return (df, diagnostics) if return_diagnostics else df
+
     # Resolve each entry: either a fitted model object or InferenceData
     idata_list = []
     log_posterior_list = []
@@ -1312,13 +1331,16 @@ def bayes_factor_compare_models(
                 logmls.append(logml_fn(idata))
                 diagnostics[label] = None
 
-    n = len(logmls)
-    log_bf_mat = np.zeros((n, n))
-    for i in range(n):
-        for j in range(n):
-            if i != j:
-                log_bf_mat[i, j] = logmls[i] - logmls[j]
+    df = _bayes_factor_frame(logmls, model_labels, log=log, prior_note=prior_note)
+    if return_diagnostics:
+        return df, diagnostics
+    return df
 
+
+def _bayes_factor_frame(logmls, model_labels, *, log: bool, prior_note):
+    """Pairwise (log) Bayes factors ``BF[i, j] = ML_i / ML_j`` as a DataFrame."""
+    logmls = np.asarray(logmls, dtype=np.float64)
+    log_bf_mat = logmls[:, None] - logmls[None, :]
     if log:
         df = pd.DataFrame(log_bf_mat, index=model_labels, columns=model_labels)
     else:
@@ -1329,14 +1351,45 @@ def bayes_factor_compare_models(
                 "Some Bayes factors overflowed to inf because the log "
                 "marginal-likelihood differences exceed ~709. Pass "
                 "``log=True`` to return log Bayes factors instead.",
-                stacklevel=2,
+                stacklevel=3,
             )
         df = pd.DataFrame(bf_mat, index=model_labels, columns=model_labels)
     if prior_note:
-        warnings.warn(f"Bayes factors computed with priors: {prior_note}", stacklevel=2)
-    if return_diagnostics:
-        return df, diagnostics
+        warnings.warn(f"Bayes factors computed with priors: {prior_note}", stacklevel=3)
     return df
+
+
+def log_marginal_likelihood(model, *, epsrel: float = 1e-10, return_diagnostics=False):
+    """Exact log marginal likelihood of a Gaussian spatial model.
+
+    Integrates β analytically and σ² and the spatial parameter by adaptive
+    quadrature under the model's own priors (:cite:p:`lesage2007BayesianModel`), so the
+    result has no Monte Carlo error and the model need not be fit.  Covers
+    OLS, SLX, SAR, SDM, SEM and SDEM with Gaussian errors; for robust or
+    non-Gaussian models use :func:`bayes_factor_compare_models` with
+    ``method='bridge'``.
+
+    Parameters
+    ----------
+    model
+        A Gaussian cross-sectional model (``robust=False``).
+    epsrel : float, default 1e-10
+        Relative tolerance of each one-dimensional quadrature.
+    return_diagnostics : bool, default False
+        Also return the error estimate and the spatial parameter's
+        posterior mode.
+
+    Returns
+    -------
+    float or dict
+        ``log p(y)``, or a dict with keys ``logml``, ``abserr``, ``mode``
+        and ``method`` when ``return_diagnostics=True``.
+    """
+    from ._quadrature_logml import quadrature_log_marginal_likelihood
+
+    return quadrature_log_marginal_likelihood(
+        model, epsrel=epsrel, return_diagnostics=return_diagnostics
+    )
 
 
 # ---------------------------------------------------------------------------

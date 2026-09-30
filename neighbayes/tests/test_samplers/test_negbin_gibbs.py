@@ -146,11 +146,11 @@ class TestSARNegBinStructuralRhoMixing:
         """Rho should have more than 1 unique value after 200 draws."""
         from neighbayes import dgp
         from neighbayes.models import SARNegBinStructural
-        from neighbayes.tests.helpers import W_to_graph, make_rook_W
+        from neighbayes.tests.helpers import W_to_graph, _as_sparse, make_rook_W
 
         rng = np.random.default_rng(42)
         data = dgp.simulate_sar_negbin(
-            W=W_to_graph(make_rook_W(5)),
+            W=_as_sparse(W_to_graph(make_rook_W(5))),
             rho=0.4,
             beta=np.array([1.0, 0.5]),
             alpha=2.0,

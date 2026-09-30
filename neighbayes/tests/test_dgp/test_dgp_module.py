@@ -6,6 +6,7 @@ import inspect
 
 import numpy as np
 import pytest
+import scipy.sparse as sp
 
 from neighbayes import dgp
 from neighbayes.tests.helpers import W_to_graph, make_rook_W
@@ -21,10 +22,10 @@ def test_dgp_exports_have_gdf_argument() -> None:
         ), f"{fn.__name__} must accept gdf directly or through **kwargs"
 
 
-def test_cross_sectional_generators_run_with_dense_W() -> None:
+def test_cross_sectional_generators_run_with_sparse_W() -> None:
     """Cross-sectional DGPs should run and return consistent output keys."""
     rng = np.random.default_rng(123)
-    W = make_rook_W(4)
+    W = sp.csr_matrix(make_rook_W(4))
 
     out_sar = dgp.simulate_sar(W=W, rng=rng)
     out_sem = dgp.simulate_sem(W=W, rng=rng)
@@ -33,7 +34,7 @@ def test_cross_sectional_generators_run_with_dense_W() -> None:
     out_sdem = dgp.simulate_sdem(W=W, rng=rng)
 
     for out in (out_sar, out_sem, out_slx, out_sdm, out_sdem):
-        assert set(("y", "X", "W_dense", "W_graph", "params_true")).issubset(out)
+        assert set(("y", "X", "W_sparse", "W_graph", "params_true")).issubset(out)
         assert out["y"].shape[0] == out["X"].shape[0]
 
 
@@ -43,14 +44,14 @@ def test_cross_sectional_generators_run_with_n_only_as_square_grid() -> None:
     n_side = 4
     expected_nobs = n_side * n_side
 
-    out_sar = dgp.simulate_sar(n=n_side, rng=rng)
-    out_sem = dgp.simulate_sem(n=n_side, rng=rng)
-    out_slx = dgp.simulate_slx(n=n_side, rng=rng)
-    out_sdm = dgp.simulate_sdm(n=n_side, rng=rng)
-    out_sdem = dgp.simulate_sdem(n=n_side, rng=rng)
+    out_sar = dgp.simulate_sar(n_side=n_side, rng=rng)
+    out_sem = dgp.simulate_sem(n_side=n_side, rng=rng)
+    out_slx = dgp.simulate_slx(n_side=n_side, rng=rng)
+    out_sdm = dgp.simulate_sdm(n_side=n_side, rng=rng)
+    out_sdem = dgp.simulate_sdem(n_side=n_side, rng=rng)
 
     for out in (out_sar, out_sem, out_slx, out_sdm, out_sdem):
-        assert out["W_dense"].shape == (expected_nobs, expected_nobs)
+        assert out["W_sparse"].shape == (expected_nobs, expected_nobs)
         assert out["y"].shape[0] == expected_nobs
         assert out["X"].shape[0] == expected_nobs
 
@@ -64,11 +65,21 @@ def test_cross_sectional_create_gdf_with_point_geometry() -> None:
     expected_nobs = n_side * n_side
 
     outs = [
-        dgp.simulate_sar(n=n_side, rng=rng, create_gdf=True, geometry_type="point"),
-        dgp.simulate_sem(n=n_side, rng=rng, create_gdf=True, geometry_type="point"),
-        dgp.simulate_slx(n=n_side, rng=rng, create_gdf=True, geometry_type="point"),
-        dgp.simulate_sdm(n=n_side, rng=rng, create_gdf=True, geometry_type="point"),
-        dgp.simulate_sdem(n=n_side, rng=rng, create_gdf=True, geometry_type="point"),
+        dgp.simulate_sar(
+            n_side=n_side, rng=rng, create_gdf=True, geometry_type="point"
+        ),
+        dgp.simulate_sem(
+            n_side=n_side, rng=rng, create_gdf=True, geometry_type="point"
+        ),
+        dgp.simulate_slx(
+            n_side=n_side, rng=rng, create_gdf=True, geometry_type="point"
+        ),
+        dgp.simulate_sdm(
+            n_side=n_side, rng=rng, create_gdf=True, geometry_type="point"
+        ),
+        dgp.simulate_sdem(
+            n_side=n_side, rng=rng, create_gdf=True, geometry_type="point"
+        ),
     ]
 
     for gdf_out in outs:
@@ -83,7 +94,9 @@ def test_cross_sectional_create_gdf_with_polygon_geometry() -> None:
     """create_gdf=True with geometry_type='polygon' should return polygon geometry."""
     gpd = pytest.importorskip("geopandas")
 
-    gdf_out = dgp.simulate_sar(n=4, seed=123, create_gdf=True, geometry_type="polygon")
+    gdf_out = dgp.simulate_sar(
+        n_side=4, seed=123, create_gdf=True, geometry_type="polygon"
+    )
     assert isinstance(gdf_out, gpd.GeoDataFrame)
     assert gdf_out.geom_type.eq("Polygon").all()
 
@@ -91,20 +104,20 @@ def test_cross_sectional_create_gdf_with_polygon_geometry() -> None:
 def test_cross_sectional_create_gdf_rejects_invalid_geometry_type() -> None:
     """Unsupported geometry types should raise a clear ValueError."""
     with pytest.raises(ValueError, match="geometry_type"):
-        dgp.simulate_sar(n=4, seed=123, create_gdf=True, geometry_type="triangle")
+        dgp.simulate_sar(n_side=4, seed=123, create_gdf=True, geometry_type="triangle")
 
 
 def test_cross_sectional_create_gdf_default_is_backward_compatible() -> None:
     """Without create_gdf, the return value should be a plain dict."""
-    out = dgp.simulate_sar(n=4, seed=123)
+    out = dgp.simulate_sar(n_side=4, seed=123)
     assert isinstance(out, dict)
 
 
-def test_panel_generators_run_with_dense_W() -> None:
+def test_panel_generators_run_with_sparse_W() -> None:
     """Panel DGPs should return time-first stacked outputs of length ``N*T``."""
     rng = np.random.default_rng(123)
     N, T = 9, 5  # make_rook_W(3) produces a 3x3 grid -> 9 units
-    W = make_rook_W(3)
+    W = sp.csr_matrix(make_rook_W(3))
 
     panel_outs = [
         dgp.simulate_panel_ols_fe(N=N, T=T, W=W, rng=rng),
@@ -130,10 +143,10 @@ def test_panel_generators_run_with_dense_W() -> None:
         assert out["time"].shape[0] == N * T
 
 
-def test_nonlinear_generators_run_with_dense_W() -> None:
+def test_nonlinear_generators_run_with_sparse_W() -> None:
     """Nonlinear DGPs should run and return expected keys and shapes."""
     rng = np.random.default_rng(123)
-    W = make_rook_W(3)
+    W = sp.csr_matrix(make_rook_W(3))
 
     out_sar_tobit = dgp.simulate_sar_tobit(W=W, rng=rng)
     out_sem_tobit = dgp.simulate_sem_tobit(W=W, rng=rng)
@@ -227,17 +240,17 @@ def test_both_gdf_and_graph_inputs_must_match_dimensions() -> None:
 
 
 def test_n_must_match_explicit_weights_dimensions() -> None:
-    """When W is provided, n must match the implied observation count."""
-    W_dense = make_rook_W(3)
-    with pytest.raises(ValueError, match="n must match"):
-        dgp.simulate_sar(W=W_dense, n=4, seed=123)
+    """When W is provided, n_side**2 must match the number of units."""
+    W = sp.csr_matrix(make_rook_W(3))
+    with pytest.raises(ValueError, match="n_side=4 implies 16 units"):
+        dgp.simulate_sar(W=W, n_side=4, seed=123)
 
 
 def test_panel_create_gdf_returns_tuple() -> None:
     """create_gdf=True returns (N-row GeoDataFrame, N*T-row DataFrame)."""
     gpd = pytest.importorskip("geopandas")
     N, T = 9, 3
-    W = make_rook_W(3)
+    W = sp.csr_matrix(make_rook_W(3))
     result = dgp.simulate_panel_sar_fe(N=N, T=T, W=W, seed=42, create_gdf=True)
     assert isinstance(result, tuple)
     unit_gdf, long_df = result
@@ -269,7 +282,7 @@ def test_panel_wide_returns_single_geodataframe() -> None:
     """wide=True returns a single N-row GeoDataFrame with pivoted columns."""
     gpd = pytest.importorskip("geopandas")
     N, T = 9, 3
-    W = make_rook_W(3)
+    W = sp.csr_matrix(make_rook_W(3))
     result = dgp.simulate_panel_sar_fe(N=N, T=T, W=W, seed=42, wide=True)
     assert isinstance(result, gpd.GeoDataFrame)
     assert len(result) == N
@@ -280,7 +293,7 @@ def test_panel_wide_returns_single_geodataframe() -> None:
 
 def test_panel_default_backward_compatible() -> None:
     """Panel functions still return a plain dict when create_gdf=False and gdf=None."""
-    W = make_rook_W(3)
+    W = sp.csr_matrix(make_rook_W(3))
     out = dgp.simulate_panel_sar_fe(N=9, T=3, W=W, seed=42)
     assert isinstance(out, dict)
     assert "y" in out and "W_graph" in out
@@ -290,7 +303,7 @@ def test_panel_tobit_create_gdf() -> None:
     """Panel Tobit wrappers respect the create_gdf parameter."""
     gpd = pytest.importorskip("geopandas")
     N, T = 9, 3
-    W = make_rook_W(3)
+    W = sp.csr_matrix(make_rook_W(3))
     result = dgp.simulate_panel_sar_tobit_fe(
         N=N, T=T, W=W, seed=42, create_gdf=True, censoring=0.0
     )
@@ -335,8 +348,8 @@ def test_cross_sectional_err_hetero_produces_different_variances() -> None:
 
     # Also verify that simulate_ols with err_hetero=True produces different
     # results than err_hetero=False (same seed should give different y).
-    out_homo = dgp.simulate_ols(n=4, sigma=1.0, err_hetero=False, seed=123)
-    out_hetero = dgp.simulate_ols(n=4, sigma=1.0, err_hetero=True, seed=123)
+    out_homo = dgp.simulate_ols(n_side=4, sigma=1.0, err_hetero=False, seed=123)
+    out_hetero = dgp.simulate_ols(n_side=4, sigma=1.0, err_hetero=True, seed=123)
     # The y values should differ because the error scaling is different.
     assert not np.allclose(out_homo["y"], out_hetero["y"]), (
         "err_hetero=True should produce different y values than err_hetero=False"
@@ -359,8 +372,8 @@ def test_cross_sectional_err_hetero_false_is_homoskedastic() -> None:
 
     # Verify backward compatibility: default err_hetero=False gives same
     # results as before the parameter was added.
-    out1 = dgp.simulate_ols(n=4, sigma=1.0, seed=123)
-    out2 = dgp.simulate_ols(n=4, sigma=1.0, seed=123, err_hetero=False)
+    out1 = dgp.simulate_ols(n_side=4, sigma=1.0, seed=123)
+    out2 = dgp.simulate_ols(n_side=4, sigma=1.0, seed=123, err_hetero=False)
     assert np.allclose(out1["y"], out2["y"]), (
         "err_hetero=False should produce identical results to the default"
     )
@@ -370,7 +383,7 @@ def test_panel_fe_err_hetero_runs_and_preserves_shape() -> None:
     """Panel FE simulators with err_hetero=True should return same shapes."""
     rng = np.random.default_rng(42)
     N, T = 9, 3
-    W = make_rook_W(3)
+    W = sp.csr_matrix(make_rook_W(3))
 
     for sim_fn in [
         dgp.simulate_panel_ols_fe,
@@ -390,7 +403,7 @@ def test_panel_re_err_hetero_forwarded() -> None:
     """Panel RE wrappers should forward err_hetero to underlying FE simulators."""
     rng = np.random.default_rng(42)
     N, T = 9, 3
-    W = make_rook_W(3)
+    W = sp.csr_matrix(make_rook_W(3))
 
     for sim_fn in [
         dgp.simulate_panel_ols_re,
@@ -405,7 +418,7 @@ def test_dynamic_panel_err_hetero_runs_and_preserves_shape() -> None:
     """Dynamic panel simulators with err_hetero=True should return same shapes."""
     rng = np.random.default_rng(42)
     N, T = 9, 3
-    W = make_rook_W(3)
+    W = sp.csr_matrix(make_rook_W(3))
 
     for sim_fn in [
         dgp.simulate_panel_dlm_fe,
@@ -425,7 +438,7 @@ def test_dynamic_panel_err_hetero_runs_and_preserves_shape() -> None:
 def test_tobit_err_hetero_forwarded() -> None:
     """Tobit wrappers should forward err_hetero to underlying simulators."""
     rng = np.random.default_rng(42)
-    W = make_rook_W(3)
+    W = sp.csr_matrix(make_rook_W(3))
 
     # Cross-sectional tobit
     for sim_fn in [
@@ -448,7 +461,7 @@ def test_tobit_err_hetero_forwarded() -> None:
 def test_spatial_probit_err_hetero_runs() -> None:
     """Spatial probit with err_hetero=True should run and return same keys."""
     rng = np.random.default_rng(42)
-    W = make_rook_W(3)
+    W = sp.csr_matrix(make_rook_W(3))
 
     out_homo = dgp.simulate_spatial_probit(W=W, rng=rng, err_hetero=False)
     out_hetero = dgp.simulate_spatial_probit(W=W, rng=rng, err_hetero=True)

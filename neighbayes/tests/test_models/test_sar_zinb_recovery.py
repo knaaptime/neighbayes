@@ -25,7 +25,7 @@ import pytest
 
 from neighbayes import dgp
 from neighbayes.models import SARZINB
-from neighbayes.tests.helpers import W_to_graph, make_rook_W
+from neighbayes.tests.helpers import W_to_graph, _as_sparse, make_rook_W
 
 pytestmark = [pytest.mark.slow, pytest.mark.recovery]
 
@@ -58,7 +58,7 @@ def zinb_data():
     W_dense = make_rook_W(SIDE)
     W_graph = W_to_graph(W_dense)
     return dgp.simulate_sar_zinb(
-        W=W_graph,
+        W=_as_sparse(W_graph),
         rho=RHO_TRUE,
         lam=LAM_TRUE,
         beta=BETA_TRUE,

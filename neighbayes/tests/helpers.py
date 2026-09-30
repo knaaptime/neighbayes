@@ -11,6 +11,7 @@ import arviz as az
 import numpy as np
 import pandas as pd
 import pytest
+import scipy.sparse as sp
 from libpysal.graph import Graph
 
 from neighbayes import dgp
@@ -48,6 +49,17 @@ PANEL_T = 10  # time periods
 # ---------------------------------------------------------------------------
 # Spatial weight helpers
 # ---------------------------------------------------------------------------
+
+
+def _as_sparse(W):
+    """Pass a Graph or sparse matrix through; wrap a dense test fixture as CSR.
+
+    The DGPs accept only a Graph or a sparse matrix, since W is never
+    densified.  Test fixtures build small dense matrices for clarity.
+    """
+    if isinstance(W, Graph) or sp.issparse(W):
+        return W
+    return sp.csr_matrix(np.asarray(W, dtype=float))
 
 
 def make_rook_W(side: int) -> np.ndarray:
@@ -114,7 +126,7 @@ def make_sar_data(
     sigma: float = 1.0,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Generate SAR data: y = (I - rho*W)^{-1}(X@beta + eps)."""
-    out = dgp.simulate_sar(W=W, rho=rho, beta=beta, sigma=sigma, rng=rng)
+    out = dgp.simulate_sar(W=_as_sparse(W), rho=rho, beta=beta, sigma=sigma, rng=rng)
     return out["y"], out["X"]
 
 
@@ -126,7 +138,7 @@ def make_sem_data(
     sigma: float = 1.0,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Generate SEM data: u = (I - lam*W)^{-1}*eps; y = X@beta + u."""
-    out = dgp.simulate_sem(W=W, lam=lam, beta=beta, sigma=sigma, rng=rng)
+    out = dgp.simulate_sem(W=_as_sparse(W), lam=lam, beta=beta, sigma=sigma, rng=rng)
     return out["y"], out["X"]
 
 
@@ -138,7 +150,9 @@ def make_slx_data(
     sigma: float = 1.0,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Generate SLX data: y = X@beta1 + W@X_noint@beta2 + eps."""
-    out = dgp.simulate_slx(W=W, beta1=beta1, beta2=beta2, sigma=sigma, rng=rng)
+    out = dgp.simulate_slx(
+        W=_as_sparse(W), beta1=beta1, beta2=beta2, sigma=sigma, rng=rng
+    )
     return out["y"], out["X"]
 
 
@@ -152,7 +166,7 @@ def make_sdm_data(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Generate SDM data: y = (I-rho*W)^{-1}(X@beta1 + WX_noint@beta2 + eps)."""
     out = dgp.simulate_sdm(
-        W=W,
+        W=_as_sparse(W),
         rho=rho,
         beta1=beta1,
         beta2=beta2,
@@ -172,7 +186,7 @@ def make_sdem_data(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Generate SDEM data: y = X@beta1 + WX_noint@beta2 + (I-lam*W)^{-1}eps."""
     out = dgp.simulate_sdem(
-        W=W,
+        W=_as_sparse(W),
         lam=lam,
         beta1=beta1,
         beta2=beta2,
@@ -203,7 +217,7 @@ def make_panel_ols_data(
         beta=beta,
         sigma=sigma,
         sigma_alpha=sigma_alpha,
-        W=W,
+        W=_as_sparse(W),
         rng=rng,
     )
     y, X = out["y"], out["X"]
@@ -231,7 +245,7 @@ def make_panel_sar_data(
         beta=beta,
         sigma=sigma,
         sigma_alpha=sigma_alpha,
-        W=W,
+        W=_as_sparse(W),
         rng=rng,
     )
     y, X = out["y"], out["X"]
@@ -259,7 +273,7 @@ def make_panel_sem_data(
         beta=beta,
         sigma=sigma,
         sigma_alpha=sigma_alpha,
-        W=W,
+        W=_as_sparse(W),
         rng=rng,
     )
     y, X = out["y"], out["X"]
@@ -287,7 +301,7 @@ def make_panel_dlm_data(
         beta=beta,
         sigma=sigma,
         sigma_alpha=sigma_alpha,
-        W=W,
+        W=_as_sparse(W),
         rng=rng,
     )
     y, X = out["y"], out["X"]
@@ -317,7 +331,7 @@ def make_panel_sdmr_data(
         beta=beta,
         sigma=sigma,
         sigma_alpha=sigma_alpha,
-        W=W,
+        W=_as_sparse(W),
         rng=rng,
     )
     y, X = out["y"], out["X"]
@@ -349,7 +363,7 @@ def make_panel_sdmu_data(
         beta=beta,
         sigma=sigma,
         sigma_alpha=sigma_alpha,
-        W=W,
+        W=_as_sparse(W),
         rng=rng,
     )
     y, X = out["y"], out["X"]
@@ -384,7 +398,7 @@ def make_spatial_probit_data(
         Region code for each observation, shape ``(nobs,)``.
     """
     out = dgp.simulate_spatial_probit(
-        W=W,
+        W=_as_sparse(W),
         rho=rho,
         beta=beta,
         sigma_a=sigma_a,
@@ -446,7 +460,7 @@ def make_sar_logit_structural_data(
     ``y ~ Bernoulli(logit^{-1}(eta))``.  Matches the structural
     ``SARLogitStructural`` model (latent field with noise).
     """
-    out = dgp.simulate_sar_logit(W=W, rho=rho, beta=beta, rng=rng)
+    out = dgp.simulate_sar_logit(W=_as_sparse(W), rho=rho, beta=beta, rng=rng)
     return out["y"], out["X"]
 
 
@@ -460,7 +474,7 @@ def make_sem_logit_data(
 
     DGP: ``eta = X beta + (I - lam W)^{-1} nu``, ``y ~ Bernoulli(logit^{-1}(eta))``.
     """
-    out = dgp.simulate_sem_logit(W=W, lam=lam, beta=beta, rng=rng)
+    out = dgp.simulate_sem_logit(W=_as_sparse(W), lam=lam, beta=beta, rng=rng)
     return out["y"], out["X"]
 
 
@@ -474,7 +488,7 @@ def make_sar_tobit_data(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Generate left-censored SAR Tobit data using the dgp module."""
     out = dgp.simulate_sar_tobit(
-        W=W,
+        W=_as_sparse(W),
         rho=rho,
         beta=beta,
         sigma=sigma,
@@ -494,7 +508,7 @@ def make_sem_tobit_data(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Generate left-censored SEM Tobit data using the dgp module."""
     out = dgp.simulate_sem_tobit(
-        W=W,
+        W=_as_sparse(W),
         lam=lam,
         beta=beta,
         sigma=sigma,
@@ -515,7 +529,7 @@ def make_sdm_tobit_data(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Generate left-censored SDM Tobit data using the dgp module."""
     out = dgp.simulate_sdm_tobit(
-        W=W,
+        W=_as_sparse(W),
         rho=rho,
         beta1=beta1,
         beta2=beta2,
@@ -540,7 +554,7 @@ def make_panel_sar_tobit_data(
     out = dgp.simulate_panel_sar_tobit_fe(
         N=N,
         T=T,
-        W=W,
+        W=_as_sparse(W),
         rho=rho,
         beta=beta,
         sigma=sigma,
@@ -564,7 +578,7 @@ def make_panel_sem_tobit_data(
     out = dgp.simulate_panel_sem_tobit_fe(
         N=N,
         T=T,
-        W=W,
+        W=_as_sparse(W),
         lam=lam,
         beta=beta,
         sigma=sigma,
@@ -594,7 +608,7 @@ def make_panel_sar_dynamic_data(
     out = dgp.simulate_panel_sar_dynamic_fe(
         N=N,
         T=T,
-        W=W,
+        W=_as_sparse(W),
         rho=rho,
         phi=phi,
         beta=beta,
@@ -623,7 +637,7 @@ def make_panel_sem_dynamic_data(
     out = dgp.simulate_panel_sem_dynamic_fe(
         N=N,
         T=T,
-        W=W,
+        W=_as_sparse(W),
         lam=lam,
         phi=phi,
         beta=beta,
@@ -652,7 +666,7 @@ def make_panel_sdem_dynamic_data(
     out = dgp.simulate_panel_sdem_dynamic_fe(
         N=N,
         T=T,
-        W=W,
+        W=_as_sparse(W),
         lam=lam,
         phi=phi,
         beta=beta,
@@ -680,7 +694,7 @@ def make_panel_slx_dynamic_data(
     out = dgp.simulate_panel_slx_dynamic_fe(
         N=N,
         T=T,
-        W=W,
+        W=_as_sparse(W),
         phi=phi,
         beta=beta,
         sigma=sigma,
@@ -713,7 +727,7 @@ def make_panel_sdm_fe_data(
     out = dgp.simulate_panel_sdm_fe(
         N=N,
         T=T,
-        W=W,
+        W=_as_sparse(W),
         rho=rho,
         beta1=beta1,
         beta2=beta2,
@@ -742,7 +756,7 @@ def make_panel_sdem_fe_data(
     out = dgp.simulate_panel_sdem_fe(
         N=N,
         T=T,
-        W=W,
+        W=_as_sparse(W),
         lam=lam,
         beta1=beta1,
         beta2=beta2,

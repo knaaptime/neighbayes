@@ -24,13 +24,15 @@ from neighbayes.samplers.gaussian._core import (
     GaussianGibbsCache,
     GaussianGibbsPriors,
     GaussianGibbsState,
+    _draw_beta_from_cho,
     _initialize_gaussian_gibbs,
     _sample_beta_conjugate,
-    _sample_beta_sar,
-    _sample_beta_sem,
     _sample_sigma2,
-    _sar_collapsed_log_density,
-    _sem_collapsed_log_density,
+    _sar_log_density_given_sigma2,
+    _sar_sweep_terms,
+    _sem_log_density_given_sigma2,
+    _sem_precision_terms,
+    gaussian_sweep,
     run_gaussian_chain,
 )
 from neighbayes.samplers.gaussian._loglik import (
@@ -61,7 +63,7 @@ def _make_sar_data(side=SIDE, rho_true=0.4, beta_true=None, sigma_true=1.0, seed
     rng = np.random.default_rng(seed)
     W_dense = make_rook_W(side)
     out = simulate_sar(
-        W=W_dense,
+        W=sp.csr_matrix(W_dense),
         rho=rho_true,
         beta=beta_true,
         sigma=sigma_true,
@@ -77,7 +79,7 @@ def _make_sem_data(side=SIDE, lam_true=0.4, beta_true=None, sigma_true=1.0, seed
     rng = np.random.default_rng(seed)
     W_dense = make_rook_W(side)
     out = simulate_sem(
-        W=W_dense,
+        W=sp.csr_matrix(W_dense),
         lam=lam_true,
         beta=beta_true,
         sigma=sigma_true,
@@ -165,110 +167,74 @@ def _build_cache(W_dense, X, model_type="sar", y=None, Wy=None, method="eigenval
 # ===================================================================
 
 
-class TestSARCollapsedLogDensity:
-    """Tests for _sar_collapsed_log_density."""
+def _exact_log_density(param, y, X, W_dense, sigma2, priors, model):
+    """Brute-force log p(ρ | σ², y) with β integrated out, up to a constant.
 
-    def test_returns_scalar(self):
+    Given ρ and σ², the filtered response ``y* = A y`` is
+    ``N(X* μ₀, σ² I + X* Λ₀ X*ᵀ)``; the Jacobian of ``y ↦ y*`` is ``|A|``.
+    """
+    n, k = X.shape
+    A = np.eye(n) - param * W_dense
+    y_star = A @ y
+    X_star = X if model == "sar" else A @ X
+    mu = np.full(k, priors.beta_mu, dtype=float)
+    Lam0 = np.diag(np.full(k, priors.beta_sigma, dtype=float) ** 2)
+    C = sigma2 * np.eye(n) + X_star @ Lam0 @ X_star.T
+    resid = y_star - X_star @ mu
+    _, logdet_C = np.linalg.slogdet(C)
+    _, logdet_A = np.linalg.slogdet(A)
+    return logdet_A - 0.5 * logdet_C - 0.5 * resid @ np.linalg.solve(C, resid)
+
+
+class TestSpatialLogDensityGivenSigma2:
+    """ρ/λ | σ², y with β integrated out under its Normal prior."""
+
+    PRIORS = GaussianGibbsPriors(beta_mu=0.3, beta_sigma=2.0)
+
+    @pytest.mark.parametrize("sigma2", [0.5, 1.7])
+    def test_sar_matches_brute_force(self, sigma2):
         y, X, W_dense, n = _make_sar_data()
-        Wy = W_dense @ y
-        cache = _build_cache(W_dense, X, model_type="sar", y=y, Wy=Wy)
-        k = X.shape[1]
-        result = _sar_collapsed_log_density(0.3, cache, n, k)
-        assert np.isscalar(result) or result.ndim == 0
+        cache = _build_cache(W_dense, X, model_type="sar", y=y, Wy=W_dense @ y)
+        terms = _sar_sweep_terms(cache, sigma2, self.PRIORS)
+        grid = (-0.6, -0.2, 0.0, 0.3, 0.7)
+        got = np.array(
+            [_sar_log_density_given_sigma2(r, cache, sigma2, terms) for r in grid]
+        )
+        want = np.array(
+            [
+                _exact_log_density(r, y, X, W_dense, sigma2, self.PRIORS, "sar")
+                for r in grid
+            ]
+        )
+        # Equal up to an additive constant in ρ.
+        np.testing.assert_allclose(got - got[0], want - want[0], atol=1e-8)
 
-    def test_maximum_near_true_rho(self):
-        """Collapsed density should peak near the true ρ."""
-        rho_true = 0.4
-        y, X, W_dense, n = _make_sar_data(rho_true=rho_true)
-        Wy = W_dense @ y
-        cache = _build_cache(W_dense, X, model_type="sar", y=y, Wy=Wy)
-        k = X.shape[1]
-
-        rho_grid = np.linspace(cache.rho_lower + 0.01, cache.rho_upper - 0.01, 50)
-        log_dens = [_sar_collapsed_log_density(r, cache, n, k) for r in rho_grid]
-        rho_argmax = rho_grid[np.argmax(log_dens)]
-        # The mode should be within 0.3 of the true value for this small dataset
-        assert abs(rho_argmax - rho_true) < 0.3
-
-    def test_decreases_at_boundaries(self):
-        """Density should decrease near the spectral bounds."""
-        y, X, W_dense, n = _make_sar_data()
-        Wy = W_dense @ y
-        cache = _build_cache(W_dense, X, model_type="sar", y=y, Wy=Wy)
-        k = X.shape[1]
-
-        ld_mid = _sar_collapsed_log_density(0.0, cache, n, k)
-        ld_near_upper = _sar_collapsed_log_density(cache.rho_upper - 0.01, cache, n, k)
-        # Near the boundary, log|I-ρW| → -∞, so density should be lower
-        assert ld_near_upper < ld_mid
-
-    def test_woodbury_matches_direct(self):
-        """Woodbury form RSS should match direct M_X computation."""
-        y, X, W_dense, n = _make_sar_data()
-        Wy = W_dense @ y
-        cache = _build_cache(W_dense, X, model_type="sar", y=y, Wy=Wy)
-        k = X.shape[1]
-        rho = 0.3
-
-        # Woodbury form (used in the function)
-        r = y - rho * Wy
-        Xtr = X.T @ r
-        from scipy.linalg import cho_solve
-
-        rss_woodbury = np.dot(r, r) - Xtr @ cho_solve(cache.XtX_cho, Xtr)
-
-        # Direct M_X form
-        XtX_inv = np.linalg.inv(X.T @ X)
-        MX = np.eye(n) - X @ XtX_inv @ X.T
-        rss_direct = r @ MX @ r
-
-        np.testing.assert_allclose(rss_woodbury, rss_direct, rtol=1e-10)
-
-
-class TestSEMCollapsedLogDensity:
-    """Tests for _sem_collapsed_log_density."""
-
-    def test_returns_scalar(self):
+    @pytest.mark.parametrize("sigma2", [0.5, 1.7])
+    def test_sem_matches_brute_force(self, sigma2):
         y, X, W_dense, n = _make_sem_data()
         cache = _build_cache(W_dense, X, model_type="sem", y=y)
-        result = _sem_collapsed_log_density(0.3, cache, n, X.shape[1])
-        assert np.isscalar(result) or result.ndim == 0
+        grid = (-0.6, -0.2, 0.0, 0.3, 0.7)
+        got = np.array(
+            [_sem_log_density_given_sigma2(l, cache, sigma2, self.PRIORS) for l in grid]
+        )
+        want = np.array(
+            [
+                _exact_log_density(l, y, X, W_dense, sigma2, self.PRIORS, "sem")
+                for l in grid
+            ]
+        )
+        np.testing.assert_allclose(got - got[0], want - want[0], atol=1e-8)
 
-    def test_maximum_near_true_lam(self):
-        """Collapsed density should peak near the true λ."""
-        lam_true = 0.4
-        y, X, W_dense, n = _make_sem_data(lam_true=lam_true)
-        cache = _build_cache(W_dense, X, model_type="sem", y=y)
-
-        lam_grid = np.linspace(cache.rho_lower + 0.01, cache.rho_upper - 0.01, 50)
-        log_dens = [
-            _sem_collapsed_log_density(l, cache, n, X.shape[1]) for l in lam_grid
-        ]
-        lam_argmax = lam_grid[np.argmax(log_dens)]
-        assert abs(lam_argmax - lam_true) < 0.3
-
-    def test_cross_product_form_matches_explicit(self):
-        """Quadratic-in-λ cross-products must equal the explicit y*/X* form."""
-        y, X, W_dense, n = _make_sem_data()
-        k = X.shape[1]
-        cache = _build_cache(W_dense, X, model_type="sem", y=y)
-        W = cache.W_sparse
-        logdet_fn = cache.logdet_fn
-
-        def _explicit(lam):
-            y_star = y - lam * (W @ y)
-            X_star = X - lam * (W @ X)
-            XtX_star = X_star.T @ X_star
-            Xty_star = X_star.T @ y_star
-            yty_star = float(y_star @ y_star)
-            sol = np.linalg.solve(XtX_star, Xty_star)
-            rss = max(yty_star - Xty_star @ sol, 1e-300)
-            logdet_XtX = np.linalg.slogdet(XtX_star)[1]
-            return logdet_fn(lam) - 0.5 * logdet_XtX - 0.5 * (n - k) * np.log(rss)
-
-        for lam in (-0.6, -0.2, 0.0, 0.3, 0.7):
-            got = _sem_collapsed_log_density(lam, cache, n, k)
-            np.testing.assert_allclose(got, _explicit(lam), rtol=0, atol=1e-8)
+    def test_sar_decreases_at_boundaries(self):
+        """log|I-ρW| → -∞ at the spectral bound, so the density falls there."""
+        y, X, W_dense, n = _make_sar_data()
+        cache = _build_cache(W_dense, X, model_type="sar", y=y, Wy=W_dense @ y)
+        terms = _sar_sweep_terms(cache, 1.0, self.PRIORS)
+        ld_mid = _sar_log_density_given_sigma2(0.0, cache, 1.0, terms)
+        ld_edge = _sar_log_density_given_sigma2(
+            cache.rho_upper - 1e-4, cache, 1.0, terms
+        )
+        assert ld_edge < ld_mid
 
 
 # ===================================================================
@@ -279,24 +245,39 @@ class TestSEMCollapsedLogDensity:
 class TestBetaBlock:
     """Tests for conjugate normal β draw."""
 
-    def test_sample_beta_sar_shape(self):
-        y, X, W_dense, n = _make_sar_data()
-        Wy = W_dense @ y
-        priors = GaussianGibbsPriors()
-        rng = np.random.default_rng(42)
-        XtX = X.T @ X
-        beta = _sample_beta_sar(0.3, 1.0, y, Wy, X, XtX, priors, rng)
-        assert beta.shape == (X.shape[1],)
+    @pytest.mark.parametrize("model", ["sar", "sem"])
+    def test_beta_given_rho_sigma2_matches_analytical(self, model):
+        """β | ρ, σ² from the sweep factor has the analytical mean and covariance."""
+        make = _make_sar_data if model == "sar" else _make_sem_data
+        y, X, W_dense, n = make()
+        cache = _build_cache(W_dense, X, model_type=model, y=y, Wy=W_dense @ y)
+        priors = GaussianGibbsPriors(beta_mu=0.3, beta_sigma=2.0)
+        rho, sigma2 = 0.35, 0.8
+        if model == "sar":
+            terms = _sar_sweep_terms(cache, sigma2, priors)
+            P_cho, mean = terms.P_cho, terms.m0 - rho * terms.m1
+        else:
+            from scipy.linalg import cho_solve
 
-    def test_sample_beta_sem_shape(self):
-        y, X, W_dense, n = _make_sem_data()
-        W_sparse = sp.csr_matrix(W_dense)
-        Wy = W_dense @ y
-        cache = _build_cache(W_dense, X, model_type="sem", y=y, Wy=Wy)
-        priors = GaussianGibbsPriors()
-        rng = np.random.default_rng(42)
-        beta = _sample_beta_sem(0.3, 1.0, cache, priors, rng)
-        assert beta.shape == (X.shape[1],)
+            P_cho, b, _ = _sem_precision_terms(rho, cache, sigma2, priors)
+            mean = cho_solve(P_cho, b)
+
+        A = np.eye(n) - rho * W_dense
+        y_star = A @ y
+        X_star = X if model == "sar" else A @ X
+        k = X.shape[1]
+        prec0 = np.eye(k) / priors.beta_sigma**2
+        post_prec = X_star.T @ X_star / sigma2 + prec0
+        post_cov = np.linalg.inv(post_prec)
+        post_mean = post_cov @ (X_star.T @ y_star / sigma2 + prec0 @ np.full(k, 0.3))
+        np.testing.assert_allclose(mean, post_mean, atol=1e-10)
+
+        rng = np.random.default_rng(0)
+        draws = np.array([_draw_beta_from_cho(P_cho, mean, rng) for _ in range(20000)])
+        # Monte Carlo SE of each covariance entry is about sqrt(Σii Σjj / N).
+        sd = np.sqrt(np.diag(post_cov))
+        se = np.outer(sd, sd) / np.sqrt(len(draws))
+        assert np.all(np.abs(np.cov(draws.T) - post_cov) < 5 * se)
 
     def test_conjugate_normal_matches_analytical(self):
         """Posterior mean of many draws should match analytical posterior mean."""
@@ -806,6 +787,143 @@ class TestGibbsVsNUTS:
         np.testing.assert_allclose(mean_nuts, mean_gibbs, atol=0.15)
 
 
+class TestJointPosterior:
+    """The stored (β, σ, ρ) triples must be joint draws, not just good marginals.
+
+    A sweep that draws ρ from a density with β integrated out and then keeps
+    the β drawn under the previous ρ reproduces every marginal but decouples
+    β from ρ.  In a SAR with an intercept, β₀ and ρ are strongly negatively
+    correlated (the fitted mean is β₀ / (1 − ρ)); a decoupled sampler reports
+    a correlation near zero.
+    """
+
+    def test_sar_intercept_rho_correlation_survives(self):
+        y, X, W_dense, n = _make_sar_data(side=10, rho_true=0.5, beta_true=[3.0, 1.0])
+        cache = _build_cache(W_dense, X, model_type="sar", y=y, Wy=W_dense @ y)
+        priors = GaussianGibbsPriors()
+        rng = np.random.default_rng(1)
+        init = _initialize_gaussian_gibbs(y, X, cache.XtX_cho, priors, rng)
+        out = run_gaussian_chain(
+            y=y,
+            X=X,
+            cache=cache,
+            priors=priors,
+            init=init,
+            draws=4000,
+            tune=500,
+            rng=rng,
+            progressbar=False,
+            store_log_lik=False,
+        )
+        corr = np.corrcoef(out["beta"][:, 0], out["rho"])[0, 1]
+        assert corr < -0.5, corr
+
+    def test_sweep_redraws_beta_after_rho(self):
+        """β after a sweep is drawn at the sweep's own ρ, not the previous one."""
+        y, X, W_dense, n = _make_sar_data(side=6)
+        cache = _build_cache(W_dense, X, model_type="sar", y=y, Wy=W_dense @ y)
+        priors = GaussianGibbsPriors()
+        from neighbayes.samplers._utils._slice import SliceWidthState
+
+        state = GaussianGibbsState(beta=np.zeros(X.shape[1]), sigma2=1.0, rho=0.0)
+        rng = np.random.default_rng(3)
+        gaussian_sweep(state, y, X, cache, priors, rng, SliceWidthState(w=0.3))
+        # Recompute the conditional mean at the new (ρ, σ²): the drawn β must be
+        # within a few posterior SDs of it.
+        terms = _sar_sweep_terms(cache, state.sigma2, priors)
+        mean = terms.m0 - state.rho * terms.m1
+        cov = np.linalg.inv(terms.P_cho[0] @ terms.P_cho[0].T)
+        z = (state.beta - mean) / np.sqrt(np.diag(cov))
+        assert np.all(np.abs(z) < 5), z
+
+
+@pytest.mark.slow
+class TestRobustGibbsVsNUTS:
+    """Robust Gibbs (normal scale mixture) matches NUTS on Student-t data."""
+
+    @pytest.mark.parametrize(
+        "backend", ["numpy", pytest.param("jax", marks=requires_jax)]
+    )
+    @pytest.mark.parametrize("model_name", ["SAR", "SEM"])
+    def test_robust_posterior_matches_nuts(self, model_name, backend):
+        from neighbayes.models import SAR, SEM
+
+        rng = np.random.default_rng(11)
+        W_dense = make_rook_W(12)
+        n = W_dense.shape[0]
+        X = np.column_stack([np.ones(n), rng.standard_normal(n)])
+        eps = 0.8 * rng.standard_t(3.0, size=n)
+        A = np.eye(n) - 0.5 * W_dense
+        if model_name == "SAR":
+            y = np.linalg.solve(A, X @ np.array([1.0, 2.0]) + eps)
+        else:
+            y = X @ np.array([1.0, 2.0]) + np.linalg.solve(A, eps)
+        Model = {"SAR": SAR, "SEM": SEM}[model_name]
+        W = W_to_graph(W_dense)
+        param = "rho" if model_name == "SAR" else "lam"
+
+        kw = dict(draws=3000, tune=1000, chains=4, random_seed=3, progressbar=False)
+        nuts = Model(y=y, X=X, W=W, robust=True).fit(sampler="nuts", **kw)
+        gibbs = Model(y=y, X=X, W=W, robust=True).fit(
+            sampler="gibbs", gibbs_backend=backend, **kw
+        )
+        # The NUTS run is the reference, so check it before blaming Gibbs.
+        rhat = az.rhat(nuts, var_names=[param, "sigma", "beta"])
+        assert float(rhat.to_array().max()) < 1.01, "NUTS reference did not converge"
+        for name in (param, "sigma", "beta"):
+            a = nuts.posterior[name].values.reshape(-1, *nuts.posterior[name].shape[2:])
+            b = gibbs.posterior[name].values.reshape(a.shape)
+            # Five combined Monte Carlo standard errors, floored at 5% of the
+            # posterior SD so a very long run does not demand digits it can't
+            # resolve.
+            se = np.sqrt(
+                az.mcse(nuts, var_names=[name])[name].values ** 2
+                + az.mcse(gibbs, var_names=[name])[name].values ** 2
+            )
+            tol = np.maximum(5 * se, 0.05 * a.std(axis=0))
+            assert np.all(np.abs(b.mean(axis=0) - a.mean(axis=0)) < tol), name
+            np.testing.assert_allclose(b.std(axis=0), a.std(axis=0), rtol=0.15)
+
+
+@pytest.mark.slow
+class TestGibbsJointVsNUTS:
+    """Gibbs reproduces the NUTS joint posterior, including cross-correlations."""
+
+    @pytest.mark.parametrize(
+        "backend", ["numpy", pytest.param("jax", marks=requires_jax)]
+    )
+    @pytest.mark.parametrize("model_name", ["SAR", "SEM"])
+    def test_correlations_match_nuts(self, model_name, backend):
+        from neighbayes.models import SAR, SEM
+
+        Model = {"SAR": SAR, "SEM": SEM}[model_name]
+        make = _make_sar_data if model_name == "SAR" else _make_sem_data
+        y, X, W_dense, n = make(side=10, beta_true=[3.0, 1.0])
+        W = W_to_graph(W_dense)
+        param = "rho" if model_name == "SAR" else "lam"
+
+        def _stats(idata):
+            post = idata.posterior
+            sp_ = post[param].values.ravel()
+            beta = post["beta"].values.reshape(-1, post["beta"].shape[-1])
+            sig = post["sigma"].values.ravel()
+            return (
+                np.corrcoef(beta[:, 0], sp_)[0, 1],
+                np.corrcoef(sig, sp_)[0, 1],
+                sp_.mean(),
+                sp_.std(),
+            )
+
+        kw = dict(draws=3000, tune=1000, chains=4, random_seed=7, progressbar=False)
+        nuts = _stats(Model(y=y, X=X, W=W).fit(sampler="nuts", **kw))
+        gibbs = _stats(
+            Model(y=y, X=X, W=W).fit(sampler="gibbs", gibbs_backend=backend, **kw)
+        )
+        np.testing.assert_allclose(gibbs[:2], nuts[:2], atol=0.08)
+        np.testing.assert_allclose(gibbs[2], nuts[2], atol=0.02)
+        np.testing.assert_allclose(gibbs[3], nuts[3], rtol=0.15)
+
+
 # ===================================================================
 # InferenceData compatibility
 # ===================================================================
@@ -1004,15 +1122,45 @@ class TestJAXGaussianGibbs:
 class TestEdgeCases:
     """Edge case tests for the Gibbs sampler."""
 
-    def test_robust_raises(self):
-        """Gibbs should raise NotImplementedError for robust models."""
-        from neighbayes.models.cross_section.sar import SAR
+    @pytest.mark.parametrize(
+        "backend", ["numpy", pytest.param("jax", marks=requires_jax)]
+    )
+    @pytest.mark.parametrize("model_name", ["SAR", "SEM", "SDM", "SDEM"])
+    def test_robust_gibbs_runs(self, model_name, backend):
+        """Robust (Student-t) models sample with Gibbs on both backends."""
+        from neighbayes.models import SAR, SDEM, SDM, SEM
+
+        Model = {"SAR": SAR, "SEM": SEM, "SDM": SDM, "SDEM": SDEM}[model_name]
+        y, X, W_dense, n = _make_sar_data()
+        model = Model(y=y, X=X, W=W_to_graph(W_dense), robust=True)
+        idata = model.fit(
+            sampler="gibbs",
+            gibbs_backend=backend,
+            draws=30,
+            tune=20,
+            chains=2,
+            progressbar=False,
+            idata_kwargs={"log_likelihood": True},
+        )
+        # The mixing variances are internal; the contract matches NUTS.
+        assert "v" not in idata.posterior
+        assert np.all(np.isfinite(idata.log_likelihood["obs"].values))
+
+    def test_robust_pointwise_loglik_is_student_t(self):
+        """Robust Gibbs stores the Student-t marginal, as the NUTS path does."""
+        from scipy import stats
+
+        from neighbayes.samplers.gaussian._core import _pointwise_loglik
 
         y, X, W_dense, n = _make_sar_data()
-        W = W_to_graph(W_dense)
-        model = SAR(y=y, X=X, W=W, robust=True)
-        with pytest.raises(NotImplementedError, match="robust"):
-            model.fit(sampler="gibbs", draws=10, tune=5, progressbar=False)
+        cache = _build_cache(W_dense, X, model_type="sar", y=y, Wy=W_dense @ y)
+        cache.nu = 4.0
+        state = GaussianGibbsState(beta=np.array([1.0, 2.0]), sigma2=0.7, rho=0.3)
+        eps = y - 0.3 * cache.Wy - X @ state.beta
+        want = stats.t.logpdf(eps, df=4.0, scale=np.sqrt(0.7)) + cache.logdet_fn(
+            0.3
+        ) / len(y)
+        np.testing.assert_allclose(_pointwise_loglik(state, y, X, cache), want)
 
     def test_tiny_n(self):
         """Gibbs should work with very small n."""

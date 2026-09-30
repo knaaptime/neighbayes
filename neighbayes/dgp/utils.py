@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 import numpy as np
 import pandas as pd
@@ -32,78 +32,19 @@ def ensure_rng(
     return np.random.default_rng(seed)
 
 
-def row_standardize(W: np.ndarray) -> np.ndarray:
-    """Row-standardize a dense weights matrix.
+def _row_standardize_sparse(W: sp.spmatrix) -> sp.csr_matrix:
+    """Row-standardize a sparse weights matrix, leaving zero-sum rows untouched.
 
-    Each row of *W* is divided by its row sum so that
-    ``W[i, :].sum() == 1`` for every isolated-free unit *i*.
-
-    Parameters
-    ----------
-    W : np.ndarray
-        Dense square matrix.
-
-    Returns
-    -------
-    np.ndarray
-        Row-standardized matrix, with zero-sum rows left unchanged.
-
-    Notes
-    -----
-    Rows whose sum is exactly ``0`` (typically *isolates* — units with
-    no neighbors) are returned untouched: dividing by zero would
-    introduce ``NaN`` entries that propagate through every subsequent
-    spatial product.  This means the returned matrix is row-stochastic
-    on the **non-isolated** rows only; the isolate rows remain rows of
-    zeros.  Downstream consumers that rely on every eigenvalue of the
-    row-standardized weight matrix being ``≤ 1`` (e.g. the SAR stability
-    domain ``ρ ∈ (-1, 1)``) should drop or reconnect isolates beforehand
-    rather than rely on this routine to do so.
+    Rows whose sum is exactly ``0`` (isolates) stay rows of zeros rather than
+    becoming ``NaN``; the result is row-stochastic on the non-isolated rows only.
     """
-    W = np.asarray(W, dtype=float)
-    rs = W.sum(axis=1, keepdims=True)
+    W = sp.csr_matrix(W, dtype=np.float64)
+    rs = np.asarray(W.sum(axis=1)).ravel()
     rs[rs == 0.0] = 1.0
-    return W / rs
+    return sp.csr_matrix(sp.diags(1.0 / rs) @ W)
 
 
-def dense_to_graph(W_dense: np.ndarray, row_standardize_weights: bool = False) -> Graph:
-    """Convert dense weights matrix to a libpysal Graph.
-
-    Parameters
-    ----------
-    W_dense : np.ndarray
-        Dense square weights matrix.
-    row_standardize_weights : bool, default=False
-        Whether to row-standardize before conversion.
-
-    Returns
-    -------
-    Graph
-        Graph representation of the same sparse structure.
-    """
-    W_arr = np.asarray(W_dense, dtype=float)
-    if row_standardize_weights:
-        W_arr = row_standardize(W_arr)
-
-    n = W_arr.shape[0]
-    focal, neighbor, weight = [], [], []
-    for i in range(n):
-        for j in range(n):
-            wij = W_arr[i, j]
-            if wij != 0.0:
-                focal.append(i)
-                neighbor.append(j)
-                weight.append(wij)
-
-    g = Graph.from_arrays(
-        np.asarray(focal, dtype=int),
-        np.asarray(neighbor, dtype=int),
-        np.asarray(weight, dtype=float),
-    )
-    return g.transform("r")
-
-
-def rook_grid_weights(n_side: int) -> tuple[np.ndarray, Graph]:
+def rook_grid_weights(n_side: int) -> tuple[sp.csr_matrix, Graph]:
     """Build row-standardized rook-contiguity weights on an ``n_side x n_side`` grid.
 
     Parameters
@@ -113,51 +54,37 @@ def rook_grid_weights(n_side: int) -> tuple[np.ndarray, Graph]:
 
     Returns
     -------
-    tuple[np.ndarray, Graph]
-        Dense and Graph forms of the same row-standardized weights.
-
-    Notes
-    -----
-    The Graph is built directly from COO neighbor lists (O(N) cost)
-    and the dense matrix is materialized only on demand via
-    ``Graph.sparse.toarray()``.  For large grids this avoids the
-    O(N²) memory and Python-loop overhead of the old dense-first path.
+    tuple[scipy.sparse.csr_matrix, Graph]
+        Sparse and Graph forms of the same row-standardized weights.
     """
     n_side = int(n_side)
     if n_side <= 0:
-        raise ValueError("n must be a positive integer when generating a default grid.")
+        raise ValueError(
+            "n_side must be a positive integer when generating a default grid."
+        )
     if n_side == 1:
         raise ValueError(
             "n_side=1 is degenerate: a 1×1 grid has no rook neighbors. Use n_side >= 2."
         )
 
-    n_side * n_side
-    focal, neighbor = [], []
-    for r in range(n_side):
-        for c in range(n_side):
-            i = r * n_side + c
-            if r > 0:
-                focal.append(i)
-                neighbor.append((r - 1) * n_side + c)
-            if r < n_side - 1:
-                focal.append(i)
-                neighbor.append((r + 1) * n_side + c)
-            if c > 0:
-                focal.append(i)
-                neighbor.append(r * n_side + (c - 1))
-            if c < n_side - 1:
-                focal.append(i)
-                neighbor.append(r * n_side + (c + 1))
+    idx = np.arange(n_side * n_side).reshape(n_side, n_side)
+    # Horizontal and vertical neighbor pairs, each in both directions.
+    pairs = np.concatenate(
+        [
+            np.column_stack([idx[:, :-1].ravel(), idx[:, 1:].ravel()]),
+            np.column_stack([idx[:-1, :].ravel(), idx[1:, :].ravel()]),
+        ]
+    )
+    focal = np.concatenate([pairs[:, 0], pairs[:, 1]])
+    neighbor = np.concatenate([pairs[:, 1], pairs[:, 0]])
+    order = np.lexsort((neighbor, focal))
 
-    weight = np.ones(len(focal), dtype=float)
     g = Graph.from_arrays(
-        np.asarray(focal, dtype=int),
-        np.asarray(neighbor, dtype=int),
-        weight,
+        focal[order],
+        neighbor[order],
+        np.ones(len(focal), dtype=float),
     ).transform("r")
-
-    Wd = g.sparse.toarray().astype(float)
-    return Wd, g
+    return g.sparse.tocsr().astype(np.float64), g
 
 
 def weights_from_geodataframe(
@@ -215,26 +142,29 @@ def weights_from_geodataframe(
 
 
 def resolve_weights(
-    W: Graph | sp.spmatrix | np.ndarray | None = None,
+    W: Graph | sp.spmatrix | None = None,
     gdf: Any | None = None,
-    n: int | None = None,
+    n_side: int | None = None,
     contiguity: str = "queen",
     k: int = 4,
     distance_threshold: float | None = None,
-) -> tuple[np.ndarray, Graph]:
-    """Resolve user-supplied spatial structure to dense matrix and Graph.
+) -> tuple[sp.csr_matrix, Graph]:
+    """Resolve user-supplied spatial structure to a sparse matrix and a Graph.
+
+    ``W`` is never densified: every simulator works from the sparse form.
 
     Parameters
     ----------
-    W : Graph or sparse/dense matrix, optional
+    W : Graph or scipy.sparse matrix, optional
         Explicit spatial structure. If provided together with ``gdf``, the
-        matrix/graph is used and checked for dimensional compatibility with
-        the GeoDataFrame.
+        graph is used and checked for dimensional compatibility with the
+        GeoDataFrame.
     gdf : geopandas.GeoDataFrame, optional
         Used only when ``W`` is not supplied.
-    n : int, optional
-        If provided without ``W`` and ``gdf``, generate a default
-        rook-contiguity square grid with side length ``n``.
+    n_side : int, optional
+        If provided without ``W`` and ``gdf``, generate a rook-contiguity
+        ``n_side x n_side`` grid (``n_side**2`` units).  When ``W`` or
+        ``gdf`` is supplied, ``n_side**2`` must equal the number of units.
     contiguity : str, default="queen"
         GeoDataFrame neighbor construction mode.
     k : int, default=4
@@ -244,51 +174,85 @@ def resolve_weights(
 
     Returns
     -------
-    tuple[np.ndarray, Graph]
-        ``(W_dense, W_graph)`` both row-standardized.
+    tuple[scipy.sparse.csr_matrix, Graph]
+        ``(W_sparse, W_graph)``, both row-standardized.
     """
     if W is not None:
-        gdf_n = len(gdf) if gdf is not None else None
-        n_obs = int(n) if n is not None else None
         if isinstance(W, Graph):
             g = W.transform("r")
-            Wd = g.sparse.toarray().astype(float)
-            if gdf_n is not None and Wd.shape[0] != gdf_n:
-                raise ValueError(
-                    "W and gdf must describe the same number of spatial units."
-                )
-            if n_obs is not None and Wd.shape[0] != n_obs:
-                raise ValueError("n must match the size implied by W/gdf.")
-            return Wd, g
-        if sp.issparse(W):
-            Wd = row_standardize(W.toarray().astype(float))
-            if gdf_n is not None and Wd.shape[0] != gdf_n:
-                raise ValueError(
-                    "W and gdf must describe the same number of spatial units."
-                )
-            if n_obs is not None and Wd.shape[0] != n_obs:
-                raise ValueError("n must match the size implied by W/gdf.")
-            return Wd, dense_to_graph(Wd)
-        Wd = row_standardize(np.asarray(W, dtype=float))
-        if gdf_n is not None and Wd.shape[0] != gdf_n:
+            Ws = g.sparse.tocsr().astype(np.float64)
+        elif sp.issparse(W):
+            Ws = _row_standardize_sparse(W)
+            g = Graph.from_sparse(Ws.tocoo())
+        else:
+            raise TypeError(
+                "W must be a libpysal.graph.Graph or a scipy sparse matrix, "
+                f"got {type(W).__name__}."
+            )
+        if gdf is not None and Ws.shape[0] != len(gdf):
             raise ValueError(
                 "W and gdf must describe the same number of spatial units."
             )
-        if n_obs is not None and Wd.shape[0] != n_obs:
-            raise ValueError("n must match the size implied by W/gdf.")
-        return Wd, dense_to_graph(Wd)
+        _check_n_side(n_side, Ws.shape[0])
+        return Ws, g
 
     if gdf is None:
-        if n is None:
-            raise ValueError("Provide either W, gdf, or n.")
-        return rook_grid_weights(int(n))
+        if n_side is None:
+            raise ValueError("Provide either W, gdf, or n_side.")
+        return rook_grid_weights(int(n_side))
 
     g = weights_from_geodataframe(
         gdf, contiguity=contiguity, k=k, distance_threshold=distance_threshold
     )
-    if n is not None and g.sparse.shape[0] != int(n):
-        raise ValueError("n must match the size implied by W/gdf.")
-    return g.sparse.toarray().astype(float), g
+    _check_n_side(n_side, g.n_nodes)
+    return g.sparse.tocsr().astype(np.float64), g
+
+
+def _check_n_side(n_side: int | None, n_units: int) -> None:
+    """Raise if ``n_side`` was given and ``n_side**2`` disagrees with ``n_units``."""
+    if n_side is not None and int(n_side) ** 2 != n_units:
+        raise ValueError(
+            f"n_side={n_side} implies {int(n_side) ** 2} units, but W/gdf has "
+            f"{n_units}."
+        )
+
+
+def spatial_filter_factor(W: sp.spmatrix, coef: float) -> Callable:
+    """Factor ``I - coef * W`` with SuiteSparse; returns a ``solve(rhs)`` callable.
+
+    Routing follows the samplers' :func:`make_sar_solver`: CHOLMOD on the
+    D-symmetrized twin for undirected (D-symmetrizable) W, KLU for directed W
+    when sparsax is installed, else CHOLMOD on the normal equations.
+    ``rhs`` may be a vector or an ``(n, m)`` matrix, which CHOLMOD solves with
+    blocked kernels, so panel and flow simulators factor once and solve many
+    right-hand sides together.
+    """
+    from ..samplers._utils._spatial_normal import CholmodFactor
+    from ..samplers.negbin_reduced._core import (
+        _make_cholmod_pattern,
+        make_sar_solver,
+    )
+
+    W_csc = sp.csc_matrix(W, dtype=np.float64)
+    n = W_csc.shape[0]
+    W_sym, WtW, pattern = _make_cholmod_pattern(W_csc, n)
+    solver = make_sar_solver(CholmodFactor(pattern), W_csc, W_sym, WtW, n)
+    coef = float(coef)
+    solver.factorize(coef)
+
+    def solve(rhs):
+        x = np.asarray(solver.solve(rhs))
+        # CHOLMOD does not always raise on a singular I − coef·W; it can return
+        # a finite but meaningless answer.  Check the residual instead.
+        resid = x - coef * (W_csc @ x) - rhs
+        scale = max(float(np.max(np.abs(rhs))), 1e-300)
+        if not np.all(np.isfinite(x)) or float(np.max(np.abs(resid))) > 1e-6 * scale:
+            raise ValueError(
+                f"I - {coef:g}*W is singular or too ill-conditioned to solve."
+            )
+        return x
+
+    return solve
 
 
 def _hetero_scale(X: np.ndarray, sigma: float) -> np.ndarray:
@@ -716,7 +680,7 @@ def _maybe_geodataframe(
     idx: dict,
     N: int,
     T: int,
-    Wd: np.ndarray,
+    Ws: sp.csr_matrix,
     Wg,
     params_true: dict,
     create_gdf: bool,
@@ -736,7 +700,7 @@ def _maybe_geodataframe(
         "X": X,
         "unit": idx["unit"],
         "time": idx["time"],
-        "W_dense": Wd,
+        "W_sparse": Ws,
         "W_graph": Wg,
         "params_true": params_true,
     }

@@ -13,7 +13,7 @@ import pytest
 
 from neighbayes import dgp
 from neighbayes.models import SARNegBin
-from neighbayes.tests.helpers import W_to_graph, make_line_W
+from neighbayes.tests.helpers import W_to_graph, _as_sparse, make_line_W
 
 
 def _idata(vars_dict: dict[str, np.ndarray]) -> az.InferenceData:
@@ -233,9 +233,9 @@ def test_sar_negbin_spatial_effects_rejects_unknown_scale():
 
 def test_simulate_sar_negbin_output_contract():
     W = W_to_graph(make_line_W(8))
-    out = dgp.simulate_sar_negbin(W=W, rho=0.25, alpha=1.5, seed=42)
+    out = dgp.simulate_sar_negbin(W=_as_sparse(W), rho=0.25, alpha=1.5, seed=42)
 
-    assert {"y", "X", "mu", "W_dense", "W_graph", "params_true"}.issubset(out)
+    assert {"y", "X", "mu", "W_sparse", "W_graph", "params_true"}.issubset(out)
     y = out["y"]
     assert y.ndim == 1
     assert np.all(y >= 0)

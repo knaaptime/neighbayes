@@ -704,7 +704,7 @@ class TestSEMLogitRecovery:
         from neighbayes.dgp import simulate_sem_logit
 
         # Use n=8 (64 obs) for better recovery
-        out = simulate_sem_logit(n=8, lam=0.5, seed=42)
+        out = simulate_sem_logit(n_side=8, lam=0.5, seed=42)
         y = out["y"]
         X = out["X"]
         W_sparse = out["W_sparse"]
@@ -746,7 +746,7 @@ class TestSEMLogitRecovery:
         from neighbayes.dgp import simulate_sem_logit
 
         # Use n=8 (64 obs) for better recovery
-        out = simulate_sem_logit(n=8, lam=0.3, beta=np.array([0.3, 1.0]), seed=456)
+        out = simulate_sem_logit(n_side=8, lam=0.3, beta=np.array([0.3, 1.0]), seed=456)
         y = out["y"]
         X = out["X"]
         W_sparse = out["W_sparse"]

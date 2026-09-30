@@ -8,11 +8,16 @@ from .cross_sectional import (
     _attach_optional_gdf,
     _check_rho_stability,
 )
-from .utils import ensure_rng, make_design_matrix, resolve_weights
+from .utils import (
+    ensure_rng,
+    make_design_matrix,
+    resolve_weights,
+    spatial_filter_factor,
+)
 
 
 def simulate_sar_zinb(
-    n: int | None = None,
+    n_side: int | None = None,
     W=None,
     gdf=None,
     rho: float = 0.5,
@@ -60,9 +65,10 @@ def simulate_sar_zinb(
 
     Parameters
     ----------
-    n : int, optional
-        Square-grid side length. Generates ``n * n`` observations.
-    W : Graph or array-like, optional
+    n_side : int, optional
+        Side length of the square rook grid used when neither ``W`` nor
+        ``gdf`` is supplied (``n_side**2`` observations).
+    W : Graph or scipy.sparse matrix, optional
         Spatial weights for the count equation. Also used for the
         selection equation when ``W_sel`` is not provided.
     gdf : GeoDataFrame, optional
@@ -85,7 +91,7 @@ def simulate_sar_zinb(
     X : ndarray, optional
         Count covariate matrix of shape ``(nobs, k)``. If not provided,
         a random design matrix is generated from ``beta``.
-    W_sel : Graph or array-like, optional
+    W_sel : Graph or scipy.sparse matrix, optional
         Spatial weights for the selection equation. If ``None``, uses
         ``W`` (same weights for both equations).
     rng : numpy.random.Generator, optional
@@ -93,7 +99,7 @@ def simulate_sar_zinb(
     seed : int, optional
         Random seed (used only if rng is None).
     contiguity : str, default "queen"
-        Contiguity type for constructing W when n is given.
+        Neighbor rule used when W is built from ``gdf``.
     target_pi : float, optional
         If given, an intercept shift is solved so that the marginal
         corridor activation probability ``mean(pi) == target_pi``.
@@ -110,7 +116,7 @@ def simulate_sar_zinb(
     -------
     dict
         Keys: ``y``, ``d``, ``X``, ``Z``, ``eta_cnt``, ``eta_sel``,
-        ``W_dense``, ``W_graph``, ``W_sel_dense``, ``W_sel_graph``,
+        ``W_sparse``, ``W_graph``, ``W_sel_sparse``, ``W_sel_graph``,
         ``params_true``.
     """
     if alpha <= 0:
@@ -124,14 +130,16 @@ def simulate_sar_zinb(
         )
 
     rng = ensure_rng(rng, seed)
-    Wd, Wg = resolve_weights(W=W, gdf=gdf, n=n, contiguity=contiguity)
-    nobs = Wd.shape[0]
+    Ws, Wg = resolve_weights(W=W, gdf=gdf, n_side=n_side, contiguity=contiguity)
+    nobs = Ws.shape[0]
 
     # Resolve selection weights
     if W_sel is not None:
-        W_sel_d, W_sel_g = resolve_weights(W=W_sel, gdf=gdf, n=n, contiguity=contiguity)
+        W_sel_s, W_sel_g = resolve_weights(
+            W=W_sel, gdf=gdf, n_side=n_side, contiguity=contiguity
+        )
     else:
-        W_sel_d, W_sel_g = Wd, Wg
+        W_sel_s, W_sel_g = Ws, Wg
 
     if beta is None:
         beta = np.array([1.0, 0.6], dtype=float)
@@ -152,18 +160,13 @@ def simulate_sar_zinb(
     else:
         Z = np.asarray(Z, dtype=np.float64)
 
-    _check_rho_stability(rho, Wd, name="rho")
-    _check_rho_stability(lam, W_sel_d, name="lam")
-
-    import scipy.sparse as sp
-    import scipy.sparse.linalg as sla
+    _check_rho_stability(rho, name="rho")
+    _check_rho_stability(lam, name="lam")
 
     # --- Selection equation: SAR-logit ---
     # eta_sel = (I - lam * W_sel)^{-1} (Z @ gamma + nu), nu ~ N(0, I)
-    W_sel_sp = W_sel_g.sparse.tocsc()
-    A_sel = sp.eye(nobs, format="csc") - lam * W_sel_sp
     nu = rng.standard_normal(nobs)
-    eta_sel = sla.spsolve(A_sel, Z @ gamma + nu)
+    eta_sel = spatial_filter_factor(W_sel_s, lam)(Z @ gamma + nu)
 
     # Apply target_pi shift if requested
     if target_pi is not None:
@@ -191,9 +194,7 @@ def simulate_sar_zinb(
 
     # --- Count equation: reduced-form SAR-NB ---
     # eta_cnt = (I - rho * W)^{-1} X @ beta
-    W_sp = Wg.sparse.tocsc()
-    A_cnt = sp.eye(nobs, format="csc") - rho * W_sp
-    eta_cnt = sla.spsolve(A_cnt, X @ beta)
+    eta_cnt = spatial_filter_factor(Ws, rho)(X @ beta)
 
     # --- ZINB observation ---
     mu = np.exp(np.clip(eta_cnt, -30.0, 30.0))
@@ -218,9 +219,9 @@ def simulate_sar_zinb(
         "Z": Z,
         "eta_cnt": eta_cnt,
         "eta_sel": eta_sel,
-        "W_dense": Wd,
+        "W_sparse": Ws,
         "W_graph": Wg,
-        "W_sel_dense": W_sel_d,
+        "W_sel_sparse": W_sel_s,
         "W_sel_graph": W_sel_g,
         "params_true": params_true,
     }

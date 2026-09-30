@@ -4,7 +4,8 @@ This sub-package provides:
 
 - **Bayesian LM tests** — Lagrange-multiplier-style specification tests
   evaluated over posterior draws rather than point estimates.
-- **Bayes factor comparison** — Bridge-sampling and BIC-based model comparison.
+- **Bayes factor comparison** — exact (quadrature), bridge-sampling and
+  BIC-based model comparison.
 
 Both modules operate on fitted Bayesian model objects (i.e. models with
 ``inference_data`` attached) and are fully posterior-aware.

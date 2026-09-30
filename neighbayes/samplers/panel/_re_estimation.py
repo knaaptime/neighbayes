@@ -27,7 +27,7 @@ from ._re_core import (
     REGibbsCache,
     REGibbsPriors,
     _initialize_re_gibbs,
-    _sem_re_unit_aggregated_terms,
+    _sem_re_alpha_structure,
     run_re_chain,
 )
 
@@ -213,14 +213,11 @@ class REGibbsEstimation:
         XtX = self.X.T @ self.X
         XtX_cho = cho_factor(XtX)
 
-        # SEM-RE α block: precompute the λ-independent terms of BᵀB once so
-        # the sweep uses the closed form instead of rebuilding a dense NT × N
-        # matrix each iteration (O(N²·NT) → O(N²)).
-        sem_BtB_M1 = sem_BtB_M2 = None
+        # SEM-RE: the λ-independent pieces of the sparse α precision, on one
+        # fixed pattern so each chain's CHOLMOD factor is analyzed once.
+        sem_alpha = None
         if self.model_type == "sem" and self.W_sparse is not None:
-            sem_BtB_M1, sem_BtB_M2 = _sem_re_unit_aggregated_terms(
-                self.W_sparse, self.unit_idx, self.N
-            )
+            sem_alpha = _sem_re_alpha_structure(self.W_sparse, self.unit_idx, self.N)
 
         return REGibbsCache(
             XtX=XtX,
@@ -235,8 +232,8 @@ class REGibbsEstimation:
             N=self.N,
             T=self.T,
             unit_idx=self.unit_idx,
-            sem_BtB_M1=sem_BtB_M1,
-            sem_BtB_M2=sem_BtB_M2,
+            unit_counts=np.bincount(self.unit_idx, minlength=self.N).astype(np.float64),
+            sem_alpha=sem_alpha,
         )
 
     def _assemble_idata(

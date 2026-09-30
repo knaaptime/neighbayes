@@ -1,53 +1,40 @@
 r"""JAX-accelerated full-JIT Gibbs sampler for Gaussian spatial models.
 
-Composes the 3-block Gibbs step (β, σ², ρ/λ) into a single
+Composes one partially collapsed Gibbs sweep (σ², ρ/λ, β) into a single
 ``@eqx.filter_jit``-compiled function, eliminating Python→JAX
 dispatch overhead entirely.
 
 Architecture
 ------------
-The sampler uses:
+Each sweep draws, in this order:
 
-- **β draw**: Conjugate normal via Cholesky factorization.
-  O(k³) but fast for k ≤ ~2000.
-- **σ² draw**: Conjugate inverse-Gamma (direct, no solve needed).
-- **ρ/λ draw**: Neal (2003) stepping-out slice sampling with
-  persistent-interval reuse and JAX-native logdet ``log|I-ρW|``
-  (eigenvalue, Chebyshev, or trace polynomial).  The slice density is
-  the collapsed (SAR) or conditional (SEM) log-density with β and σ²
-  integrated out.
+- **σ²** from its conjugate inverse-gamma conditional given β and ρ/λ.
+- **ρ/λ** by Neal (2003) stepping-out slice sampling on
+  :math:`p(\rho \mid \sigma^2, y)`, with β integrated out under its Normal
+  prior, using a JAX-native ``log|I-ρW|``.
+- **β** from its conjugate normal conditional given the new ρ/λ and σ².
 
-For SAR/SDM, the ρ log-density is *collapsed* (β and σ² integrated out):
+β is redrawn straight after the ρ/λ draw that marginalized it (van Dyk &
+Park, 2008), so each stored triple is a draw from the joint posterior.
 
-.. math::
-
-    \log p(\rho \mid y) = \log|I - \rho W|
-    - \frac{n-k}{2}\log\text{RSS}(\rho) + \text{const}
-
-where RSS(ρ) uses the Woodbury form:
+With :math:`P = X^{*\top}X^*/\sigma^2 + \Lambda_0^{-1}` and
+:math:`b = X^{*\top}y^*/\sigma^2 + \Lambda_0^{-1}\mu_0`, the spatial density is
 
 .. math::
 
-    \text{RSS}(\rho) = r^\top r - (X^\top r)^\top (X^\top X)^{-1}(X^\top r),
-    \quad r = y - \rho W y
+    \log p(\rho \mid \sigma^2, y) = \log|I - \rho W|
+    - \frac{y^{*\top} y^*}{2\sigma^2}
+    - \tfrac12 \log|P| + \tfrac12 b^\top P^{-1} b + \text{const}.
 
-For SEM/SDEM, the λ log-density is also *collapsed* (β and σ² integrated out):
-
-.. math::
-
-    \log p(\lambda \mid y) = \log|I - \lambda W|
-    - \frac{1}{2}\log|X^{*\top} X^*|
-    - \frac{n-k}{2}\log\text{RSS}(\lambda) + \text{const}
-
-where :math:`y^* = (I - \lambda W)y`, :math:`X^* = (I - \lambda W)X`, and
-:math:`\text{RSS}(\lambda) = y^{*\top} y^* - y^{*\top} X^* (X^{*\top} X^*)^{-1} X^{*\top} y^*`.
-The extra term :math:`-\frac{1}{2}\log|X^{*\top} X^*|` appears because :math:`X^*`
-depends on :math:`\lambda` (unlike SAR where :math:`X` is fixed).
+For SAR/SDM, :math:`y^* = y - \rho W y` and :math:`X^* = X`, so :math:`P`
+is fixed within a sweep and the density is the log-determinant plus a
+quadratic in ρ.  For SEM/SDEM, :math:`y^* = (I - \lambda W)y` and
+:math:`X^* = (I - \lambda W)X`, so each evaluation is a k×k Cholesky.
 
 Slice sampling
 ~~~~~~~~~~~~~~
 The ρ/λ update uses Neal's (2003) stepping-out slice sampler on the
-collapsed log-density, carrying a persistent interval in the sampler
+spatial log-density, carrying a persistent interval in the sampler
 state across sweeps for better ESS per sample.  No gradient, proposal,
 or Metropolis correction is required — every slice step accepts.
 
@@ -59,6 +46,9 @@ References
 ----------
 Neal, R. M. (2003). Slice sampling. *Annals of Statistics*, 31(3),
 705–767.
+
+van Dyk, D. A., & Park, T. (2008). Partially collapsed Gibbs samplers.
+*Journal of the American Statistical Association*, 103(482), 790–796.
 
 LeSage, J. P., & Pace, R. K. (2009). *Introduction to Spatial
 Econometrics*. CRC Press.
@@ -105,6 +95,9 @@ JAXGaussianGibbsState = make_jax_state_class(
         "logdet_params",
         "rho_lo",
         "rho_hi",
+        # Student-t mixing variances vᵢ; all ones (and unused) for Gaussian
+        # errors, so every model shares one state layout.
+        "v",
     ),
 )
 
@@ -195,7 +188,6 @@ def _make_gaussian_gibbs_step(
     k,
     logdet_jax,
     XtX_jax,
-    XtX_cho_jax,
     # Precomputed ρ-independent inner products (closure constants)
     yty,
     yTWy,
@@ -209,6 +201,7 @@ def _make_gaussian_gibbs_step(
     priors,
     model_type: str,
     logdet_param_fn=None,
+    nu: float | None = None,
 ):
     """Build a JIT-compiled Gaussian Gibbs step with data bound into the closure.
 
@@ -240,12 +233,14 @@ def _make_gaussian_gibbs_step(
         log|I - rho*W|.
     XtX_jax : jax.numpy.ndarray of shape (k, k)
         Precomputed X^T X.
-    XtX_cho_jax : tuple of (jax.numpy.ndarray, bool)
-        Cholesky factor of X^T X from ``jax.scipy.linalg.cho_factor``.
     priors : GaussianGibbsPriors
         Prior hyperparameters.
     model_type : str
         One of "sar", "sem", "sdm", "sdem".
+    nu : float or None, default None
+        Student-t degrees of freedom for robust errors.  When set, each sweep
+        first draws the scale-mixture variances ``v`` and weights every
+        cross-product by ``1/v``; ``None`` gives Gaussian errors.
 
     Returns
     -------
@@ -280,7 +275,7 @@ def _make_gaussian_gibbs_step(
 
     @eqx.filter_jit
     def gibbs_step(state, key):
-        """One complete 3-block Gibbs sweep: β → σ² → ρ/λ (slice).
+        """One partially collapsed Gibbs sweep: σ² → ρ/λ (slice) → β.
 
         Parameters
         ----------
@@ -296,7 +291,6 @@ def _make_gaussian_gibbs_step(
         accept : bool
             Always ``True`` (slice sampling has no rejection step).
         """
-        sigma2 = state.sigma2
         rho = state.rho  # holds λ for SEM/SDEM
 
         # The interpolant and the ρ support are read from the state, so a
@@ -312,91 +306,102 @@ def _make_gaussian_gibbs_step(
             def _logdet_of(param_val):
                 return logdet_param_fn(param_val, state.logdet_params)
 
-        key_beta, key_sigma2, key_rho = jax.random.split(key, 3)
-
-        # ── Block 1: β | ρ, σ², y — conjugate normal ──
+        # Partially collapsed sweep: [v | β, σ², ρ →] σ² | β, ρ →
+        # ρ | σ² (β integrated out under its Normal prior) → β | ρ, σ².  β must
+        # be redrawn straight after the ρ draw that marginalized it, so the
+        # stored triple is a draw from the joint posterior.
         if is_sar:
-            r = y_jax - rho * Wy_jax
-            X_eff = X_jax
-            XtX_eff = XtX_jax
-            # X*'y* = Xᵀ(y - ρWy) = XTy - ρ·XTWy — O(k) from precomputed
-            Xty_eff = XTy - rho * XTWy
+            resid = y_jax - rho * Wy_jax - X_jax @ state.beta
         else:
-            # SEM: transform y and X by (I - λW) using PRECOMPUTED Wy/WX
-            r = y_jax - rho * Wy_jax
-            X_eff = X_jax - rho * WX_jax
-            # Quadratic-in-ρ form for X*'X* — no O(nk²) needed
-            XtX_eff = XtX_jax - rho * (XtWX + XtWX.T) + (rho * rho) * WXtWX
-            # Quadratic-in-ρ form for X*'y* — avoids O(nk) matmul
-            Xty_eff = XTy - rho * (XTWy + WXTy) + (rho * rho) * WXTWy
+            # SEM filtered residual: (I-λW)(y - Xβ) = (y-λWy) - (X-λWX)β
+            resid = (y_jax - rho * Wy_jax) - (X_jax - rho * WX_jax) @ state.beta
 
-        Sigma_beta_inv = XtX_eff / sigma2 + beta_prior_prec
-        rhs_beta = beta_mu_jax / beta_sigma2_jax + Xty_eff / sigma2
-        L_beta = jnp.linalg.cholesky(Sigma_beta_inv)
-        m_beta = jnp.linalg.solve(L_beta.T, jnp.linalg.solve(L_beta, rhs_beta))
-        z_beta = jax.random.normal(key_beta, shape=(k,), dtype=jnp.float64)
-        beta_new = m_beta + jnp.linalg.solve(L_beta.T, z_beta)
-
-        # ── Block 2: σ² | β, ρ/λ, y — conjugate InverseGamma draw ──
-        # Prior: σ² ~ InverseGamma(α, β).  Full conditional:
-        #   σ² | rest ~ InverseGamma(α + n/2, β + ss/2)
-        # Matches the InverseGamma prior used by the NUTS path so the two
-        # samplers target identical posteriors (LeSage 2009 convention).
-        if is_sar:
-            resid = y_jax - rho * Wy_jax - X_jax @ beta_new
+        if nu is None:
+            key_beta, key_sigma2, key_rho = jax.random.split(key, 3)
+            v_new = state.v
+            ss = resid @ resid
+            XtX_m, yty_m, yTWy_m, WyTWy_m = XtX_jax, yty, yTWy, WyTWy
+            XTy_m, XTWy_m = XTy, XTWy
+            XtWX_m, WXtWX_m, WXTy_m, WXTWy_m = XtWX, WXtWX, WXTy, WXTWy
         else:
-            # SEM filtered residual: (I-ρW)(y - Xβ) = (y-ρWy) - (X-ρWX)β
-            resid = r - X_eff @ beta_new
+            key_beta, key_sigma2, key_rho, key_v = jax.random.split(key, 4)
+            # vᵢ | · ~ InvGamma((ν+1)/2, (ν + εᵢ²/σ²)/2)
+            g = jax.random.gamma(key_v, 0.5 * (nu + 1.0), shape=(n,))
+            v_new = 0.5 * (nu + resid * resid / state.sigma2) / g
+            w = 1.0 / v_new
+            ss = w @ (resid * resid)
+            # Every cross-product weighted by Ω = diag(1/v): O(n·k²) per sweep.
+            Xw = X_jax * w[:, None]
+            wy, wWy = w * y_jax, w * Wy_jax
+            XtX_m = Xw.T @ X_jax
+            yty_m, yTWy_m, WyTWy_m = y_jax @ wy, Wy_jax @ wy, Wy_jax @ wWy
+            XTy_m, XTWy_m = Xw.T @ y_jax, Xw.T @ Wy_jax
+            if is_sar:
+                XtWX_m, WXtWX_m, WXTy_m, WXTWy_m = XtWX, WXtWX, WXTy, WXTWy
+            else:
+                WXw = WX_jax * w[:, None]
+                XtWX_m = Xw.T @ WX_jax
+                WXtWX_m = WXw.T @ WX_jax
+                WXTy_m = WXw.T @ y_jax
+                WXTWy_m = WXw.T @ Wy_jax
 
-        ss = resid @ resid
+        # ── Block 1: σ² | β, ρ/λ[, v], y — conjugate InverseGamma draw ──
+        # Prior σ² ~ InverseGamma(α, β), matching the NUTS path.
         a_post = sigma2_alpha_jax + jnp.float64(n / 2.0)
         b_post = sigma2_beta_jax + 0.5 * ss
         sigma2_inv = jax.random.gamma(key_sigma2, a_post) / b_post
         sigma2_new = jnp.maximum(1.0 / sigma2_inv, 1e-10)
 
-        # ── Block 3: ρ/λ — slice sampling ──
-        # Build the collapsed log-density used by the slice sampler.
-        # All n-dependent inner products are *precomputed* closure constants,
-        # so each density evaluation is O(k³) — no O(nk) or O(n²k) work.
+        def _in_support(param_val):
+            return jnp.where(
+                (param_val >= rho_lo) & (param_val <= rho_hi), 0.0, -jnp.inf
+            )
+
+        # ── Block 2: ρ/λ | σ², y — slice sampling, β integrated out ──
         if is_sar:
+            # P = XᵀX/σ² + Λ₀⁻¹ does not depend on ρ: factor once per sweep and
+            # reduce b(ρ)ᵀP⁻¹b(ρ), b(ρ) = b0 − ρ b1, to a quadratic in ρ.
+            P = XtX_m / sigma2_new + beta_prior_prec
+            L_P = jnp.linalg.cholesky(P)
+            b0 = XTy_m / sigma2_new + beta_mu_jax / beta_sigma2_jax
+            b1 = XTWy_m / sigma2_new
+            m0 = jax.scipy.linalg.cho_solve((L_P, True), b0)
+            m1 = jax.scipy.linalg.cho_solve((L_P, True), b1)
+            c00, c01, c11 = b0 @ m0, b0 @ m1, b1 @ m1
 
             def log_density_spatial(param_val):
-                # r'r and X'r in closed form (quadratic / linear in param_val)
-                r_dot_r = yty - 2.0 * param_val * yTWy + (param_val * param_val) * WyTWy
-                Xtr = XTy - param_val * XTWy
-                rss = r_dot_r - Xtr @ jax.scipy.linalg.cho_solve(XtX_cho_jax, Xtr)
-                rss = jnp.maximum(rss, 1e-300)
-                logdet = _logdet_of(param_val)
-                log_prior = jnp.where(
-                    (param_val >= rho_lo) & (param_val <= rho_hi),
-                    0.0,
-                    -jnp.inf,
+                r_dot_r = (
+                    yty_m - 2.0 * param_val * yTWy_m + (param_val * param_val) * WyTWy_m
                 )
-                return logdet - 0.5 * (n - k) * jnp.log(rss) + log_prior
+                quad = c00 - 2.0 * param_val * c01 + (param_val * param_val) * c11
+                return (
+                    _logdet_of(param_val)
+                    - 0.5 * r_dot_r / sigma2_new
+                    + 0.5 * quad
+                    + _in_support(param_val)
+                )
 
         else:
 
+            def _sem_terms(param_val):
+                p2 = param_val * param_val
+                XtX_star = XtX_m - param_val * (XtWX_m + XtWX_m.T) + p2 * WXtWX_m
+                Xty_star = XTy_m - param_val * (XTWy_m + WXTy_m) + p2 * WXTWy_m
+                yty_star = yty_m - 2.0 * param_val * yTWy_m + p2 * WyTWy_m
+                L_P = jnp.linalg.cholesky(XtX_star / sigma2_new + beta_prior_prec)
+                b = Xty_star / sigma2_new + beta_mu_jax / beta_sigma2_jax
+                return L_P, b, yty_star
+
             def log_density_spatial(param_val):
-                rho_sq = param_val * param_val
-                yty_star = yty - 2.0 * param_val * yTWy + rho_sq * WyTWy
-                Xty_star = XTy - param_val * (XTWy + WXTy) + rho_sq * WXTWy
-                XtX_star = XtX_jax - param_val * (XtWX + XtWX.T) + rho_sq * WXtWX
-
-                L_XtX = jnp.linalg.cholesky(XtX_star)
-                XtX_star_inv_Xty = jax.scipy.linalg.cho_solve((L_XtX, True), Xty_star)
-                rss = yty_star - Xty_star @ XtX_star_inv_Xty
-                rss = jnp.maximum(rss, 1e-300)
-
-                logdet = _logdet_of(param_val)
-                logdet_XtX = 2.0 * jnp.sum(jnp.log(jnp.diag(L_XtX)))
-
-                log_prior = jnp.where(
-                    (param_val >= rho_lo) & (param_val <= rho_hi),
-                    0.0,
-                    -jnp.inf,
-                )
+                L_P, b, yty_star = _sem_terms(param_val)
+                quad = b @ jax.scipy.linalg.cho_solve((L_P, True), b)
+                logdet_P = 2.0 * jnp.sum(jnp.log(jnp.diag(L_P)))
                 return (
-                    logdet - 0.5 * logdet_XtX - 0.5 * (n - k) * jnp.log(rss) + log_prior
+                    _logdet_of(param_val)
+                    - 0.5 * yty_star / sigma2_new
+                    - 0.5 * logdet_P
+                    + 0.5 * quad
+                    + _in_support(param_val)
                 )
 
         # Slice sampling: uses persistent interval for better ESS.
@@ -416,6 +421,17 @@ def _make_gaussian_gibbs_step(
             R_prev=state.slice_R,
         )
 
+        # ── Block 3: β | ρ, σ², y — conjugate normal, reusing P's factor ──
+        if is_sar:
+            m_beta = m0 - rho_new * m1
+        else:
+            L_P, b, _ = _sem_terms(rho_new)
+            m_beta = jax.scipy.linalg.cho_solve((L_P, True), b)
+        z_beta = jax.random.normal(key_beta, shape=(k,), dtype=jnp.float64)
+        beta_new = m_beta + jax.scipy.linalg.solve_triangular(
+            L_P.T, z_beta, lower=False
+        )
+
         # Slice sampling always "accepts" (no MH step)
         accept = jnp.bool_(True)
 
@@ -429,6 +445,7 @@ def _make_gaussian_gibbs_step(
             slice_w=state.slice_w,  # width adapted in Python between phases
             slice_L=L_final,
             slice_R=R_final,
+            v=v_new,
         )
         return new_state, accept
 
@@ -530,6 +547,7 @@ def run_chain_jax_gaussian(
     progress_manager: object | None = None,
     logdet_param_fn=None,
     logdet_params=None,
+    nu: float | None = None,
 ):
     """Run one chain of the full-JIT JAX Gaussian Gibbs sampler.
 
@@ -613,7 +631,6 @@ def run_chain_jax_gaussian(
     y_jax = jnp.asarray(y, dtype=jnp.float64)
     X_jax = jnp.asarray(X, dtype=jnp.float64)
     XtX_jax = jnp.asarray(X.T @ X, dtype=jnp.float64)
-    XtX_cho_jax = jax.scipy.linalg.cho_factor(XtX_jax)
 
     if Wy is None:
         Wy_np = np.asarray(W_sparse @ np.asarray(y, dtype=np.float64))
@@ -636,6 +653,7 @@ def run_chain_jax_gaussian(
         # Initialize persistent interval to support bounds (no prior info)
         slice_L=jnp.float64(priors.rho_lower),
         slice_R=jnp.float64(priors.rho_upper),
+        v=jnp.ones(n, dtype=jnp.float64),
     )
 
     # Pre-allocate storage
@@ -656,7 +674,6 @@ def run_chain_jax_gaussian(
         k=k,
         logdet_jax=logdet_jax,
         XtX_jax=XtX_jax,
-        XtX_cho_jax=XtX_cho_jax,
         yty=_consts["yty"],
         yTWy=_consts["yTWy"],
         WyTWy=_consts["WyTWy"],
@@ -669,6 +686,7 @@ def run_chain_jax_gaussian(
         priors=priors,
         model_type=model_type,
         logdet_param_fn=logdet_param_fn,
+        nu=nu,
     )
 
     key = jax.random.PRNGKey(rng.integers(2**31))
@@ -731,6 +749,7 @@ def run_chain_jax_gaussian(
             Wy=Wy,
             logdet_vec_fn=logdet_vec_fn,
             n=n,
+            nu=nu,
         )
     else:
         log_lik = sem_pointwise_loglik_vectorized(
@@ -742,6 +761,7 @@ def run_chain_jax_gaussian(
             W_sparse=W_sparse,
             logdet_vec_fn=logdet_vec_fn,
             n=n,
+            nu=nu,
         )
 
     # Name the spatial parameter appropriately
@@ -782,6 +802,7 @@ def run_chains_jax_gibbs_vectorized(
     logdet_params=None,
     refit_hook=None,
     log_likelihood: bool = True,
+    nu: float | None = None,
 ) -> list[dict]:
     """Run multiple JAX Gibbs chains via ``jax.vmap``.
 
@@ -852,7 +873,6 @@ def run_chains_jax_gibbs_vectorized(
     y_jax = jnp.asarray(y, dtype=jnp.float64)
     X_jax = jnp.asarray(X, dtype=jnp.float64)
     XtX_jax = jnp.asarray(X.T @ X, dtype=jnp.float64)
-    XtX_cho_jax = jax.scipy.linalg.cho_factor(XtX_jax)
 
     if Wy is None:
         Wy_np = np.asarray(W_sparse @ np.asarray(y, dtype=np.float64))
@@ -872,7 +892,6 @@ def run_chains_jax_gibbs_vectorized(
         k=k,
         logdet_jax=logdet_jax,
         XtX_jax=XtX_jax,
-        XtX_cho_jax=XtX_cho_jax,
         yty=_consts["yty"],
         yTWy=_consts["yTWy"],
         WyTWy=_consts["WyTWy"],
@@ -885,6 +904,7 @@ def run_chains_jax_gibbs_vectorized(
         priors=priors,
         model_type=model_type,
         logdet_param_fn=logdet_param_fn,
+        nu=nu,
     )
 
     # Convert NumPy initial states to JAX states, then batch into a
@@ -900,6 +920,7 @@ def run_chains_jax_gibbs_vectorized(
             slice_w=jnp.float64(slice_width),
             slice_L=jnp.float64(priors.rho_lower),
             slice_R=jnp.float64(priors.rho_upper),
+            v=jnp.ones(n, dtype=jnp.float64),
         )
         for init in inits
     ]
@@ -1093,6 +1114,7 @@ def run_chains_jax_gibbs_vectorized(
                 Wy=Wy,
                 logdet_vec_fn=logdet_vec_fn,
                 n=n,
+                nu=nu,
             )
         else:
             log_lik = sem_pointwise_loglik_vectorized(
@@ -1104,6 +1126,7 @@ def run_chains_jax_gibbs_vectorized(
                 W_sparse=W_sparse,
                 logdet_vec_fn=logdet_vec_fn,
                 n=n,
+                nu=nu,
             )
 
         param_name = "rho" if is_sar else "lam"

@@ -30,7 +30,7 @@ def small_symmetric_W():
 
     from neighbayes import dgp
 
-    gdf = dgp.simulate_sar(n=20, create_gdf=True)
+    gdf = dgp.simulate_sar(n_side=20, create_gdf=True)
     W = graph.Graph.build_contiguity(gdf, rook=True).transform("r").sparse.toarray()
     return sp.csr_matrix(W.astype(np.float64))
 

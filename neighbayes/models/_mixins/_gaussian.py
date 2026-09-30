@@ -533,5 +533,6 @@ for _structure in ("cross_section", "panel_fe"):
         run=_run_gaussian_gibbs,
         backends={"jax", "numpy"},
         options={"slice_width", "chain_method"},
+        supports_robust=True,
         skips_log_likelihood=True,
     )

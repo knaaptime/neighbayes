@@ -18,7 +18,7 @@ import pytest
 
 from neighbayes import dgp
 from neighbayes.models import SARNegBin, SARNegBinStructural
-from neighbayes.tests.helpers import W_to_graph, make_rook_W
+from neighbayes.tests.helpers import W_to_graph, _as_sparse, make_rook_W
 
 # ---------------------------------------------------------------------------
 # Fast build / validation tests (not marked slow)
@@ -108,7 +108,7 @@ def sar_nb_data():
     W_dense = make_rook_W(SIDE)
     W_graph = W_to_graph(W_dense)
     return dgp.simulate_sar_negbin(
-        W=W_graph,
+        W=_as_sparse(W_graph),
         rho=RHO_TRUE,
         beta=BETA_TRUE,
         alpha=ALPHA_TRUE,
@@ -409,7 +409,7 @@ def sar_nb_reduced_data():
     W_dense = make_rook_W(SIDE)
     W_graph = W_to_graph(W_dense)
     return dgp.simulate_sar_negbin(
-        W=W_graph,
+        W=_as_sparse(W_graph),
         rho=RHO_TRUE,
         beta=BETA_TRUE,
         alpha=ALPHA_TRUE,

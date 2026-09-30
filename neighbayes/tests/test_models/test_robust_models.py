@@ -45,6 +45,7 @@ from neighbayes.tests.helpers import (
     PANEL_T,
     SAMPLE_KWARGS,
     W_to_graph,
+    _as_sparse,
     make_line_W,
     make_rook_W,
 )
@@ -70,13 +71,17 @@ class TestRobustCrossSectional:
     @pytest.fixture
     def sar_data(self, rng):
         W = make_rook_W(SIDE)
-        out = simulate_sar(W=W, rho=0.5, beta=np.array([1.0, 2.0]), sigma=0.8, rng=rng)
+        out = simulate_sar(
+            W=_as_sparse(W), rho=0.5, beta=np.array([1.0, 2.0]), sigma=0.8, rng=rng
+        )
         return out["y"], out["X"], W
 
     @pytest.fixture
     def sem_data(self, rng):
         W = make_rook_W(SIDE)
-        out = simulate_sem(W=W, lam=0.5, beta=np.array([1.0, 2.0]), sigma=0.8, rng=rng)
+        out = simulate_sem(
+            W=_as_sparse(W), lam=0.5, beta=np.array([1.0, 2.0]), sigma=0.8, rng=rng
+        )
         return out["y"], out["X"], W
 
     def test_ols_robust_builds_and_samples(self, sar_data):
@@ -139,7 +144,7 @@ class TestRobustPanelFE:
             beta=np.array([1.0, 2.0]),
             sigma=0.5,
             rng=rng,
-            W=W,
+            W=_as_sparse(W),
         )
         return out["y"], out["X"], W_graph
 
@@ -189,7 +194,7 @@ class TestRobustPanelRE:
             beta=np.array([1.0, 2.0]),
             sigma=0.5,
             rng=rng,
-            W=W,
+            W=_as_sparse(W),
         )
         return out["y"], out["X"], W_graph
 
@@ -223,7 +228,9 @@ class TestRobustTobit:
     @pytest.fixture
     def sar_tobit_data(self, rng):
         W = make_rook_W(SIDE)
-        out = simulate_sar(W=W, rho=0.5, beta=np.array([1.0, 2.0]), sigma=0.8, rng=rng)
+        out = simulate_sar(
+            W=_as_sparse(W), rho=0.5, beta=np.array([1.0, 2.0]), sigma=0.8, rng=rng
+        )
         # Apply censoring at 0
         y = np.maximum(out["y"], 0.0)
         return y, out["X"], W
@@ -231,7 +238,9 @@ class TestRobustTobit:
     @pytest.fixture
     def sem_tobit_data(self, rng):
         W = make_rook_W(SIDE)
-        out = simulate_sem(W=W, lam=0.5, beta=np.array([1.0, 2.0]), sigma=0.8, rng=rng)
+        out = simulate_sem(
+            W=_as_sparse(W), lam=0.5, beta=np.array([1.0, 2.0]), sigma=0.8, rng=rng
+        )
         y = np.maximum(out["y"], 0.0)
         return y, out["X"], W
 
@@ -290,13 +299,17 @@ class TestNuPriorParameters:
 
     def test_default_nu_is_lesage_rval(self, rng):
         W = make_rook_W(SIDE)
-        out = simulate_sar(W=W, rho=0.5, beta=np.array([1.0, 2.0]), sigma=0.8, rng=rng)
+        out = simulate_sar(
+            W=_as_sparse(W), rho=0.5, beta=np.array([1.0, 2.0]), sigma=0.8, rng=rng
+        )
         model = OLS(y=out["y"], X=out["X"], W=W_to_graph(W), robust=True)
         assert model._nu == 4.0
 
     def test_custom_nu(self, rng):
         W = make_rook_W(SIDE)
-        out = simulate_sar(W=W, rho=0.5, beta=np.array([1.0, 2.0]), sigma=0.8, rng=rng)
+        out = simulate_sar(
+            W=_as_sparse(W), rho=0.5, beta=np.array([1.0, 2.0]), sigma=0.8, rng=rng
+        )
         model = OLS(
             y=out["y"], X=out["X"], W=W_to_graph(W), robust=True, priors={"nu": 10.0}
         )
@@ -307,7 +320,9 @@ class TestNuPriorParameters:
 
     def test_nu_must_exceed_two(self, rng):
         W = make_rook_W(SIDE)
-        out = simulate_sar(W=W, rho=0.5, beta=np.array([1.0, 2.0]), sigma=0.8, rng=rng)
+        out = simulate_sar(
+            W=_as_sparse(W), rho=0.5, beta=np.array([1.0, 2.0]), sigma=0.8, rng=rng
+        )
         model = OLS(
             y=out["y"], X=out["X"], W=W_to_graph(W), robust=True, priors={"nu": 1.5}
         )

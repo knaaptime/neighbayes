@@ -15,7 +15,7 @@ import libpysal
 from neighbayes.dgp import simulate_sar
 from neighbayes.models import OLS, SAR
 
-gdf = simulate_sar(n=400, beta=[1, 0.4, 2.5], rho=0.6, create_gdf=True)
+gdf = simulate_sar(n_side=20, beta=[1, 0.4, 2.5], rho=0.6, create_gdf=True)
 G = libpysal.graph.Graph.build_contiguity(gdf).transform("r")
 form = "y ~ -1 + X_0 + X_1 + X_2"
 

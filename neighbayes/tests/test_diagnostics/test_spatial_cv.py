@@ -17,7 +17,7 @@ FIT_KW = dict(draws=20, tune=20, chains=1, random_seed=0, progressbar=False)
 def sar_grid():
     """6x6 SAR-generated GeoDataFrame plus its rook contiguity Graph."""
     gdf = simulate_sar(
-        n=6,
+        n_side=6,
         rho=0.5,
         beta=np.array([1.0, 2.0]),
         sigma=1.0,

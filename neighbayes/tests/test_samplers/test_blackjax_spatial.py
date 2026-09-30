@@ -47,11 +47,13 @@ def _sar_priors():
 
 class TestRecovery:
     def test_recovers_known_parameters(self):
-        d = simulate_sar(n=15, rho=0.6, beta=np.array([1.0, 2.0]), sigma=1.0, seed=3)
+        d = simulate_sar(
+            n_side=15, rho=0.6, beta=np.array([1.0, 2.0]), sigma=1.0, seed=3
+        )
         res = run_chain_blackjax_gaussian(
             d["y"],
             d["X"],
-            sp.csr_matrix(d["W_dense"]),
+            d["W_sparse"],
             _sar_priors(),
             spatial=True,
             logdet_method="eigenvalue",
@@ -71,8 +73,10 @@ class TestRecovery:
         """blackjax NUTS and package SAR Gibbs target the same posterior."""
         from neighbayes.models import SAR
 
-        d = simulate_sar(n=15, rho=0.6, beta=np.array([1.0, 2.0]), sigma=1.0, seed=3)
-        y, X, Wd = d["y"], d["X"], sp.csr_matrix(d["W_dense"])
+        d = simulate_sar(
+            n_side=15, rho=0.6, beta=np.array([1.0, 2.0]), sigma=1.0, seed=3
+        )
+        y, X, Wd = d["y"], d["X"], d["W_sparse"]
 
         res = run_chain_blackjax_gaussian(
             y,
@@ -107,8 +111,10 @@ class TestRecovery:
 
 class TestSurrogateAgreesWithReference:
     def test_cheb_cholesky_matches_eigenvalue(self):
-        d = simulate_sar(n=15, rho=0.5, beta=np.array([0.5, 1.5]), sigma=1.0, seed=7)
-        y, X, W = d["y"], d["X"], sp.csr_matrix(d["W_dense"])
+        d = simulate_sar(
+            n_side=15, rho=0.5, beta=np.array([0.5, 1.5]), sigma=1.0, seed=7
+        )
+        y, X, W = d["y"], d["X"], d["W_sparse"]
         common = dict(draws=2000, tune=1000, chains=2, seed=1, spatial=True)
 
         ref = run_chain_blackjax_gaussian(
@@ -144,7 +150,7 @@ class TestOLSYardstick:
         analytic MLE (the object the near-flat-prior OLS posterior concentrates
         on), independent of finite-sample deviation from the true β.
         """
-        d = simulate_ols(n=500, beta=np.array([1.0, -2.0, 0.5]), sigma=1.0, seed=5)
+        d = simulate_ols(n_side=22, beta=np.array([1.0, -2.0, 0.5]), sigma=1.0, seed=5)
         y, X = d["y"], d["X"]
         bhat = np.linalg.lstsq(X, y, rcond=None)[0]
 
@@ -176,10 +182,12 @@ class TestJointLogDensity:
 
         jax.config.update("jax_enable_x64", True)
 
-        d = simulate_sar(n=8, rho=0.4, beta=np.array([1.0, 1.0]), sigma=1.0, seed=2)
-        y, X, W = d["y"], d["X"], sp.csr_matrix(d["W_dense"])
+        d = simulate_sar(
+            n_side=8, rho=0.4, beta=np.array([1.0, 1.0]), sigma=1.0, seed=2
+        )
+        y, X, W = d["y"], d["X"], d["W_sparse"]
         Wy = W @ y
-        eigs = np.linalg.eigvals(d["W_dense"]).real
+        eigs = np.linalg.eigvals(d["W_sparse"].toarray()).real
 
         from neighbayes._logdet import make_logdet_jax_fn
 
@@ -236,10 +244,12 @@ class TestJointLogDensity:
         np.testing.assert_allclose(val, manual, rtol=1e-10, atol=1e-10)
 
     def test_to_constrained_roundtrip(self):
-        d = simulate_sar(n=8, rho=0.4, beta=np.array([1.0, 1.0]), sigma=1.0, seed=2)
-        y, X, W = d["y"], d["X"], sp.csr_matrix(d["W_dense"])
+        d = simulate_sar(
+            n_side=8, rho=0.4, beta=np.array([1.0, 1.0]), sigma=1.0, seed=2
+        )
+        y, X, W = d["y"], d["X"], d["W_sparse"]
         Wy = W @ y
-        eigs = np.linalg.eigvals(d["W_dense"]).real
+        eigs = np.linalg.eigvals(d["W_sparse"].toarray()).real
 
         from neighbayes._logdet import make_logdet_jax_fn
 

@@ -24,6 +24,7 @@ The only cross-section vs panel difference is:
 
 from __future__ import annotations
 
+from functools import cached_property
 from typing import Any, Optional
 
 import numpy as np
@@ -52,6 +53,17 @@ class FlowSharedMethods:
     # ------------------------------------------------------------------
     # Properties that abstract cross-section vs panel differences
     # ------------------------------------------------------------------
+
+    @cached_property
+    def _flow_effect_masks(self):
+        """``(dmask, omask, imask)`` index masks for the LeSage effects breakdown.
+
+        Built on first use, only when spatial effects are computed: they
+        index ``(N, n)`` shock arrays and are needed nowhere else.
+        """
+        from ..flow._flow import _build_flow_effect_masks
+
+        return _build_flow_effect_masks(self._n)
 
     @property
     def _flow_system_size(self) -> int:

@@ -1,16 +1,17 @@
 """Gaussian spatial Gibbs sampler for panel models with random effects.
 
-Implements a 5-block Gibbs sampler for RE panel models:
+Implements a partially collapsed Gibbs sampler (van Dyk & Park, 2008) for
+RE panel models.  Each sweep draws
 
-1. β | α, σ², ρ/λ, y  — conjugate normal (direct draw)
-2. σ² | β, α, ρ/λ, y  — conjugate inverse-gamma (direct draw)
-3. α | β, σ², ρ/λ, y  — conjugate normal (direct draw, vectorized)
-4. σ_α² | α             — conjugate inverse-gamma (direct draw)
-5. ρ/λ | β, σ², σ_α², y — 1-D slice sampling on marginalized density
+1. β | α, σ², ρ/λ, y        — conjugate normal
+2. σ² | β, α, ρ/λ, y        — conjugate inverse-gamma
+3. σ_α² | α                 — conjugate inverse-gamma
+4. ρ/λ | β, σ², σ_α², y     — 1-D slice sampling with α integrated out
+5. α | β, σ², σ_α², ρ/λ, y  — conjugate normal
 
-Blocks 1-4 are all conjugate and can be sampled directly. Only block 5
-(the spatial parameter) requires slice sampling, exactly as in the FE
-Gibbs sampler.
+Step 4 marginalizes α, so step 5 must redraw α straight after it; the
+stored state is then a draw from the joint posterior.  Integrating α out of
+the ρ/λ update removes the α–ρ/λ correlation that would otherwise slow it.
 
 The key difference from the FE (within-transformed) Gibbs sampler is:
 - FE models demean the data, eliminating α and σ_α²
@@ -27,47 +28,28 @@ Or for SEM-RE:
     u_it = λ(Wu)_it + ε_it
     ε_it ~ N(0, σ²),  α_i ~ N(0, σ_α²)
 
-Block 1 (β):
-    r = y - ρWy - α_expanded   (SAR)  or  r = (I-λW)(y - α_expanded)  (SEM)
-    β | rest ~ N(β̂, Σ_β)  — standard conjugate normal
+With D the ``n × N`` unit-indicator matrix, c_i the number of periods for
+unit i, and A = I - ρW (or I - λW):
 
-Block 2 (σ²):
-    resid = y - ρWy - Xβ - α_expanded   (SAR)  or  (I-λW)(y - Xβ - α_expanded)  (SEM)
-    σ² | rest ~ Inv-Γ(a_post, b_post)
+SAR-RE ρ step: r = y - Xβ - ρWy ~ N(Dα, σ²I), and DᵀD = diag(c) is
+diagonal, so integrating α out by Woodbury gives
 
-Block 3 (α):
-    SAR-RE: α_i | rest ~ N(μ_i, τ_i²)  (diagonal conditional, each unit independent)
-        where τ_i² = 1 / (T/σ² + 1/σ_α²),  μ_i = τ_i² × r_i / σ²
+    log p(ρ | β, σ², σ_α², y) = log|A| - rᵀr/(2σ²)
+                                + Σ_i τ_i (Dᵀr)_i² / (2σ⁴),
+    τ_i = 1 / (c_i/σ² + 1/σ_α²),
 
-    SEM-RE: α | rest ~ N(μ, Σ_α)  (full N×N multivariate normal)
-        because the spatial filter (I-λW) couples units across space.
-        Σ_α^{-1} = (1/σ²) B^T B + (1/σ_α²) I_N,  where B = (I-λW)D
-        μ = Σ_α × (1/σ²) B^T (I-λW)(y - Xβ)
+a quadratic in ρ whose coefficients cost O(n) once per sweep.
 
-Block 4 (σ_α²):
-    σ_α² | α ~ Inv-Γ(a_post, b_post)
-    where a_post = N/2 + ε,  b_post = Σα_i²/2 + ε  (Jeffreys-like prior)
+SEM-RE λ step: with r = y - Xβ, B = AD and the sparse N × N precision
+P(λ) = BᵀB/σ² + I/σ_α²,
 
-Block 5 (ρ/λ):
-    SAR-RE: Collapsed density that integrates out β and σ², conditioning
-    on α.  Uses within-group demeaning (Frisch-Waugh-Lovell) to eliminate
-    the intercept and compute the density efficiently.
+    log p(λ | β, σ², σ_α², y) = log|A| - ½ log|P(λ)|
+                                - rᵀAᵀAr/(2σ²) + qᵀP(λ)⁻¹q/(2σ⁴),
+    q = DᵀAᵀAr.
 
-    SEM-RE: Marginalized density that integrates out α analytically,
-    breaking the α-λ correlation that causes slow mixing.  The marginalized
-    density is:
-
-        log p(λ | β, σ², σ_α², y) = T·log|I-λW| + ½·log|Σ_α|
-            + (1/(2σ⁴))·(D^T A^T A r)^T Σ_α (D^T A^T A r)
-            - (1/(2σ²))·r^T A^T A r
-
-    where A = I-λW, B = AD, r = y - Xβ, and Σ_α^{-1} = (1/σ²)B^T B + (1/σ_α²)I_N.
-
-    .. note::
-        The marginalized density depends on β, σ², and σ_α², which change
-        every Gibbs iteration.  Therefore the log-density cannot be cached
-        across iterations (unlike the SAR-RE collapsed density, which only
-        depends on ρ and α).
+BᵀB = diag(c) - λ(M1 + M1ᵀ) + λ²M2 with M1 = DᵀWD and M2 = DᵀWᵀWD
+precomputed and sparse; each evaluation is one CHOLMOD numeric
+refactorization on a fixed pattern.  The α draw uses the same P(λ).
 
 Identification warning
 ----------------------
@@ -93,6 +75,9 @@ Possible remedies for SEM-RE identification:
 
 References
 ----------
+van Dyk, D. A., & Park, T. (2008). Partially collapsed Gibbs samplers.
+*Journal of the American Statistical Association*, 103(482), 790–796.
+
 Baltagi, B. H. (2021). *Econometric Analysis of Panel Data* (6th ed.).
 Springer.
 
@@ -118,6 +103,7 @@ from .._utils._slice import (
     SliceWidthState,
     slice_sample_1d_adaptive,
 )
+from .._utils._spatial_normal import CholmodFactor
 
 # ---------------------------------------------------------------------------
 # State and configuration dataclasses
@@ -195,10 +181,10 @@ class REGibbsCache:
     N: int = 1
     T: int = 1
     unit_idx: np.ndarray | None = None
-    # SEM-RE only: λ-independent terms of BᵀB = DᵀAᵀAD, precomputed once
-    # (M1 = DᵀWD, M2 = DᵀWᵀWD).  See ``_sem_re_BtB``.
-    sem_BtB_M1: np.ndarray | None = None
-    sem_BtB_M2: np.ndarray | None = None
+    # Periods per unit, c_i (DᵀD = diag(c)).
+    unit_counts: np.ndarray | None = None
+    # SEM-RE only: sparse λ-independent pieces of the α precision.
+    sem_alpha: "SemReAlphaStructure | None" = None
 
 
 # ---------------------------------------------------------------------------
@@ -353,37 +339,69 @@ def _sample_sigma2_re(
     return sigma2
 
 
-def _sem_re_unit_aggregated_terms(
-    W_sparse: sp.csr_matrix, unit_idx: np.ndarray, N: int
-) -> tuple[np.ndarray, np.ndarray]:
-    """Precompute the λ-independent terms of ``BᵀB = DᵀAᵀAD`` for SEM-RE.
+@dataclass
+class SemReAlphaStructure:
+    """λ-independent pieces of the SEM-RE α precision on one sparsity pattern.
 
-    With ``A = I - λW`` and ``D`` the ``(NT × N)`` unit-indicator matrix,
-
-        BᵀB(λ) = DᵀD − λ(DᵀWD + DᵀWᵀD) + λ² DᵀWᵀWD
-
-    For a balanced panel ``DᵀD = T·I_N``.  This returns ``(M1, M2)`` with
-    ``M1 = DᵀWD`` and ``M2 = DᵀWᵀWD`` (dense ``N × N``), so that
-
-        BᵀB(λ) = T·I_N − λ(M1 + M1ᵀ) + λ² M2.
-
-    Both terms depend only on ``W`` and the panel structure, so they are
-    computed once (at cache build time) instead of rebuilding the dense
-    ``NT × N`` matrix ``B`` on every Gibbs sweep (``O(N²·NT)`` → ``O(N²)``).
+    ``BᵀB(λ) = DᵀAᵀAD = diag(c) − λ(M1 + M1ᵀ) + λ² M2`` with ``M1 = DᵀWD``
+    and ``M2 = DᵀWᵀWD``.  Each term's values are stored aligned to the CSC
+    structure of ``pattern`` (their union plus the diagonal), so
+    ``precision`` assembles ``P(λ) = BᵀB/σ² + I/σ_α²`` with that exact
+    structure and CHOLMOD's symbolic analysis is reused on every refactor.
     """
+
+    pattern: sp.csc_matrix
+    diag_vals: np.ndarray  # c_i on the diagonal
+    m1s_vals: np.ndarray  # M1 + M1ᵀ
+    m2_vals: np.ndarray  # M2
+    eye_vals: np.ndarray  # I_N
+
+    def precision(
+        self, lam: float, sigma2: float, sigma_alpha2: float
+    ) -> sp.csc_matrix:
+        vals = (
+            self.diag_vals - lam * self.m1s_vals + (lam * lam) * self.m2_vals
+        ) / sigma2 + self.eye_vals / sigma_alpha2
+        return sp.csc_matrix(
+            (vals, self.pattern.indices, self.pattern.indptr),
+            shape=self.pattern.shape,
+        )
+
+    def new_factor(self) -> CholmodFactor:
+        """A CHOLMOD factor analyzed on ``pattern`` (one per chain)."""
+        return CholmodFactor(self.pattern)
+
+
+def _sem_re_alpha_structure(
+    W_sparse: sp.csr_matrix, unit_idx: np.ndarray, N: int
+) -> SemReAlphaStructure:
+    """Precompute the sparse λ-independent terms of the SEM-RE α precision."""
     n = len(unit_idx)
     D = sp.csr_matrix((np.ones(n), (np.arange(n), unit_idx)), shape=(n, N))
-    M1 = np.asarray((D.T @ W_sparse @ D).todense())
-    WD = W_sparse @ D
-    M2 = np.asarray((WD.T @ WD).todense())
-    return M1, M2
+    WD = sp.csr_matrix(W_sparse) @ D
+    M1 = sp.csr_matrix(D.T @ WD)
+    M1s = (M1 + M1.T).tocsr()
+    M2 = sp.csr_matrix(WD.T @ WD)
+    counts = np.bincount(unit_idx, minlength=N).astype(np.float64)
 
+    # Union pattern with a diagonally dominant, hence SPD, value set for the
+    # symbolic analysis.  abs() keeps entries from cancelling to zero.
+    S = (abs(M1s) + abs(M2)).tocsr()
+    pattern = (S + sp.diags(np.asarray(S.sum(axis=1)).ravel() + 1.0)).tocsc()
+    pattern.sort_indices()
+    rows = pattern.indices
+    cols = np.repeat(np.arange(N), np.diff(pattern.indptr))
 
-def _sem_re_BtB(
-    lam: float, M1: np.ndarray, M2: np.ndarray, T: int, N: int
-) -> np.ndarray:
-    """Closed-form ``BᵀB(λ) = T·I_N − λ(M1 + M1ᵀ) + λ² M2`` (see above)."""
-    return T * np.eye(N) - lam * (M1 + M1.T) + (lam * lam) * M2
+    def _on_pattern(M: sp.spmatrix) -> np.ndarray:
+        return np.asarray(sp.csr_matrix(M)[rows, cols], dtype=np.float64).ravel()
+
+    return SemReAlphaStructure(
+        pattern=pattern,
+        diag_vals=_on_pattern(sp.diags(counts)),
+        m1s_vals=_on_pattern(M1s),
+        m2_vals=_on_pattern(M2),
+        eye_vals=(rows == cols).astype(np.float64),
+    )
 
 
 def _sample_alpha_re(
@@ -395,115 +413,36 @@ def _sample_alpha_re(
     W_sparse: sp.csr_matrix | None,
     X: np.ndarray,
     N: int,
-    T: int,
     unit_idx: np.ndarray,
+    unit_counts: np.ndarray,
     sigma_alpha2: float,
-    priors: REGibbsPriors,
     model_type: str,
     rng: np.random.Generator,
-    M1: np.ndarray | None = None,
-    M2: np.ndarray | None = None,
+    sem_alpha: SemReAlphaStructure | None = None,
+    factor: CholmodFactor | None = None,
 ) -> np.ndarray:
-    """Sample α (unit random effects) from conditional posterior.
+    """Sample α (unit random effects) from its conditional posterior.
 
-    **SAR-RE**: The conditional is conjugate and diagonal:
-        α_i | rest ~ N(μ_i, τ_i²)
-    where τ_i² = 1/(T/σ² + 1/σ_α²) and μ_i = τ_i² × (Σ_t r_it)/σ²,
-    with r = y - ρWy - Xβ.  Each α_i is independent given the rest,
-    so sampling is fully vectorized.
+    **SAR-RE**: diagonal, α_i | rest ~ N(τ_i (Dᵀr)_i / σ², τ_i) with
+    r = y − ρWy − Xβ and τ_i = 1 / (c_i/σ² + 1/σ_α²).
 
-    **SEM-RE**: The spatial filter (I - λW) couples α values across
-    units, so the conditional is multivariate normal:
-        α | rest ~ N(μ_α, Σ_α)
-    where Σ_α^{-1} = (1/σ²) D^T A^T A D + (1/σ_α²) I_N
-    and   μ_α = Σ_α × (1/σ²) D^T A^T A r
-    with A = I - λW_NT, r = y - Xβ, D = unit indicator matrix.
-    This requires solving an N × N linear system.
-
-    Parameters
-    ----------
-    rho : float
-        Current spatial parameter (ρ for SAR, λ for SEM).
-    beta : ndarray of shape (k,)
-        Current regression coefficients.
-    sigma2 : float
-        Current residual variance.
-    y : ndarray of shape (n,)
-        Response vector.
-    Wy : ndarray of shape (n,) or None
-        W @ y (for SAR).
-    W_sparse : csr_matrix or None
-        Sparse W (for SEM).
-    X : ndarray of shape (n, k)
-        Design matrix.
-    N : int
-        Number of cross-sectional units.
-    T : int
-        Number of time periods.
-    unit_idx : ndarray of shape (n,)
-        Maps observation index to unit index.
-    sigma_alpha2 : float
-        Current random effects variance.
-    priors : REGibbsPriors
-        Prior hyperparameters.
-    model_type : str
-        One of "sar", "sem".
-    rng : numpy.random.Generator
-        Random state.
-
-    Returns
-    -------
-    alpha : ndarray of shape (N,)
-        New draw from the conditional posterior.
+    **SEM-RE**: the filter A = I − λW couples units, so
+    α | rest ~ N(P⁻¹q/σ², P⁻¹) with the sparse precision
+    P = DᵀAᵀAD/σ² + I/σ_α² and q = DᵀAᵀA r, r = y − Xβ; drawn with a
+    CHOLMOD refactorization of ``factor`` on ``sem_alpha.pattern``.
     """
     if model_type in ("sar", "sdm"):
-        # SAR: α conditional is diagonal — each α_i is independent
         r = y - rho * Wy - X @ beta
         r_sum = np.bincount(unit_idx, weights=r, minlength=N)
-        tau2 = 1.0 / (T / sigma2 + 1.0 / sigma_alpha2)
-        mu = tau2 * r_sum / sigma2
-        alpha = rng.normal(loc=mu, scale=np.sqrt(tau2))
-        return alpha
+        tau2 = 1.0 / (unit_counts / sigma2 + 1.0 / sigma_alpha2)
+        return rng.normal(loc=tau2 * r_sum / sigma2, scale=np.sqrt(tau2))
 
-    # SEM: α conditional is multivariate normal due to spatial coupling
-    # Model: A(y - Xβ - Dα) = ε,  A = I - λW_NT
-    # Conditional: α | rest ~ N(μ_α, Σ_α)
-    #   Σ_α^{-1} = (1/σ²) D^T A^T A D + (1/σ_α²) I_N
-    #   μ_α = Σ_α × (1/σ²) D^T A^T A r,  r = y - Xβ
-    lam = rho  # λ is stored in state.rho for SEM
-    r = y - X @ beta  # NT × 1
-
-    # Compute A @ r = (I - λW) @ r
-    Ar = r - lam * (W_sparse @ r)
-
-    # Compute A^T @ Ar = (I - λW^T) @ Ar
-    # For row-standardized W, W^T ≠ W in general.
-    # W_sparse is the NT × NT block-diagonal matrix.
-    WtAr = W_sparse.T @ Ar
-    AtAr = Ar - lam * WtAr
-
-    # D^T @ AtAr: sum AtAr values by unit
-    DtAtAr = np.bincount(unit_idx, weights=AtAr, minlength=N)
-
-    # B^T B = D^T A^T A D, evaluated via the closed form in λ from the
-    # precomputed λ-independent terms M1 = D^T W D, M2 = D^T W^T W D:
-    #   B^T B(λ) = T·I_N − λ(M1 + M1ᵀ) + λ² M2
-    # (avoids rebuilding the dense NT × N matrix B every sweep).
-    if M1 is None or M2 is None:
-        M1, M2 = _sem_re_unit_aggregated_terms(W_sparse, unit_idx, N)
-    BtB = _sem_re_BtB(lam, M1, M2, T, N)  # N × N
-    # Precision matrix
-    prec_alpha = (1.0 / sigma2) * BtB + (1.0 / sigma_alpha2) * np.eye(N)
-    # Cholesky factorization: prec_alpha = L Lᵀ (SPD, lower-triangular L)
-    # Must request lower=True so that solve_triangular(L, z, trans='T')
-    # produces L⁻ᵀ z with Cov = (L Lᵀ)⁻¹ = prec_alpha⁻¹.  (See
-    # _gaussian_gibbs._sample_beta_conjugate for the full explanation.)
-    rhs_alpha = (1.0 / sigma2) * DtAtAr
-    L, lower = cho_factor(prec_alpha, lower=True)
-    mean_alpha = cho_solve((L, lower), rhs_alpha)
-    z = rng.standard_normal(N)
-    alpha = mean_alpha + solve_triangular(L, z, lower=lower, trans="T")
-    return alpha
+    r = y - X @ beta
+    Ar = r - rho * (W_sparse @ r)
+    AtAr = Ar - rho * (W_sparse.T @ Ar)
+    q = np.bincount(unit_idx, weights=AtAr, minlength=N)
+    factor.factorize(sem_alpha.precision(rho, sigma2, sigma_alpha2))
+    return factor.sample(q / sigma2, rng=rng)
 
 
 def _sample_sigma_alpha2(
@@ -528,100 +467,39 @@ def _sample_sigma_alpha2(
 
 
 # ---------------------------------------------------------------------------
-# Collapsed ρ/λ log-density for RE models
+# ρ/λ | β, σ², σ_α², y with α integrated out
 # ---------------------------------------------------------------------------
 
 
-def _sar_re_collapsed_log_density(
-    rho: float,
+def _sar_re_rho_quadratic(
+    beta: np.ndarray,
+    sigma2: float,
+    sigma_alpha2: float,
     y: np.ndarray,
     Wy: np.ndarray,
     X: np.ndarray,
-    XtX_cho: tuple,
-    logdet_fn: Callable[[float], float],
-    n: int,
-    k: int,
     N: int,
-    T: int,
     unit_idx: np.ndarray,
-) -> float:
-    """Collapsed log p(ρ | y) for SAR-RE model.
+    unit_counts: np.ndarray,
+) -> tuple[float, float, float]:
+    """Coefficients ``(q0, q1, q2)`` of the SAR-RE ρ density's quadratic part.
 
-    Integrates out β, σ², α, and σ_α² analytically.  The collapsed
-    density uses the within-group residual structure:
-
-        r = y - ρWy
-        RSS(ρ) = r^T M_Z r
-
-    where Z = [X, D] with D being the N unit dummies (via unit_idx),
-    and M_Z = I - Z(Z^T Z)^{-1} Z^T.
-
-    Using the Woodbury form:
-        r^T M_Z r = r^T r - (Z^T r)^T (Z^T Z)^{-1} (Z^T r)
-
-    However, Z^T Z has a block structure that makes direct inversion
-    expensive. Instead, we use the Frisch-Waugh-Lovell (FWL) approach:
-
-    1. Partial out unit effects from r and X:
-       M_D = I - D(D^T D)^{-1} D^T  (within-group demeaning)
-       r̃ = M_D r, X̃ = M_D X
-
-    2. Then RSS(ρ) = r̃^T M_{X̃} r̃ = r̃^T r̃ - (X̃^T r̃)^T (X̃^T X̃)^{-1} (X̃^T r̃)
-
-    This avoids forming the (k+N) × (k+N) matrix Z^T Z.
-
-    Parameters
-    ----------
-    rho : float
-        Spatial autoregressive parameter.
-    y, Wy, X, XtX_cho, logdet_fn, n, k
-        As in the FE collapsed density.
-    N : int
-        Number of cross-sectional units.
-    T : int
-        Number of time periods.
-    unit_idx : ndarray of shape (n,)
-        Maps observation index to unit index.
-
-    Returns
-    -------
-    log_density : float
+    With ``e = y − Xβ`` and ``r = e − ρWy``, the α-integrated density is
+    ``log|I − ρW| + q0 + q1·ρ + q2·ρ²`` (see the module docstring), where
+    the quadratic combines ``−rᵀr/(2σ²)`` and ``Σ τ_i (Dᵀr)_i²/(2σ⁴)``.
     """
-    r = y - rho * Wy
-
-    # Within-group demeaning (FWL: partial out unit effects)
-    # For each unit i, compute group mean and subtract
-    group_counts = np.bincount(unit_idx, minlength=N)
-    r_group_sum = np.bincount(unit_idx, weights=r, minlength=N)
-    r_demeaned = r - r_group_sum[unit_idx] / group_counts[unit_idx]
-
-    X_group_sum = np.zeros((N, k))
-    for j in range(k):
-        X_group_sum[:, j] = np.bincount(unit_idx, weights=X[:, j], minlength=N)
-    X_demeaned = X - X_group_sum[unit_idx] / group_counts[unit_idx, None]
-
-    # Drop columns that are zero after demeaning (e.g. intercept).
-    # Within-group demeaning turns constant columns into zeros, making
-    # XtX_tilde singular.  The intercept is absorbed by the unit effects α.
-    col_norms = np.linalg.norm(X_demeaned, axis=0)
-    nonzero_mask = col_norms > 1e-10
-    X_tilde = X_demeaned[:, nonzero_mask]
-    k_eff = int(nonzero_mask.sum())
-
-    # RSS via Cholesky: r̃^T r̃ - (X̃^T r̃)^T (X̃^T X̃)^{-1} (X̃^T r̃)
-    XtX_tilde = X_tilde.T @ X_tilde
-    Xtr_tilde = X_tilde.T @ r_demeaned
-    rtr_tilde = np.dot(r_demeaned, r_demeaned)
-
-    c, lower = cho_factor(XtX_tilde)
-    rss = rtr_tilde - Xtr_tilde @ cho_solve((c, lower), Xtr_tilde)
-
-    logdet = logdet_fn(rho)
-    # Degrees of freedom: n - k_eff - N (k_eff non-zero regressors + N unit effects)
-    return logdet - 0.5 * (n - k_eff - N) * np.log(max(rss, 1e-300))
+    e = y - X @ beta
+    tau2 = 1.0 / (unit_counts / sigma2 + 1.0 / sigma_alpha2)
+    De = np.bincount(unit_idx, weights=e, minlength=N)
+    Dw = np.bincount(unit_idx, weights=Wy, minlength=N)
+    s2, s4 = sigma2, sigma2 * sigma2
+    q0 = -0.5 * (e @ e) / s2 + 0.5 * (tau2 @ (De * De)) / s4
+    q1 = (e @ Wy) / s2 - (tau2 @ (De * Dw)) / s4
+    q2 = -0.5 * (Wy @ Wy) / s2 + 0.5 * (tau2 @ (Dw * Dw)) / s4
+    return q0, q1, q2
 
 
-def _sem_re_marginalized_log_density(
+def _sem_re_lam_log_density(
     lam: float,
     beta: np.ndarray,
     sigma2: float,
@@ -630,246 +508,106 @@ def _sem_re_marginalized_log_density(
     X: np.ndarray,
     W_sparse: sp.csr_matrix,
     logdet_fn: Callable[[float], float],
-    n: int,
-    k: int,
     N: int,
-    T: int,
     unit_idx: np.ndarray,
-    M1: np.ndarray | None = None,
-    M2: np.ndarray | None = None,
+    sem_alpha: SemReAlphaStructure,
+    factor: CholmodFactor,
 ) -> float:
-    """Marginalized log p(λ | β, σ², σ_α², y) for SEM-RE model.
+    """log p(λ | β, σ², σ_α², y) for SEM-RE with α integrated out.
 
-    Integrates out α analytically from the conditional density,
-    breaking the α-λ correlation that causes slow mixing in the
-    standard Gibbs sampler.
-
-    The marginalized density is derived from the joint:
-
-        p(y | β, σ², λ, σ_α²) = ∫ p(y | β, α, σ², λ) p(α | σ_α²) dα
-
-    which is a Gaussian integral over α.  Using the Woodbury identity
-    on the resulting marginal covariance:
-
-        Ω = σ²(A^T A)^{-1} + σ_α² D D^T
-
-    where A = I - λW and D is the unit indicator matrix, we obtain:
-
-        log p(λ | β, σ², σ_α², y) =
-            T·log|I - λW|
-            + (1/2)·log|Σ_α|
-            - (1/(2σ²))·Q
-
-    where:
-        Σ_α^{-1} = (1/σ²) B^T B + (1/σ_α²) I_N
-        B = A D  (NT × N matrix)
-        Q = r^T A^T A r - (1/σ²)·(D^T A^T A r)^T Σ_α (D^T A^T A r)
-        r = y - Xβ
-
-    The N×N matrix Σ_α^{-1} is inverted via Cholesky, making this
-    O(N³ + nnz(W)·N) per evaluation, which is efficient for moderate N.
-
-    Parameters
-    ----------
-    lam : float
-        Spatial error parameter.
-    beta : ndarray of shape (k,)
-        Current regression coefficients.
-    sigma2 : float
-        Current residual variance.
-    sigma_alpha2 : float
-        Current random effects variance.
-    y, X, W_sparse, logdet_fn, n, k
-        As in the cross-sectional collapsed density.
-    N : int
-        Number of cross-sectional units.
-    T : int
-        Number of time periods.
-    unit_idx : ndarray of shape (n,)
-        Maps observation index to unit index.
-
-    Returns
-    -------
-    log_density : float
+    ``log|A| − ½ log|P(λ)| − rᵀAᵀAr/(2σ²) + qᵀP(λ)⁻¹q/(2σ⁴)`` with
+    ``r = y − Xβ``, ``q = DᵀAᵀAr`` and the sparse precision
+    ``P(λ) = DᵀAᵀAD/σ² + I/σ_α²`` (one CHOLMOD refactorization).
     """
-    # Residual
     r = y - X @ beta
-
-    # Spatial filter: A = I - λW
     Ar = r - lam * (W_sparse @ r)
     AtAr = Ar - lam * (W_sparse.T @ Ar)
-
-    # D^T A^T A r: sum A^T A r values by unit
-    DtAtAr = np.bincount(unit_idx, weights=AtAr, minlength=N)
-
-    # B^T B = D^T A^T A D via the closed form in λ (see _sem_re_BtB):
-    #   B^T B(λ) = T·I_N − λ(M1 + M1ᵀ) + λ² M2
-    # from the precomputed λ-independent M1 = D^T W D, M2 = D^T W^T W D.
-    if M1 is None or M2 is None:
-        M1, M2 = _sem_re_unit_aggregated_terms(W_sparse, unit_idx, N)
-    BtB = _sem_re_BtB(lam, M1, M2, T, N)  # N × N
-
-    # Precision and covariance of α
-    prec_alpha = (1.0 / sigma2) * BtB + (1.0 / sigma_alpha2) * np.eye(N)
-
-    # Cholesky factorization of precision
+    q = np.bincount(unit_idx, weights=AtAr, minlength=N)
     try:
-        c_alpha, lower_alpha = cho_factor(prec_alpha)
-    except np.linalg.LinAlgError:
-        # Near-singular precision — λ likely near boundary
+        factor.factorize(sem_alpha.precision(lam, sigma2, sigma_alpha2))
+    except Exception:
+        # Not positive definite: λ at the edge of its support.
         return -np.inf
-
-    # log|Σ_α| = -log|Σ_α^{-1}| = -log|prec_alpha|
-    # Using Cholesky: log|prec_alpha| = 2·Σ log(diag(L))
-    log_det_prec = 2.0 * np.sum(np.log(np.diag(c_alpha)))
-    log_det_sigma_alpha = -log_det_prec  # log|Σ_α| = -log|prec_alpha|
-
-    # Solve Σ_α (D^T A^T A r) via Cholesky
-    z = cho_solve((c_alpha, lower_alpha), DtAtAr)
-
-    # Marginalized log-likelihood (up to constants):
-    #   T·log|I-λW| + ½·log|Σ_α| + (1/(2σ⁴))·(D^T A^T A r)^T Σ_α (D^T A^T A r)
-    #                  - (1/(2σ²))·r^T A^T A r
-    rAtAr = np.dot(r, AtAr)
-    quad_alpha = np.dot(DtAtAr, z)  # (D^T A^T A r)^T Σ_α (D^T A^T A r)
-
-    logdet = logdet_fn(lam)
-
+    s2 = sigma2
     return (
-        logdet
-        + 0.5 * log_det_sigma_alpha
-        + 0.5 * quad_alpha / (sigma2 * sigma2)
-        - 0.5 * rAtAr / sigma2
+        logdet_fn(lam)
+        - 0.5 * factor.logdet()
+        - 0.5 * (Ar @ Ar) / s2
+        + 0.5 * (q @ factor.solve(q)) / (s2 * s2)
     )
-
-
-# ---------------------------------------------------------------------------
-# Slice sampling for ρ/λ
-# ---------------------------------------------------------------------------
 
 
 def _sample_rho_re_sar(
     state: REGibbsState,
     cache: REGibbsCache,
-    priors: REGibbsPriors,
     y: np.ndarray,
-    Wy: np.ndarray,
     X: np.ndarray,
-    n: int,
-    k: int,
-    N: int,
-    T: int,
-    unit_idx: np.ndarray,
     rng: np.random.Generator,
     slice_state: SliceWidthState,
-    log_density_rho: float | None,
-) -> tuple[float, float]:
-    """Sample ρ via adaptive slice sampling (SAR-RE collapsed density).
+) -> float:
+    """Slice sample ρ from p(ρ | β, σ², σ_α², y) for SAR-RE (α integrated out)."""
+    q0, q1, q2 = _sar_re_rho_quadratic(
+        state.beta,
+        state.sigma2,
+        state.sigma_alpha2,
+        y,
+        cache.Wy,
+        X,
+        cache.N,
+        cache.unit_idx,
+        cache.unit_counts,
+    )
 
-    Returns
-    -------
-    rho : float
-        New draw of ρ.
-    log_density_rho : float
-        Log-density at the new ρ (cached for next iteration).
-    """
-    # Use cached log-density if available, otherwise compute it
-    if log_density_rho is None:
-        log_density_rho = _sar_re_collapsed_log_density(
-            state.rho, y, Wy, X, cache.XtX_cho, cache.logdet_fn, n, k, N, T, unit_idx
-        )
+    def log_density(rho):
+        return cache.logdet_fn(rho) + q0 + rho * (q1 + rho * q2)
 
-    new_rho, new_log_density, _, _ = slice_sample_1d_adaptive(
-        lambda rho: _sar_re_collapsed_log_density(
-            rho, y, Wy, X, cache.XtX_cho, cache.logdet_fn, n, k, N, T, unit_idx
-        ),
+    new_rho, _, _, _ = slice_sample_1d_adaptive(
+        log_density,
         state.rho,
         lower=cache.rho_lower,
         upper=cache.rho_upper,
         rng=rng,
         width_state=slice_state,
-        log_density_x0=log_density_rho,
     )
-    return new_rho, new_log_density
+    return new_rho
 
 
 def _sample_lam_re_sem(
     state: REGibbsState,
     cache: REGibbsCache,
-    priors: REGibbsPriors,
     y: np.ndarray,
     X: np.ndarray,
-    W_sparse: sp.csr_matrix,
-    n: int,
-    k: int,
-    N: int,
-    T: int,
-    unit_idx: np.ndarray,
+    factor: CholmodFactor,
     rng: np.random.Generator,
     slice_state: SliceWidthState,
-    log_density_lam: float | None,
-) -> tuple[float, float]:
-    """Sample λ via adaptive slice sampling (SEM-RE marginalized density).
+) -> float:
+    """Slice sample λ from p(λ | β, σ², σ_α², y) for SEM-RE (α integrated out)."""
 
-    Uses a marginalized density that integrates out α analytically,
-    breaking the α-λ correlation that causes slow mixing in the
-    standard Gibbs sampler.
-
-    Returns
-    -------
-    lam : float
-        New draw of λ.
-    log_density_lam : float
-        Log-density at the new λ (cached for next iteration).
-    """
-    # NOTE: Unlike the SAR-RE collapsed density (which only depends on ρ),
-    # the SEM-RE marginalized density depends on β, σ², and σ_α², which
-    # change every Gibbs iteration.  Therefore we cannot cache the
-    # log-density across iterations — it must be recomputed each time.
-    log_density_lam = _sem_re_marginalized_log_density(
-        state.rho,
-        state.beta,
-        state.sigma2,
-        state.sigma_alpha2,
-        y,
-        X,
-        W_sparse,
-        cache.logdet_fn,
-        n,
-        k,
-        N,
-        T,
-        unit_idx,
-        cache.sem_BtB_M1,
-        cache.sem_BtB_M2,
-    )
-
-    new_lam, new_log_density, _, _ = slice_sample_1d_adaptive(
-        lambda lam: _sem_re_marginalized_log_density(
+    def log_density(lam):
+        return _sem_re_lam_log_density(
             lam,
             state.beta,
             state.sigma2,
             state.sigma_alpha2,
             y,
             X,
-            W_sparse,
+            cache.W_sparse,
             cache.logdet_fn,
-            n,
-            k,
-            N,
-            T,
-            unit_idx,
-            cache.sem_BtB_M1,
-            cache.sem_BtB_M2,
-        ),
+            cache.N,
+            cache.unit_idx,
+            cache.sem_alpha,
+            factor,
+        )
+
+    new_lam, _, _, _ = slice_sample_1d_adaptive(
+        log_density,
         state.rho,
         lower=cache.rho_lower,
         upper=cache.rho_upper,
         rng=rng,
         width_state=slice_state,
-        log_density_x0=log_density_lam,
     )
-    return new_lam, new_log_density
+    return new_lam
 
 
 # ---------------------------------------------------------------------------
@@ -1002,7 +740,6 @@ def run_re_chain(
 
     n, k = X.shape
     N = cache.N
-    T = cache.T
     unit_idx = cache.unit_idx
     total_iters = tune + draws
     n_keep = draws // thin if thin > 0 else draws
@@ -1029,14 +766,12 @@ def run_re_chain(
     rho_range = cache.rho_upper - cache.rho_lower
     slice_state = SliceWidthState(w=rho_range * 0.1)
 
-    # Cached log-density for ρ/λ
-    log_density_rho = None
-
-    # Precompute Wy for SAR
     Wy = cache.Wy
+    counts = cache.unit_counts
+    # One CHOLMOD factor per chain (chains may run in threads).
+    factor = cache.sem_alpha.new_factor() if cache.sem_alpha is not None else None
 
     for i in range(total_iters):
-        # Expand α to observation level
         alpha_expanded = state.alpha[unit_idx]
 
         # --- Block 1: β | α, σ², ρ/λ, y ---
@@ -1065,7 +800,6 @@ def run_re_chain(
             )
 
         # --- Block 2: σ² | β, α, ρ/λ, y ---
-        alpha_expanded = state.alpha[unit_idx]
         state.sigma2 = _sample_sigma2_re(
             state.rho,
             state.beta,
@@ -1079,7 +813,16 @@ def run_re_chain(
             rng,
         )
 
-        # --- Block 3: α | β, σ², ρ/λ, y ---
+        # --- Block 3: σ_α² | α ---
+        state.sigma_alpha2 = _sample_sigma_alpha2(state.alpha, priors, rng)
+
+        # --- Block 4: ρ/λ | β, σ², σ_α², y (α integrated out) ---
+        if model_type in ("sar", "sdm"):
+            state.rho = _sample_rho_re_sar(state, cache, y, X, rng, slice_state)
+        else:  # sem, sdem
+            state.rho = _sample_lam_re_sem(state, cache, y, X, factor, rng, slice_state)
+
+        # --- Block 5: α | β, σ², σ_α², ρ/λ, y — straight after block 4 ---
         state.alpha = _sample_alpha_re(
             state.rho,
             state.beta,
@@ -1089,58 +832,14 @@ def run_re_chain(
             cache.W_sparse,
             X,
             N,
-            T,
             unit_idx,
+            counts,
             state.sigma_alpha2,
-            priors,
             model_type,
             rng,
-            cache.sem_BtB_M1,
-            cache.sem_BtB_M2,
+            cache.sem_alpha,
+            factor,
         )
-
-        # --- Block 4: σ_α² | α ---
-        state.sigma_alpha2 = _sample_sigma_alpha2(
-            state.alpha,
-            priors,
-            rng,
-        )
-
-        # --- Block 5: ρ/λ | y (collapsed, slice sampling) ---
-        if model_type in ("sar", "sdm"):
-            state.rho, log_density_rho = _sample_rho_re_sar(
-                state,
-                cache,
-                priors,
-                y,
-                Wy,
-                X,
-                n,
-                k,
-                N,
-                T,
-                unit_idx,
-                rng,
-                slice_state,
-                log_density_rho,
-            )
-        else:  # sem, sdem
-            state.rho, log_density_rho = _sample_lam_re_sem(
-                state,
-                cache,
-                priors,
-                y,
-                X,
-                cache.W_sparse,
-                n,
-                k,
-                N,
-                T,
-                unit_idx,
-                rng,
-                slice_state,
-                log_density_rho,
-            )
 
         # Store post-warmup draws
         if i >= tune and (i - tune) % thin == 0:
