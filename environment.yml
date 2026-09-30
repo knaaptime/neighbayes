@@ -11,7 +11,7 @@ dependencies:
   - statsmodels
   - geopandas
   - geodatasets
-  - arviz < 1  #pinned until supported by pymc
+  - arviz
   - lazy_loader
   - fastprogress
   - scikit-sparse

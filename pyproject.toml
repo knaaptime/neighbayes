@@ -37,9 +37,9 @@ classifiers = [
 ]
 
 dependencies = [
-    "pymc>=5.16",
+    "pymc",
     "pytensor>=2.25",
-    "arviz>=0.18,<1",
+    "arviz>=0.18",
     "libpysal>=4.9",
     "formulaic>=1.0",
     "lazy_loader>=0.4",

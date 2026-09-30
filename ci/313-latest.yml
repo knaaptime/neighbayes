@@ -4,7 +4,7 @@ channels:
 dependencies:
   - python=3.13
   - libpysal
-  - arviz < 1
+  - arviz
   - formulaic
   - pymc
   - arviz
