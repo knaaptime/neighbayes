@@ -126,11 +126,15 @@ class REGibbsState(GibbsBaseState):
         Variance of random effects σ_α².
     rho : float
         Spatial autoregressive parameter (ρ for SAR, λ for SEM).
+    sigma_alpha_aux : float
+        Auxiliary variable ``a`` of the Huang & Wand (2013) mixture that
+        makes the half-t prior on σ_α conditionally conjugate.
     """
 
     sigma2: float = 1.0
     alpha: np.ndarray = None
     sigma_alpha2: float = 1.0
+    sigma_alpha_aux: float = 1.0
 
 
 @dataclass
@@ -319,7 +323,8 @@ def _sample_sigma2_re(
         ε = (I - λW) resid_raw
         σ² | · ~ Inv-Γ(a_post, b_post)
 
-    Uses Jeffreys prior p(σ²) ∝ 1/σ².
+    Prior σ² ~ Inv-Γ(priors.sigma2_alpha, priors.sigma2_beta), the same
+    prior the NUTS build uses.
     """
     n = len(y)
 
@@ -331,9 +336,8 @@ def _sample_sigma2_re(
         eps = resid_raw - rho * (W_sparse @ resid_raw)
         ss = np.dot(eps, eps)
 
-    EPS = 1e-3
-    a_post = n / 2 + EPS
-    b_post = ss / 2 + EPS
+    a_post = priors.sigma2_alpha + n / 2
+    b_post = priors.sigma2_beta + ss / 2
 
     sigma2 = 1.0 / rng.gamma(a_post, 1.0 / b_post)
     return sigma2
@@ -447,23 +451,30 @@ def _sample_alpha_re(
 
 def _sample_sigma_alpha2(
     alpha: np.ndarray,
+    sigma_alpha2: float,
     priors: REGibbsPriors,
     rng: np.random.Generator,
-) -> float:
-    """Sample σ_α² from conjugate inverse-gamma posterior.
+) -> tuple[float, float]:
+    """Draw σ_α² under the half-t prior, returning ``(σ_α², a)``.
 
-    Prior: p(σ_α²) ∝ 1/σ_α²  (Jeffreys, approximated as Inv-Γ(ε, ε))
+    Prior σ_α ~ half-t_ν(0, A), written as the inverse-gamma scale mixture of
+    Huang & Wand (2013)::
 
-    Posterior: σ_α² | α ~ Inv-Γ(a_post, b_post)
-    where a_post = N/2 + ε,  b_post = Σα_i²/2 + ε
+        σ_α² | a ~ Inv-Γ(ν/2, ν/a),    a ~ Inv-Γ(1/2, 1/A²)
+
+    which keeps both conditionals conjugate::
+
+        a | σ_α²     ~ Inv-Γ((ν+1)/2, ν/σ_α² + 1/A²)
+        σ_α² | α, a  ~ Inv-Γ((N+ν)/2, Σα_i²/2 + ν/a)
+
+    ``Inv-Γ(s, r)`` has density ∝ x^(-s-1) e^(-r/x), drawn as 1/Gamma(s, 1/r).
     """
-    N = len(alpha)
-    EPS = 1e-3
-    a_post = N / 2 + EPS
-    b_post = np.dot(alpha, alpha) / 2 + EPS
-
-    sigma_alpha2 = 1.0 / rng.gamma(a_post, 1.0 / b_post)
-    return sigma_alpha2
+    nu = priors.sigma_alpha_nu
+    A = priors.sigma_alpha_scale
+    a = 1.0 / rng.gamma((nu + 1.0) / 2.0, 1.0 / (nu / sigma_alpha2 + 1.0 / A**2))
+    a_post = (len(alpha) + nu) / 2.0
+    b_post = np.dot(alpha, alpha) / 2.0 + nu / a
+    return 1.0 / rng.gamma(a_post, 1.0 / b_post), a
 
 
 # ---------------------------------------------------------------------------
@@ -675,6 +686,8 @@ def _initialize_re_gibbs(
         alpha=alpha_init.copy(),
         sigma_alpha2=sigma_alpha2_init,
         rho=rho_init,
+        # a | σ_α² is drawn before it is used, so any positive start works.
+        sigma_alpha_aux=priors.sigma_alpha_scale**2,
     )
 
 
@@ -760,6 +773,7 @@ def run_re_chain(
         alpha=init.alpha.copy(),
         sigma_alpha2=init.sigma_alpha2,
         rho=init.rho,
+        sigma_alpha_aux=init.sigma_alpha_aux,
     )
 
     # Adaptive slice width for ρ/λ
@@ -813,8 +827,10 @@ def run_re_chain(
             rng,
         )
 
-        # --- Block 3: σ_α² | α ---
-        state.sigma_alpha2 = _sample_sigma_alpha2(state.alpha, priors, rng)
+        # --- Block 3: σ_α² | α (and the half-t mixture variable) ---
+        state.sigma_alpha2, state.sigma_alpha_aux = _sample_sigma_alpha2(
+            state.alpha, state.sigma_alpha2, priors, rng
+        )
 
         # --- Block 4: ρ/λ | β, σ², σ_α², y (α integrated out) ---
         if model_type in ("sar", "sdm"):

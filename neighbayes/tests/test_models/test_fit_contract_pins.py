@@ -199,28 +199,32 @@ def test_gaussian_panel_fe_fit_contract(name, ctor, data_fn, expected, sampler):
 #
 # RE posteriors carry the unit effect ``alpha`` and its scale ``sigma_alpha``.
 # The 5-block RE Gibbs sampler does not emit the deterministic ``sigma2`` that
-# the NUTS build derives, so the contract is pinned *per sampler*.
+# the NUTS build derives, so the contract is pinned *per sampler*.  NUTS
+# samples the effects non-centered by default (``alpha = sigma_alpha *
+# alpha_z``) and keeps the free variable ``alpha_z``: bridge sampling reads
+# every free variable's draws from the posterior.
 # ---------------------------------------------------------------------------
 
 _RE_BASE = {"alpha", "beta", "sigma", "sigma_alpha"}
+_RE_NUTS = _RE_BASE | {"sigma2", "alpha_z"}
 
 # name -> (ctor, data_fn, {sampler: expected_varnames})
 GAUSSIAN_PANEL_RE: dict[str, tuple] = {
-    "OLS": (OLSPanelRE, make_panel_ols_data, {"nuts": _RE_BASE | {"sigma2"}}),
+    "OLS": (OLSPanelRE, make_panel_ols_data, {"nuts": _RE_NUTS}),
     "SAR": (
         SARPanelRE,
         make_panel_sar_data,
-        {"gibbs": _RE_BASE | {"rho"}, "nuts": _RE_BASE | {"rho", "sigma2"}},
+        {"gibbs": _RE_BASE | {"rho"}, "nuts": _RE_NUTS | {"rho"}},
     ),
     "SEM": (
         SEMPanelRE,
         make_panel_sem_data,
-        {"gibbs": _RE_BASE | {"lam"}, "nuts": _RE_BASE | {"lam", "sigma2"}},
+        {"gibbs": _RE_BASE | {"lam"}, "nuts": _RE_NUTS | {"lam"}},
     ),
     "SDEM": (
         SDEMPanelRE,
         make_panel_sdem_fe_data,
-        {"nuts": _RE_BASE | {"lam", "sigma2"}},
+        {"nuts": _RE_NUTS | {"lam"}},
     ),
 }
 

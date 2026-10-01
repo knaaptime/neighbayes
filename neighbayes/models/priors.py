@@ -411,9 +411,27 @@ class PanelSDEMPriors(PanelSEMPriors):
 
 @dataclass(frozen=True)
 class PanelREMixinPriors:
-    """Mixin providing the random-effects scale prior."""
+    r"""Mixin providing the random-effects scale prior.
 
-    sigma_alpha_sigma: float = 10.0
+    Attributes
+    ----------
+    sigma_alpha_nu, sigma_alpha_scale
+        Half-t prior on the random-effect scale,
+        :math:`\sigma_\alpha \sim \text{half-}t_\nu(0, A)`.  The default
+        ``nu = 1`` is the half-Cauchy of Gelman (2006) and Polson & Scott
+        (2012), the weakly informative choice for a hierarchical variance;
+        the inverse gamma, conjugate or near-improper, pulls
+        :math:`\sigma_\alpha` toward zero and over-shrinks the unit effects
+        when units are few or weakly identified.  ``sigma_alpha_scale``
+        (``A``) defaults to ``sd(y)`` at construction, so the prior is
+        scale-aware like the Gelman et al. (2008) default for
+        :math:`\beta`.  NUTS and Gibbs use the same prior; the Gibbs
+        sampler keeps it conditionally conjugate through the inverse-gamma
+        scale mixture of Huang & Wand (2013).
+    """
+
+    sigma_alpha_nu: float = 1.0
+    sigma_alpha_scale: float | None = None
 
 
 @dataclass(frozen=True)
@@ -669,10 +687,21 @@ class REGibbsPriors(GibbsBasePriors):
     """Prior hyperparameters for RE panel Gibbs sampler.
 
     Inherits ``beta_mu`` / ``beta_sigma`` / ``rho_lower`` / ``rho_upper``
-    from :class:`GibbsBasePriors`.  The σ² and σ_α² blocks use weakly
-    informative Jeffreys priors p(·) ∝ 1/(·) (approximated as
-    Inv-Γ(ε, ε) with ε = 1e-3) and take no hyperparameters.
+    from :class:`GibbsBasePriors`.  The models resolve every field to the
+    same values their NUTS build uses, so both backends target one
+    posterior:
+
+    * ``sigma2_alpha``, ``sigma2_beta``: σ² ~ Inv-Γ(sigma2_alpha,
+      sigma2_beta), the models' default ``Inv-Γ(2, Var(y))``.
+    * ``sigma_alpha_nu``, ``sigma_alpha_scale``: σ_α ~ half-t_ν(0, A),
+      half-Cauchy by default (see :class:`PanelREMixinPriors`), sampled
+      through the Huang & Wand (2013) inverse-gamma mixture.
     """
+
+    sigma2_alpha: float = 2.0
+    sigma2_beta: float = 1.0
+    sigma_alpha_nu: float = 1.0
+    sigma_alpha_scale: float = 1.0
 
 
 @dataclass
