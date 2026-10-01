@@ -67,11 +67,8 @@ enters the model directly (Wy), providing more information to separate
 
 Possible remedies for SEM-RE identification:
 - Use fixed effects (within transform) instead of random effects
-- Use a Spatial Durbin (SDM) specification that includes WX terms
+- Use the spatial Durbin error specification (SDEM), which adds WX terms
 - Use longer panels (T → ∞) which provide more information
-- Use the Mundlak specification (α_i = X̄_i γ + η_i) to test for
-  RE-regressor correlation, though this does not resolve the λ
-  identification issue itself
 
 References
 ----------
@@ -84,8 +81,6 @@ Springer.
 LeSage, J. P., & Pace, R. K. (2009). *Introduction to Spatial
 Econometrics*. CRC Press.
 
-Mundlak, Y. (1978). On the pooling of time series and cross section data.
-*Econometrica*, 46(1), 69–85.
 """
 
 from __future__ import annotations
