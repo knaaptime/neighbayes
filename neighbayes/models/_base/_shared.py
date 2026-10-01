@@ -37,17 +37,21 @@ def gelman_default_beta_prior(
     design: np.ndarray,
     feature_names: list[str],
     scale: float = 2.5,
+    link: str = "identity",
 ) -> tuple[np.ndarray, np.ndarray]:
     r"""Weakly-informative default prior on regression coefficients.
 
     Follows Gelman, Jakulin, Pittau & Su (2008) by setting per-column
-    prior scales from ``sd(y)`` and ``sd(x_j)``.  For each column ``j``
-    of ``design``:
+    prior scales from the outcome's scale and ``sd(x_j)``.  The outcome's
+    scale is ``sd(y)`` for an identity link and the unit scale of the linear
+    predictor otherwise (Gelman et al.'s 2.5 is already on the logit scale;
+    the probit scale is that divided by 1.6).  For each column ``j`` of
+    ``design``, with ``s_y`` that scale and ``g`` the link:
 
     * **Intercept-like** (named ``"intercept"`` or numerically constant):
-      ``mu_j = mean(y)``, ``sigma_j = scale * sd(y)``.
+      ``mu_j = g(mean(y))``, ``sigma_j = scale * s_y``.
     * **Slope**:
-      ``mu_j = 0``, ``sigma_j = scale * sd(y) / sd(x_j)``.
+      ``mu_j = 0``, ``sigma_j = scale * s_y / sd(x_j)``.
 
     Parameters
     ----------
@@ -61,6 +65,9 @@ def gelman_default_beta_prior(
         intercept-like columns named ``"intercept"``.
     scale : float, default 2.5
         Multiplier on the standardized prior scale.
+    link : {"identity", "log", "logit", "probit"}, default "identity"
+        Link between ``E[y]`` and the linear predictor ``X beta``.  Count
+        models use ``"log"``; binary models ``"logit"`` or ``"probit"``.
 
     Returns
     -------
@@ -74,10 +81,30 @@ def gelman_default_beta_prior(
     other regression models.* Annals of Applied Statistics, 2(4),
     1360-1383.
     """
-    sd_y = float(np.std(y))
-    if sd_y <= 0.0:
+    y = np.asarray(y, dtype=np.float64)
+    if link == "identity":
+        sd_y = float(np.std(y))
+        if sd_y <= 0.0:
+            sd_y = 1.0
+        mean_y = float(np.mean(y))
+    elif link == "log":
         sd_y = 1.0
-    mean_y = float(np.mean(y))
+        # Half a count over the sample keeps an all-zero response finite.
+        mean_y = float(np.log(max(float(np.mean(y)), 0.5 / max(y.size, 1))))
+    elif link in ("logit", "probit"):
+        from scipy.special import logit, ndtri
+
+        eps = 0.5 / max(y.size, 1)
+        p_bar = float(np.clip(np.mean(y), eps, 1.0 - eps))
+        sd_y, mean_y = (
+            (1.0, float(logit(p_bar)))
+            if link == "logit"
+            else (1.0 / 1.6, float(ndtri(p_bar)))
+        )
+    else:
+        raise ValueError(
+            f"link must be 'identity', 'log', 'logit' or 'probit', got {link!r}"
+        )
     p = design.shape[1]
     beta_mu = np.zeros(p, dtype=np.float64)
     beta_sigma = np.empty(p, dtype=np.float64)
@@ -991,13 +1018,41 @@ class SharedSpatialMethods:
         design: np.ndarray,
         feature_names: list[str],
         scale: float = 2.5,
+        link: str = "identity",
     ) -> tuple[np.ndarray, np.ndarray]:
         r"""Weakly-informative default prior on regression coefficients.
 
         Thin wrapper around :func:`gelman_default_beta_prior` that uses
         ``self._y`` as the response.  See that function for details.
         """
-        return gelman_default_beta_prior(self._y, design, feature_names, scale=scale)
+        return gelman_default_beta_prior(
+            self._y, design, feature_names, scale=scale, link=link
+        )
+
+    def _resolved_beta_prior(
+        self,
+        design: np.ndarray | None = None,
+        feature_names: list[str] | None = None,
+        link: str = "identity",
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """``(beta_mu, beta_sigma)``: user overrides over the Gelman default.
+
+        One resolution shared by a model's NUTS build and its Gibbs sampler, so
+        both place the same prior on ``beta``.  ``design`` defaults to ``X``.
+        """
+        if design is None:
+            design = self._X
+        if feature_names is None:
+            feature_names = list(self._feature_names)
+        mu, sd = self._gelman_default_beta_prior(design, feature_names, link=link)
+        k = design.shape[1]
+        mu = np.broadcast_to(
+            np.asarray(self.priors.get("beta_mu", mu), dtype=np.float64), (k,)
+        ).copy()
+        sd = np.broadcast_to(
+            np.asarray(self.priors.get("beta_sigma", sd), dtype=np.float64), (k,)
+        ).copy()
+        return mu, sd
 
     @cached_property
     def _W_eigs(self) -> np.ndarray | None:

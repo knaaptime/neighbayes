@@ -1488,10 +1488,9 @@ class SARNegBinFlow(_NegBinFlowMixin, SARFlow):
     def _build_pymc_model(self) -> pm.Model:
         from ..._ops import SparseFlowSolveOp
 
-        beta_mu = self.priors.get("beta_mu", 0.0)
-        beta_sigma = self.priors.get("beta_sigma", 10.0)
-        alpha_sigma = self.priors.get("alpha_sigma", 2.5)
-        alpha_nu = self.priors.get("alpha_nu", 3.0)
+        pv = self._flow_count_priors()
+        beta_mu, beta_sigma = pv["beta_mu"], pv["beta_sigma"]
+        alpha_sigma, alpha_nu = pv["alpha_sigma"], pv["alpha_nu"]
 
         X_t = pt.as_tensor_variable(self._X.astype(np.float64))
 
@@ -1626,10 +1625,9 @@ class SARNegBinFlowSeparable(_NegBinFlowMixin, SARFlowSeparable):
     def _build_pymc_model(self) -> pm.Model:
         from ..._ops import KroneckerFlowSolveOp
 
-        beta_mu = self.priors.get("beta_mu", 0.0)
-        beta_sigma = self.priors.get("beta_sigma", 10.0)
-        alpha_sigma = self.priors.get("alpha_sigma", 2.5)
-        alpha_nu = self.priors.get("alpha_nu", 3.0)
+        pv = self._flow_count_priors()
+        beta_mu, beta_sigma = pv["beta_mu"], pv["beta_sigma"]
+        alpha_sigma, alpha_nu = pv["alpha_sigma"], pv["alpha_nu"]
         rho_lower = self.priors.get("rho_lower", -0.999)
         rho_upper = self.priors.get("rho_upper", 0.999)
 
@@ -1758,10 +1756,9 @@ class NegBinFlow(_NegBinFlowMixin, OLSFlow):
         return None
 
     def _build_pymc_model(self) -> pm.Model:
-        beta_mu = self.priors.get("beta_mu", 0.0)
-        beta_sigma = self.priors.get("beta_sigma", 10.0)
-        alpha_sigma = self.priors.get("alpha_sigma", 2.5)
-        alpha_nu = self.priors.get("alpha_nu", 3.0)
+        pv = self._flow_count_priors()
+        beta_mu, beta_sigma = pv["beta_mu"], pv["beta_sigma"]
+        alpha_sigma, alpha_nu = pv["alpha_sigma"], pv["alpha_nu"]
 
         X_t = pt.as_tensor_variable(self._X.astype(np.float64))
 
@@ -1820,7 +1817,6 @@ class NegBinFlow(_NegBinFlowMixin, OLSFlow):
         Three blocks per sweep: ω (Pólya–Gamma), β (conjugate normal),
         α (slice on log(α)).
         """
-        from ...models._base._shared import gelman_default_beta_prior
         from ...samplers._utils._idata import gibbs_to_inference_data
         from ...samplers.gaussian._chain_runner import run_chains
         from ...samplers.negbin._core import GibbsState
@@ -1837,14 +1833,12 @@ class NegBinFlow(_NegBinFlowMixin, OLSFlow):
         N, k = X.shape
 
         # --- Build priors ---
-        default_beta_mu, default_beta_sigma = gelman_default_beta_prior(
-            self._y, X, list(self._feature_names)
-        )
+        pv = self._flow_count_priors()
         priors = ReducedGibbsPriors(
-            beta_mu=self.priors.get("beta_mu", default_beta_mu),
-            beta_sigma=self.priors.get("beta_sigma", default_beta_sigma),
-            alpha_sigma=self.priors.get("alpha_sigma", 2.5),
-            alpha_nu=self.priors.get("alpha_nu", 3.0),
+            beta_mu=pv["beta_mu"],
+            beta_sigma=pv["beta_sigma"],
+            alpha_sigma=pv["alpha_sigma"],
+            alpha_nu=pv["alpha_nu"],
             rho_lower=-0.999,
             rho_upper=0.999,
         )

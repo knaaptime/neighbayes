@@ -44,7 +44,7 @@ from ...samplers.logit import (
 )
 from ...samplers.logit._jax import run_chains_jax_vectorized
 from ..base import SpatialModel
-from ..priors import SARLogitPriors, resolve_priors
+from ..priors import SARLogitPriors
 
 
 class SARLogitStructural(SpatialModel):
@@ -72,10 +72,8 @@ class SARLogitStructural(SpatialModel):
           Uniform prior on :math:`\\rho`.
         - ``rho_upper`` (float, default 0.999): Upper bound of the
           Uniform prior on :math:`\\rho`.
-        - ``beta_mu`` (float, default 0.0): Normal prior mean for
-          :math:`\\beta`.
-        - ``beta_sigma`` (float, default 10.0): Normal prior std for
-          :math:`\\beta`.
+        - ``beta_mu``, ``beta_sigma`` (float or array, default Gelman et al.
+          2008): Normal prior on :math:`\\beta`, on the logit scale (intercept at ``logit(mean(y))``, scale 2.5; slopes ``2.5 / sd(x_j)``).
 
     logdet_method : str, optional
         How to compute :math:`\\log|I - \\rho W|`. ``None`` (default)
@@ -250,17 +248,11 @@ class SARLogitStructural(SpatialModel):
         W_sparse = self._W_sparse
         n, k = X.shape
 
-        # Build priors from the typed priors object
-        priors_obj = resolve_priors(
-            self.priors if isinstance(self.priors, dict) else None,
-            SARLogitPriors,
-        )
-        if isinstance(self.priors, SARLogitPriors):
-            priors_obj = self.priors
-
+        # Link-scale Gelman et al. (2008) default unless overridden.
+        beta_mu, beta_sigma = self._resolved_beta_prior(link="logit")
         priors = LogitGibbsPriors(
-            beta_mu=priors_obj.beta_mu,
-            beta_sigma=priors_obj.beta_sigma,
+            beta_mu=beta_mu,
+            beta_sigma=beta_sigma,
             rho_lower=self._logdet_bounds.rho_min,
             rho_upper=self._logdet_bounds.rho_max,
         )

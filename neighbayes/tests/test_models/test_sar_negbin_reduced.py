@@ -270,14 +270,16 @@ def test_reduced_nuts_uses_the_resolved_beta_prior():
 
     data = simulate_sar_negbin(n_side=15, rho=0.4, seed=1)
     model = SARNegBin(y=data["y"], X=data["X"], W=data["W_graph"])
-    expected_mu, expected_sigma = model._gelman_default_beta_prior(
-        model._X, list(model._feature_names)
-    )
+    # The default lives on the log scale of the linear predictor, and the
+    # Gibbs path resolves the same one.
+    expected_mu, expected_sigma = model._resolved_beta_prior(link="log")
 
     pymc_model = model._build_pymc_model()
     beta = pymc_model.named_vars["beta"]
     sigma = beta.owner.inputs[-1].eval()
+    mu = beta.owner.inputs[-2].eval()
 
+    np.testing.assert_allclose(np.broadcast_to(mu, expected_mu.shape), expected_mu)
     np.testing.assert_allclose(
         np.broadcast_to(sigma, expected_sigma.shape), expected_sigma, rtol=1e-8
     )

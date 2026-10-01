@@ -1478,9 +1478,8 @@ class SARNegBinFlowPanel(SARFlowPanel):
     def _build_pymc_model(self) -> pm.Model:
         from ..._ops import SparseFlowSolveMatrixOp
 
-        beta_mu = self.priors.get("beta_mu", 0.0)
-        beta_sigma = self.priors.get("beta_sigma", 10.0)
-        alpha_sigma = self.priors.get("alpha_sigma", 10.0)
+        pv = self._flow_count_priors()
+        beta_mu, beta_sigma = pv["beta_mu"], pv["beta_sigma"]
 
         N = self._N_flow
         T = self._T
@@ -1502,7 +1501,7 @@ class SARNegBinFlowPanel(SARFlowPanel):
                 pm.Potential("stability", pt.switch(slack > 0.0, 0.0, -1e6 * slack**2))
 
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            alpha = pm.HalfNormal("alpha", sigma=alpha_sigma)
+            alpha = pm.HalfStudentT("alpha", nu=pv["alpha_nu"], sigma=pv["alpha_sigma"])
 
             Xb = pt.dot(X_t, beta)
             Xb_mat = pt.reshape(Xb, (T, N)).T
@@ -1736,9 +1735,8 @@ class SARNegBinFlowSeparablePanel(SARFlowSeparablePanel):
     def _build_pymc_model(self) -> pm.Model:
         from ..._ops import KroneckerFlowSolveMatrixOp
 
-        beta_mu = self.priors.get("beta_mu", 0.0)
-        beta_sigma = self.priors.get("beta_sigma", 10.0)
-        alpha_sigma = self.priors.get("alpha_sigma", 10.0)
+        pv = self._flow_count_priors()
+        beta_mu, beta_sigma = pv["beta_mu"], pv["beta_sigma"]
         rho_lower = self.priors.get("rho_lower", -0.999)
         rho_upper = self.priors.get("rho_upper", 0.999)
 
@@ -1759,7 +1757,7 @@ class SARNegBinFlowSeparablePanel(SARFlowSeparablePanel):
             pm.Deterministic("rho_w", -rho_d * rho_o)
 
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            alpha = pm.HalfNormal("alpha", sigma=alpha_sigma)
+            alpha = pm.HalfStudentT("alpha", nu=pv["alpha_nu"], sigma=pv["alpha_sigma"])
 
             Xb = pt.dot(X_t, beta)
             Xb_mat = pt.reshape(Xb, (T, N)).T
@@ -1858,15 +1856,14 @@ class NegBinFlowPanel(OLSFlowPanel):
         return out
 
     def _build_pymc_model(self) -> pm.Model:
-        beta_mu = self.priors.get("beta_mu", 0.0)
-        beta_sigma = self.priors.get("beta_sigma", 10.0)
-        alpha_sigma = self.priors.get("alpha_sigma", 10.0)
+        pv = self._flow_count_priors()
+        beta_mu, beta_sigma = pv["beta_mu"], pv["beta_sigma"]
 
         X_t = pt.as_tensor_variable(self._X.astype(np.float64))
 
         with pm.Model(coords=self._model_coords()) as model:
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            alpha = pm.HalfNormal("alpha", sigma=alpha_sigma)
+            alpha = pm.HalfStudentT("alpha", nu=pv["alpha_nu"], sigma=pv["alpha_sigma"])
             eta = pt.dot(X_t, beta)
             lam = pm.Deterministic("lambda", pt.exp(eta))
             pm.NegativeBinomial("obs", mu=lam, alpha=alpha, observed=self._y_int_vec)

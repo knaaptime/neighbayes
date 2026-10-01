@@ -91,12 +91,13 @@ class SARZINB(SpatialModel):
     priors : dict, optional
         Override default priors. Supported keys:
 
-        - ``gamma_mu`` (float, default 0.0): Normal prior mean for γ.
-        - ``gamma_sigma`` (float, default 1e6): Normal prior std for γ.
+        - ``gamma_mu``, ``gamma_sigma`` (float or array, default Gelman et al.
+          2008 on the logit scale, centred at even odds): Normal prior on γ.
         - ``lam_lower`` (float, default -0.999): Lower bound for λ.
         - ``lam_upper`` (float, default 0.999): Upper bound for λ.
-        - ``beta_mu`` (float, default 0.0): Normal prior mean for β.
-        - ``beta_sigma`` (float, default 10.0): Normal prior std for β.
+        - ``beta_mu``, ``beta_sigma`` (float or array, default Gelman et al.
+          2008 on the log scale): Normal prior on β, intercept at
+          ``log(mean(y))`` with scale 2.5 and slopes ``2.5 / sd(x_j)``.
         - ``rho_lower`` (float, default -0.999): Lower bound for ρ.
         - ``rho_upper`` (float, default 0.999): Upper bound for ρ.
         - ``alpha_sigma`` (float, default 2.5): Half-Normal scale for α.
@@ -443,13 +444,26 @@ class SARZINB(SpatialModel):
         rho_upper = float(bounds.rho_max)
 
         # Build priors
+        # Gelman et al. (2008) defaults on each equation's link scale: log for
+        # the count equation; logit for the latent selection, centred at even
+        # odds because the structural zeros are not observed.
+        beta_mu, beta_sigma = self._resolved_beta_prior(link="log")
+        from .._base._shared import gelman_default_beta_prior
+
+        p_sel = self._Z.shape[1]
+        g_mu, g_sd = gelman_default_beta_prior(
+            np.full(self._Z.shape[0], 0.5),
+            self._Z,
+            [f"z{j}" for j in range(p_sel)],
+            link="logit",
+        )
         priors = ZINBGibbsPriors(
-            gamma_mu=self.priors.get("gamma_mu", 0.0),
-            gamma_sigma=self.priors.get("gamma_sigma", 1e6),
+            gamma_mu=self.priors.get("gamma_mu", g_mu),
+            gamma_sigma=self.priors.get("gamma_sigma", g_sd),
             lam_lower=self.priors.get("lam_lower", rho_lower),
             lam_upper=self.priors.get("lam_upper", rho_upper),
-            beta_mu=self.priors.get("beta_mu", 0.0),
-            beta_sigma=self.priors.get("beta_sigma", 10.0),
+            beta_mu=beta_mu,
+            beta_sigma=beta_sigma,
             rho_lower=self.priors.get("rho_lower", rho_lower),
             rho_upper=self.priors.get("rho_upper", rho_upper),
             alpha_sigma=self.priors.get("alpha_sigma", 2.5),

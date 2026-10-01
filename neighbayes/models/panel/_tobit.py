@@ -65,16 +65,35 @@ class _PanelTobitBase(SpatialPanelModel):
 
     def _tobit_beta_prior(self):
         """Gelman et al. (2008) ``beta`` prior, scaled to the observed ``y``."""
-        names = list(self._model_coords()["coefficient"])
-        mu, sd = self._gelman_default_beta_prior(self._X, names)
-        return self.priors.get("beta_mu", mu), self.priors.get("beta_sigma", sd)
+        return self._resolved_beta_prior(
+            self._X, list(self._model_coords()["coefficient"])
+        )
+
+    def _tobit_sigma(self):
+        """``σ² ~ IG(sigma2_alpha, sigma2_beta)`` (default ``IG(2, Var y)``); σ recorded."""
+        sigma2 = pm.InverseGamma(
+            "sigma2",
+            alpha=float(self.priors.get("sigma2_alpha", 2.0)),
+            beta=float(self.priors.get("sigma2_beta", np.var(self._y))),
+        )
+        return pm.Deterministic("sigma", pt.sqrt(sigma2))
+
+    @staticmethod
+    def _censored_gap(n_cens: int):
+        """Gap ``c − y*`` of each censored latent value, with a flat prior on (0, ∞).
+
+        The regression density on ``y*`` is the only distribution the latent
+        values get, so integrating them out leaves the censored likelihood
+        ``P(y* ≤ c)`` exactly.  A proper prior on the gap would be a second,
+        spurious density on the same data.
+        """
+        return pm.HalfFlat("y_cens_gap", shape=n_cens)
 
     def _latent_y_tensor(self) -> pt.TensorVariable:
         y_lat = pt.as_tensor_variable(self._y.astype(np.float64))
         n_cens = int(self._censored_idx.size)
         if n_cens > 0:
-            censor_sigma = float(self.priors.get("censor_sigma", 10.0))
-            y_cens_gap = pm.HalfNormal("y_cens_gap", sigma=censor_sigma, shape=n_cens)
+            y_cens_gap = self._censored_gap(n_cens)
             y_cens = self.censoring - y_cens_gap
             y_lat = pt.set_subtensor(y_lat[self._censored_idx], y_cens)
         return y_lat
@@ -101,19 +120,18 @@ class _PanelTobitBase(SpatialPanelModel):
 
 class SARPanelTobit(_PanelTobitBase):
     _priors_cls = PanelSARTobitPriors
-    "Bayesian spatial lag panel Tobit model.\n\n    .. math::\n        y^* = \\rho W y^* + X\\beta + \\varepsilon,\\quad \\varepsilon \\sim N(0,\\sigma^2 I)\n\n    with observed outcome\n\n    .. math::\n        y = \\max(c, y^*)\n\n    Parameters\n    ----------\n    formula : str, optional\n        Wilkinson-style formula. Requires ``data``, ``unit_col``,\n        ``time_col``.\n    data : pandas.DataFrame, optional\n        Long-format panel data when using formula mode.\n    y : array-like, optional\n        Stacked observed outcome of shape ``(N*T,)``. Required in\n        matrix mode. Values at or below ``censoring`` are treated as\n        left-censored.\n    X : array-like or pandas.DataFrame, optional\n        Stacked design matrix. Required in matrix mode.\n    W : libpysal.graph.Graph or scipy.sparse matrix\n        Spatial weights of shape ``(N, N)``. Should be\n        row-standardized.\n    unit_col, time_col : str, optional\n        Column names identifying the unit and time period in ``data``.\n        Required in formula mode.\n    N, T : int, optional\n        Cross-sectional and time dimensions. Required in matrix mode.\n    censoring : float, default 0.0\n        Left-censoring threshold ``c``. Observations with\n        ``y <= censoring`` are treated as censored and the latent\n        ``y*`` is sampled from a HalfNormal gap below ``c``.\n    priors : dict, optional\n        Override default priors. Supported keys:\n\n        - ``rho_lower`` (float, default -1.0): Lower bound of Uniform\n          prior on :math:`\\rho`.\n        - ``rho_upper`` (float, default 1.0): Upper bound of Uniform\n          prior on :math:`\\rho`.\n        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal\n          prior on :math:`\\beta`, scaled to ``sd(y)`` and each column's sd.\n        - ``sigma_sigma`` (float, default 10.0): HalfNormal prior std\n          for :math:`\\sigma`.\n        - ``censor_sigma`` (float, default 10.0): HalfNormal prior\n          std for the latent gap below the censoring threshold.\n        - ``nu`` (float, default 4.0): Fixed Student-t degrees of\n          freedom (only used when ``robust=True``).\n\n    logdet_method : str, optional\n        How to compute :math:`\\log|I - \\rho W|`; auto-selected when\n        ``None`` (default).\n    robust : bool, default False\n        If True, replace the Normal error with Student-t. See\n        *Robust regression* below.\n\n    Notes\n    -----\n    The base-class ``model`` argument is not exposed; pooled mean\n    structure (``model=0``) is used.\n\n    **Robust regression**\n\n    When ``robust=True``, the error distribution is changed from Normal\n    to Student-t.  For uncensored observations the density becomes:\n\n    .. math::\n\n        f(y^*_i \\mid \\mu_i, \\sigma, \\nu) =\n        \\frac{1}{\\sigma} \\, t_\\nu\\!\\left(\\frac{y^*_i - \\mu_i}{\\sigma}\\right)\n\n    and for censored observations:\n\n    .. math::\n\n        P(y^*_i \\le c) = T_\\nu\\!\\left(\\frac{c - \\mu_i}{\\sigma}\\right)\n\n    where :math:`T_\\nu` is the Student-t CDF and :math:`\\nu` is a **fixed**\n    hyperparameter set by ``priors={'nu': value}`` (default 4).\n    "
+    "Bayesian spatial lag panel Tobit model.\n\n    .. math::\n        y^* = \\rho W y^* + X\\beta + \\varepsilon,\\quad \\varepsilon \\sim N(0,\\sigma^2 I)\n\n    with observed outcome\n\n    .. math::\n        y = \\max(c, y^*)\n\n    Parameters\n    ----------\n    formula : str, optional\n        Wilkinson-style formula. Requires ``data``, ``unit_col``,\n        ``time_col``.\n    data : pandas.DataFrame, optional\n        Long-format panel data when using formula mode.\n    y : array-like, optional\n        Stacked observed outcome of shape ``(N*T,)``. Required in\n        matrix mode. Values at or below ``censoring`` are treated as\n        left-censored.\n    X : array-like or pandas.DataFrame, optional\n        Stacked design matrix. Required in matrix mode.\n    W : libpysal.graph.Graph or scipy.sparse matrix\n        Spatial weights of shape ``(N, N)``. Should be\n        row-standardized.\n    unit_col, time_col : str, optional\n        Column names identifying the unit and time period in ``data``.\n        Required in formula mode.\n    N, T : int, optional\n        Cross-sectional and time dimensions. Required in matrix mode.\n    censoring : float, default 0.0\n        Left-censoring threshold ``c``. Observations with\n        ``y <= censoring`` are treated as censored and the latent\n        ``y*`` is sampled below ``c`` with a flat prior on the gap.\n    priors : dict, optional\n        Override default priors. Supported keys:\n\n        - ``rho_lower`` (float, default -1.0): Lower bound of Uniform\n          prior on :math:`\\rho`.\n        - ``rho_upper`` (float, default 1.0): Upper bound of Uniform\n          prior on :math:`\\rho`.\n        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal\n          prior on :math:`\\beta`, scaled to ``sd(y)`` and each column's sd.\n        - ``sigma2_alpha``, ``sigma2_beta`` (float, default 2 and ``Var(y)``):\n          InverseGamma prior on :math:`\\sigma^2`.\n\n        - ``nu`` (float, default 4.0): Fixed Student-t degrees of\n          freedom (only used when ``robust=True``).\n\n    logdet_method : str, optional\n        How to compute :math:`\\log|I - \\rho W|`; auto-selected when\n        ``None`` (default).\n    robust : bool, default False\n        If True, replace the Normal error with Student-t. See\n        *Robust regression* below.\n\n    Notes\n    -----\n    The base-class ``model`` argument is not exposed; pooled mean\n    structure (``model=0``) is used.\n\n    **Robust regression**\n\n    When ``robust=True``, the error distribution is changed from Normal\n    to Student-t.  For uncensored observations the density becomes:\n\n    .. math::\n\n        f(y^*_i \\mid \\mu_i, \\sigma, \\nu) =\n        \\frac{1}{\\sigma} \\, t_\\nu\\!\\left(\\frac{y^*_i - \\mu_i}{\\sigma}\\right)\n\n    and for censored observations:\n\n    .. math::\n\n        P(y^*_i \\le c) = T_\\nu\\!\\left(\\frac{c - \\mu_i}{\\sigma}\\right)\n\n    where :math:`T_\\nu` is the Student-t CDF and :math:`\\nu` is a **fixed**\n    hyperparameter set by ``priors={'nu': value}`` (default 4).\n    "
 
     def _build_pymc_model(self) -> pm.Model:
         rho_lower = self.priors.get("rho_lower", -1.0)
         rho_upper = self.priors.get("rho_upper", 1.0)
         beta_mu, beta_sigma = self._tobit_beta_prior()
-        sigma_sigma = self.priors.get("sigma_sigma", 10.0)
         logdet_fn = self._logdet_pytensor_fn
         W_pt = self._W_pt_sparse
         with pm.Model(coords=self._model_coords()) as model:
             rho = pm.Uniform("rho", lower=rho_lower, upper=rho_upper)
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            sigma = pm.HalfNormal("sigma", sigma=sigma_sigma)
+            sigma = self._tobit_sigma()
             y_lat = self._latent_y_tensor()
             resid = (
                 y_lat
@@ -174,13 +192,12 @@ class SARPanelTobit(_PanelTobitBase):
 
 class SEMPanelTobit(_PanelTobitBase):
     _priors_cls = PanelSEMTobitPriors
-    "Bayesian spatial error panel Tobit model.\n\n    .. math::\n        y^* = X\\beta + u,\\quad u = \\lambda W u + \\varepsilon,\n        \\quad \\varepsilon \\sim N(0,\\sigma^2 I)\n\n    with observed outcome ``y = max(c, y*)``.\n\n    Parameters\n    ----------\n    formula : str, optional\n        Wilkinson-style formula. Requires ``data``, ``unit_col``,\n        ``time_col``.\n    data : pandas.DataFrame, optional\n        Long-format panel data when using formula mode.\n    y : array-like, optional\n        Stacked observed outcome of shape ``(N*T,)``. Required in\n        matrix mode. Values at or below ``censoring`` are treated as\n        left-censored.\n    X : array-like or pandas.DataFrame, optional\n        Stacked design matrix. Required in matrix mode.\n    W : libpysal.graph.Graph or scipy.sparse matrix\n        Spatial weights of shape ``(N, N)``. Should be\n        row-standardized.\n    unit_col, time_col : str, optional\n        Column names identifying the unit and time period in ``data``.\n        Required in formula mode.\n    N, T : int, optional\n        Cross-sectional and time dimensions. Required in matrix mode.\n    censoring : float, default 0.0\n        Left-censoring threshold ``c``.\n    priors : dict, optional\n        Override default priors. Supported keys:\n\n        - ``lam_lower`` (float, default -1.0): Lower bound of Uniform\n          prior on :math:`\\lambda`.\n        - ``lam_upper`` (float, default 1.0): Upper bound of Uniform\n          prior on :math:`\\lambda`.\n        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal\n          prior on :math:`\\beta`, scaled to ``sd(y)`` and each column's sd.\n        - ``sigma_sigma`` (float, default 10.0): HalfNormal prior std\n          for :math:`\\sigma`.\n        - ``censor_sigma`` (float, default 10.0): HalfNormal prior\n          std for the latent gap below the censoring threshold.\n        - ``nu`` (float, default 4.0): Fixed Student-t degrees of\n          freedom (only used when ``robust=True``).\n\n    logdet_method : str, optional\n        How to compute :math:`\\log|I - \\lambda W|`; auto-selected\n        when ``None`` (default).\n    robust : bool, default False\n        If True, replace the Normal innovation with Student-t. See\n        *Robust regression* below.\n\n    Notes\n    -----\n    The base-class ``model`` argument is not exposed; pooled mean\n    structure (``model=0``) is used.\n\n    **Robust regression**\n\n    When ``robust=True``, the error distribution is changed from Normal\n    to Student-t.  For uncensored observations the density becomes:\n\n    .. math::\n\n        f(y^*_i \\mid \\mu_i, \\sigma, \\nu) =\n        \\frac{1}{\\sigma} \\, t_\\nu\\!\\left(\\frac{y^*_i - \\mu_i}{\\sigma}\\right)\n\n    and for censored observations:\n\n    .. math::\n\n        P(y^*_i \\le c) = T_\\nu\\!\\left(\\frac{c - \\mu_i}{\\sigma}\\right)\n\n    where :math:`T_\\nu` is the Student-t CDF and :math:`\\nu` is a **fixed**\n    hyperparameter set by ``priors={'nu': value}`` (default 4).\n    "
+    "Bayesian spatial error panel Tobit model.\n\n    .. math::\n        y^* = X\\beta + u,\\quad u = \\lambda W u + \\varepsilon,\n        \\quad \\varepsilon \\sim N(0,\\sigma^2 I)\n\n    with observed outcome ``y = max(c, y*)``.\n\n    Parameters\n    ----------\n    formula : str, optional\n        Wilkinson-style formula. Requires ``data``, ``unit_col``,\n        ``time_col``.\n    data : pandas.DataFrame, optional\n        Long-format panel data when using formula mode.\n    y : array-like, optional\n        Stacked observed outcome of shape ``(N*T,)``. Required in\n        matrix mode. Values at or below ``censoring`` are treated as\n        left-censored.\n    X : array-like or pandas.DataFrame, optional\n        Stacked design matrix. Required in matrix mode.\n    W : libpysal.graph.Graph or scipy.sparse matrix\n        Spatial weights of shape ``(N, N)``. Should be\n        row-standardized.\n    unit_col, time_col : str, optional\n        Column names identifying the unit and time period in ``data``.\n        Required in formula mode.\n    N, T : int, optional\n        Cross-sectional and time dimensions. Required in matrix mode.\n    censoring : float, default 0.0\n        Left-censoring threshold ``c``.\n    priors : dict, optional\n        Override default priors. Supported keys:\n\n        - ``lam_lower`` (float, default -1.0): Lower bound of Uniform\n          prior on :math:`\\lambda`.\n        - ``lam_upper`` (float, default 1.0): Upper bound of Uniform\n          prior on :math:`\\lambda`.\n        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal\n          prior on :math:`\\beta`, scaled to ``sd(y)`` and each column's sd.\n        - ``sigma2_alpha``, ``sigma2_beta`` (float, default 2 and ``Var(y)``):\n          InverseGamma prior on :math:`\\sigma^2`.\n\n        - ``nu`` (float, default 4.0): Fixed Student-t degrees of\n          freedom (only used when ``robust=True``).\n\n    logdet_method : str, optional\n        How to compute :math:`\\log|I - \\lambda W|`; auto-selected\n        when ``None`` (default).\n    robust : bool, default False\n        If True, replace the Normal innovation with Student-t. See\n        *Robust regression* below.\n\n    Notes\n    -----\n    The base-class ``model`` argument is not exposed; pooled mean\n    structure (``model=0``) is used.\n\n    **Robust regression**\n\n    When ``robust=True``, the error distribution is changed from Normal\n    to Student-t.  For uncensored observations the density becomes:\n\n    .. math::\n\n        f(y^*_i \\mid \\mu_i, \\sigma, \\nu) =\n        \\frac{1}{\\sigma} \\, t_\\nu\\!\\left(\\frac{y^*_i - \\mu_i}{\\sigma}\\right)\n\n    and for censored observations:\n\n    .. math::\n\n        P(y^*_i \\le c) = T_\\nu\\!\\left(\\frac{c - \\mu_i}{\\sigma}\\right)\n\n    where :math:`T_\\nu` is the Student-t CDF and :math:`\\nu` is a **fixed**\n    hyperparameter set by ``priors={'nu': value}`` (default 4).\n    "
 
     def _build_pymc_model(self, nuts_sampler: str = "pymc") -> pm.Model:
         lam_lower = self.priors.get("lam_lower", -1.0)
         lam_upper = self.priors.get("lam_upper", 1.0)
         beta_mu, beta_sigma = self._tobit_beta_prior()
-        sigma_sigma = self.priors.get("sigma_sigma", 10.0)
         logdet_fn = self._logdet_pytensor_fn
         W_pt = self._W_pt_sparse
         n_obs = int(self._y.shape[0])
@@ -190,13 +207,10 @@ class SEMPanelTobit(_PanelTobitBase):
         with pm.Model(coords=self._model_coords()) as model:
             lam = pm.Uniform("lam", lower=lam_lower, upper=lam_upper)
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            sigma = pm.HalfNormal("sigma", sigma=sigma_sigma)
+            sigma = self._tobit_sigma()
             if jax_logp:
                 if n_cens > 0:
-                    censor_sigma = float(self.priors.get("censor_sigma", 10.0))
-                    y_cens_gap = pm.HalfNormal(
-                        "y_cens_gap", sigma=censor_sigma, shape=n_cens
-                    )
+                    y_cens_gap = self._censored_gap(n_cens)
                 else:
                     y_cens_gap = None
                 X_const = pt.as_tensor_variable(self._X)

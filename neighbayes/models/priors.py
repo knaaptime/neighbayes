@@ -88,10 +88,6 @@ class BasePriors:
         informative prior; if ``sigma2_beta`` is ``None`` the model
         resolves it to ``Var(y)`` at construction so the prior mean is
         scale-aware (~ Var(y)).
-    sigma_sigma
-        Half-normal scale on σ.  **Tobit/Probit models only.**  Ignored
-        by the Gaussian and NB paths, which use ``sigma2_alpha`` /
-        ``sigma2_beta`` (InverseGamma on σ²).
     nu
         Student-t degrees of freedom used when ``robust=True``.  Following
         LeSage (2009) this is a **fixed** hyperparameter rather than a
@@ -110,7 +106,6 @@ class BasePriors:
     beta_sigma: float | Any = None
     sigma2_alpha: float = 2.0
     sigma2_beta: float | None = None
-    sigma_sigma: float = 10.0  # Tobit/Probit only.
     nu: float = 4.0  # Student-t df when robust=True; LeSage's rval.
 
 
@@ -181,33 +176,24 @@ class SARNegBinPriors(SARPriors, NegBinPriors):
 
 
 @dataclass(frozen=True)
-class _CensoredMixin:
-    """Half-normal scale on the censored latent-variable gap (Tobit models).
-
-    Placed as the *first* base of each Tobit priors class so its field is
-    collected last, matching the historical ``censor_sigma``-at-the-end
-    field order.
-    """
-
-    censor_sigma: float = 10.0
-
-
-@dataclass(frozen=True)
-class SARTobitPriors(_CensoredMixin, SARPriors):
+class SARTobitPriors(SARPriors):
     """Priors for :class:`neighbayes.models.SARTobit`.
 
-    Adds ``censor_sigma``: scale of the half-normal prior on the censored
-    latent-variable gap.
+    The same priors as :class:`SARPriors`: Gelman et al. (2008) on
+    ``beta`` and ``IG(2, Var y)`` on ``sigma**2``.  The censored latent
+    values carry a flat prior on their gap below the threshold, so the
+    regression density alone defines their distribution and integrating
+    them out gives the censored likelihood exactly.
     """
 
 
 @dataclass(frozen=True)
-class SEMTobitPriors(_CensoredMixin, SEMPriors):
+class SEMTobitPriors(SEMPriors):
     """Priors for :class:`neighbayes.models.SEMTobit`."""
 
 
 @dataclass(frozen=True)
-class SDMTobitPriors(_CensoredMixin, SDMPriors):
+class SDMTobitPriors(SDMPriors):
     """Priors for :class:`neighbayes.models.SDMTobit`."""
 
 
@@ -222,8 +208,8 @@ class SARProbitPriors:
 
     rho_lower: float = -0.95
     rho_upper: float = 0.95
-    beta_mu: float = 0.0
-    beta_sigma: float = 10.0
+    beta_mu: float | Any = None  # Gelman et al. (2008), link scale
+    beta_sigma: float | Any = None
     sigma_a_sigma: float = 2.0
 
 
@@ -238,8 +224,8 @@ class SARLogitPriors:
 
     rho_lower: float = -0.999
     rho_upper: float = 0.999
-    beta_mu: float = 0.0
-    beta_sigma: float = 10.0
+    beta_mu: float | Any = None  # Gelman et al. (2008), link scale
+    beta_sigma: float | Any = None
 
 
 # Alias — the non-spatial Logit model uses the same prior structure.
@@ -256,8 +242,8 @@ class SEMLogitPriors:
 
     lam_lower: float = -0.999
     lam_upper: float = 0.999
-    beta_mu: float = 0.0
-    beta_sigma: float = 10.0
+    beta_mu: float | Any = None  # Gelman et al. (2008), link scale
+    beta_sigma: float | Any = None
 
 
 # ---------------------------------------------------------------------------
@@ -353,10 +339,6 @@ class PanelBasePriors:
         Inverse-gamma prior on the observation-noise variance
         :math:`\\sigma^2`.  Default ``alpha=2.0``; ``sigma2_beta`` defaults
         to ``Var(y)`` when ``None``.
-    sigma_sigma
-        Half-normal scale on :math:`\\sigma`.  Retained for backward
-        compatibility with callers that still pass it; unused by the
-        Gaussian path, which uses ``sigma2_alpha`` / ``sigma2_beta``.
     nu
         Student-t degrees of freedom used when ``robust=True``.  Fixed
         rather than sampled; see :class:`BasePriors`.
@@ -366,7 +348,6 @@ class PanelBasePriors:
     beta_sigma: float | Any = None
     sigma2_alpha: float = 2.0
     sigma2_beta: float | None = None
-    sigma_sigma: float = 10.0
     nu: float = 4.0  # Student-t df when robust=True; LeSage's rval.
 
 
@@ -458,12 +439,12 @@ class PanelSDEMREPriors(PanelSDEMPriors, PanelREMixinPriors):
 
 
 @dataclass(frozen=True)
-class PanelSARTobitPriors(_CensoredMixin, PanelSARPriors):
+class PanelSARTobitPriors(PanelSARPriors):
     """Priors for :class:`neighbayes.models.SARPanelTobit`."""
 
 
 @dataclass(frozen=True)
-class PanelSEMTobitPriors(_CensoredMixin, PanelSEMPriors):
+class PanelSEMTobitPriors(PanelSEMPriors):
     """Priors for :class:`neighbayes.models.SEMPanelTobit`."""
 
 

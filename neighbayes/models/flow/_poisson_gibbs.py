@@ -52,7 +52,6 @@ def run_poisson_flow_gibbs(
         run_chain_separable,
         run_chain_unrestricted,
     )
-    from .._base._shared import gelman_default_beta_prior
     from ..priors import FlowReducedGibbsPriors
 
     X = model._X
@@ -77,12 +76,10 @@ def run_poisson_flow_gibbs(
         cache_kwargs["positive"] = model.restrict_positive
     cache = FlowReducedGibbsCache(**cache_kwargs)
 
-    default_beta_mu, default_beta_sigma = gelman_default_beta_prior(
-        model._y, X, list(model._feature_names)
-    )
+    pv = model._flow_count_priors()
     priors = FlowReducedGibbsPriors(
-        beta_mu=model.priors.get("beta_mu", default_beta_mu),
-        beta_sigma=model.priors.get("beta_sigma", default_beta_sigma),
+        beta_mu=pv["beta_mu"],
+        beta_sigma=pv["beta_sigma"],
         rho_lower=model.priors.get("rho_lower", -0.999),
         rho_upper=model.priors.get("rho_upper", 0.999),
     )

@@ -58,10 +58,8 @@ class SDEM(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
           Uniform prior on :math:`\\lambda`.
         - ``lam_upper`` (float, default 1.0): Upper bound of the
           Uniform prior on :math:`\\lambda`.
-        - ``beta_mu`` (float, default 0.0): Normal prior mean for
-          :math:`[\\beta, \\theta]`.
-        - ``beta_sigma`` (float, default 1e6): Normal prior std for
-          :math:`[\\beta, \\theta]`.
+        - ``beta_mu``, ``beta_sigma`` (float or array, default Gelman et al.
+          2008): Normal prior on :math:`[\\beta, \\theta]`, scaled to ``sd(y)`` and each column's sd.
         - ``sigma2_alpha`` (float, default 2.0): Shape of the
           InverseGamma prior on :math:`\\sigma^2`.
         - ``sigma2_beta`` (float, default ``Var(y)``): Scale of the

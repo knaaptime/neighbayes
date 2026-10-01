@@ -243,9 +243,10 @@ class SARNegBinStructural(SpatialModel):
             )
 
         # Build priors
+        beta_mu, beta_sigma = self._resolved_beta_prior(link="log")
         priors = GibbsPriors(
-            beta_mu=self.priors.get("beta_mu", 0.0),
-            beta_sigma=self.priors.get("beta_sigma", 1e6),
+            beta_mu=beta_mu,
+            beta_sigma=beta_sigma,
             sigma2_alpha=self.priors.get("sigma2_alpha", 2.0),
             sigma2_beta=self.priors.get("sigma2_beta", 1.0),
             alpha_sigma=self.priors.get("alpha_sigma", 2.5),

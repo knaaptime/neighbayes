@@ -304,6 +304,24 @@ class FlowSharedMethods:
             "sigma2_beta": float(p.get("sigma2_beta", np.var(self._y))),
         }
 
+    def _flow_count_priors(self) -> dict:
+        """Resolved priors for the count flow models, shared by NUTS and Gibbs.
+
+        ``beta`` gets the Gelman et al. (2008) default on the log scale: the
+        intercept is centred on ``log(mean(y))`` with scale 2.5 and each slope
+        has scale ``2.5 / sd(x_j)``.  The NB2 dispersion ``alpha`` gets a
+        half-t(``alpha_nu``, ``alpha_sigma``), default half-t(3, 2.5).
+        """
+        k = self._X.shape[1]
+        names = list(self._feature_names) or [f"x{j}" for j in range(k)]
+        mu, sd = self._resolved_beta_prior(self._X, names, link="log")
+        return {
+            "beta_mu": mu,
+            "beta_sigma": sd,
+            "alpha_sigma": float(self.priors.get("alpha_sigma", 2.5)),
+            "alpha_nu": float(self.priors.get("alpha_nu", 3.0)),
+        }
+
     def _flow_sigma(self, pv: dict):
         """``σ² ~ IG`` with ``σ`` recorded as a deterministic (inside a model)."""
         import pytensor.tensor as pt
