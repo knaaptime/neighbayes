@@ -275,6 +275,44 @@ class FlowSharedMethods:
     # Pointwise log-likelihood (with Jacobian correction for SAR variants)
     # ------------------------------------------------------------------
 
+    def _flow_gaussian_priors(self) -> dict:
+        """Resolved priors for the Gaussian flow models, shared by NUTS and Gibbs.
+
+        ``beta`` gets the Gelman et al. (2008) default on the sampled design
+        (scaled to ``sd(y)`` and each column's sd) and ``σ²`` gets
+        ``IG(2, Var y)``, the same defaults as the cross-section and panel
+        Gaussian models, so both mean the same thing in any units of ``y``.
+        """
+        if "sigma_sigma" in self.priors:
+            raise ValueError(
+                "'sigma_sigma' set the old HalfNormal prior on sigma; the Gaussian "
+                "flow models now place IG(sigma2_alpha, sigma2_beta) on sigma**2 "
+                "(default IG(2, Var y))."
+            )
+        k = self._X.shape[1]
+        names = list(self._feature_names) or [f"x{j}" for j in range(k)]
+        mu, sd = self._gelman_default_beta_prior(self._X, names)
+        p = self.priors
+        return {
+            "beta_mu": np.broadcast_to(
+                np.asarray(p.get("beta_mu", mu), dtype=np.float64), (k,)
+            ).copy(),
+            "beta_sigma": np.broadcast_to(
+                np.asarray(p.get("beta_sigma", sd), dtype=np.float64), (k,)
+            ).copy(),
+            "sigma2_alpha": float(p.get("sigma2_alpha", 2.0)),
+            "sigma2_beta": float(p.get("sigma2_beta", np.var(self._y))),
+        }
+
+    def _flow_sigma(self, pv: dict):
+        """``σ² ~ IG`` with ``σ`` recorded as a deterministic (inside a model)."""
+        import pytensor.tensor as pt
+
+        sigma2 = pm.InverseGamma(
+            "sigma2", alpha=pv["sigma2_alpha"], beta=pv["sigma2_beta"]
+        )
+        return pm.Deterministic("sigma", pt.sqrt(sigma2))
+
     def _compute_jacobian_log_det(self, posterior) -> Optional[np.ndarray]:
         """Per-draw log-determinant of the flow filter matrix.
 

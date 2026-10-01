@@ -134,6 +134,19 @@ class GaussianGibbsCache:
     WXTWy: np.ndarray | None = None
     # Student-t degrees of freedom; ``None`` for Gaussian errors.
     nu: float | None = None
+    # Fixed-effects panels (Lee & Yu 2010): the independent observations the
+    # variance counts (``None``: every row) and the coefficient m of the
+    # -m·log(1 - ρ) time-effects Jacobian term.
+    n_eff: int | None = None
+    jacobian_shift: float = 0.0
+
+
+def _jacobian(cache: GaussianGibbsCache, rho):
+    """``log|I - ρW|`` as the likelihood uses it, with any time-effects term."""
+    ld = cache.logdet_fn(rho)
+    if cache.jacobian_shift:
+        ld = ld - cache.jacobian_shift * np.log1p(-rho)
+    return ld
 
 
 # ---------------------------------------------------------------------------
@@ -212,8 +225,12 @@ def _sample_sigma2(
     priors: GaussianGibbsPriors,
     model_type: str,
     rng: np.random.Generator,
+    n_eff: int | None = None,
 ) -> float:
     """Sample σ² from its conjugate Inverse-Gamma full conditional.
+
+    ``n_eff`` is the number of independent observations (default ``len(y)``);
+    a fixed-effects panel has fewer than it has rows.
 
     With prior ``σ² ~ InverseGamma(α, β)`` and Gaussian likelihood the
     full conditional is
@@ -261,7 +278,7 @@ def _sample_sigma2(
     sigma2 : float
         Draw from the full conditional.
     """
-    n = len(y)
+    n = len(y) if n_eff is None else int(n_eff)
 
     if model_type in ("sar", "sdm"):
         resid = y - rho * Wy - X @ beta
@@ -348,7 +365,7 @@ def _sar_log_density_given_sigma2(
     """
     r_dot_r = cache.yty - 2.0 * rho * cache.yTWy + rho * rho * cache.WyTWy
     quad = terms.c00 - 2.0 * rho * terms.c01 + rho * rho * terms.c11
-    return cache.logdet_fn(rho) - 0.5 * r_dot_r / sigma2 + 0.5 * quad
+    return _jacobian(cache, rho) - 0.5 * r_dot_r / sigma2 + 0.5 * quad
 
 
 def _sem_precision_terms(
@@ -395,7 +412,7 @@ def _sem_log_density_given_sigma2(
     P_cho, b, yty_star = _sem_precision_terms(lam, cache, sigma2, priors)
     logdet_P = 2.0 * np.sum(np.log(np.diag(P_cho[0])))
     quad = b @ cho_solve(P_cho, b)
-    return cache.logdet_fn(lam) - 0.5 * yty_star / sigma2 - 0.5 * logdet_P + 0.5 * quad
+    return _jacobian(cache, lam) - 0.5 * yty_star / sigma2 - 0.5 * logdet_P + 0.5 * quad
 
 
 def _draw_beta_from_cho(
@@ -522,7 +539,8 @@ def gaussian_sweep(
             0.5 * (nu + 1.0), size=eps.shape[0]
         )
         w = 1.0 / state.v
-        a_post = priors.sigma2_alpha + 0.5 * eps.shape[0]
+        n_obs = eps.shape[0] if cache.n_eff is None else cache.n_eff
+        a_post = priors.sigma2_alpha + 0.5 * n_obs
         b_post = priors.sigma2_beta + 0.5 * float(w @ (eps * eps))
         state.sigma2 = 1.0 / rng.gamma(a_post, 1.0 / b_post)
         cache = _weighted_cache(cache, y, X, w)
@@ -537,6 +555,7 @@ def gaussian_sweep(
             priors,
             cache.model_type,
             rng,
+            n_eff=cache.n_eff,
         )
     if cache.model_type in ("sar", "sdm"):
         terms = _sar_sweep_terms(cache, state.sigma2, priors)
@@ -563,7 +582,7 @@ def _pointwise_loglik(
     """
     eps = _residual(state, y, X, cache)
     ll = _eps_log_density(eps, np.sqrt(state.sigma2), cache.nu)
-    ll = ll + cache.logdet_fn(state.rho) / eps.shape[0]
+    ll = ll + _jacobian(cache, state.rho) / eps.shape[0]
     return np.where(np.isfinite(ll), ll, -1e10)
 
 

@@ -92,6 +92,9 @@ class GibbsEstimation:
         logdet_aaa_check: bool = False,
         logdet_probe_check: bool = False,
         nu: float | None = None,
+        jacobian_T: int | None = None,
+        jacobian_shift: float = 0.0,
+        n_eff: int | None = None,
     ):
         self.y = y
         self.X = X
@@ -112,6 +115,12 @@ class GibbsEstimation:
         self.nu = None if nu is None else float(nu)
         self.warmup_jacobian = None
         self.n, self.k = X.shape
+        # Fixed-effects panels (Lee & Yu 2010): the Jacobian multiplier (T
+        # still slices the per-period block of ``I_T ⊗ W``), the time-effects
+        # term's coefficient, and the independent observations σ² counts.
+        self.jacobian_T = self.T if jacobian_T is None else int(jacobian_T)
+        self.jacobian_shift = float(jacobian_shift)
+        self.n_eff = self.n if n_eff is None else int(n_eff)
 
     def __getstate__(self):
         """Pickle without the warmup log-determinant.
@@ -487,6 +496,8 @@ class GibbsEstimation:
             refit_hook=refit_hook,
             log_likelihood=self.log_likelihood,
             nu=self.nu,
+            n_eff=self.n_eff,
+            jacobian_shift=self.jacobian_shift,
         )
 
         # Assemble DataTree
@@ -523,6 +534,7 @@ class GibbsEstimation:
                 wp = WarmupProbes.for_sampler(
                     self.W_sparse,
                     T=self.T,
+                    jacobian_T=self.jacobian_T,
                     rho_min=self.priors.rho_lower,
                     rho_max=self.priors.rho_upper,
                 )
@@ -534,6 +546,7 @@ class GibbsEstimation:
             self.W_sparse,
             self.logdet_method,
             T=self.T,
+            jacobian_T=self.jacobian_T,
             rho_min=self.priors.rho_lower,
             rho_max=self.priors.rho_upper,
             refit=self.logdet_refit,
@@ -588,8 +601,10 @@ class GibbsEstimation:
         Uses ``make_logdet_jax_fn`` from ``neighbayes.logdet`` with the
         model's eigenvalues (if available) or sparse W matrix.
 
-        The panel Jacobian is ``T·log|I_N − ρW|``, applied by passing the
-        per-period ``N×N`` weights with ``T=self.T``.  For panels the sampler
+        The panel Jacobian is ``jacobian_T·log|I_N − ρW|`` (``T`` by default,
+        ``T − 1`` under Lee & Yu's unit-effect correction), applied by passing
+        the per-period ``N×N`` weights with ``T=self.jacobian_T``; any
+        time-effect ``−m·log(1 − ρ)`` term is added by the sampler.  For panels the sampler
         receives the ``NT×NT`` block-diagonal lag matrix (``I_T ⊗ W``) as
         ``self.W_sparse`` — whose determinant *already* carries the ``T``
         replication — so the per-period block ``W[:N, :N]`` is extracted first to
@@ -616,7 +631,7 @@ class GibbsEstimation:
             method=self.logdet_method,
             rho_min=self.priors.rho_lower,
             rho_max=self.priors.rho_upper,
-            T=self.T,
+            T=self.jacobian_T,
         )
 
     def _build_cache(self) -> GaussianGibbsCache:
@@ -675,6 +690,8 @@ class GibbsEstimation:
             WXTy=WXTy,
             WXTWy=WXTWy,
             nu=self.nu,
+            n_eff=self.n_eff,
+            jacobian_shift=self.jacobian_shift,
         )
 
     def _assemble_idata(
@@ -803,6 +820,9 @@ class GaussianSARGibbs(GibbsEstimation):
         logdet_aaa_check: bool = False,
         logdet_probe_check: bool = False,
         nu: float | None = None,
+        jacobian_T: int | None = None,
+        jacobian_shift: float = 0.0,
+        n_eff: int | None = None,
     ):
         super().__init__(
             y=y,
@@ -822,6 +842,9 @@ class GaussianSARGibbs(GibbsEstimation):
             logdet_aaa_check=logdet_aaa_check,
             logdet_probe_check=logdet_probe_check,
             nu=nu,
+            jacobian_T=jacobian_T,
+            jacobian_shift=jacobian_shift,
+            n_eff=n_eff,
         )
 
     def _spatial_param_name(self) -> str:
@@ -878,6 +901,9 @@ class GaussianSEMGibbs(GibbsEstimation):
         logdet_aaa_check: bool = False,
         logdet_probe_check: bool = False,
         nu: float | None = None,
+        jacobian_T: int | None = None,
+        jacobian_shift: float = 0.0,
+        n_eff: int | None = None,
     ):
         super().__init__(
             y=y,
@@ -897,6 +923,9 @@ class GaussianSEMGibbs(GibbsEstimation):
             logdet_aaa_check=logdet_aaa_check,
             logdet_probe_check=logdet_probe_check,
             nu=nu,
+            jacobian_T=jacobian_T,
+            jacobian_shift=jacobian_shift,
+            n_eff=n_eff,
         )
 
     def _spatial_param_name(self) -> str:

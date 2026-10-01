@@ -44,6 +44,7 @@ from ._backend import (
     _warn_sparse_auto_scipy_fallback_once,
 )
 from ._flow import (
+    FlowLogdetOp,
     SparseFlowSolveMatrixOp,
     SparseFlowSolveOp,
     _SparseFlowVJPMatrixOp,
@@ -70,6 +71,7 @@ from ._sar import (
 
 __all__ = [
     # Flow Ops
+    "FlowLogdetOp",
     "SparseFlowSolveOp",
     "SparseFlowSolveMatrixOp",
     # Kronecker Flow Ops

@@ -1263,17 +1263,38 @@ class SharedSpatialMethods:
     # Lazy logdet evaluators (cross-section is the T=1 case)
     # ------------------------------------------------------------------
 
+    # Likelihood dimensions.  A cross-section (and a pooled panel) counts
+    # every observation and applies the Jacobian T times; fixed-effects
+    # panels override these (Lee & Yu 2010; see ``SpatialPanelModel``).
+
+    @property
+    def _jacobian_T(self) -> int:
+        """Multiplier on the per-period Jacobian ``log|I - ρW|``."""
+        return getattr(self, "_T", 1)
+
+    @property
+    def _jacobian_shift(self) -> float:
+        """Coefficient ``m`` of the ``-m·log(1 - ρ)`` time-effects Jacobian term."""
+        return 0.0
+
+    @property
+    def _n_effective(self) -> int:
+        """Independent observations the Gaussian likelihood counts."""
+        return int(np.asarray(self._y).shape[0])
+
     @cached_property
     def _logdet_numpy_fn(self):
         """Pure-numpy ``(rho) -> float`` logdet evaluator (lazy)."""
         self._require_W()
+        # The time-effects term -m·log(1 - ρ) is not included: the Gibbs
+        # samplers that consume these add it themselves (``_jacobian_shift``).
         return make_logdet_numpy_fn(
             self._W_sparse,
             self._logdet_eigs,
             method=self._logdet_bounds.method,
             rho_min=self._logdet_bounds.rho_min,
             rho_max=self._logdet_bounds.rho_max,
-            T=getattr(self, "_T", 1),
+            T=self._jacobian_T,
         )
 
     @cached_property
@@ -1286,7 +1307,7 @@ class SharedSpatialMethods:
             method=self._logdet_bounds.method,
             rho_min=self._logdet_bounds.rho_min,
             rho_max=self._logdet_bounds.rho_max,
-            T=getattr(self, "_T", 1),
+            T=self._jacobian_T,
         )
 
     @cached_property
@@ -1312,15 +1333,24 @@ class SharedSpatialMethods:
 
     @cached_property
     def _logdet_pytensor_fn(self):
-        """PyTensor logdet evaluator used inside ``_build_pymc_model`` (lazy)."""
+        """PyTensor logdet evaluator used inside ``_build_pymc_model`` (lazy).
+
+        The full Jacobian NUTS adds, including any time-effects term.
+        """
         self._require_W()
-        return make_logdet_fn(
+        fn = make_logdet_fn(
             self._W_for_logdet,
             method=self._logdet_bounds.method,
             rho_min=self._logdet_bounds.rho_min,
             rho_max=self._logdet_bounds.rho_max,
-            T=getattr(self, "_T", 1),
+            T=self._jacobian_T,
         )
+        m = self._jacobian_shift
+        if not m:
+            return fn
+        import pytensor.tensor as pt
+
+        return lambda rho: fn(rho) - m * pt.log1p(-rho)
 
     # ------------------------------------------------------------------
     # Eigendecomposition-backed spatial-effect helpers

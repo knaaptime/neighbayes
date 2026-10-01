@@ -542,3 +542,54 @@ class SparseFlowSolveMatrixOp(_CachedSolverOpMixin, pt.Op):
         G = output_grads[0]
         grad_rd, grad_ro, grad_rw, grad_B = self._vjp_op(rd, ro, rw, H, G)
         return [grad_rd, grad_ro, grad_rw, grad_B]
+
+
+class FlowLogdetOp(pt.Op):
+    r"""Differentiable unrestricted flow log-determinant :math:`\log|A(\rho)|`.
+
+    Wraps an exact value-and-gradient evaluator such as
+    :class:`~neighbayes._logdet._flow_kron_traces.FlowKronTraceLogdet` for
+    :math:`A = I_N - \rho_d W_d - \rho_o W_o - \rho_w W_w`.  The single
+    ``perform`` returns the value and the three partial derivatives; the
+    pullback scales the latter by the upstream gradient.  Outside the region
+    where the evaluator converges the system is at or past the stability wall,
+    so the value is :math:`-\infty` (the limit of :math:`\log|A|` there) and
+    the proposal is rejected.
+
+    Parameters
+    ----------
+    logdet : callable
+        ``logdet(rho_d, rho_o, rho_w) -> (value, grad)`` with ``grad`` ordered
+        ``(d, o, w)``.
+    """
+
+    __props__ = ("_op_id",)
+
+    def __init__(self, logdet) -> None:
+        self._logdet = logdet
+        self._op_id = next(_op_id_counter)
+        super().__init__()
+
+    def make_node(self, rho_d, rho_o, rho_w):
+        inputs = [
+            pt.as_tensor_variable(r, dtype="float64") for r in (rho_d, rho_o, rho_w)
+        ]
+        return Apply(self, inputs, [pt.dscalar(), pt.dvector()])
+
+    def perform(self, node, inputs, outputs):
+        try:
+            value, grad = self._logdet(*(float(r) for r in inputs))
+        except ValueError:
+            value, grad = -np.inf, np.zeros(3)
+        outputs[0][0] = np.asarray(value, dtype=np.float64)
+        outputs[1][0] = np.asarray(grad, dtype=np.float64).reshape(3)
+
+    def infer_shape(self, node, input_shapes):
+        return [(), (3,)]
+
+    def pullback(self, inputs, outputs, output_grads):
+        g_value = output_grads[0]
+        grad = outputs[1]
+        # The gradient output is only consumed by this pullback; NUTS needs
+        # first derivatives, so its own cotangent is not propagated.
+        return [g_value * grad[k] for k in range(3)]

@@ -132,13 +132,19 @@ class _FlowEffectMoments:
     def order_for(self, rd, ro, rw, tol: float = 1e-12) -> int:
         """Series order bounding the neglected tail below ``tol`` (relative)."""
         w = self.w_inf
-        r = float(
-            np.max((np.abs(ro) + np.abs(rd)) * w + np.abs(rw) * w * w, initial=0.0)
-        )
+        rd, ro, rw = (np.asarray(x, dtype=np.float64) for x in (rd, ro, rw))
+        # A draw on the separable surface ρ_w = −ρ_d ρ_o has coefficients
+        # C_pq = ρ_o^p ρ_d^q, so its series converges whenever each ρ alone is
+        # inside the disc; the general bound would reject valid separable draws.
+        separable = np.abs(rw + rd * ro) <= 1e-12 * np.maximum(np.abs(rd * ro), 1e-300)
+        rd, ro, rw = np.abs(rd), np.abs(ro), np.abs(rw)
+        r_all = np.where(separable, np.maximum(rd, ro) * w, (ro + rd) * w + rw * w * w)
+        r = float(np.max(r_all, initial=0.0))
         if r >= 1.0:
             raise ValueError(
-                "Flow effects need |rho_d| + |rho_o| + |rho_w| < 1 (in the "
-                f"max-row-sum norm of W); a posterior draw reaches {r:.4f}."
+                "Flow effects need |rho_d| + |rho_o| + |rho_w| < 1 (or, on the "
+                "separable surface, |rho_d|, |rho_o| < 1) in the max-row-sum norm "
+                f"of W; a posterior draw reaches {r:.4f}."
             )
         if r == 0.0:
             return 1
@@ -768,9 +774,9 @@ class SARFlow(FlowModel):
     priors : dict, optional
         Override default priors. Supported keys:
 
-        - ``beta_mu`` : float, default 0.0 — Normal prior mean for ``beta``.
-        - ``beta_sigma`` : float, default 1e6 — Normal prior std for ``beta``.
-        - ``sigma_sigma`` : float, default 10.0 — HalfNormal prior std for ``sigma``.
+        - ``beta_mu`` : float or array, default Gelman et al. (2008) — Normal prior mean for ``beta`` (``mean(y)`` on the intercept, 0 otherwise).
+        - ``beta_sigma`` : float or array, default Gelman et al. (2008) — Normal prior std for ``beta``, scaled to ``sd(y)`` and each column's sd.
+        - ``sigma2_alpha``, ``sigma2_beta`` : float, default 2 and ``Var(y)`` — InverseGamma prior on ``sigma**2``.
         - ``rho_lower`` : float, default -1.0 — Lower bound of Uniform prior on each ρ (only when ``restrict_positive=False``).
         - ``rho_upper`` : float, default 1.0 — Upper bound of Uniform prior on each ρ (only when ``restrict_positive=False``).
 
@@ -843,6 +849,7 @@ class SARFlow(FlowModel):
             progressbar=progressbar,
             n_jobs=n_jobs,
             restrict_positive=self.restrict_positive,
+            priors=self._flow_gaussian_priors(),
             compute_log_likelihood=bool(
                 (idata_kwargs or {}).get("log_likelihood", False)
             ),
@@ -976,9 +983,9 @@ class SARFlowSeparable(FlowModel):
     priors : dict, optional
         Override default priors. Supported keys:
 
-        - ``beta_mu`` : float, default 0.0 — Normal prior mean for ``beta``.
-        - ``beta_sigma`` : float, default 1e6 — Normal prior std for ``beta``.
-        - ``sigma_sigma`` : float, default 10.0 — HalfNormal prior std for ``sigma``.
+        - ``beta_mu`` : float or array, default Gelman et al. (2008) — Normal prior mean for ``beta`` (``mean(y)`` on the intercept, 0 otherwise).
+        - ``beta_sigma`` : float or array, default Gelman et al. (2008) — Normal prior std for ``beta``, scaled to ``sd(y)`` and each column's sd.
+        - ``sigma2_alpha``, ``sigma2_beta`` : float, default 2 and ``Var(y)`` — InverseGamma prior on ``sigma**2``.
         - ``rho_lower`` : float, default -0.999 — Lower bound of Uniform prior on ``rho_d`` and ``rho_o``.
         - ``rho_upper`` : float, default 0.999 — Upper bound of Uniform prior on ``rho_d`` and ``rho_o``.
 
@@ -1001,9 +1008,8 @@ class SARFlowSeparable(FlowModel):
         super().__init__(y, X, W, **kwargs)
 
     def _build_pymc_model(self) -> pm.Model:
-        beta_mu = self.priors.get("beta_mu", 0.0)
-        beta_sigma = self.priors.get("beta_sigma", 1e6)
-        sigma_sigma = self.priors.get("sigma_sigma", 10.0)
+        pv = self._flow_gaussian_priors()
+        beta_mu, beta_sigma = pv["beta_mu"], pv["beta_sigma"]
         rho_lower = self.priors.get("rho_lower", -0.999)
         rho_upper = self.priors.get("rho_upper", 0.999)
 
@@ -1026,7 +1032,7 @@ class SARFlowSeparable(FlowModel):
             rho_w = pm.Deterministic("rho_w", -rho_d * rho_o)
 
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            sigma = pm.HalfNormal("sigma", sigma=sigma_sigma)
+            sigma = self._flow_sigma(pv)
 
             mu = rho_d * Wd_y_t + rho_o * Wo_y_t + rho_w * Ww_y_t + pt.dot(X_t, beta)
             pm.Normal("obs", mu=mu, sigma=sigma, observed=y_t)
@@ -1120,6 +1126,7 @@ def _compute_ols_flow_effects(
     feature_names: list[str],
     intra_idx: Optional[np.ndarray],
     draws: Optional[int],
+    beta_draws: Optional[np.ndarray] = None,
 ) -> dict[str, np.ndarray]:
     """Closed-form Thomas-Agnan & LeSage (2014, Table 83.1) effects.
 
@@ -1129,7 +1136,8 @@ def _compute_ols_flow_effects(
     which have :math:`\\mathbb{E}[y] = X\\beta` (no :math:`X`-mediated
     spillovers).
     """
-    beta_draws = idata.posterior["beta"].values.reshape(-1, len(feature_names))
+    if beta_draws is None:
+        beta_draws = idata.posterior["beta"].values.reshape(-1, len(feature_names))
 
     dest_start = 2
     orig_start = 2 + k_d
@@ -1214,9 +1222,9 @@ class OLSFlow(FlowModel):
     priors : dict, optional
         Override default priors. Supported keys:
 
-        - ``beta_mu`` : float, default 0.0 — Normal prior mean for ``beta``.
-        - ``beta_sigma`` : float, default 1e6 — Normal prior std for ``beta``.
-        - ``sigma_sigma`` : float, default 10.0 — HalfNormal prior std for ``sigma``.
+        - ``beta_mu`` : float or array, default Gelman et al. (2008) — Normal prior mean for ``beta`` (``mean(y)`` on the intercept, 0 otherwise).
+        - ``beta_sigma`` : float or array, default Gelman et al. (2008) — Normal prior std for ``beta``, scaled to ``sd(y)`` and each column's sd.
+        - ``sigma2_alpha``, ``sigma2_beta`` : float, default 2 and ``Var(y)`` — InverseGamma prior on ``sigma**2``.
 
         Spatial keys (``rho_*``) are ignored.
     symmetric_xo_xd : bool, optional
@@ -1236,16 +1244,15 @@ class OLSFlow(FlowModel):
         super().__init__(y, X, W, logdet_method="none", **kwargs)
 
     def _build_pymc_model(self) -> pm.Model:
-        beta_mu = self.priors.get("beta_mu", 0.0)
-        beta_sigma = self.priors.get("beta_sigma", 1e6)
-        sigma_sigma = self.priors.get("sigma_sigma", 10.0)
+        pv = self._flow_gaussian_priors()
+        beta_mu, beta_sigma = pv["beta_mu"], pv["beta_sigma"]
 
         X_t = pt.as_tensor_variable(self._X.astype(np.float64))
         y_t = pt.as_tensor_variable(self._y.astype(np.float64))
 
         with pm.Model(coords=self._model_coords()) as model:
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            sigma = pm.HalfNormal("sigma", sigma=sigma_sigma)
+            sigma = self._flow_sigma(pv)
             mu = pt.dot(X_t, beta)
             pm.Normal("obs", mu=mu, sigma=sigma, observed=y_t)
 
@@ -2264,9 +2271,9 @@ class SEMFlow(FlowModel):
     priors : dict, optional
         Override default priors. Supported keys:
 
-        - ``beta_mu`` : float, default 0.0 — Normal prior mean for ``beta``.
-        - ``beta_sigma`` : float, default 1e6 — Normal prior std for ``beta``.
-        - ``sigma_sigma`` : float, default 10.0 — HalfNormal prior std for ``sigma``.
+        - ``beta_mu`` : float or array, default Gelman et al. (2008) — Normal prior mean for ``beta`` (``mean(y)`` on the intercept, 0 otherwise).
+        - ``beta_sigma`` : float or array, default Gelman et al. (2008) — Normal prior std for ``beta``, scaled to ``sd(y)`` and each column's sd.
+        - ``sigma2_alpha``, ``sigma2_beta`` : float, default 2 and ``Var(y)`` — InverseGamma prior on ``sigma**2``.
         - ``lam_lower`` : float, default -1.0 — Lower bound of Uniform prior on each λ (only when ``restrict_positive=False``).
         - ``lam_upper`` : float, default 1.0 — Upper bound of Uniform prior on each λ (only when ``restrict_positive=False``).
 
@@ -2352,6 +2359,7 @@ class SEMFlow(FlowModel):
             progressbar=progressbar,
             n_jobs=n_jobs,
             restrict_positive=self.restrict_positive,
+            priors=self._flow_gaussian_priors(),
             compute_log_likelihood=bool(
                 (idata_kwargs or {}).get("log_likelihood", False)
             ),
@@ -2455,9 +2463,9 @@ class SEMFlowSeparable(SEMFlow):
     priors : dict, optional
         Override default priors. Supported keys:
 
-        - ``beta_mu`` : float, default 0.0 — Normal prior mean for ``beta``.
-        - ``beta_sigma`` : float, default 1e6 — Normal prior std for ``beta``.
-        - ``sigma_sigma`` : float, default 10.0 — HalfNormal prior std for ``sigma``.
+        - ``beta_mu`` : float or array, default Gelman et al. (2008) — Normal prior mean for ``beta`` (``mean(y)`` on the intercept, 0 otherwise).
+        - ``beta_sigma`` : float or array, default Gelman et al. (2008) — Normal prior std for ``beta``, scaled to ``sd(y)`` and each column's sd.
+        - ``sigma2_alpha``, ``sigma2_beta`` : float, default 2 and ``Var(y)`` — InverseGamma prior on ``sigma**2``.
         - ``lam_lower`` : float, default -0.999 — Lower bound of Uniform prior on ``lam_d`` and ``lam_o``.
         - ``lam_upper`` : float, default 0.999 — Upper bound of Uniform prior on ``lam_d`` and ``lam_o``.
 
@@ -2480,9 +2488,8 @@ class SEMFlowSeparable(SEMFlow):
         super().__init__(y, X, W, **kwargs)
 
     def _build_pymc_model(self) -> pm.Model:
-        beta_mu = self.priors.get("beta_mu", 0.0)
-        beta_sigma = self.priors.get("beta_sigma", 1e6)
-        sigma_sigma = self.priors.get("sigma_sigma", 10.0)
+        pv = self._flow_gaussian_priors()
+        beta_mu, beta_sigma = pv["beta_mu"], pv["beta_sigma"]
         lam_lower = self.priors.get("lam_lower", -0.999)
         lam_upper = self.priors.get("lam_upper", 0.999)
 
@@ -2507,7 +2514,7 @@ class SEMFlowSeparable(SEMFlow):
             lam_w = pm.Deterministic("lam_w", -lam_d * lam_o)
 
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            sigma = pm.HalfNormal("sigma", sigma=sigma_sigma)
+            sigma = self._flow_sigma(pv)
 
             mu = (
                 lam_d * Wd_y_t

@@ -95,12 +95,18 @@ class WarmupProbes:
         self.probe_check: ProbeCheck | None = None
 
     @classmethod
-    def for_sampler(cls, W_sparse, *, T: int = 1, **kwargs):
-        """Build from a sampler's lag matrix; a panel's is ``I_T ⊗ W``, so take one block."""
+    def for_sampler(
+        cls, W_sparse, *, T: int = 1, jacobian_T: int | None = None, **kwargs
+    ):
+        """Build from a sampler's lag matrix; a panel's is ``I_T ⊗ W``, so take one block.
+
+        ``T`` slices the block; ``jacobian_T`` (default ``T``) multiplies the
+        Jacobian, ``T - 1`` for a unit fixed-effects panel (Lee & Yu 2010).
+        """
         T = int(T)
         n_units = W_sparse.shape[0] // T
         W = W_sparse[:n_units, :n_units] if T > 1 else W_sparse
-        return cls(W, T=T, **kwargs)
+        return cls(W, T=T if jacobian_T is None else int(jacobian_T), **kwargs)
 
     def adapts(self, tune: int) -> bool:
         """Whether a warmup of ``tune`` iterations has a midpoint to size the pool at."""

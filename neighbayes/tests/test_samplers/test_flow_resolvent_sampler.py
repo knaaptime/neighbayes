@@ -94,11 +94,11 @@ def test_Ay_is_linear_in_rho():
 
 
 def test_beta_sigma2_gibbs_runs():
-    """The conjugate β, σ² draw returns finite values of the right shape."""
+    """The β | σ², σ² | β draw returns finite values of the right shape."""
     W, y, X = _directed_flow_data(n=12, seed=2)
     tgt = FlowResolventTarget(W, y, X, logdet_value_and_grad=_exact_value_and_grad(W))
     beta, sigma2 = tgt.draw_beta_sigma2(
-        np.array([0.3, 0.2, -0.05]), np.random.default_rng(0)
+        np.array([0.3, 0.2, -0.05]), np.random.default_rng(0), 1.0
     )
     assert beta.shape == (2,)
     assert np.isfinite(beta).all() and np.isfinite(sigma2) and sigma2 > 0

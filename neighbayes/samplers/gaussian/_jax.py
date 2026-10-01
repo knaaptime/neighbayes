@@ -179,6 +179,15 @@ def _precompute_gibbs_constants(y, X, Wy, W_sparse, is_sar: bool):
 # ---------------------------------------------------------------------------
 
 
+def _with_shift(logdet_vec_fn, shift: float):
+    """``logdet_vec_fn`` plus the ``-m·log(1 - ρ)`` time-effects term, if any."""
+    if not shift:
+        return logdet_vec_fn
+    return lambda rho: (
+        logdet_vec_fn(rho) - shift * np.log1p(-np.asarray(rho, dtype=np.float64))
+    )
+
+
 def _make_gaussian_gibbs_step(
     y_jax,
     X_jax,
@@ -202,8 +211,15 @@ def _make_gaussian_gibbs_step(
     model_type: str,
     logdet_param_fn=None,
     nu: float | None = None,
+    n_eff: int | None = None,
+    jacobian_shift: float = 0.0,
 ):
     """Build a JIT-compiled Gaussian Gibbs step with data bound into the closure.
+
+    ``n_eff`` (default ``n``) is the number of independent observations the
+    σ² draw counts, and ``jacobian_shift`` the coefficient m of the
+    ``-m·log(1 - ρ)`` time-effects Jacobian term; both are for fixed-effects
+    panels (Lee & Yu 2010).
 
     Creates a ``@eqx.filter_jit``-compiled function that performs one
     complete 3-block Gibbs sweep (β, σ², ρ/λ) in a single XLA kernel
@@ -259,6 +275,7 @@ def _make_gaussian_gibbs_step(
     import jax.numpy as jnp
 
     ensure_x64()
+    n_obs = n if n_eff is None else int(n_eff)
 
     is_sar = model_type in ("sar", "sdm")
 
@@ -300,11 +317,19 @@ def _make_gaussian_gibbs_step(
         rho_lo = state.rho_lo
         rho_hi = state.rho_hi
         if logdet_param_fn is None:
-            _logdet_of = logdet_jax
+            _logdet_base = logdet_jax
         else:
 
-            def _logdet_of(param_val):
+            def _logdet_base(param_val):
                 return logdet_param_fn(param_val, state.logdet_params)
+
+        if jacobian_shift:
+
+            def _logdet_of(param_val):
+                return _logdet_base(param_val) - jacobian_shift * jnp.log1p(-param_val)
+
+        else:
+            _logdet_of = _logdet_base
 
         # Partially collapsed sweep: [v | β, σ², ρ →] σ² | β, ρ →
         # ρ | σ² (β integrated out under its Normal prior) → β | ρ, σ².  β must
@@ -347,7 +372,7 @@ def _make_gaussian_gibbs_step(
 
         # ── Block 1: σ² | β, ρ/λ[, v], y — conjugate InverseGamma draw ──
         # Prior σ² ~ InverseGamma(α, β), matching the NUTS path.
-        a_post = sigma2_alpha_jax + jnp.float64(n / 2.0)
+        a_post = sigma2_alpha_jax + jnp.float64(n_obs / 2.0)
         b_post = sigma2_beta_jax + 0.5 * ss
         sigma2_inv = jax.random.gamma(key_sigma2, a_post) / b_post
         sigma2_new = jnp.maximum(1.0 / sigma2_inv, 1e-10)
@@ -548,6 +573,8 @@ def run_chain_jax_gaussian(
     logdet_param_fn=None,
     logdet_params=None,
     nu: float | None = None,
+    n_eff: int | None = None,
+    jacobian_shift: float = 0.0,
 ):
     """Run one chain of the full-JIT JAX Gaussian Gibbs sampler.
 
@@ -687,6 +714,8 @@ def run_chain_jax_gaussian(
         model_type=model_type,
         logdet_param_fn=logdet_param_fn,
         nu=nu,
+        n_eff=n_eff,
+        jacobian_shift=jacobian_shift,
     )
 
     key = jax.random.PRNGKey(rng.integers(2**31))
@@ -747,7 +776,7 @@ def run_chain_jax_gaussian(
             y=y,
             X=X,
             Wy=Wy,
-            logdet_vec_fn=logdet_vec_fn,
+            logdet_vec_fn=_with_shift(logdet_vec_fn, jacobian_shift),
             n=n,
             nu=nu,
         )
@@ -759,7 +788,7 @@ def run_chain_jax_gaussian(
             y=y,
             X=X,
             W_sparse=W_sparse,
-            logdet_vec_fn=logdet_vec_fn,
+            logdet_vec_fn=_with_shift(logdet_vec_fn, jacobian_shift),
             n=n,
             nu=nu,
         )
@@ -803,6 +832,8 @@ def run_chains_jax_gibbs_vectorized(
     refit_hook=None,
     log_likelihood: bool = True,
     nu: float | None = None,
+    n_eff: int | None = None,
+    jacobian_shift: float = 0.0,
 ) -> list[dict]:
     """Run multiple JAX Gibbs chains via ``jax.vmap``.
 
@@ -905,6 +936,8 @@ def run_chains_jax_gibbs_vectorized(
         model_type=model_type,
         logdet_param_fn=logdet_param_fn,
         nu=nu,
+        n_eff=n_eff,
+        jacobian_shift=jacobian_shift,
     )
 
     # Convert NumPy initial states to JAX states, then batch into a
@@ -1112,7 +1145,7 @@ def run_chains_jax_gibbs_vectorized(
                 y=y,
                 X=X,
                 Wy=Wy,
-                logdet_vec_fn=logdet_vec_fn,
+                logdet_vec_fn=_with_shift(logdet_vec_fn, jacobian_shift),
                 n=n,
                 nu=nu,
             )
@@ -1124,7 +1157,7 @@ def run_chains_jax_gibbs_vectorized(
                 y=y,
                 X=X,
                 W_sparse=W_sparse,
-                logdet_vec_fn=logdet_vec_fn,
+                logdet_vec_fn=_with_shift(logdet_vec_fn, jacobian_shift),
                 n=n,
                 nu=nu,
             )
