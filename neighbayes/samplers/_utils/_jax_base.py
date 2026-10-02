@@ -1,7 +1,7 @@
 """Factory for JAX-compatible Gibbs state classes.
 
 The pattern ``if _eqx_available(): class JAX...State(eqx.Module): ... else: class JAX...State: raise ImportError``
-is repeated across negbin, logit, gaussian, and panel_flow samplers.
+is repeated across the negbin, logit and gaussian samplers.
 This module provides a factory that creates the equinox.Module subclass
 (or stub) once, caching the result so ``jax.lax.scan`` sees a stable type.
 """

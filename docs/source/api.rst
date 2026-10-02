@@ -143,7 +143,6 @@ Default Gibbs Priors
    LogitGibbsPriors
    SEMLogitGibbsPriors
    REGibbsPriors
-   PanelGaussianPriors
 
 Default NUTS Priors
 ---------------------

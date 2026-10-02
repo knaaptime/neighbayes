@@ -247,7 +247,6 @@ _GIBBS_PRIOR_STRUCTS = {
     "LogitGibbsPriors",
     "SEMLogitGibbsPriors",
     "REGibbsPriors",
-    "PanelGaussianPriors",
 }
 
 

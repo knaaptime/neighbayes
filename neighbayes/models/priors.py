@@ -40,8 +40,7 @@ Two independent families live here:
   the numpy/JAX kernels consume (``GibbsBasePriors`` →
   ``GaussianGibbsPriors`` / ``LogitGibbsPriors`` / ``REGibbsPriors``;
   standalone ``GibbsPriors``, ``ReducedGibbsPriors``,
-  ``FlowReducedGibbsPriors``, ``ZINBGibbsPriors``, ``SEMLogitGibbsPriors``,
-  ``PanelGaussianPriors``).  Models build these internally in
+  ``FlowReducedGibbsPriors``, ``ZINBGibbsPriors``, ``SEMLogitGibbsPriors``).  Models build these internally in
   ``_fit_gibbs``; they are not part of the user-facing ``priors=`` API.
 """
 
@@ -685,47 +684,6 @@ class REGibbsPriors(GibbsBasePriors):
     sigma_alpha_scale: float = 1.0
 
 
-@dataclass
-class PanelGaussianPriors:
-    r"""Prior hyperparameters for the Gaussian panel flow Gibbs sampler.
-
-    All priors are weakly informative by default, matching the
-    ``GibbsPriors`` / ``FlowGibbsPriors`` convention.
-
-    Parameters
-    ----------
-    beta_mu : float, default 0.0
-        Normal prior mean for :math:`\beta`.
-    beta_sigma : float, default 1e6
-        Normal prior standard deviation for :math:`\beta`.
-    sigma2_alpha : float, default 2.0
-        Inverse-Gamma shape for :math:`\sigma^2_u`.
-    sigma2_beta : float, default 1.0
-        Inverse-Gamma scale for :math:`\sigma^2_u`.
-    sigma2_y_alpha : float, default 2.0
-        Inverse-Gamma shape for :math:`\sigma^2_y`.
-    sigma2_y_beta : float, default 1.0
-        Inverse-Gamma scale for :math:`\sigma^2_y`.
-    gamma_prior_var : float, default 1.0
-        Prior variance for :math:`\gamma \sim N(0, \sigma^2_\gamma)`
-        truncated to :math:`(-1, 1)`.
-    rho_lower : float, default -0.999
-        Lower bound for :math:`\rho_d, \rho_o`.
-    rho_upper : float, default 0.999
-        Upper bound for :math:`\rho_d, \rho_o`.
-    """
-
-    beta_mu: float | np.ndarray = 0.0
-    beta_sigma: float | np.ndarray = 1e6
-    sigma2_alpha: float = 2.0
-    sigma2_beta: float = 1.0
-    sigma2_y_alpha: float = 2.0
-    sigma2_y_beta: float = 1.0
-    gamma_prior_var: float = 1.0
-    rho_lower: float = -0.999
-    rho_upper: float = 0.999
-
-
 __all__ = [
     "BasePriors",
     "OLSPriors",
@@ -773,7 +731,6 @@ __all__ = [
     "LogitGibbsPriors",
     "SEMLogitGibbsPriors",
     "REGibbsPriors",
-    "PanelGaussianPriors",
     "PriorsLike",
     "resolve_priors",
     "priors_as_dict",
