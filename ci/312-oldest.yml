@@ -13,14 +13,15 @@ channels:
 dependencies:
   - python=3.12
   # runtime floors — keep in sync with pyproject.toml
-  - pymc=5.16
-  - arviz=0.18
+  - pymc=6.3
+  - pytensor=3.3.2
+  - arviz=1.1
   - libpysal=4.9
   - formulaic=1.0
   - lazy_loader=0.4
-  - numpy=1.26
-  - scipy=1.11
-  - pandas=2.1
+  - numpy=2.0
+  - scipy=1.14
+  - pandas=2.2
   - polyagamma=2.0
   - scikit-sparse=0.5
   # test-only and optional extras float: this job pins the runtime floor,

@@ -43,6 +43,34 @@ from ..._logdet._flow_resolvent import (
 )
 
 
+def resolve_flow_logdet(W, method: str = "auto"):
+    """Pick the unrestricted flow log-determinant backend.
+
+    ``"auto"`` uses the exact trace-moment method
+    (:class:`~neighbayes._logdet._flow_kron_traces.FlowKronTraceLogdet`) when ``W``
+    is undirected (D-symmetrizable, so its spectrum is real and the Chebyshev
+    basis converges up to the stability wall), and the stochastic resolvent
+    estimator (``"jax"``) for directed ``W``.  ``"kron_traces"`` forces the exact
+    method (Taylor basis for directed ``W``, which is slow near the wall).
+
+    Returns ``(logdet_value_and_grad or None, resolved_method)``; ``None`` means
+    each chain's target builds its own resolvent estimator.
+    """
+    if method == "auto":
+        from ..._logdet._config import _is_symmetric_W
+
+        method = "kron_traces" if _is_symmetric_W(W) else "jax"
+    if method == "kron_traces":
+        from ..._logdet._flow_kron_traces import FlowKronTraceLogdet
+
+        return FlowKronTraceLogdet(W), method
+    if method not in ("jax", "numpy"):
+        raise ValueError(
+            f"logdet_method must be 'auto', 'kron_traces', 'jax' or 'numpy', got {method!r}"
+        )
+    return None, method
+
+
 def _default_logdet_value_and_grad(kron, probes):
     """Resolvent value+grad closure sharing frozen probes across a chain.
 
@@ -77,6 +105,69 @@ def _jax_logdet_value_and_grad(kron, probes, n_quad=8):
         return float(v), np.asarray(g)
 
     return _fn
+
+
+def _fe_jacobian(target, ld_val, ld_grad, rho):
+    """The likelihood's Jacobian ``(value, grad)`` from ``log|A|`` and its gradient.
+
+    ``jacobian_T·log|A|``, less ``m·log(1 - Σρ)`` under time fixed effects,
+    whose derivative is ``m / (1 - Σρ)`` in each of the three parameters.
+    """
+    val = target.jacobian_T * ld_val
+    grad = target.jacobian_T * np.asarray(ld_grad, dtype=np.float64)
+    m = target.jacobian_shift
+    if m:
+        one_minus = 1.0 - float(np.sum(rho))
+        val = val - m * np.log(one_minus)
+        grad = grad + m / one_minus
+    return val, grad
+
+
+def _resolve_priors(target) -> None:
+    """Fill a flow target's prior fields with their data-scaled defaults."""
+    from ...models._base._shared import gelman_default_beta_prior
+
+    k = target.X.shape[1]
+    if target.beta_mu is None or target.beta_sigma is None:
+        mu, sd = gelman_default_beta_prior(
+            target.y, target.X, [f"x{j}" for j in range(k)]
+        )
+        target.beta_mu = mu if target.beta_mu is None else target.beta_mu
+        target.beta_sigma = sd if target.beta_sigma is None else target.beta_sigma
+    target.beta_mu = np.broadcast_to(
+        np.asarray(target.beta_mu, dtype=np.float64), (k,)
+    ).copy()
+    target.beta_sigma = np.broadcast_to(
+        np.asarray(target.beta_sigma, dtype=np.float64), (k,)
+    ).copy()
+    target.sigma2_alpha = float(target.sigma2_alpha)
+    if target.sigma2_beta is None:
+        target.sigma2_beta = float(np.var(target.y))
+    target.sigma2_beta = float(target.sigma2_beta)
+
+
+def _draw_beta_sigma2(target, X, XtX, e, sigma2, rng):
+    """``β | σ²`` under the Normal prior, then ``σ² | β`` under the IG prior.
+
+    ``e`` is the filtered response (``A y`` for SAR, ``A y`` with ``X = A X``
+    for SEM).  The β prior is independent of σ², so the two are drawn from
+    their full conditionals in turn.  σ² counts ``n_eff`` observations (Lee &
+    Yu's fixed-effects dimension for panels).
+    """
+    prior_prec = 1.0 / target.beta_sigma**2
+    P = XtX / sigma2
+    P[np.diag_indices_from(P)] += prior_prec
+    L = np.linalg.cholesky(P)
+    m = scipy.linalg.cho_solve(
+        (L, True), X.T @ e / sigma2 + prior_prec * target.beta_mu
+    )
+    z = rng.standard_normal(X.shape[1])
+    beta = m + scipy.linalg.solve_triangular(L, z, lower=True, trans="T")
+    r = e - X @ beta
+    a_n = target.sigma2_alpha + 0.5 * target.n_eff
+    b_n = target.sigma2_beta + 0.5 * float(r @ r)
+    sigma2 = 1.0 / rng.gamma(a_n, 1.0 / b_n)
+    return beta, sigma2
 
 
 @dataclass
@@ -114,6 +205,20 @@ class FlowResolventTarget:
     seed: int | np.random.SeedSequence = 0
     logdet_method: str = "jax"
     n_quad: int = 8
+    # Fixed-effects panels (Lee & Yu 2010): the Jacobian multiplier (default
+    # ``T``; ``T`` itself still indexes periods), the independent observations
+    # σ² counts (default ``Nf·T``), and the coefficient m of the time-effects
+    # term -m·log(1 - ρ_d - ρ_o - ρ_w).
+    jacobian_T: int | None = None
+    n_eff: int | None = None
+    jacobian_shift: float = 0.0
+    # Priors, identical to the NUTS build: β ~ N(beta_mu, diag(beta_sigma²))
+    # (default Gelman et al. 2008, scaled to y and each column of X) and
+    # σ² ~ IG(sigma2_alpha, sigma2_beta) (default IG(2, Var y)).
+    beta_mu: np.ndarray | None = None
+    beta_sigma: np.ndarray | None = None
+    sigma2_alpha: float = 2.0
+    sigma2_beta: float | None = None
 
     def __post_init__(self):
         self.kron = FlowKron(self.W)
@@ -121,12 +226,15 @@ class FlowResolventTarget:
         self.Nf = self.kron.N  # per-period flow count = n²
         self.T = int(self.T)
         self.Ntot = self.Nf * self.T
+        self.jacobian_T = self.T if self.jacobian_T is None else int(self.jacobian_T)
+        self.n_eff = self.Ntot if self.n_eff is None else int(self.n_eff)
         self.y = np.asarray(self.y, dtype=np.float64).ravel()
         self.X = np.asarray(self.X, dtype=np.float64)
         if self.y.shape[0] != self.Ntot:
             raise ValueError(
                 f"y has length {self.y.shape[0]}, expected Nf*T = {self.Ntot}."
             )
+        _resolve_priors(self)
         # Per-period spatial lags W_k y (stacked over T); make the data term
         # linear in ρ.  The panel operator is block-diagonal I_T ⊗ (I_N − W_F),
         # so each period's block gets the cross-sectional W_k.
@@ -138,8 +246,6 @@ class FlowResolventTarget:
             ]
         )
         self.XtX = self.X.T @ self.X
-        # Cached Cholesky factor of XtX (used by draw_beta_sigma2).
-        self._XtX_cho = scipy.linalg.cho_factor(self.XtX, lower=True)
         self._last_ld_val = 0.0  # cached per-period log|A| for the Jacobian
         self._cached_rho = None  # cache key for logdet reuse after Gibbs
         self._cached_ld_val = 0.0
@@ -185,10 +291,12 @@ class FlowResolventTarget:
 
     # -- ρ-conditional target ---------------------------------------------
     def logpost_and_grad(self, rho, beta, sigma2):
-        """Return ``(logp, grad3)`` of ``log p(ρ | β, σ²)`` (flat prior in-bounds).
+        """Return ``(logp, grad3)`` of ``log p(ρ | β, σ²)`` (flat ρ prior in-bounds).
 
         ``log|A_panel| = T·log|I_N − W_F|`` so the log-determinant value/gradient
-        are scaled by ``T`` (``T=1`` for the cross-section).  The per-period
+        are scaled by ``jacobian_T`` (``T``, or ``T − 1`` under Lee & Yu's
+        pair-effect correction; ``1`` for the cross-section), less any
+        time-effect ``m·log(1 − Σρ)`` (see :func:`_fe_jacobian`).  The per-period
         ``log|A|`` value is cached in ``self._last_ld_val`` so the sampler can attach
         the change-of-variables Jacobian to the ``log_likelihood`` group.
 
@@ -207,9 +315,10 @@ class FlowResolventTarget:
         self._cached_rho = rho.copy()
         self._cached_ld_val = ld_val
         self._cached_ld_grad = np.asarray(ld_grad, dtype=np.float64)
-        logp = self.T * ld_val - 0.5 * float(r @ r) / sigma2
+        jac, jac_grad = _fe_jacobian(self, ld_val, self._cached_ld_grad, rho)
+        logp = jac - 0.5 * float(r @ r) / sigma2
         # d/dρ_k [-||r||²/2σ²] = (rᵀ L_k)/σ²  since ∂r/∂ρ_k = -L_k
-        grad = self.T * self._cached_ld_grad + (self.L.T @ r) / sigma2
+        grad = jac_grad + (self.L.T @ r) / sigma2
         return logp, grad
 
     def logpost_cached(self, rho, beta, sigma2):
@@ -224,27 +333,16 @@ class FlowResolventTarget:
         ld_val = self._cached_ld_val
         ld_grad = self._cached_ld_grad
         self._last_ld_val = float(ld_val)
-        logp = self.T * ld_val - 0.5 * float(r @ r) / sigma2
-        grad = self.T * ld_grad + (self.L.T @ r) / sigma2
+        jac, jac_grad = _fe_jacobian(self, ld_val, ld_grad, rho)
+        logp = jac - 0.5 * float(r @ r) / sigma2
+        grad = jac_grad + (self.L.T @ r) / sigma2
         return logp, grad
 
     # -- conjugate Gibbs updates for β, σ² given ρ ------------------------
-    def draw_beta_sigma2(self, rho, rng, a0=1e-3, b0=1e-3):
-        """Draw ``(β, σ²)`` from their conjugate conditionals given ρ."""
+    def draw_beta_sigma2(self, rho, rng, sigma2):
+        """Draw ``β | σ², ρ`` then ``σ² | β, ρ`` from their full conditionals."""
         e = self.Ay(rho)
-        bhat = scipy.linalg.cho_solve(self._XtX_cho, self.X.T @ e)
-        resid = e - self.X @ bhat
-        sse = float(resid @ resid)
-        # σ² | ρ  (inverse-gamma with weak prior)
-        a_n = a0 + self.Ntot / 2.0
-        b_n = b0 + 0.5 * sse
-        sigma2 = 1.0 / rng.gamma(a_n, 1.0 / b_n)
-        # β | ρ, σ²  (Normal): bhat + sqrt(σ²) · (L')⁻¹ z
-        z = rng.standard_normal(self.X.shape[1])
-        beta = bhat + np.sqrt(sigma2) * scipy.linalg.solve_triangular(
-            self._XtX_cho[0], z, lower=True, trans="T"
-        )
-        return beta, sigma2
+        return _draw_beta_sigma2(self, self.X, self.XtX, e, sigma2, rng)
 
 
 def _lag_matrix(kron: FlowKron, M: np.ndarray, which: str, T: int = 1) -> np.ndarray:
@@ -288,6 +386,20 @@ class SEMFlowResolventTarget:
     seed: int | np.random.SeedSequence = 0
     logdet_method: str = "jax"
     n_quad: int = 8
+    # Fixed-effects panels (Lee & Yu 2010): the Jacobian multiplier (default
+    # ``T``; ``T`` itself still indexes periods), the independent observations
+    # σ² counts (default ``Nf·T``), and the coefficient m of the time-effects
+    # term -m·log(1 - ρ_d - ρ_o - ρ_w).
+    jacobian_T: int | None = None
+    n_eff: int | None = None
+    jacobian_shift: float = 0.0
+    # Priors, identical to the NUTS build: β ~ N(beta_mu, diag(beta_sigma²))
+    # (default Gelman et al. 2008, scaled to y and each column of X) and
+    # σ² ~ IG(sigma2_alpha, sigma2_beta) (default IG(2, Var y)).
+    beta_mu: np.ndarray | None = None
+    beta_sigma: np.ndarray | None = None
+    sigma2_alpha: float = 2.0
+    sigma2_beta: float | None = None
 
     def __post_init__(self):
         self.kron = FlowKron(self.W)
@@ -295,12 +407,15 @@ class SEMFlowResolventTarget:
         self.Nf = self.kron.N
         self.T = int(self.T)
         self.Ntot = self.Nf * self.T
+        self.jacobian_T = self.T if self.jacobian_T is None else int(self.jacobian_T)
+        self.n_eff = self.Ntot if self.n_eff is None else int(self.n_eff)
         self.y = np.asarray(self.y, dtype=np.float64).ravel()
         self.X = np.asarray(self.X, dtype=np.float64)
         if self.y.shape[0] != self.Ntot:
             raise ValueError(
                 f"y has length {self.y.shape[0]}, expected Nf*T = {self.Ntot}."
             )
+        _resolve_priors(self)
         # Per-period lags of y (Ntot,3) and of each design column (Ntot,k).
         y2 = self.y[:, None]
         self.L_y = np.column_stack(
@@ -362,7 +477,8 @@ class SEMFlowResolventTarget:
         self._cached_rho = rho.copy()
         self._cached_ld_val = ld_val
         self._cached_ld_grad = np.asarray(ld_grad, dtype=np.float64)
-        logp = self.T * ld_val - 0.5 * float(r @ r) / sigma2
+        jac, jac_grad = _fe_jacobian(self, ld_val, self._cached_ld_grad, rho)
+        logp = jac - 0.5 * float(r @ r) / sigma2
         # W_k e = W_k y - W_k X β ;  d/dλ_k[-||r||²/2σ²] = (rᵀ W_k e)/σ²
         WkE = np.column_stack(
             [
@@ -371,7 +487,7 @@ class SEMFlowResolventTarget:
                 self.L_y[:, 2] - self.WwX @ beta,
             ]
         )
-        grad = self.T * self._cached_ld_grad + (WkE.T @ r) / sigma2
+        grad = jac_grad + (WkE.T @ r) / sigma2
         return logp, grad
 
     def logpost_cached(self, rho, beta, sigma2):
@@ -382,7 +498,8 @@ class SEMFlowResolventTarget:
         ld_val = self._cached_ld_val
         ld_grad = self._cached_ld_grad
         self._last_ld_val = float(ld_val)
-        logp = self.T * ld_val - 0.5 * float(r @ r) / sigma2
+        jac, jac_grad = _fe_jacobian(self, ld_val, ld_grad, rho)
+        logp = jac - 0.5 * float(r @ r) / sigma2
         WkE = np.column_stack(
             [
                 self.L_y[:, 0] - self.WdX @ beta,
@@ -390,24 +507,13 @@ class SEMFlowResolventTarget:
                 self.L_y[:, 2] - self.WwX @ beta,
             ]
         )
-        grad = self.T * ld_grad + (WkE.T @ r) / sigma2
+        grad = jac_grad + (WkE.T @ r) / sigma2
         return logp, grad
 
-    def draw_beta_sigma2(self, rho, rng, a0=1e-3, b0=1e-3):
+    def draw_beta_sigma2(self, rho, rng, sigma2):
+        """Draw ``β | σ², λ`` (GLS) then ``σ² | β, λ`` from their full conditionals."""
         ytil, Xtil = self._whiten(rho)
-        XtX = Xtil.T @ Xtil
-        # Cholesky-based solve: faster and more stable than forming inv(XtX).
-        L = np.linalg.cholesky(XtX)  # XtX = L L'
-        bhat = scipy.linalg.cho_solve((L, True), Xtil.T @ ytil)
-        resid = ytil - Xtil @ bhat
-        sse = float(resid @ resid)
-        sigma2 = 1.0 / rng.gamma(a0 + self.Ntot / 2.0, 1.0 / (b0 + 0.5 * sse))
-        # β draw: bhat + sqrt(σ²) · (L')⁻¹ z  (cov = σ² (L L')⁻¹ = σ² (L')⁻¹ L⁻¹)
-        z = rng.standard_normal(self.X.shape[1])
-        beta = bhat + np.sqrt(sigma2) * scipy.linalg.solve_triangular(
-            L, z, lower=True, trans="T"
-        )
-        return beta, sigma2
+        return _draw_beta_sigma2(self, Xtil, Xtil.T @ Xtil, ytil, sigma2, rng)
 
 
 def run_flow_resolvent_gibbs(
@@ -436,7 +542,7 @@ def run_flow_resolvent_gibbs(
     """
     rng = np.random.default_rng(seed)
     rho = np.zeros(3) if rho_init is None else np.asarray(rho_init, dtype=np.float64)
-    beta, sigma2 = target.draw_beta_sigma2(rho, rng)
+    beta, sigma2 = target.draw_beta_sigma2(rho, rng, target.sigma2_beta)
     logp, grad = target.logpost_and_grad(rho, beta, sigma2)
 
     out = {k: [] for k in ("rho_d", "rho_o", "rho_w", "beta", "sigma", "log_abs_det")}
@@ -480,7 +586,7 @@ def run_flow_resolvent_gibbs(
                 accepted_window = 0
                 window = 0
         # --- Gibbs β, σ² ---
-        beta, sigma2 = target.draw_beta_sigma2(rho, rng)
+        beta, sigma2 = target.draw_beta_sigma2(rho, rng, sigma2)
         # ρ unchanged after Gibbs β/σ² update — reuse cached logdet (50% fewer GMRES solves)
         logp, grad = target.logpost_cached(rho, beta, sigma2)
         if it >= tune:
@@ -491,7 +597,8 @@ def run_flow_resolvent_gibbs(
             out["sigma"].append(np.sqrt(sigma2))
             # log|A| for this draw (cached by the last logpost_and_grad call above).
             ld_val = target._last_ld_val
-            out["log_abs_det"].append(target.T * ld_val)
+            jac, _ = _fe_jacobian(target, ld_val, np.zeros(3), rho)
+            out["log_abs_det"].append(jac)
             if compute_log_likelihood:
                 # Pointwise Gaussian log-density of the whitened/filtered residual,
                 # plus the joint change-of-variables Jacobian T·log|A| spread evenly
@@ -501,7 +608,7 @@ def run_flow_resolvent_gibbs(
                     -_half_log_2pi
                     - 0.5 * np.log(sigma2)
                     - 0.5 * (r * r) / sigma2
-                    + (target.T * ld_val) / target.Ntot
+                    + jac / target.Ntot
                 )
                 out["loglik"].append(ll)
         # --- progress bar ---
@@ -529,17 +636,22 @@ def _sample_flow_chains(
     compute_log_likelihood: bool = True,
     progressbar: bool = True,
     n_jobs: int = -1,
-    logdet_method: str = "jax",
+    logdet_method: str = "auto",
     n_quad: int = 8,
     positive: bool = False,
+    fe_dims: dict | None = None,
+    priors: dict | None = None,
 ):
-    """Run ``chains`` MALA-within-Gibbs chains for a flow target → InferenceData.
+    """Run ``chains`` MALA-within-Gibbs chains for a flow target → DataTree.
+
+    ``fe_dims`` (``jacobian_T``, ``n_eff``, ``jacobian_shift``) carries a
+    fixed-effects panel's likelihood dimensions to the target.
 
     ``param_prefix`` is ``"rho"`` (SAR flow) or ``"lam"`` (SEM flow); λ and ρ are
     otherwise interchangeable (same resolvent log-det, same sampler).  The returned
-    ``InferenceData`` carries the per-draw Jacobian ``log|A|`` in ``sample_stats`` and
+    ``DataTree`` carries the per-draw Jacobian ``log|A|`` in ``sample_stats`` and
     — when ``compute_log_likelihood`` — a pointwise ``log_likelihood`` group (Gaussian
-    density + change-of-variables Jacobian) so ``az.loo`` / ``az.waic`` work directly.
+    density + change-of-variables Jacobian) so ``az.loo`` work directly.
 
     When ``parallel=True``, chains are dispatched via ``run_chains`` (joblib
     process-based parallelism with shared-memory progress bars), matching the
@@ -557,12 +669,19 @@ def _sample_flow_chains(
 
     seeds = spawn_chain_seeds(random_seed, chains)
 
+    if logdet_value_and_grad is None:
+        # Built once and shared by every chain: the exact method's trace moments
+        # are the one-time cost.
+        logdet_value_and_grad, logdet_method = resolve_flow_logdet(W, logdet_method)
+
     def _chain_fn(chain_id, seed, progress_manager=None, chain_id_kw=0):
         target = target_cls(
             W,
             y,
             X,
             T=T,
+            **(fe_dims or {}),
+            **(priors or {}),
             logdet_value_and_grad=logdet_value_and_grad,
             positive=positive,
             n_probes=n_probes,
@@ -604,14 +723,14 @@ def _sample_flow_chains(
         "sigma": _stack("sigma"),
         "beta": _stack("beta"),
     }
-    # Per-draw Jacobian log|A| (= T·log|I_N − W_F|) is always attached so the
+    # Per-draw Jacobian log|A| (Lee & Yu-scaled for FE panels) is always attached so the
     # change-of-variables correction is available on the arviz object.
     sample_stats = {"log_abs_det": _stack("log_abs_det")}
-    log_likelihood = {"obs": _stack("loglik")} if compute_log_likelihood else None
+    groups = {"posterior": posterior, "sample_stats": sample_stats}
+    if compute_log_likelihood:
+        groups["log_likelihood"] = {"obs": _stack("loglik")}
     return az.from_dict(
-        posterior=posterior,
-        sample_stats=sample_stats,
-        log_likelihood=log_likelihood,
+        groups,
         coords={"coefficient": list(coord_names)},
         dims={"beta": ["coefficient"]},
     )
@@ -635,16 +754,19 @@ def sample_flow_resolvent(
     compute_log_likelihood: bool = True,
     progressbar: bool = True,
     n_jobs: int = -1,
-    logdet_method: str = "jax",
+    logdet_method: str = "auto",
     restrict_positive: bool = False,
+    fe_dims: dict | None = None,
+    priors: dict | None = None,
 ):
-    """Sample the unrestricted **SAR** flow posterior → ``arviz.InferenceData``.
+    """Sample the unrestricted **SAR** flow posterior → ``xarray.DataTree``.
 
     Builds a :class:`FlowResolventTarget` from ``(W, y, X)`` and runs ``chains``
     MALA-within-Gibbs chains, packaging ``rho_d, rho_o, rho_w, beta, sigma``.  ``T>1``
-    handles the panel (stacked over ``T`` periods; log-det scaled by ``T``).  Pass
-    ``logdet_value_and_grad`` to override the resolvent log-det backend (e.g. an exact
-    one for small problems / testing).  With ``restrict_positive`` the flat ρ prior is
+    handles the panel (stacked over ``T`` periods; log-det scaled by ``T``).
+    ``logdet_method`` selects the log-det backend (see :func:`resolve_flow_logdet`;
+    ``"auto"`` is exact for undirected ``W``); ``logdet_value_and_grad`` overrides it
+    with any ``(ρ_d, ρ_o, ρ_w) -> (value, grad)`` callable.  With ``restrict_positive`` the flat ρ prior is
     truncated to ``ρ_k ≥ 0`` (the model-level positivity constraint).  The per-draw
     Jacobian ``log|A|`` is attached in ``sample_stats``; with
     ``compute_log_likelihood`` (default) a pointwise ``log_likelihood`` group
@@ -672,6 +794,8 @@ def sample_flow_resolvent(
         logdet_method=logdet_method,
         n_quad=n_quad,
         positive=restrict_positive,
+        fe_dims=fe_dims,
+        priors=priors,
     )
 
 
@@ -693,10 +817,12 @@ def sample_sem_flow_resolvent(
     compute_log_likelihood: bool = True,
     progressbar: bool = True,
     n_jobs: int = -1,
-    logdet_method: str = "jax",
+    logdet_method: str = "auto",
     restrict_positive: bool = False,
+    fe_dims: dict | None = None,
+    priors: dict | None = None,
 ):
-    """Sample the unrestricted **SEM** flow posterior → ``arviz.InferenceData``.
+    """Sample the unrestricted **SEM** flow posterior → ``xarray.DataTree``.
 
     Same resolvent log-det and sampler as the SAR flow; the data term uses the
     whitened residual ``A(y−Xβ)`` and a GLS ``β`` draw.  ``T>1`` handles the panel.
@@ -725,6 +851,8 @@ def sample_sem_flow_resolvent(
         logdet_method=logdet_method,
         n_quad=n_quad,
         positive=restrict_positive,
+        fe_dims=fe_dims,
+        priors=priors,
     )
 
 
@@ -871,8 +999,8 @@ def attach_flow_log_abs_det(
 
     lad = (T * vals).reshape(shape)
     da = xr.DataArray(lad, dims=("chain", "draw"), name="log_abs_det")
-    if "sample_stats" in idata.groups():
+    if "sample_stats" in idata.children:
         idata.sample_stats["log_abs_det"] = da
     else:
-        idata.add_groups({"sample_stats": xr.Dataset({"log_abs_det": da})})
+        idata["sample_stats"] = xr.DataTree(xr.Dataset({"log_abs_det": da}))
     return idata

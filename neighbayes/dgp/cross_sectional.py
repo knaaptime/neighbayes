@@ -6,6 +6,7 @@ import warnings
 from typing import Any
 
 import numpy as np
+import scipy.sparse as sp
 
 from .utils import (
     _hetero_scale,
@@ -13,10 +14,11 @@ from .utils import (
     make_design_matrix,
     make_output_geodataframe,
     resolve_weights,
+    spatial_filter_factor,
 )
 
 
-def _check_rho_stability(rho: float, W: np.ndarray, name: str = "rho") -> None:
+def _check_rho_stability(rho: float, name: str = "rho") -> None:
     """Warn when ``|rho|`` exceeds the spectral stability bound of W.
 
     The DGP map :math:`y = (I - \\rho W)^{-1} u` is well-defined iff
@@ -59,7 +61,7 @@ def _attach_optional_gdf(
 def _simulate_sdm_core(
     *,
     nobs: int,
-    Wd: np.ndarray | None,
+    Ws: sp.csr_matrix | None,
     X: np.ndarray,
     beta1: np.ndarray,
     beta2: np.ndarray,
@@ -74,14 +76,14 @@ def _simulate_sdm_core(
 
     * ``len(beta2) == 0`` skips the WX term (collapses SDM -> SAR / OLS).
     * ``rho == 0`` skips the spatial solve (collapses SDM -> SLX / OLS).
-    * ``Wd is None`` is permitted only when both restrictions above hold,
+    * ``Ws is None`` is permitted only when both restrictions above hold,
       enabling the OLS path with no weights matrix.
     """
     has_wx = len(beta2) > 0
     if has_wx:
-        if Wd is None:
+        if Ws is None:
             raise ValueError("W must be supplied when beta2 is non-empty.")
-        Wx = Wd @ X[:, 1:]
+        Wx = Ws @ X[:, 1:]
         if Wx.shape[1] != len(beta2):
             raise ValueError(
                 "len(beta2) must match number of non-intercept regressors."
@@ -92,16 +94,16 @@ def _simulate_sdm_core(
 
     eps = (_hetero_scale(X, sigma) if err_hetero else sigma) * rng.standard_normal(nobs)
     rhs = X @ beta1 + wx_beta + eps
-    if Wd is None or rho == 0.0:
+    if Ws is None or rho == 0.0:
         return rhs
-    _check_rho_stability(rho, Wd, name="rho")
-    return np.linalg.solve(np.eye(nobs) - rho * Wd, rhs)
+    _check_rho_stability(rho, name="rho")
+    return spatial_filter_factor(Ws, rho)(rhs)
 
 
 def _simulate_sdem_core(
     *,
     nobs: int,
-    Wd: np.ndarray | None,
+    Ws: sp.csr_matrix | None,
     X: np.ndarray,
     beta1: np.ndarray,
     beta2: np.ndarray,
@@ -113,14 +115,14 @@ def _simulate_sdem_core(
     """SDEM kernel: ``y = X beta1 + WX beta2 + (I - lam W)^-1 eps``.
 
     Same nesting semantics as :func:`_simulate_sdm_core`: ``beta2=[]``
-    drops the WX term, ``lam=0`` drops the error solve, and ``Wd=None``
+    drops the WX term, ``lam=0`` drops the error solve, and ``Ws=None``
     is allowed only when both restrictions hold.
     """
     has_wx = len(beta2) > 0
     if has_wx:
-        if Wd is None:
+        if Ws is None:
             raise ValueError("W must be supplied when beta2 is non-empty.")
-        Wx = Wd @ X[:, 1:]
+        Wx = Ws @ X[:, 1:]
         if Wx.shape[1] != len(beta2):
             raise ValueError(
                 "len(beta2) must match number of non-intercept regressors."
@@ -130,16 +132,16 @@ def _simulate_sdem_core(
         wx_beta = 0.0
 
     eps = (_hetero_scale(X, sigma) if err_hetero else sigma) * rng.standard_normal(nobs)
-    if Wd is None or lam == 0.0:
+    if Ws is None or lam == 0.0:
         u = eps
     else:
-        _check_rho_stability(lam, Wd, name="lam")
-        u = np.linalg.solve(np.eye(nobs) - lam * Wd, eps)
+        _check_rho_stability(lam, name="lam")
+        u = spatial_filter_factor(Ws, lam)(eps)
     return X @ beta1 + wx_beta + u
 
 
 def simulate_sar(
-    n: int | None = None,
+    n_side: int | None = None,
     W=None,
     gdf=None,
     rho: float = 0.5,
@@ -156,12 +158,12 @@ def simulate_sar(
 
     Parameters
     ----------
-    n : int, optional
-        Square-grid side length used when only ``n`` is supplied. This
-        generates ``n * n`` observations on an ``n x n`` rook grid.
-        When ``W`` or ``gdf`` is provided, ``n`` (if provided) must match
-        the implied number of observations.
-    W : Graph or sparse/dense matrix, optional
+    n_side : int, optional
+        Side length of the square rook grid used when neither ``W`` nor
+        ``gdf`` is supplied; the grid has ``n_side**2`` observations.  When
+        ``W`` or ``gdf`` is provided, ``n_side**2`` (if given) must match
+        the number of units.
+    W : Graph or scipy.sparse matrix, optional
         Spatial weights. If supplied, takes precedence over ``gdf``.
     gdf : geopandas.GeoDataFrame, optional
         Spatial units source used when ``W`` is not provided.
@@ -191,7 +193,7 @@ def simulate_sar(
     Returns
     -------
     dict
-        Keys: ``y``, ``X``, ``W_dense``, ``W_graph``, ``params_true``.
+        Keys: ``y``, ``X``, ``W_sparse``, ``W_graph``, ``params_true``.
 
     Notes
     -----
@@ -199,8 +201,8 @@ def simulate_sar(
     :func:`simulate_sdm` for the unified Spatial Durbin form.
     """
     rng = ensure_rng(rng, seed)
-    Wd, Wg = resolve_weights(W=W, gdf=gdf, n=n, contiguity=contiguity)
-    nobs = Wd.shape[0]
+    Ws, Wg = resolve_weights(W=W, gdf=gdf, n_side=n_side, contiguity=contiguity)
+    nobs = Ws.shape[0]
 
     if beta is None:
         beta = np.array([1.0, 2.0], dtype=float)
@@ -209,7 +211,7 @@ def simulate_sar(
     X = make_design_matrix(rng, nobs, k=max(len(beta) - 1, 0), add_intercept=True)
     y = _simulate_sdm_core(
         nobs=nobs,
-        Wd=Wd,
+        Ws=Ws,
         X=X,
         beta1=beta,
         beta2=np.empty(0, dtype=float),
@@ -221,7 +223,7 @@ def simulate_sar(
     out = {
         "y": y,
         "X": X,
-        "W_dense": Wd,
+        "W_sparse": Ws,
         "W_graph": Wg,
         "params_true": {"rho": rho, "beta": beta, "sigma": sigma},
     }
@@ -234,7 +236,7 @@ def simulate_sar(
 
 
 def simulate_sar_negbin(
-    n: int | None = None,
+    n_side: int | None = None,
     W=None,
     gdf=None,
     rho: float = 0.5,
@@ -277,11 +279,11 @@ def simulate_sar_negbin(
 
     Parameters
     ----------
-    n : int, optional
-        Square-grid side length used when only ``n`` is supplied. This
-        generates ``n * n`` observations on an ``n x n`` rook grid.
-        When ``W`` or ``gdf`` is provided, ``n`` (if provided) must match
-        the implied number of observations.
+    n_side : int, optional
+        Side length of the square rook grid used when neither ``W`` nor
+        ``gdf`` is supplied; the grid has ``n_side**2`` observations.  When
+        ``W`` or ``gdf`` is provided, ``n_side**2`` (if given) must match
+        the number of units.
     W : Graph or array-like, optional
         Spatial weights.
     gdf : GeoDataFrame, optional
@@ -305,7 +307,7 @@ def simulate_sar_negbin(
     seed : int, optional
         Random seed (used only if rng is None).
     contiguity : str, default "queen"
-        Contiguity type for constructing W when n is given.
+        Neighbor rule used when W is built from ``gdf``.
     create_gdf : bool, default False
         Whether to attach a GeoDataFrame to the output.
     geometry_type : str, default "polygon"
@@ -314,7 +316,7 @@ def simulate_sar_negbin(
     Returns
     -------
     dict
-        Dictionary with keys ``y``, ``X``, ``mu``, ``W_dense``,
+        Dictionary with keys ``y``, ``X``, ``mu``, ``W_sparse``,
         ``W_graph``, and ``params_true``. When ``sigma2 > 0``,
         ``params_true`` also includes ``sigma2``.
     """
@@ -330,30 +332,25 @@ def simulate_sar_negbin(
         )
 
     rng = ensure_rng(rng, seed)
-    Wd, Wg = resolve_weights(W=W, gdf=gdf, n=n, contiguity=contiguity)
-    nobs = Wd.shape[0]
+    Ws, Wg = resolve_weights(W=W, gdf=gdf, n_side=n_side, contiguity=contiguity)
+    nobs = Ws.shape[0]
 
     if beta is None:
         beta = np.array([1.0, 0.6], dtype=float)
     beta = np.asarray(beta, dtype=float)
 
     X = make_design_matrix(rng, nobs, k=max(len(beta) - 1, 0), add_intercept=True)
-    _check_rho_stability(rho, Wd, name="rho")
+    _check_rho_stability(rho, name="rho")
 
-    # Use sparse solve to avoid O(N²) dense factorization for large grids.
-    import scipy.sparse as sp
-    import scipy.sparse.linalg as sla
-
-    W_sp = Wg.sparse.tocsc()
-    A = sp.eye(nobs, format="csc") - rho * W_sp
+    solve = spatial_filter_factor(Ws, rho)
 
     # Structural form: (I - rho*W) eta = X beta + nu
     # When sigma2 > 0, add Gaussian noise nu ~ N(0, sigma2 I)
     if sigma2 > 0:
         nu = rng.normal(0, np.sqrt(sigma2), size=nobs)
-        eta = sla.spsolve(A, X @ beta + nu)
+        eta = solve(X @ beta + nu)
     else:
-        eta = sla.spsolve(A, X @ beta)
+        eta = solve(X @ beta)
 
     mu = np.exp(np.clip(eta, -30.0, 30.0))
 
@@ -368,7 +365,7 @@ def simulate_sar_negbin(
         "y": y,
         "X": X,
         "mu": mu,
-        "W_dense": Wd,
+        "W_sparse": Ws,
         "W_graph": Wg,
         "params_true": params_true,
     }
@@ -381,7 +378,7 @@ def simulate_sar_negbin(
 
 
 def simulate_ols(
-    n: int | None = None,
+    n_side: int | None = None,
     W=None,
     gdf=None,
     beta: np.ndarray | None = None,
@@ -403,16 +400,17 @@ def simulate_ols(
 
     Parameters
     ----------
-    n : int, optional
-        Square-grid side length used when only ``n`` is supplied. This
-        generates ``n * n`` observations on an ``n x n`` rook grid.
-        When ``W`` or ``gdf`` is provided, ``n`` (if provided) must match
-        the implied number of observations.
-    W : Graph or sparse/dense matrix, optional
-        Spatial weights input used only to infer ``n`` and validate dimensions.
+    n_side : int, optional
+        Side length of the square rook grid used when neither ``W`` nor
+        ``gdf`` is supplied; the grid has ``n_side**2`` observations.  When
+        ``W`` or ``gdf`` is provided, ``n_side**2`` (if given) must match
+        the number of units.
+    W : Graph or scipy.sparse matrix, optional
+        Spatial weights input used only to infer the number of observations.
         Not used in the OLS data-generating mechanism.
     gdf : geopandas.GeoDataFrame, optional
-        Spatial units source used only to infer ``n`` when ``W`` is not provided.
+        Spatial units source used only to infer the number of observations
+        when ``W`` is not provided.
     beta : array-like, optional
         Coefficient vector including intercept. Defaults to
         ``[1.0, 2.0]`` (intercept = 1, one regressor with slope = 2).
@@ -427,10 +425,10 @@ def simulate_ols(
     seed : int, optional
         Integer seed used when ``rng`` is not supplied.
     contiguity : str, default="queen"
-        Neighbor rule used when inferring ``n`` from ``gdf``.
+        Neighbor rule used when inferring the size from ``gdf``.
     create_gdf : bool, default=False
         If ``True``, attaches a GeoDataFrame with ``y`` and ``X_*`` columns
-        to geometry generated on an ``n``-unit grid.
+        to geometry generated on an ``n_side x n_side`` grid.
     geometry_type : {"point", "polygon"}, default="polygon"
         Geometry type to generate when ``create_gdf=True``.
 
@@ -454,14 +452,14 @@ def simulate_ols(
 
     rng = ensure_rng(rng, seed)
 
-    if n is None and W is None and gdf is None:
-        raise ValueError("Provide one of n, W, or gdf.")
+    if n_side is None and W is None and gdf is None:
+        raise ValueError("Provide one of n_side, W, or gdf.")
 
     if W is not None or gdf is not None:
-        Wd, _ = resolve_weights(W=W, gdf=gdf, n=n, contiguity=contiguity)
-        nobs = Wd.shape[0]
+        Ws, _ = resolve_weights(W=W, gdf=gdf, n_side=n_side, contiguity=contiguity)
+        nobs = Ws.shape[0]
     else:
-        nobs = int(n)
+        nobs = int(n_side) ** 2
 
     if beta is None:
         beta = np.array([1.0, 2.0], dtype=float)
@@ -470,7 +468,7 @@ def simulate_ols(
     X = make_design_matrix(rng, nobs, k=max(len(beta) - 1, 0), add_intercept=True)
     y = _simulate_sdm_core(
         nobs=nobs,
-        Wd=None,
+        Ws=None,
         X=X,
         beta1=beta,
         beta2=np.empty(0, dtype=float),
@@ -494,7 +492,7 @@ def simulate_ols(
 
 
 def simulate_sem(
-    n: int | None = None,
+    n_side: int | None = None,
     W=None,
     gdf=None,
     lam: float = 0.5,
@@ -515,7 +513,7 @@ def simulate_sem(
     Returns
     -------
     dict
-        Keys: ``y``, ``X``, ``W_dense``, ``W_graph``, ``params_true``.
+        Keys: ``y``, ``X``, ``W_sparse``, ``W_graph``, ``params_true``.
 
     Notes
     -----
@@ -523,8 +521,8 @@ def simulate_sem(
     :func:`simulate_sdem` for the unified Spatial Durbin Error form.
     """
     rng = ensure_rng(rng, seed)
-    Wd, Wg = resolve_weights(W=W, gdf=gdf, n=n, contiguity=contiguity)
-    nobs = Wd.shape[0]
+    Ws, Wg = resolve_weights(W=W, gdf=gdf, n_side=n_side, contiguity=contiguity)
+    nobs = Ws.shape[0]
 
     if beta is None:
         beta = np.array([1.0, 2.0], dtype=float)
@@ -533,7 +531,7 @@ def simulate_sem(
     X = make_design_matrix(rng, nobs, k=max(len(beta) - 1, 0), add_intercept=True)
     y = _simulate_sdem_core(
         nobs=nobs,
-        Wd=Wd,
+        Ws=Ws,
         X=X,
         beta1=beta,
         beta2=np.empty(0, dtype=float),
@@ -545,7 +543,7 @@ def simulate_sem(
     out = {
         "y": y,
         "X": X,
-        "W_dense": Wd,
+        "W_sparse": Ws,
         "W_graph": Wg,
         "params_true": {"lam": lam, "beta": beta, "sigma": sigma},
     }
@@ -558,7 +556,7 @@ def simulate_sem(
 
 
 def simulate_slx(
-    n: int | None = None,
+    n_side: int | None = None,
     W=None,
     gdf=None,
     beta1: np.ndarray | None = None,
@@ -576,11 +574,11 @@ def simulate_slx(
     Returns
     -------
     dict
-        Keys: ``y``, ``X``, ``W_dense``, ``W_graph``, ``params_true``.
+        Keys: ``y``, ``X``, ``W_sparse``, ``W_graph``, ``params_true``.
     """
     rng = ensure_rng(rng, seed)
-    Wd, Wg = resolve_weights(W=W, gdf=gdf, n=n, contiguity=contiguity)
-    nobs = Wd.shape[0]
+    Ws, Wg = resolve_weights(W=W, gdf=gdf, n_side=n_side, contiguity=contiguity)
+    nobs = Ws.shape[0]
 
     if beta1 is None:
         beta1 = np.array([1.0, 2.0], dtype=float)
@@ -592,7 +590,7 @@ def simulate_slx(
     X = make_design_matrix(rng, nobs, k=max(len(beta1) - 1, 0), add_intercept=True)
     y = _simulate_sdm_core(
         nobs=nobs,
-        Wd=Wd,
+        Ws=Ws,
         X=X,
         beta1=beta1,
         beta2=beta2,
@@ -604,7 +602,7 @@ def simulate_slx(
     out = {
         "y": y,
         "X": X,
-        "W_dense": Wd,
+        "W_sparse": Ws,
         "W_graph": Wg,
         "params_true": {"beta1": beta1, "beta2": beta2, "sigma": sigma},
     }
@@ -617,7 +615,7 @@ def simulate_slx(
 
 
 def simulate_sdm(
-    n: int | None = None,
+    n_side: int | None = None,
     W=None,
     gdf=None,
     rho: float = 0.4,
@@ -636,11 +634,11 @@ def simulate_sdm(
     Returns
     -------
     dict
-        Keys: ``y``, ``X``, ``W_dense``, ``W_graph``, ``params_true``.
+        Keys: ``y``, ``X``, ``W_sparse``, ``W_graph``, ``params_true``.
     """
     rng = ensure_rng(rng, seed)
-    Wd, Wg = resolve_weights(W=W, gdf=gdf, n=n, contiguity=contiguity)
-    nobs = Wd.shape[0]
+    Ws, Wg = resolve_weights(W=W, gdf=gdf, n_side=n_side, contiguity=contiguity)
+    nobs = Ws.shape[0]
 
     if beta1 is None:
         beta1 = np.array([1.0, 2.0], dtype=float)
@@ -652,7 +650,7 @@ def simulate_sdm(
     X = make_design_matrix(rng, nobs, k=max(len(beta1) - 1, 0), add_intercept=True)
     y = _simulate_sdm_core(
         nobs=nobs,
-        Wd=Wd,
+        Ws=Ws,
         X=X,
         beta1=beta1,
         beta2=beta2,
@@ -664,7 +662,7 @@ def simulate_sdm(
     out = {
         "y": y,
         "X": X,
-        "W_dense": Wd,
+        "W_sparse": Ws,
         "W_graph": Wg,
         "params_true": {"rho": rho, "beta1": beta1, "beta2": beta2, "sigma": sigma},
     }
@@ -677,7 +675,7 @@ def simulate_sdm(
 
 
 def simulate_sdem(
-    n: int | None = None,
+    n_side: int | None = None,
     W=None,
     gdf=None,
     lam: float = 0.4,
@@ -696,11 +694,11 @@ def simulate_sdem(
     Returns
     -------
     dict
-        Keys: ``y``, ``X``, ``W_dense``, ``W_graph``, ``params_true``.
+        Keys: ``y``, ``X``, ``W_sparse``, ``W_graph``, ``params_true``.
     """
     rng = ensure_rng(rng, seed)
-    Wd, Wg = resolve_weights(W=W, gdf=gdf, n=n, contiguity=contiguity)
-    nobs = Wd.shape[0]
+    Ws, Wg = resolve_weights(W=W, gdf=gdf, n_side=n_side, contiguity=contiguity)
+    nobs = Ws.shape[0]
 
     if beta1 is None:
         beta1 = np.array([1.0, 2.0], dtype=float)
@@ -712,7 +710,7 @@ def simulate_sdem(
     X = make_design_matrix(rng, nobs, k=max(len(beta1) - 1, 0), add_intercept=True)
     y = _simulate_sdem_core(
         nobs=nobs,
-        Wd=Wd,
+        Ws=Ws,
         X=X,
         beta1=beta1,
         beta2=beta2,
@@ -724,7 +722,7 @@ def simulate_sdem(
     out = {
         "y": y,
         "X": X,
-        "W_dense": Wd,
+        "W_sparse": Ws,
         "W_graph": Wg,
         "params_true": {"lam": lam, "beta1": beta1, "beta2": beta2, "sigma": sigma},
     }

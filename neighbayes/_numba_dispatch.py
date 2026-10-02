@@ -65,6 +65,10 @@ def register_numba_dispatch() -> bool:
         _SparseSARVJPOp,
     )
 
+    # A scalar Op output (a gradient w.r.t. rho) must reach PyTensor as a 0-d
+    # array; a bare float passes through the Numba backend unconverted.
+    _SCALAR = numba.types.Array(numba.types.float64, 0, "C")
+
     @numba_funcify.register(SparseSARSolveOp)
     def _funcify_sparse_sar_solve(op, **kwargs):
         n = op._n
@@ -110,11 +114,12 @@ def register_numba_dispatch() -> bool:
                 A_t = (I - rho * W_dense).T
                 v = np.linalg.solve(A_t, g)
                 grad_rho = np.dot(v, W_dense @ eta)
-                return grad_rho, v
+                # 0-d arrays, as PyTensor expects for scalar outputs.
+                return np.asarray(grad_rho), v
 
             return sparse_sar_vjp
 
-        ret_sig = numba.types.Tuple((numba.types.float64, numba.types.float64[:]))
+        ret_sig = numba.types.Tuple((_SCALAR, numba.types.float64[:]))
 
         def _py_vjp(rho, eta, g):
             outputs = [[None], [None]]
@@ -163,8 +168,11 @@ def register_numba_dispatch() -> bool:
                 # C-contiguous and is required by numba's ``reshape``.
                 b_c = np.ascontiguousarray(b)
                 Hb = b_c.reshape(n, n).T  # F-order reshape (n*n,) -> (n,n)
+                # (Lo ⊗ Ld) vec(H) = vec(Ld H Loᵀ): solve Ld H' = Hb, then
+                # H Loᵀ = H', i.e. Lo Hᵀ = H'ᵀ.  Lo, not Loᵀ -- a transposed
+                # solve here only agrees with ``perform`` when W is symmetric.
                 Hp = np.linalg.solve(Ld, Hb)  # Ld H' = Hb
-                Z = np.linalg.solve(Lo.T, Hp.T)  # Lo^T Z = H'^T
+                Z = np.linalg.solve(Lo, Hp.T)  # Lo Z = H'^T, Z = H^T
                 return np.ascontiguousarray(Z).ravel()  # = Z.T.ravel(order='F')
 
             return kron_solve
@@ -215,13 +223,12 @@ def register_numba_dispatch() -> bool:
                 grad_rd = np.sum(H_v * (W_H @ Lo.T))
                 grad_ro = np.sum(H_v * (Ld_H @ W_dense.T))
                 grad_b = np.ascontiguousarray(H_v).T.ravel()  # H_v.ravel(order='F')
-                return grad_rd, grad_ro, grad_b
+                # 0-d arrays, as PyTensor expects for scalar outputs.
+                return np.asarray(grad_rd), np.asarray(grad_ro), grad_b
 
             return kron_vjp
 
-        ret_sig = numba.types.Tuple(
-            (numba.types.float64, numba.types.float64, numba.types.float64[:])
-        )
+        ret_sig = numba.types.Tuple((_SCALAR, _SCALAR, numba.types.float64[:]))
 
         def _py_vjp(rd, ro, eta, g):
             outputs = [[None], [None], [None]]
@@ -262,9 +269,7 @@ def register_numba_dispatch() -> bool:
 
     @numba_funcify.register(_KroneckerFlowVJPMatrixOp)
     def _funcify_kron_vjp_matrix(op, **kwargs):
-        ret_sig = numba.types.Tuple(
-            (numba.types.float64, numba.types.float64, numba.types.float64[:, :])
-        )
+        ret_sig = numba.types.Tuple((_SCALAR, _SCALAR, numba.types.float64[:, :]))
 
         def _py_vjp(rd, ro, H_eta, G):
             outputs = [[None], [None], [None]]

@@ -528,7 +528,7 @@ def _bridge_logml(
 
     Parameters
     ----------
-    idata : arviz.InferenceData
+    idata : xarray.DataTree
         Posterior samples.
     log_posterior : callable
         A function ``f(theta_flat) -> float`` that evaluates the
@@ -815,7 +815,7 @@ def _bic_logml(idata, return_diagnostics=False, model=None):
 
     Parameters
     ----------
-    idata : arviz.InferenceData
+    idata : xarray.DataTree
         Must include ``log_likelihood`` group.
     return_diagnostics : bool, default False
         If True, return a dict with diagnostics.
@@ -823,7 +823,7 @@ def _bic_logml(idata, return_diagnostics=False, model=None):
         A fitted model object with a ``_y`` attribute (the dependent
         variable array).  Used as a fallback to determine the number
         of observations when ``observed_data`` and ``sample_stats``
-        groups are absent from the InferenceData.
+        groups are absent from the DataTree.
 
     Returns
     -------
@@ -834,7 +834,7 @@ def _bic_logml(idata, return_diagnostics=False, model=None):
     """
     if not hasattr(idata, "log_likelihood"):
         raise ValueError(
-            "InferenceData must have a log_likelihood group for BIC approximation. "
+            "DataTree must have a log_likelihood group for BIC approximation. "
             "It is stored only on request: refit with "
             "fit(..., idata_kwargs={'log_likelihood': True})."
         )
@@ -878,7 +878,7 @@ def _bic_logml(idata, return_diagnostics=False, model=None):
         n_obs = len(model._y)
     if n_obs is None:
         raise ValueError(
-            "Cannot determine number of observations. Provide an InferenceData "
+            "Cannot determine number of observations. Provide a DataTree "
             "with observed_data, sample_stats.n_data_points, or log_likelihood "
             "groups, or pass a fitted model object with a _y attribute."
         )
@@ -968,7 +968,7 @@ def bayes_factor_compare_models(
     Parameters
     ----------
     models : list or dict
-        Fitted model objects or InferenceData objects to compare.
+        Fitted model objects or DataTree objects to compare.
 
         - **Fitted model objects** (recommended): Each object must have
           ``inference_data`` and ``pymc_model`` attributes (e.g., a
@@ -977,7 +977,7 @@ def bayes_factor_compare_models(
         - **Dict of {str: model_object}**: Keys are used as model labels
           (unless ``model_labels`` is also provided), matching the
           convention of :func:`arviz.compare`.
-        - **List of InferenceData**: For ``method='bic'``, InferenceData
+        - **List of DataTree**: For ``method='bic'``, DataTree
           objects can be passed directly.  For ``method='bridge'``,
           fitted model objects are required so the log-posterior can be
           compiled automatically.
@@ -997,7 +997,11 @@ def bayes_factor_compare_models(
           compiled automatically.
         - ``'bic'``: BIC approximation (:cite:p:`wagenmakers2007PracticalSolution`).
           Computes :math:`\\log(ML) \\approx -BIC/2`.  Works with either
-          fitted model objects or InferenceData.
+          fitted model objects or DataTree.
+        - ``'quadrature'``: exact marginal likelihood for Gaussian OLS, SLX,
+          SAR, SDM, SEM and SDEM models (see :func:`log_marginal_likelihood`).
+          No Monte Carlo error; the models need not be fit.  Accepts
+          ``epsrel``.
 
     prior_note : str, optional
         Optional string describing the priors used (for reporting).
@@ -1165,7 +1169,22 @@ def bayes_factor_compare_models(
     if len(model_labels) != len(model_objects):
         raise ValueError("model_labels must match length of models")
 
-    # Resolve each entry: either a fitted model object or InferenceData
+    if method == "quadrature":
+        # Exact, and needs only the model and data: no posterior draws.
+        epsrel = kwargs.pop("epsrel", 1e-10)
+        if kwargs:
+            raise TypeError(
+                f"method='quadrature' got unexpected keyword arguments {sorted(kwargs)}"
+            )
+        diagnostics = {
+            label: log_marginal_likelihood(obj, epsrel=epsrel, return_diagnostics=True)
+            for label, obj in zip(model_labels, model_objects)
+        }
+        logmls = [diagnostics[label]["logml"] for label in model_labels]
+        df = _bayes_factor_frame(logmls, model_labels, log=log, prior_note=prior_note)
+        return (df, diagnostics) if return_diagnostics else df
+
+    # Resolve each entry: either a fitted model object or DataTree
     idata_list = []
     log_posterior_list = []
     constrained_to_unconstrained_list = []
@@ -1211,12 +1230,12 @@ def bayes_factor_compare_models(
                 log_posterior_list.append(None)
                 constrained_to_unconstrained_list.append(None)
         elif hasattr(obj, "posterior"):
-            # Bare InferenceData object
+            # Bare DataTree object
             idata_list.append(obj)
             if method == "bridge":
                 raise ValueError(
-                    f"Entry at index {i} ('{model_labels[i]}') is an "
-                    "InferenceData object, but bridge sampling requires a "
+                    f"Entry at index {i} ('{model_labels[i]}') is a "
+                    "DataTree object, but bridge sampling requires a "
                     "fitted model object with a pymc_model attribute so the "
                     "log-posterior can be compiled automatically.  Pass the "
                     "fitted model object (e.g., sar, sem) instead of its "
@@ -1228,7 +1247,7 @@ def bayes_factor_compare_models(
             raise TypeError(
                 f"Entry at index {i} ('{model_labels[i]}') must be a fitted "
                 "model object (with .inference_data and .pymc_model attributes) "
-                f"or an InferenceData object, got {type(obj).__name__}"
+                f"or a DataTree object, got {type(obj).__name__}"
             )
 
     # Warn about sample size for bridge sampling (Gronau et al., 2017)
@@ -1312,13 +1331,16 @@ def bayes_factor_compare_models(
                 logmls.append(logml_fn(idata))
                 diagnostics[label] = None
 
-    n = len(logmls)
-    log_bf_mat = np.zeros((n, n))
-    for i in range(n):
-        for j in range(n):
-            if i != j:
-                log_bf_mat[i, j] = logmls[i] - logmls[j]
+    df = _bayes_factor_frame(logmls, model_labels, log=log, prior_note=prior_note)
+    if return_diagnostics:
+        return df, diagnostics
+    return df
 
+
+def _bayes_factor_frame(logmls, model_labels, *, log: bool, prior_note):
+    """Pairwise (log) Bayes factors ``BF[i, j] = ML_i / ML_j`` as a DataFrame."""
+    logmls = np.asarray(logmls, dtype=np.float64)
+    log_bf_mat = logmls[:, None] - logmls[None, :]
     if log:
         df = pd.DataFrame(log_bf_mat, index=model_labels, columns=model_labels)
     else:
@@ -1329,14 +1351,45 @@ def bayes_factor_compare_models(
                 "Some Bayes factors overflowed to inf because the log "
                 "marginal-likelihood differences exceed ~709. Pass "
                 "``log=True`` to return log Bayes factors instead.",
-                stacklevel=2,
+                stacklevel=3,
             )
         df = pd.DataFrame(bf_mat, index=model_labels, columns=model_labels)
     if prior_note:
-        warnings.warn(f"Bayes factors computed with priors: {prior_note}", stacklevel=2)
-    if return_diagnostics:
-        return df, diagnostics
+        warnings.warn(f"Bayes factors computed with priors: {prior_note}", stacklevel=3)
     return df
+
+
+def log_marginal_likelihood(model, *, epsrel: float = 1e-10, return_diagnostics=False):
+    """Exact log marginal likelihood of a Gaussian spatial model.
+
+    Integrates β analytically and σ² and the spatial parameter by adaptive
+    quadrature under the model's own priors (:cite:p:`lesage2007BayesianModel`), so the
+    result has no Monte Carlo error and the model need not be fit.  Covers
+    OLS, SLX, SAR, SDM, SEM and SDEM with Gaussian errors; for robust or
+    non-Gaussian models use :func:`bayes_factor_compare_models` with
+    ``method='bridge'``.
+
+    Parameters
+    ----------
+    model
+        A Gaussian cross-sectional model (``robust=False``).
+    epsrel : float, default 1e-10
+        Relative tolerance of each one-dimensional quadrature.
+    return_diagnostics : bool, default False
+        Also return the error estimate and the spatial parameter's
+        posterior mode.
+
+    Returns
+    -------
+    float or dict
+        ``log p(y)``, or a dict with keys ``logml``, ``abserr``, ``mode``
+        and ``method`` when ``return_diagnostics=True``.
+    """
+    from ._quadrature_logml import quadrature_log_marginal_likelihood
+
+    return quadrature_log_marginal_likelihood(
+        model, epsrel=epsrel, return_diagnostics=return_diagnostics
+    )
 
 
 # ---------------------------------------------------------------------------

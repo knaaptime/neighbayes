@@ -18,7 +18,7 @@ import pytest
 
 from neighbayes import dgp
 from neighbayes.models import SARNegBin, SARNegBinStructural
-from neighbayes.tests.helpers import W_to_graph, make_rook_W
+from neighbayes.tests.helpers import W_to_graph, _as_sparse, make_rook_W
 
 # ---------------------------------------------------------------------------
 # Fast build / validation tests (not marked slow)
@@ -108,7 +108,7 @@ def sar_nb_data():
     W_dense = make_rook_W(SIDE)
     W_graph = W_to_graph(W_dense)
     return dgp.simulate_sar_negbin(
-        W=W_graph,
+        W=_as_sparse(W_graph),
         rho=RHO_TRUE,
         beta=BETA_TRUE,
         alpha=ALPHA_TRUE,
@@ -127,7 +127,11 @@ class TestSARNegBinStructuralRecovery:
     """
 
     def test_fit_returns_idata(self, sar_nb_data):
-        """fit() returns InferenceData with expected groups."""
+        """fit() returns a DataTree with the expected groups.
+
+        The pointwise log-likelihood is stored only on request (as in PyMC),
+        so the fit asks for it.
+        """
         y = sar_nb_data["y"]
         X = sar_nb_data["X"]
         W = sar_nb_data["W_graph"]
@@ -140,6 +144,7 @@ class TestSARNegBinStructuralRecovery:
             random_seed=42,
             n_jobs=1,
             progressbar=False,
+            idata_kwargs={"log_likelihood": True},
         )
 
         assert "posterior" in idata
@@ -409,7 +414,7 @@ def sar_nb_reduced_data():
     W_dense = make_rook_W(SIDE)
     W_graph = W_to_graph(W_dense)
     return dgp.simulate_sar_negbin(
-        W=W_graph,
+        W=_as_sparse(W_graph),
         rho=RHO_TRUE,
         beta=BETA_TRUE,
         alpha=ALPHA_TRUE,

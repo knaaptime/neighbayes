@@ -5,7 +5,10 @@ from __future__ import annotations
 import importlib
 import importlib.util
 import os
+import threading
+import time
 import warnings
+from collections import OrderedDict
 from functools import lru_cache
 
 import numpy as np
@@ -85,17 +88,13 @@ def _select_sparse_backend() -> str:
 
     Notes
     -----
-    Unlike the log-determinant coarse grid — where
-    :class:`~neighbayes._logdet._aaa._ReusableLULogdet` times KLU against
-    UMFPACK and keeps the winner — ``auto`` here does **not** measure.  That
-    crossover was established on *factorization*, and this selector feeds
-    repeated *solves* (:func:`_solve_sparse_vector`,
-    :func:`_solve_sparse_matrix`, :class:`_SparseFactorSolver`, and the flow
-    resolvent's ``P`` probe vectors per call), where the backends' relative
-    standing has not been measured and iterative-refinement settings differ.
-    ``umfpack`` is exposed so that comparison can be run, and so dense weights
-    can be routed by hand; promoting it into ``auto`` should follow the
-    measurement, not precede it.
+    Under ``auto`` the returned name is ``"klu"``, but
+    :func:`_sparse_factor` then times KLU against UMFPACK on the first
+    factorization of each sparsity pattern and keeps the faster (see
+    :func:`_refactor`).  The crossover is size-dependent: with the symbolic
+    analysis reused, KLU is 2× faster than UMFPACK at ``n = 10,000`` (k-NN,
+    k = 8) and UMFPACK 1.6–1.8× faster at ``n = 160,000``.  Naming a backend
+    explicitly disables the probe.
     """
     requested = os.environ.get("NEIGHBAYES_SPARSE_BACKEND", "auto").strip().lower()
     strict = os.environ.get("NEIGHBAYES_SPARSE_STRICT", "0").strip().lower() in {
@@ -139,23 +138,106 @@ def _select_sparse_backend() -> str:
 
 @lru_cache(maxsize=1)
 def _get_klu_factor():
-    """Import and return ``sksparse.klu.klu_factor``."""
-    return importlib.import_module("sksparse.klu").klu_factor
+    """Import and return ``sksparse.klu.KLUFactor``."""
+    return importlib.import_module("sksparse.klu").KLUFactor
 
 
 @lru_cache(maxsize=1)
 def _get_umf_factor():
-    """Import and return ``sksparse.umfpack.umf_factor``."""
-    return importlib.import_module("sksparse.umfpack").umf_factor
+    """Import and return ``sksparse.umfpack.UMFFactor``."""
+    return importlib.import_module("sksparse.umfpack").UMFFactor
+
+
+_FACTOR_CLASSES = {"klu": _get_klu_factor, "umfpack": _get_umf_factor}
+
+# Working factors per thread, keyed on sparsity pattern (LRU).  Each holds one
+# symbolic analysis and is refactored in place for every new set of values, so
+# a repeated pattern pays the analysis once — 1.3–2.3× cheaper per call than a
+# fresh factorization.  Thread-local, so concurrent callers never share one.
+_FACTOR_CACHE_SIZE = 16
+_factor_cache = threading.local()
+
+# ``auto`` prefers UMFPACK over KLU only when it is clearly faster: UMFPACK's
+# per-call cost varies more, and KLU wins at every size up to ~40,000.
+_UMF_PROBE_MARGIN = 0.8
+
+
+def _auto_backend_requested() -> bool:
+    requested = os.environ.get("NEIGHBAYES_SPARSE_BACKEND", "auto").strip().lower()
+    return requested in {"", "auto"}
+
+
+def _pattern_key(A_csc, backend: str):
+    return (
+        backend,
+        A_csc.shape,
+        A_csc.nnz,
+        hash(A_csc.indptr.tobytes()),
+        hash(A_csc.indices.tobytes()),
+    )
+
+
+def _new_working_factor(A_csc, backend: str):
+    """``(backend, factor)`` for a new pattern, numerically factored at ``A_csc``.
+
+    Under ``auto`` with both bindings importable, KLU and UMFPACK are each
+    factored once and the faster kept.
+    """
+    candidates = [backend]
+    if backend == "klu" and _auto_backend_requested() and _umfpack_available():
+        candidates.append("umfpack")
+    timed = []
+    for name in candidates:
+        factor = _FACTOR_CLASSES[name]()(A_csc)  # symbolic analysis
+        t0 = time.perf_counter()
+        factor.factorize(A_csc)
+        timed.append((time.perf_counter() - t0, name, factor))
+    if len(timed) == 2 and timed[1][0] < _UMF_PROBE_MARGIN * timed[0][0]:
+        return timed[1][1], timed[1][2]
+    return timed[0][1], timed[0][2]
+
+
+def _refactor(A_csc, backend: str):
+    """This thread's working factor for ``A_csc``'s pattern, refactored at ``A_csc``.
+
+    The factor is shared by every later call on the same pattern and thread;
+    callers that keep it past their next factorization must copy it (as
+    :func:`_sparse_factor` does).
+    """
+    if backend not in _FACTOR_CLASSES:
+        raise ValueError(f"Unknown sparse backend: {backend!r}")
+    if not A_csc.has_sorted_indices:
+        A_csc = A_csc.sorted_indices()
+    cache = getattr(_factor_cache, "entries", None)
+    if cache is None:
+        cache = _factor_cache.entries = OrderedDict()
+    key = _pattern_key(A_csc, backend)
+    entry = cache.get(key)
+    if entry is not None and (
+        np.array_equal(entry[0], A_csc.indptr)
+        and np.array_equal(entry[1], A_csc.indices)
+    ):
+        cache.move_to_end(key)
+        factor = entry[2]
+        factor.factorize(A_csc)
+        return factor
+    _, factor = _new_working_factor(A_csc, backend)
+    cache[key] = (A_csc.indptr.copy(), A_csc.indices.copy(), factor)
+    if len(cache) > _FACTOR_CACHE_SIZE:
+        cache.popitem(last=False)
+    return factor
 
 
 def _sparse_factor(A_csc, backend: str):
-    """Factorize ``A_csc`` with the requested SuiteSparse backend."""
-    if backend == "klu":
-        return _get_klu_factor()(A_csc)
-    if backend == "umfpack":
-        return _get_umf_factor()(A_csc)
-    raise ValueError(f"Unknown sparse backend: {backend!r}")
+    """Factorize ``A_csc`` with the requested SuiteSparse backend.
+
+    Reuses the symbolic analysis of an earlier call with the same sparsity
+    pattern (:func:`_refactor`) and returns a private copy of the numeric
+    factor, so the caller may hold it across later factorizations.  Under
+    ``auto`` the factor may be UMFPACK's even though ``backend`` is ``"klu"``;
+    both expose ``solve``.
+    """
+    return _refactor(A_csc, backend).copy()
 
 
 def _is_suitesparse(backend: str) -> bool:
@@ -163,12 +245,23 @@ def _is_suitesparse(backend: str) -> bool:
     return backend in _SPARSE_BACKEND_AVAILABLE
 
 
+def _writable_f64(rhs: np.ndarray) -> np.ndarray:
+    """``rhs`` as a writable float64 array, copying only when it must.
+
+    ``scikit-sparse`` solves take typed memoryviews, which reject read-only
+    buffers, and JAX hands ``pure_callback`` functions read-only views of its
+    device arrays.  ``np.asarray`` keeps those views, so the UMFPACK solve
+    raised ``buffer source array is read-only`` from every JAX host callback.
+    """
+    return np.require(rhs, dtype=np.float64, requirements=["W"])
+
+
 def _solve_sparse_vector(A: sp.spmatrix, rhs: np.ndarray) -> np.ndarray:
     """Solve ``A x = rhs`` for vector RHS using configured sparse backend."""
     backend = _select_sparse_backend()
-    rhs64 = np.asarray(rhs, dtype=np.float64)
+    rhs64 = _writable_f64(rhs)
     if _is_suitesparse(backend):
-        factor = _sparse_factor(A.tocsc(), backend)
+        factor = _refactor(A.tocsc(), backend)
         return np.asarray(factor.solve(rhs64), dtype=np.float64)
     lu = sp.linalg.splu(A.tocsc())
     return np.asarray(lu.solve(rhs64), dtype=np.float64)
@@ -177,11 +270,11 @@ def _solve_sparse_vector(A: sp.spmatrix, rhs: np.ndarray) -> np.ndarray:
 def _solve_sparse_matrix(A: sp.spmatrix, rhs: np.ndarray) -> np.ndarray:
     """Solve ``A X = rhs`` for matrix RHS using configured sparse backend."""
     backend = _select_sparse_backend()
-    rhs64 = np.asarray(rhs, dtype=np.float64)
+    rhs64 = _writable_f64(rhs)
     if _is_suitesparse(backend):
         # KLU and UMFPACK factors both accept a 2-D RHS directly (single
         # factorization, batched solve).
-        factor = _sparse_factor(A.tocsc(), backend)
+        factor = _refactor(A.tocsc(), backend)
         return np.asarray(factor.solve(rhs64), dtype=np.float64)
     lu = sp.linalg.splu(A.tocsc())
     return np.asarray(lu.solve(rhs64), dtype=np.float64)
@@ -192,25 +285,45 @@ def _factor_solve_logdet(A: sp.spmatrix, rhs: np.ndarray) -> tuple[np.ndarray, f
 
     Uses a ``scikit-sparse`` backend (KLU or UMFPACK) when available, falling
     back to scipy SuperLU.  The logdet comes from UMFPACK's own determinant
-    routine where that backend is selected, and from the factor diagonals
+    routine where that backend factored ``A``, and from the factor diagonals
     otherwise; see :mod:`neighbayes._logdet._aaa` for why the distinction is
     worth making.
     """
     backend = _select_sparse_backend()
-    rhs64 = np.asarray(rhs, dtype=np.float64)
+    rhs64 = _writable_f64(rhs)
     A_csc = A.tocsc() if not sp.isspmatrix_csc(A) else A
     if _is_suitesparse(backend):
         from .._logdet._aaa import _lu_logdet_from_factor, _umf_logdet_from_factor
 
-        factor = _sparse_factor(A_csc, backend)
+        factor = _refactor(A_csc, backend)
         x = np.asarray(factor.solve(rhs64), dtype=np.float64)
-        if backend == "umfpack":
+        # Dispatch on the factor, not the name: auto may have chosen UMFPACK.
+        if hasattr(factor, "slogdet"):
             return x, _umf_logdet_from_factor(factor)
         return x, _lu_logdet_from_factor(factor)
     lu = sp.linalg.splu(A_csc)
     x = np.asarray(lu.solve(rhs64), dtype=np.float64)
     logdet = float(np.sum(np.log(np.abs(lu.U.diagonal()))))
     return x, logdet
+
+
+class _CachedSolverOpMixin:
+    """Pickling for Ops that keep a numeric factor between ``perform`` calls.
+
+    The cached factor (scikit-sparse, SuperLU or LAPACK) cannot be pickled, and
+    PyTensor pickles Ops -- the Numba backend does so to cache compiled graphs
+    that call back into Python.  The cache is dropped from the pickled state and
+    rebuilt on the next ``perform``.
+    """
+
+    _CACHE_ATTRS = ("_cached_solver", "_cached_backend", "_cached_rho", "_cached_rhos")
+
+    def __getstate__(self):
+        state = self.__dict__.copy()
+        for name in self._CACHE_ATTRS:
+            if name in state:
+                state[name] = None
+        return state
 
 
 class _SparseFactorSolver:
@@ -232,8 +345,7 @@ class _SparseFactorSolver:
     def solve(self, rhs: np.ndarray, trans: str = "N") -> np.ndarray:
         if trans != "N":
             raise ValueError("sparse factor solver supports trans='N' only")
-        rhs = np.asarray(rhs, dtype=np.float64)
-        return np.asarray(self._factor.solve(rhs), dtype=np.float64)
+        return np.asarray(self._factor.solve(_writable_f64(rhs)), dtype=np.float64)
 
 
 def _make_cached_sparse_solver(

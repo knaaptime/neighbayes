@@ -1,27 +1,42 @@
 """Gaussian spatial Gibbs sampler for SAR, SEM, SDM, SDEM models.
 
-Implements a 3-block Gibbs sampler that exploits conditional conjugacy
-in Gaussian spatial regression models:
+Implements a partially collapsed Gibbs sampler (van Dyk & Park, 2008) that
+exploits conditional conjugacy in Gaussian spatial regression models.  Each
+sweep is
 
-1. β | ρ, σ², y  — conjugate normal (direct draw)
-2. σ² | β, ρ, y  — conjugate inverse-gamma (direct draw)
-3. ρ/λ | β, σ², y — 1-D slice or MALA (non-conjugate, scalar)
+1. σ² | β, ρ, y  — conjugate inverse-gamma (direct draw)
+2. ρ/λ | σ², y   — 1-D slice sampling on the density with β integrated out
+   under its Normal prior
+3. β | ρ, σ², y  — conjugate normal (direct draw)
 
-Only the spatial parameter (ρ or λ) is non-conjugate, and it is a
-scalar — a 1-D slice or MALA update is trivial.  No NUTS adaptation,
-no gradient through the full model graph, no banana geometry.
+Step 2 marginalizes β, so step 3 must follow it immediately: the stored
+``(β, σ², ρ)`` triple is then a draw from the joint posterior, not a
+pairing of ρ with a β drawn under the previous ρ.  All three steps use the
+model's own priors (β ~ N(μ₀, diag(s²)), σ² ~ InvGamma(a, b), ρ uniform),
+so the Gibbs and NUTS paths target the same posterior.
 
-**SAR/SDM**: Uses a *collapsed* ρ log-density that integrates out β
-and σ², giving better mixing.  The collapsed density only requires
-log|I - ρW| (already available) and RSS(ρ) (a simple quadratic form).
+**SAR/SDM**: with ``P = XᵀX/σ² + Λ₀⁻¹`` independent of ρ, the ρ density is
+log|I - ρW| plus a quadratic in ρ whose coefficients are computed once per
+sweep, so each slice evaluation is O(1) beyond the log-determinant.
 
-**SEM/SDEM**: Uses an *un-collapsed* λ log-density conditional on
-current β and σ².  Simpler to implement; mixing penalty is small for
-a scalar parameter.
+**SEM/SDEM**: ``P(λ)`` depends on λ through quadratic-in-λ Gram matrices,
+so each evaluation is a k×k Cholesky.
+
+**Robust (Student-t) errors**: ``εᵢ ~ t_ν(0, σ)`` is written as the scale
+mixture ``εᵢ | vᵢ ~ N(0, σ² vᵢ)``, ``vᵢ ~ InvGamma(ν/2, ν/2)`` (Geweke,
+1993; LeSage's ``sar_g``).  Each sweep first draws
+``vᵢ | ε ~ InvGamma((ν + 1)/2, (ν + εᵢ²/σ²)/2)`` and then runs the blocks
+above on moments weighted by ``1/vᵢ``.  ν is fixed, as in the NUTS path.
 
 References
 ----------
 Neal, R. M. (2003). Slice sampling. *Annals of Statistics*, 31(3), 705–767.
+
+Geweke, J. (1993). Bayesian treatment of the independent Student-t linear
+model. *Journal of Applied Econometrics*, 8(S1), S19–S40.
+
+van Dyk, D. A., & Park, T. (2008). Partially collapsed Gibbs samplers.
+*Journal of the American Statistical Association*, 103(482), 790–796.
 
 LeSage, J. P., & Pace, R. K. (2009). *Introduction to Spatial
 Econometrics*. CRC Press.
@@ -29,7 +44,7 @@ Econometrics*. CRC Press.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Callable
 
 import numpy as np
@@ -41,6 +56,7 @@ from .._utils._slice import (
     SliceWidthState,
     slice_sample_1d_adaptive,
 )
+from ._loglik import _eps_log_density
 
 # ---------------------------------------------------------------------------
 # State and configuration dataclasses
@@ -64,6 +80,8 @@ class GaussianGibbsState:
     beta: np.ndarray
     sigma2: float
     rho: float
+    # Student-t mixing variances vᵢ (robust models only).
+    v: np.ndarray | None = None
 
 
 @dataclass
@@ -114,99 +132,26 @@ class GaussianGibbsCache:
     XTWy: np.ndarray | None = None
     WXTy: np.ndarray | None = None
     WXTWy: np.ndarray | None = None
+    # Student-t degrees of freedom; ``None`` for Gaussian errors.
+    nu: float | None = None
+    # Fixed-effects panels (Lee & Yu 2010): the independent observations the
+    # variance counts (``None``: every row) and the coefficient m of the
+    # -m·log(1 - ρ) time-effects Jacobian term.
+    n_eff: int | None = None
+    jacobian_shift: float = 0.0
+
+
+def _jacobian(cache: GaussianGibbsCache, rho):
+    """``log|I - ρW|`` as the likelihood uses it, with any time-effects term."""
+    ld = cache.logdet_fn(rho)
+    if cache.jacobian_shift:
+        ld = ld - cache.jacobian_shift * np.log1p(-rho)
+    return ld
 
 
 # ---------------------------------------------------------------------------
 # Block samplers
 # ---------------------------------------------------------------------------
-
-
-def _sample_beta_sar(
-    rho: float,
-    sigma2: float,
-    y: np.ndarray,
-    Wy: np.ndarray,
-    X: np.ndarray,
-    XtX: np.ndarray,
-    priors: GaussianGibbsPriors,
-    rng: np.random.Generator,
-) -> np.ndarray:
-    """Sample β from conjugate normal posterior (SAR/SDM).
-
-    Residuals: r = y - ρ W y.  The model becomes r = X β + ε,
-    which is standard conjugate normal.
-
-    Parameters
-    ----------
-    rho : float
-        Current spatial autoregressive parameter.
-    sigma2 : float
-        Current residual variance.
-    y : ndarray of shape (n,)
-        Response vector.
-    Wy : ndarray of shape (n,)
-        W @ y (precomputed).
-    X : ndarray of shape (n, k)
-        Design matrix.
-    XtX : ndarray of shape (k, k)
-        X^T X (precomputed).
-    priors : GaussianGibbsPriors
-        Prior hyperparameters.
-    rng : numpy.random.Generator
-        Random state.
-
-    Returns
-    -------
-    beta : ndarray of shape (k,)
-        New draw from the conditional posterior.
-    """
-    r = y - rho * Wy
-    return _sample_beta_conjugate(r, X, XtX, sigma2, priors, rng)
-
-
-def _sample_beta_sem(
-    lam: float,
-    sigma2: float,
-    cache: GaussianGibbsCache,
-    priors: GaussianGibbsPriors,
-    rng: np.random.Generator,
-) -> np.ndarray:
-    """Sample β from conjugate normal posterior (SEM/SDEM).
-
-    For SEM, conditional on λ and σ², the model is:
-        y* = X* β + ε,  ε ~ N(0, σ² I)
-    where y* = (I - λW)y and X* = (I - λW)X.
-
-    The posterior is:
-        β | λ, σ², y ~ N(β̂, Σ_β)
-        Σ_β = (X*^T X* / σ² + Λ₀⁻¹)⁻¹
-        β̂ = Σ_β (X*^T y* / σ² + Λ₀⁻¹ μ₀)
-
-    Uses the quadratic-in-λ forms from precomputed cache constants
-    so each evaluation is O(k² + k³) — no O(nk) or O(nk²) work.
-
-    Parameters
-    ----------
-    lam : float
-        Current spatial error parameter λ.
-    sigma2 : float
-        Current residual variance.
-    cache : GaussianGibbsCache
-        Precomputed cross-products (XtX, XtWX, WXtWX, XTy, XTWy, WXTy, WXTWy).
-    priors : GaussianGibbsPriors
-        Prior hyperparameters.
-    rng : numpy.random.Generator
-        Random state.
-
-    Returns
-    -------
-    beta : ndarray of shape (k,)
-        New draw from the conditional posterior.
-    """
-    lam2 = lam * lam
-    XtX_star = cache.XtX - lam * (cache.XtWX + cache.XtWX.T) + lam2 * cache.WXtWX
-    Xty_star = cache.XTy - lam * (cache.XTWy + cache.WXTy) + lam2 * cache.WXTWy
-    return _sample_beta_conjugate_from_prec(XtX_star, Xty_star, sigma2, priors, rng)
 
 
 def _sample_beta_conjugate(
@@ -270,61 +215,6 @@ def _sample_beta_conjugate(
     return beta
 
 
-def _sample_beta_conjugate_from_prec(
-    XtX_star: np.ndarray,
-    Xty_star: np.ndarray,
-    sigma2: float,
-    priors: GaussianGibbsPriors,
-    rng: np.random.Generator,
-) -> np.ndarray:
-    """Sample β from conjugate normal posterior, given precomputed Gram and cross.
-
-    Model: y* = X* β + ε,  ε ~ N(0, σ² I)
-    Prior: β ~ N(μ₀, Λ₀)  with Λ₀ diagonal
-
-    Posterior: β | · ~ N(β̂, Σ_β)
-    where Σ_β = (X*ᵀX* / σ² + Λ₀⁻¹)⁻¹
-          β̂ = Σ_β (X*ᵀy* / σ² + Λ₀⁻¹ μ₀)
-
-    This variant accepts the precomputed Gram matrix ``XtX_star`` and
-    cross-product ``Xty_star`` directly, avoiding any O(nk) work inside
-    the Gibbs hot loop (used by the SEM/SDEM β block where these are
-    available as quadratics in λ from cache constants).
-
-    Parameters
-    ----------
-    XtX_star : ndarray of shape (k, k)
-        Precomputed X*ᵀX* (Gram matrix of the transformed design).
-    Xty_star : ndarray of shape (k,)
-        Precomputed X*ᵀy* (cross-product of transformed design and response).
-    sigma2 : float
-        Current residual variance.
-    priors : GaussianGibbsPriors
-        Prior hyperparameters.
-    rng : numpy.random.Generator
-        Random state.
-
-    Returns
-    -------
-    beta : ndarray of shape (k,)
-        New draw from the conditional posterior.
-    """
-    k = XtX_star.shape[0]
-    beta_sigma_arr = np.broadcast_to(np.asarray(priors.beta_sigma, dtype=float), (k,))
-    beta_mu_arr = np.broadcast_to(np.asarray(priors.beta_mu, dtype=float), (k,))
-    prior_prec_diag = 1.0 / beta_sigma_arr**2
-
-    post_prec = XtX_star / sigma2
-    post_prec[np.diag_indices_from(post_prec)] += prior_prec_diag
-    rhs = Xty_star / sigma2 + prior_prec_diag * beta_mu_arr
-
-    L, lower = cho_factor(post_prec, lower=True)
-    post_mean = cho_solve((L, lower), rhs)
-    z = rng.standard_normal(k)
-    beta = post_mean + solve_triangular(L, z, lower=lower, trans="T")
-    return beta
-
-
 def _sample_sigma2(
     rho: float,
     beta: np.ndarray,
@@ -335,8 +225,12 @@ def _sample_sigma2(
     priors: GaussianGibbsPriors,
     model_type: str,
     rng: np.random.Generator,
+    n_eff: int | None = None,
 ) -> float:
     """Sample σ² from its conjugate Inverse-Gamma full conditional.
+
+    ``n_eff`` is the number of independent observations (default ``len(y)``);
+    a fixed-effects panel has fewer than it has rows.
 
     With prior ``σ² ~ InverseGamma(α, β)`` and Gaussian likelihood the
     full conditional is
@@ -384,7 +278,7 @@ def _sample_sigma2(
     sigma2 : float
         Draw from the full conditional.
     """
-    n = len(y)
+    n = len(y) if n_eff is None else int(n_eff)
 
     if model_type in ("sar", "sdm"):
         resid = y - rho * Wy - X @ beta
@@ -400,129 +294,133 @@ def _sample_sigma2(
 
 
 # ---------------------------------------------------------------------------
-# Collapsed ρ log-density (SAR/SDM)
+# ρ/λ | σ², y with β integrated out
 # ---------------------------------------------------------------------------
 
 
-def _sar_collapsed_log_density(
+def _beta_prior(priors: GaussianGibbsPriors, k: int) -> tuple[np.ndarray, np.ndarray]:
+    """Return the prior mean and diagonal prior precision of β as length-k arrays."""
+    mu = np.broadcast_to(np.asarray(priors.beta_mu, dtype=float), (k,))
+    s = np.broadcast_to(np.asarray(priors.beta_sigma, dtype=float), (k,))
+    return mu, 1.0 / s**2
+
+
+@dataclass
+class SarSweepTerms:
+    """ρ-independent quantities for one SAR/SDM sweep at fixed σ².
+
+    With ``P = XᵀX/σ² + Λ₀⁻¹`` and ``b(ρ) = b0 − ρ b1`` where
+    ``b0 = Xᵀy/σ² + Λ₀⁻¹μ₀`` and ``b1 = XᵀWy/σ²``, the posterior of β given
+    (ρ, σ²) is ``N(P⁻¹ b(ρ), P⁻¹)``, and ``b(ρ)ᵀP⁻¹b(ρ) = c00 − 2ρ c01 + ρ² c11``.
+    """
+
+    P_cho: tuple
+    m0: np.ndarray
+    m1: np.ndarray
+    c00: float
+    c01: float
+    c11: float
+
+
+def _sar_sweep_terms(
+    cache: GaussianGibbsCache, sigma2: float, priors: GaussianGibbsPriors
+) -> SarSweepTerms:
+    """Factor ``P`` once per sweep and reduce ``bᵀP⁻¹b`` to a quadratic in ρ."""
+    k = cache.XtX.shape[0]
+    mu, pprec = _beta_prior(priors, k)
+    P = cache.XtX / sigma2
+    P[np.diag_indices_from(P)] += pprec
+    P_cho = cho_factor(P, lower=True)
+    b0 = cache.XTy / sigma2 + pprec * mu
+    b1 = cache.XTWy / sigma2
+    m0 = cho_solve(P_cho, b0)
+    m1 = cho_solve(P_cho, b1)
+    return SarSweepTerms(
+        P_cho=P_cho,
+        m0=m0,
+        m1=m1,
+        c00=float(b0 @ m0),
+        c01=float(b0 @ m1),
+        c11=float(b1 @ m1),
+    )
+
+
+def _sar_log_density_given_sigma2(
     rho: float,
     cache: GaussianGibbsCache,
-    n: int,
-    k: int,
+    sigma2: float,
+    terms: SarSweepTerms,
 ) -> float:
-    """Collapsed log p(ρ | y) for SAR/SDM Gaussian model.
+    """log p(ρ | σ², y) for SAR/SDM with β integrated out under its Normal prior.
 
-    Integrates out β and σ² analytically.  The collapsed density is:
+    .. math::
 
-        log p(ρ | y) = log|I - ρW| - (n-k)/2 · log RSS(ρ) + const
+        \\log p(\\rho \\mid \\sigma^2, y) = \\log|I - \\rho W|
+            - \\frac{r^\\top r}{2\\sigma^2}
+            + \\tfrac12 b(\\rho)^\\top P^{-1} b(\\rho) + \\text{const},
 
-    where RSS(ρ) = (y - ρWy)^T M_X (y - ρWy) and
-    M_X = I - X(X^T X)^{-1} X^T.
-
-    Uses the precomputed inner products from ``cache`` to evaluate in O(k²)
-    instead of O(nk).  The quadratic-in-ρ forms are:
-
-        r^T r   = yty − 2ρ·yTWy + ρ²·WyTWy
-        X^T r   = XTy − ρ·XTWy
-        RSS(ρ)  = r^T r − (X^T r)^T (X^T X)^{-1} (X^T r)
-
-    Parameters
-    ----------
-    rho : float
-        Spatial autoregressive parameter.
-    cache : GaussianGibbsCache
-        Carries precomputed ``yty``, ``yTWy``, ``WyTWy``, ``XTy``, ``XTWy``,
-        ``XtX_cho``, and ``logdet_fn``.
-    n : int
-        Number of observations.
-    k : int
-        Number of regressors (including intercept).
-
-    Returns
-    -------
-    log_density : float
-        Collapsed log-density of ρ (up to a constant).
+    with ``r = y − ρWy``.  ``rᵀr`` is quadratic in ρ from cached inner products
+    and ``bᵀP⁻¹b`` is quadratic in ρ from ``terms``, so an evaluation costs the
+    log-determinant plus O(1).
     """
     r_dot_r = cache.yty - 2.0 * rho * cache.yTWy + rho * rho * cache.WyTWy
-    Xtr = cache.XTy - rho * cache.XTWy
-    rss = r_dot_r - Xtr @ cho_solve(cache.XtX_cho, Xtr)
-    logdet = cache.logdet_fn(rho)
-    return logdet - 0.5 * (n - k) * np.log(rss)
+    quad = terms.c00 - 2.0 * rho * terms.c01 + rho * rho * terms.c11
+    return _jacobian(cache, rho) - 0.5 * r_dot_r / sigma2 + 0.5 * quad
 
 
-# ---------------------------------------------------------------------------
-# Collapsed λ log-density (SEM/SDEM)
-# ---------------------------------------------------------------------------
-
-
-def _sem_collapsed_log_density(
+def _sem_precision_terms(
     lam: float,
     cache: GaussianGibbsCache,
-    n: int,
-    k: int,
-) -> float:
-    """Collapsed log p(λ | y) for SEM/SDEM Gaussian model.
+    sigma2: float,
+    priors: GaussianGibbsPriors,
+) -> tuple[tuple, np.ndarray, float]:
+    """Return ``(cho(P(λ)), b(λ), y*ᵀy*)`` for SEM/SDEM at fixed σ².
 
-    Integrates out β and σ² analytically.  The collapsed density is:
-
-        log p(λ | y) = log|I - λW|
-                       - (1/2) log|X*^T X*|
-                       - (n-k)/2 · log RSS(λ) + const
-
-    where y* = (I - λW)y, X* = (I - λW)X, and
-    RSS(λ) = y*^T y* - y*^T X* (X*^T X*)^{-1} X*^T y*.
-
-    The λ-dependent cross-products are expanded as quadratics in λ from the
-    λ-independent terms precomputed on ``GaussianGibbsCache`` (``WX = W X``):
-
-        X*^T X*(λ) = XtX − λ(XtWX + XtWXᵀ) + λ² WXtWX
-        X*^T y*(λ) = XTy − λ(XTWy + WXTy) + λ² WXTWy
-        y*^T y*(λ) = yty − 2λ yTWy + λ² WyTWy
-
-    so each evaluation is ``O(k³)`` (a k×k Cholesky) instead of ``O(n·k²)``.
-    The slice sampler makes several such evaluations per Gibbs sweep.
-
-    Parameters
-    ----------
-    lam : float
-        Spatial error parameter.
-    cache : GaussianGibbsCache
-        Carries the precomputed λ-independent cross-products and
-        ``logdet_fn`` (log|I - λW|).
-    n : int
-        Number of observations.
-    k : int
-        Number of regressors (including intercept).
-
-    Returns
-    -------
-    log_density : float
-        Collapsed log-density of λ (up to a constant).
+    ``P(λ) = X*ᵀX*/σ² + Λ₀⁻¹`` and ``b(λ) = X*ᵀy*/σ² + Λ₀⁻¹μ₀`` with
+    ``y* = (I − λW)y`` and ``X* = (I − λW)X``; the cross-products are
+    quadratics in λ from the λ-independent terms on the cache.
     """
+    k = cache.XtX.shape[0]
+    mu, pprec = _beta_prior(priors, k)
     lam2 = lam * lam
-    XtWX = cache.XtWX
-    XtX_star = cache.XtX - lam * (XtWX + XtWX.T) + lam2 * cache.WXtWX
+    XtX_star = cache.XtX - lam * (cache.XtWX + cache.XtWX.T) + lam2 * cache.WXtWX
     Xty_star = cache.XTy - lam * (cache.XTWy + cache.WXTy) + lam2 * cache.WXTWy
     yty_star = cache.yty - 2.0 * lam * cache.yTWy + lam2 * cache.WyTWy
+    P = XtX_star / sigma2
+    P[np.diag_indices_from(P)] += pprec
+    return cho_factor(P, lower=True), Xty_star / sigma2 + pprec * mu, yty_star
 
-    # RSS = y*^T y* - y*^T X* (X*^T X*)^{-1} X*^T y*
-    # Use Cholesky for the SPD happy path; fall back to pinv for
-    # rank-deficient X*^T X* (e.g. near-collinear WX columns).
-    try:
-        L, lower = cho_factor(XtX_star)
-        sol = cho_solve((L, lower), Xty_star)
-        rss = yty_star - Xty_star @ sol
-        logdet_XtX = 2.0 * np.sum(np.log(np.diag(L)))  # free from Cholesky
-    except np.linalg.LinAlgError:
-        # Cholesky failed — matrix is not SPD, use pseudo-inverse
-        XtX_star_inv = np.linalg.pinv(XtX_star)
-        rss = yty_star - Xty_star @ XtX_star_inv @ Xty_star
-        logdet_XtX = np.linalg.slogdet(XtX_star)[1]  # fallback: general det
-    rss = max(rss, 1e-300)  # Prevent log(0)
 
-    logdet = cache.logdet_fn(lam)
+def _sem_log_density_given_sigma2(
+    lam: float,
+    cache: GaussianGibbsCache,
+    sigma2: float,
+    priors: GaussianGibbsPriors,
+) -> float:
+    """log p(λ | σ², y) for SEM/SDEM with β integrated out under its Normal prior.
 
-    return logdet - 0.5 * logdet_XtX - 0.5 * (n - k) * np.log(rss)
+    .. math::
+
+        \\log p(\\lambda \\mid \\sigma^2, y) = \\log|I - \\lambda W|
+            - \\frac{y^{*\\top} y^*}{2\\sigma^2}
+            - \\tfrac12 \\log|P(\\lambda)|
+            + \\tfrac12 b(\\lambda)^\\top P(\\lambda)^{-1} b(\\lambda)
+            + \\text{const}.
+
+    Each evaluation is a k×k Cholesky; no O(n) work.
+    """
+    P_cho, b, yty_star = _sem_precision_terms(lam, cache, sigma2, priors)
+    logdet_P = 2.0 * np.sum(np.log(np.diag(P_cho[0])))
+    quad = b @ cho_solve(P_cho, b)
+    return _jacobian(cache, lam) - 0.5 * yty_star / sigma2 - 0.5 * logdet_P + 0.5 * quad
+
+
+def _draw_beta_from_cho(
+    P_cho: tuple, mean: np.ndarray, rng: np.random.Generator
+) -> np.ndarray:
+    """Draw ``β ~ N(mean, P⁻¹)`` given the lower Cholesky factor of ``P``."""
+    z = rng.standard_normal(mean.shape[0])
+    return mean + solve_triangular(P_cho[0], z, lower=True, trans="T")
 
 
 # ---------------------------------------------------------------------------
@@ -531,120 +429,161 @@ def _sem_collapsed_log_density(
 
 
 def _sample_rho_sar(
-    state: GaussianGibbsState,
+    rho: float,
     cache: GaussianGibbsCache,
-    priors: GaussianGibbsPriors,
-    n: int,
-    k: int,
+    sigma2: float,
+    terms: SarSweepTerms,
     rng: np.random.Generator,
     slice_state: SliceWidthState,
-    log_density_current: float | None = None,
-) -> tuple[float, float]:
-    """Slice sample ρ from the collapsed SAR/SDM log-density.
-
-    Parameters
-    ----------
-    state : GaussianGibbsState
-        Current Gibbs state.
-    cache : GaussianGibbsCache
-        Precomputed data (carries ``yty``, ``yTWy``, ``WyTWy``, ``XTy``,
-        ``XTWy``, ``XtX_cho``, ``logdet_fn``).
-    priors : GaussianGibbsPriors
-        Prior hyperparameters.
-    n : int
-        Number of observations.
-    k : int
-        Number of regressors.
-    rng : numpy.random.Generator
-        Random state.
-    slice_state : SliceWidthState
-        Adaptive slice width state.
-    log_density_current : float or None
-        Cached log-density at current ρ (avoids recomputation).
-
-    Returns
-    -------
-    rho_new : float
-        New ρ draw.
-    log_density_new : float
-        Log-density at the new ρ (for caching).
-    """
+) -> float:
+    """Slice sample ρ from p(ρ | σ², y) for SAR/SDM (β integrated out)."""
 
     def log_density(rho_val):
-        return _sar_collapsed_log_density(
-            rho_val,
-            cache,
-            n,
-            k,
-        )
+        return _sar_log_density_given_sigma2(rho_val, cache, sigma2, terms)
 
-    rho_new, log_density_new, _, _ = slice_sample_1d_adaptive(
+    rho_new, _, _, _ = slice_sample_1d_adaptive(
         log_density,
-        state.rho,
+        rho,
         lower=cache.rho_lower,
         upper=cache.rho_upper,
         rng=rng,
         width_state=slice_state,
-        log_density_x0=log_density_current,
     )
-    return rho_new, log_density_new
+    return rho_new
 
 
-def _sample_lam_sem_collapsed(
-    state: GaussianGibbsState,
+def _sample_lam_sem(
+    lam: float,
     cache: GaussianGibbsCache,
+    sigma2: float,
     priors: GaussianGibbsPriors,
-    n: int,
-    k: int,
     rng: np.random.Generator,
     slice_state: SliceWidthState,
-    log_density_current: float | None = None,
-) -> tuple[float, float]:
-    """Slice sample λ from the collapsed SEM/SDEM log-density.
-
-    Uses the collapsed density that integrates out β and σ² analytically,
-    giving much better mixing than the un-collapsed conditional approach.
-
-    Parameters
-    ----------
-    state : GaussianGibbsState
-        Current Gibbs state.
-    cache : GaussianGibbsCache
-        Precomputed data.
-    priors : GaussianGibbsPriors
-        Prior hyperparameters.
-    n : int
-        Number of observations.
-    k : int
-        Number of regressors.
-    rng : numpy.random.Generator
-        Random state.
-    slice_state : SliceWidthState
-        Adaptive slice width state.
-    log_density_current : float or None
-        Cached log-density at current λ.
-
-    Returns
-    -------
-    lam_new : float
-        New λ draw.
-    log_density_new : float
-        Log-density at the new λ.
-    """
+) -> float:
+    """Slice sample λ from p(λ | σ², y) for SEM/SDEM (β integrated out)."""
 
     def log_density(lam_val):
-        return _sem_collapsed_log_density(lam_val, cache, n, k)
+        return _sem_log_density_given_sigma2(lam_val, cache, sigma2, priors)
 
-    lam_new, log_density_new, _, _ = slice_sample_1d_adaptive(
+    lam_new, _, _, _ = slice_sample_1d_adaptive(
         log_density,
-        state.rho,  # state.rho holds λ for SEM/SDEM
+        lam,
         lower=cache.rho_lower,
         upper=cache.rho_upper,
         rng=rng,
         width_state=slice_state,
-        log_density_x0=log_density_current,
     )
-    return lam_new, log_density_new
+    return lam_new
+
+
+def _residual(
+    state: GaussianGibbsState, y: np.ndarray, X: np.ndarray, cache: GaussianGibbsCache
+) -> np.ndarray:
+    """ε = y − ρWy − Xβ (SAR/SDM) or (I − λW)(y − Xβ) (SEM/SDEM)."""
+    if cache.model_type in ("sar", "sdm"):
+        return y - state.rho * cache.Wy - X @ state.beta
+    raw = y - X @ state.beta
+    return raw - state.rho * (cache.W_sparse @ raw)
+
+
+def _weighted_cache(
+    cache: GaussianGibbsCache, y: np.ndarray, X: np.ndarray, w: np.ndarray
+) -> GaussianGibbsCache:
+    """The cache with every cross-product weighted by ``w = 1/v`` (Ω = diag(w)).
+
+    O(n·k²) per call; the ρ/λ density and β draw then run unchanged on
+    ``yᵀΩy``, ``XᵀΩX``, … in place of their unweighted counterparts.
+    """
+    Wy = cache.Wy
+    wy, wWy, Xw = w * y, w * Wy, X * w[:, None]
+    fields = dict(
+        XtX=Xw.T @ X,
+        yty=float(y @ wy),
+        yTWy=float(Wy @ wy),
+        WyTWy=float(Wy @ wWy),
+        XTy=Xw.T @ y,
+        XTWy=Xw.T @ Wy,
+    )
+    if cache.model_type in ("sem", "sdem"):
+        WX = cache.WX
+        WXw = WX * w[:, None]
+        fields.update(
+            XtWX=Xw.T @ WX,
+            WXtWX=WXw.T @ WX,
+            WXTy=WXw.T @ y,
+            WXTWy=WXw.T @ Wy,
+        )
+    return replace(cache, **fields)
+
+
+def gaussian_sweep(
+    state: GaussianGibbsState,
+    y: np.ndarray,
+    X: np.ndarray,
+    cache: GaussianGibbsCache,
+    priors: GaussianGibbsPriors,
+    rng: np.random.Generator,
+    slice_state: SliceWidthState,
+) -> None:
+    """One partially collapsed Gibbs sweep, updating ``state`` in place.
+
+    Order: [v | β, σ², ρ →] σ² | β, ρ[, v] → ρ | σ²[, v] (β integrated out)
+    → β | ρ, σ²[, v].  The β draw must come straight after the ρ draw that
+    marginalized it.  The bracketed v block runs only for robust models.
+    """
+    if cache.nu is not None:
+        eps = _residual(state, y, X, cache)
+        nu = cache.nu
+        # vᵢ | · ~ InvGamma((ν+1)/2, (ν + εᵢ²/σ²)/2)
+        state.v = (0.5 * (nu + eps * eps / state.sigma2)) / rng.gamma(
+            0.5 * (nu + 1.0), size=eps.shape[0]
+        )
+        w = 1.0 / state.v
+        n_obs = eps.shape[0] if cache.n_eff is None else cache.n_eff
+        a_post = priors.sigma2_alpha + 0.5 * n_obs
+        b_post = priors.sigma2_beta + 0.5 * float(w @ (eps * eps))
+        state.sigma2 = 1.0 / rng.gamma(a_post, 1.0 / b_post)
+        cache = _weighted_cache(cache, y, X, w)
+    else:
+        state.sigma2 = _sample_sigma2(
+            state.rho,
+            state.beta,
+            y,
+            cache.Wy,
+            cache.W_sparse,
+            X,
+            priors,
+            cache.model_type,
+            rng,
+            n_eff=cache.n_eff,
+        )
+    if cache.model_type in ("sar", "sdm"):
+        terms = _sar_sweep_terms(cache, state.sigma2, priors)
+        state.rho = _sample_rho_sar(
+            state.rho, cache, state.sigma2, terms, rng, slice_state
+        )
+        mean = terms.m0 - state.rho * terms.m1
+        state.beta = _draw_beta_from_cho(terms.P_cho, mean, rng)
+    else:  # sem, sdem
+        state.rho = _sample_lam_sem(
+            state.rho, cache, state.sigma2, priors, rng, slice_state
+        )
+        P_cho, b, _ = _sem_precision_terms(state.rho, cache, state.sigma2, priors)
+        state.beta = _draw_beta_from_cho(P_cho, cho_solve(P_cho, b), rng)
+
+
+def _pointwise_loglik(
+    state: GaussianGibbsState, y: np.ndarray, X: np.ndarray, cache: GaussianGibbsCache
+) -> np.ndarray:
+    """Pointwise log-likelihood with the Jacobian spread evenly over observations.
+
+    Normal for Gaussian errors; Student-t (the mixture's marginal, as the NUTS
+    path stores) for robust models.
+    """
+    eps = _residual(state, y, X, cache)
+    ll = _eps_log_density(eps, np.sqrt(state.sigma2), cache.nu)
+    ll = ll + _jacobian(cache, state.rho) / eps.shape[0]
+    return np.where(np.isfinite(ll), ll, -1e10)
 
 
 # ---------------------------------------------------------------------------
@@ -781,76 +720,15 @@ def run_gaussian_chain(
         beta=init.beta.copy(),
         sigma2=init.sigma2,
         rho=init.rho,
+        v=None if init.v is None else init.v.copy(),
     )
 
     # Adaptive slice width for ρ/λ
     rho_range = cache.rho_upper - cache.rho_lower
     slice_state = SliceWidthState(w=rho_range * 0.1)
 
-    # Precompute Wy for SAR/SDM
-    Wy = cache.Wy
-
     for i in range(total_iters):
-        # --- Block 1: β | ρ, σ², y ---
-        if model_type in ("sar", "sdm"):
-            state.beta = _sample_beta_sar(
-                state.rho,
-                state.sigma2,
-                y,
-                Wy,
-                X,
-                cache.XtX,
-                priors,
-                rng,
-            )
-        else:  # sem, sdem
-            state.beta = _sample_beta_sem(
-                state.rho,
-                state.sigma2,
-                cache,
-                priors,
-                rng,
-            )
-
-        # --- Block 2: σ² | β, ρ/λ, y (conjugate Inv-Γ draw) ---
-        state.sigma2 = _sample_sigma2(
-            state.rho,
-            state.beta,
-            y,
-            Wy,
-            cache.W_sparse,
-            X,
-            priors,
-            model_type,
-            rng,
-        )
-
-        # --- Block 3: ρ/λ | β, σ², y (slice sampling) ---
-        # NOTE: The collapsed ρ/λ conditional changes every iteration because
-        # β and σ² change.  We must NOT cache the log-density across
-        # iterations — the stale value would make the slice level wrong.
-        if model_type in ("sar", "sdm"):
-            state.rho, _ = _sample_rho_sar(
-                state,
-                cache,
-                priors,
-                n,
-                k,
-                rng,
-                slice_state,
-                None,
-            )
-        else:  # sem, sdem
-            state.rho, _ = _sample_lam_sem_collapsed(
-                state,
-                cache,
-                priors,
-                n,
-                k,
-                rng,
-                slice_state,
-                None,
-            )
+        gaussian_sweep(state, y, X, cache, priors, rng, slice_state)
 
         # Store post-warmup draws
         if i >= tune and (i - tune) % thin == 0:
@@ -861,31 +739,7 @@ def run_gaussian_chain(
 
         # Pointwise log-likelihood (including Jacobian/n)
         if store_log_lik and i >= tune and (i - tune) % thin == 0:
-            j = (i - tune) // thin
-            sigma = np.sqrt(state.sigma2)
-            if model_type in ("sar", "sdm"):
-                mu = state.rho * Wy + X @ state.beta
-                resid = y - mu
-                ll = (
-                    -0.5 * (resid / sigma) ** 2
-                    - np.log(sigma)
-                    - 0.5 * np.log(2.0 * np.pi)
-                )
-                jacobian = cache.logdet_fn(state.rho)
-                ll += jacobian / n
-            else:  # sem, sdem
-                resid_raw = y - X @ state.beta
-                eps = resid_raw - state.rho * (cache.W_sparse @ resid_raw)
-                ll = (
-                    -0.5 * (eps / sigma) ** 2
-                    - np.log(sigma)
-                    - 0.5 * np.log(2.0 * np.pi)
-                )
-                jacobian = cache.logdet_fn(state.rho)
-                ll += jacobian / n
-            # Clamp for numerical stability
-            ll = np.where(np.isfinite(ll), ll, -1e10)
-            log_lik_samples[j] = ll
+            log_lik_samples[(i - tune) // thin] = _pointwise_loglik(state, y, X, cache)
 
         # Update progress bar
         if progress_manager is not None:
@@ -908,6 +762,7 @@ def run_gaussian_chain(
             beta=state.beta.copy(),
             sigma2=state.sigma2,
             rho=state.rho,
+            v=None if state.v is None else state.v.copy(),
         )
 
     return result

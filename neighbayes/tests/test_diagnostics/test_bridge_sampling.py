@@ -46,7 +46,7 @@ def _make_2d_normal_idata(n_samples=10000, seed=42):
         "x1": samples[:, 0].reshape(1, -1),
         "x2": samples[:, 1].reshape(1, -1),
     }
-    idata = az.from_dict(posterior=posterior_dict)
+    idata = az.from_dict({"posterior": posterior_dict})
     return idata, samples
 
 
@@ -76,14 +76,16 @@ def _make_simple_linear_idata(n=30, k=2, seed=42):
     sigma_samples = np.abs(rng.normal(loc=0.5, scale=0.05, size=n_draws))
 
     idata = az.from_dict(
-        posterior={
-            "beta": beta_samples.reshape(1, n_draws, k),
-            "sigma": sigma_samples.reshape(1, n_draws),
-        },
-        log_likelihood={
-            "obs": rng.normal(size=(1, n_draws, n)),  # placeholder
-        },
-        observed_data={"y": y},
+        {
+            "posterior": {
+                "beta": beta_samples.reshape(1, n_draws, k),
+                "sigma": sigma_samples.reshape(1, n_draws),
+            },
+            "log_likelihood": {
+                "obs": rng.normal(size=(1, n_draws, n)),  # placeholder
+            },
+            "observed_data": {"y": y},
+        }
     )
     return idata
 
@@ -342,10 +344,10 @@ class TestBayesFactorCompareModels:
             bayes_factor_compare_models([idata], method="bic", metric="bridge")
 
     def test_bridge_requires_model_object(self):
-        """Bridge method raises ValueError when InferenceData is passed without model object."""
+        """Bridge method raises ValueError when a DataTree is passed without model object."""
         idata, _ = _make_2d_normal_idata(n_samples=1000, seed=42)
         with pytest.raises(
-            ValueError, match="InferenceData.*bridge sampling requires a fitted model"
+            ValueError, match="DataTree.*bridge sampling requires a fitted model"
         ):
             bayes_factor_compare_models([idata], method="bridge", model_labels=["M1"])
 
@@ -558,9 +560,11 @@ class TestCompileLogPosterior:
         )  # constrained (positive)
 
         posterior = az.from_dict(
-            posterior={
-                "beta": beta_samples,
-                "sigma": sigma_samples.reshape(n_chains, n_draws, 1),
+            {
+                "posterior": {
+                    "beta": beta_samples,
+                    "sigma": sigma_samples.reshape(n_chains, n_draws, 1),
+                }
             }
         ).posterior
 

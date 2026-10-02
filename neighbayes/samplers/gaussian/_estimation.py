@@ -1,6 +1,6 @@
 """GibbsEstimation base class for Gaussian spatial Gibbs samplers.
 
-Orchestrates chain running, InferenceData assembly, and method
+Orchestrates chain running, DataTree assembly, and method
 dispatch for the 3-block Gaussian Gibbs sampler (β, σ², ρ/λ).
 
 Two execution backends are supported:
@@ -24,7 +24,7 @@ from abc import abstractmethod
 import numpy as np
 import scipy.sparse as sp
 
-from ..._lazy_deps import az
+from ..._lazy_deps import xr
 from ..._logdet._probe_check import WarmupProbes
 from ..._logdet._refit import DEFAULT_PAD_SD
 from ..._logdet._warmup import WarmupJacobian
@@ -65,9 +65,12 @@ class GibbsEstimation:
     logdet_vec_fn : callable
         Vectorized logdet callable for arrays of rho values.
     feature_names : list of str
-        Names for the columns of X (for InferenceData coords).
+        Names for the columns of X (for DataTree coords).
     model_type : str
         One of "sar", "sem", "sdm", "sdem".
+    nu : float or None, default None
+        Student-t degrees of freedom for robust errors, sampled as a normal
+        scale mixture; ``None`` for Gaussian errors.
     """
 
     def __init__(
@@ -88,6 +91,10 @@ class GibbsEstimation:
         logdet_refit_pad_sd: float = DEFAULT_PAD_SD,
         logdet_aaa_check: bool = False,
         logdet_probe_check: bool = False,
+        nu: float | None = None,
+        jacobian_T: int | None = None,
+        jacobian_shift: float = 0.0,
+        n_eff: int | None = None,
     ):
         self.y = y
         self.X = X
@@ -105,8 +112,15 @@ class GibbsEstimation:
         self.logdet_refit_pad_sd = float(logdet_refit_pad_sd)
         self.logdet_aaa_check = bool(logdet_aaa_check)
         self.logdet_probe_check = bool(logdet_probe_check)
+        self.nu = None if nu is None else float(nu)
         self.warmup_jacobian = None
         self.n, self.k = X.shape
+        # Fixed-effects panels (Lee & Yu 2010): the Jacobian multiplier (T
+        # still slices the per-period block of ``I_T ⊗ W``), the time-effects
+        # term's coefficient, and the independent observations σ² counts.
+        self.jacobian_T = self.T if jacobian_T is None else int(jacobian_T)
+        self.jacobian_shift = float(jacobian_shift)
+        self.n_eff = self.n if n_eff is None else int(n_eff)
 
     def __getstate__(self):
         """Pickle without the warmup log-determinant.
@@ -132,8 +146,8 @@ class GibbsEstimation:
         slice_width: float | None = None,
         chain_method: str | None = None,
         log_likelihood: bool = False,
-    ) -> az.InferenceData:
-        """Run Gibbs chains and assemble InferenceData.
+    ) -> xr.DataTree:
+        """Run Gibbs chains and assemble DataTree.
 
         Parameters
         ----------
@@ -177,7 +191,7 @@ class GibbsEstimation:
 
         Returns
         -------
-        az.InferenceData
+        xr.DataTree
             With ``posterior`` and ``observed_data`` groups, and
             ``log_likelihood`` when requested.
         """
@@ -325,7 +339,7 @@ class GibbsEstimation:
             reuse_workers=inits[0] is not None,
         )
 
-        # Assemble InferenceData
+        # Assemble DataTree
         idata = self._assemble_idata(chain_results)
         self._record_refit(idata, chain_results, spatial_param)
         elapsed = time.time() - t_start
@@ -347,8 +361,8 @@ class GibbsEstimation:
         progressbar: bool = True,
         slice_width: float | None = None,
         chain_method: str = "vectorized",
-    ) -> az.InferenceData:
-        """Run JAX JIT Gibbs chains and assemble InferenceData.
+    ) -> xr.DataTree:
+        """Run JAX JIT Gibbs chains and assemble DataTree.
 
         Uses slice sampling for the ρ/λ update, enabling full JIT
         compilation of the Gibbs step.
@@ -378,7 +392,7 @@ class GibbsEstimation:
 
         Returns
         -------
-        az.InferenceData
+        xr.DataTree
         """
         from ._jax import run_chains_jax_gibbs_vectorized
 
@@ -481,9 +495,12 @@ class GibbsEstimation:
             logdet_params=params0,
             refit_hook=refit_hook,
             log_likelihood=self.log_likelihood,
+            nu=self.nu,
+            n_eff=self.n_eff,
+            jacobian_shift=self.jacobian_shift,
         )
 
-        # Assemble InferenceData
+        # Assemble DataTree
         idata = self._assemble_idata(chain_results)
         self._record_refit(idata, chain_results, spatial_param)
         elapsed = time.time() - t_start
@@ -517,6 +534,7 @@ class GibbsEstimation:
                 wp = WarmupProbes.for_sampler(
                     self.W_sparse,
                     T=self.T,
+                    jacobian_T=self.jacobian_T,
                     rho_min=self.priors.rho_lower,
                     rho_max=self.priors.rho_upper,
                 )
@@ -528,6 +546,7 @@ class GibbsEstimation:
             self.W_sparse,
             self.logdet_method,
             T=self.T,
+            jacobian_T=self.jacobian_T,
             rho_min=self.priors.rho_lower,
             rho_max=self.priors.rho_upper,
             refit=self.logdet_refit,
@@ -582,8 +601,10 @@ class GibbsEstimation:
         Uses ``make_logdet_jax_fn`` from ``neighbayes.logdet`` with the
         model's eigenvalues (if available) or sparse W matrix.
 
-        The panel Jacobian is ``T·log|I_N − ρW|``, applied by passing the
-        per-period ``N×N`` weights with ``T=self.T``.  For panels the sampler
+        The panel Jacobian is ``jacobian_T·log|I_N − ρW|`` (``T`` by default,
+        ``T − 1`` under Lee & Yu's unit-effect correction), applied by passing
+        the per-period ``N×N`` weights with ``T=self.jacobian_T``; any
+        time-effect ``−m·log(1 − ρ)`` term is added by the sampler.  For panels the sampler
         receives the ``NT×NT`` block-diagonal lag matrix (``I_T ⊗ W``) as
         ``self.W_sparse`` — whose determinant *already* carries the ``T``
         replication — so the per-period block ``W[:N, :N]`` is extracted first to
@@ -610,7 +631,7 @@ class GibbsEstimation:
             method=self.logdet_method,
             rho_min=self.priors.rho_lower,
             rho_max=self.priors.rho_upper,
-            T=self.T,
+            T=self.jacobian_T,
         )
 
     def _build_cache(self) -> GaussianGibbsCache:
@@ -668,13 +689,16 @@ class GibbsEstimation:
             XTWy=XTWy,
             WXTy=WXTy,
             WXTWy=WXTWy,
+            nu=self.nu,
+            n_eff=self.n_eff,
+            jacobian_shift=self.jacobian_shift,
         )
 
     def _assemble_idata(
         self,
         chain_results: list[dict],
-    ) -> az.InferenceData:
-        """Convert chain output dicts to InferenceData.
+    ) -> xr.DataTree:
+        """Convert chain output dicts to DataTree.
 
         Parameters
         ----------
@@ -683,7 +707,7 @@ class GibbsEstimation:
 
         Returns
         -------
-        az.InferenceData
+        xr.DataTree
         """
         spatial_param = self._spatial_param_name()
 
@@ -795,6 +819,10 @@ class GaussianSARGibbs(GibbsEstimation):
         logdet_refit_pad_sd: float = DEFAULT_PAD_SD,
         logdet_aaa_check: bool = False,
         logdet_probe_check: bool = False,
+        nu: float | None = None,
+        jacobian_T: int | None = None,
+        jacobian_shift: float = 0.0,
+        n_eff: int | None = None,
     ):
         super().__init__(
             y=y,
@@ -813,6 +841,10 @@ class GaussianSARGibbs(GibbsEstimation):
             logdet_refit_pad_sd=logdet_refit_pad_sd,
             logdet_aaa_check=logdet_aaa_check,
             logdet_probe_check=logdet_probe_check,
+            nu=nu,
+            jacobian_T=jacobian_T,
+            jacobian_shift=jacobian_shift,
+            n_eff=n_eff,
         )
 
     def _spatial_param_name(self) -> str:
@@ -868,6 +900,10 @@ class GaussianSEMGibbs(GibbsEstimation):
         logdet_refit_pad_sd: float = DEFAULT_PAD_SD,
         logdet_aaa_check: bool = False,
         logdet_probe_check: bool = False,
+        nu: float | None = None,
+        jacobian_T: int | None = None,
+        jacobian_shift: float = 0.0,
+        n_eff: int | None = None,
     ):
         super().__init__(
             y=y,
@@ -886,6 +922,10 @@ class GaussianSEMGibbs(GibbsEstimation):
             logdet_refit_pad_sd=logdet_refit_pad_sd,
             logdet_aaa_check=logdet_aaa_check,
             logdet_probe_check=logdet_probe_check,
+            nu=nu,
+            jacobian_T=jacobian_T,
+            jacobian_shift=jacobian_shift,
+            n_eff=n_eff,
         )
 
     def _spatial_param_name(self) -> str:

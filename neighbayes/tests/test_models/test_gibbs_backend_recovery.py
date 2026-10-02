@@ -27,6 +27,7 @@ import pytest
 from neighbayes import dgp
 from neighbayes.tests.helpers import (
     W_to_graph,
+    _as_sparse,
     make_rook_W,
     make_sar_logit_data,
     make_sar_logit_structural_data,
@@ -212,7 +213,7 @@ def sar_negbin_data():
     rng = np.random.default_rng(42)
     W = W_to_graph(make_rook_W(SIDE_NB))
     return dgp.simulate_sar_negbin(
-        W=W,
+        W=_as_sparse(W),
         rho=RHO_NB,
         beta=BETA_NB,
         alpha=ALPHA_NB,
@@ -259,7 +260,7 @@ def sar_negbin_struct_data():
     rng = np.random.default_rng(42)
     W = W_to_graph(make_rook_W(SIDE_NB))
     return dgp.simulate_sar_negbin(
-        W=W,
+        W=_as_sparse(W),
         rho=RHO_NB,
         beta=BETA_NB,
         alpha=ALPHA_NB,
@@ -306,7 +307,7 @@ def sar_zinb_data():
     rng = np.random.default_rng(42)
     W = W_to_graph(make_rook_W(SIDE_NB))
     return dgp.simulate_sar_zinb(
-        W=W,
+        W=_as_sparse(W),
         rho=RHO_ZINB,
         lam=LAM_ZINB,
         beta=BETA_ZINB,
@@ -427,7 +428,7 @@ def sar_zinb_small_data():
     ``test_sar_zinb_backends_agree`` with the fixes reverted.
     """
     return dgp.simulate_sar_zinb(
-        n=18,
+        n_side=18,
         rho=RHO_ZINB,
         lam=LAM_ZINB,
         beta=BETA_ZINB,
@@ -533,13 +534,11 @@ def test_backends_agree(request, model_name, fixture_name, tols):
 # Separable NB flow
 # ----------------------------------------------------------------------
 #
-# This one is not decoration.  Until 2026-09-03 the JAX flow backend was
-# simply wrong: ``_kron_solve_jax`` returned ``vec(Hᵀ)`` and both Kronecker
-# matvecs applied a stray transpose, so the sampler fit a permuted system
-# and reported rho_d = -0.21 against a true +0.35 with R-hat = 1.00 —
-# converged, and wrong.  The operators are pinned directly in
-# ``test_kron_krylov_matvec.py``; this test is the end-to-end backstop, and
-# the only recovery coverage the flow JAX path has.
+# This one is not decoration.  An earlier JAX flow kernel fit a permuted
+# system (a transposed Kronecker solve) and reported rho_d = -0.21 against a
+# true +0.35 with R-hat = 1.00 — converged, and wrong.  The structured JAX
+# kernels are pinned against dense algebra in ``test_flow_structured.py``;
+# this test is the end-to-end backstop that both backends agree.
 
 
 @pytest.fixture(scope="module")

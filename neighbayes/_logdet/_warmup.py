@@ -17,7 +17,7 @@ holds them for any Gibbs sampler, which
 2. runs the first half of warmup on every chain;
 3. passes the settled draws of all chains to :meth:`WarmupJacobian.adapt` and
    resumes every chain under what it returns, if anything;
-4. calls :meth:`WarmupJacobian.record` on the assembled InferenceData.
+4. calls :meth:`WarmupJacobian.record` on the assembled DataTree.
 
 A model asks :func:`sampler_builds_evaluators` whether to hand the sampler
 evaluators of its own, so the model and the sampler never disagree about who
@@ -154,13 +154,23 @@ class WarmupJacobian:
         self._interval = self.prior
 
     @classmethod
-    def for_sampler(cls, W_sparse, logdet_method: str | None, *, T: int = 1, **kwargs):
+    def for_sampler(
+        cls,
+        W_sparse,
+        logdet_method: str | None,
+        *,
+        T: int = 1,
+        jacobian_T: int | None = None,
+        **kwargs,
+    ):
         """Build from a sampler's lag matrix, resolving the method as the sampler does.
 
         A panel sampler receives the ``NT × NT`` block-diagonal lag matrix
         ``I_T ⊗ W``, whose determinant already carries the ``T`` replication.  The
         interpolant is built from the per-period block with ``T`` reapplied; built
-        from the full matrix, it would count ``T`` twice.
+        from the full matrix, it would count ``T`` twice.  ``jacobian_T``
+        (default ``T``) is that multiplier, ``T - 1`` for a unit fixed-effects
+        panel (Lee & Yu 2010).
         """
         from ._config import resolve_logdet_method
 
@@ -168,7 +178,7 @@ class WarmupJacobian:
         n_units = W_sparse.shape[0] // T
         W = W_sparse[:n_units, :n_units] if T > 1 else W_sparse
         method = resolve_logdet_method(logdet_method, n=n_units, W=W)
-        return cls(W, method, T=T, **kwargs)
+        return cls(W, method, T=T if jacobian_T is None else int(jacobian_T), **kwargs)
 
     @property
     def supported(self) -> bool:

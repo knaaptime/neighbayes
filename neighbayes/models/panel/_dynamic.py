@@ -37,7 +37,11 @@ from pytensor import sparse as pts
 from ..._backends.sampler_helpers import use_jax_likelihood
 from ..._lazy_deps import pm
 from ..._logdet import get_cached_logdet_fn
-from .._base._shared import _pointwise_gaussian_loglik, _write_log_likelihood_to_idata
+from .._base._shared import (
+    _pointwise_gaussian_loglik,
+    _write_log_likelihood_to_idata,
+    gelman_default_beta_prior,
+)
 from ..panel_base import SpatialPanelModel, _resolve_effects
 from ..priors import (
     PanelOLSDynamicPriors,
@@ -64,6 +68,9 @@ class _DynamicPanelMixin:
     (unit FE) raises a ValueError at construction time.
     """
 
+    # Fixed-T bias here is Nickell's, not Lee & Yu's; see SpatialPanelModel.
+    _lee_yu = False
+
     _y_dyn: np.ndarray
     _y_lag: np.ndarray
     _Wy_dyn: np.ndarray
@@ -72,6 +79,12 @@ class _DynamicPanelMixin:
     _WX_dyn: np.ndarray
     _Z_dyn: np.ndarray
     _n_time_eff: int
+
+    def _dyn_beta_prior(self, design: np.ndarray):
+        """Gelman et al. (2008) ``beta`` prior on ``design``, scaled to ``y_dyn``."""
+        names = list(self._model_coords()["coefficient"])
+        mu, sd = gelman_default_beta_prior(self._y_dyn, design, names)
+        return self.priors.get("beta_mu", mu), self.priors.get("beta_sigma", sd)
 
     def _compute_spatial_effects_posterior(
         self,
@@ -449,10 +462,8 @@ class OLSPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
           Uniform prior on :math:`\\phi`.
         - ``phi_upper`` (float, default 0.95): Upper bound of Uniform
           prior on :math:`\\phi`.
-        - ``beta_mu`` (float, default 0.0): Normal prior mean for
-          :math:`[\\beta, \\theta]`.
-        - ``beta_sigma`` (float, default 1e6): Normal prior std for
-          :math:`[\\beta, \\theta]`.
+        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal
+          prior on :math:`[\\beta, \\theta]`, scaled to ``sd(y)`` and each column's sd.
         - ``sigma2_alpha`` (float, default 2.0): InverseGamma prior alpha for sigma2
         - ``sigma2_beta`` (float, default var(y)): InverseGamma prior beta for sigma2
           for :math:`\\sigma`.
@@ -490,8 +501,7 @@ class OLSPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
 
         phi_lower = self.priors.get("phi_lower", -0.95)
         phi_upper = self.priors.get("phi_upper", 0.95)
-        beta_mu = self.priors.get("beta_mu", 0.0)
-        beta_sigma = self.priors.get("beta_sigma", 1e6)
+        beta_mu, beta_sigma = self._dyn_beta_prior(self._Z_dyn)
         sigma2_alpha = self.priors.get("sigma2_alpha", 2.0)
         sigma2_beta = self.priors.get("sigma2_beta", float(np.var(self._y_dyn)))
 
@@ -557,8 +567,7 @@ class SDMRPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
         rho_upper = self.priors.get("rho_upper", 0.95)
         phi_lower = self.priors.get("phi_lower", -0.95)
         phi_upper = self.priors.get("phi_upper", 0.95)
-        beta_mu = self.priors.get("beta_mu", 0.0)
-        beta_sigma = self.priors.get("beta_sigma", 1e6)
+        beta_mu, beta_sigma = self._dyn_beta_prior(self._Z_dyn)
         sigma2_alpha = self.priors.get("sigma2_alpha", 2.0)
         sigma2_beta = self.priors.get("sigma2_beta", float(np.var(self._y_dyn)))
 
@@ -678,10 +687,8 @@ class SDMUPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
           Uniform prior on :math:`\\psi` (lagged-spatial coefficient).
         - ``theta_upper`` (float, default 0.95): Upper bound of
           Uniform prior on :math:`\\psi`.
-        - ``beta_mu`` (float, default 0.0): Normal prior mean for
-          :math:`[\\beta, \\theta]`.
-        - ``beta_sigma`` (float, default 1e6): Normal prior std for
-          :math:`[\\beta, \\theta]`.
+        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal
+          prior on :math:`[\\beta, \\theta]`, scaled to ``sd(y)`` and each column's sd.
         - ``sigma2_alpha`` (float, default 2.0): InverseGamma prior alpha for sigma2
         - ``sigma2_beta`` (float, default var(y)): InverseGamma prior beta for sigma2
           for :math:`\\sigma`.
@@ -723,8 +730,7 @@ class SDMUPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
         phi_upper = self.priors.get("phi_upper", 0.95)
         theta_lower = self.priors.get("theta_lower", -0.95)
         theta_upper = self.priors.get("theta_upper", 0.95)
-        beta_mu = self.priors.get("beta_mu", 0.0)
-        beta_sigma = self.priors.get("beta_sigma", 1e6)
+        beta_mu, beta_sigma = self._dyn_beta_prior(self._Z_dyn)
         sigma2_alpha = self.priors.get("sigma2_alpha", 2.0)
         sigma2_beta = self.priors.get("sigma2_beta", float(np.var(self._y_dyn)))
 
@@ -841,10 +847,8 @@ class SARPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
           Uniform prior on :math:`\\phi`.
         - ``phi_upper`` (float, default 0.95): Upper bound of Uniform
           prior on :math:`\\phi`.
-        - ``beta_mu`` (float, default 0.0): Normal prior mean for
-          :math:`\\beta`.
-        - ``beta_sigma`` (float, default 1e6): Normal prior std for
-          :math:`\\beta`.
+        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal
+          prior on :math:`\\beta`, scaled to ``sd(y)`` and each column's sd.
         - ``sigma2_alpha`` (float, default 2.0): InverseGamma prior alpha for sigma2
         - ``sigma2_beta`` (float, default var(y)): InverseGamma prior beta for sigma2
           for :math:`\\sigma`.
@@ -880,8 +884,7 @@ class SARPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
         rho_upper = self.priors.get("rho_upper", 0.95)
         phi_lower = self.priors.get("phi_lower", -0.95)
         phi_upper = self.priors.get("phi_upper", 0.95)
-        beta_mu = self.priors.get("beta_mu", 0.0)
-        beta_sigma = self.priors.get("beta_sigma", 1e6)
+        beta_mu, beta_sigma = self._dyn_beta_prior(self._X_dyn)
         sigma2_alpha = self.priors.get("sigma2_alpha", 2.0)
         sigma2_beta = self.priors.get("sigma2_beta", float(np.var(self._y_dyn)))
 
@@ -985,10 +988,8 @@ class SEMPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
           Uniform prior on :math:`\\phi`.
         - ``phi_upper`` (float, default 0.95): Upper bound of Uniform
           prior on :math:`\\phi`.
-        - ``beta_mu`` (float, default 0.0): Normal prior mean for
-          :math:`\\beta`.
-        - ``beta_sigma`` (float, default 1e6): Normal prior std for
-          :math:`\\beta`.
+        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal
+          prior on :math:`\\beta`, scaled to ``sd(y)`` and each column's sd.
         - ``sigma2_alpha`` (float, default 2.0): InverseGamma prior alpha for sigma2
         - ``sigma2_beta`` (float, default var(y)): InverseGamma prior beta for sigma2
           for :math:`\\sigma`.
@@ -1025,8 +1026,7 @@ class SEMPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
         lam_upper = self.priors.get("lam_upper", 0.95)
         phi_lower = self.priors.get("phi_lower", -0.95)
         phi_upper = self.priors.get("phi_upper", 0.95)
-        beta_mu = self.priors.get("beta_mu", 0.0)
-        beta_sigma = self.priors.get("beta_sigma", 1e6)
+        beta_mu, beta_sigma = self._dyn_beta_prior(self._X_dyn)
         sigma2_alpha = self.priors.get("sigma2_alpha", 2.0)
         sigma2_beta = self.priors.get("sigma2_beta", float(np.var(self._y_dyn)))
 
@@ -1190,10 +1190,8 @@ class SDEMPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
           Uniform prior on :math:`\\phi`.
         - ``phi_upper`` (float, default 0.95): Upper bound of Uniform
           prior on :math:`\\phi`.
-        - ``beta_mu`` (float, default 0.0): Normal prior mean for
-          :math:`[\\beta, \\theta]`.
-        - ``beta_sigma`` (float, default 1e6): Normal prior std for
-          :math:`[\\beta, \\theta]`.
+        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal
+          prior on :math:`[\\beta, \\theta]`, scaled to ``sd(y)`` and each column's sd.
         - ``sigma2_alpha`` (float, default 2.0): InverseGamma prior alpha for sigma2
         - ``sigma2_beta`` (float, default var(y)): InverseGamma prior beta for sigma2
           for :math:`\\sigma`.
@@ -1242,8 +1240,7 @@ class SDEMPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
         lam_upper = self.priors.get("lam_upper", 0.95)
         phi_lower = self.priors.get("phi_lower", -0.95)
         phi_upper = self.priors.get("phi_upper", 0.95)
-        beta_mu = self.priors.get("beta_mu", 0.0)
-        beta_sigma = self.priors.get("beta_sigma", 1e6)
+        beta_mu, beta_sigma = self._dyn_beta_prior(Z)
         sigma2_alpha = self.priors.get("sigma2_alpha", 2.0)
         sigma2_beta = self.priors.get("sigma2_beta", float(np.var(self._y_dyn)))
 
@@ -1401,10 +1398,8 @@ class SLXPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
           Uniform prior on :math:`\\phi`.
         - ``phi_upper`` (float, default 0.95): Upper bound of Uniform
           prior on :math:`\\phi`.
-        - ``beta_mu`` (float, default 0.0): Normal prior mean for
-          :math:`[\\beta, \\theta]`.
-        - ``beta_sigma`` (float, default 1e6): Normal prior std for
-          :math:`[\\beta, \\theta]`.
+        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal
+          prior on :math:`[\\beta, \\theta]`, scaled to ``sd(y)`` and each column's sd.
         - ``sigma2_alpha`` (float, default 2.0): InverseGamma prior alpha for sigma2
         - ``sigma2_beta`` (float, default var(y)): InverseGamma prior beta for sigma2
           for :math:`\\sigma`.
@@ -1449,8 +1444,7 @@ class SLXPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
 
         phi_lower = self.priors.get("phi_lower", -0.95)
         phi_upper = self.priors.get("phi_upper", 0.95)
-        beta_mu = self.priors.get("beta_mu", 0.0)
-        beta_sigma = self.priors.get("beta_sigma", 1e6)
+        beta_mu, beta_sigma = self._dyn_beta_prior(Z)
         sigma2_alpha = self.priors.get("sigma2_alpha", 2.0)
         sigma2_beta = self.priors.get("sigma2_beta", float(np.var(self._y_dyn)))
 

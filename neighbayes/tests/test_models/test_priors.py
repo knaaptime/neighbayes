@@ -109,9 +109,13 @@ def test_model_unknown_prior_key_raises(xy):
 
 
 def test_sar_tobit_priors(xy):
+    """Tobit shares the Gaussian priors; the old fixed-scale keys are gone."""
     y, X, W = xy
     m = SARTobit(y=np.clip(y, 0, None), X=X, W=W)
-    assert m.priors["censor_sigma"] == 10.0
+    assert m.priors["sigma2_alpha"] == 2.0
+    for key in ("censor_sigma", "sigma_sigma"):
+        with pytest.raises(TypeError, match="Unknown prior key"):
+            SARTobit(y=np.clip(y, 0, None), X=X, W=W, priors={key: 10.0})
 
 
 def test_spatial_probit_priors_defaults():

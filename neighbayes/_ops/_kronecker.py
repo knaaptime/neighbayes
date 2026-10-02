@@ -156,11 +156,11 @@ class _KroneckerFlowVJPOp(pt.Op):
         outputs[1][0] = np.asarray(np.sum(H_v * (self._W @ Ld_H.T).T), dtype=np.float64)
         outputs[2][0] = H_v.ravel(order="F").astype(np.float64)  # v = vec(H_v)
 
-    def infer_shape(self, fgraph, node, input_shapes):
+    def infer_shape(self, node, input_shapes):
         eta_shape = input_shapes[2]
         return [(), (), eta_shape]
 
-    def grad(self, inputs, output_grads):
+    def pullback(self, inputs, outputs, output_grads):
         return [pt.zeros_like(inp) for inp in inputs]
 
 
@@ -287,8 +287,8 @@ class KroneckerFlowSolveOp(pt.Op):
         Applies the two-step Kronecker solve:
 
         1. :math:`L_d H' = H_b` — sparse solve (``spsolve(Ld, Hb)``).
-        2. :math:`L_o^\top Z = H'^\top` — second sparse solve
-           (``spsolve(Lo.T, Hp.T)``), yielding :math:`Z = H_\eta^\top`.
+        2. :math:`L_o Z = H'^\top` — second sparse solve, yielding
+           :math:`Z = H_\eta^\top` (from :math:`H_\eta L_o^\top = H'`).
         3. :math:`\eta = \operatorname{vec}(Z^\top)` — column-major flatten.
         """
         rd, ro, b = inputs
@@ -301,10 +301,10 @@ class KroneckerFlowSolveOp(pt.Op):
         Z = np.asarray(lu_o.solve(Hp.T), dtype=np.float64)
         outputs[0][0] = Z.T.ravel(order="F").astype(np.float64)
 
-    def infer_shape(self, fgraph, node, input_shapes):
+    def infer_shape(self, node, input_shapes):
         return [input_shapes[2]]
 
-    def L_op(self, inputs, outputs, output_grads):
+    def pullback(self, inputs, outputs, output_grads):
         r"""Compute VJPs via the Kronecker adjoint method.
 
         Delegates to :class:`_KroneckerFlowVJPOp`.
@@ -501,11 +501,11 @@ class _KroneckerFlowVJPMatrixOp(pt.Op):
         outputs[1][0] = np.asarray(self._W.multiply(S_o).sum(), dtype=np.float64)
         outputs[2][0] = np.asarray(H_v, dtype=np.float64)
 
-    def infer_shape(self, fgraph, node, input_shapes):
+    def infer_shape(self, node, input_shapes):
         H_shape = input_shapes[2]
         return [(), (), H_shape]
 
-    def grad(self, inputs, output_grads):
+    def pullback(self, inputs, outputs, output_grads):
         return [pt.zeros_like(inp) for inp in inputs]
 
 
@@ -597,10 +597,10 @@ class KroneckerFlowSolveMatrixOp(pt.Op):
         )
         outputs[0][0] = np.asarray(result, dtype=np.float64)
 
-    def infer_shape(self, fgraph, node, input_shapes):
+    def infer_shape(self, node, input_shapes):
         return [input_shapes[2]]
 
-    def L_op(self, inputs, outputs, output_grads):
+    def pullback(self, inputs, outputs, output_grads):
         r"""Compute VJPs via the Kronecker adjoint method.
 
         Delegates to :class:`_KroneckerFlowVJPMatrixOp`.

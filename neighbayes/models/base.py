@@ -12,7 +12,7 @@ import scipy.sparse as sp
 from libpysal.graph import Graph
 
 from .._backends.sampler_helpers import jax_available
-from .._lazy_deps import az, pm
+from .._lazy_deps import pm, xr
 from .._logdet import (
     resolve_logdet_bounds,
 )
@@ -112,7 +112,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
     _model_type : str
         Short lowercase model name used as the ``model_type`` argument to
         the Gibbs sampler (e.g. ``"sar"``, ``"sdm"``).  Also used for
-        InferenceData coordinate labels.
+        DataTree coordinate labels.
     """
 
     # --- Declarative model metadata ----------------------------------------
@@ -153,15 +153,18 @@ class SpatialModel(SharedSpatialMethods, ABC):
         self.logdet_aaa_check = bool(logdet_aaa_check)
         self.logdet_probe_check = bool(logdet_probe_check)
 
-        self._idata: Optional[az.InferenceData] = None
+        self._idata: Optional[xr.DataTree] = None
         self._pymc_model: Optional[pm.Model] = None
 
         if formula is not None:
             if data is None:
                 raise ValueError("data must be provided when using formula mode.")
-            self._y, self._X, self._feature_names = self._parse_formula(formula, data)
+            self._y, self._X, self._feature_names, self._model_spec = (
+                self._parse_formula_with_spec(formula, data)
+            )
         elif y is not None and X is not None:
             self._y, self._X, self._feature_names = self._parse_matrices(y, X)
+            self._model_spec = None
         else:
             raise ValueError("Provide either (formula, data) or (y, X).")
 
@@ -271,7 +274,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
         n_jobs: int = -1,
         idata_kwargs: dict[str, Any] | None = None,
         **sample_kwargs,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Draw samples from the posterior.
 
         Dispatches to this model's Gibbs sampler (``sampler="gibbs"``) or NUTS
@@ -301,7 +304,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
             Parallel workers for the NumPy Gibbs path (Gibbs only).
         idata_kwargs : dict, optional
             ``{"log_likelihood": True}`` stores the complete Jacobian-corrected
-            pointwise log-likelihood that ``az.loo`` / ``az.waic`` /
+            pointwise log-likelihood that ``az.loo`` /
             ``az.compare`` need, for Gibbs and NUTS alike.  Off by default, as
             in PyMC: it holds one value per draw, chain, and observation (16 GB
             at n = 250,000 with 4 × 2,000 draws).  For NUTS the dict is also
@@ -312,7 +315,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
 
         Returns
         -------
-        arviz.InferenceData
+        xarray.DataTree
         """
         from ..samplers._registry import (
             pop_options,
@@ -414,14 +417,11 @@ class SpatialModel(SharedSpatialMethods, ABC):
         n_jobs: int = -1,
         progressbar: bool = True,
         gibbs_method: str = "numpy",
-        mala_step_size: float = 0.05,
-        use_mala: bool = True,
-        use_slice: bool = True,
         slice_width: float | None = None,
         chain_method: str | None = None,
         log_likelihood: bool = False,
-    ) -> az.InferenceData:
-        """Sample posterior via 3-block Gaussian Gibbs.
+    ) -> xr.DataTree:
+        """Sample the posterior with the partially collapsed Gaussian Gibbs sampler.
 
         Uses the model's :attr:`_gibbs_class` attribute to resolve the
         appropriate Gibbs sampler class at runtime.  Only models with
@@ -446,15 +446,9 @@ class SpatialModel(SharedSpatialMethods, ABC):
         progressbar : bool, default True
             Show per-chain progress bars.
         gibbs_method : str, default "numpy"
-            Execution backend: ``"numpy"`` for Python-loop Gibbs with
-            adaptive slice sampling, or ``"jax"`` for full-JIT Gibbs
-            with MALA for ρ/λ.
-        mala_step_size : float, default 0.05
-            Initial MALA step size for the JAX path.
-        use_mala : bool, default True
-            If True, use MALA for the ρ/λ update in the JAX path.
-        use_slice : bool, default True
-            If True, use slice sampling for the ρ/λ update.
+            Execution backend (the resolved ``gibbs_backend``): ``"numpy"``
+            for Python-loop Gibbs or ``"jax"`` for full-JIT Gibbs; both
+            slice-sample ρ/λ.
         slice_width : float or None, default None
             Initial step-out width for slice sampling.
         chain_method : str or None, default None
@@ -462,25 +456,19 @@ class SpatialModel(SharedSpatialMethods, ABC):
 
         Returns
         -------
-        arviz.InferenceData
+        xarray.DataTree
             With ``posterior``, ``log_likelihood``, and ``observed_data``
             groups.
 
         Raises
         ------
         NotImplementedError
-            If the model has no Gibbs sampler (``_gibbs_class is None``)
-            or uses a robust (Student-t) likelihood.
+            If the model has no Gibbs sampler (``_gibbs_class is None``).
         """
         if self._gibbs_class is None:
             raise NotImplementedError(
                 f"{type(self).__name__} does not support Gibbs sampling. "
                 f"Use sampler='nuts' (the default)."
-            )
-        if self.robust:
-            raise NotImplementedError(
-                "Gibbs sampling is not yet supported for robust (Student-t) "
-                "models. Use sampler='nuts' (the default)."
             )
 
         # --- Resolve Gibbs class (lazy import to avoid circular deps) ---
@@ -550,6 +538,10 @@ class SpatialModel(SharedSpatialMethods, ABC):
         if self._jacobian_param == "rho":
             gibbs_kwargs["Wy"] = self._Wy
 
+        if self.robust:
+            # Student-t errors as a normal scale mixture with the same fixed ν
+            # the NUTS path uses.
+            gibbs_kwargs["nu"] = self._nu
         gibbs = GibbsClass(**gibbs_kwargs)
 
         self._idata = gibbs.fit(

@@ -8,6 +8,7 @@ import arviz as az
 import numpy as np
 import pymc as pm
 import pytest
+import xarray as xr
 from libpysal.graph import Graph
 
 from neighbayes.models import (
@@ -22,9 +23,9 @@ from neighbayes.models.panel_base import SpatialPanelModel
 from neighbayes.tests.helpers import W_to_graph, make_line_W
 
 
-def _idata(vars_dict: dict[str, np.ndarray]) -> az.InferenceData:
+def _idata(vars_dict: dict[str, np.ndarray]) -> xr.DataTree:
     payload = {k: np.asarray(v)[None, ...] for k, v in vars_dict.items()}
-    return az.from_dict(posterior=payload)
+    return az.from_dict({"posterior": payload})
 
 
 def _panel_data(seed: int = 60):
@@ -189,7 +190,7 @@ def test_sem_panel_fe_fit_adds_log_likelihood_when_missing(monkeypatch):
         "beta": np.array([[[0.9], [0.91]]]),
         "sigma": np.array([[1.0, 1.1]]),
     }
-    fake_idata = az.from_dict(posterior=posterior)
+    fake_idata = az.from_dict({"posterior": posterior})
 
     import pymc as pm
 
@@ -202,7 +203,7 @@ def test_sem_panel_fe_fit_adds_log_likelihood_when_missing(monkeypatch):
         idata_kwargs={"log_likelihood": True},
     )
 
-    assert "log_likelihood" in out.groups()
+    assert "log_likelihood" in out.children
     assert "obs" in out.log_likelihood
 
 
@@ -212,12 +213,14 @@ def test_sem_panel_fe_fit_returns_early_when_log_likelihood_exists(monkeypatch):
 
     n = y.shape[0]
     fake_idata = az.from_dict(
-        posterior={
-            "lam": np.array([[0.1, 0.11]]),
-            "beta": np.array([[[0.9], [0.91]]]),
-            "sigma": np.array([[1.0, 1.1]]),
-        },
-        log_likelihood={"obs": np.zeros((1, 2, n), dtype=float)},
+        {
+            "posterior": {
+                "lam": np.array([[0.1, 0.11]]),
+                "beta": np.array([[[0.9], [0.91]]]),
+                "sigma": np.array([[1.0, 1.1]]),
+            },
+            "log_likelihood": {"obs": np.zeros((1, 2, n), dtype=float)},
+        }
     )
 
     import pymc as pm
@@ -244,7 +247,7 @@ def test_sdem_panel_fe_fit_adds_log_likelihood_when_missing(monkeypatch):
         "beta": np.array([[[0.9, 0.15], [0.91, 0.16]]]),
         "sigma": np.array([[1.0, 1.1]]),
     }
-    fake_idata = az.from_dict(posterior=posterior)
+    fake_idata = az.from_dict({"posterior": posterior})
 
     import pymc as pm
 
@@ -257,7 +260,7 @@ def test_sdem_panel_fe_fit_adds_log_likelihood_when_missing(monkeypatch):
         idata_kwargs={"log_likelihood": True},
     )
 
-    assert "log_likelihood" in out.groups()
+    assert "log_likelihood" in out.children
     assert "obs" in out.log_likelihood
 
 
@@ -268,12 +271,14 @@ def test_sar_panel_fe_fit_applies_jacobian_when_loglik_requested(monkeypatch):
 
     n = y.shape[0]
     fake_idata = az.from_dict(
-        posterior={
-            "rho": np.array([[0.2, 0.21]]),
-            "beta": np.array([[[0.9], [0.91]]]),
-            "sigma": np.array([[1.0, 1.1]]),
-        },
-        log_likelihood={"obs": np.zeros((1, 2, n), dtype=float)},
+        {
+            "posterior": {
+                "rho": np.array([[0.2, 0.21]]),
+                "beta": np.array([[[0.9], [0.91]]]),
+                "sigma": np.array([[1.0, 1.1]]),
+            },
+            "log_likelihood": {"obs": np.zeros((1, 2, n), dtype=float)},
+        }
     )
 
     called = {"ok": False}

@@ -13,9 +13,11 @@ from __future__ import annotations
 
 import numpy as np
 import pytensor.tensor as pt
+import scipy.sparse as sp
+import scipy.sparse.linalg as spla
 from pytensor import sparse as pts
 
-from ..._lazy_deps import az, pm
+from ..._lazy_deps import pm, xr
 from .._base._shared import _tobit_pointwise_loglik, _write_log_likelihood_to_idata
 from ..base import SpatialModel
 from ..priors import SARTobitPriors, SDMTobitPriors, SEMTobitPriors
@@ -105,13 +107,32 @@ class _SpatialTobitBase(SpatialModel):
         self._censored_mask = self._y <= self.censoring
         self._censored_idx = np.where(self._censored_mask)[0]
 
+    def _tobit_sigma(self):
+        """``σ² ~ IG(sigma2_alpha, sigma2_beta)`` (default ``IG(2, Var y)``); σ recorded."""
+        sigma2 = pm.InverseGamma(
+            "sigma2",
+            alpha=float(self.priors.get("sigma2_alpha", 2.0)),
+            beta=float(self.priors.get("sigma2_beta", np.var(self._y))),
+        )
+        return pm.Deterministic("sigma", pt.sqrt(sigma2))
+
+    @staticmethod
+    def _censored_gap(n_cens: int):
+        """Gap ``c − y*`` of each censored latent value, with a flat prior on (0, ∞).
+
+        The regression density on ``y*`` is the only distribution the latent
+        values get, so integrating them out leaves the censored likelihood
+        ``P(y* ≤ c)`` exactly.  A proper prior on the gap would be a second,
+        spurious density on the same data.
+        """
+        return pm.HalfFlat("y_cens_gap", shape=n_cens)
+
     def _latent_y_tensor(self) -> pt.TensorVariable:
         """Create latent y* tensor where censored values are sampled."""
         y_lat = pt.as_tensor_variable(self._y.astype(np.float64))
         n_cens = int(self._censored_idx.size)
         if n_cens > 0:
-            censor_sigma = float(self.priors.get("censor_sigma", 10.0))
-            y_cens_gap = pm.HalfNormal("y_cens_gap", sigma=censor_sigma, shape=n_cens)
+            y_cens_gap = self._censored_gap(n_cens)
             y_cens = self.censoring - y_cens_gap
             y_lat = pt.set_subtensor(y_lat[self._censored_idx], y_cens)
         return y_lat
@@ -232,14 +253,10 @@ class SARTobit(_SpatialTobitBase):
           prior on :math:`\\rho`.
         - ``rho_upper`` (float, default 1.0): Upper bound of Uniform
           prior on :math:`\\rho`.
-        - ``beta_mu`` (float, default 0.0): Normal prior mean for
-          :math:`\\beta`.
-        - ``beta_sigma`` (float, default 1e6): Normal prior std for
-          :math:`\\beta`.
-        - ``sigma_sigma`` (float, default 10.0): HalfNormal prior std
-          for :math:`\\sigma`.
-        - ``censor_sigma`` (float, default 10.0): HalfNormal scale for
-          the latent ``y_cens_gap`` shifting censored draws below ``c``.
+        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal
+          prior on :math:`\\beta`, scaled to ``sd(y)`` and each column's sd.
+        - ``sigma2_alpha``, ``sigma2_beta`` (float, default 2 and ``Var(y)``):
+          InverseGamma prior on :math:`\\sigma^2`.
         - ``nu`` (float, default 4.0): Fixed Student-t degrees of
           freedom (only used when ``robust=True``).
 
@@ -279,15 +296,15 @@ class SARTobit(_SpatialTobitBase):
     def _build_pymc_model(self) -> pm.Model:
         rho_lower = self.priors.get("rho_lower", -1.0)
         rho_upper = self.priors.get("rho_upper", 1.0)
-        beta_mu = self.priors.get("beta_mu", 0.0)
-        beta_sigma = self.priors.get("beta_sigma", 1000000.0)
-        sigma_sigma = self.priors.get("sigma_sigma", 10.0)
+        beta_mu, beta_sigma = self._resolved_beta_prior(
+            self._X, list(self._model_coords()["coefficient"])
+        )
         logdet_fn = self._logdet_pytensor_fn
         W_pt = self._W_pt_sparse
         with pm.Model(coords=self._model_coords()) as model:
             rho = pm.Uniform("rho", lower=rho_lower, upper=rho_upper)
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            sigma = pm.HalfNormal("sigma", sigma=sigma_sigma)
+            sigma = self._tobit_sigma()
             y_lat = self._latent_y_tensor()
             resid = (
                 y_lat
@@ -317,11 +334,11 @@ class SARTobit(_SpatialTobitBase):
         rho = float(self._posterior_mean("rho"))
         beta = self._posterior_mean("beta")
         n = self._y.shape[0]
-        A = np.eye(n) - rho * self._W_dense
-        structural = np.linalg.solve(A, self._X @ beta)
+        A = sp.eye(n, format="csc") - rho * sp.csc_matrix(self._W_sparse)
+        structural = spla.spsolve(A, self._X @ beta)
         return np.maximum(self.censoring, structural)
 
-    def _postprocess_idata(self, idata: az.InferenceData) -> az.InferenceData:
+    def _postprocess_idata(self, idata: xr.DataTree) -> xr.DataTree:
         """Attach the complete pointwise Tobit log-likelihood for IC metrics.
 
         The SAR Tobit model expresses both the residual log-likelihood and the
@@ -331,7 +348,7 @@ class SARTobit(_SpatialTobitBase):
         matching left-tail log-CDF for censored ones) with the structural
         latent mean :math:`\\mu = (I - \\rho W)^{-1} X\\beta`.
         """
-        if "log_likelihood" in idata.groups() and "obs" in idata.log_likelihood:
+        if "log_likelihood" in idata.children and "obs" in idata.log_likelihood:
             return idata
         rho = idata.posterior["rho"].values
         beta = idata.posterior["beta"].values
@@ -389,14 +406,10 @@ class SEMTobit(_SpatialTobitBase):
           prior on :math:`\\lambda`.
         - ``lam_upper`` (float, default 1.0): Upper bound of Uniform
           prior on :math:`\\lambda`.
-        - ``beta_mu`` (float, default 0.0): Normal prior mean for
-          :math:`\\beta`.
-        - ``beta_sigma`` (float, default 1e6): Normal prior std for
-          :math:`\\beta`.
-        - ``sigma_sigma`` (float, default 10.0): HalfNormal prior std
-          for :math:`\\sigma`.
-        - ``censor_sigma`` (float, default 10.0): HalfNormal scale for
-          the latent ``y_cens_gap``.
+        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal
+          prior on :math:`\\beta`, scaled to ``sd(y)`` and each column's sd.
+        - ``sigma2_alpha``, ``sigma2_beta`` (float, default 2 and ``Var(y)``):
+          InverseGamma prior on :math:`\\sigma^2`.
         - ``nu`` (float, default 4.0): Fixed Student-t degrees of
           freedom (only used when ``robust=True``).
 
@@ -433,15 +446,15 @@ class SEMTobit(_SpatialTobitBase):
     def _build_pymc_model(self) -> pm.Model:
         lam_lower = self.priors.get("lam_lower", -1.0)
         lam_upper = self.priors.get("lam_upper", 1.0)
-        beta_mu = self.priors.get("beta_mu", 0.0)
-        beta_sigma = self.priors.get("beta_sigma", 1000000.0)
-        sigma_sigma = self.priors.get("sigma_sigma", 10.0)
+        beta_mu, beta_sigma = self._resolved_beta_prior(
+            self._X, list(self._model_coords()["coefficient"])
+        )
         logdet_fn = self._logdet_pytensor_fn
         W_pt = self._W_pt_sparse
         with pm.Model(coords=self._model_coords()) as model:
             lam = pm.Uniform("lam", lower=lam_lower, upper=lam_upper)
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            sigma = pm.HalfNormal("sigma", sigma=sigma_sigma)
+            sigma = self._tobit_sigma()
             y_lat = self._latent_y_tensor()
             resid = y_lat - pt.dot(self._X, beta)
             eps = resid - lam * pts.structured_dot(W_pt, resid[:, None]).flatten()
@@ -467,7 +480,7 @@ class SEMTobit(_SpatialTobitBase):
         beta = self._posterior_mean("beta")
         return np.maximum(self.censoring, self._X @ beta)
 
-    def _postprocess_idata(self, idata: az.InferenceData) -> az.InferenceData:
+    def _postprocess_idata(self, idata: xr.DataTree) -> xr.DataTree:
         """Attach the complete pointwise Tobit log-likelihood for IC metrics.
 
         The SEM Tobit model expresses both the error log-likelihood and the
@@ -476,7 +489,7 @@ class SEMTobit(_SpatialTobitBase):
         formula with structural latent mean :math:`\\mu = X\\beta` (the spatial
         filter operates on the error term and is absorbed into the Jacobian).
         """
-        if "log_likelihood" in idata.groups() and "obs" in idata.log_likelihood:
+        if "log_likelihood" in idata.children and "obs" in idata.log_likelihood:
             return idata
         lam = idata.posterior["lam"].values
         beta = idata.posterior["beta"].values
@@ -530,14 +543,10 @@ class SDMTobit(_SpatialTobitBase):
           prior on :math:`\\rho`.
         - ``rho_upper`` (float, default 1.0): Upper bound of Uniform
           prior on :math:`\\rho`.
-        - ``beta_mu`` (float, default 0.0): Normal prior mean for
-          :math:`[\\beta, \\theta]`.
-        - ``beta_sigma`` (float, default 1e6): Normal prior std for
-          :math:`[\\beta, \\theta]`.
-        - ``sigma_sigma`` (float, default 10.0): HalfNormal prior std
-          for :math:`\\sigma`.
-        - ``censor_sigma`` (float, default 10.0): HalfNormal scale for
-          the latent ``y_cens_gap``.
+        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal
+          prior on :math:`[\\beta, \\theta]`, scaled to ``sd(y)`` and each column's sd.
+        - ``sigma2_alpha``, ``sigma2_beta`` (float, default 2 and ``Var(y)``):
+          InverseGamma prior on :math:`\\sigma^2`.
         - ``nu`` (float, default 4.0): Fixed Student-t degrees of
           freedom (only used when ``robust=True``).
 
@@ -579,15 +588,15 @@ class SDMTobit(_SpatialTobitBase):
         Z = np.hstack([self._X, self._WX])
         rho_lower = self.priors.get("rho_lower", -1.0)
         rho_upper = self.priors.get("rho_upper", 1.0)
-        beta_mu = self.priors.get("beta_mu", 0.0)
-        beta_sigma = self.priors.get("beta_sigma", 1000000.0)
-        sigma_sigma = self.priors.get("sigma_sigma", 10.0)
+        beta_mu, beta_sigma = self._resolved_beta_prior(
+            Z, list(self._model_coords()["coefficient"])
+        )
         logdet_fn = self._logdet_pytensor_fn
         W_pt = self._W_pt_sparse
         with pm.Model(coords=self._model_coords()) as model:
             rho = pm.Uniform("rho", lower=rho_lower, upper=rho_upper)
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            sigma = pm.HalfNormal("sigma", sigma=sigma_sigma)
+            sigma = self._tobit_sigma()
             y_lat = self._latent_y_tensor()
             resid = (
                 y_lat
@@ -617,11 +626,11 @@ class SDMTobit(_SpatialTobitBase):
         beta = self._posterior_mean("beta")
         Z = np.hstack([self._X, self._WX])
         n = self._y.shape[0]
-        A = np.eye(n) - rho * self._W_dense
-        structural = np.linalg.solve(A, Z @ beta)
+        A = sp.eye(n, format="csc") - rho * sp.csc_matrix(self._W_sparse)
+        structural = spla.spsolve(A, Z @ beta)
         return np.maximum(self.censoring, structural)
 
-    def _postprocess_idata(self, idata: az.InferenceData) -> az.InferenceData:
+    def _postprocess_idata(self, idata: xr.DataTree) -> xr.DataTree:
         """Attach the complete pointwise Tobit log-likelihood for IC metrics.
 
         The SDM Tobit model expresses both the residual log-likelihood and the
@@ -631,7 +640,7 @@ class SDMTobit(_SpatialTobitBase):
         :math:`\\mu = (I - \\rho W)^{-1} (X\\beta + WX\\theta)`, where the
         stacked design ``Z = [X, WX]`` carries the Durbin lags.
         """
-        if "log_likelihood" in idata.groups() and "obs" in idata.log_likelihood:
+        if "log_likelihood" in idata.children and "obs" in idata.log_likelihood:
             return idata
         rho = idata.posterior["rho"].values
         beta = idata.posterior["beta"].values

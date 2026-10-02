@@ -28,7 +28,7 @@ def simulate_panel_ols_re(*, err_hetero: bool = False, **kwargs) -> dict:
     -------
     dict
         Simulation output with keys ``y``, ``X``, ``unit``, ``time``,
-        ``W_dense``, ``W_graph``, and ``params_true``.
+        ``W_sparse``, ``W_graph``, and ``params_true``.
 
     Notes
     -----
@@ -53,7 +53,7 @@ def simulate_panel_sar_re(*, err_hetero: bool = False, **kwargs) -> dict:
     -------
     dict
         Simulation output with keys ``y``, ``X``, ``unit``, ``time``,
-        ``W_dense``, ``W_graph``, and ``params_true``.
+        ``W_sparse``, ``W_graph``, and ``params_true``.
 
     Notes
     -----
@@ -77,7 +77,7 @@ def simulate_panel_sem_re(*, err_hetero: bool = False, **kwargs) -> dict:
     -------
     dict
         Simulation output with keys ``y``, ``X``, ``unit``, ``time``,
-        ``W_dense``, ``W_graph``, and ``params_true``.
+        ``W_sparse``, ``W_graph``, and ``params_true``.
 
     Notes
     -----

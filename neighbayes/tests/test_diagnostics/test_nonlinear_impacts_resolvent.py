@@ -118,7 +118,7 @@ def test_linear_scale_impacts_use_no_eigendecomposition(model_cls, y_kind, _desi
     G = 200
     beta_draws = rng.standard_normal((1, G, X.shape[1]))
     rho_draws = rng.uniform(0.0, 0.9, size=(1, G))
-    model._idata = az.from_dict(posterior={"beta": beta_draws, "rho": rho_draws})
+    model._idata = az.from_dict({"posterior": {"beta": beta_draws, "rho": rho_draws}})
 
     orig_eig, orig_eigvals = np.linalg.eig, np.linalg.eigvals
 

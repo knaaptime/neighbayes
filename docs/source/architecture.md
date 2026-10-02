@@ -26,7 +26,7 @@ replaced by an explicit argument — `logdet_method=`, `sampler=`, `gibbs_backen
 `priors=` — and the resolved log-determinant method is recorded on the model as
 `_resolved_logdet_method`. Nothing is chosen in a way you cannot see or change.
 
-**No bespoke result objects.** `fit()` returns an `arviz.InferenceData`. The posterior
+**No bespoke result objects.** `fit()` returns an ArviZ `DataTree` (`xarray.DataTree`). The posterior
 belongs to the wider PyData ecosystem, not to this package.
 
 ## The layers
@@ -190,7 +190,7 @@ know about it:
 
 `run`
 : The callable, which takes the model and resolved controls and returns a **finished**
-  `InferenceData`. Returning finished output rather than raw chains is deliberate: it
+  `DataTree`. Returning finished output rather than raw chains is deliberate: it
   lets class-based families keep their own `fit` and function-based families keep
   `run_chains` + `gibbs_to_inference_data`. The registry unifies dispatch, not sampler
   internals.
@@ -213,12 +213,17 @@ know about it:
 
 ### Two samplers behind one object
 
-Most models are estimated by a blocked Gibbs sampler written for this posterior:
-conjugate draws for $\beta$ and $\sigma^2$, and $\rho$ updated by slice sampling the
-collapsed log-density with $\beta$ and $\sigma^2$ integrated out. Collapsing is what
-makes the sampler robust to the strong $\rho$–$\beta$–$\sigma^2$ correlation that
-frustrates generic samplers, and it is also why per-$\rho$ log-determinant cost is the
-thing worth optimising.
+Most models are estimated by a blocked Gibbs sampler written for this posterior. The
+Gaussian families use a partially collapsed sweep (van Dyk & Park, 2008): a conjugate
+draw of $\sigma^2$, then $\rho$ by slice sampling $p(\rho \mid \sigma^2, y)$ with
+$\beta$ integrated out under its Normal prior, then $\beta \mid \rho, \sigma^2$. The
+$\beta$ draw must follow the $\rho$ draw that integrated it out, or the stored
+$(\beta, \rho)$ pairs stop being joint draws even though every marginal looks right.
+Integrating $\beta$ out is what makes the sampler robust to the strong
+$\rho$–$\beta$ correlation that frustrates generic samplers, and it is also why
+per-$\rho$ log-determinant cost is the thing worth optimising. Robust (Student-t)
+errors add one block, the scale-mixture variances, and weight every cross-product by
+their inverses.
 
 Models without a registered Gibbs sampler are built as PyMC models and sampled with
 NUTS. Both paths are reachable from the same object through `fit(sampler=...)`, which

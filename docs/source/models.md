@@ -348,8 +348,10 @@ Gaussian panel families, that means Gibbs unless you ask for something else.
 NUTS is not universally available. The Pólya–Gamma logit classes
 (`SARLogit`, `SARLogitStructural`, `SEMLogit`) and the auxiliary-mixture
 Poisson flow classes build no PyMC graph at all, and `fit(sampler="nuts")`
-raises `NotImplementedError`. Robust (Student-t) models are the mirror case:
-no Gibbs sampler supports them, so `robust=True` requires NUTS.
+raises `NotImplementedError`. Robust (Student-t) SAR/SEM/SDM/SDEM and
+Gaussian panel FE models keep Gibbs: the Student-t error is sampled as a
+normal scale mixture with the same fixed `nu` the NUTS path uses. Robust
+random-effects and Tobit models still require NUTS.
 
 `target_accept` is NUTS-only and raises `TypeError` if passed with Gibbs.
 

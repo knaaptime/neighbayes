@@ -11,6 +11,7 @@ import arviz as az
 import numpy as np
 import pymc as pm
 import pytest
+import xarray as xr
 
 from neighbayes.models import SDEM, SDM, SEM, SLX
 from neighbayes.tests.helpers import W_to_graph, make_line_W
@@ -31,9 +32,9 @@ _EXPECTED_EFFECT_COLUMNS = {
 }
 
 
-def _idata(vars_dict: dict[str, np.ndarray]) -> az.InferenceData:
+def _idata(vars_dict: dict[str, np.ndarray]) -> xr.DataTree:
     payload = {k: np.asarray(v)[None, ...] for k, v in vars_dict.items()}
-    return az.from_dict(posterior=payload)
+    return az.from_dict({"posterior": payload})
 
 
 def _cs_data(seed: int = 90, *, intercept: bool = True):

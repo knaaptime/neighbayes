@@ -23,7 +23,7 @@ import pytensor.tensor as pt
 from libpysal.graph import Graph
 
 from ..._backends.sampler_helpers import prepare_compile_kwargs, prepare_idata_kwargs
-from ..._lazy_deps import az, pm
+from ..._lazy_deps import pm, xr
 from .._base._shared import SharedSpatialMethods
 from ..priors import SARProbitPriors, priors_as_dict, resolve_priors
 
@@ -84,11 +84,9 @@ class SARProbit(SharedSpatialMethods):
           Uniform prior on :math:`\\rho`.
         - ``rho_upper`` (float, default 0.95): Upper bound of the
           Uniform prior on :math:`\\rho`.
-        - ``beta_mu`` (float, default 0.0): Normal prior mean for
-          :math:`\\beta`.
-        - ``beta_sigma`` (float, default 1e6): Normal prior std for
-          :math:`\\beta`.
-        - ``sigma_a_sigma`` (float, default 10.0): HalfNormal scale
+        - ``beta_mu``, ``beta_sigma`` (float or array, default Gelman et al.
+          2008): Normal prior on :math:`\\beta`, on the probit scale (intercept at ``Φ⁻¹(mean(y))``, scale ``2.5 / 1.6``; slopes ``(2.5 / 1.6) / sd(x_j)``).
+        - ``sigma_a_sigma`` (float, default 2.0): HalfNormal scale
           for the regional random-effect std :math:`\\sigma_a`.
 
     robust : bool, default False
@@ -130,7 +128,7 @@ class SARProbit(SharedSpatialMethods):
         self.priors_obj = resolve_priors(priors, SARProbitPriors)
         self.priors = priors_as_dict(self.priors_obj)
         self.robust = robust
-        self._idata: Optional[az.InferenceData] = None
+        self._idata: Optional[xr.DataTree] = None
         self._pymc_model: Optional[pm.Model] = None
 
         self._W_dense = self._as_dense_region_W(W)
@@ -239,8 +237,7 @@ class SARProbit(SharedSpatialMethods):
 
         rho_lower = self.priors.get("rho_lower", -0.95)
         rho_upper = self.priors.get("rho_upper", 0.95)
-        beta_mu = self.priors.get("beta_mu", 0.0)
-        beta_sigma = self.priors.get("beta_sigma", 10.0)
+        beta_mu, beta_sigma = self._resolved_beta_prior(link="probit")
         sigma_a_sigma = self.priors.get("sigma_a_sigma", 2.0)
 
         if self.robust:
@@ -281,7 +278,7 @@ class SARProbit(SharedSpatialMethods):
         random_seed: Optional[int] = None,
         progressbar: bool = True,
         **sample_kwargs,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Draw samples from the posterior."""
         nuts_sampler = sample_kwargs.pop("nuts_sampler", "pymc")
         target_accept = sample_kwargs.pop("target_accept", 0.9)

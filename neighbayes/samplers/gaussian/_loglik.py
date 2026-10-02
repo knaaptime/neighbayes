@@ -261,6 +261,23 @@ def ols_pointwise_loglik_numpy(
 # ---------------------------------------------------------------------------
 
 
+def _eps_log_density(
+    eps: np.ndarray, sigma: np.ndarray, nu: float | None = None
+) -> np.ndarray:
+    """Pointwise Normal(0, σ) or Student-t(ν, 0, σ) log-density of residuals."""
+    if nu is None:
+        return -0.5 * (eps / sigma) ** 2 - np.log(sigma) - 0.5 * np.log(2.0 * np.pi)
+    from scipy.special import gammaln
+
+    return (
+        gammaln(0.5 * (nu + 1.0))
+        - gammaln(0.5 * nu)
+        - 0.5 * np.log(nu * np.pi)
+        - np.log(sigma)
+        - 0.5 * (nu + 1.0) * np.log1p((eps / sigma) ** 2 / nu)
+    )
+
+
 def sar_pointwise_loglik_vectorized(
     rho_draws: np.ndarray,
     beta_draws: np.ndarray,
@@ -270,6 +287,7 @@ def sar_pointwise_loglik_vectorized(
     Wy: np.ndarray,
     logdet_vec_fn: callable,
     n: int,
+    nu: float | None = None,
 ) -> np.ndarray:
     """Vectorized pointwise LL for SAR/SDM over all posterior draws.
 
@@ -295,6 +313,8 @@ def sar_pointwise_loglik_vectorized(
         Accepts array of ρ values, returns array of logdet values.
     n : int
         Number of observations.
+    nu : float or None, default None
+        Student-t degrees of freedom for robust models; ``None`` for Normal.
 
     Returns
     -------
@@ -303,10 +323,7 @@ def sar_pointwise_loglik_vectorized(
     """
     mu = rho_draws[:, None] * Wy[None, :] + (beta_draws @ X.T)  # (n_keep, n)
     resid = y[None, :] - mu
-    sigma_2d = sigma_draws[:, None]
-    ll_gauss = (
-        -0.5 * (resid / sigma_2d) ** 2 - np.log(sigma_2d) - 0.5 * np.log(2.0 * np.pi)
-    )
+    ll_gauss = _eps_log_density(resid, sigma_draws[:, None], nu)
     jacobian = logdet_vec_fn(rho_draws)  # (n_keep,)
     ll_total = ll_gauss + jacobian[:, None] / n  # (n_keep, n)
     return ll_total
@@ -321,6 +338,7 @@ def sem_pointwise_loglik_vectorized(
     W_sparse: sp.csr_matrix,
     logdet_vec_fn: callable,
     n: int,
+    nu: float | None = None,
 ) -> np.ndarray:
     """Vectorized pointwise LL for SEM/SDEM over all posterior draws.
 
@@ -342,6 +360,8 @@ def sem_pointwise_loglik_vectorized(
         Vectorized logdet function.
     n : int
         Number of observations.
+    nu : float or None, default None
+        Student-t degrees of freedom for robust models; ``None`` for Normal.
 
     Returns
     -------
@@ -356,10 +376,7 @@ def sem_pointwise_loglik_vectorized(
     W_resid = (W_sparse @ resid_all.T).T  # (n_keep, n)
     eps = resid_all - lam_draws[:, None] * W_resid  # (n_keep, n)
 
-    sigma_2d = sigma_draws[:, None]
-    ll_gauss = (
-        -0.5 * (eps / sigma_2d) ** 2 - np.log(sigma_2d) - 0.5 * np.log(2.0 * np.pi)
-    )
+    ll_gauss = _eps_log_density(eps, sigma_draws[:, None], nu)
     jacobian = logdet_vec_fn(lam_draws)  # (n_keep,)
     ll_total = ll_gauss + jacobian[:, None] / n  # (n_keep, n)
     return ll_total

@@ -8,6 +8,7 @@ import scipy.sparse as sp
 from pytensor.graph.basic import Apply
 
 from ._backend import (
+    _CachedSolverOpMixin,
     _make_cached_sparse_solver,
     _select_sparse_backend,
     _solve_sparse_matrix,
@@ -16,7 +17,7 @@ from ._backend import (
 from ._instrument import _op_id_counter
 
 
-class _SparseFlowVJPOp(pt.Op):
+class _SparseFlowVJPOp(_CachedSolverOpMixin, pt.Op):
     r"""Vector-Jacobian product (VJP) for :class:`SparseFlowSolveOp`.
 
     Computes all four partial derivatives of the scalar loss :math:`L` with
@@ -134,17 +135,17 @@ class _SparseFlowVJPOp(pt.Op):
         outputs[2][0] = np.asarray(float(v @ (self._Ww @ eta)), dtype=np.float64)
         outputs[3][0] = np.asarray(v, dtype=np.float64)
 
-    def infer_shape(self, fgraph, node, input_shapes):
+    def infer_shape(self, node, input_shapes):
         # Three scalar outputs + one vector matching b/g shape
         eta_shape = input_shapes[3]
         return [(), (), (), eta_shape]
 
-    def grad(self, inputs, output_grads):
+    def pullback(self, inputs, outputs, output_grads):
         # Second-order gradients are not required for NUTS (first-order only).
         return [pt.zeros_like(inp) for inp in inputs]
 
 
-class SparseFlowSolveOp(pt.Op):
+class SparseFlowSolveOp(_CachedSolverOpMixin, pt.Op):
     r"""Differentiable sparse solve :math:`\eta = A(\rho)^{-1} b`.
 
     Wraps :func:`scipy.sparse.linalg.spsolve` as a pytensor
@@ -301,11 +302,11 @@ class SparseFlowSolveOp(pt.Op):
             float(rd), float(ro), float(rw), np.asarray(b, dtype=np.float64)
         )
 
-    def infer_shape(self, fgraph, node, input_shapes):
+    def infer_shape(self, node, input_shapes):
         # Output has same shape as b
         return [input_shapes[3]]
 
-    def L_op(self, inputs, outputs, output_grads):
+    def pullback(self, inputs, outputs, output_grads):
         """Compute the VJP via the adjoint method.
 
         Delegates to :class:`_SparseFlowVJPOp`, which performs:
@@ -337,7 +338,7 @@ class SparseFlowSolveOp(pt.Op):
         return [grad_rd, grad_ro, grad_rw, grad_b]
 
 
-class _SparseFlowVJPMatrixOp(pt.Op):
+class _SparseFlowVJPMatrixOp(_CachedSolverOpMixin, pt.Op):
     """Vector-Jacobian product (VJP) for :class:`SparseFlowSolveMatrixOp`.
 
     Same adjoint-method derivation as :class:`_SparseFlowVJPOp`, extended to
@@ -439,15 +440,15 @@ class _SparseFlowVJPMatrixOp(pt.Op):
         outputs[2][0] = np.asarray(np.sum(V * (self._Ww @ H)), dtype=np.float64)
         outputs[3][0] = np.asarray(V, dtype=np.float64)
 
-    def infer_shape(self, fgraph, node, input_shapes):
+    def infer_shape(self, node, input_shapes):
         H_shape = input_shapes[3]
         return [(), (), (), H_shape]
 
-    def grad(self, inputs, output_grads):
+    def pullback(self, inputs, outputs, output_grads):
         return [pt.zeros_like(inp) for inp in inputs]
 
 
-class SparseFlowSolveMatrixOp(pt.Op):
+class SparseFlowSolveMatrixOp(_CachedSolverOpMixin, pt.Op):
     r"""Differentiable sparse solve :math:`H = A(\rho)^{-1} B` for matrix RHS.
 
     Extends :class:`SparseFlowSolveOp` to a matrix right-hand side
@@ -532,12 +533,63 @@ class SparseFlowSolveMatrixOp(pt.Op):
             float(rd), float(ro), float(rw), np.asarray(B, dtype=np.float64)
         )
 
-    def infer_shape(self, fgraph, node, input_shapes):
+    def infer_shape(self, node, input_shapes):
         return [input_shapes[3]]
 
-    def L_op(self, inputs, outputs, output_grads):
+    def pullback(self, inputs, outputs, output_grads):
         rd, ro, rw, B = inputs
         H = outputs[0]
         G = output_grads[0]
         grad_rd, grad_ro, grad_rw, grad_B = self._vjp_op(rd, ro, rw, H, G)
         return [grad_rd, grad_ro, grad_rw, grad_B]
+
+
+class FlowLogdetOp(pt.Op):
+    r"""Differentiable unrestricted flow log-determinant :math:`\log|A(\rho)|`.
+
+    Wraps an exact value-and-gradient evaluator such as
+    :class:`~neighbayes._logdet._flow_kron_traces.FlowKronTraceLogdet` for
+    :math:`A = I_N - \rho_d W_d - \rho_o W_o - \rho_w W_w`.  The single
+    ``perform`` returns the value and the three partial derivatives; the
+    pullback scales the latter by the upstream gradient.  Outside the region
+    where the evaluator converges the system is at or past the stability wall,
+    so the value is :math:`-\infty` (the limit of :math:`\log|A|` there) and
+    the proposal is rejected.
+
+    Parameters
+    ----------
+    logdet : callable
+        ``logdet(rho_d, rho_o, rho_w) -> (value, grad)`` with ``grad`` ordered
+        ``(d, o, w)``.
+    """
+
+    __props__ = ("_op_id",)
+
+    def __init__(self, logdet) -> None:
+        self._logdet = logdet
+        self._op_id = next(_op_id_counter)
+        super().__init__()
+
+    def make_node(self, rho_d, rho_o, rho_w):
+        inputs = [
+            pt.as_tensor_variable(r, dtype="float64") for r in (rho_d, rho_o, rho_w)
+        ]
+        return Apply(self, inputs, [pt.dscalar(), pt.dvector()])
+
+    def perform(self, node, inputs, outputs):
+        try:
+            value, grad = self._logdet(*(float(r) for r in inputs))
+        except ValueError:
+            value, grad = -np.inf, np.zeros(3)
+        outputs[0][0] = np.asarray(value, dtype=np.float64)
+        outputs[1][0] = np.asarray(grad, dtype=np.float64).reshape(3)
+
+    def infer_shape(self, node, input_shapes):
+        return [(), (3,)]
+
+    def pullback(self, inputs, outputs, output_grads):
+        g_value = output_grads[0]
+        grad = outputs[1]
+        # The gradient output is only consumed by this pullback; NUTS needs
+        # first derivatives, so its own cotangent is not propagated.
+        return [g_value * grad[k] for k in range(3)]

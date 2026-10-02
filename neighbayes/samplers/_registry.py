@@ -7,12 +7,12 @@ Contract
 --------
 Each model family registers **one** :class:`GibbsEntry` whose ``run`` callable
 takes the model plus the resolved sampling controls and returns a finished
-:class:`arviz.InferenceData`::
+:class:`xarray.DataTree`::
 
     def run(model, *, draws, tune, chains, random_seed, thin, n_jobs,
-            progressbar, backend, **family_opts) -> az.InferenceData
+            progressbar, backend, **family_opts) -> xr.DataTree
 
-Returning a finished ``InferenceData`` (rather than raw chain results) is a
+Returning a finished ``DataTree`` (rather than raw chain results) is a
 deliberate low-risk choice: class-based families keep ``Gaussian*Gibbs.fit`` and
 function-based families keep ``run_chains`` + ``gibbs_to_inference_data``; the
 registry unifies only the *dispatch* layer, not the sampler internals.
@@ -32,10 +32,10 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Callable
 
 if TYPE_CHECKING:
-    import arviz as az
+    import xarray as xr
 
-# A runner returns a finished InferenceData.
-GibbsRunner = Callable[..., "az.InferenceData"]
+# A runner returns a finished DataTree.
+GibbsRunner = Callable[..., "xr.DataTree"]
 
 
 @dataclass(frozen=True)
@@ -45,7 +45,7 @@ class GibbsEntry:
     Attributes
     ----------
     run
-        Callable ``(model, *, draws, tune, chains, ...) -> az.InferenceData``.
+        Callable ``(model, *, draws, tune, chains, ...) -> xr.DataTree``.
     backends
         Execution backends this family supports, a subset of
         ``{"jax", "numpy"}``.  ``"auto"`` resolves against this set; every
@@ -204,6 +204,6 @@ def run_entry(entry: GibbsEntry, model, *, log_likelihood: bool, **kwargs):
     if entry.skips_log_likelihood:
         kwargs["log_likelihood"] = bool(log_likelihood)
     idata = entry.run(model, **kwargs)
-    if not log_likelihood and "log_likelihood" in idata.groups():
+    if not log_likelihood and "log_likelihood" in idata.children:
         del idata["log_likelihood"]
     return idata

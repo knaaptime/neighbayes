@@ -75,7 +75,9 @@ class Logit(SpatialModel):
     def _build_pymc_model(self) -> pm.Model:
         X = self._X
         names = list(self._feature_names)
-        default_beta_mu, default_beta_sigma = self._gelman_default_beta_prior(X, names)
+        default_beta_mu, default_beta_sigma = self._gelman_default_beta_prior(
+            X, names, link="logit"
+        )
         beta_mu = self.priors.get("beta_mu", default_beta_mu)
         beta_sigma = self.priors.get("beta_sigma", default_beta_sigma)
 

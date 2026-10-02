@@ -121,6 +121,20 @@ class GaussianLikelihoodMixin:
             "lam_upper": self.priors.get("lam_upper", 1.0),
         }
 
+    def _fe_dof_potential(self, sigma2) -> None:
+        """Count ``_n_effective`` observations in the variance, not ``n``.
+
+        The observation node is a Normal over all ``n`` (demeaned) rows,
+        contributing ``-n/2·log σ²``.  A fixed-effects panel has only
+        ``_n_effective`` independent observations (Lee & Yu 2010), so the
+        surplus is returned.  A no-op wherever the two counts agree.
+        """
+        import pytensor.tensor as pt
+
+        surplus = int(np.asarray(self._y).shape[0]) - int(self._n_effective)
+        if surplus:
+            pm.Potential("fe_dof", 0.5 * surplus * pt.log(sigma2))
+
     # ------------------------------------------------------------------
     # Main entry point
     # ------------------------------------------------------------------
@@ -220,6 +234,7 @@ class GaussianLikelihoodMixin:
                 alpha=priors["sigma2_alpha"],
                 beta=priors["sigma2_beta"],
             )
+            self._fe_dof_potential(sigma2)
             sigma = pm.Deterministic("sigma", pt.sqrt(sigma2))
             mu = pt.dot(Z, beta)
             if self.robust:
@@ -288,6 +303,7 @@ class GaussianLikelihoodMixin:
                 alpha=priors["sigma2_alpha"],
                 beta=priors["sigma2_beta"],
             )
+            self._fe_dof_potential(sigma2)
             sigma = pm.Deterministic("sigma", pt.sqrt(sigma2))
 
             if native_ll:
@@ -409,6 +425,7 @@ class GaussianLikelihoodMixin:
                 alpha=priors["sigma2_alpha"],
                 beta=priors["sigma2_beta"],
             )
+            self._fe_dof_potential(sigma2)
             sigma = pm.Deterministic("sigma", pt.sqrt(sigma2))
 
             if jax_logp:
@@ -533,5 +550,6 @@ for _structure in ("cross_section", "panel_fe"):
         run=_run_gaussian_gibbs,
         backends={"jax", "numpy"},
         options={"slice_width", "chain_method"},
+        supports_robust=True,
         skips_log_likelihood=True,
     )

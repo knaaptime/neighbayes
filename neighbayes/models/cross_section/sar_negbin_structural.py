@@ -28,7 +28,7 @@ from typing import Optional
 import numpy as np
 import scipy.sparse as sp
 
-from ..._lazy_deps import az
+from ..._lazy_deps import xr
 from ...samplers._utils._idata import gibbs_to_inference_data
 from ...samplers._utils._slice import SliceWidthState
 from ...samplers._utils._sparsax_utils import resolve_pg_jax_backend
@@ -58,7 +58,7 @@ class SARNegBinStructural(SpatialModel):
     to obtain fully conjugate Gibbs updates for eta, beta, and sigma^2.
 
     The sampler bypasses PyMC's NUTS entirely. It produces an
-    ``arviz.InferenceData`` object compatible with all downstream
+    ``xarray.DataTree`` object compatible with all downstream
     diagnostics (``spatial_diagnostics()``, ``spatial_effects()``,
     ``summary()``).
 
@@ -182,7 +182,7 @@ class SARNegBinStructural(SpatialModel):
         krylov_degree: int = 0,
         krylov_dmax: float = 0.4,
         log_likelihood: bool = False,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Sample posterior via Pólya–Gamma block Gibbs.
 
         Parameters
@@ -224,7 +224,7 @@ class SARNegBinStructural(SpatialModel):
 
         Returns
         -------
-        az.InferenceData
+        xr.DataTree
             With posterior, log_likelihood, and observed_data groups.
         """
         y = self._y
@@ -243,9 +243,10 @@ class SARNegBinStructural(SpatialModel):
             )
 
         # Build priors
+        beta_mu, beta_sigma = self._resolved_beta_prior(link="log")
         priors = GibbsPriors(
-            beta_mu=self.priors.get("beta_mu", 0.0),
-            beta_sigma=self.priors.get("beta_sigma", 1e6),
+            beta_mu=beta_mu,
+            beta_sigma=beta_sigma,
             sigma2_alpha=self.priors.get("sigma2_alpha", 2.0),
             sigma2_beta=self.priors.get("sigma2_beta", 1.0),
             alpha_sigma=self.priors.get("alpha_sigma", 2.5),
@@ -428,7 +429,7 @@ class SARNegBinStructural(SpatialModel):
                 model_type="sar_negbin",
             )
 
-        # Assemble InferenceData
+        # Assemble DataTree
         # Stack chain results: each key has shape (n_keep, ...) per chain
         param_keys = ["rho", "sigma", "alpha"]
         if return_eta:

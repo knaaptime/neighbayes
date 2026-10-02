@@ -168,7 +168,7 @@ def _flatten_chain(da) -> np.ndarray:
 
 def _hpdi_width(samples: np.ndarray, hdi_prob: float = 0.95) -> float:
     """Return the width of an equal-tailed HDI for a 1-D sample."""
-    lo, hi = az.hdi(samples, hdi_prob=hdi_prob)
+    lo, hi = np.asarray(az.hdi(samples, prob=hdi_prob))
     return float(hi - lo)
 
 
@@ -273,7 +273,7 @@ def spatial_mcmc_diagnostic(
        :filter: docname in docnames
     """
     idata = getattr(model, "inference_data", None)
-    if idata is None or "posterior" not in idata.groups():
+    if idata is None or "posterior" not in idata.children:
         raise RuntimeError(
             "Model has not been fit yet; `inference_data` is unavailable."
         )
@@ -305,17 +305,14 @@ def spatial_mcmc_diagnostic(
     warnings_triggered: list[str] = []
 
     for name in monitored:
-        # ArviZ functions return a Dataset; for vector-valued params
-        # (e.g. beta with k coords) we collapse to the worst case.
-        ess_b_ds = az.ess(posterior[name], method="bulk")
-        ess_t_ds = az.ess(posterior[name], method="tail")
-        rhat_ds = az.rhat(posterior[name])
-        mcse_ds = az.mcse(posterior[name], method="mean")
-
-        ess_b = float(np.nanmin(np.asarray(ess_b_ds[name].values)))
-        ess_t = float(np.nanmin(np.asarray(ess_t_ds[name].values)))
-        rhat_v = float(np.nanmax(np.asarray(rhat_ds[name].values)))
-        mcse_v = float(np.nanmax(np.asarray(mcse_ds[name].values)))
+        # On a DataArray the ArviZ diagnostics return a DataArray over the
+        # parameter's own dims; for vector-valued params (e.g. beta with k
+        # coords) we collapse to the worst case.
+        da = posterior[name]
+        ess_b = float(np.nanmin(np.asarray(az.ess(da, method="bulk"))))
+        ess_t = float(np.nanmin(np.asarray(az.ess(da, method="tail"))))
+        rhat_v = float(np.nanmax(np.asarray(az.rhat(da))))
+        mcse_v = float(np.nanmax(np.asarray(az.mcse(da, method="mean"))))
 
         ess_bulk[name] = ess_b
         ess_tail[name] = ess_t

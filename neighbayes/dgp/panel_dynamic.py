@@ -29,6 +29,7 @@ the exact form.
 from __future__ import annotations
 
 import numpy as np
+import scipy.sparse as sp
 
 from .panel_fe import _panel_finalize
 from .utils import (
@@ -37,6 +38,7 @@ from .utils import (
     ensure_rng,
     make_design_matrix,
     resolve_weights,
+    spatial_filter_factor,
 )
 
 
@@ -44,7 +46,7 @@ def _simulate_panel_sdmu_fe_core(
     *,
     N: int,
     T: int,
-    Wd: np.ndarray,
+    Ws: sp.csr_matrix,
     beta: np.ndarray,
     rho: float,
     phi: float,
@@ -63,7 +65,7 @@ def _simulate_panel_sdmu_fe_core(
     dynamic SAR (``theta=0``), DLM and dynamic SLX (``rho=0, theta=0``).
     """
     use_solve = rho != 0.0
-    A_inv = np.linalg.inv(np.eye(N) - rho * Wd) if use_solve else None
+    solve = spatial_filter_factor(Ws, rho) if use_solve else None
 
     alpha = rng.normal(0.0, sigma_alpha, N)
     y_prev = rng.normal(scale=sigma, size=N)
@@ -76,8 +78,8 @@ def _simulate_panel_sdmu_fe_core(
         )
         rhs = phi * y_prev + Xt @ beta + alpha + eps
         if theta != 0.0:
-            rhs = rhs + theta * (Wd @ y_prev)
-        yt = A_inv @ rhs if use_solve else rhs
+            rhs = rhs + theta * (Ws @ y_prev)
+        yt = solve(rhs) if use_solve else rhs
         y_list.append(yt)
         X_list.append(Xt)
         y_prev = yt
@@ -88,7 +90,7 @@ def _simulate_panel_sdem_dynamic_fe_core(
     *,
     N: int,
     T: int,
-    Wd: np.ndarray,
+    Ws: sp.csr_matrix,
     beta: np.ndarray,
     lam: float,
     phi: float,
@@ -105,7 +107,7 @@ def _simulate_panel_sdem_dynamic_fe_core(
     :func:`simulate_panel_sdem_dynamic_fe` route through this kernel.
     """
     use_solve = lam != 0.0
-    B_inv = np.linalg.inv(np.eye(N) - lam * Wd) if use_solve else None
+    solve = spatial_filter_factor(Ws, lam) if use_solve else None
 
     alpha = rng.normal(0.0, sigma_alpha, N)
     y_prev = rng.normal(scale=sigma, size=N)
@@ -116,7 +118,7 @@ def _simulate_panel_sdem_dynamic_fe_core(
         eps = (_hetero_scale(Xt, sigma) if err_hetero else sigma) * rng.standard_normal(
             N
         )
-        u = B_inv @ eps if use_solve else eps
+        u = solve(eps) if use_solve else eps
         yt = phi * y_prev + Xt @ beta + alpha + u
         y_list.append(yt)
         X_list.append(Xt)
@@ -131,10 +133,10 @@ def _coerce_beta(beta: np.ndarray | None) -> np.ndarray:
 
 
 def _resolve_panel_weights(W, gdf, contiguity, N):
-    Wd, Wg = resolve_weights(W=W, gdf=gdf, contiguity=contiguity)
-    if Wd.shape[0] != N:
+    Ws, Wg = resolve_weights(W=W, gdf=gdf, contiguity=contiguity)
+    if Ws.shape[0] != N:
         raise ValueError("N must match W/gdf unit count.")
-    return Wd, Wg
+    return Ws, Wg
 
 
 def simulate_panel_dlm_fe(
@@ -161,12 +163,12 @@ def simulate_panel_dlm_fe(
     Equivalent to :func:`simulate_panel_sdmu_fe` with ``rho=0`` and ``theta=0``.
     """
     rng = ensure_rng(rng, seed)
-    Wd, Wg = _resolve_panel_weights(W, gdf, contiguity, N)
+    Ws, Wg = _resolve_panel_weights(W, gdf, contiguity, N)
     beta = _coerce_beta(beta)
     y, X, idx = _simulate_panel_sdmu_fe_core(
         N=N,
         T=T,
-        Wd=Wd,
+        Ws=Ws,
         beta=beta,
         rho=0.0,
         phi=phi,
@@ -182,7 +184,7 @@ def simulate_panel_dlm_fe(
         idx=idx,
         N=N,
         T=T,
-        Wd=Wd,
+        Ws=Ws,
         Wg=Wg,
         params_true={
             "phi": phi,
@@ -223,12 +225,12 @@ def simulate_panel_sdmr_fe(
     Equivalent to :func:`simulate_panel_sdmu_fe` with ``theta = -rho * phi``.
     """
     rng = ensure_rng(rng, seed)
-    Wd, Wg = _resolve_panel_weights(W, gdf, contiguity, N)
+    Ws, Wg = _resolve_panel_weights(W, gdf, contiguity, N)
     beta = _coerce_beta(beta)
     y, X, idx = _simulate_panel_sdmu_fe_core(
         N=N,
         T=T,
-        Wd=Wd,
+        Ws=Ws,
         beta=beta,
         rho=rho,
         phi=phi,
@@ -244,7 +246,7 @@ def simulate_panel_sdmr_fe(
         idx=idx,
         N=N,
         T=T,
-        Wd=Wd,
+        Ws=Ws,
         Wg=Wg,
         params_true={
             "rho": rho,
@@ -289,12 +291,12 @@ def simulate_panel_sdmu_fe(
     ``slx_dynamic_fe``, ``sdmr_fe``) are wrappers around this kernel.
     """
     rng = ensure_rng(rng, seed)
-    Wd, Wg = _resolve_panel_weights(W, gdf, contiguity, N)
+    Ws, Wg = _resolve_panel_weights(W, gdf, contiguity, N)
     beta = _coerce_beta(beta)
     y, X, idx = _simulate_panel_sdmu_fe_core(
         N=N,
         T=T,
-        Wd=Wd,
+        Ws=Ws,
         beta=beta,
         rho=rho,
         phi=phi,
@@ -310,7 +312,7 @@ def simulate_panel_sdmu_fe(
         idx=idx,
         N=N,
         T=T,
-        Wd=Wd,
+        Ws=Ws,
         Wg=Wg,
         params_true={
             "rho": rho,
@@ -352,12 +354,12 @@ def simulate_panel_sar_dynamic_fe(
     Equivalent to :func:`simulate_panel_sdmu_fe` with ``theta=0``.
     """
     rng = ensure_rng(rng, seed)
-    Wd, Wg = _resolve_panel_weights(W, gdf, contiguity, N)
+    Ws, Wg = _resolve_panel_weights(W, gdf, contiguity, N)
     beta = _coerce_beta(beta)
     y, X, idx = _simulate_panel_sdmu_fe_core(
         N=N,
         T=T,
-        Wd=Wd,
+        Ws=Ws,
         beta=beta,
         rho=rho,
         phi=phi,
@@ -373,7 +375,7 @@ def simulate_panel_sar_dynamic_fe(
         idx=idx,
         N=N,
         T=T,
-        Wd=Wd,
+        Ws=Ws,
         Wg=Wg,
         params_true={
             "rho": rho,
@@ -415,12 +417,12 @@ def simulate_panel_sem_dynamic_fe(
     same algebra in the current implementation).
     """
     rng = ensure_rng(rng, seed)
-    Wd, Wg = _resolve_panel_weights(W, gdf, contiguity, N)
+    Ws, Wg = _resolve_panel_weights(W, gdf, contiguity, N)
     beta = _coerce_beta(beta)
     y, X, idx = _simulate_panel_sdem_dynamic_fe_core(
         N=N,
         T=T,
-        Wd=Wd,
+        Ws=Ws,
         beta=beta,
         lam=lam,
         phi=phi,
@@ -435,7 +437,7 @@ def simulate_panel_sem_dynamic_fe(
         idx=idx,
         N=N,
         T=T,
-        Wd=Wd,
+        Ws=Ws,
         Wg=Wg,
         params_true={
             "lam": lam,
@@ -477,12 +479,12 @@ def simulate_panel_sdem_dynamic_fe(
     also dispatches to.
     """
     rng = ensure_rng(rng, seed)
-    Wd, Wg = _resolve_panel_weights(W, gdf, contiguity, N)
+    Ws, Wg = _resolve_panel_weights(W, gdf, contiguity, N)
     beta = _coerce_beta(beta)
     y, X, idx = _simulate_panel_sdem_dynamic_fe_core(
         N=N,
         T=T,
-        Wd=Wd,
+        Ws=Ws,
         beta=beta,
         lam=lam,
         phi=phi,
@@ -497,7 +499,7 @@ def simulate_panel_sdem_dynamic_fe(
         idx=idx,
         N=N,
         T=T,
-        Wd=Wd,
+        Ws=Ws,
         Wg=Wg,
         params_true={
             "lam": lam,
@@ -539,12 +541,12 @@ def simulate_panel_slx_dynamic_fe(
     matches the pre-refactor behavior).
     """
     rng = ensure_rng(rng, seed)
-    Wd, Wg = _resolve_panel_weights(W, gdf, contiguity, N)
+    Ws, Wg = _resolve_panel_weights(W, gdf, contiguity, N)
     beta = _coerce_beta(beta)
     y, X, idx = _simulate_panel_sdmu_fe_core(
         N=N,
         T=T,
-        Wd=Wd,
+        Ws=Ws,
         beta=beta,
         rho=0.0,
         phi=phi,
@@ -560,7 +562,7 @@ def simulate_panel_slx_dynamic_fe(
         idx=idx,
         N=N,
         T=T,
-        Wd=Wd,
+        Ws=Ws,
         Wg=Wg,
         params_true={
             "phi": phi,

@@ -13,6 +13,18 @@ where :math:`\\mu_{it}` is the spatial or non-spatial mean depending on the mode
     \\alpha_i \\sim N(0, \\sigma_\\alpha^2), \\quad
     \\varepsilon_{it} \\sim N(0, \\sigma^2)
 
+Priors and parameterization
+---------------------------
+:math:`\\sigma_\\alpha` gets a half-t prior (half-Cauchy by default) scaled to
+``sd(y)``, and :math:`\\sigma^2` the package's ``Inv-Gamma(2, Var(y))``; the
+NUTS and Gibbs paths share both (see :func:`_re_prior_values`).  NUTS samples
+the effects non-centered by default, :math:`\\alpha_i = \\sigma_\\alpha z_i`
+with :math:`z_i \\sim N(0, 1)`: the same prior and posterior as the centered
+form, without the funnel between :math:`\\sigma_\\alpha` and
+:math:`\\alpha` that makes NUTS diverge when the effects are weakly
+identified.  ``centered=True`` restores the centered form, which mixes better
+when every unit has many observations.
+
 Data convention
 ---------------
 Observations must be stacked time-first (time period changes slowest),
@@ -27,7 +39,7 @@ import pytensor.tensor as pt
 from pytensor import sparse as pts
 
 from ..._backends.sampler_helpers import use_jax_likelihood
-from ..._lazy_deps import az, pm
+from ..._lazy_deps import pm, xr
 from ...samplers._registry import register
 from ..panel_base import SpatialPanelModel
 from ..priors import (
@@ -38,7 +50,72 @@ from ..priors import (
 )
 
 
-class OLSPanelRE(SpatialPanelModel):
+def _re_prior_values(model, Z: np.ndarray) -> dict:
+    """Resolved prior hyperparameters, shared by the NUTS and Gibbs paths.
+
+    ``Z`` is the design ``beta`` multiplies (``[X, WX]`` for SDEM); the
+    ``beta`` default is the data-scaled Gelman et al. (2008) prior on it.
+    ``sigma_alpha_scale`` defaults to ``sd(y)``, so the half-t prior on
+    :math:`\\sigma_\\alpha` means the same thing whatever units ``y`` is in.
+    """
+    names = list(model._model_coords()["coefficient"])
+    beta_mu, beta_sigma = model._gelman_default_beta_prior(Z, names)
+    p = model.priors
+    return {
+        "beta_mu": p.get("beta_mu", beta_mu),
+        "beta_sigma": p.get("beta_sigma", beta_sigma),
+        "sigma2_alpha": float(p.get("sigma2_alpha", 2.0)),
+        "sigma2_beta": float(p.get("sigma2_beta", np.var(model._y))),
+        "sigma_alpha_nu": float(p.get("sigma_alpha_nu", 1.0)),
+        "sigma_alpha_scale": float(p.get("sigma_alpha_scale", np.std(model._y))),
+    }
+
+
+def _random_effects(pv: dict, centered: bool):
+    """``sigma_alpha`` and the unit effects ``alpha``, inside a model context.
+
+    The half-t prior is ``HalfCauchy`` when ``nu == 1``.  Non-centered,
+    ``alpha`` is a ``Deterministic`` of the standardized ``alpha_z``, so the
+    posterior carries ``alpha`` under either parameterization.
+    """
+    nu, scale = pv["sigma_alpha_nu"], pv["sigma_alpha_scale"]
+    if nu == 1.0:
+        sigma_alpha = pm.HalfCauchy("sigma_alpha", beta=scale)
+    else:
+        sigma_alpha = pm.HalfStudentT("sigma_alpha", nu=nu, sigma=scale)
+    if centered:
+        alpha = pm.Normal("alpha", mu=0.0, sigma=sigma_alpha, dims="unit")
+    else:
+        alpha_z = pm.Normal("alpha_z", mu=0.0, sigma=1.0, dims="unit")
+        alpha = pm.Deterministic("alpha", sigma_alpha * alpha_z, dims="unit")
+    return sigma_alpha, alpha
+
+
+def _re_gibbs_priors(pv: dict, rho_lower: float, rho_upper: float):
+    """The Gibbs sampler's priors, built from the same resolved values."""
+    from ...samplers.panel import REGibbsPriors
+
+    return REGibbsPriors(
+        beta_mu=pv["beta_mu"],
+        beta_sigma=pv["beta_sigma"],
+        rho_lower=rho_lower,
+        rho_upper=rho_upper,
+        sigma2_alpha=pv["sigma2_alpha"],
+        sigma2_beta=pv["sigma2_beta"],
+        sigma_alpha_nu=pv["sigma_alpha_nu"],
+        sigma_alpha_scale=pv["sigma_alpha_scale"],
+    )
+
+
+class _RandomEffectsMixin:
+    """Adds the ``centered`` switch for the unit effects' parameterization."""
+
+    def __init__(self, *, centered: bool = False, **kwargs):
+        self.centered = bool(centered)
+        super().__init__(**kwargs)
+
+
+class OLSPanelRE(_RandomEffectsMixin, SpatialPanelModel):
     """Bayesian random effects panel regression (non-spatial).
 
     .. math::
@@ -78,18 +155,27 @@ class OLSPanelRE(SpatialPanelModel):
     priors : dict, optional
         Override default priors. Supported keys:
 
-        - ``beta_mu`` (float, default 0.0): Normal prior mean for
-          :math:`\\beta`.
-        - ``beta_sigma`` (float, default 1e6): Normal prior std for
-          :math:`\\beta`.
+        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal
+          prior on :math:`\\beta`, data-scaled (see
+          :class:`~neighbayes.models.priors.BasePriors`).
         - ``sigma2_alpha`` (float, default 2.0): InverseGamma prior alpha for sigma2
         - ``sigma2_beta`` (float, default var(y)): InverseGamma prior beta for sigma2
           for :math:`\\sigma`.
-        - ``sigma_alpha_sigma`` (float, default 10.0): HalfNormal
-          prior std for :math:`\\sigma_\\alpha`.
+        - ``sigma_alpha_nu`` (float, default 1.0): degrees of freedom of the
+          half-t prior on :math:`\\sigma_\\alpha`; 1 is the half-Cauchy.
+        - ``sigma_alpha_scale`` (float, default sd(y)): scale of that prior.
+          See :class:`~neighbayes.models.priors.PanelREMixinPriors`.
         - ``nu`` (float, default 4.0): Fixed Student-t degrees of
           freedom (only used when ``robust=True``).
 
+    centered : bool, default False
+        Parameterization of the unit effects under NUTS.  The default samples
+        them non-centered, :math:`\\alpha_i = \\sigma_\\alpha z_i`, which
+        avoids the funnel between :math:`\\sigma_\\alpha` and
+        :math:`\\alpha` when the effects are weakly identified (few periods,
+        small :math:`\\sigma_\\alpha`).  ``True`` samples :math:`\\alpha`
+        directly, which mixes better when every unit has many observations.
+        The prior and the posterior are the same either way.
     robust : bool, default False
         If True, replace the Normal error with Student-t. See
         *Robust regression* below.
@@ -140,11 +226,9 @@ class OLSPanelRE(SpatialPanelModel):
         -------
         pymc.Model
         """
-        beta_mu = self.priors.get("beta_mu", 0.0)
-        beta_sigma = self.priors.get("beta_sigma", 1e6)
-        sigma2_alpha = self.priors.get("sigma2_alpha", 2.0)
-        sigma2_beta = self.priors.get("sigma2_beta", float(np.var(self._y)))
-        sigma_alpha_sigma = self.priors.get("sigma_alpha_sigma", 10.0)
+        pv = _re_prior_values(self, self._X)
+        beta_mu, beta_sigma = pv["beta_mu"], pv["beta_sigma"]
+        sigma2_alpha, sigma2_beta = pv["sigma2_alpha"], pv["sigma2_beta"]
 
         unit_idx = self._unit_idx
 
@@ -152,8 +236,7 @@ class OLSPanelRE(SpatialPanelModel):
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
             sigma2 = pm.InverseGamma("sigma2", alpha=sigma2_alpha, beta=sigma2_beta)
             sigma = pm.Deterministic("sigma", pt.sqrt(sigma2))
-            sigma_alpha = pm.HalfNormal("sigma_alpha", sigma=sigma_alpha_sigma)
-            alpha = pm.Normal("alpha", mu=0.0, sigma=sigma_alpha, dims="unit")
+            sigma_alpha, alpha = _random_effects(pv, self.centered)
 
             mu = pt.dot(self._X, beta) + alpha[unit_idx]
             if self.robust:
@@ -208,7 +291,7 @@ class OLSPanelRE(SpatialPanelModel):
         return direct_samples, indirect_samples, total_samples
 
 
-class SARPanelRE(SpatialPanelModel):
+class SARPanelRE(_RandomEffectsMixin, SpatialPanelModel):
     """Bayesian spatial lag panel model with unit random effects.
 
     .. math::
@@ -247,18 +330,27 @@ class SARPanelRE(SpatialPanelModel):
           prior on :math:`\\rho`.
         - ``rho_upper`` (float, default 1.0): Upper bound of Uniform
           prior on :math:`\\rho`.
-        - ``beta_mu`` (float, default 0.0): Normal prior mean for
-          :math:`\\beta`.
-        - ``beta_sigma`` (float, default 1e6): Normal prior std for
-          :math:`\\beta`.
+        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal
+          prior on :math:`\\beta`, data-scaled (see
+          :class:`~neighbayes.models.priors.BasePriors`).
         - ``sigma2_alpha`` (float, default 2.0): InverseGamma prior alpha for sigma2
         - ``sigma2_beta`` (float, default var(y)): InverseGamma prior beta for sigma2
           for :math:`\\sigma`.
-        - ``sigma_alpha_sigma`` (float, default 10.0): HalfNormal
-          prior std for :math:`\\sigma_\\alpha`.
+        - ``sigma_alpha_nu`` (float, default 1.0): degrees of freedom of the
+          half-t prior on :math:`\\sigma_\\alpha`; 1 is the half-Cauchy.
+        - ``sigma_alpha_scale`` (float, default sd(y)): scale of that prior.
+          See :class:`~neighbayes.models.priors.PanelREMixinPriors`.
         - ``nu`` (float, default 4.0): Fixed Student-t degrees of
           freedom (only used when ``robust=True``).
 
+    centered : bool, default False
+        Parameterization of the unit effects under NUTS.  The default samples
+        them non-centered, :math:`\\alpha_i = \\sigma_\\alpha z_i`, which
+        avoids the funnel between :math:`\\sigma_\\alpha` and
+        :math:`\\alpha` when the effects are weakly identified (few periods,
+        small :math:`\\sigma_\\alpha`).  ``True`` samples :math:`\\alpha`
+        directly, which mixes better when every unit has many observations.
+        The prior and the posterior are the same either way.
     logdet_method : str, optional
         How to compute :math:`\\log|I - \\rho W|`; auto-selected
         (``"eigenvalue"`` for ``N <= 2000`` else ``"chebyshev"``) when
@@ -312,11 +404,9 @@ class SARPanelRE(SpatialPanelModel):
         """
         rho_lower = self.priors.get("rho_lower", -1.0)
         rho_upper = self.priors.get("rho_upper", 1.0)
-        beta_mu = self.priors.get("beta_mu", 0.0)
-        beta_sigma = self.priors.get("beta_sigma", 1e6)
-        sigma2_alpha = self.priors.get("sigma2_alpha", 2.0)
-        sigma2_beta = self.priors.get("sigma2_beta", float(np.var(self._y)))
-        sigma_alpha_sigma = self.priors.get("sigma_alpha_sigma", 10.0)
+        pv = _re_prior_values(self, self._X)
+        beta_mu, beta_sigma = pv["beta_mu"], pv["beta_sigma"]
+        sigma2_alpha, sigma2_beta = pv["sigma2_alpha"], pv["sigma2_beta"]
 
         logdet_fn = self._logdet_pytensor_fn
         unit_idx = self._unit_idx
@@ -326,8 +416,7 @@ class SARPanelRE(SpatialPanelModel):
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
             sigma2 = pm.InverseGamma("sigma2", alpha=sigma2_alpha, beta=sigma2_beta)
             sigma = pm.Deterministic("sigma", pt.sqrt(sigma2))
-            sigma_alpha = pm.HalfNormal("sigma_alpha", sigma=sigma_alpha_sigma)
-            alpha = pm.Normal("alpha", mu=0.0, sigma=sigma_alpha, dims="unit")
+            sigma_alpha, alpha = _random_effects(pv, self.centered)
 
             mu = rho * self._Wy + pt.dot(self._X, beta) + alpha[unit_idx]
             if self.robust:
@@ -349,7 +438,7 @@ class SARPanelRE(SpatialPanelModel):
         n_jobs: int = -1,
         progressbar: bool = True,
         log_likelihood: bool = False,
-    ) -> "az.InferenceData":
+    ) -> "xr.DataTree":
         """Sample posterior via 5-block RE Gibbs (β, σ², α, σ_α², ρ).
 
         NumPy-only; there is no JAX kernel for the RE sampler.
@@ -373,7 +462,7 @@ class SARPanelRE(SpatialPanelModel):
 
         Returns
         -------
-        az.InferenceData
+        xr.DataTree
         """
         if self.robust:
             raise NotImplementedError(
@@ -381,13 +470,12 @@ class SARPanelRE(SpatialPanelModel):
                 "models. Use sampler='nuts' (the default)."
             )
 
-        from ...samplers.panel import GaussianSARREGibbs, REGibbsPriors
+        from ...samplers.panel import GaussianSARREGibbs
 
-        priors = REGibbsPriors(
-            beta_mu=self.priors.get("beta_mu", 0.0),
-            beta_sigma=self.priors.get("beta_sigma", 1e6),
-            rho_lower=self._logdet_bounds.rho_min,
-            rho_upper=self._logdet_bounds.rho_max,
+        priors = _re_gibbs_priors(
+            _re_prior_values(self, self._X),
+            self._logdet_bounds.rho_min,
+            self._logdet_bounds.rho_max,
         )
 
         gibbs = GaussianSARREGibbs(
@@ -463,7 +551,7 @@ class SARPanelRE(SpatialPanelModel):
         return direct_samples, indirect_samples, total_samples
 
 
-class SEMPanelRE(SpatialPanelModel):
+class SEMPanelRE(_RandomEffectsMixin, SpatialPanelModel):
     """Bayesian spatial error panel model with unit random effects.
 
     .. math::
@@ -506,31 +594,33 @@ class SEMPanelRE(SpatialPanelModel):
           prior on :math:`\\lambda`.
         - ``lam_upper`` (float, default 1.0): Upper bound of Uniform
           prior on :math:`\\lambda`.
-        - ``beta_mu`` (float, default 0.0): Normal prior mean for
-          :math:`\\beta`.
-        - ``beta_sigma`` (float, default 1e6): Normal prior std for
-          :math:`\\beta`.
+        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal
+          prior on :math:`\\beta`, data-scaled (see
+          :class:`~neighbayes.models.priors.BasePriors`).
         - ``sigma2_alpha`` (float, default 2.0): InverseGamma prior alpha for sigma2
         - ``sigma2_beta`` (float, default var(y)): InverseGamma prior beta for sigma2
           for :math:`\\sigma`.
-        - ``sigma_alpha_sigma`` (float, default 10.0): HalfNormal
-          prior std for :math:`\\sigma_\\alpha`.
+        - ``sigma_alpha_nu`` (float, default 1.0): degrees of freedom of the
+          half-t prior on :math:`\\sigma_\\alpha`; 1 is the half-Cauchy.
+        - ``sigma_alpha_scale`` (float, default sd(y)): scale of that prior.
+          See :class:`~neighbayes.models.priors.PanelREMixinPriors`.
         - ``nu`` (float, default 4.0): Fixed Student-t degrees of
           freedom (only used when ``robust=True``).
 
+    centered : bool, default False
+        Parameterization of the unit effects under NUTS.  The default samples
+        them non-centered, :math:`\\alpha_i = \\sigma_\\alpha z_i`, which
+        avoids the funnel between :math:`\\sigma_\\alpha` and
+        :math:`\\alpha` when the effects are weakly identified (few periods,
+        small :math:`\\sigma_\\alpha`).  ``True`` samples :math:`\\alpha`
+        directly, which mixes better when every unit has many observations.
+        The prior and the posterior are the same either way.
     logdet_method : str, optional
         How to compute :math:`\\log|I - \\lambda W|`; auto-selected
         when ``None`` (default).
     robust : bool, default False
         If True, replace the Normal innovation with Student-t. See
         *Robust regression* below.
-
-    mundlak : bool, default False
-        If True, use the Mundlak (1978) correlated random effects
-        specification.  This augments the design matrix with unit-level
-        time-averages of the regressors, modelling the correlation
-        between :math:`\\alpha_i` and :math:`X` explicitly.  See
-        *Mundlak / Correlated Random Effects* below for details.
 
     Notes
     -----
@@ -553,46 +643,9 @@ class SEMPanelRE(SpatialPanelModel):
     Possible remedies include:
 
     - Use fixed effects (``SEMPanelFE``) instead of random effects
-    - Use a Spatial Durbin model (``SDMPanelRE``) that includes WX terms
+    - Use the spatial Durbin error model (``SDEMPanelRE``), which adds WX terms
     - Use longer panels (:math:`T \\to \\infty`) which provide more
       information to separate :math:`\\lambda` from :math:`\\alpha`
-    - Use the Mundlak specification (``mundlak=True``) to test for
-      RE-regressor correlation, though note this does not resolve
-      the :math:`\\lambda` identification issue itself
-
-    **Mundlak / Correlated Random Effects**
-
-    The Mundlak (1978) approach models the correlation between
-    :math:`\\alpha_i` and the regressors by decomposing the random effect:
-
-    .. math::
-
-        \\alpha_i = \\bar{X}_i \\gamma + \\eta_i, \\quad \\eta_i \\sim N(0, \\sigma_\\eta^2)
-
-    where :math:`\\bar{X}_i = T^{-1} \\sum_t X_{it}` are the unit-level
-    means of the time-varying regressors.  Substituting into the model
-    yields an augmented regression with :math:`[X, \\bar{X}]` as
-    regressors, where :math:`\\gamma` is estimated alongside
-    :math:`\\beta` and the residual random effect :math:`\\eta_i`
-    captures only orthogonal unit heterogeneity.
-
-    **Important**: The Mundlak specification addresses RE-regressor
-    correlation but does **not** resolve the :math:`\\lambda`
-    identification issue described above.  Even with Mundlak
-    augmentation, :math:`\\lambda` remains weakly identified because
-    :math:`\\eta_i` can still absorb spatial correlation.  The Mundlak
-    approach is primarily useful for:
-
-    - Testing whether :math:`\\alpha_i` is correlated with regressors
-      (LR test of :math:`\\gamma = 0`)
-    - Obtaining consistent :math:`\\beta` estimates when RE are
-      correlated with :math:`X`
-    - Reducing :math:`\\sigma_\\alpha^2` by absorbing the explained
-      between-unit variation into :math:`\\gamma`
-
-    Following Baltagi (2023), the Mundlak approach does *not* yield
-    the same estimates as fixed effects for spatial models (unlike
-    the non-spatial case), but MLE/Gibbs estimation remains valid.
 
     **Robust regression**
 
@@ -614,92 +667,11 @@ class SEMPanelRE(SpatialPanelModel):
     _likelihood: str = "gaussian"
     _gibbs_key: tuple[str, str] | None = ("gaussian", "panel_re")
 
-    def __init__(self, mundlak: bool = False, **kwargs):
+    def __init__(self, **kwargs):
         kwargs.pop("model", None)
         kwargs["effects"] = 0  # pooled
         super().__init__(**kwargs)
         self._unit_idx = np.arange(self._N * self._T) % self._N
-        self._mundlak = mundlak
-
-        if mundlak:
-            self._build_mundlak_augmentation()
-
-    def _build_mundlak_augmentation(self):
-        """Compute unit-level means of X and augment the design matrix.
-
-        The Mundlak (1978) approach models correlated random effects as:
-
-            α_i = X̄_i γ + η_i
-
-        where X̄_i = T⁻¹ Σ_t X_{it} are unit-level time averages.
-        Substituting into the model yields an augmented regression with
-        [X, X̄_expanded] as regressors, where γ is estimated alongside β
-        and the residual random effect η_i captures only orthogonal
-        unit heterogeneity.
-
-        This addresses RE-regressor correlation but does NOT resolve
-        the α-λ identification issue in SEM-RE models — η_i can still
-        absorb spatial correlation.  The Mundlak approach is primarily
-        useful for testing RE-regressor correlation (LR test of γ=0)
-        and obtaining consistent β estimates when RE are correlated
-        with X.
-
-        Following Baltagi (2023), the Mundlak approach does *not* yield
-        the same estimates as fixed effects for spatial models (unlike
-        the non-spatial case), but MLE/Gibbs estimation remains valid.
-
-        Note: Constant/intercept columns are excluded from the Mundlak
-        means because their unit-level averages are collinear with the
-        original intercept.
-        """
-        X = self._X
-        N, _T = self._N, self._T
-        unit_idx = self._unit_idx
-
-        # Identify non-constant columns for Mundlak means
-        # Constant columns have unit means equal to the constant itself,
-        # creating perfect collinearity with the original intercept.
-        nonconst_idx = self._nonintercept_indices
-        if len(nonconst_idx) == 0:
-            # No time-varying regressors — Mundlak has nothing to add
-            return
-
-        # Compute unit-level means for non-constant columns only
-        counts = np.bincount(unit_idx, minlength=N)
-        X_bar = np.zeros((N, len(nonconst_idx)))
-        for j_idx, j in enumerate(nonconst_idx):
-            X_bar[:, j_idx] = (
-                np.bincount(unit_idx, weights=X[:, j], minlength=N) / counts
-            )
-
-        # Expand to observation level: repeat each unit's means T times
-        X_bar_expanded = X_bar[unit_idx]  # shape (NT, len(nonconst_idx))
-
-        # Store original X and feature names for reference
-        self._X_original = X.copy()
-        self._feature_names_original = list(self._feature_names)
-
-        # Augment X: [X, X̄_expanded]
-        self._X = np.column_stack([X, X_bar_expanded])
-
-        # Augment feature names (only for non-constant columns)
-        mundlak_names = [
-            f"mundlak_{self._feature_names_original[j]}" for j in nonconst_idx
-        ]
-        self._feature_names = list(self._feature_names_original) + mundlak_names
-
-    @property
-    def mundlak(self) -> bool:
-        """Whether the Mundlak correlated RE specification is active."""
-        return self._mundlak
-
-    @property
-    def mundlak_names(self) -> list[str] | None:
-        """Names of the Mundlak augmentation columns, or None if inactive."""
-        if not self._mundlak:
-            return None
-        k_orig = len(self._feature_names_original)
-        return list(self._feature_names[k_orig:])
 
     def _model_coords(self) -> dict:
         coords = super()._model_coords()
@@ -723,11 +695,9 @@ class SEMPanelRE(SpatialPanelModel):
         """
         lam_lower = self.priors.get("lam_lower", -1.0)
         lam_upper = self.priors.get("lam_upper", 1.0)
-        beta_mu = self.priors.get("beta_mu", 0.0)
-        beta_sigma = self.priors.get("beta_sigma", 1e6)
-        sigma2_alpha = self.priors.get("sigma2_alpha", 2.0)
-        sigma2_beta = self.priors.get("sigma2_beta", float(np.var(self._y)))
-        sigma_alpha_sigma = self.priors.get("sigma_alpha_sigma", 10.0)
+        pv = _re_prior_values(self, self._X)
+        beta_mu, beta_sigma = pv["beta_mu"], pv["beta_sigma"]
+        sigma2_alpha, sigma2_beta = pv["sigma2_alpha"], pv["sigma2_beta"]
 
         logdet_fn = self._logdet_pytensor_fn
         W_pt = self._W_pt_sparse
@@ -742,8 +712,7 @@ class SEMPanelRE(SpatialPanelModel):
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
             sigma2 = pm.InverseGamma("sigma2", alpha=sigma2_alpha, beta=sigma2_beta)
             sigma = pm.Deterministic("sigma", pt.sqrt(sigma2))
-            sigma_alpha = pm.HalfNormal("sigma_alpha", sigma=sigma_alpha_sigma)
-            alpha = pm.Normal("alpha", mu=0.0, sigma=sigma_alpha, dims="unit")
+            sigma_alpha, alpha = _random_effects(pv, self.centered)
 
             if jax_logp:
                 X_const = pt.as_tensor_variable(self._X)
@@ -820,7 +789,7 @@ class SEMPanelRE(SpatialPanelModel):
         n_jobs: int = -1,
         progressbar: bool = True,
         log_likelihood: bool = False,
-    ) -> "az.InferenceData":
+    ) -> "xr.DataTree":
         """Sample posterior via 5-block RE Gibbs (β, σ², α, σ_α², λ).
 
         NumPy-only; there is no JAX kernel for the RE sampler.
@@ -844,7 +813,7 @@ class SEMPanelRE(SpatialPanelModel):
 
         Returns
         -------
-        az.InferenceData
+        xr.DataTree
         """
         if self.robust:
             raise NotImplementedError(
@@ -852,13 +821,12 @@ class SEMPanelRE(SpatialPanelModel):
                 "models. Use sampler='nuts' (the default)."
             )
 
-        from ...samplers.panel import GaussianSEMREGibbs, REGibbsPriors
+        from ...samplers.panel import GaussianSEMREGibbs
 
-        priors = REGibbsPriors(
-            beta_mu=self.priors.get("beta_mu", 0.0),
-            beta_sigma=self.priors.get("beta_sigma", 1e6),
-            rho_lower=self._logdet_bounds.rho_min,
-            rho_upper=self._logdet_bounds.rho_max,
+        priors = _re_gibbs_priors(
+            _re_prior_values(self, self._X),
+            self._logdet_bounds.rho_min,
+            self._logdet_bounds.rho_max,
         )
 
         gibbs = GaussianSEMREGibbs(
@@ -932,7 +900,7 @@ class SEMPanelRE(SpatialPanelModel):
         return direct_samples, indirect_samples, total_samples
 
 
-class SDEMPanelRE(SpatialPanelModel):
+class SDEMPanelRE(_RandomEffectsMixin, SpatialPanelModel):
     """Bayesian spatial Durbin error panel model with unit random effects.
 
     .. math::
@@ -975,18 +943,27 @@ class SDEMPanelRE(SpatialPanelModel):
           prior on :math:`\\lambda`.
         - ``lam_upper`` (float, default 1.0): Upper bound of Uniform
           prior on :math:`\\lambda`.
-        - ``beta_mu`` (float, default 0.0): Normal prior mean for
-          :math:`[\\beta, \\theta]`.
-        - ``beta_sigma`` (float, default 1e6): Normal prior std for
-          :math:`[\\beta, \\theta]`.
+        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal
+          prior on :math:`[\\beta, \\theta]`, data-scaled (see
+          :class:`~neighbayes.models.priors.BasePriors`).
         - ``sigma2_alpha`` (float, default 2.0): InverseGamma prior alpha for sigma2
         - ``sigma2_beta`` (float, default var(y)): InverseGamma prior beta for sigma2
           for :math:`\\sigma`.
-        - ``sigma_alpha_sigma`` (float, default 10.0): HalfNormal
-          prior std for :math:`\\sigma_\\alpha`.
+        - ``sigma_alpha_nu`` (float, default 1.0): degrees of freedom of the
+          half-t prior on :math:`\\sigma_\\alpha`; 1 is the half-Cauchy.
+        - ``sigma_alpha_scale`` (float, default sd(y)): scale of that prior.
+          See :class:`~neighbayes.models.priors.PanelREMixinPriors`.
         - ``nu`` (float, default 4.0): Fixed Student-t degrees of
           freedom (only used when ``robust=True``).
 
+    centered : bool, default False
+        Parameterization of the unit effects under NUTS.  The default samples
+        them non-centered, :math:`\\alpha_i = \\sigma_\\alpha z_i`, which
+        avoids the funnel between :math:`\\sigma_\\alpha` and
+        :math:`\\alpha` when the effects are weakly identified (few periods,
+        small :math:`\\sigma_\\alpha`).  ``True`` samples :math:`\\alpha`
+        directly, which mixes better when every unit has many observations.
+        The prior and the posterior are the same either way.
     logdet_method : str, optional
         How to compute :math:`\\log|I - \\lambda W|`; auto-selected
         when ``None`` (default).
@@ -1044,11 +1021,9 @@ class SDEMPanelRE(SpatialPanelModel):
 
         lam_lower = self.priors.get("lam_lower", -1.0)
         lam_upper = self.priors.get("lam_upper", 1.0)
-        beta_mu = self.priors.get("beta_mu", 0.0)
-        beta_sigma = self.priors.get("beta_sigma", 1e6)
-        sigma2_alpha = self.priors.get("sigma2_alpha", 2.0)
-        sigma2_beta = self.priors.get("sigma2_beta", float(np.var(self._y)))
-        sigma_alpha_sigma = self.priors.get("sigma_alpha_sigma", 10.0)
+        pv = _re_prior_values(self, Z)
+        beta_mu, beta_sigma = pv["beta_mu"], pv["beta_sigma"]
+        sigma2_alpha, sigma2_beta = pv["sigma2_alpha"], pv["sigma2_beta"]
 
         logdet_fn = self._logdet_pytensor_fn
         W_pt = self._W_pt_sparse
@@ -1063,8 +1038,7 @@ class SDEMPanelRE(SpatialPanelModel):
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
             sigma2 = pm.InverseGamma("sigma2", alpha=sigma2_alpha, beta=sigma2_beta)
             sigma = pm.Deterministic("sigma", pt.sqrt(sigma2))
-            sigma_alpha = pm.HalfNormal("sigma_alpha", sigma=sigma_alpha_sigma)
-            alpha = pm.Normal("alpha", mu=0.0, sigma=sigma_alpha, dims="unit")
+            sigma_alpha, alpha = _random_effects(pv, self.centered)
 
             if jax_logp:
                 Z_const = pt.as_tensor_variable(Z)

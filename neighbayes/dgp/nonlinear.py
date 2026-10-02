@@ -22,6 +22,7 @@ from .utils import (
     ensure_rng,
     make_design_matrix,
     resolve_weights,
+    spatial_filter_factor,
 )
 
 
@@ -115,7 +116,7 @@ def simulate_sdm_tobit(
 def simulate_spatial_probit(
     W=None,
     gdf=None,
-    n: int | None = None,
+    n_side: int | None = None,
     rho: float = 0.35,
     beta: np.ndarray | None = None,
     sigma_a: float = 0.8,
@@ -138,6 +139,9 @@ def simulate_spatial_probit(
     W, gdf
         Spatial unit structure. If ``W`` is provided it takes precedence;
         otherwise ``gdf`` is used with ``contiguity``.
+    n_side : int, optional
+        Side length of the square rook grid used when neither ``W`` nor
+        ``gdf`` is supplied (``n_side**2`` units).
     rho : float, default=0.35
         Spatial dependence in regional effects.
     beta : np.ndarray, optional
@@ -160,12 +164,12 @@ def simulate_spatial_probit(
     Returns
     -------
     dict
-        Keys: ``y``, ``X``, ``region_ids``, ``W_dense``, ``W_graph``,
+        Keys: ``y``, ``X``, ``region_ids``, ``W_sparse``, ``W_graph``,
         ``params_true``.
     """
     rng = ensure_rng(rng, seed)
-    Wd, Wg = resolve_weights(W=W, gdf=gdf, n=n, contiguity=contiguity)
-    m = Wd.shape[0]
+    W_sparse, Wg = resolve_weights(W=W, gdf=gdf, n_side=n_side, contiguity=contiguity)
+    m = W_sparse.shape[0]
 
     if beta is None:
         beta = np.array([0.3, 1.0], dtype=float)
@@ -185,7 +189,7 @@ def simulate_spatial_probit(
         # Preserve the original RNG draw order: a is drawn before X.
         a_scale = sigma_a
 
-    a = np.linalg.solve(np.eye(m) - rho * Wd, a_scale * rng.standard_normal(m))
+    a = spatial_filter_factor(W_sparse, rho)(a_scale * rng.standard_normal(m))
 
     if not err_hetero:
         X = make_design_matrix(rng, nobs, k=max(len(beta) - 1, 0), add_intercept=True)
@@ -198,7 +202,7 @@ def simulate_spatial_probit(
         "y": y,
         "X": X,
         "region_ids": region_ids,
-        "W_dense": Wd,
+        "W_sparse": W_sparse,
         "W_graph": Wg,
         "params_true": {
             "rho": rho,
@@ -212,7 +216,7 @@ def simulate_spatial_probit(
 def simulate_sar_logit(
     W=None,
     gdf=None,
-    n: int | None = None,
+    n_side: int | None = None,
     rho: float = 0.35,
     beta: np.ndarray | None = None,
     rng: np.random.Generator | None = None,
@@ -234,6 +238,9 @@ def simulate_sar_logit(
     W, gdf
         Spatial unit structure. If ``W`` is provided it takes precedence;
         otherwise ``gdf`` is used with ``contiguity``.
+    n_side : int, optional
+        Side length of the square rook grid used when neither ``W`` nor
+        ``gdf`` is supplied (``n_side**2`` units).
     rho : float, default=0.35
         Spatial autoregressive parameter.
     beta : np.ndarray, optional
@@ -259,26 +266,19 @@ def simulate_sar_logit(
         ``X_*`` columns is returned instead.
     """
     rng = ensure_rng(rng, seed)
-    Wd, Wg = resolve_weights(W=W, gdf=gdf, n=n, contiguity=contiguity)
-    n_obs = Wd.shape[0]
+    W_sparse, Wg = resolve_weights(W=W, gdf=gdf, n_side=n_side, contiguity=contiguity)
+    n_obs = W_sparse.shape[0]
 
     if beta is None:
         beta = np.array([0.3, 1.0], dtype=float)
     beta = np.asarray(beta, dtype=float)
-
-    import scipy.sparse as sp
-
-    W_sparse = sp.csr_matrix(Wd)
 
     X = make_design_matrix(rng, n_obs, k=max(len(beta) - 1, 0), add_intercept=True)
 
     # Generate latent field: eta = (I - rho W)^{-1} (X beta + nu)
     nu = rng.standard_normal(n_obs)
     Xbeta = X @ beta
-    A_rho_inv = sp.linalg.spsolve(
-        sp.eye(n_obs, format="csr") - rho * W_sparse, Xbeta + nu
-    )
-    eta = A_rho_inv
+    eta = spatial_filter_factor(W_sparse, rho)(Xbeta + nu)
 
     # Binary response: y ~ Bernoulli(logit^{-1}(eta))
     probs = 1.0 / (1.0 + np.exp(-eta))
@@ -306,7 +306,7 @@ def simulate_sar_logit(
 def simulate_sem_logit(
     W=None,
     gdf=None,
-    n: int | None = None,
+    n_side: int | None = None,
     lam: float = 0.35,
     beta: np.ndarray | None = None,
     rng: np.random.Generator | None = None,
@@ -328,6 +328,9 @@ def simulate_sem_logit(
     W, gdf
         Spatial unit structure. If ``W`` is provided it takes precedence;
         otherwise ``gdf`` is used with ``contiguity``.
+    n_side : int, optional
+        Side length of the square rook grid used when neither ``W`` nor
+        ``gdf`` is supplied (``n_side**2`` units).
     lam : float, default 0.35
         Spatial error parameter.
     beta : np.ndarray, optional
@@ -353,24 +356,19 @@ def simulate_sem_logit(
         ``X_*`` columns is returned instead.
     """
     rng = ensure_rng(rng, seed)
-    Wd, Wg = resolve_weights(W=W, gdf=gdf, n=n, contiguity=contiguity)
-    n_obs = Wd.shape[0]
+    W_sparse, Wg = resolve_weights(W=W, gdf=gdf, n_side=n_side, contiguity=contiguity)
+    n_obs = W_sparse.shape[0]
 
     if beta is None:
         beta = np.array([0.3, 1.0], dtype=float)
     beta = np.asarray(beta, dtype=float)
-
-    import scipy.sparse as sp
-
-    W_sparse = sp.csr_matrix(Wd)
 
     X = make_design_matrix(rng, n_obs, k=max(len(beta) - 1, 0), add_intercept=True)
 
     # Generate latent field: eta = X beta + (I - lam W)^{-1} nu
     nu = rng.standard_normal(n_obs)
     Xbeta = X @ beta
-    A_lam_inv = sp.linalg.spsolve(sp.eye(n_obs, format="csr") - lam * W_sparse, nu)
-    eta = Xbeta + A_lam_inv
+    eta = Xbeta + spatial_filter_factor(W_sparse, lam)(nu)
 
     # Binary response: y ~ Bernoulli(logit^{-1}(eta))
     probs = 1.0 / (1.0 + np.exp(-eta))

@@ -11,6 +11,9 @@ from .bayesfactor import (
     compile_log_posterior as compile_log_posterior,
 )
 from .bayesfactor import (
+    log_marginal_likelihood as log_marginal_likelihood,
+)
+from .bayesfactor import (
     post_prob as post_prob,
 )
 from .mcmc_efficiency import (

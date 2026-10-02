@@ -23,7 +23,7 @@ from ..._backends.sampler_helpers import (
     prepare_idata_kwargs,
     use_jax_likelihood,
 )
-from ..._lazy_deps import az, pm
+from ..._lazy_deps import az, pm, xr
 from ..._logdet import (
     make_logdet_fn,
     make_logdet_grad_numpy_vec_fn,
@@ -37,17 +37,21 @@ def gelman_default_beta_prior(
     design: np.ndarray,
     feature_names: list[str],
     scale: float = 2.5,
+    link: str = "identity",
 ) -> tuple[np.ndarray, np.ndarray]:
     r"""Weakly-informative default prior on regression coefficients.
 
     Follows Gelman, Jakulin, Pittau & Su (2008) by setting per-column
-    prior scales from ``sd(y)`` and ``sd(x_j)``.  For each column ``j``
-    of ``design``:
+    prior scales from the outcome's scale and ``sd(x_j)``.  The outcome's
+    scale is ``sd(y)`` for an identity link and the unit scale of the linear
+    predictor otherwise (Gelman et al.'s 2.5 is already on the logit scale;
+    the probit scale is that divided by 1.6).  For each column ``j`` of
+    ``design``, with ``s_y`` that scale and ``g`` the link:
 
     * **Intercept-like** (named ``"intercept"`` or numerically constant):
-      ``mu_j = mean(y)``, ``sigma_j = scale * sd(y)``.
+      ``mu_j = g(mean(y))``, ``sigma_j = scale * s_y``.
     * **Slope**:
-      ``mu_j = 0``, ``sigma_j = scale * sd(y) / sd(x_j)``.
+      ``mu_j = 0``, ``sigma_j = scale * s_y / sd(x_j)``.
 
     Parameters
     ----------
@@ -61,6 +65,9 @@ def gelman_default_beta_prior(
         intercept-like columns named ``"intercept"``.
     scale : float, default 2.5
         Multiplier on the standardized prior scale.
+    link : {"identity", "log", "logit", "probit"}, default "identity"
+        Link between ``E[y]`` and the linear predictor ``X beta``.  Count
+        models use ``"log"``; binary models ``"logit"`` or ``"probit"``.
 
     Returns
     -------
@@ -74,10 +81,30 @@ def gelman_default_beta_prior(
     other regression models.* Annals of Applied Statistics, 2(4),
     1360-1383.
     """
-    sd_y = float(np.std(y))
-    if sd_y <= 0.0:
+    y = np.asarray(y, dtype=np.float64)
+    if link == "identity":
+        sd_y = float(np.std(y))
+        if sd_y <= 0.0:
+            sd_y = 1.0
+        mean_y = float(np.mean(y))
+    elif link == "log":
         sd_y = 1.0
-    mean_y = float(np.mean(y))
+        # Half a count over the sample keeps an all-zero response finite.
+        mean_y = float(np.log(max(float(np.mean(y)), 0.5 / max(y.size, 1))))
+    elif link in ("logit", "probit"):
+        from scipy.special import logit, ndtri
+
+        eps = 0.5 / max(y.size, 1)
+        p_bar = float(np.clip(np.mean(y), eps, 1.0 - eps))
+        sd_y, mean_y = (
+            (1.0, float(logit(p_bar)))
+            if link == "logit"
+            else (1.0 / 1.6, float(ndtri(p_bar)))
+        )
+    else:
+        raise ValueError(
+            f"link must be 'identity', 'log', 'logit' or 'probit', got {link!r}"
+        )
     p = design.shape[1]
     beta_mu = np.zeros(p, dtype=np.float64)
     beta_sigma = np.empty(p, dtype=np.float64)
@@ -302,14 +329,14 @@ def _pointwise_gaussian_loglik(
 
 
 def _write_log_likelihood_to_idata(
-    idata: az.InferenceData,
+    idata: xr.DataTree,
     ll_array: np.ndarray,
 ) -> None:
-    """Write a complete pointwise log-likelihood array to InferenceData.
+    """Write a complete pointwise log-likelihood array to DataTree.
 
     Parameters
     ----------
-    idata : az.InferenceData
+    idata : xr.DataTree
         Target inference data object to mutate in place.
     ll_array : np.ndarray
         Array with shape ``(chain, draw, obs)``.
@@ -734,12 +761,12 @@ class SharedSpatialMethods:
         return out
 
     @property
-    def inference_data(self) -> Optional[az.InferenceData]:
-        """Return the ArviZ InferenceData from the most recent fit.
+    def inference_data(self) -> Optional[xr.DataTree]:
+        """Return the ArviZ DataTree from the most recent fit.
 
         Returns
         -------
-        arviz.InferenceData or None
+        xarray.DataTree or None
             The inference data object, or ``None`` if the model has not
             been fit yet.
         """
@@ -752,7 +779,7 @@ class SharedSpatialMethods:
     def _posterior_mean(self, var: str) -> np.ndarray:
         return self._idata.posterior[var].mean(("chain", "draw")).to_numpy()
 
-    def _postprocess_idata(self, idata: az.InferenceData) -> az.InferenceData:
+    def _postprocess_idata(self, idata: xr.DataTree) -> xr.DataTree:
         """Hook to augment ``idata`` after sampling, before it is returned.
 
         The default is a no-op.  Subclasses whose likelihood is expressed via
@@ -779,7 +806,7 @@ class SharedSpatialMethods:
         idata_kwargs: dict[str, Any] | None = None,
         compute_log_likelihood: bool = False,
         sample_kwargs: dict[str, Any] | None = None,
-    ) -> tuple["az.InferenceData", bool]:
+    ) -> tuple["xr.DataTree", bool]:
         """Shared NUTS sampling path used by model-specific ``fit`` methods.
 
         Inspects ``_build_pymc_model`` for optional ``compute_log_likelihood``
@@ -789,7 +816,7 @@ class SharedSpatialMethods:
 
         Returns
         -------
-        tuple[arviz.InferenceData, bool]
+        tuple[xarray.DataTree, bool]
         """
         sample_kwargs = dict(sample_kwargs or {})
         idata_kwargs = dict(idata_kwargs or {})
@@ -991,13 +1018,41 @@ class SharedSpatialMethods:
         design: np.ndarray,
         feature_names: list[str],
         scale: float = 2.5,
+        link: str = "identity",
     ) -> tuple[np.ndarray, np.ndarray]:
         r"""Weakly-informative default prior on regression coefficients.
 
         Thin wrapper around :func:`gelman_default_beta_prior` that uses
         ``self._y`` as the response.  See that function for details.
         """
-        return gelman_default_beta_prior(self._y, design, feature_names, scale=scale)
+        return gelman_default_beta_prior(
+            self._y, design, feature_names, scale=scale, link=link
+        )
+
+    def _resolved_beta_prior(
+        self,
+        design: np.ndarray | None = None,
+        feature_names: list[str] | None = None,
+        link: str = "identity",
+    ) -> tuple[np.ndarray, np.ndarray]:
+        """``(beta_mu, beta_sigma)``: user overrides over the Gelman default.
+
+        One resolution shared by a model's NUTS build and its Gibbs sampler, so
+        both place the same prior on ``beta``.  ``design`` defaults to ``X``.
+        """
+        if design is None:
+            design = self._X
+        if feature_names is None:
+            feature_names = list(self._feature_names)
+        mu, sd = self._gelman_default_beta_prior(design, feature_names, link=link)
+        k = design.shape[1]
+        mu = np.broadcast_to(
+            np.asarray(self.priors.get("beta_mu", mu), dtype=np.float64), (k,)
+        ).copy()
+        sd = np.broadcast_to(
+            np.asarray(self.priors.get("beta_sigma", sd), dtype=np.float64), (k,)
+        ).copy()
+        return mu, sd
 
     @cached_property
     def _W_eigs(self) -> np.ndarray | None:
@@ -1191,6 +1246,15 @@ class SharedSpatialMethods:
     def _parse_formula(formula: str, data: pd.DataFrame):
         """Parse formula/data inputs into ``y`` and ``X`` arrays.
 
+        See :meth:`_parse_formula_with_spec`, which also returns the RHS
+        model spec.
+        """
+        return SharedSpatialMethods._parse_formula_with_spec(formula, data)[:3]
+
+    @staticmethod
+    def _parse_formula_with_spec(formula: str, data: pd.DataFrame):
+        """Parse formula/data inputs into ``y`` and ``X`` arrays.
+
         Parameters
         ----------
         formula : str
@@ -1200,8 +1264,10 @@ class SharedSpatialMethods:
 
         Returns
         -------
-        tuple[np.ndarray, np.ndarray, list[str]]
-            Dependent variable, design matrix, and feature names.
+        tuple[np.ndarray, np.ndarray, list[str], formulaic.ModelSpec]
+            Dependent variable, design matrix, feature names, and the RHS
+            model spec, which rebuilds the design for new data with the same
+            transforms and categorical levels.
         """
         lhs_name, rhs = formula.split("~", 1)
         lhs_name = lhs_name.strip()
@@ -1213,7 +1279,7 @@ class SharedSpatialMethods:
         X_arr = np.asarray(X_mm, dtype=np.float64)
 
         y_arr = np.asarray(data[lhs_name], dtype=np.float64)
-        return y_arr, X_arr, feature_names
+        return y_arr, X_arr, feature_names, X_mm.model_spec
 
     @staticmethod
     def _parse_matrices(y, X):
@@ -1252,17 +1318,38 @@ class SharedSpatialMethods:
     # Lazy logdet evaluators (cross-section is the T=1 case)
     # ------------------------------------------------------------------
 
+    # Likelihood dimensions.  A cross-section (and a pooled panel) counts
+    # every observation and applies the Jacobian T times; fixed-effects
+    # panels override these (Lee & Yu 2010; see ``SpatialPanelModel``).
+
+    @property
+    def _jacobian_T(self) -> int:
+        """Multiplier on the per-period Jacobian ``log|I - ρW|``."""
+        return getattr(self, "_T", 1)
+
+    @property
+    def _jacobian_shift(self) -> float:
+        """Coefficient ``m`` of the ``-m·log(1 - ρ)`` time-effects Jacobian term."""
+        return 0.0
+
+    @property
+    def _n_effective(self) -> int:
+        """Independent observations the Gaussian likelihood counts."""
+        return int(np.asarray(self._y).shape[0])
+
     @cached_property
     def _logdet_numpy_fn(self):
         """Pure-numpy ``(rho) -> float`` logdet evaluator (lazy)."""
         self._require_W()
+        # The time-effects term -m·log(1 - ρ) is not included: the Gibbs
+        # samplers that consume these add it themselves (``_jacobian_shift``).
         return make_logdet_numpy_fn(
             self._W_sparse,
             self._logdet_eigs,
             method=self._logdet_bounds.method,
             rho_min=self._logdet_bounds.rho_min,
             rho_max=self._logdet_bounds.rho_max,
-            T=getattr(self, "_T", 1),
+            T=self._jacobian_T,
         )
 
     @cached_property
@@ -1275,7 +1362,7 @@ class SharedSpatialMethods:
             method=self._logdet_bounds.method,
             rho_min=self._logdet_bounds.rho_min,
             rho_max=self._logdet_bounds.rho_max,
-            T=getattr(self, "_T", 1),
+            T=self._jacobian_T,
         )
 
     @cached_property
@@ -1301,15 +1388,24 @@ class SharedSpatialMethods:
 
     @cached_property
     def _logdet_pytensor_fn(self):
-        """PyTensor logdet evaluator used inside ``_build_pymc_model`` (lazy)."""
+        """PyTensor logdet evaluator used inside ``_build_pymc_model`` (lazy).
+
+        The full Jacobian NUTS adds, including any time-effects term.
+        """
         self._require_W()
-        return make_logdet_fn(
+        fn = make_logdet_fn(
             self._W_for_logdet,
             method=self._logdet_bounds.method,
             rho_min=self._logdet_bounds.rho_min,
             rho_max=self._logdet_bounds.rho_max,
-            T=getattr(self, "_T", 1),
+            T=self._jacobian_T,
         )
+        m = self._jacobian_shift
+        if not m:
+            return fn
+        import pytensor.tensor as pt
+
+        return lambda rho: fn(rho) - m * pt.log1p(-rho)
 
     # ------------------------------------------------------------------
     # Eigendecomposition-backed spatial-effect helpers

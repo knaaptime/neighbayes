@@ -8,6 +8,7 @@ import pandas as pd
 import pymc as pm
 import pytest
 import scipy.sparse as sp
+import xarray as xr
 
 from neighbayes.models import SARProbit
 from neighbayes.tests.helpers import W_to_graph, make_line_W
@@ -21,7 +22,7 @@ class _LegacyW:
         return self
 
 
-def _idata_for_model(m: SARProbit) -> az.InferenceData:
+def _idata_for_model(m: SARProbit) -> xr.DataTree:
     n = m._X.shape[0]
     r = m._m
     posterior = {
@@ -33,7 +34,7 @@ def _idata_for_model(m: SARProbit) -> az.InferenceData:
         "rho": np.array([[0.1, 0.11]], dtype=float),
         "sigma_a": np.array([[0.9, 0.91]], dtype=float),
     }
-    return az.from_dict(posterior=posterior)
+    return az.from_dict({"posterior": posterior})
 
 
 def test_as_dense_region_W_warns_for_non_row_standardized_sparse():

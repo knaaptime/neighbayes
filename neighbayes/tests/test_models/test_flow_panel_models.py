@@ -444,8 +444,10 @@ class TestFlowPanelLogLikelihood:
         ll = idata.log_likelihood["obs"].values
         assert ll.shape[2] == n_obs
         assert np.isfinite(ll).all()
+        # PSIS fits its tail to min(S/5, 3√S) draws and needs at least 5,
+        # so every fit below keeps S >= 25.
         loo = az.loo(idata)
-        assert np.isfinite(loo.elpd_loo)
+        assert np.isfinite(loo.elpd)
 
     def test_sar_flow_panel_loglik(self):
         n, T = 4, 2
@@ -460,7 +462,7 @@ class TestFlowPanelLogLikelihood:
             effects=0,
         )
         idata = m.fit(
-            draws=20,
+            draws=40,
             tune=20,
             chains=1,
             progressbar=False,
@@ -482,7 +484,7 @@ class TestFlowPanelLogLikelihood:
             effects=0,
         )
         idata = m.fit(
-            draws=20,
+            draws=40,
             tune=20,
             chains=1,
             progressbar=False,
@@ -497,7 +499,7 @@ class TestFlowPanelLogLikelihood:
         y, X, col_names = _panel_flow_stack(n=n, T=T, k=2, seed=0)
         m = OLSFlowPanel(y=y, W=G, X=X, T=T, col_names=col_names, effects=0)
         idata = m.fit(
-            draws=20,
+            draws=40,
             tune=20,
             chains=1,
             progressbar=False,

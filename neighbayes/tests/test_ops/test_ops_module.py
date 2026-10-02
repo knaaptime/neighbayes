@@ -119,9 +119,9 @@ class TestSparseFlowSolveOpVJP:
         Wd, Wo, Ww = _flow_weight_mats(W)
         rng = np.random.default_rng(11)
         b_val = rng.normal(size=n * n)
-        rd_val = np.float64(0.2)
-        ro_val = np.float64(-0.1)
-        rw_val = np.float64(0.05)
+        rd_val = np.asarray(0.2)
+        ro_val = np.asarray(-0.1)
+        rw_val = np.asarray(0.05)
 
         solve_op = SparseFlowSolveOp(Wd, Wo, Ww)
 
@@ -177,9 +177,9 @@ class TestSparseFlowSolveMatrixOpVJP:
         Wd, Wo, Ww = _flow_weight_mats(W)
         rng = np.random.default_rng(13)
         B_val = rng.normal(size=(n * n, T))
-        rd_val = np.float64(0.15)
-        ro_val = np.float64(0.1)
-        rw_val = np.float64(-0.05)
+        rd_val = np.asarray(0.15)
+        ro_val = np.asarray(0.1)
+        rw_val = np.asarray(-0.05)
 
         solve_op = SparseFlowSolveMatrixOp(Wd, Wo, Ww)
 
@@ -253,8 +253,8 @@ class TestKroneckerFlowSolveOpVJP:
         W = _ring_W(n)
         rng = np.random.default_rng(2)
         b_val = rng.normal(size=n * n)
-        rd_val = np.float64(0.25)
-        ro_val = np.float64(-0.15)
+        rd_val = np.asarray(0.25)
+        ro_val = np.asarray(-0.15)
 
         solve_op = KroneckerFlowSolveOp(W, n)
 
@@ -329,8 +329,8 @@ class TestKroneckerFlowSolveMatrixOpVJP:
         W = _ring_W(n)
         rng = np.random.default_rng(5)
         B_val = rng.normal(size=(n * n, T))
-        rd_val = np.float64(0.2)
-        ro_val = np.float64(-0.1)
+        rd_val = np.asarray(0.2)
+        ro_val = np.asarray(-0.1)
 
         solve_op = KroneckerFlowSolveMatrixOp(W, n)
 
@@ -493,7 +493,8 @@ class TestOptionalSparseBackends:
 
             return _F()
 
-        monkeypatch.setattr(ops_mod._backend, "_sparse_factor", _fake_sparse_factor)
+        # Immediate solves use the cached working factor directly (no copy).
+        monkeypatch.setattr(ops_mod._backend, "_refactor", _fake_sparse_factor)
 
         A = sp.csr_matrix(np.array([[2.0, 1.0], [1.0, 2.0]], dtype=np.float64))
         rhs = np.array([1.0, 2.0], dtype=np.float64)
@@ -825,3 +826,67 @@ class TestSparseSARSolveOpNumbaDispatch:
 
         msgs = [str(w.message) for w in caught]
         assert not any("Numba will use object mode to run" in m for m in msgs)
+
+
+class TestSparseFactorCache:
+    """The scikit-sparse fallback reuses one symbolic analysis per pattern."""
+
+    @staticmethod
+    def _system(n=300, seed=0):
+        W = sp.random(n, n, density=0.02, random_state=seed, format="csc")
+        W = sp.diags(1.0 / np.maximum(np.asarray(W.sum(1)).ravel(), 1e-12)) @ W
+        eye = sp.eye(n, format="csc")
+        return lambda rho: (eye - rho * W).tocsc()
+
+    @pytest.mark.parametrize("backend", ["klu", "umfpack"])
+    def test_refactor_reuses_analysis_and_copies_are_private(
+        self, monkeypatch, backend
+    ):
+        pytest.importorskip(f"sksparse.{backend}")
+        from neighbayes._ops import _backend
+
+        monkeypatch.setenv("NEIGHBAYES_SPARSE_BACKEND", backend)
+        A = self._system()
+        b = np.random.default_rng(1).standard_normal(A(0.3).shape[0])
+
+        held = _backend._sparse_factor(A(0.3), backend)
+        work = _backend._refactor(A(0.3), backend)
+        # Same pattern: the working factor is reused, refactored in place.
+        assert _backend._refactor(A(0.6), backend) is work
+        np.testing.assert_allclose(A(0.6) @ work.solve(b), b, atol=1e-12)
+        # The copy handed out earlier still solves at its own values.
+        np.testing.assert_allclose(A(0.3) @ held.solve(b), b, atol=1e-12)
+
+    def test_auto_probe_returns_a_working_factor(self, monkeypatch):
+        pytest.importorskip("sksparse.klu")
+        pytest.importorskip("sksparse.umfpack")
+        from neighbayes._ops import _backend
+
+        monkeypatch.setenv("NEIGHBAYES_SPARSE_BACKEND", "auto")
+        A = self._system(seed=2)
+        b = np.ones(A(0.4).shape[0])
+        x, logdet = _backend._factor_solve_logdet(A(0.4), b)
+        np.testing.assert_allclose(A(0.4) @ x, b, atol=1e-12)
+        np.testing.assert_allclose(
+            logdet, np.linalg.slogdet(A(0.4).toarray())[1], rtol=1e-10
+        )
+
+
+@pytest.mark.parametrize("backend", ["klu", "umfpack"])
+def test_sparse_solves_accept_read_only_rhs(backend):
+    """JAX ``pure_callback`` hands host code read-only views of its arrays.
+
+    scikit-sparse solves take typed memoryviews, which reject read-only
+    buffers; the UMFPACK path raised ``buffer source array is read-only``
+    from every JAX host callback until the right-hand side was made writable.
+    """
+    pytest.importorskip(f"sksparse.{backend}")
+    from neighbayes._ops._backend import _make_cached_sparse_solver
+
+    rng = np.random.default_rng(0)
+    A = sp.random(30, 30, density=0.15, random_state=1, format="csc") + 4 * sp.eye(30)
+    for rhs in (rng.normal(size=30), rng.normal(size=(30, 3))):
+        ro = rhs.copy()
+        ro.flags.writeable = False
+        solver = _make_cached_sparse_solver(A.tocsc(), backend)
+        np.testing.assert_allclose(A @ solver.solve(ro), rhs, atol=1e-10)

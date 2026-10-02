@@ -4,10 +4,9 @@ channels:
 dependencies:
   - python=3.12
   - libpysal
-  - arviz < 1
+  - arviz
   - formulaic
   - pymc
-  - arviz
   - spreg
   - statsmodels
   - geopandas

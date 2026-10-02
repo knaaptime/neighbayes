@@ -99,7 +99,7 @@ def _assert_valid_log_likelihood(idata, n_obs: int, label: str):
     # Check that "obs" is a data variable, not a coordinate (xarray bug)
     assert "obs" not in ll.coords, (
         f"{label}: 'obs' is a coordinate instead of a data variable — "
-        f"this breaks az.loo()/az.waic()/az.compare()"
+        f"this breaks az.loo()/az.compare()"
     )
     # Check shape: (chain, draw, obs_dim*)
     assert obs_da.ndim == 3, (
@@ -496,7 +496,7 @@ class TestLogLikelihoodStructureFast:
             "beta": np.array([[[0.5, 0.8], [0.51, 0.81]]]),
             "sigma": np.array([[1.0, 1.01]]),
         }
-        fake_idata = az.from_dict(posterior=posterior)
+        fake_idata = az.from_dict({"posterior": posterior})
 
         def _fake_fit_nuts(self, **kwargs):
             self._idata = fake_idata
@@ -524,7 +524,7 @@ class TestLogLikelihoodStructureFast:
             "beta": np.array([[[0.5, 0.8], [0.51, 0.81]]]),
             "sigma": np.array([[1.0, 1.01]]),
         }
-        fake_idata = az.from_dict(posterior=posterior)
+        fake_idata = az.from_dict({"posterior": posterior})
 
         def _fake_fit_nuts(self, **kwargs):
             self._idata = fake_idata
@@ -552,7 +552,7 @@ class TestLogLikelihoodStructureFast:
             "beta": np.array([[[0.5, 0.8, 0.1], [0.51, 0.81, 0.11]]]),
             "sigma": np.array([[1.0, 1.01]]),
         }
-        fake_idata = az.from_dict(posterior=posterior)
+        fake_idata = az.from_dict({"posterior": posterior})
 
         def _fake_fit_nuts(self, **kwargs):
             self._idata = fake_idata
@@ -580,7 +580,7 @@ class TestLogLikelihoodStructureFast:
             "beta": np.array([[[0.5, 0.8, 0.1], [0.51, 0.81, 0.11]]]),
             "sigma": np.array([[1.0, 1.01]]),
         }
-        fake_idata = az.from_dict(posterior=posterior)
+        fake_idata = az.from_dict({"posterior": posterior})
 
         def _fake_fit_nuts(self, **kwargs):
             self._idata = fake_idata
@@ -610,7 +610,7 @@ class TestLogLikelihoodStructureFast:
             "beta": np.array([[[0.2, 0.9], [0.21, 0.91]]]),
             "sigma": np.array([[1.0, 1.1]]),
         }
-        fake_idata = az.from_dict(posterior=posterior)
+        fake_idata = az.from_dict({"posterior": posterior})
 
         def _fake_fit_nuts(self, **kwargs):
             self._idata = fake_idata
@@ -640,7 +640,7 @@ class TestLogLikelihoodStructureFast:
             "beta": np.array([[[0.2, 0.9, 0.15], [0.21, 0.91, 0.16]]]),
             "sigma": np.array([[1.0, 1.1]]),
         }
-        fake_idata = az.from_dict(posterior=posterior)
+        fake_idata = az.from_dict({"posterior": posterior})
 
         def _fake_fit_nuts(self, **kwargs):
             self._idata = fake_idata
@@ -676,8 +676,7 @@ class TestLogLikelihoodStructureFast:
         # Simulate auto-captured log_likelihood (Pattern A)
         log_lik = np.random.randn(1, 2, n_obs) - 5.0
         fake_idata = az.from_dict(
-            posterior=posterior,
-            log_likelihood={"obs": log_lik},
+            {"posterior": posterior, "log_likelihood": {"obs": log_lik}}
         )
 
         def _fake_fit_nuts(self, **kwargs):
@@ -711,8 +710,7 @@ class TestLogLikelihoodStructureFast:
         }
         log_lik = np.random.randn(1, 2, n_obs) - 5.0
         fake_idata = az.from_dict(
-            posterior=posterior,
-            log_likelihood={"obs": log_lik},
+            {"posterior": posterior, "log_likelihood": {"obs": log_lik}}
         )
 
         def _fake_fit_nuts(self, **kwargs):
@@ -744,8 +742,8 @@ class TestArviZCompatibility:
     def setup_data(self):
         self.y, self.X, self.W, self.W_dense, self.n = _cross_section_data()
 
-    def test_sar_loo_waic(self):
-        """SAR log_likelihood should work with az.loo() and az.waic()."""
+    def test_sar_loo(self):
+        """SAR log_likelihood should work with az.loo()."""
         model = SAR(y=self.y, X=self.X, W=self.W, logdet_method="eigenvalue")
         idata = model.fit(
             draws=50,
@@ -756,12 +754,10 @@ class TestArviZCompatibility:
             idata_kwargs={"log_likelihood": True},
         )
         loo = az.loo(idata)
-        waic = az.waic(idata)
-        assert np.isfinite(loo.elpd_loo), "az.loo() returned non-finite elpd_loo"
-        assert np.isfinite(waic.elpd_waic), "az.waic() returned non-finite elpd_waic"
+        assert np.isfinite(loo.elpd), "az.loo() returned a non-finite elpd"
 
-    def test_sem_loo_waic(self):
-        """SEM log_likelihood should work with az.loo() and az.waic()."""
+    def test_sem_loo(self):
+        """SEM log_likelihood should work with az.loo()."""
         model = SEM(y=self.y, X=self.X, W=self.W, logdet_method="eigenvalue")
         idata = model.fit(
             draws=50,
@@ -772,9 +768,7 @@ class TestArviZCompatibility:
             idata_kwargs={"log_likelihood": True},
         )
         loo = az.loo(idata)
-        waic = az.waic(idata)
-        assert np.isfinite(loo.elpd_loo), "az.loo() returned non-finite elpd_loo"
-        assert np.isfinite(waic.elpd_waic), "az.waic() returned non-finite elpd_waic"
+        assert np.isfinite(loo.elpd), "az.loo() returned a non-finite elpd"
 
     def test_compare_multiple_models(self):
         """az.compare() should work with multiple models that have log_likelihood."""
@@ -795,7 +789,7 @@ class TestArviZCompatibility:
             )
             models[name] = idata
 
-        comparison = az.compare(models, ic="loo")
+        comparison = az.compare(models)
         assert isinstance(comparison, object), "az.compare() should return a DataFrame"
         assert len(comparison) == 3, (
             f"Expected 3 models in comparison, got {len(comparison)}"

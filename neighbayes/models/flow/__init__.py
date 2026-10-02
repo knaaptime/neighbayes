@@ -11,7 +11,8 @@ from ._flow import (
     SARPoissonFlowSeparable,
     SEMFlow,
     SEMFlowSeparable,
-    _build_flow_effect_masks,
-    _compute_flow_effects_lesage,
+    _compute_flow_effects,
     _compute_ols_flow_effects,
+    _flow_effect_sums,
+    _FlowEffectMoments,
 )

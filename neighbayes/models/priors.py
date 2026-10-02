@@ -40,8 +40,7 @@ Two independent families live here:
   the numpy/JAX kernels consume (``GibbsBasePriors`` →
   ``GaussianGibbsPriors`` / ``LogitGibbsPriors`` / ``REGibbsPriors``;
   standalone ``GibbsPriors``, ``ReducedGibbsPriors``,
-  ``FlowReducedGibbsPriors``, ``ZINBGibbsPriors``, ``SEMLogitGibbsPriors``,
-  ``PanelGaussianPriors``).  Models build these internally in
+  ``FlowReducedGibbsPriors``, ``ZINBGibbsPriors``, ``SEMLogitGibbsPriors``).  Models build these internally in
   ``_fit_gibbs``; they are not part of the user-facing ``priors=`` API.
 """
 
@@ -88,10 +87,6 @@ class BasePriors:
         informative prior; if ``sigma2_beta`` is ``None`` the model
         resolves it to ``Var(y)`` at construction so the prior mean is
         scale-aware (~ Var(y)).
-    sigma_sigma
-        Half-normal scale on σ.  **Tobit/Probit models only.**  Ignored
-        by the Gaussian and NB paths, which use ``sigma2_alpha`` /
-        ``sigma2_beta`` (InverseGamma on σ²).
     nu
         Student-t degrees of freedom used when ``robust=True``.  Following
         LeSage (2009) this is a **fixed** hyperparameter rather than a
@@ -110,7 +105,6 @@ class BasePriors:
     beta_sigma: float | Any = None
     sigma2_alpha: float = 2.0
     sigma2_beta: float | None = None
-    sigma_sigma: float = 10.0  # Tobit/Probit only.
     nu: float = 4.0  # Student-t df when robust=True; LeSage's rval.
 
 
@@ -181,33 +175,24 @@ class SARNegBinPriors(SARPriors, NegBinPriors):
 
 
 @dataclass(frozen=True)
-class _CensoredMixin:
-    """Half-normal scale on the censored latent-variable gap (Tobit models).
-
-    Placed as the *first* base of each Tobit priors class so its field is
-    collected last, matching the historical ``censor_sigma``-at-the-end
-    field order.
-    """
-
-    censor_sigma: float = 10.0
-
-
-@dataclass(frozen=True)
-class SARTobitPriors(_CensoredMixin, SARPriors):
+class SARTobitPriors(SARPriors):
     """Priors for :class:`neighbayes.models.SARTobit`.
 
-    Adds ``censor_sigma``: scale of the half-normal prior on the censored
-    latent-variable gap.
+    The same priors as :class:`SARPriors`: Gelman et al. (2008) on
+    ``beta`` and ``IG(2, Var y)`` on ``sigma**2``.  The censored latent
+    values carry a flat prior on their gap below the threshold, so the
+    regression density alone defines their distribution and integrating
+    them out gives the censored likelihood exactly.
     """
 
 
 @dataclass(frozen=True)
-class SEMTobitPriors(_CensoredMixin, SEMPriors):
+class SEMTobitPriors(SEMPriors):
     """Priors for :class:`neighbayes.models.SEMTobit`."""
 
 
 @dataclass(frozen=True)
-class SDMTobitPriors(_CensoredMixin, SDMPriors):
+class SDMTobitPriors(SDMPriors):
     """Priors for :class:`neighbayes.models.SDMTobit`."""
 
 
@@ -222,8 +207,8 @@ class SARProbitPriors:
 
     rho_lower: float = -0.95
     rho_upper: float = 0.95
-    beta_mu: float = 0.0
-    beta_sigma: float = 10.0
+    beta_mu: float | Any = None  # Gelman et al. (2008), link scale
+    beta_sigma: float | Any = None
     sigma_a_sigma: float = 2.0
 
 
@@ -238,8 +223,8 @@ class SARLogitPriors:
 
     rho_lower: float = -0.999
     rho_upper: float = 0.999
-    beta_mu: float = 0.0
-    beta_sigma: float = 10.0
+    beta_mu: float | Any = None  # Gelman et al. (2008), link scale
+    beta_sigma: float | Any = None
 
 
 # Alias — the non-spatial Logit model uses the same prior structure.
@@ -256,8 +241,8 @@ class SEMLogitPriors:
 
     lam_lower: float = -0.999
     lam_upper: float = 0.999
-    beta_mu: float = 0.0
-    beta_sigma: float = 10.0
+    beta_mu: float | Any = None  # Gelman et al. (2008), link scale
+    beta_sigma: float | Any = None
 
 
 # ---------------------------------------------------------------------------
@@ -353,10 +338,6 @@ class PanelBasePriors:
         Inverse-gamma prior on the observation-noise variance
         :math:`\\sigma^2`.  Default ``alpha=2.0``; ``sigma2_beta`` defaults
         to ``Var(y)`` when ``None``.
-    sigma_sigma
-        Half-normal scale on :math:`\\sigma`.  Retained for backward
-        compatibility with callers that still pass it; unused by the
-        Gaussian path, which uses ``sigma2_alpha`` / ``sigma2_beta``.
     nu
         Student-t degrees of freedom used when ``robust=True``.  Fixed
         rather than sampled; see :class:`BasePriors`.
@@ -366,7 +347,6 @@ class PanelBasePriors:
     beta_sigma: float | Any = None
     sigma2_alpha: float = 2.0
     sigma2_beta: float | None = None
-    sigma_sigma: float = 10.0
     nu: float = 4.0  # Student-t df when robust=True; LeSage's rval.
 
 
@@ -411,9 +391,27 @@ class PanelSDEMPriors(PanelSEMPriors):
 
 @dataclass(frozen=True)
 class PanelREMixinPriors:
-    """Mixin providing the random-effects scale prior."""
+    r"""Mixin providing the random-effects scale prior.
 
-    sigma_alpha_sigma: float = 10.0
+    Attributes
+    ----------
+    sigma_alpha_nu, sigma_alpha_scale
+        Half-t prior on the random-effect scale,
+        :math:`\sigma_\alpha \sim \text{half-}t_\nu(0, A)`.  The default
+        ``nu = 1`` is the half-Cauchy of Gelman (2006) and Polson & Scott
+        (2012), the weakly informative choice for a hierarchical variance;
+        the inverse gamma, conjugate or near-improper, pulls
+        :math:`\sigma_\alpha` toward zero and over-shrinks the unit effects
+        when units are few or weakly identified.  ``sigma_alpha_scale``
+        (``A``) defaults to ``sd(y)`` at construction, so the prior is
+        scale-aware like the Gelman et al. (2008) default for
+        :math:`\beta`.  NUTS and Gibbs use the same prior; the Gibbs
+        sampler keeps it conditionally conjugate through the inverse-gamma
+        scale mixture of Huang & Wand (2013).
+    """
+
+    sigma_alpha_nu: float = 1.0
+    sigma_alpha_scale: float | None = None
 
 
 @dataclass(frozen=True)
@@ -440,12 +438,12 @@ class PanelSDEMREPriors(PanelSDEMPriors, PanelREMixinPriors):
 
 
 @dataclass(frozen=True)
-class PanelSARTobitPriors(_CensoredMixin, PanelSARPriors):
+class PanelSARTobitPriors(PanelSARPriors):
     """Priors for :class:`neighbayes.models.SARPanelTobit`."""
 
 
 @dataclass(frozen=True)
-class PanelSEMTobitPriors(_CensoredMixin, PanelSEMPriors):
+class PanelSEMTobitPriors(PanelSEMPriors):
     """Priors for :class:`neighbayes.models.SEMPanelTobit`."""
 
 
@@ -669,51 +667,21 @@ class REGibbsPriors(GibbsBasePriors):
     """Prior hyperparameters for RE panel Gibbs sampler.
 
     Inherits ``beta_mu`` / ``beta_sigma`` / ``rho_lower`` / ``rho_upper``
-    from :class:`GibbsBasePriors`.  The σ² and σ_α² blocks use weakly
-    informative Jeffreys priors p(·) ∝ 1/(·) (approximated as
-    Inv-Γ(ε, ε) with ε = 1e-3) and take no hyperparameters.
+    from :class:`GibbsBasePriors`.  The models resolve every field to the
+    same values their NUTS build uses, so both backends target one
+    posterior:
+
+    * ``sigma2_alpha``, ``sigma2_beta``: σ² ~ Inv-Γ(sigma2_alpha,
+      sigma2_beta), the models' default ``Inv-Γ(2, Var(y))``.
+    * ``sigma_alpha_nu``, ``sigma_alpha_scale``: σ_α ~ half-t_ν(0, A),
+      half-Cauchy by default (see :class:`PanelREMixinPriors`), sampled
+      through the Huang & Wand (2013) inverse-gamma mixture.
     """
 
-
-@dataclass
-class PanelGaussianPriors:
-    r"""Prior hyperparameters for the Gaussian panel flow Gibbs sampler.
-
-    All priors are weakly informative by default, matching the
-    ``GibbsPriors`` / ``FlowGibbsPriors`` convention.
-
-    Parameters
-    ----------
-    beta_mu : float, default 0.0
-        Normal prior mean for :math:`\beta`.
-    beta_sigma : float, default 1e6
-        Normal prior standard deviation for :math:`\beta`.
-    sigma2_alpha : float, default 2.0
-        Inverse-Gamma shape for :math:`\sigma^2_u`.
-    sigma2_beta : float, default 1.0
-        Inverse-Gamma scale for :math:`\sigma^2_u`.
-    sigma2_y_alpha : float, default 2.0
-        Inverse-Gamma shape for :math:`\sigma^2_y`.
-    sigma2_y_beta : float, default 1.0
-        Inverse-Gamma scale for :math:`\sigma^2_y`.
-    gamma_prior_var : float, default 1.0
-        Prior variance for :math:`\gamma \sim N(0, \sigma^2_\gamma)`
-        truncated to :math:`(-1, 1)`.
-    rho_lower : float, default -0.999
-        Lower bound for :math:`\rho_d, \rho_o`.
-    rho_upper : float, default 0.999
-        Upper bound for :math:`\rho_d, \rho_o`.
-    """
-
-    beta_mu: float | np.ndarray = 0.0
-    beta_sigma: float | np.ndarray = 1e6
     sigma2_alpha: float = 2.0
     sigma2_beta: float = 1.0
-    sigma2_y_alpha: float = 2.0
-    sigma2_y_beta: float = 1.0
-    gamma_prior_var: float = 1.0
-    rho_lower: float = -0.999
-    rho_upper: float = 0.999
+    sigma_alpha_nu: float = 1.0
+    sigma_alpha_scale: float = 1.0
 
 
 __all__ = [
@@ -763,7 +731,6 @@ __all__ = [
     "LogitGibbsPriors",
     "SEMLogitGibbsPriors",
     "REGibbsPriors",
-    "PanelGaussianPriors",
     "PriorsLike",
     "resolve_priors",
     "priors_as_dict",

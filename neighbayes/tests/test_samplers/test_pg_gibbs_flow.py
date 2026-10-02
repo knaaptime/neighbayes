@@ -364,7 +364,7 @@ class TestNegativeBinomialSARFlowGibbs:
         for v in ("beta", "alpha", "rho_d", "rho_o", "rho_w"):
             assert v in idata.posterior
             assert np.isfinite(idata.posterior[v].to_numpy()).all()
-        assert "log_likelihood" in idata.groups()
+        assert "log_likelihood" in idata.children
 
     @pytest.mark.requires_jax
     def test_separable_jax_backend_works(self):

@@ -24,6 +24,7 @@ The only cross-section vs panel difference is:
 
 from __future__ import annotations
 
+from functools import cached_property
 from typing import Any, Optional
 
 import numpy as np
@@ -34,15 +35,16 @@ from ..._backends.sampler_helpers import (
     prepare_compile_kwargs,
     prepare_idata_kwargs,
 )
-from ..._lazy_deps import az, pm
+from ..._lazy_deps import pm, xr
 
 
 class FlowSharedMethods:
     """Mixin with shared methods for flow and flow-panel models.
 
     Both :class:`FlowModel` and :class:`FlowPanelModel` inherit from this
-    mixin.  Subclasses are expected to set ``self._Wd``, ``self._Wo``,
-    ``self._Ww``, ``self._W_sparse``, and either ``self._N`` (cross-section)
+    mixin.  Subclasses are expected to set ``self._W_sparse`` (the ``n × n``
+    weights; the ``N × N`` flow weights are derived lazily) and either
+    ``self._N`` (cross-section)
     or ``self._N_flow`` (panel) before calling any mixin method.
     """
 
@@ -52,6 +54,49 @@ class FlowSharedMethods:
     # ------------------------------------------------------------------
     # Properties that abstract cross-section vs panel differences
     # ------------------------------------------------------------------
+
+    @cached_property
+    def _flow_kron_weights(self) -> dict:
+        """The ``N × N`` flow weights ``I⊗W``, ``W⊗I``, ``W⊗W``, built on first use.
+
+        ``W⊗W`` holds ``nnz(W)²`` entries, so the constructors never build it:
+        lags use :func:`~neighbayes.graph.flow_lags` and effects use W-only
+        moments.  Only the samplers and PyMC ops that factor the ``N × N``
+        system ask for these.
+        """
+        from ...graph import flow_weight_matrices
+
+        return flow_weight_matrices(self._W_sparse)
+
+    @property
+    def _Wd(self) -> sp.csr_matrix:
+        return self._flow_kron_weights["destination"]
+
+    @property
+    def _Wo(self) -> sp.csr_matrix:
+        return self._flow_kron_weights["origin"]
+
+    @property
+    def _Ww(self) -> sp.csr_matrix:
+        return self._flow_kron_weights["network"]
+
+    @cached_property
+    def _flow_effect_moments(self):
+        """W-only moments for the exact LeSage effects breakdown.
+
+        Built on first use, only when spatial effects are computed; see
+        :class:`~neighbayes.models.flow._flow._FlowEffectMoments`.
+        """
+        from ..flow._flow import _FlowEffectMoments
+
+        return _FlowEffectMoments(self._W_sparse)
+
+    def _flow_effects_for_draws(self, rho_d, rho_o, rho_w, beta_d, beta_o, beta_intra):
+        """LeSage effects for every posterior draw, with no n²-sized arrays."""
+        from ..flow._flow import _compute_flow_effects, _flow_effect_sums
+
+        sums = _flow_effect_sums(self._flow_effect_moments, rho_d, rho_o, rho_w)
+        return _compute_flow_effects(sums, beta_d, beta_o, beta_intra)
 
     @property
     def _flow_system_size(self) -> int:
@@ -99,7 +144,7 @@ class FlowSharedMethods:
         idata_kwargs: Optional[dict] = None,
         progressbar: bool = True,
         **sample_kwargs,
-    ) -> "az.InferenceData":
+    ) -> "xr.DataTree":
         """Draw samples from the posterior via PyMC NUTS.
 
         Parameters
@@ -118,7 +163,7 @@ class FlowSharedMethods:
             overhead for NB flow models.
         idata_kwargs : dict, optional
             Forwarded to ``pm.sample``.  ``{"log_likelihood": True}`` stores
-            the pointwise log-likelihood that ``az.loo`` / ``az.waic`` /
+            the pointwise log-likelihood that ``az.loo`` /
             ``az.compare`` need; for SAR flow variants the captured Gaussian
             log-likelihood is post-processed to add the Jacobian contribution
             from ``log|I_N - rho_d W_d - rho_o W_o - rho_w W_w|``.  Off by
@@ -131,7 +176,7 @@ class FlowSharedMethods:
 
         Returns
         -------
-        arviz.InferenceData
+        xarray.DataTree
         """
         idata_kwargs = dict(idata_kwargs) if idata_kwargs else {}
         compute_log_likelihood = bool(idata_kwargs.get("log_likelihood", False))
@@ -230,6 +275,62 @@ class FlowSharedMethods:
     # Pointwise log-likelihood (with Jacobian correction for SAR variants)
     # ------------------------------------------------------------------
 
+    def _flow_gaussian_priors(self) -> dict:
+        """Resolved priors for the Gaussian flow models, shared by NUTS and Gibbs.
+
+        ``beta`` gets the Gelman et al. (2008) default on the sampled design
+        (scaled to ``sd(y)`` and each column's sd) and ``σ²`` gets
+        ``IG(2, Var y)``, the same defaults as the cross-section and panel
+        Gaussian models, so both mean the same thing in any units of ``y``.
+        """
+        if "sigma_sigma" in self.priors:
+            raise ValueError(
+                "'sigma_sigma' set the old HalfNormal prior on sigma; the Gaussian "
+                "flow models now place IG(sigma2_alpha, sigma2_beta) on sigma**2 "
+                "(default IG(2, Var y))."
+            )
+        k = self._X.shape[1]
+        names = list(self._feature_names) or [f"x{j}" for j in range(k)]
+        mu, sd = self._gelman_default_beta_prior(self._X, names)
+        p = self.priors
+        return {
+            "beta_mu": np.broadcast_to(
+                np.asarray(p.get("beta_mu", mu), dtype=np.float64), (k,)
+            ).copy(),
+            "beta_sigma": np.broadcast_to(
+                np.asarray(p.get("beta_sigma", sd), dtype=np.float64), (k,)
+            ).copy(),
+            "sigma2_alpha": float(p.get("sigma2_alpha", 2.0)),
+            "sigma2_beta": float(p.get("sigma2_beta", np.var(self._y))),
+        }
+
+    def _flow_count_priors(self) -> dict:
+        """Resolved priors for the count flow models, shared by NUTS and Gibbs.
+
+        ``beta`` gets the Gelman et al. (2008) default on the log scale: the
+        intercept is centred on ``log(mean(y))`` with scale 2.5 and each slope
+        has scale ``2.5 / sd(x_j)``.  The NB2 dispersion ``alpha`` gets a
+        half-t(``alpha_nu``, ``alpha_sigma``), default half-t(3, 2.5).
+        """
+        k = self._X.shape[1]
+        names = list(self._feature_names) or [f"x{j}" for j in range(k)]
+        mu, sd = self._resolved_beta_prior(self._X, names, link="log")
+        return {
+            "beta_mu": mu,
+            "beta_sigma": sd,
+            "alpha_sigma": float(self.priors.get("alpha_sigma", 2.5)),
+            "alpha_nu": float(self.priors.get("alpha_nu", 3.0)),
+        }
+
+    def _flow_sigma(self, pv: dict):
+        """``σ² ~ IG`` with ``σ`` recorded as a deterministic (inside a model)."""
+        import pytensor.tensor as pt
+
+        sigma2 = pm.InverseGamma(
+            "sigma2", alpha=pv["sigma2_alpha"], beta=pv["sigma2_beta"]
+        )
+        return pm.Deterministic("sigma", pt.sqrt(sigma2))
+
     def _compute_jacobian_log_det(self, posterior) -> Optional[np.ndarray]:
         """Per-draw log-determinant of the flow filter matrix.
 
@@ -252,7 +353,7 @@ class FlowSharedMethods:
         observed-RV log densities, so the ``pm.Potential("jacobian", ...)``
         contribution from ``log|I_N - rho_d W_d - rho_o W_o - rho_w W_w|``
         is added post-hoc to the stored log-likelihood so that
-        ``az.loo`` / ``az.waic`` / ``az.compare`` operate on the full
+        ``az.loo`` / ``az.compare`` operate on the full
         joint log-likelihood.
         """
         if idata is None or not hasattr(idata, "log_likelihood"):

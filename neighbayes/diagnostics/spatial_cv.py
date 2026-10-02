@@ -1,7 +1,7 @@
 """Spatial block cross-validation for fitted Bayesian spatial models.
 
 Implements the refit-based spatial k-fold predictive evaluation of
-:cite:t:`roberts2017CrossValidationStrategies` for the models in
+:cite:t:`roberts2017CrossvalidationStrategies` for the models in
 :mod:`neighbayes.models`.
 
 The estimator avoids the well-known failures of PSIS-LOO on spatially
@@ -36,6 +36,7 @@ from dataclasses import dataclass
 from typing import Any, Optional
 
 import numpy as np
+import pandas as pd
 import scipy.sparse as sp
 from scipy.special import logsumexp
 
@@ -79,12 +80,13 @@ class SpatialCVResult:
     n_per_fold : np.ndarray
         Number of observations in each fold, shape ``(n_folds,)``.
     fold_ids : np.ndarray
-        Integer fold assignment for each observation, shape ``(n,)``.
+        Fold in which each observation was held out, shape ``(n,)``; ``-1``
+        for observations never held out.  When a splitter tests an
+        observation more than once, the last fold wins.
     n_folds : int
         Number of folds actually used.
     method : str
-        ``"explicit"`` if ``fold_ids`` was supplied, ``"kmeans"`` if
-        folds were derived from geometry.
+        Class name of the splitter that produced the folds.
     """
 
     elpd: float
@@ -137,17 +139,6 @@ def _stack_draws(idata, name: str) -> np.ndarray:
     return arr.stack(sample=("chain", "draw")).transpose("sample", ...).values
 
 
-def _kmeans_fold_ids(geometry, n_blocks: int, seed: int) -> np.ndarray:
-    """Cluster centroid coordinates into ``n_blocks`` spatial blocks."""
-    from sklearn.cluster import KMeans
-
-    cx = np.asarray(geometry.centroid.x, dtype=np.float64)
-    cy = np.asarray(geometry.centroid.y, dtype=np.float64)
-    coords = np.column_stack([cx, cy])
-    km = KMeans(n_clusters=n_blocks, random_state=seed, n_init=10)
-    return km.fit_predict(coords).astype(np.int64)
-
-
 def _refit_on_train(
     model: Any,
     train_idx: np.ndarray,
@@ -168,13 +159,20 @@ def _refit_on_train(
         W_train = W_train.tocsr()
     else:
         W_train = None
+    # Named columns, so the refit lags the same covariates (``w_vars``).
+    X_train = pd.DataFrame(model._X[train_idx, :], columns=model._feature_names)
     new = model.__class__(
         y=model._y[train_idx],
-        X=model._X[train_idx, :],
+        X=X_train,
         W=W_train,
         priors=model.priors_obj,
         logdet_method=model.logdet_method,
         robust=model.robust,
+        w_vars=model._wx_feature_names if W_train is not None else None,
+        logdet_refit=model.logdet_refit,
+        logdet_refit_pad_sd=model.logdet_refit_pad_sd,
+        logdet_aaa_check=model.logdet_aaa_check,
+        logdet_probe_check=model.logdet_probe_check,
     )
     new.fit(**fit_kwargs)
     return new
@@ -202,63 +200,34 @@ def _fold_elpd(
 
     G = beta.shape[0]
     n = y_full.shape[0]
-    n_test = test_idx.shape[0]
 
-    if kind == "iid":
-        # Closed form: independent normal predictive.
-        X_test = design_full[test_idx]
-        y_test = y_full[test_idx]
-        mu_g = X_test @ beta.T  # (n_test, G)
-        r = y_test[:, None] - mu_g
-        s = sigma[None, :]
-        log_p = (
-            -0.5 * np.sum((r / s) ** 2, axis=0)
-            - n_test * np.log(sigma)
-            - 0.5 * n_test * np.log(2.0 * np.pi)
-        )
-        return float(logsumexp(log_p) - np.log(G))
-
-    if W_full is None:
+    if kind != "iid" and W_full is None:
         raise ValueError(f"Model kind {kind!r} requires W_full but it is None.")
 
-    spatial = _stack_draws(idata, "rho" if kind == "lag" else "lam").reshape(-1)
-    eye_n = sp.eye(n, format="csr")
+    from .._prediction import GaussianConditional
+
+    cond = GaussianConditional(None if kind == "iid" else W_full, test_idx, n)
+    if kind == "iid":
+        spatial = np.zeros(G)
+    else:
+        spatial = _stack_draws(idata, "rho" if kind == "lag" else "lam").reshape(-1)
+
+    # Cached symbolic analysis: A = I - rho W shares one sparsity pattern
+    # across all G draws (only rho rescales the values).
+    cached_solver = None
+    if kind == "lag":
+        from ..samplers._utils._sparsax_utils import CachedSparseSolver
+
+        cached_solver = CachedSparseSolver([W_full], n)
+
+    y_test = y_full[test_idx]
     log_p = np.empty(G, dtype=np.float64)
-
-    # Cached symbolic analysis: A = I - θ W shares one sparsity pattern
-    # across all G draws (only θ rescales the values).  When sparsax is
-    # available the fill-reducing analysis is computed once and reused; the
-    # scipy ``splu`` fallback still benefits from the precomputed pattern
-    # assembly (one numeric factorization per draw, no symbolic work).
-    from ..samplers._utils._sparsax_utils import CachedSparseSolver
-
-    cached_solver = CachedSparseSolver([W_full], n) if kind == "lag" else None
-
     for g in range(G):
         theta = float(spatial[g])
-        s2 = float(sigma[g]) ** 2
         Xb = design_full @ beta[g]
-        if kind == "lag":
-            mu = cached_solver.solve([-theta], Xb)
-        else:
-            mu = Xb
-        A = eye_n - theta * W_full  # I - rho*W or I - lambda*W
-        Lam = (A.T @ A).tocsc() / s2  # full precision
-        r = y_full - mu
-        z = Lam @ r
-        z_test = z[test_idx]
-        Lam_tt = Lam[test_idx, :][:, test_idx].tocsc()
-        try:
-            from .._ops._backend import _factor_solve_logdet
-
-            v, logdet = _factor_solve_logdet(Lam_tt, z_test)
-        except Exception:
-            Lam_tt_dense = Lam_tt.toarray()
-            v = np.linalg.solve(Lam_tt_dense, z_test)
-            _, logdet = np.linalg.slogdet(Lam_tt_dense)
-            logdet = float(logdet)
-        quad = float(z_test @ v)
-        log_p[g] = 0.5 * logdet - 0.5 * n_test * np.log(2.0 * np.pi) - 0.5 * quad
+        mu = cached_solver.solve([-theta], Xb) if kind == "lag" else Xb
+        cond.update(theta, float(sigma[g]))
+        log_p[g] = cond.logpdf(y_test, cond.mean(mu, y_full))
 
     return float(logsumexp(log_p) - np.log(G))
 
@@ -270,11 +239,10 @@ def _fold_elpd(
 
 def spatial_kfold(
     model: Any,
+    splitter: Any,
     *,
-    splitter: Optional[Any] = None,
-    fold_ids: Optional[np.ndarray] = None,
-    n_blocks: int = 10,
     geometry: Optional[Any] = None,
+    groups: Optional[Any] = None,
     draws: int = 400,
     tune: int = 400,
     chains: int = 2,
@@ -296,26 +264,21 @@ def spatial_kfold(
         constructed (its ``_X``, ``_y`` and ``_W_sparse`` will be used for
         prediction); it does **not** need to be fit, since fold-specific
         refits are performed internally.
-    splitter : sklearn-compatible splitter, optional
-        Any object exposing ``split(X)`` that yields ``(train_idx,
-        test_idx)`` pairs (sklearn ``BaseCrossValidator`` protocol).  This
-        is the recommended entry point for using
-        `geovalidate <https://github.com/ljwolf/geovalidate/>`_ splitters
-        such as ``HilbertKFold``, ``CellStratifiedKFold``,
-        ``LeaveClusterOut``, or ``BallKFold``.  ``geometry`` (when
-        provided) is forwarded as the ``X`` argument to ``split``; this
-        suffices for geometry-aware geovalidate splitters.  Mutually
-        exclusive with ``fold_ids``.
-    fold_ids : np.ndarray, optional
-        Integer fold assignment per observation, shape ``(n,)``.  When
-        supplied, ``n_blocks`` and ``geometry`` are ignored.
-    n_blocks : int, default 10
-        Number of spatial blocks for the KMeans fallback when neither
-        ``splitter`` nor ``fold_ids`` is provided.
+    splitter : cross-validation splitter
+        Any object whose ``split`` method yields ``(train_idx, test_idx)``
+        pairs, called as ``splitter.split(geometry)`` or, when ``groups`` is
+        given, ``splitter.split(geometry, groups=groups)``: the scikit-learn
+        ``BaseCrossValidator`` protocol.  Spatial splitters from
+        `geovalidate <https://github.com/ljwolf/geovalidate/>`_ (e.g.
+        ``HilbertKFold``, ``CellStratifiedKFold``, ``BallKFold``) take the
+        geometry as ``X``; scikit-learn splitters such as ``GroupKFold`` or
+        ``PredefinedSplit`` express blocks built by other means.
     geometry : geopandas.GeoSeries, optional
-        Geometry used by the KMeans fallback to cluster centroids, and
-        forwarded to ``splitter.split`` when ``splitter`` is supplied.
-        Required for the KMeans fallback.
+        Passed to ``splitter.split`` as ``X``.  Required by geometry-aware
+        splitters; when omitted, a placeholder of ``n`` rows is passed.
+    groups : array-like, optional
+        Group label per observation, forwarded to ``splitter.split``
+        (e.g. for ``GroupKFold``).
     draws, tune, chains, random_seed
         Forwarded to :meth:`SpatialModel.fit` for each per-fold refit.
         Defaults are deliberately modest to keep CV affordable.
@@ -349,59 +312,36 @@ def spatial_kfold(
     -----
     Computation is :math:`O(K \\cdot G \\cdot \\text{nnz}(W))` per fold
     plus the cost of refitting; spatial folds are typically a handful
-    (e.g. ``n_blocks=5``\u201310).  For ``OLS``/``SLX`` the predictive
+    (5\u201310).  For ``OLS``/``SLX`` the predictive
     collapses to the standard independent Gaussian and the per-fold
     cost is :math:`O(G \\cdot n_{\\text{test}} \\cdot k)`.
     """
     n = int(model._y.shape[0])
-    if splitter is not None and fold_ids is not None:
-        raise ValueError("Pass either splitter or fold_ids, not both.")
-
-    if splitter is not None:
-        split_X = geometry if geometry is not None else np.zeros((n, 1))
-        folds = [
-            (np.asarray(tr, dtype=np.int64), np.asarray(te, dtype=np.int64))
-            for tr, te in splitter.split(split_X)
-        ]
-        method = type(splitter).__name__
-        fold_ids_out = np.full(n, -1, dtype=np.int64)
-        for f, (_, te) in enumerate(folds):
-            fold_ids_out[te] = f  # last-writer-wins for overlapping splitters
-    elif fold_ids is None:
-        if geometry is None:
-            raise ValueError(
-                "Either splitter, fold_ids, or geometry (for KMeans blocking) "
-                "must be supplied."
-            )
-        fold_ids_out = _kmeans_fold_ids(geometry, n_blocks=n_blocks, seed=random_seed)
-        method = "kmeans"
-        folds = [
-            (
-                np.flatnonzero(fold_ids_out != f).astype(np.int64),
-                np.flatnonzero(fold_ids_out == f).astype(np.int64),
-            )
-            for f in np.unique(fold_ids_out)
-        ]
-    else:
-        fold_ids_out = np.asarray(fold_ids, dtype=np.int64).ravel()
-        if fold_ids_out.shape[0] != n:
-            raise ValueError(
-                f"fold_ids has length {fold_ids_out.shape[0]}, expected n={n}."
-            )
-        method = "explicit"
-        folds = [
-            (
-                np.flatnonzero(fold_ids_out != f).astype(np.int64),
-                np.flatnonzero(fold_ids_out == f).astype(np.int64),
-            )
-            for f in np.unique(fold_ids_out)
-        ]
+    kind = _model_kind(model)
+    if getattr(model, "robust", False):
+        raise NotImplementedError(
+            "spatial_kfold scores the Gaussian conditional density, which does "
+            "not hold for Student-t errors (robust=True)."
+        )
+    if not callable(getattr(splitter, "split", None)):
+        raise TypeError(
+            "splitter must expose a split(X) method yielding (train_idx, test_idx)."
+        )
+    split_X = geometry if geometry is not None else np.zeros((n, 1))
+    split_kw = {} if groups is None else {"groups": groups}
+    folds = [
+        (np.asarray(tr, dtype=np.int64), np.asarray(te, dtype=np.int64))
+        for tr, te in splitter.split(split_X, **split_kw)
+    ]
+    method = type(splitter).__name__
+    fold_ids_out = np.full(n, -1, dtype=np.int64)
+    for f, (_, te) in enumerate(folds):
+        fold_ids_out[te] = f  # last-writer-wins for overlapping splitters
 
     n_folds = len(folds)
     if n_folds < 2:
         raise ValueError(f"spatial_kfold requires at least 2 folds (got {n_folds}).")
 
-    kind = _model_kind(model)
     y_full = np.asarray(model._y, dtype=np.float64)
     design_full = _full_design(model)
     W_full = model._W_sparse

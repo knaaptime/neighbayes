@@ -10,14 +10,15 @@ from __future__ import annotations
 import arviz as az
 import numpy as np
 import pytest
+import xarray as xr
 
 import neighbayes as bp
 from neighbayes.tests.helpers import W_to_graph, make_line_W
 
 
-def _idata(vars_dict: dict[str, np.ndarray]) -> az.InferenceData:
+def _idata(vars_dict: dict[str, np.ndarray]) -> xr.DataTree:
     payload = {k: np.asarray(v)[None, ...] for k, v in vars_dict.items()}
-    return az.from_dict(posterior=payload)
+    return az.from_dict({"posterior": payload})
 
 
 def _count_data(seed: int = 101, n: int = 10):
@@ -135,10 +136,10 @@ def test_reduced_fit_returns_inference_data():
         idata_kwargs={"log_likelihood": True},
     )
 
-    assert isinstance(idata, az.InferenceData)
-    assert "posterior" in idata.groups()
-    assert "log_likelihood" in idata.groups()
-    assert "observed_data" in idata.groups()
+    assert isinstance(idata, xr.DataTree)
+    assert "posterior" in idata.children
+    assert "log_likelihood" in idata.children
+    assert "observed_data" in idata.children
     # Reduced-form posterior must NOT contain σ or z.
     assert "sigma" not in idata.posterior.data_vars
     assert "z" not in idata.posterior.data_vars
@@ -163,7 +164,7 @@ def test_reduced_fit_default_is_gibbs():
     model = bp.models.SARNegBin(y=y, X=X, W=W)
     # Default call (no sampler kwarg) should use Gibbs
     idata = model.fit(draws=10, tune=10, chains=1, random_seed=0)
-    assert isinstance(idata, az.InferenceData)
+    assert isinstance(idata, xr.DataTree)
     assert "rho" in idata.posterior.data_vars
     assert "alpha" in idata.posterior.data_vars
 
@@ -235,7 +236,7 @@ def test_reduced_nuts_and_gibbs_agree_and_recover_rho():
     from neighbayes.dgp import simulate_sar_negbin
     from neighbayes.models import SARNegBin
 
-    data = simulate_sar_negbin(n=25, rho=0.4, seed=1)
+    data = simulate_sar_negbin(n_side=25, rho=0.4, seed=1)
     y, X, W = data["y"], data["X"], data["W_graph"]
     kwargs = dict(draws=1000, tune=800, chains=2, random_seed=1, progressbar=False)
 
@@ -267,16 +268,18 @@ def test_reduced_nuts_uses_the_resolved_beta_prior():
     from neighbayes.dgp import simulate_sar_negbin
     from neighbayes.models import SARNegBin
 
-    data = simulate_sar_negbin(n=15, rho=0.4, seed=1)
+    data = simulate_sar_negbin(n_side=15, rho=0.4, seed=1)
     model = SARNegBin(y=data["y"], X=data["X"], W=data["W_graph"])
-    expected_mu, expected_sigma = model._gelman_default_beta_prior(
-        model._X, list(model._feature_names)
-    )
+    # The default lives on the log scale of the linear predictor, and the
+    # Gibbs path resolves the same one.
+    expected_mu, expected_sigma = model._resolved_beta_prior(link="log")
 
     pymc_model = model._build_pymc_model()
     beta = pymc_model.named_vars["beta"]
     sigma = beta.owner.inputs[-1].eval()
+    mu = beta.owner.inputs[-2].eval()
 
+    np.testing.assert_allclose(np.broadcast_to(mu, expected_mu.shape), expected_mu)
     np.testing.assert_allclose(
         np.broadcast_to(sigma, expected_sigma.shape), expected_sigma, rtol=1e-8
     )

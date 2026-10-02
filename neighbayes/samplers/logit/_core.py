@@ -630,7 +630,7 @@ def _sample_rho(
 
 
 # ---------------------------------------------------------------------------
-# Pointwise log-likelihood (for ArviZ InferenceData)
+# Pointwise log-likelihood (for ArviZ DataTree)
 # ---------------------------------------------------------------------------
 
 

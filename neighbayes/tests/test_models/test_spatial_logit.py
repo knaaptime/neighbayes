@@ -6,6 +6,7 @@ import arviz as az
 import numpy as np
 import pytest
 import scipy.sparse as sp
+import xarray as xr
 
 from neighbayes import dgp
 from neighbayes.models.cross_section.sar_logit import SARLogit
@@ -28,9 +29,9 @@ def _binary_data(seed: int = 101):
     return y, X, W
 
 
-def _idata(vars_dict: dict[str, np.ndarray]) -> az.InferenceData:
+def _idata(vars_dict: dict[str, np.ndarray]) -> xr.DataTree:
     payload = {k: np.asarray(v)[None, ...] for k, v in vars_dict.items()}
-    return az.from_dict(posterior=payload)
+    return az.from_dict({"posterior": payload})
 
 
 # ---------------------------------------------------------------------------
@@ -205,7 +206,7 @@ class TestDGPIntegration:
     """simulate_sar_logit should produce valid data."""
 
     def test_dgp_output(self):
-        out = dgp.simulate_sar_logit(n=5, rho=0.3, seed=42)
+        out = dgp.simulate_sar_logit(n_side=5, rho=0.3, seed=42)
         assert "y" in out
         assert "X" in out
         assert "W_sparse" in out
@@ -217,7 +218,7 @@ class TestDGPIntegration:
 
     def test_model_from_dgp(self):
         """Model should accept data from simulate_sar_logit."""
-        out = dgp.simulate_sar_logit(n=5, rho=0.3, seed=42)
+        out = dgp.simulate_sar_logit(n_side=5, rho=0.3, seed=42)
         model = SARLogit(y=out["y"], X=out["X"], W=out["W_graph"])
         assert model._y.shape == (25,)
 
@@ -320,7 +321,7 @@ class TestSEMDGPIntegration:
     """simulate_sem_logit should produce valid data."""
 
     def test_dgp_output(self):
-        out = dgp.simulate_sem_logit(n=5, lam=0.3, seed=42)
+        out = dgp.simulate_sem_logit(n_side=5, lam=0.3, seed=42)
         assert "y" in out
         assert "X" in out
         assert "W_sparse" in out
@@ -332,7 +333,7 @@ class TestSEMDGPIntegration:
 
     def test_model_from_dgp(self):
         """Model should accept data from simulate_sem_logit."""
-        out = dgp.simulate_sem_logit(n=5, lam=0.3, seed=42)
+        out = dgp.simulate_sem_logit(n_side=5, lam=0.3, seed=42)
         model = SEMLogit(y=out["y"], X=out["X"], W=out["W_graph"])
         assert model._y.shape == (25,)
 
@@ -342,7 +343,7 @@ class TestSEMFitIntegration:
 
     def test_fit_small(self):
         """Fit on small DGP data should return valid InferenceData."""
-        out = dgp.simulate_sem_logit(n=5, lam=0.3, seed=42)
+        out = dgp.simulate_sem_logit(n_side=5, lam=0.3, seed=42)
         model = SEMLogit(y=out["y"], X=out["X"], W=out["W_graph"])
         idata = model.fit(draws=50, tune=50, chains=2, random_seed=42)
         assert "lam" in idata.posterior

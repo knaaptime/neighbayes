@@ -13,12 +13,12 @@ from libpysal.graph import Graph
 
 from neighbayes.dgp.utils import (
     _hetero_scale,
-    dense_to_graph,
+    _row_standardize_sparse,
     ensure_rng,
     make_design_matrix,
     resolve_weights,
     rook_grid_weights,
-    row_standardize,
+    spatial_filter_factor,
     weights_from_geodataframe,
 )
 
@@ -43,47 +43,49 @@ class TestEnsureRng:
 
 
 # ---------------------------------------------------------------------------
-# row_standardize
+# _row_standardize_sparse
 # ---------------------------------------------------------------------------
 
 
-class TestRowStandardize:
+class TestRowStandardizeSparse:
     def test_already_row_standardized(self):
-        W = np.array([[0.0, 0.5, 0.5], [0.5, 0.0, 0.5], [0.5, 0.5, 0.0]])
-        result = row_standardize(W)
-        np.testing.assert_allclose(result, W)
+        W = sp.csr_matrix([[0.0, 0.5, 0.5], [0.5, 0.0, 0.5], [0.5, 0.5, 0.0]])
+        result = _row_standardize_sparse(W)
+        assert sp.issparse(result)
+        np.testing.assert_allclose(result.toarray(), W.toarray())
 
     def test_unnormalized(self):
-        W = np.array([[0, 1, 1], [1, 0, 1], [1, 1, 0]], dtype=float)
-        result = row_standardize(W)
-        np.testing.assert_allclose(result.sum(axis=1), 1.0)
+        W = sp.csr_matrix([[0, 1, 1], [1, 0, 1], [1, 1, 0]], dtype=float)
+        result = _row_standardize_sparse(W)
+        np.testing.assert_allclose(np.asarray(result.sum(axis=1)).ravel(), 1.0)
 
     def test_isolate_row(self):
         """Row of zeros should remain zeros (no NaN)."""
-        W = np.array([[0, 1, 0], [1, 0, 1], [0, 0, 0]], dtype=float)
-        result = row_standardize(W)
+        W = sp.csr_matrix([[0, 1, 0], [1, 0, 1], [0, 0, 0]], dtype=float)
+        result = _row_standardize_sparse(W).toarray()
         assert not np.any(np.isnan(result))
         np.testing.assert_allclose(result[2], 0.0)
 
 
 # ---------------------------------------------------------------------------
-# dense_to_graph
+# spatial_filter_factor
 # ---------------------------------------------------------------------------
 
 
-class TestDenseToGraph:
-    def test_round_trip(self):
-        W = np.array([[0.0, 0.5, 0.5], [0.5, 0.0, 0.5], [0.5, 0.5, 0.0]])
-        g = dense_to_graph(W)
-        assert isinstance(g, Graph)
-        W_back = g.sparse.toarray().astype(float)
-        np.testing.assert_allclose(W_back, W, atol=1e-10)
+class TestSpatialFilterFactor:
+    def test_matches_dense_solve(self):
+        W, _ = rook_grid_weights(4)
+        rhs = np.arange(16, dtype=float)
+        got = spatial_filter_factor(W, 0.6)(rhs)
+        want = np.linalg.solve(np.eye(16) - 0.6 * W.toarray(), rhs)
+        np.testing.assert_allclose(got, want, atol=1e-12)
 
-    def test_with_row_standardize(self):
-        W = np.array([[0, 1, 1], [1, 0, 1], [1, 1, 0]], dtype=float)
-        g = dense_to_graph(W, row_standardize_weights=True)
-        W_back = g.sparse.toarray().astype(float)
-        np.testing.assert_allclose(W_back.sum(axis=1), 1.0)
+    def test_matrix_rhs(self):
+        W, _ = rook_grid_weights(3)
+        rhs = np.random.default_rng(0).standard_normal((9, 4))
+        got = spatial_filter_factor(W, -0.4)(rhs)
+        want = np.linalg.solve(np.eye(9) + 0.4 * W.toarray(), rhs)
+        np.testing.assert_allclose(got, want, atol=1e-12)
 
 
 # ---------------------------------------------------------------------------
@@ -94,9 +96,12 @@ class TestDenseToGraph:
 class TestRookGridWeights:
     def test_basic_grid(self):
         W, g = rook_grid_weights(3)
+        assert sp.issparse(W)
         assert W.shape == (9, 9)
+        np.testing.assert_allclose(np.asarray(W.sum(axis=1)).ravel(), 1.0)
         # Corner units have 2 neighbors, edge units have 3, center has 4
-        assert W[0].sum() == pytest.approx(1.0)  # row-standardized
+        np.testing.assert_array_equal(np.diff(W.indptr), [2, 3, 2, 3, 4, 3, 2, 3, 2])
+        np.testing.assert_allclose(W.toarray(), g.sparse.toarray())
 
     def test_invalid_n_raises(self):
         with pytest.raises(ValueError, match="positive integer"):
@@ -190,26 +195,28 @@ class TestWeightsFromGeodataframe:
 
 class TestResolveWeights:
     def test_with_graph(self):
-        W_dense, g = resolve_weights(W=_W_to_graph(_rook_W(4)))
-        assert W_dense.shape == (4, 4)
+        W_sparse, g = resolve_weights(W=_W_to_graph(_rook_W(4)))
+        assert sp.issparse(W_sparse)
+        assert W_sparse.shape == (4, 4)
         assert isinstance(g, Graph)
 
     def test_with_sparse(self):
         W_sp = sp.csr_matrix(_rook_W(4))
-        W_dense, g = resolve_weights(W=W_sp)
-        assert W_dense.shape == (4, 4)
+        W_sparse, g = resolve_weights(W=W_sp)
+        assert sp.issparse(W_sparse)
+        assert W_sparse.shape == (4, 4)
+        np.testing.assert_allclose(W_sparse.toarray(), g.sparse.toarray())
 
-    def test_with_ndarray(self):
-        W_arr = _rook_W(4)
-        W_dense, g = resolve_weights(W=W_arr)
-        assert W_dense.shape == (4, 4)
+    def test_ndarray_rejected(self):
+        with pytest.raises(TypeError, match="Graph or a scipy sparse"):
+            resolve_weights(W=_rook_W(4))
 
-    def test_with_n_only(self):
-        W_dense, g = resolve_weights(n=4)
-        assert W_dense.shape == (16, 16)  # 4x4 grid = 16 units
+    def test_with_n_side_only(self):
+        W_sparse, g = resolve_weights(n_side=4)
+        assert W_sparse.shape == (16, 16)  # 4x4 grid = 16 units
 
     def test_no_args_raises(self):
-        with pytest.raises(ValueError, match="Provide either W, gdf, or n"):
+        with pytest.raises(ValueError, match="Provide either W, gdf, or n_side"):
             resolve_weights()
 
     def test_graph_with_gdf_mismatch_raises(self):
@@ -223,8 +230,8 @@ class TestResolveWeights:
 
     def test_graph_with_n_mismatch_raises(self):
         W_graph = _W_to_graph(_rook_W(4))
-        with pytest.raises(ValueError, match="n must match"):
-            resolve_weights(W=W_graph, n=5)
+        with pytest.raises(ValueError, match="n_side=5 implies 25 units"):
+            resolve_weights(W=W_graph, n_side=5)
 
 
 # ---------------------------------------------------------------------------

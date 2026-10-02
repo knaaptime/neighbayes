@@ -22,6 +22,7 @@ The corresponding error-side restrictions hold for ``sem_fe`` /
 from __future__ import annotations
 
 import numpy as np
+import scipy.sparse as sp
 
 from .utils import (
     _hetero_scale,
@@ -30,6 +31,7 @@ from .utils import (
     make_design_matrix,
     panel_index,
     resolve_weights,
+    spatial_filter_factor,
 )
 
 
@@ -46,7 +48,7 @@ def _simulate_panel_sdm_fe_core(
     *,
     N: int,
     T: int,
-    Wd: np.ndarray,
+    Ws: sp.csr_matrix,
     beta1: np.ndarray,
     beta2: np.ndarray,
     rho: float,
@@ -64,14 +66,14 @@ def _simulate_panel_sdm_fe_core(
     """
     has_wx = len(beta2) > 0
     use_solve = rho != 0.0
-    A_inv = np.linalg.inv(np.eye(N) - rho * Wd) if use_solve else None
+    solve = spatial_filter_factor(Ws, rho) if use_solve else None
 
     alpha = rng.normal(0.0, sigma_alpha, N)
     y_list, X_list = [], []
     for _ in range(T):
         Xt = make_design_matrix(rng, N, k=max(len(beta1) - 1, 0), add_intercept=True)
         if has_wx:
-            Wx = Wd @ Xt[:, 1:]
+            Wx = Ws @ Xt[:, 1:]
             if Wx.shape[1] != len(beta2):
                 raise ValueError(
                     "len(beta2) must match number of non-intercept regressors."
@@ -83,7 +85,7 @@ def _simulate_panel_sdm_fe_core(
             N
         )
         rhs = Xt @ beta1 + wx_beta + alpha + eps
-        yt = A_inv @ rhs if use_solve else rhs
+        yt = solve(rhs) if use_solve else rhs
         y_list.append(yt)
         X_list.append(Xt)
     return _panel_finalize(y_list, X_list, N, T)
@@ -93,7 +95,7 @@ def _simulate_panel_sdem_fe_core(
     *,
     N: int,
     T: int,
-    Wd: np.ndarray,
+    Ws: sp.csr_matrix,
     beta1: np.ndarray,
     beta2: np.ndarray,
     lam: float,
@@ -111,14 +113,14 @@ def _simulate_panel_sdem_fe_core(
     """
     has_wx = len(beta2) > 0
     use_solve = lam != 0.0
-    A_inv = np.linalg.inv(np.eye(N) - lam * Wd) if use_solve else None
+    solve = spatial_filter_factor(Ws, lam) if use_solve else None
 
     alpha = rng.normal(0.0, sigma_alpha, N)
     y_list, X_list = [], []
     for _ in range(T):
         Xt = make_design_matrix(rng, N, k=max(len(beta1) - 1, 0), add_intercept=True)
         if has_wx:
-            Wx = Wd @ Xt[:, 1:]
+            Wx = Ws @ Xt[:, 1:]
             if Wx.shape[1] != len(beta2):
                 raise ValueError(
                     "len(beta2) must match number of non-intercept regressors."
@@ -129,7 +131,7 @@ def _simulate_panel_sdem_fe_core(
         eps = (_hetero_scale(Xt, sigma) if err_hetero else sigma) * rng.standard_normal(
             N
         )
-        u = A_inv @ eps if use_solve else eps
+        u = solve(eps) if use_solve else eps
         yt = Xt @ beta1 + wx_beta + alpha + u
         y_list.append(yt)
         X_list.append(Xt)
@@ -161,12 +163,12 @@ def simulate_panel_ols_fe(
     Returns
     -------
     dict
-        Keys: ``y``, ``X``, ``unit``, ``time``, ``W_dense``, ``W_graph``,
+        Keys: ``y``, ``X``, ``unit``, ``time``, ``W_sparse``, ``W_graph``,
         ``params_true`` with ``{beta, sigma, sigma_alpha}``.
     """
     rng = ensure_rng(rng, seed)
-    Wd, Wg = resolve_weights(W=W, gdf=gdf, contiguity=contiguity)
-    if Wd.shape[0] != N:
+    Ws, Wg = resolve_weights(W=W, gdf=gdf, contiguity=contiguity)
+    if Ws.shape[0] != N:
         raise ValueError("N must match W/gdf unit count.")
 
     if beta is None:
@@ -176,7 +178,7 @@ def simulate_panel_ols_fe(
     y, X, idx = _simulate_panel_sdm_fe_core(
         N=N,
         T=T,
-        Wd=Wd,
+        Ws=Ws,
         beta1=beta,
         beta2=np.empty(0, dtype=float),
         rho=0.0,
@@ -191,7 +193,7 @@ def simulate_panel_ols_fe(
         idx=idx,
         N=N,
         T=T,
-        Wd=Wd,
+        Ws=Ws,
         Wg=Wg,
         params_true={"beta": beta, "sigma": sigma, "sigma_alpha": sigma_alpha},
         create_gdf=create_gdf,
@@ -213,7 +215,7 @@ def simulate_panel_sar_fe(
     seed: int | None = None,
     W=None,
     gdf=None,
-    n: int | None = None,
+    n_side: int | None = None,
     contiguity: str = "queen",
     create_gdf: bool = False,
     geometry_type: str = "polygon",
@@ -226,8 +228,8 @@ def simulate_panel_sar_fe(
     Equivalent to :func:`simulate_panel_sdm_fe` with ``beta2=[]``.
     """
     rng = ensure_rng(rng, seed)
-    Wd, Wg = resolve_weights(W=W, gdf=gdf, n=n, contiguity=contiguity)
-    if Wd.shape[0] != N:
+    Ws, Wg = resolve_weights(W=W, gdf=gdf, n_side=n_side, contiguity=contiguity)
+    if Ws.shape[0] != N:
         raise ValueError("N must match W/gdf unit count.")
 
     if beta is None:
@@ -237,7 +239,7 @@ def simulate_panel_sar_fe(
     y, X, idx = _simulate_panel_sdm_fe_core(
         N=N,
         T=T,
-        Wd=Wd,
+        Ws=Ws,
         beta1=beta,
         beta2=np.empty(0, dtype=float),
         rho=rho,
@@ -252,7 +254,7 @@ def simulate_panel_sar_fe(
         idx=idx,
         N=N,
         T=T,
-        Wd=Wd,
+        Ws=Ws,
         Wg=Wg,
         params_true={
             "rho": rho,
@@ -279,7 +281,7 @@ def simulate_panel_sem_fe(
     seed: int | None = None,
     W=None,
     gdf=None,
-    n: int | None = None,
+    n_side: int | None = None,
     contiguity: str = "queen",
     create_gdf: bool = False,
     geometry_type: str = "polygon",
@@ -292,8 +294,8 @@ def simulate_panel_sem_fe(
     Equivalent to :func:`simulate_panel_sdem_fe` with ``beta2=[]``.
     """
     rng = ensure_rng(rng, seed)
-    Wd, Wg = resolve_weights(W=W, gdf=gdf, n=n, contiguity=contiguity)
-    if Wd.shape[0] != N:
+    Ws, Wg = resolve_weights(W=W, gdf=gdf, n_side=n_side, contiguity=contiguity)
+    if Ws.shape[0] != N:
         raise ValueError("N must match W/gdf unit count.")
 
     if beta is None:
@@ -303,7 +305,7 @@ def simulate_panel_sem_fe(
     y, X, idx = _simulate_panel_sdem_fe_core(
         N=N,
         T=T,
-        Wd=Wd,
+        Ws=Ws,
         beta1=beta,
         beta2=np.empty(0, dtype=float),
         lam=lam,
@@ -318,7 +320,7 @@ def simulate_panel_sem_fe(
         idx=idx,
         N=N,
         T=T,
-        Wd=Wd,
+        Ws=Ws,
         Wg=Wg,
         params_true={
             "lam": lam,
@@ -359,8 +361,8 @@ def simulate_panel_sdm_fe(
     nested by setting ``beta2=[]`` and/or ``rho=0``.
     """
     rng = ensure_rng(rng, seed)
-    Wd, Wg = resolve_weights(W=W, gdf=gdf, contiguity=contiguity)
-    if Wd.shape[0] != N:
+    Ws, Wg = resolve_weights(W=W, gdf=gdf, contiguity=contiguity)
+    if Ws.shape[0] != N:
         raise ValueError("N must match W/gdf unit count.")
 
     if beta1 is None:
@@ -373,7 +375,7 @@ def simulate_panel_sdm_fe(
     y, X, idx = _simulate_panel_sdm_fe_core(
         N=N,
         T=T,
-        Wd=Wd,
+        Ws=Ws,
         beta1=beta1,
         beta2=beta2,
         rho=rho,
@@ -388,7 +390,7 @@ def simulate_panel_sdm_fe(
         idx=idx,
         N=N,
         T=T,
-        Wd=Wd,
+        Ws=Ws,
         Wg=Wg,
         params_true={
             "rho": rho,
@@ -431,8 +433,8 @@ def simulate_panel_sdem_fe(
     are nested by setting ``beta2=[]`` and/or ``lam=0``.
     """
     rng = ensure_rng(rng, seed)
-    Wd, Wg = resolve_weights(W=W, gdf=gdf, contiguity=contiguity)
-    if Wd.shape[0] != N:
+    Ws, Wg = resolve_weights(W=W, gdf=gdf, contiguity=contiguity)
+    if Ws.shape[0] != N:
         raise ValueError("N must match W/gdf unit count.")
 
     if beta1 is None:
@@ -445,7 +447,7 @@ def simulate_panel_sdem_fe(
     y, X, idx = _simulate_panel_sdem_fe_core(
         N=N,
         T=T,
-        Wd=Wd,
+        Ws=Ws,
         beta1=beta1,
         beta2=beta2,
         lam=lam,
@@ -460,7 +462,7 @@ def simulate_panel_sdem_fe(
         idx=idx,
         N=N,
         T=T,
-        Wd=Wd,
+        Ws=Ws,
         Wg=Wg,
         params_true={
             "lam": lam,
@@ -500,8 +502,8 @@ def simulate_panel_slx_fe(
     Equivalent to :func:`simulate_panel_sdm_fe` with ``rho=0``.
     """
     rng = ensure_rng(rng, seed)
-    Wd, Wg = resolve_weights(W=W, gdf=gdf, contiguity=contiguity)
-    if Wd.shape[0] != N:
+    Ws, Wg = resolve_weights(W=W, gdf=gdf, contiguity=contiguity)
+    if Ws.shape[0] != N:
         raise ValueError("N must match W/gdf unit count.")
 
     if beta1 is None:
@@ -514,7 +516,7 @@ def simulate_panel_slx_fe(
     y, X, idx = _simulate_panel_sdm_fe_core(
         N=N,
         T=T,
-        Wd=Wd,
+        Ws=Ws,
         beta1=beta1,
         beta2=beta2,
         rho=0.0,
@@ -529,7 +531,7 @@ def simulate_panel_slx_fe(
         idx=idx,
         N=N,
         T=T,
-        Wd=Wd,
+        Ws=Ws,
         Wg=Wg,
         params_true={
             "beta1": beta1,

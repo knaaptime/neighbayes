@@ -12,12 +12,12 @@ from __future__ import annotations
 
 import numpy as np
 
-from .._mixins import GaussianLikelihoodMixin
+from .._mixins import GaussianLikelihoodMixin, GaussianPredictionMixin
 from ..base import SpatialModel
 from ..priors import OLSPriors
 
 
-class OLS(GaussianLikelihoodMixin, SpatialModel):
+class OLS(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     """Bayesian ordinary least squares cross-sectional regression.
 
     .. math::

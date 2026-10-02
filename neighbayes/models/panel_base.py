@@ -13,7 +13,7 @@ from formulaic import model_matrix
 from libpysal.graph import Graph
 
 from .._backends.sampler_helpers import jax_available
-from .._lazy_deps import az, pm
+from .._lazy_deps import pm, xr
 from ._base._shared import (
     SharedSpatialMethods,
     _check_row_standardization,
@@ -75,9 +75,13 @@ def _demean_panel(y: np.ndarray, X: np.ndarray, N: int, T: int, effects: int):
     then demean" yields the same likelihood — a fact exploited in
     Lee & Yu (2010) and Elhorst (2014, ch. 3).  This is why
     :func:`neighbayes.models.panel.SARPanel` builds ``Wy`` from the
-    *demeaned* ``y`` returned here without an additional Jacobian
-    correction beyond the standard :math:`T\\,\\log|I_N - \\rho W|`
-    panel Jacobian.
+    *demeaned* ``y`` returned here.  Demeaning costs degrees of freedom,
+    so the likelihood of the demeaned data follows Lee & Yu's (2010)
+    transformation approach: a unit effect leaves :math:`N(T-1)`
+    effective observations and a Jacobian of
+    :math:`(T-1)\\,\\log|I_N - \\rho W|`; a time effect with a
+    row-standardized :math:`W` subtracts :math:`\\log(1-\\rho)` per
+    retained period (see ``SpatialPanelModel._jacobian_T``).
 
     References
     ----------
@@ -399,7 +403,7 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         self.model = _resolve_effects(effects)
         self.effects = _EFFECTS_NAMES[self.model]
         self.robust = robust
-        self._idata: Optional[az.InferenceData] = None
+        self._idata: Optional[xr.DataTree] = None
         self._pymc_model: Optional[pm.Model] = None
         self._W_dense_cache: Optional[np.ndarray] = None
 
@@ -548,6 +552,76 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         """
         return self._structure.batch_spatial_lag(resid, T_eff)
 
+    # ------------------------------------------------------------------
+    # Fixed-effects likelihood (Lee & Yu 2010)
+    # ------------------------------------------------------------------
+    #
+    # Demeaning over T periods leaves N(T-1) independent observations, not
+    # NT: the within-transformed errors are correlated within each unit.
+    # Lee & Yu's transformation approach (an orthonormal F with F F' equal to
+    # the demeaning projector) gives the exact likelihood of the transformed
+    # data.  Its sum of squares equals the demeaned one, so only two
+    # quantities change: the observations the variance counts and the
+    # Jacobian multiplier.  With time effects and a row-standardized W the
+    # transformation also removes the eigenvalue 1 - ρ of I - ρW, so
+    #
+    #   effects   observations     Jacobian
+    #   unit      N(T-1)           (T-1)·log|I - ρW|
+    #   time      (N-1)T           T·[log|I - ρW| - log(1 - ρ)]
+    #   two-way   (N-1)(T-1)       (T-1)·[log|I - ρW| - log(1 - ρ)]
+    #
+    # The direct approach (all NT observations, T·log|I - ρW|) underestimates
+    # σ² by (T-1)/T under unit effects.  Exact for Gaussian errors; with
+    # ``robust=True`` the same dimensions are the best available correction.
+    # Dynamic and Tobit panels set ``_lee_yu = False``: their fixed-T theory
+    # (or likelihood) differs.
+
+    _lee_yu: bool = True
+
+    @property
+    def _fe_unit(self) -> bool:
+        return self._lee_yu and self.model in (1, 3)
+
+    @property
+    def _fe_time(self) -> bool:
+        return self._lee_yu and self.model in (2, 3)
+
+    @property
+    def _jacobian_T(self) -> int:
+        return self._T - 1 if self._fe_unit else self._T
+
+    @property
+    def _jacobian_shift(self) -> float:
+        if not self._fe_time or self._jacobian_param is None:
+            return 0.0
+        if not self._W_row_standardized():
+            return 0.0
+        return float(self._jacobian_T)
+
+    @property
+    def _n_effective(self) -> int:
+        n = int(np.asarray(self._y).shape[0])
+        if not self._lee_yu:
+            return n
+        units = n // self._T
+        return (units - int(self._fe_time)) * (self._T - int(self._fe_unit))
+
+    def _W_row_standardized(self) -> bool:
+        """Whether W's rows sum to one; warns once when time effects need it."""
+        if getattr(self, "_row_std_checked", None) is None:
+            rs = np.asarray(self._W_sparse.sum(axis=1)).ravel()
+            ok = bool(np.allclose(rs[rs != 0], 1.0))
+            self._row_std_checked = ok
+            if not ok:
+                warnings.warn(
+                    "Time fixed effects: the exact Lee & Yu (2010) Jacobian "
+                    "term -log(1 - rho) requires a row-standardized W, which "
+                    "this W is not; it is omitted (an O(1/N) approximation).",
+                    UserWarning,
+                    stacklevel=3,
+                )
+        return self._row_std_checked
+
     @property
     def _W_dense(self) -> np.ndarray:
         """Dense (N*T)×(N*T) weight matrix, materialized lazily on first access."""
@@ -683,7 +757,7 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         n_jobs: int = -1,
         idata_kwargs: dict[str, Any] | None = None,
         **sample_kwargs,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Draw samples from the posterior for the panel model.
 
         Mirrors :meth:`SpatialModel.fit`: dispatches to this model's Gibbs
@@ -713,7 +787,7 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
             Parallel workers for the NumPy Gibbs path (Gibbs only).
         idata_kwargs : dict, optional
             ``{"log_likelihood": True}`` stores the complete Jacobian-corrected
-            pointwise log-likelihood that ``az.loo`` / ``az.waic`` /
+            pointwise log-likelihood that ``az.loo`` /
             ``az.compare`` need, for Gibbs and NUTS alike.  Off by default, as
             in PyMC: it holds one value per draw, chain, and observation (16 GB
             at n = 250,000 with 4 × 2,000 draws).  For NUTS the dict is also
@@ -726,7 +800,7 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
 
         Returns
         -------
-        arviz.InferenceData
+        xarray.DataTree
             Posterior samples and diagnostics.
         """
         from ..samplers._registry import (
@@ -795,7 +869,7 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         progressbar: bool,
         idata_kwargs: dict[str, Any] | None,
         sample_kwargs: dict[str, Any],
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Shared NUTS path for panel models: sample, then reconstruct log-lik.
 
         The Jacobian-corrected pointwise log-likelihood is reconstructed only
@@ -849,7 +923,7 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         slice_width: float | None = None,
         chain_method: str | None = None,
         log_likelihood: bool = False,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Sample a Gaussian FE panel posterior via 3-block Gaussian Gibbs.
 
         Generic over the FE families: resolves the Gibbs class from
@@ -862,11 +936,6 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
             raise NotImplementedError(
                 f"{type(self).__name__} does not support Gibbs sampling. "
                 "Use sampler='nuts' (the default)."
-            )
-        if self.robust:
-            raise NotImplementedError(
-                "Gibbs sampling is not yet supported for robust (Student-t) "
-                "models. Use sampler='nuts' (the default)."
             )
 
         import importlib
@@ -924,6 +993,10 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
             W_eigs=self._logdet_eigs,
             logdet_method=method,
             T=self._T,
+            # Fixed-effects dimensions (Lee & Yu 2010; see _jacobian_T).
+            jacobian_T=self._jacobian_T,
+            jacobian_shift=self._jacobian_shift,
+            n_eff=self._n_effective,
             logdet_refit=self.logdet_refit,
             logdet_refit_pad_sd=self.logdet_refit_pad_sd,
             logdet_aaa_check=self.logdet_aaa_check,
@@ -933,6 +1006,10 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         if self._jacobian_param == "rho":
             gibbs_kwargs["Wy"] = self._Wy
 
+        if self.robust:
+            # Student-t errors as a normal scale mixture with the same fixed ν
+            # the NUTS path uses.
+            gibbs_kwargs["nu"] = self._nu
         gibbs = GibbsClass(**gibbs_kwargs)
 
         self._idata = gibbs.fit(

@@ -86,7 +86,7 @@ def _fit_varnames(model, sampler):
         random_seed=1,
         **kw,
     )
-    return set(idata.posterior.data_vars), ("log_likelihood" in idata.groups())
+    return set(idata.posterior.data_vars), ("log_likelihood" in idata.children)
 
 
 # name -> (ctor, data_fn, expected_varnames, samplers, gibbs_has_ll)
@@ -188,7 +188,7 @@ def test_gaussian_panel_fe_fit_contract(name, ctor, data_fn, expected, sampler):
         kwargs["idata_kwargs"] = _LL
     idata = model.fit(**kwargs)
     varnames = set(idata.posterior.data_vars)
-    has_ll = "log_likelihood" in idata.groups()
+    has_ll = "log_likelihood" in idata.children
     assert varnames == expected, f"{name} [{sampler}]: {sorted(varnames)}"
     if sampler == "gibbs":
         assert has_ll, f"{name} gibbs should attach a log_likelihood group on request"
@@ -199,28 +199,32 @@ def test_gaussian_panel_fe_fit_contract(name, ctor, data_fn, expected, sampler):
 #
 # RE posteriors carry the unit effect ``alpha`` and its scale ``sigma_alpha``.
 # The 5-block RE Gibbs sampler does not emit the deterministic ``sigma2`` that
-# the NUTS build derives, so the contract is pinned *per sampler*.
+# the NUTS build derives, so the contract is pinned *per sampler*.  NUTS
+# samples the effects non-centered by default (``alpha = sigma_alpha *
+# alpha_z``) and keeps the free variable ``alpha_z``: bridge sampling reads
+# every free variable's draws from the posterior.
 # ---------------------------------------------------------------------------
 
 _RE_BASE = {"alpha", "beta", "sigma", "sigma_alpha"}
+_RE_NUTS = _RE_BASE | {"sigma2", "alpha_z"}
 
 # name -> (ctor, data_fn, {sampler: expected_varnames})
 GAUSSIAN_PANEL_RE: dict[str, tuple] = {
-    "OLS": (OLSPanelRE, make_panel_ols_data, {"nuts": _RE_BASE | {"sigma2"}}),
+    "OLS": (OLSPanelRE, make_panel_ols_data, {"nuts": _RE_NUTS}),
     "SAR": (
         SARPanelRE,
         make_panel_sar_data,
-        {"gibbs": _RE_BASE | {"rho"}, "nuts": _RE_BASE | {"rho", "sigma2"}},
+        {"gibbs": _RE_BASE | {"rho"}, "nuts": _RE_NUTS | {"rho"}},
     ),
     "SEM": (
         SEMPanelRE,
         make_panel_sem_data,
-        {"gibbs": _RE_BASE | {"lam"}, "nuts": _RE_BASE | {"lam", "sigma2"}},
+        {"gibbs": _RE_BASE | {"lam"}, "nuts": _RE_NUTS | {"lam"}},
     ),
     "SDEM": (
         SDEMPanelRE,
         make_panel_sdem_fe_data,
-        {"nuts": _RE_BASE | {"lam", "sigma2"}},
+        {"nuts": _RE_NUTS | {"lam"}},
     ),
 }
 
@@ -245,7 +249,7 @@ def test_gaussian_panel_re_fit_contract(name, ctor, data_fn, expected, sampler):
         kwargs["idata_kwargs"] = _LL
     idata = model.fit(**kwargs)
     varnames = set(idata.posterior.data_vars)
-    has_ll = "log_likelihood" in idata.groups()
+    has_ll = "log_likelihood" in idata.children
     assert varnames == expected, f"{name} [{sampler}]: {sorted(varnames)}"
     if sampler == "gibbs":
         assert has_ll, f"{name} gibbs should attach a log_likelihood group on request"
@@ -302,7 +306,7 @@ def test_binary_xs_fit_contract(name):
     )
     varnames = set(idata.posterior.data_vars)
     assert varnames == expected, f"{name} [gibbs]: {sorted(varnames)}"
-    assert "log_likelihood" in idata.groups(), (
+    assert "log_likelihood" in idata.children, (
         f"{name} gibbs should attach log_lik on request"
     )
 
@@ -323,7 +327,7 @@ def test_sarlogit_numpy_backend_fit_contract():
         idata_kwargs=_LL,
     )
     assert set(idata.posterior.data_vars) == {"beta", "rho"}
-    assert "log_likelihood" in idata.groups()
+    assert "log_likelihood" in idata.children
 
 
 # ---------------------------------------------------------------------------
@@ -395,7 +399,7 @@ def test_count_xs_fit_contract(name, ctor, zi, expected, sampler):
     varnames = set(idata.posterior.data_vars)
     assert varnames == expected, f"{name} [{sampler}]: {sorted(varnames)}"
     if sampler == "gibbs":
-        assert "log_likelihood" in idata.groups(), (
+        assert "log_likelihood" in idata.children, (
             f"{name} gibbs should attach log_lik on request"
         )
 
@@ -424,7 +428,7 @@ def test_zinb_jax_backend_fit_contract():
     )
     varnames = set(idata.posterior.data_vars)
     assert varnames == {"beta", "rho", "alpha", "gamma", "lam"}, sorted(varnames)
-    assert "log_likelihood" in idata.groups()
+    assert "log_likelihood" in idata.children
 
 
 # ---------------------------------------------------------------------------
@@ -471,4 +475,4 @@ def test_gibbs_log_likelihood_is_opt_in(name, build, extra):
         random_seed=1,
         **extra,
     )
-    assert "log_likelihood" not in idata.groups(), name
+    assert "log_likelihood" not in idata.children, name

@@ -16,7 +16,7 @@ from typing import Any, Dict, Optional, Tuple
 import numpy as np
 from scipy import stats as sp_stats
 
-from ..._lazy_deps import az
+from ..._lazy_deps import xr
 
 # ---------------------------------------------------------------------------
 # Module constants
@@ -101,13 +101,13 @@ class BayesianLMTestResult:
 # ---------------------------------------------------------------------------
 
 
-def _get_posterior_draws(idata: az.InferenceData, param: str) -> np.ndarray:
-    """Extract posterior draws for a parameter from an ArviZ InferenceData object.
+def _get_posterior_draws(idata: xr.DataTree, param: str) -> np.ndarray:
+    """Extract posterior draws for a parameter from an ArviZ DataTree object.
 
     Parameters
     ----------
-    idata : arviz.InferenceData
-        InferenceData object containing posterior samples.
+    idata : xarray.DataTree
+        DataTree object containing posterior samples.
     param : str
         Name of the parameter to extract.
 
@@ -494,13 +494,13 @@ def _compute_residuals(
     return resid
 
 
-def _posterior_mean_sigma2(idata: az.InferenceData) -> tuple[np.ndarray, float]:
+def _posterior_mean_sigma2(idata: xr.DataTree) -> tuple[np.ndarray, float]:
     """Return sigma draws and posterior-mean sigma².
 
     Parameters
     ----------
-    idata : arviz.InferenceData
-        InferenceData object containing posterior samples.
+    idata : xarray.DataTree
+        DataTree object containing posterior samples.
 
     Returns
     -------
@@ -630,7 +630,7 @@ def _resolve_lam_name(idata) -> str:
 
     Parameters
     ----------
-    idata : arviz.InferenceData
+    idata : xarray.DataTree
         Fitted-model inference data with a ``posterior`` group.
 
     Returns

@@ -61,8 +61,13 @@ def _make_mock_model(y, X, W_sparse, beta_noise=0.1, draws=100):
 
     # Build InferenceData using az.from_dict (works with all ArViZ versions)
     idata = az.from_dict(
-        posterior={"beta": beta_samples[:, None, :], "sigma": np.ones(draws)[:, None]},
-        observed_data={"y": y},
+        {
+            "posterior": {
+                "beta": beta_samples[:, None, :],
+                "sigma": np.ones(draws)[:, None],
+            },
+            "observed_data": {"y": y},
+        }
     )
 
     model = MagicMock()
@@ -133,8 +138,13 @@ def _make_mock_ols_model_with_wx(y, X, WX, W_sparse, beta_noise=0.1, draws=100):
     Wy = np.asarray(W_sparse @ y, dtype=np.float64)
 
     idata = az.from_dict(
-        posterior={"beta": beta_samples[:, None, :], "sigma": np.ones(draws)[:, None]},
-        observed_data={"y": y},
+        {
+            "posterior": {
+                "beta": beta_samples[:, None, :],
+                "sigma": np.ones(draws)[:, None],
+            },
+            "observed_data": {"y": y},
+        }
     )
 
     model = MagicMock()
@@ -160,12 +170,14 @@ def _make_mock_sar_model(y, X, WX, W_sparse, beta_noise=0.1, rho_noise=0.05, dra
     Wy = np.asarray(W_sparse @ y, dtype=np.float64)
 
     idata = az.from_dict(
-        posterior={
-            "beta": beta_samples[:, None, :],
-            "rho": rho_samples[:, None],
-            "sigma": np.ones(draws)[:, None],
-        },
-        observed_data={"y": y},
+        {
+            "posterior": {
+                "beta": beta_samples[:, None, :],
+                "rho": rho_samples[:, None],
+                "sigma": np.ones(draws)[:, None],
+            },
+            "observed_data": {"y": y},
+        }
     )
 
     model = MagicMock()
@@ -192,11 +204,13 @@ def _make_mock_slx_model(y, X, WX, W_sparse, beta_noise=0.1, draws=100):
     Wy = np.asarray(W_sparse @ y, dtype=np.float64)
 
     idata = az.from_dict(
-        posterior={
-            "beta": beta_samples[:, None, :],
-            "sigma": np.ones(draws)[:, None],
-        },
-        observed_data={"y": y},
+        {
+            "posterior": {
+                "beta": beta_samples[:, None, :],
+                "sigma": np.ones(draws)[:, None],
+            },
+            "observed_data": {"y": y},
+        }
     )
 
     model = MagicMock()
@@ -420,12 +434,14 @@ def _make_mock_sdm_model(
 
     Wy = np.asarray(W_sparse @ y, dtype=np.float64)
     idata = az.from_dict(
-        posterior={
-            "beta": beta_samples[:, None, :],
-            "rho": rho_samples[:, None],
-            "sigma": np.ones(draws)[:, None],
-        },
-        observed_data={"y": y},
+        {
+            "posterior": {
+                "beta": beta_samples[:, None, :],
+                "rho": rho_samples[:, None],
+                "sigma": np.ones(draws)[:, None],
+            },
+            "observed_data": {"y": y},
+        }
     )
 
     model = MagicMock()
@@ -453,12 +469,14 @@ def _make_mock_sdem_model(
 
     Wy = np.asarray(W_sparse @ y, dtype=np.float64)
     idata = az.from_dict(
-        posterior={
-            "beta": beta_samples[:, None, :],
-            "lam": lam_samples[:, None],
-            "sigma": np.ones(draws)[:, None],
-        },
-        observed_data={"y": y},
+        {
+            "posterior": {
+                "beta": beta_samples[:, None, :],
+                "lam": lam_samples[:, None],
+                "sigma": np.ones(draws)[:, None],
+            },
+            "observed_data": {"y": y},
+        }
     )
 
     model = MagicMock()
@@ -682,8 +700,13 @@ def _make_mock_panel_ols_model(N=6, T=3, k_wx=0, beta_noise=0.1, draws=100, seed
     beta_samples += rng.normal(scale=beta_noise, size=beta_samples.shape)
 
     idata = az.from_dict(
-        posterior={"beta": beta_samples[:, None, :], "sigma": np.ones(draws)[:, None]},
-        observed_data={"y": y},
+        {
+            "posterior": {
+                "beta": beta_samples[:, None, :],
+                "sigma": np.ones(draws)[:, None],
+            },
+            "observed_data": {"y": y},
+        }
     )
 
     model = MagicMock()
@@ -713,12 +736,14 @@ def _make_mock_panel_sar_model(
     rho_samples = rng.normal(scale=rho_noise, size=draws)
 
     idata = az.from_dict(
-        posterior={
-            "beta": beta_samples[:, None, :],
-            "rho": rho_samples[:, None],
-            "sigma": np.ones(draws)[:, None],
-        },
-        observed_data={"y": y},
+        {
+            "posterior": {
+                "beta": beta_samples[:, None, :],
+                "rho": rho_samples[:, None],
+                "sigma": np.ones(draws)[:, None],
+            },
+            "observed_data": {"y": y},
+        }
     )
 
     model = MagicMock()
@@ -746,11 +771,13 @@ def _make_mock_panel_slx_model(N=6, T=3, k_wx=2, beta_noise=0.1, draws=100, seed
     beta_samples += rng.normal(scale=beta_noise, size=beta_samples.shape)
 
     idata = az.from_dict(
-        posterior={
-            "beta": beta_samples[:, None, :],
-            "sigma": np.ones(draws)[:, None],
-        },
-        observed_data={"y": y},
+        {
+            "posterior": {
+                "beta": beta_samples[:, None, :],
+                "sigma": np.ones(draws)[:, None],
+            },
+            "observed_data": {"y": y},
+        }
     )
 
     model = MagicMock()
@@ -1002,10 +1029,7 @@ class TestSpatialDiagnosticsMethod:
         if cls is _SEM:
             posterior["lam"] = rng.normal(scale=0.05, size=draws)[:, None]
 
-        idata = az.from_dict(
-            posterior=posterior,
-            observed_data={"y": y},
-        )
+        idata = az.from_dict({"posterior": posterior, "observed_data": {"y": y}})
 
         if WX is None:
             WX = np.empty((n, 0), dtype=float)

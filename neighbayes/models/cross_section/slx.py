@@ -10,12 +10,12 @@ from __future__ import annotations
 
 import numpy as np
 
-from .._mixins import GaussianLikelihoodMixin
+from .._mixins import GaussianLikelihoodMixin, GaussianPredictionMixin
 from ..base import SpatialModel
 from ..priors import SLXPriors
 
 
-class SLX(GaussianLikelihoodMixin, SpatialModel):
+class SLX(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     """Bayesian SLX (Spatial Lag X) model.
 
     Adds spatial lags of the regressors :math:`X` to a standard linear

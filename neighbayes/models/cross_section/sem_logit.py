@@ -33,7 +33,7 @@ from typing import Optional
 import numpy as np
 import scipy.sparse as sp
 
-from ..._lazy_deps import az
+from ..._lazy_deps import xr
 from ...samplers._utils._idata import gibbs_to_inference_data
 from ...samplers._utils._slice import SliceWidthState
 from ...samplers._utils._sparsax_utils import resolve_pg_jax_backend
@@ -49,7 +49,7 @@ from ...samplers.logit._jax import (
     run_chains_jax_sem_vectorized,
 )
 from ..base import SpatialModel
-from ..priors import SEMLogitPriors, resolve_priors
+from ..priors import SEMLogitPriors
 
 
 class SEMLogit(SpatialModel):
@@ -77,10 +77,8 @@ class SEMLogit(SpatialModel):
           Uniform prior on :math:`\\lambda`.
         - ``lam_upper`` (float, default 0.999): Upper bound of the
           Uniform prior on :math:`\\lambda`.
-        - ``beta_mu`` (float, default 0.0): Normal prior mean for
-          :math:`\\beta`.
-        - ``beta_sigma`` (float, default 10.0): Normal prior std for
-          :math:`\\beta`.
+        - ``beta_mu``, ``beta_sigma`` (float or array, default Gelman et al.
+          2008): Normal prior on :math:`\\beta`, on the logit scale (intercept at ``logit(mean(y))``, scale 2.5; slopes ``2.5 / sd(x_j)``).
 
     logdet_method : str, optional
         How to compute :math:`\\log|I - \\lambda W|`. ``None`` (default)
@@ -97,7 +95,7 @@ class SEMLogit(SpatialModel):
     updates for η and β.
 
     The sampler bypasses PyMC's NUTS entirely. It produces an
-    ``arviz.InferenceData`` object compatible with all downstream
+    ``xarray.DataTree`` object compatible with all downstream
     diagnostics.
 
     The ``fit()`` method does **not** accept ``nuts_sampler`` or
@@ -193,7 +191,7 @@ class SEMLogit(SpatialModel):
         krylov_degree: int = 0,
         krylov_dmax: float = 0.4,
         log_likelihood: bool = False,
-    ) -> az.InferenceData:
+    ) -> xr.DataTree:
         """Sample posterior via Pólya–Gamma block Gibbs.
 
         Parameters
@@ -233,7 +231,7 @@ class SEMLogit(SpatialModel):
 
         Returns
         -------
-        az.InferenceData
+        xr.DataTree
             With posterior, log_likelihood, and observed_data groups.
         """
         y = self._y
@@ -241,17 +239,11 @@ class SEMLogit(SpatialModel):
         W_sparse = self._W_sparse
         n, k = X.shape
 
-        # Build priors from the typed priors object
-        priors_obj = resolve_priors(
-            self.priors if isinstance(self.priors, dict) else None,
-            SEMLogitPriors,
-        )
-        if isinstance(self.priors, SEMLogitPriors):
-            priors_obj = self.priors
-
+        # Link-scale Gelman et al. (2008) default unless overridden.
+        beta_mu, beta_sigma = self._resolved_beta_prior(link="logit")
         priors = SEMLogitGibbsPriors(
-            beta_mu=priors_obj.beta_mu,
-            beta_sigma=priors_obj.beta_sigma,
+            beta_mu=beta_mu,
+            beta_sigma=beta_sigma,
             lam_lower=self._logdet_bounds.rho_min,
             lam_upper=self._logdet_bounds.rho_max,
         )
@@ -384,7 +376,7 @@ class SEMLogit(SpatialModel):
                 model_type="sem_logit",
             )
 
-        # Assemble InferenceData
+        # Assemble DataTree
         param_keys = ["lam"]
         if return_eta:
             param_keys.append("eta")

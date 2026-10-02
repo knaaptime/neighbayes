@@ -99,7 +99,7 @@ def run_chains_in_threads(fn, per_chain_args):
 
 
 def run_chains_chunked(
-    sweep, states, warm_keys, draw_keys, *, tune, draws, on_chunk=None
+    sweep, states, warm_keys, draw_keys, *, tune, draws, on_chunk=None, consts=None
 ):
     """Run Gibbs chains in parallel, in compiled chunks of sweeps.
 
@@ -127,6 +127,12 @@ def run_chains_chunked(
     on_chunk : callable, optional
         ``on_chunk(sweep_index, tuning)``, called after each chunk with the
         0-based index of the last completed sweep (warmup sweeps come first).
+    consts : pytree, optional
+        Read-only arrays shared by every chain (the data), passed to the
+        compiled chunk as an argument and to the sweep as a fourth argument,
+        ``sweep(state, key, tuning, consts)``.  Large arrays belong here rather
+        than in the sweep's closure: XLA embeds closed-over arrays as constants
+        and constant-folds operations on them at compile time.
 
     Returns
     -------
@@ -142,15 +148,21 @@ def run_chains_chunked(
     states = list(states)
     chains = len(states)
     chunk_len = max(50, max(tune, draws) // 10)
-    trace_avals = jax.eval_shape(sweep, states[0], warm_keys[0], True)[1]
+    if consts is None:
+        _sweep = sweep
 
-    def _chunk(state, key, n_active, tuning):
+        def sweep(st, key, tuning, _consts):
+            return _sweep(st, key, tuning)
+
+    trace_avals = jax.eval_shape(sweep, states[0], warm_keys[0], True, consts)[1]
+
+    def _chunk(state, key, n_active, tuning, consts):
         def body(carry, i):
             st, kk = carry
 
             def _run(_):
                 kk_next, sk = jax.random.split(kk)
-                st_next, trace = sweep(st, sk, tuning)
+                st_next, trace = sweep(st, sk, tuning, consts)
                 return (st_next, kk_next), trace
 
             def _hold(_):
@@ -165,11 +177,12 @@ def run_chains_chunked(
     chunk = jax.jit(_chunk)
     # A zero-sweep call compiles here; threads reaching an uncompiled function
     # together would each compile their own copy.
-    jax.block_until_ready(chunk(states[0], warm_keys[0], 0, True))
+    jax.block_until_ready(chunk(states[0], warm_keys[0], 0, True, consts))
 
     def _advance(keys, n_active, tuning):
         out = run_chains_in_threads(
-            chunk, [(states[c], keys[c], n_active, tuning) for c in range(chains)]
+            chunk,
+            [(states[c], keys[c], n_active, tuning, consts) for c in range(chains)],
         )
         for c in range(chains):
             states[c] = out[c][0][0]

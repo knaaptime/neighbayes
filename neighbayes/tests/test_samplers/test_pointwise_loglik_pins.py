@@ -1,6 +1,6 @@
 """Pin every stored pointwise log-likelihood against a reference pmf.
 
-The stored ``log_likelihood`` group is what ``az.loo``/``az.waic`` and the
+The stored ``log_likelihood`` group is what ``az.loo`` and the
 BIC bridge factor read, so each count family must store the **full log-pmf
 of the observed data** — every normalizing constant included, and for ZINB
 the latent allocation integrated out.  A missing draw-independent constant
@@ -233,9 +233,11 @@ def test_bic_logml_inherits_the_normalizing_constant():
 
     def _logml(ll):
         idata = az.from_dict(
-            posterior={"beta": rng.standard_normal((n_chains, n_draws, 2))},
-            log_likelihood={"obs": ll},
-            observed_data={"y": y},
+            {
+                "posterior": {"beta": rng.standard_normal((n_chains, n_draws, 2))},
+                "log_likelihood": {"obs": ll},
+                "observed_data": {"y": y},
+            }
         )
         return _bic_logml(idata)
 

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from ..._lazy_deps import az
+from ..._lazy_deps import xr
 
 
 def run_poisson_flow_gibbs(
@@ -28,7 +28,7 @@ def run_poisson_flow_gibbs(
     progressbar: bool = True,
     n_jobs: int = -1,
     log_likelihood: bool = False,
-) -> az.InferenceData:
+) -> xr.DataTree:
     """Run the reduced-form auxiliary-mixture sampler for a Poisson flow model.
 
     Parameters
@@ -52,7 +52,6 @@ def run_poisson_flow_gibbs(
         run_chain_separable,
         run_chain_unrestricted,
     )
-    from .._base._shared import gelman_default_beta_prior
     from ..priors import FlowReducedGibbsPriors
 
     X = model._X
@@ -61,9 +60,11 @@ def run_poisson_flow_gibbs(
     W_csc = model._W_sparse.tocsc()
 
     cache_kwargs: dict = dict(
-        Wd=model._Wd,
-        Wo=model._Wo,
-        Ww=model._Ww,
+        # The separable sampler works from the n×n W alone; building the
+        # N×N Kronecker weights (W⊗W has nnz(W)² entries) is unrestricted-only.
+        Wd=None if separable else model._Wd,
+        Wo=None if separable else model._Wo,
+        Ww=None if separable else model._Ww,
         W_csc=W_csc,
         n=model._n,
         separable=separable,
@@ -75,12 +76,10 @@ def run_poisson_flow_gibbs(
         cache_kwargs["positive"] = model.restrict_positive
     cache = FlowReducedGibbsCache(**cache_kwargs)
 
-    default_beta_mu, default_beta_sigma = gelman_default_beta_prior(
-        model._y, X, list(model._feature_names)
-    )
+    pv = model._flow_count_priors()
     priors = FlowReducedGibbsPriors(
-        beta_mu=model.priors.get("beta_mu", default_beta_mu),
-        beta_sigma=model.priors.get("beta_sigma", default_beta_sigma),
+        beta_mu=pv["beta_mu"],
+        beta_sigma=pv["beta_sigma"],
         rho_lower=model.priors.get("rho_lower", -0.999),
         rho_upper=model.priors.get("rho_upper", 0.999),
     )

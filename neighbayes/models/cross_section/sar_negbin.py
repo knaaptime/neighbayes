@@ -49,7 +49,7 @@ import numpy as np
 import pytensor.tensor as pt
 import scipy.sparse as sp
 
-from ..._lazy_deps import az, pm
+from ..._lazy_deps import pm, xr
 from ...samplers._utils._slice import SliceWidthState
 from ...samplers.negbin_reduced import (  # noqa: F401 — import side-effect registers the Gibbs entry
     ReducedGibbsCache,
@@ -122,11 +122,7 @@ class SARNegBin(SpatialModel):
         bounds = self._logdet_bounds
         rho_lower = bounds.rho_min
         rho_upper = bounds.rho_max
-        default_beta_mu, default_beta_sigma = self._gelman_default_beta_prior(
-            self._X, list(self._feature_names)
-        )
-        beta_mu = self.priors.get("beta_mu", default_beta_mu)
-        beta_sigma = self.priors.get("beta_sigma", default_beta_sigma)
+        beta_mu, beta_sigma = self._resolved_beta_prior(link="log")
         alpha_sigma = self.priors.get("alpha_sigma", 2.5)
         alpha_nu = self.priors.get("alpha_nu", 3.0)
 
@@ -172,7 +168,7 @@ class SARNegBin(SpatialModel):
         krylov_reuse: bool = True,
         timeout: float | None = None,
         log_likelihood: bool = False,
-    ) -> "az.InferenceData":
+    ) -> "xr.DataTree":
         r"""Sample the reduced-form posterior via Pólya-Gamma block Gibbs.
 
         Parameters
@@ -217,7 +213,7 @@ class SARNegBin(SpatialModel):
 
         Returns
         -------
-        arviz.InferenceData
+        xarray.DataTree
             Posterior draws of ``rho``, ``beta``, ``alpha`` and pointwise
             ``log_likelihood`` for the observed counts.
         """
@@ -240,9 +236,10 @@ class SARNegBin(SpatialModel):
         rho_lower = float(bounds.rho_min)
         rho_upper = float(bounds.rho_max)
 
+        beta_mu, beta_sigma = self._resolved_beta_prior(link="log")
         priors = ReducedGibbsPriors(
-            beta_mu=self.priors.get("beta_mu", 0.0),
-            beta_sigma=self.priors.get("beta_sigma", 1e6),
+            beta_mu=beta_mu,
+            beta_sigma=beta_sigma,
             alpha_sigma=self.priors.get("alpha_sigma", 2.5),
             alpha_nu=self.priors.get("alpha_nu", 3.0),
             rho_lower=rho_lower,

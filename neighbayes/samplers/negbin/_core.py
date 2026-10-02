@@ -953,30 +953,35 @@ def _sample_alpha(
     eta = state.eta
     log_alpha = np.log(state.alpha)
 
+    # α-independent pieces of Σ log NB(y | μ, α), computed once per draw:
+    #   Σ log NB = Σ gammaln(y+α) − N·gammaln(α) + Σ y·η − Σ (y+α)·log(μ+α)
+    #              + N·α·log α       (dropping −Σ log y!, constant in α)
+    # Σ gammaln(y+α) runs over the distinct counts only, and log μ = η exactly,
+    # so each evaluation is one log over the data instead of two gammaln and
+    # three logs (the dominant cost of the α block on large flow data).
+    from scipy.special import gammaln
+
+    y_arr = np.asarray(y, dtype=np.float64)
+    y_vals, y_counts = np.unique(y_arr, return_counts=True)
+    n_obs = y_arr.size
+    y_dot_eta = float(y_arr @ eta)
+    mu = np.exp(eta)
+
     def log_density(log_a: float) -> float:
         """Log-density on the log(α) scale."""
         alpha = np.exp(log_a)
         if alpha <= 0:
             return -np.inf
 
-        # NB log-likelihood: sum_i log NB(y_i | mu_i, alpha)
-        # where mu_i = exp(eta_i)
-        mu = np.exp(eta)
-        # scipy.stats.nbinom.logpmf uses (n, p) parameterization
-        # NB(y | mu, alpha) = Gamma-Poisson mixture
-        # log p(y | mu, alpha) = log Gamma(y + alpha) - log Gamma(alpha)
-        #   + y * log(mu / (mu + alpha)) + alpha * log(alpha / (mu + alpha))
-        #   - log(y!)
-        # Using scipy's nbinom: n=alpha, p=alpha/(mu+alpha)
-        from scipy.special import gammaln
-
-        log_lik = (
-            gammaln(y + alpha)
-            - gammaln(alpha)
-            + y * np.log(np.maximum(mu / (mu + alpha), 1e-300))
-            + alpha * np.log(np.maximum(alpha / (mu + alpha), 1e-300))
+        log_mu_a = np.log(mu + alpha)
+        total_log_lik = (
+            float(y_counts @ gammaln(y_vals + alpha))
+            - n_obs * gammaln(alpha)
+            + y_dot_eta
+            - float(y_arr @ log_mu_a)
+            - alpha * float(log_mu_a.sum())
+            + n_obs * alpha * log_a
         )
-        total_log_lik = np.sum(log_lik)
 
         # Half-Student-t(nu, sigma) prior on alpha:
         #   p(alpha) ∝ (1 + alpha^2 / (nu * sigma^2))^{-(nu+1)/2}
@@ -1007,7 +1012,7 @@ def _sample_alpha(
 
 
 # ---------------------------------------------------------------------------
-# NB log-likelihood (for InferenceData)
+# NB log-likelihood (for DataTree)
 # ---------------------------------------------------------------------------
 
 

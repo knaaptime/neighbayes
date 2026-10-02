@@ -14,7 +14,7 @@ import warnings
 from typing import Optional, Union
 
 import numpy as np
-import scipy.sparse as sp
+import scipy.sparse.linalg as spla
 from libpysal.graph import Graph
 
 from ..graph import (
@@ -22,11 +22,11 @@ from ..graph import (
     flow_design_matrix,
     flow_design_matrix_asymmetric,
     flow_design_matrix_with_orig,
-    flow_weight_matrices,
 )
 from .utils import (
     _resolve_flow_geometry,
     pairwise_distance_matrix,
+    spatial_filter_factor,
 )
 
 # ---------------------------------------------------------------------------
@@ -43,13 +43,89 @@ from .utils import (
 # ---------------------------------------------------------------------------
 
 
-def _flow_system(G: Graph, r_d: float, r_o: float, r_w: float) -> sp.csr_matrix:
-    """Assemble the N×N flow filter ``I_N - r_d W_d - r_o W_o - r_w W_w``."""
-    wms = flow_weight_matrices(G)
-    Wd, Wo, Ww = wms["destination"], wms["origin"], wms["network"]
-    N = Wd.shape[0]
-    I_N = sp.eye(N, format="csr", dtype=np.float64)
-    return I_N - r_d * Wd - r_o * Wo - r_w * Ww
+class _FlowFilter:
+    """The N×N flow filter ``I_N − r_d W_d − r_o W_o − r_w W_w``, never materialized.
+
+    With ``N = n²`` pairs, ``W_d = I⊗W``, ``W_o = W⊗I`` and ``W_w = W⊗W``.  On
+    the flow array ``Y = v.reshape(n, n)`` (origins × destinations, the
+    row-major order of those Kronecker products) the three terms are ``YWᵀ``,
+    ``WY`` and ``WYWᵀ``, so the operator costs a few n-sized sparse products
+    and ``W⊗W`` — ``nnz(W)²`` entries — is never built.
+
+    Solves are exact for the separable filter ``r_w = −r_d·r_o``, which
+    factors as ``(I − r_o W) ⊗ (I − r_d W)``: two n×n SuiteSparse factors
+    (see :func:`spatial_filter_factor`), with
+    ``Y = B_o⁻¹ R B_d⁻ᵀ``.  Otherwise GMRES on the matrix-free operator,
+    preconditioned by that separable solve.
+    """
+
+    def __init__(
+        self,
+        G: Graph,
+        r_d: float,
+        r_o: float,
+        r_w: float,
+        letter: str = "A",
+        prefix: str = "rho",
+    ):
+        self.W = _graph_to_csr(G)
+        self.n = self.W.shape[0]
+        self.WT = self.W.T.tocsr()
+        self.r_d, self.r_o, self.r_w = float(r_d), float(r_o), float(r_w)
+        self.letter, self.prefix = letter, prefix
+        self.separable = abs(self.r_w + self.r_d * self.r_o) <= 1e-12 * max(
+            1.0, abs(self.r_w)
+        )
+        try:
+            self._solve_o = spatial_filter_factor(self.W, self.r_o)
+            self._solve_d = spatial_filter_factor(self.W, self.r_d)
+        except Exception as exc:
+            raise ValueError(_singular_flow_message(letter, prefix)) from exc
+
+    def _right_W(self, Y: np.ndarray) -> np.ndarray:
+        """``Y Wᵀ`` for dense Y, as ``(W Yᵀ)ᵀ`` so W stays on the sparse side."""
+        return (self.W @ Y.T).T
+
+    def matvec(self, v: np.ndarray) -> np.ndarray:
+        Y = np.asarray(v, dtype=np.float64).reshape(self.n, self.n)
+        WY = self.W @ Y
+        out = Y - self.r_d * self._right_W(Y) - self.r_o * WY
+        if self.r_w:
+            out = out - self.r_w * self._right_W(WY)
+        return out.ravel()
+
+    def _separable_solve(self, v: np.ndarray) -> np.ndarray:
+        R = np.asarray(v, dtype=np.float64).reshape(self.n, self.n)
+        Z = self._solve_o(R)  # B_o⁻¹ R
+        return np.ascontiguousarray(self._solve_d(Z.T).T).ravel()  # Z B_d⁻ᵀ
+
+    def solve(self, rhs: np.ndarray) -> np.ndarray:
+        rhs = np.asarray(rhs, dtype=np.float64)
+        if self.separable:
+            return self._separable_solve(rhs)
+        N = self.n * self.n
+        A = spla.LinearOperator((N, N), matvec=self.matvec, dtype=np.float64)
+        M = spla.LinearOperator((N, N), matvec=self._separable_solve, dtype=np.float64)
+        x, info = spla.gmres(
+            A,
+            rhs,
+            x0=self._separable_solve(rhs),
+            M=M,
+            rtol=1e-10,
+            atol=0.0,
+            restart=10,
+            maxiter=100,
+        )
+        if info != 0:
+            raise ValueError(_singular_flow_message(self.letter, self.prefix))
+        return x
+
+
+def _flow_system(
+    G: Graph, r_d: float, r_o: float, r_w: float, letter: str = "A", prefix: str = "rho"
+) -> _FlowFilter:
+    """The flow filter ``I_N - r_d Wd - r_o Wo - r_w Ww`` as a matrix-free operator."""
+    return _FlowFilter(G, r_d, r_o, r_w, letter=letter, prefix=prefix)
 
 
 def _singular_flow_message(letter: str, prefix: str) -> str:
@@ -59,20 +135,16 @@ def _singular_flow_message(letter: str, prefix: str) -> str:
     )
 
 
-def _spsolve_flow(A, rhs, letter: str = "A", prefix: str = "rho") -> np.ndarray:
-    """``A^{-1} rhs`` with the standard singular-filter error message."""
-    try:
-        return sp.linalg.spsolve(A, rhs)
-    except sp.linalg.MatrixRankWarning as exc:
-        raise ValueError(_singular_flow_message(letter, prefix)) from exc
+def _spsolve_flow(
+    A: _FlowFilter, rhs, letter: str = "A", prefix: str = "rho"
+) -> np.ndarray:
+    """``A^{-1} rhs`` for a flow filter."""
+    return A.solve(rhs)
 
 
-def _factorized_flow(A, letter: str = "A", prefix: str = "rho"):
-    """Factorize ``A`` once (panel reuse) with the standard error message."""
-    try:
-        return sp.linalg.factorized(A.tocsc())
-    except RuntimeError as exc:
-        raise ValueError(_singular_flow_message(letter, prefix)) from exc
+def _factorized_flow(A: _FlowFilter, letter: str = "A", prefix: str = "rho"):
+    """A reusable ``solve(rhs)`` for a flow filter (panel generators)."""
+    return A.solve
 
 
 def _warn_flow_stability(
@@ -1248,7 +1320,7 @@ def generate_sem_flow_data(
             log_distance=True,
         )
 
-    B = _flow_system(G, lam_d, lam_o, lam_w)
+    B = _flow_system(G, lam_d, lam_o, lam_w, letter="B", prefix="lam")
     _warn_flow_stability(
         lam_d,
         lam_o,
@@ -1381,7 +1453,7 @@ def generate_panel_sem_flow_data(
     k_d_val = len(beta_d_arr)
     k_o_val = len(beta_o_arr)
 
-    B = _flow_system(G, lam_d, lam_o, lam_w)
+    B = _flow_system(G, lam_d, lam_o, lam_w, letter="B", prefix="lam")
     solve_B = _factorized_flow(B, letter="B", prefix="lam")
 
     alpha = rng.normal(0.0, sigma_alpha, N) if sigma_alpha > 0 else np.zeros(N)
