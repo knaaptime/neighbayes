@@ -870,3 +870,23 @@ class TestSparseFactorCache:
         np.testing.assert_allclose(
             logdet, np.linalg.slogdet(A(0.4).toarray())[1], rtol=1e-10
         )
+
+
+@pytest.mark.parametrize("backend", ["klu", "umfpack"])
+def test_sparse_solves_accept_read_only_rhs(backend):
+    """JAX ``pure_callback`` hands host code read-only views of its arrays.
+
+    scikit-sparse solves take typed memoryviews, which reject read-only
+    buffers; the UMFPACK path raised ``buffer source array is read-only``
+    from every JAX host callback until the right-hand side was made writable.
+    """
+    pytest.importorskip(f"sksparse.{backend}")
+    from neighbayes._ops._backend import _make_cached_sparse_solver
+
+    rng = np.random.default_rng(0)
+    A = sp.random(30, 30, density=0.15, random_state=1, format="csc") + 4 * sp.eye(30)
+    for rhs in (rng.normal(size=30), rng.normal(size=(30, 3))):
+        ro = rhs.copy()
+        ro.flags.writeable = False
+        solver = _make_cached_sparse_solver(A.tocsc(), backend)
+        np.testing.assert_allclose(A @ solver.solve(ro), rhs, atol=1e-10)

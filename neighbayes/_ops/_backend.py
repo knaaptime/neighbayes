@@ -245,10 +245,21 @@ def _is_suitesparse(backend: str) -> bool:
     return backend in _SPARSE_BACKEND_AVAILABLE
 
 
+def _writable_f64(rhs: np.ndarray) -> np.ndarray:
+    """``rhs`` as a writable float64 array, copying only when it must.
+
+    ``scikit-sparse`` solves take typed memoryviews, which reject read-only
+    buffers, and JAX hands ``pure_callback`` functions read-only views of its
+    device arrays.  ``np.asarray`` keeps those views, so the UMFPACK solve
+    raised ``buffer source array is read-only`` from every JAX host callback.
+    """
+    return np.require(rhs, dtype=np.float64, requirements=["W"])
+
+
 def _solve_sparse_vector(A: sp.spmatrix, rhs: np.ndarray) -> np.ndarray:
     """Solve ``A x = rhs`` for vector RHS using configured sparse backend."""
     backend = _select_sparse_backend()
-    rhs64 = np.asarray(rhs, dtype=np.float64)
+    rhs64 = _writable_f64(rhs)
     if _is_suitesparse(backend):
         factor = _refactor(A.tocsc(), backend)
         return np.asarray(factor.solve(rhs64), dtype=np.float64)
@@ -259,7 +270,7 @@ def _solve_sparse_vector(A: sp.spmatrix, rhs: np.ndarray) -> np.ndarray:
 def _solve_sparse_matrix(A: sp.spmatrix, rhs: np.ndarray) -> np.ndarray:
     """Solve ``A X = rhs`` for matrix RHS using configured sparse backend."""
     backend = _select_sparse_backend()
-    rhs64 = np.asarray(rhs, dtype=np.float64)
+    rhs64 = _writable_f64(rhs)
     if _is_suitesparse(backend):
         # KLU and UMFPACK factors both accept a 2-D RHS directly (single
         # factorization, batched solve).
@@ -279,7 +290,7 @@ def _factor_solve_logdet(A: sp.spmatrix, rhs: np.ndarray) -> tuple[np.ndarray, f
     worth making.
     """
     backend = _select_sparse_backend()
-    rhs64 = np.asarray(rhs, dtype=np.float64)
+    rhs64 = _writable_f64(rhs)
     A_csc = A.tocsc() if not sp.isspmatrix_csc(A) else A
     if _is_suitesparse(backend):
         from .._logdet._aaa import _lu_logdet_from_factor, _umf_logdet_from_factor
@@ -334,8 +345,7 @@ class _SparseFactorSolver:
     def solve(self, rhs: np.ndarray, trans: str = "N") -> np.ndarray:
         if trans != "N":
             raise ValueError("sparse factor solver supports trans='N' only")
-        rhs = np.asarray(rhs, dtype=np.float64)
-        return np.asarray(self._factor.solve(rhs), dtype=np.float64)
+        return np.asarray(self._factor.solve(_writable_f64(rhs)), dtype=np.float64)
 
 
 def _make_cached_sparse_solver(
