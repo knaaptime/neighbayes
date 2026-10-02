@@ -16,6 +16,8 @@
       ~SDM.__init__
       ~SDM.fit
       ~SDM.fitted_values
+      ~SDM.predict
+      ~SDM.predict_in_sample
       ~SDM.residuals
       ~SDM.spatial_diagnostics
       ~SDM.spatial_diagnostics_decision

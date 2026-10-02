@@ -144,7 +144,7 @@
     "    \"\"\"\n",
     "    rng = np.random.default_rng(seed)\n",
     "    gdf = dgp.simulate_sem(\n",
-    "        n=n_side,\n",
+    "        n_side=n_side,\n",
     "        lam=TRUE_LAM,\n",
     "        beta=TRUE_BETA,\n",
     "        sigma=TRUE_SIGMA,\n",
@@ -813,9 +813,9 @@
     "    loo_rows.append(\n",
     "        {\n",
     "            \"backend\": name,\n",
-    "            \"elpd_loo\": float(loo.elpd_loo),\n",
+    "            \"elpd_loo\": float(loo.elpd),\n",
     "            \"se\": float(loo.se),\n",
-    "            \"p_loo\": float(loo.p_loo),\n",
+    "            \"p_loo\": float(loo.p),\n",
     "        }\n",
     "    )\n",
     "loo_df = pd.DataFrame(loo_rows).round(3)\n",
@@ -940,7 +940,7 @@
    ],
    "source": [
     "if len(successful) >= 2:\n",
-    "    cmp = az.compare(successful, ic=\"loo\")\n",
+    "    cmp = az.compare(successful)\n",
     "    display(cmp)"
    ]
   },

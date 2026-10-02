@@ -32,6 +32,5 @@
       ~PanelSDEMDynamicPriors.phi_upper
       ~PanelSDEMDynamicPriors.sigma2_alpha
       ~PanelSDEMDynamicPriors.sigma2_beta
-      ~PanelSDEMDynamicPriors.sigma_sigma
    
    

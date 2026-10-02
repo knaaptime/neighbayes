@@ -757,6 +757,30 @@
 
               
             
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1780,19 +1804,19 @@
 <span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="n">SEED</span><span class="p">)</span>
 
 <span class="c1"># SAR data</span>
-<span class="n">sar_out</span> <span class="o">=</span> <span class="n">simulate_sar</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W_dense</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">)</span>
+<span class="n">sar_out</span> <span class="o">=</span> <span class="n">simulate_sar</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">)</span>
 <span class="n">y_sar</span><span class="p">,</span> <span class="n">X_sar</span> <span class="o">=</span> <span class="n">sar_out</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">sar_out</span><span class="p">[</span><span class="s2">"X"</span><span class="p">]</span>
 
 <span class="c1"># SEM data</span>
-<span class="n">sem_out</span> <span class="o">=</span> <span class="n">simulate_sem</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W_dense</span><span class="p">,</span> <span class="n">lam</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">)</span>
+<span class="n">sem_out</span> <span class="o">=</span> <span class="n">simulate_sem</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span> <span class="n">lam</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">)</span>
 <span class="n">y_sem</span><span class="p">,</span> <span class="n">X_sem</span> <span class="o">=</span> <span class="n">sem_out</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">sem_out</span><span class="p">[</span><span class="s2">"X"</span><span class="p">]</span>
 
 <span class="c1"># SDM data</span>
-<span class="n">sdm_out</span> <span class="o">=</span> <span class="n">simulate_sdm</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W_dense</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">)</span>
+<span class="n">sdm_out</span> <span class="o">=</span> <span class="n">simulate_sdm</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">)</span>
 <span class="n">y_sdm</span><span class="p">,</span> <span class="n">X_sdm</span> <span class="o">=</span> <span class="n">sdm_out</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">sdm_out</span><span class="p">[</span><span class="s2">"X"</span><span class="p">]</span>
 
 <span class="c1"># SDEM data</span>
-<span class="n">sdem_out</span> <span class="o">=</span> <span class="n">simulate_sdem</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W_dense</span><span class="p">,</span> <span class="n">lam</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">)</span>
+<span class="n">sdem_out</span> <span class="o">=</span> <span class="n">simulate_sdem</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span> <span class="n">lam</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">)</span>
 <span class="n">y_sdem</span><span class="p">,</span> <span class="n">X_sdem</span> <span class="o">=</span> <span class="n">sdem_out</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">sdem_out</span><span class="p">[</span><span class="s2">"X"</span><span class="p">]</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SAR:  y=</span><span class="si">{</span><span class="n">y_sar</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">, X=</span><span class="si">{</span><span class="n">X_sar</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
@@ -1807,6 +1831,10 @@
 SEM:  y=(49,), X=(49, 2)
 SDM:  y=(49,), X=(49, 2)
 SDEM: y=(49,), X=(49, 2)
+</code></pre></div>
+</div>
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
 </code></pre></div>
 </div>
 </div>
@@ -1944,41 +1972,41 @@ SDEM: y=(49,), X=(49, 2)
 Model: SAR
 ============================================================
   Running SAR/NUTS...
-15.8s  ρ̂=0.4057  r̂=1.000  ESS=4042
+10.4s  ρ̂=0.4057  r̂=1.001  ESS=4042
   Running SAR/Gibbs-NumPy...
-3.3s  ρ̂=0.4173  r̂=1.000  ESS=7305
+2.4s  ρ̂=0.4048  r̂=1.000  ESS=6932
   Running SAR/Gibbs-JAX...
-3.8s  ρ̂=0.4153  r̂=1.000  ESS=7136
+3.6s  ρ̂=0.4037  r̂=1.001  ESS=6401
 
 ============================================================
 Model: SEM
 ============================================================
   Running SEM/NUTS...
-15.9s  ρ̂=0.7646  r̂=1.000  ESS=3575
+10.8s  ρ̂=0.7634  r̂=1.001  ESS=3564
   Running SEM/Gibbs-NumPy...
-4.4s  ρ̂=0.7861  r̂=1.000  ESS=7341
+5.4s  ρ̂=0.7660  r̂=1.000  ESS=5556
   Running SEM/Gibbs-JAX...
-3.5s  ρ̂=0.7834  r̂=1.000  ESS=6907
+3.4s  ρ̂=0.7643  r̂=1.001  ESS=5547
 
 ============================================================
 Model: SDM
 ============================================================
   Running SDM/NUTS...
-14.0s  ρ̂=0.2812  r̂=1.000  ESS=3442
+9.7s  ρ̂=0.2812  r̂=1.001  ESS=3442
   Running SDM/Gibbs-NumPy...
-3.6s  ρ̂=0.3030  r̂=1.000  ESS=6914
+2.6s  ρ̂=0.2811  r̂=1.000  ESS=6135
   Running SDM/Gibbs-JAX...
-3.4s  ρ̂=0.2997  r̂=1.000  ESS=6814
+3.2s  ρ̂=0.2757  r̂=1.000  ESS=6419
 
 ============================================================
 Model: SDEM
 ============================================================
   Running SDEM/NUTS...
-13.7s  ρ̂=0.4472  r̂=1.000  ESS=5180
+8.9s  ρ̂=0.4472  r̂=1.001  ESS=5179
   Running SDEM/Gibbs-NumPy...
-4.7s  ρ̂=0.4801  r̂=1.000  ESS=7280
+6.2s  ρ̂=0.4528  r̂=1.001  ESS=6618
   Running SDEM/Gibbs-JAX...
-3.6s  ρ̂=0.4769  r̂=1.000  ESS=6771
+3.5s  ρ̂=0.4461  r̂=1.001  ESS=6177
 
 Done! 12 configurations profiled.
 </code></pre></div>
@@ -1986,25 +2014,25 @@ Done! 12 configurations profiled.
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 2 jobs)
 NUTS: [rho, beta, sigma2]
-Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 12 seconds.
+Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 8 seconds.
 /home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
   W_arr = np.asarray(W, dtype=np.float64)
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 2 jobs)
 NUTS: [lam, beta, sigma2]
-Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 11 seconds.
+Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 6 seconds.
 /home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
   W_arr = np.asarray(W, dtype=np.float64)
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 2 jobs)
 NUTS: [rho, beta, sigma2]
-Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 12 seconds.
+Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 8 seconds.
 /home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
   W_arr = np.asarray(W, dtype=np.float64)
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 2 jobs)
 NUTS: [lam, beta, sigma2]
-Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 11 seconds.
+Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 7 seconds.
 /home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
   W_arr = np.asarray(W, dtype=np.float64)
 </code></pre></div>
@@ -2051,152 +2079,152 @@ Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws 
 <div class="cell_output docutils container">
 <div class="output text_html"><style type="text/css">
 </style>
-<table id="T_f81f2">
+<table id="T_b8501">
   <thead>
     <tr>
       <th class="blank level0" >&nbsp;</th>
-      <th id="T_f81f2_level0_col0" class="col_heading level0 col0" >Model</th>
-      <th id="T_f81f2_level0_col1" class="col_heading level0 col1" >Sampler</th>
-      <th id="T_f81f2_level0_col2" class="col_heading level0 col2" >Time (s)</th>
-      <th id="T_f81f2_level0_col3" class="col_heading level0 col3" >Intercept</th>
-      <th id="T_f81f2_level0_col4" class="col_heading level0 col4" >σ̂</th>
-      <th id="T_f81f2_level0_col5" class="col_heading level0 col5" >ρ̂/λ̂</th>
-      <th id="T_f81f2_level0_col6" class="col_heading level0 col6" >max R̂</th>
-      <th id="T_f81f2_level0_col7" class="col_heading level0 col7" >min ESS</th>
+      <th id="T_b8501_level0_col0" class="col_heading level0 col0" >Model</th>
+      <th id="T_b8501_level0_col1" class="col_heading level0 col1" >Sampler</th>
+      <th id="T_b8501_level0_col2" class="col_heading level0 col2" >Time (s)</th>
+      <th id="T_b8501_level0_col3" class="col_heading level0 col3" >Intercept</th>
+      <th id="T_b8501_level0_col4" class="col_heading level0 col4" >σ̂</th>
+      <th id="T_b8501_level0_col5" class="col_heading level0 col5" >ρ̂/λ̂</th>
+      <th id="T_b8501_level0_col6" class="col_heading level0 col6" >max R̂</th>
+      <th id="T_b8501_level0_col7" class="col_heading level0 col7" >min ESS</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <th id="T_f81f2_level0_row0" class="row_heading level0 row0" >0</th>
-      <td id="T_f81f2_row0_col0" class="data row0 col0" >SAR</td>
-      <td id="T_f81f2_row0_col1" class="data row0 col1" >NUTS</td>
-      <td id="T_f81f2_row0_col2" class="data row0 col2" >15.8</td>
-      <td id="T_f81f2_row0_col3" class="data row0 col3" >1.3207</td>
-      <td id="T_f81f2_row0_col4" class="data row0 col4" >0.8343</td>
-      <td id="T_f81f2_row0_col5" class="data row0 col5" >0.4057</td>
-      <td id="T_f81f2_row0_col6" class="data row0 col6" >1.000000</td>
-      <td id="T_f81f2_row0_col7" class="data row0 col7" >4042</td>
+      <th id="T_b8501_level0_row0" class="row_heading level0 row0" >0</th>
+      <td id="T_b8501_row0_col0" class="data row0 col0" >SAR</td>
+      <td id="T_b8501_row0_col1" class="data row0 col1" >NUTS</td>
+      <td id="T_b8501_row0_col2" class="data row0 col2" >10.4</td>
+      <td id="T_b8501_row0_col3" class="data row0 col3" >1.3207</td>
+      <td id="T_b8501_row0_col4" class="data row0 col4" >0.8343</td>
+      <td id="T_b8501_row0_col5" class="data row0 col5" >0.4057</td>
+      <td id="T_b8501_row0_col6" class="data row0 col6" >1.001000</td>
+      <td id="T_b8501_row0_col7" class="data row0 col7" >4042</td>
     </tr>
     <tr>
-      <th id="T_f81f2_level0_row1" class="row_heading level0 row1" >1</th>
-      <td id="T_f81f2_row1_col0" class="data row1 col0" >SAR</td>
-      <td id="T_f81f2_row1_col1" class="data row1 col1" >Gibbs-NumPy</td>
-      <td id="T_f81f2_row1_col2" class="data row1 col2" >3.3</td>
-      <td id="T_f81f2_row1_col3" class="data row1 col3" >1.2924</td>
-      <td id="T_f81f2_row1_col4" class="data row1 col4" >0.8344</td>
-      <td id="T_f81f2_row1_col5" class="data row1 col5" >0.4173</td>
-      <td id="T_f81f2_row1_col6" class="data row1 col6" >1.000000</td>
-      <td id="T_f81f2_row1_col7" class="data row1 col7" >7305</td>
+      <th id="T_b8501_level0_row1" class="row_heading level0 row1" >1</th>
+      <td id="T_b8501_row1_col0" class="data row1 col0" >SAR</td>
+      <td id="T_b8501_row1_col1" class="data row1 col1" >Gibbs-NumPy</td>
+      <td id="T_b8501_row1_col2" class="data row1 col2" >2.4</td>
+      <td id="T_b8501_row1_col3" class="data row1 col3" >1.3260</td>
+      <td id="T_b8501_row1_col4" class="data row1 col4" >0.8364</td>
+      <td id="T_b8501_row1_col5" class="data row1 col5" >0.4048</td>
+      <td id="T_b8501_row1_col6" class="data row1 col6" >1.000000</td>
+      <td id="T_b8501_row1_col7" class="data row1 col7" >6932</td>
     </tr>
     <tr>
-      <th id="T_f81f2_level0_row2" class="row_heading level0 row2" >2</th>
-      <td id="T_f81f2_row2_col0" class="data row2 col0" >SAR</td>
-      <td id="T_f81f2_row2_col1" class="data row2 col1" >Gibbs-JAX</td>
-      <td id="T_f81f2_row2_col2" class="data row2 col2" >3.8</td>
-      <td id="T_f81f2_row2_col3" class="data row2 col3" >1.2972</td>
-      <td id="T_f81f2_row2_col4" class="data row2 col4" >0.8360</td>
-      <td id="T_f81f2_row2_col5" class="data row2 col5" >0.4153</td>
-      <td id="T_f81f2_row2_col6" class="data row2 col6" >1.000000</td>
-      <td id="T_f81f2_row2_col7" class="data row2 col7" >7136</td>
+      <th id="T_b8501_level0_row2" class="row_heading level0 row2" >2</th>
+      <td id="T_b8501_row2_col0" class="data row2 col0" >SAR</td>
+      <td id="T_b8501_row2_col1" class="data row2 col1" >Gibbs-JAX</td>
+      <td id="T_b8501_row2_col2" class="data row2 col2" >3.6</td>
+      <td id="T_b8501_row2_col3" class="data row2 col3" >1.3267</td>
+      <td id="T_b8501_row2_col4" class="data row2 col4" >0.8379</td>
+      <td id="T_b8501_row2_col5" class="data row2 col5" >0.4037</td>
+      <td id="T_b8501_row2_col6" class="data row2 col6" >1.001000</td>
+      <td id="T_b8501_row2_col7" class="data row2 col7" >6401</td>
     </tr>
     <tr>
-      <th id="T_f81f2_level0_row3" class="row_heading level0 row3" >3</th>
-      <td id="T_f81f2_row3_col0" class="data row3 col0" >SEM</td>
-      <td id="T_f81f2_row3_col1" class="data row3 col1" >NUTS</td>
-      <td id="T_f81f2_row3_col2" class="data row3 col2" >15.9</td>
-      <td id="T_f81f2_row3_col3" class="data row3 col3" >1.0499</td>
-      <td id="T_f81f2_row3_col4" class="data row3 col4" >0.9325</td>
-      <td id="T_f81f2_row3_col5" class="data row3 col5" >0.7646</td>
-      <td id="T_f81f2_row3_col6" class="data row3 col6" >1.000000</td>
-      <td id="T_f81f2_row3_col7" class="data row3 col7" >3575</td>
+      <th id="T_b8501_level0_row3" class="row_heading level0 row3" >3</th>
+      <td id="T_b8501_row3_col0" class="data row3 col0" >SEM</td>
+      <td id="T_b8501_row3_col1" class="data row3 col1" >NUTS</td>
+      <td id="T_b8501_row3_col2" class="data row3 col2" >10.8</td>
+      <td id="T_b8501_row3_col3" class="data row3 col3" >1.0465</td>
+      <td id="T_b8501_row3_col4" class="data row3 col4" >0.9324</td>
+      <td id="T_b8501_row3_col5" class="data row3 col5" >0.7634</td>
+      <td id="T_b8501_row3_col6" class="data row3 col6" >1.001000</td>
+      <td id="T_b8501_row3_col7" class="data row3 col7" >3564</td>
     </tr>
     <tr>
-      <th id="T_f81f2_level0_row4" class="row_heading level0 row4" >4</th>
-      <td id="T_f81f2_row4_col0" class="data row4 col0" >SEM</td>
-      <td id="T_f81f2_row4_col1" class="data row4 col1" >Gibbs-NumPy</td>
-      <td id="T_f81f2_row4_col2" class="data row4 col2" >4.4</td>
-      <td id="T_f81f2_row4_col3" class="data row4 col3" >1.0426</td>
-      <td id="T_f81f2_row4_col4" class="data row4 col4" >0.9250</td>
-      <td id="T_f81f2_row4_col5" class="data row4 col5" >0.7861</td>
-      <td id="T_f81f2_row4_col6" class="data row4 col6" >1.000000</td>
-      <td id="T_f81f2_row4_col7" class="data row4 col7" >7341</td>
+      <th id="T_b8501_level0_row4" class="row_heading level0 row4" >4</th>
+      <td id="T_b8501_row4_col0" class="data row4 col0" >SEM</td>
+      <td id="T_b8501_row4_col1" class="data row4 col1" >Gibbs-NumPy</td>
+      <td id="T_b8501_row4_col2" class="data row4 col2" >5.4</td>
+      <td id="T_b8501_row4_col3" class="data row4 col3" >1.0425</td>
+      <td id="T_b8501_row4_col4" class="data row4 col4" >0.9334</td>
+      <td id="T_b8501_row4_col5" class="data row4 col5" >0.7660</td>
+      <td id="T_b8501_row4_col6" class="data row4 col6" >1.000000</td>
+      <td id="T_b8501_row4_col7" class="data row4 col7" >5556</td>
     </tr>
     <tr>
-      <th id="T_f81f2_level0_row5" class="row_heading level0 row5" >5</th>
-      <td id="T_f81f2_row5_col0" class="data row5 col0" >SEM</td>
-      <td id="T_f81f2_row5_col1" class="data row5 col1" >Gibbs-JAX</td>
-      <td id="T_f81f2_row5_col2" class="data row5 col2" >3.5</td>
-      <td id="T_f81f2_row5_col3" class="data row5 col3" >1.0369</td>
-      <td id="T_f81f2_row5_col4" class="data row5 col4" >0.9290</td>
-      <td id="T_f81f2_row5_col5" class="data row5 col5" >0.7834</td>
-      <td id="T_f81f2_row5_col6" class="data row5 col6" >1.000000</td>
-      <td id="T_f81f2_row5_col7" class="data row5 col7" >6907</td>
+      <th id="T_b8501_level0_row5" class="row_heading level0 row5" >5</th>
+      <td id="T_b8501_row5_col0" class="data row5 col0" >SEM</td>
+      <td id="T_b8501_row5_col1" class="data row5 col1" >Gibbs-JAX</td>
+      <td id="T_b8501_row5_col2" class="data row5 col2" >3.4</td>
+      <td id="T_b8501_row5_col3" class="data row5 col3" >1.0507</td>
+      <td id="T_b8501_row5_col4" class="data row5 col4" >0.9351</td>
+      <td id="T_b8501_row5_col5" class="data row5 col5" >0.7643</td>
+      <td id="T_b8501_row5_col6" class="data row5 col6" >1.001000</td>
+      <td id="T_b8501_row5_col7" class="data row5 col7" >5547</td>
     </tr>
     <tr>
-      <th id="T_f81f2_level0_row6" class="row_heading level0 row6" >6</th>
-      <td id="T_f81f2_row6_col0" class="data row6 col0" >SDM</td>
-      <td id="T_f81f2_row6_col1" class="data row6 col1" >NUTS</td>
-      <td id="T_f81f2_row6_col2" class="data row6 col2" >14.0</td>
-      <td id="T_f81f2_row6_col3" class="data row6 col3" >1.2825</td>
-      <td id="T_f81f2_row6_col4" class="data row6 col4" >1.1647</td>
-      <td id="T_f81f2_row6_col5" class="data row6 col5" >0.2812</td>
-      <td id="T_f81f2_row6_col6" class="data row6 col6" >1.000000</td>
-      <td id="T_f81f2_row6_col7" class="data row6 col7" >3442</td>
+      <th id="T_b8501_level0_row6" class="row_heading level0 row6" >6</th>
+      <td id="T_b8501_row6_col0" class="data row6 col0" >SDM</td>
+      <td id="T_b8501_row6_col1" class="data row6 col1" >NUTS</td>
+      <td id="T_b8501_row6_col2" class="data row6 col2" >9.7</td>
+      <td id="T_b8501_row6_col3" class="data row6 col3" >1.2825</td>
+      <td id="T_b8501_row6_col4" class="data row6 col4" >1.1647</td>
+      <td id="T_b8501_row6_col5" class="data row6 col5" >0.2812</td>
+      <td id="T_b8501_row6_col6" class="data row6 col6" >1.001000</td>
+      <td id="T_b8501_row6_col7" class="data row6 col7" >3442</td>
     </tr>
     <tr>
-      <th id="T_f81f2_level0_row7" class="row_heading level0 row7" >7</th>
-      <td id="T_f81f2_row7_col0" class="data row7 col0" >SDM</td>
-      <td id="T_f81f2_row7_col1" class="data row7 col1" >Gibbs-NumPy</td>
-      <td id="T_f81f2_row7_col2" class="data row7 col2" >3.6</td>
-      <td id="T_f81f2_row7_col3" class="data row7 col3" >1.2531</td>
-      <td id="T_f81f2_row7_col4" class="data row7 col4" >1.1624</td>
-      <td id="T_f81f2_row7_col5" class="data row7 col5" >0.3030</td>
-      <td id="T_f81f2_row7_col6" class="data row7 col6" >1.000000</td>
-      <td id="T_f81f2_row7_col7" class="data row7 col7" >6914</td>
+      <th id="T_b8501_level0_row7" class="row_heading level0 row7" >7</th>
+      <td id="T_b8501_row7_col0" class="data row7 col0" >SDM</td>
+      <td id="T_b8501_row7_col1" class="data row7 col1" >Gibbs-NumPy</td>
+      <td id="T_b8501_row7_col2" class="data row7 col2" >2.6</td>
+      <td id="T_b8501_row7_col3" class="data row7 col3" >1.2820</td>
+      <td id="T_b8501_row7_col4" class="data row7 col4" >1.1642</td>
+      <td id="T_b8501_row7_col5" class="data row7 col5" >0.2811</td>
+      <td id="T_b8501_row7_col6" class="data row7 col6" >1.000000</td>
+      <td id="T_b8501_row7_col7" class="data row7 col7" >6135</td>
     </tr>
     <tr>
-      <th id="T_f81f2_level0_row8" class="row_heading level0 row8" >8</th>
-      <td id="T_f81f2_row8_col0" class="data row8 col0" >SDM</td>
-      <td id="T_f81f2_row8_col1" class="data row8 col1" >Gibbs-JAX</td>
-      <td id="T_f81f2_row8_col2" class="data row8 col2" >3.4</td>
-      <td id="T_f81f2_row8_col3" class="data row8 col3" >1.2568</td>
-      <td id="T_f81f2_row8_col4" class="data row8 col4" >1.1631</td>
-      <td id="T_f81f2_row8_col5" class="data row8 col5" >0.2997</td>
-      <td id="T_f81f2_row8_col6" class="data row8 col6" >1.000000</td>
-      <td id="T_f81f2_row8_col7" class="data row8 col7" >6814</td>
+      <th id="T_b8501_level0_row8" class="row_heading level0 row8" >8</th>
+      <td id="T_b8501_row8_col0" class="data row8 col0" >SDM</td>
+      <td id="T_b8501_row8_col1" class="data row8 col1" >Gibbs-JAX</td>
+      <td id="T_b8501_row8_col2" class="data row8 col2" >3.2</td>
+      <td id="T_b8501_row8_col3" class="data row8 col3" >1.2919</td>
+      <td id="T_b8501_row8_col4" class="data row8 col4" >1.1662</td>
+      <td id="T_b8501_row8_col5" class="data row8 col5" >0.2757</td>
+      <td id="T_b8501_row8_col6" class="data row8 col6" >1.000000</td>
+      <td id="T_b8501_row8_col7" class="data row8 col7" >6419</td>
     </tr>
     <tr>
-      <th id="T_f81f2_level0_row9" class="row_heading level0 row9" >9</th>
-      <td id="T_f81f2_row9_col0" class="data row9 col0" >SDEM</td>
-      <td id="T_f81f2_row9_col1" class="data row9 col1" >NUTS</td>
-      <td id="T_f81f2_row9_col2" class="data row9 col2" >13.7</td>
-      <td id="T_f81f2_row9_col3" class="data row9 col3" >1.0022</td>
-      <td id="T_f81f2_row9_col4" class="data row9 col4" >1.1653</td>
-      <td id="T_f81f2_row9_col5" class="data row9 col5" >0.4472</td>
-      <td id="T_f81f2_row9_col6" class="data row9 col6" >1.000000</td>
-      <td id="T_f81f2_row9_col7" class="data row9 col7" >5180</td>
+      <th id="T_b8501_level0_row9" class="row_heading level0 row9" >9</th>
+      <td id="T_b8501_row9_col0" class="data row9 col0" >SDEM</td>
+      <td id="T_b8501_row9_col1" class="data row9 col1" >NUTS</td>
+      <td id="T_b8501_row9_col2" class="data row9 col2" >8.9</td>
+      <td id="T_b8501_row9_col3" class="data row9 col3" >1.0022</td>
+      <td id="T_b8501_row9_col4" class="data row9 col4" >1.1653</td>
+      <td id="T_b8501_row9_col5" class="data row9 col5" >0.4472</td>
+      <td id="T_b8501_row9_col6" class="data row9 col6" >1.001000</td>
+      <td id="T_b8501_row9_col7" class="data row9 col7" >5179</td>
     </tr>
     <tr>
-      <th id="T_f81f2_level0_row10" class="row_heading level0 row10" >10</th>
-      <td id="T_f81f2_row10_col0" class="data row10 col0" >SDEM</td>
-      <td id="T_f81f2_row10_col1" class="data row10 col1" >Gibbs-NumPy</td>
-      <td id="T_f81f2_row10_col2" class="data row10 col2" >4.7</td>
-      <td id="T_f81f2_row10_col3" class="data row10 col3" >0.9902</td>
-      <td id="T_f81f2_row10_col4" class="data row10 col4" >1.1591</td>
-      <td id="T_f81f2_row10_col5" class="data row10 col5" >0.4801</td>
-      <td id="T_f81f2_row10_col6" class="data row10 col6" >1.000000</td>
-      <td id="T_f81f2_row10_col7" class="data row10 col7" >7280</td>
+      <th id="T_b8501_level0_row10" class="row_heading level0 row10" >10</th>
+      <td id="T_b8501_row10_col0" class="data row10 col0" >SDEM</td>
+      <td id="T_b8501_row10_col1" class="data row10 col1" >Gibbs-NumPy</td>
+      <td id="T_b8501_row10_col2" class="data row10 col2" >6.2</td>
+      <td id="T_b8501_row10_col3" class="data row10 col3" >0.9923</td>
+      <td id="T_b8501_row10_col4" class="data row10 col4" >1.1658</td>
+      <td id="T_b8501_row10_col5" class="data row10 col5" >0.4528</td>
+      <td id="T_b8501_row10_col6" class="data row10 col6" >1.001000</td>
+      <td id="T_b8501_row10_col7" class="data row10 col7" >6618</td>
     </tr>
     <tr>
-      <th id="T_f81f2_level0_row11" class="row_heading level0 row11" >11</th>
-      <td id="T_f81f2_row11_col0" class="data row11 col0" >SDEM</td>
-      <td id="T_f81f2_row11_col1" class="data row11 col1" >Gibbs-JAX</td>
-      <td id="T_f81f2_row11_col2" class="data row11 col2" >3.6</td>
-      <td id="T_f81f2_row11_col3" class="data row11 col3" >0.9943</td>
-      <td id="T_f81f2_row11_col4" class="data row11 col4" >1.1624</td>
-      <td id="T_f81f2_row11_col5" class="data row11 col5" >0.4769</td>
-      <td id="T_f81f2_row11_col6" class="data row11 col6" >1.000000</td>
-      <td id="T_f81f2_row11_col7" class="data row11 col7" >6771</td>
+      <th id="T_b8501_level0_row11" class="row_heading level0 row11" >11</th>
+      <td id="T_b8501_row11_col0" class="data row11 col0" >SDEM</td>
+      <td id="T_b8501_row11_col1" class="data row11 col1" >Gibbs-JAX</td>
+      <td id="T_b8501_row11_col2" class="data row11 col2" >3.5</td>
+      <td id="T_b8501_row11_col3" class="data row11 col3" >0.9921</td>
+      <td id="T_b8501_row11_col4" class="data row11 col4" >1.1673</td>
+      <td id="T_b8501_row11_col5" class="data row11 col5" >0.4461</td>
+      <td id="T_b8501_row11_col6" class="data row11 col6" >1.001000</td>
+      <td id="T_b8501_row11_col7" class="data row11 col7" >6177</td>
     </tr>
   </tbody>
 </table>
@@ -2271,35 +2299,35 @@ Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws 
   <tbody>
     <tr>
       <th>SAR</th>
-      <td>15.77</td>
-      <td>3.78</td>
-      <td>3.29</td>
-      <td>0.24</td>
-      <td>0.21</td>
+      <td>10.36</td>
+      <td>3.62</td>
+      <td>2.35</td>
+      <td>0.35</td>
+      <td>0.23</td>
     </tr>
     <tr>
       <th>SDEM</th>
-      <td>13.66</td>
-      <td>3.64</td>
-      <td>4.73</td>
-      <td>0.27</td>
-      <td>0.35</td>
+      <td>8.86</td>
+      <td>3.55</td>
+      <td>6.16</td>
+      <td>0.40</td>
+      <td>0.70</td>
     </tr>
     <tr>
       <th>SDM</th>
-      <td>13.99</td>
-      <td>3.40</td>
-      <td>3.65</td>
-      <td>0.24</td>
-      <td>0.26</td>
+      <td>9.73</td>
+      <td>3.17</td>
+      <td>2.58</td>
+      <td>0.33</td>
+      <td>0.27</td>
     </tr>
     <tr>
       <th>SEM</th>
-      <td>15.89</td>
-      <td>3.53</td>
-      <td>4.37</td>
-      <td>0.22</td>
-      <td>0.28</td>
+      <td>10.80</td>
+      <td>3.39</td>
+      <td>5.38</td>
+      <td>0.31</td>
+      <td>0.50</td>
     </tr>
   </tbody>
 </table>
@@ -2352,30 +2380,30 @@ Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws 
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 2 jobs)
 NUTS: [rho, beta, sigma2]
-Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 12 seconds.
+Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 8 seconds.
 /home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
   W_arr = np.asarray(W, dtype=np.float64)
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 2 jobs)
 NUTS: [lam, beta, sigma2]
-Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 11 seconds.
+Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 7 seconds.
 /home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
   W_arr = np.asarray(W, dtype=np.float64)
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 2 jobs)
 NUTS: [rho, beta, sigma2]
-Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 12 seconds.
+Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 7 seconds.
 /home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
   W_arr = np.asarray(W, dtype=np.float64)
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 2 jobs)
 NUTS: [lam, beta, sigma2]
-Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 11 seconds.
+Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 7 seconds.
 /home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
   W_arr = np.asarray(W, dtype=np.float64)
 </code></pre></div>
 </div>
-<img alt="../_images/fb9e3b4573dcbd1d0a41e54045b22b8b55fa3dd19c7aa99f51cfa4a7c7317c02.png" src="../_images/fb9e3b4573dcbd1d0a41e54045b22b8b55fa3dd19c7aa99f51cfa4a7c7317c02.png" />
+<img alt="../_images/56ffb665549e47137b197a842c348553f49e51b6b69c2e106b31438627457540.png" src="../_images/56ffb665549e47137b197a842c348553f49e51b6b69c2e106b31438627457540.png" />
 </div>
 </div>
 <h2 id="b-diagnostics-gibbs-mixing-for-sem-sdem">6b. Diagnostics: Gibbs Mixing for SEM/SDEM<a class="headerlink" href="#b-diagnostics-gibbs-mixing-for-sem-sdem" title="Link to this heading">¶</a></h2>
@@ -2443,7 +2471,7 @@ Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws 
     <span class="n">W_dense_s</span> <span class="o">=</span> <span class="n">make_rook_W</span><span class="p">(</span><span class="n">side</span><span class="p">)</span>
     <span class="n">W_s</span> <span class="o">=</span> <span class="n">W_to_graph</span><span class="p">(</span><span class="n">W_dense_s</span><span class="p">)</span>
     <span class="n">rng_s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="n">SEED</span><span class="p">)</span>
-    <span class="n">out_s</span> <span class="o">=</span> <span class="n">simulate_sar</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W_dense_s</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng_s</span><span class="p">)</span>
+    <span class="n">out_s</span> <span class="o">=</span> <span class="n">simulate_sar</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W_s</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng_s</span><span class="p">)</span>
     <span class="n">y_s</span><span class="p">,</span> <span class="n">X_s</span> <span class="o">=</span> <span class="n">out_s</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">out_s</span><span class="p">[</span><span class="s2">"X"</span><span class="p">]</span>
 
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="se">\n</span><span class="s2">n = </span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s2"> (side=</span><span class="si">{</span><span class="n">side</span><span class="si">}</span><span class="s2">)"</span><span class="p">)</span>
@@ -2465,27 +2493,27 @@ Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws 
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>n = 100 (side=10)
-  NUTS: 8.4s
-  Gibbs-NumPy: 2.3s
-  Gibbs-JAX: 3.1s
+  NUTS: 5.5s
+  Gibbs-NumPy: 1.8s
+  Gibbs-JAX: 3.0s
   NUTS-JAX: FAILED (build_kernel.&lt;locals&gt;.kernel() got an unexpected keyword argument 'progress_bar')
 
 n = 400 (side=20)
-  NUTS: 8.1s
-  Gibbs-NumPy: 2.4s
+  NUTS: 5.5s
+  Gibbs-NumPy: 1.8s
   Gibbs-JAX: 3.0s
   NUTS-JAX: FAILED (build_kernel.&lt;locals&gt;.kernel() got an unexpected keyword argument 'progress_bar')
 
 n = 2500 (side=50)
-  NUTS: 9.2s
-  Gibbs-NumPy: 2.5s
-  Gibbs-JAX: 2.9s
+  NUTS: 6.0s
+  Gibbs-NumPy: 1.9s
+  Gibbs-JAX: 2.8s
   NUTS-JAX: FAILED (build_kernel.&lt;locals&gt;.kernel() got an unexpected keyword argument 'progress_bar')
 
 n = 5625 (side=75)
-  NUTS: 9.5s
-  Gibbs-NumPy: 2.9s
-  Gibbs-JAX: 3.9s
+  NUTS: 6.0s
+  Gibbs-NumPy: 5.5s
+  Gibbs-JAX: 6.1s
   NUTS-JAX: FAILED (build_kernel.&lt;locals&gt;.kernel() got an unexpected keyword argument 'progress_bar')
 
 Scaling benchmark complete.
@@ -2494,29 +2522,43 @@ Scaling benchmark complete.
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [rho, beta, sigma2]
-Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 6 seconds.
+Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 3 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 /home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
   W_arr = np.asarray(W, dtype=np.float64)
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
-  from .autonotebook import tqdm as notebook_tqdm
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_base/_shared.py:839: FutureWarning: `nuts_sampler_kwargs` is deprecated. Pass NUTS keyword arguments via the `nuts={...}` argument to `pm.sample`.
+  self._idata = pm.sample(
+NUTS[blackjax]: [rho, beta, sigma2]
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [rho, beta, sigma2]
-Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 6 seconds.
+Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 3 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 /home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
   W_arr = np.asarray(W, dtype=np.float64)
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_base/_shared.py:839: FutureWarning: `nuts_sampler_kwargs` is deprecated. Pass NUTS keyword arguments via the `nuts={...}` argument to `pm.sample`.
+  self._idata = pm.sample(
+NUTS[blackjax]: [rho, beta, sigma2]
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [rho, beta, sigma2]
-Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 6 seconds.
+Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 4 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_base/_shared.py:839: FutureWarning: `nuts_sampler_kwargs` is deprecated. Pass NUTS keyword arguments via the `nuts={...}` argument to `pm.sample`.
+  self._idata = pm.sample(
+NUTS[blackjax]: [rho, beta, sigma2]
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [rho, beta, sigma2]
-Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 7 seconds.
+Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 4 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/base.py:547: RuntimeWarning: The warmup posterior of the spatial parameter, [0.4621, 0.5325], lies nearer a singularity of the Jacobian than an AAA fit of 62 nodes resolves; the log-determinant may bias the posterior there.
+  self._idata = gibbs.fit(
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/samplers/gaussian/_jax.py:1038: RuntimeWarning: The warmup posterior of the spatial parameter, [0.4601, 0.5336], lies nearer a singularity of the Jacobian than an AAA fit of 62 nodes resolves; the log-determinant may bias the posterior there.
+  refit = refit_hook(pooled)
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_base/_shared.py:839: FutureWarning: `nuts_sampler_kwargs` is deprecated. Pass NUTS keyword arguments via the `nuts={...}` argument to `pm.sample`.
+  self._idata = pm.sample(
+NUTS[blackjax]: [rho, beta, sigma2]
 </code></pre></div>
 </div>
 </div>
@@ -2545,7 +2587,7 @@ We recommend running at least 4 chains for robust computation of convergence dia
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/0f6f042a872d3de7ee9b615d20cb2a00e78ddd3ea1f59261547db2986b0f633c.png" src="../_images/0f6f042a872d3de7ee9b615d20cb2a00e78ddd3ea1f59261547db2986b0f633c.png" />
+<img alt="../_images/4b1735d174b67cf2bf3252810c70deb88edeb7779d2fd25e08b043a20960d0cb.png" src="../_images/4b1735d174b67cf2bf3252810c70deb88edeb7779d2fd25e08b043a20960d0cb.png" />
 </div>
 </div>
 <div class="cell docutils container">
@@ -2604,7 +2646,7 @@ We recommend running at least 4 chains for robust computation of convergence dia
     <span class="n">W_dense_s</span> <span class="o">=</span> <span class="n">make_rook_W</span><span class="p">(</span><span class="n">side</span><span class="p">)</span>
     <span class="n">W_s</span> <span class="o">=</span> <span class="n">W_to_graph</span><span class="p">(</span><span class="n">W_dense_s</span><span class="p">)</span>
     <span class="n">rng_s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="n">SEED</span><span class="p">)</span>
-    <span class="n">out_s</span> <span class="o">=</span> <span class="n">simulate_sem</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W_dense_s</span><span class="p">,</span> <span class="n">lam</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng_s</span><span class="p">)</span>
+    <span class="n">out_s</span> <span class="o">=</span> <span class="n">simulate_sem</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W_s</span><span class="p">,</span> <span class="n">lam</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng_s</span><span class="p">)</span>
     <span class="n">y_s</span><span class="p">,</span> <span class="n">X_s</span> <span class="o">=</span> <span class="n">out_s</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">out_s</span><span class="p">[</span><span class="s2">"X"</span><span class="p">]</span>
 
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="se">\n</span><span class="s2">n = </span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s2"> (side=</span><span class="si">{</span><span class="n">side</span><span class="si">}</span><span class="s2">)"</span><span class="p">)</span>
@@ -2626,26 +2668,26 @@ We recommend running at least 4 chains for robust computation of convergence dia
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>n = 100 (side=10)
-  NUTS: 8.1s
-  Gibbs-NumPy: 2.7s
+  NUTS: 5.7s
+  Gibbs-NumPy: 3.6s
   Gibbs-JAX: 3.1s
   NUTS-JAX: FAILED (build_kernel.&lt;locals&gt;.kernel() got an unexpected keyword argument 'progress_bar')
 
 n = 400 (side=20)
-  NUTS: 8.4s
-  Gibbs-NumPy: 2.8s
+  NUTS: 5.6s
+  Gibbs-NumPy: 3.6s
   Gibbs-JAX: 3.3s
   NUTS-JAX: FAILED (build_kernel.&lt;locals&gt;.kernel() got an unexpected keyword argument 'progress_bar')
 
 n = 2500 (side=50)
-  NUTS: 9.4s
-  Gibbs-NumPy: 3.0s
-  Gibbs-JAX: 3.2s
+  NUTS: 6.2s
+  Gibbs-NumPy: 3.8s
+  Gibbs-JAX: 3.1s
   NUTS-JAX: FAILED (build_kernel.&lt;locals&gt;.kernel() got an unexpected keyword argument 'progress_bar')
 
 n = 5625 (side=75)
-  NUTS: 10.4s
-  Gibbs-NumPy: 4.6s
+  NUTS: 6.5s
+  Gibbs-NumPy: 6.2s
   Gibbs-JAX: 3.4s
   NUTS-JAX: FAILED (build_kernel.&lt;locals&gt;.kernel() got an unexpected keyword argument 'progress_bar')
 
@@ -2655,27 +2697,39 @@ Scaling benchmark complete.
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [lam, beta, sigma2]
-Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 6 seconds.
+Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 3 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 /home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
   W_arr = np.asarray(W, dtype=np.float64)
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_base/_shared.py:839: FutureWarning: `nuts_sampler_kwargs` is deprecated. Pass NUTS keyword arguments via the `nuts={...}` argument to `pm.sample`.
+  self._idata = pm.sample(
+NUTS[blackjax]: [lam, beta, sigma2]
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [lam, beta, sigma2]
-Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 6 seconds.
+Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 3 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 /home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
   W_arr = np.asarray(W, dtype=np.float64)
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_base/_shared.py:839: FutureWarning: `nuts_sampler_kwargs` is deprecated. Pass NUTS keyword arguments via the `nuts={...}` argument to `pm.sample`.
+  self._idata = pm.sample(
+NUTS[blackjax]: [lam, beta, sigma2]
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [lam, beta, sigma2]
-Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 7 seconds.
+Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 4 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_base/_shared.py:839: FutureWarning: `nuts_sampler_kwargs` is deprecated. Pass NUTS keyword arguments via the `nuts={...}` argument to `pm.sample`.
+  self._idata = pm.sample(
+NUTS[blackjax]: [lam, beta, sigma2]
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [lam, beta, sigma2]
-Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 8 seconds.
+Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 4 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_base/_shared.py:839: FutureWarning: `nuts_sampler_kwargs` is deprecated. Pass NUTS keyword arguments via the `nuts={...}` argument to `pm.sample`.
+  self._idata = pm.sample(
+NUTS[blackjax]: [lam, beta, sigma2]
 </code></pre></div>
 </div>
 </div>
@@ -2704,7 +2758,7 @@ We recommend running at least 4 chains for robust computation of convergence dia
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/ce91f26d797a987a808821b75735c6ee62200b05f5a2a22f6dbe1261ad966c1d.png" src="../_images/ce91f26d797a987a808821b75735c6ee62200b05f5a2a22f6dbe1261ad966c1d.png" />
+<img alt="../_images/0b7b3900674384dde4295c7eab7c1b30a7b7fa6b98a27dc8246dbbaf8fe15543.png" src="../_images/0b7b3900674384dde4295c7eab7c1b30a7b7fa6b98a27dc8246dbbaf8fe15543.png" />
 </div>
 </div>
 <p>Gibbs is <strong>way</strong> faster with better ESS than NUTS. The JAX-based Gibbs sampler wins across the board in time/ESS tradeoff.</p>

@@ -57,7 +57,7 @@
    "source": [
     "RHO_TRUE, BETA_TRUE = 0.5, np.array([-0.3, 0.5])\n",
     "\n",
-    "data_sar = simulate_sar_logit(n=35, rho=RHO_TRUE, beta=BETA_TRUE, seed=42)\n",
+    "data_sar = simulate_sar_logit(n_side=35, rho=RHO_TRUE, beta=BETA_TRUE, seed=42)\n",
     "y_sar, X_sar, W_sar = data_sar[\"y\"], data_sar[\"X\"], data_sar[\"W_graph\"]\n",
     "\n",
     "print(f\"observations : {len(y_sar)}  (35 x 35 queen grid)\")\n",
@@ -179,7 +179,7 @@
    "metadata": {},
    "outputs": [],
    "source": [
-    "data_sem = simulate_sem_logit(n=35, lam=0.5, beta=BETA_TRUE, seed=42)\n",
+    "data_sem = simulate_sem_logit(n_side=35, lam=0.5, beta=BETA_TRUE, seed=42)\n",
     "y_sem, X_sem, W_sem = data_sem[\"y\"], data_sem[\"X\"], data_sem[\"W_graph\"]\n",
     "\n",
     "model_sem = SEMLogit(y=y_sem, X=X_sem, W=W_sem)\n",
@@ -347,7 +347,7 @@
    "metadata": {},
    "outputs": [],
    "source": [
-    "print(\"groups:\", idata_sar.groups())\n",
+    "print(\"groups:\", list(idata_sar.children))\n",
     "az.summary(idata_sar, var_names=[\"rho\"]).round(3)"
    ]
   },

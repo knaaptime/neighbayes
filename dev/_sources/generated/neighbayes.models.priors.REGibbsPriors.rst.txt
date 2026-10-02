@@ -27,5 +27,9 @@
       ~REGibbsPriors.beta_sigma
       ~REGibbsPriors.rho_lower
       ~REGibbsPriors.rho_upper
+      ~REGibbsPriors.sigma2_alpha
+      ~REGibbsPriors.sigma2_beta
+      ~REGibbsPriors.sigma_alpha_nu
+      ~REGibbsPriors.sigma_alpha_scale
    
    

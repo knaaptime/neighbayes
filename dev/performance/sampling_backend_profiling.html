@@ -757,6 +757,30 @@
 
               
             
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1613,7 +1637,7 @@
 <span class="sd">    """</span>
     <span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
     <span class="n">gdf</span> <span class="o">=</span> <span class="n">dgp</span><span class="o">.</span><span class="n">simulate_sar</span><span class="p">(</span>
-        <span class="n">n</span><span class="o">=</span><span class="n">n_side</span><span class="p">,</span>
+        <span class="n">n_side</span><span class="o">=</span><span class="n">n_side</span><span class="p">,</span>
         <span class="n">rho</span><span class="o">=</span><span class="n">TRUE_RHO</span><span class="p">,</span>
         <span class="n">beta</span><span class="o">=</span><span class="n">TRUE_BETA</span><span class="p">,</span>
         <span class="n">sigma</span><span class="o">=</span><span class="n">TRUE_SIGMA</span><span class="p">,</span>
@@ -1735,26 +1759,31 @@
 </div>
 </div>
 <div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (4 chains in 2 jobs)
+NUTS: [rho, beta, sigma2]
+Sampling 4 chains for 250 tune and 250 draw iterations (1_000 + 1_000 draws total) took 4 seconds.
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (4 chains in 2 jobs)
+NUTS: [rho, beta, sigma2]
+Sampling 4 chains for 250 tune and 250 draw iterations (1_000 + 1_000 draws total) took 4 seconds.
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_base/_shared.py:839: FutureWarning: `nuts_sampler_kwargs` is deprecated. Pass NUTS keyword arguments via the `nuts={...}` argument to `pm.sample`.
+  self._idata = pm.sample(
+NUTS[numpyro]: [rho, beta, sigma2]
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_base/_shared.py:839: FutureWarning: `nuts_sampler_kwargs` is deprecated. Pass NUTS keyword arguments via the `nuts={...}` argument to `pm.sample`.
+  self._idata = pm.sample(
+NUTS[blackjax]: [rho, beta, sigma2]
+NUTS[nutpie]: [rho, beta, sigma2]
+</code></pre></div>
+</div>
 <img alt="../_images/c3e176b23c1bb76c0b44c239b245e0f85c9c4359111c28d521b410476e3fe5f9.png" src="../_images/c3e176b23c1bb76c0b44c239b245e0f85c9c4359111c28d521b410476e3fe5f9.png" />
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Profiling backend=c...
 Profiling backend=numba...
 Profiling backend=numpyro...
 Profiling backend=blackjax...
 Profiling backend=nutpie...
-</code></pre></div>
-</div>
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
-Multiprocess sampling (4 chains in 2 jobs)
-NUTS: [rho, beta, sigma2]
-Sampling 4 chains for 250 tune and 250 draw iterations (1_000 + 1_000 draws total) took 10 seconds.
-Initializing NUTS using jitter+adapt_diag...
-Multiprocess sampling (4 chains in 2 jobs)
-NUTS: [rho, beta, sigma2]
-Sampling 4 chains for 250 tune and 250 draw iterations (1_000 + 1_000 draws total) took 9 seconds.
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
-  from .autonotebook import tqdm as notebook_tqdm
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/pymc/sampling/mcmc.py:361: UserWarning: `idata_kwargs` are currently ignored by the nutpie sampler
-  warnings.warn(
 </code></pre></div>
 </div>
 <div class="output text_html"><div>
@@ -1791,37 +1820,37 @@ Sampling 4 chains for 250 tune and 250 draw iterations (1_000 + 1_000 draws tota
   <tbody>
     <tr>
       <th>0</th>
-      <td>nutpie</td>
+      <td>numba</td>
       <td>True</td>
-      <td>5.477681</td>
-      <td>0.308117</td>
-      <td>1.087130</td>
-      <td>0.769438</td>
-      <td>-0.447783</td>
+      <td>4.558101</td>
+      <td>0.305057</td>
+      <td>1.089754</td>
+      <td>0.770237</td>
+      <td>-0.448078</td>
       <td>0.0</td>
       <td></td>
-      <td>0.041883</td>
-      <td>0.061243</td>
+      <td>0.044943</td>
+      <td>0.062283</td>
     </tr>
     <tr>
       <th>1</th>
-      <td>numpyro</td>
+      <td>nutpie</td>
       <td>True</td>
-      <td>8.508946</td>
-      <td>0.305089</td>
-      <td>1.092707</td>
-      <td>0.771200</td>
-      <td>-0.446871</td>
+      <td>5.116990</td>
+      <td>0.307607</td>
+      <td>1.086948</td>
+      <td>0.768769</td>
+      <td>-0.447414</td>
       <td>0.0</td>
       <td></td>
-      <td>0.044911</td>
-      <td>0.063892</td>
+      <td>0.042393</td>
+      <td>0.061375</td>
     </tr>
     <tr>
       <th>2</th>
-      <td>numba</td>
+      <td>c</td>
       <td>True</td>
-      <td>11.406905</td>
+      <td>6.438410</td>
       <td>0.305057</td>
       <td>1.089754</td>
       <td>0.770237</td>
@@ -1833,17 +1862,17 @@ Sampling 4 chains for 250 tune and 250 draw iterations (1_000 + 1_000 draws tota
     </tr>
     <tr>
       <th>3</th>
-      <td>c</td>
+      <td>numpyro</td>
       <td>True</td>
-      <td>24.543207</td>
-      <td>0.305057</td>
-      <td>1.089754</td>
-      <td>0.770237</td>
-      <td>-0.448078</td>
+      <td>7.727190</td>
+      <td>0.307253</td>
+      <td>1.085888</td>
+      <td>0.766563</td>
+      <td>-0.447944</td>
       <td>0.0</td>
       <td></td>
-      <td>0.044943</td>
-      <td>0.062283</td>
+      <td>0.042747</td>
+      <td>0.061114</td>
     </tr>
     <tr>
       <th>4</th>
@@ -1915,9 +1944,20 @@ Sampling 4 chains for 250 tune and 250 draw iterations (1_000 + 1_000 draws tota
   <tbody>
     <tr>
       <th>0</th>
+      <td>numba</td>
+      <td>True</td>
+      <td>4.558</td>
+      <td>0.305</td>
+      <td>0.045</td>
+      <td>0.062</td>
+      <td>0.0</td>
+      <td></td>
+    </tr>
+    <tr>
+      <th>1</th>
       <td>nutpie</td>
       <td>True</td>
-      <td>5.478</td>
+      <td>5.117</td>
       <td>0.308</td>
       <td>0.042</td>
       <td>0.061</td>
@@ -1925,21 +1965,10 @@ Sampling 4 chains for 250 tune and 250 draw iterations (1_000 + 1_000 draws tota
       <td></td>
     </tr>
     <tr>
-      <th>1</th>
-      <td>numpyro</td>
-      <td>True</td>
-      <td>8.509</td>
-      <td>0.305</td>
-      <td>0.045</td>
-      <td>0.064</td>
-      <td>0.0</td>
-      <td></td>
-    </tr>
-    <tr>
       <th>2</th>
-      <td>numba</td>
+      <td>c</td>
       <td>True</td>
-      <td>11.407</td>
+      <td>6.438</td>
       <td>0.305</td>
       <td>0.045</td>
       <td>0.062</td>
@@ -1948,12 +1977,12 @@ Sampling 4 chains for 250 tune and 250 draw iterations (1_000 + 1_000 draws tota
     </tr>
     <tr>
       <th>3</th>
-      <td>c</td>
+      <td>numpyro</td>
       <td>True</td>
-      <td>24.543</td>
-      <td>0.305</td>
-      <td>0.045</td>
-      <td>0.062</td>
+      <td>7.727</td>
+      <td>0.307</td>
+      <td>0.043</td>
+      <td>0.061</td>
       <td>0.0</td>
       <td></td>
     </tr>
@@ -2005,7 +2034,7 @@ Sampling 4 chains for 250 tune and 250 draw iterations (1_000 + 1_000 draws tota
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/4a6149b87aec4b3b8a1df4e597f15ebb1b9ae93009c7bfbe565e6b8234d86dd5.png" src="../_images/4a6149b87aec4b3b8a1df4e597f15ebb1b9ae93009c7bfbe565e6b8234d86dd5.png" />
+<img alt="../_images/39c340f336e96861f42a9319e16395a3884da6c7ad76aed63b7900c8114ba845.png" src="../_images/39c340f336e96861f42a9319e16395a3884da6c7ad76aed63b7900c8114ba845.png" />
 </div>
 </div>
 <div class="cell docutils container">
@@ -2064,7 +2093,7 @@ Sampling 4 chains for 250 tune and 250 draw iterations (1_000 + 1_000 draws tota
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/76e3e7a0134d413a86acec4acc50c1dede0b593695e00c9761fef5073e57cc57.png" src="../_images/76e3e7a0134d413a86acec4acc50c1dede0b593695e00c9761fef5073e57cc57.png" />
+<img alt="../_images/c7de03a67605a2e3d8f15e4fabfac614172f8f5e942cde0f2073b0ea1b4538c7.png" src="../_images/c7de03a67605a2e3d8f15e4fabfac614172f8f5e942cde0f2073b0ea1b4538c7.png" />
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Profiling backend=c on 40×40 grid...
 Profiling backend=numba on 40×40 grid...
 Profiling backend=numpyro on 40×40 grid...
@@ -2075,13 +2104,18 @@ Profiling backend=nutpie on 40×40 grid...
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 2 jobs)
 NUTS: [rho, beta, sigma2]
-Sampling 4 chains for 250 tune and 250 draw iterations (1_000 + 1_000 draws total) took 10 seconds.
+Sampling 4 chains for 250 tune and 250 draw iterations (1_000 + 1_000 draws total) took 4 seconds.
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 2 jobs)
 NUTS: [rho, beta, sigma2]
-Sampling 4 chains for 250 tune and 250 draw iterations (1_000 + 1_000 draws total) took 10 seconds.
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/pymc/sampling/mcmc.py:361: UserWarning: `idata_kwargs` are currently ignored by the nutpie sampler
-  warnings.warn(
+Sampling 4 chains for 250 tune and 250 draw iterations (1_000 + 1_000 draws total) took 4 seconds.
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_base/_shared.py:839: FutureWarning: `nuts_sampler_kwargs` is deprecated. Pass NUTS keyword arguments via the `nuts={...}` argument to `pm.sample`.
+  self._idata = pm.sample(
+NUTS[numpyro]: [rho, beta, sigma2]
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_base/_shared.py:839: FutureWarning: `nuts_sampler_kwargs` is deprecated. Pass NUTS keyword arguments via the `nuts={...}` argument to `pm.sample`.
+  self._idata = pm.sample(
+NUTS[blackjax]: [rho, beta, sigma2]
+NUTS[nutpie]: [rho, beta, sigma2]
 </code></pre></div>
 </div>
 <div class="output text_html"><div>
@@ -2117,7 +2151,7 @@ Sampling 4 chains for 250 tune and 250 draw iterations (1_000 + 1_000 draws tota
       <th>0</th>
       <td>nutpie</td>
       <td>True</td>
-      <td>3.958</td>
+      <td>3.487</td>
       <td>0.353</td>
       <td>0.003</td>
       <td>0.016</td>
@@ -2126,20 +2160,9 @@ Sampling 4 chains for 250 tune and 250 draw iterations (1_000 + 1_000 draws tota
     </tr>
     <tr>
       <th>1</th>
-      <td>numpyro</td>
-      <td>True</td>
-      <td>6.460</td>
-      <td>0.353</td>
-      <td>0.003</td>
-      <td>0.015</td>
-      <td>0.0</td>
-      <td></td>
-    </tr>
-    <tr>
-      <th>2</th>
       <td>numba</td>
       <td>True</td>
-      <td>13.251</td>
+      <td>5.746</td>
       <td>0.354</td>
       <td>0.004</td>
       <td>0.015</td>
@@ -2147,10 +2170,21 @@ Sampling 4 chains for 250 tune and 250 draw iterations (1_000 + 1_000 draws tota
       <td></td>
     </tr>
     <tr>
+      <th>2</th>
+      <td>numpyro</td>
+      <td>True</td>
+      <td>6.301</td>
+      <td>0.355</td>
+      <td>0.005</td>
+      <td>0.013</td>
+      <td>0.0</td>
+      <td></td>
+    </tr>
+    <tr>
       <th>3</th>
       <td>c</td>
       <td>True</td>
-      <td>14.628</td>
+      <td>7.158</td>
       <td>0.354</td>
       <td>0.004</td>
       <td>0.015</td>
@@ -2205,7 +2239,7 @@ Sampling 4 chains for 250 tune and 250 draw iterations (1_000 + 1_000 draws tota
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/9b47b4060c174d7cc8d9f216fead97e4724242d3bffa47341e94fd8ccabcbf02.png" src="../_images/9b47b4060c174d7cc8d9f216fead97e4724242d3bffa47341e94fd8ccabcbf02.png" />
+<img alt="../_images/43988522e29717a8b15fe84414a7396c7dfa235f1e8891cb382b7235110ed365.png" src="../_images/43988522e29717a8b15fe84414a7396c7dfa235f1e8891cb382b7235110ed365.png" />
 </div>
 </div>
 <h2 id="reading-the-results">Reading The Results<a class="headerlink" href="#reading-the-results" title="Link to this heading">¶</a></h2>

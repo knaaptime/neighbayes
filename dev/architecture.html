@@ -757,6 +757,30 @@
 
               
             
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="how-to/prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1599,7 +1623,7 @@ sampler, a sparse backend, and a set of priors for you. Every one of them can be
 replaced by an explicit argument — <code class="docutils literal notranslate"><span class="pre">logdet_method=</span></code>, <code class="docutils literal notranslate"><span class="pre">sampler=</span></code>, <code class="docutils literal notranslate"><span class="pre">gibbs_backend=</span></code>,
 <code class="docutils literal notranslate"><span class="pre">priors=</span></code> — and the resolved log-determinant method is recorded on the model as
 <code class="docutils literal notranslate"><span class="pre">_resolved_logdet_method</span></code>. Nothing is chosen in a way you cannot see or change.</p>
-<p><strong>No bespoke result objects.</strong> <code class="docutils literal notranslate"><span class="pre">fit()</span></code> returns an <code class="docutils literal notranslate"><span class="pre">arviz.InferenceData</span></code>. The posterior
+<p><strong>No bespoke result objects.</strong> <code class="docutils literal notranslate"><span class="pre">fit()</span></code> returns an ArviZ <code class="docutils literal notranslate"><span class="pre">DataTree</span></code> (<code class="docutils literal notranslate"><span class="pre">xarray.DataTree</span></code>). The posterior
 belongs to the wider PyData ecosystem, not to this package.</p>
 <h2 id="the-layers">The layers<a class="headerlink" href="#the-layers" title="Link to this heading">¶</a></h2>
 <div class="highlight-default notranslate"><div class="highlight"><pre><span></span><code>models/          SAR, SDM, panel FE, flow …  — thin, declarative
@@ -1757,7 +1781,7 @@ it to NUTS.</p>
 know about it:</p>
 <dl class="simple myst">
 <dt><code class="docutils literal notranslate"><span class="pre">run</span></code></dt><dd><p>The callable, which takes the model and resolved controls and returns a <strong>finished</strong>
-<code class="docutils literal notranslate"><span class="pre">InferenceData</span></code>. Returning finished output rather than raw chains is deliberate: it
+<code class="docutils literal notranslate"><span class="pre">DataTree</span></code>. Returning finished output rather than raw chains is deliberate: it
 lets class-based families keep their own <code class="docutils literal notranslate"><span class="pre">fit</span></code> and function-based families keep
 <code class="docutils literal notranslate"><span class="pre">run_chains</span></code> + <code class="docutils literal notranslate"><span class="pre">gibbs_to_inference_data</span></code>. The registry unifies dispatch, not sampler
 internals.</p>
@@ -1777,12 +1801,17 @@ clear error instead of each runner re-checking.</p>
 </dd>
 </dl>
 <h3 id="two-samplers-behind-one-object">Two samplers behind one object<a class="headerlink" href="#two-samplers-behind-one-object" title="Link to this heading">¶</a></h3>
-<p>Most models are estimated by a blocked Gibbs sampler written for this posterior:
-conjugate draws for <span class="math notranslate nohighlight">\(\beta\)</span> and <span class="math notranslate nohighlight">\(\sigma^2\)</span>, and <span class="math notranslate nohighlight">\(\rho\)</span> updated by slice sampling the
-collapsed log-density with <span class="math notranslate nohighlight">\(\beta\)</span> and <span class="math notranslate nohighlight">\(\sigma^2\)</span> integrated out. Collapsing is what
-makes the sampler robust to the strong <span class="math notranslate nohighlight">\(\rho\)</span>–<span class="math notranslate nohighlight">\(\beta\)</span>–<span class="math notranslate nohighlight">\(\sigma^2\)</span> correlation that
-frustrates generic samplers, and it is also why per-<span class="math notranslate nohighlight">\(\rho\)</span> log-determinant cost is the
-thing worth optimising.</p>
+<p>Most models are estimated by a blocked Gibbs sampler written for this posterior. The
+Gaussian families use a partially collapsed sweep (van Dyk &amp; Park, 2008): a conjugate
+draw of <span class="math notranslate nohighlight">\(\sigma^2\)</span>, then <span class="math notranslate nohighlight">\(\rho\)</span> by slice sampling <span class="math notranslate nohighlight">\(p(\rho \mid \sigma^2, y)\)</span> with
+<span class="math notranslate nohighlight">\(\beta\)</span> integrated out under its Normal prior, then <span class="math notranslate nohighlight">\(\beta \mid \rho, \sigma^2\)</span>. The
+<span class="math notranslate nohighlight">\(\beta\)</span> draw must follow the <span class="math notranslate nohighlight">\(\rho\)</span> draw that integrated it out, or the stored
+<span class="math notranslate nohighlight">\((\beta, \rho)\)</span> pairs stop being joint draws even though every marginal looks right.
+Integrating <span class="math notranslate nohighlight">\(\beta\)</span> out is what makes the sampler robust to the strong
+<span class="math notranslate nohighlight">\(\rho\)</span>–<span class="math notranslate nohighlight">\(\beta\)</span> correlation that frustrates generic samplers, and it is also why
+per-<span class="math notranslate nohighlight">\(\rho\)</span> log-determinant cost is the thing worth optimising. Robust (Student-t)
+errors add one block, the scale-mixture variances, and weight every cross-product by
+their inverses.</p>
 <p>Models without a registered Gibbs sampler are built as PyMC models and sampled with
 NUTS. Both paths are reachable from the same object through <code class="docutils literal notranslate"><span class="pre">fit(sampler=...)</span></code>, which
 exists so that a Gibbs result can be checked against an independent NUTS result on

@@ -757,6 +757,30 @@
 
               
             
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1448,7 +1472,7 @@
       <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SLX.fit.idata_kwargs (Python parameter) — {&#34;log_likelihood&#34;: True} stores the complete Jacobian-corrected pointwise log-likelihood that az.loo / az.waic / az.compare need, for Gibbs and NUTS alike."><span>idata_<wbr>kwargs</span></span>
+      <span title="neighbayes.models.SLX.fit.idata_kwargs (Python parameter) — {&#34;log_likelihood&#34;: True} stores the complete Jacobian-corrected pointwise log-likelihood that az.loo / az.compare need, for Gibbs and NUTS alike."><span>idata_<wbr>kwargs</span></span>
     </span>
   </a>
   
@@ -1530,7 +1554,7 @@
       <span aria-label="Python property" class="objinfo-icon objinfo-icon__alias" title="Python property">P</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SLX.inference_data (Python property) — Return the ArviZ InferenceData from the most recent fit."><span>inference_<wbr>data</span></span>
+      <span title="neighbayes.models.SLX.inference_data (Python property) — Return the ArviZ DataTree from the most recent fit."><span>inference_<wbr>data</span></span>
     </span>
   </a>
   
@@ -1549,6 +1573,198 @@
         
           <li class="md-nav__item">
   <a href="#neighbayes.models.SLX.inference_data-return-type" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Return type</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SLX.predict (Python method) — Posterior predictive distribution of y at new units."><span>predict</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="predict">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict-parameters" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Parameters</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict.X_new" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SLX.predict.X_new (Python parameter) — Covariates of the new units."><span>X_<wbr>new</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict.W" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SLX.predict.W (Python parameter) — Weights over the union of fitted and new units, n_fit + n_new square, standardized the way the fitted W was."><span>W</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict.oos" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SLX.predict.oos (Python parameter) — Positions of the new units in W, in the row order of X_new; the fitted units fill the remaining positions in their fitted order."><span>oos</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict.thin" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SLX.predict.thin (Python parameter) — Use every thin-th draw of each chain."><span>thin</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict.random_seed" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SLX.predict.random_seed (Python parameter) — Seed for the predictive draws."><span>random_<wbr>seed</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict-returns" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Returns</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict-return-type" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Return type</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict_in_sample" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SLX.predict_in_sample (Python method) — Leave-one-out conditional predictive of each fitted unit."><span>predict_<wbr>in_<wbr>sample</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="predict_in_sample">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict_in_sample-parameters" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Parameters</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict_in_sample.thin" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SLX.predict_in_sample.thin (Python parameter) — Use every thin-th draw of each chain."><span>thin</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict_in_sample.random_seed" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SLX.predict_in_sample.random_seed (Python parameter) — Seed for the predictive draws."><span>random_<wbr>seed</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict_in_sample-returns" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Returns</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict_in_sample-return-type" class="md-nav__link">
     
     <span class="md-ellipsis">
       <span>Return type</span>
@@ -2849,7 +3065,7 @@
       <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SLX.fit.idata_kwargs (Python parameter) — {&#34;log_likelihood&#34;: True} stores the complete Jacobian-corrected pointwise log-likelihood that az.loo / az.waic / az.compare need, for Gibbs and NUTS alike."><span>idata_<wbr>kwargs</span></span>
+      <span title="neighbayes.models.SLX.fit.idata_kwargs (Python parameter) — {&#34;log_likelihood&#34;: True} stores the complete Jacobian-corrected pointwise log-likelihood that az.loo / az.compare need, for Gibbs and NUTS alike."><span>idata_<wbr>kwargs</span></span>
     </span>
   </a>
   
@@ -2931,7 +3147,7 @@
       <span aria-label="Python property" class="objinfo-icon objinfo-icon__alias" title="Python property">P</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SLX.inference_data (Python property) — Return the ArviZ InferenceData from the most recent fit."><span>inference_<wbr>data</span></span>
+      <span title="neighbayes.models.SLX.inference_data (Python property) — Return the ArviZ DataTree from the most recent fit."><span>inference_<wbr>data</span></span>
     </span>
   </a>
   
@@ -2950,6 +3166,198 @@
         
           <li class="md-nav__item">
   <a href="#neighbayes.models.SLX.inference_data-return-type" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Return type</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SLX.predict (Python method) — Posterior predictive distribution of y at new units."><span>predict</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="predict">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict-parameters" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Parameters</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict.X_new" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SLX.predict.X_new (Python parameter) — Covariates of the new units."><span>X_<wbr>new</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict.W" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SLX.predict.W (Python parameter) — Weights over the union of fitted and new units, n_fit + n_new square, standardized the way the fitted W was."><span>W</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict.oos" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SLX.predict.oos (Python parameter) — Positions of the new units in W, in the row order of X_new; the fitted units fill the remaining positions in their fitted order."><span>oos</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict.thin" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SLX.predict.thin (Python parameter) — Use every thin-th draw of each chain."><span>thin</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict.random_seed" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SLX.predict.random_seed (Python parameter) — Seed for the predictive draws."><span>random_<wbr>seed</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict-returns" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Returns</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict-return-type" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Return type</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict_in_sample" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SLX.predict_in_sample (Python method) — Leave-one-out conditional predictive of each fitted unit."><span>predict_<wbr>in_<wbr>sample</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="predict_in_sample">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict_in_sample-parameters" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Parameters</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict_in_sample.thin" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SLX.predict_in_sample.thin (Python parameter) — Use every thin-th draw of each chain."><span>thin</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict_in_sample.random_seed" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SLX.predict_in_sample.random_seed (Python parameter) — Seed for the predictive draws."><span>random_<wbr>seed</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict_in_sample-returns" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Returns</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SLX.predict_in_sample-return-type" class="md-nav__link">
     
     <span class="md-ellipsis">
       <span>Return type</span>
@@ -3358,7 +3766,7 @@ because there is no spatial lag of <span class="math notranslate nohighlight">\(
 <code class="docutils literal notranslate"><span class="pre">data</span></code>. Intercept is included by default; suppress with
 <code class="docutils literal notranslate"><span class="pre">&quot;y</span> <span class="pre">~</span> <span class="pre">x</span> <span class="pre">-</span> <span class="pre">1&quot;</span></code>.</p>
 </dd>
-<dt id="neighbayes.models.SLX.__init__.data"><span class="sig-name descname">data</span><span class="p"> : </span><span class="desctype"><span class="desctype">pandas.DataFrame or <a class="reference external" href="https://geopandas.org/en/latest/docs/reference/api/geopandas.GeoDataFrame.html#geopandas.GeoDataFrame" title="(in GeoPandas v1.1.2.dev149.dev+g6302753ef)">geopandas.GeoDataFrame</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SLX.__init__.data" title="Permalink to this definition">¶</a></dt><dd><p>Data source for formula mode.</p>
+<dt id="neighbayes.models.SLX.__init__.data"><span class="sig-name descname">data</span><span class="p"> : </span><span class="desctype"><span class="desctype">pandas.DataFrame or <a class="reference external" href="https://geopandas.org/en/latest/docs/reference/api/geopandas.GeoDataFrame.html#geopandas.GeoDataFrame" title="(in GeoPandas v1.2.1.dev0.dev+g199fc53c8)">geopandas.GeoDataFrame</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SLX.__init__.data" title="Permalink to this definition">¶</a></dt><dd><p>Data source for formula mode.</p>
 </dd>
 <dt id="neighbayes.models.SLX.__init__.y"><span class="sig-name descname">y</span><span class="p"> : </span><span class="desctype"><span class="desctype">array-like, optional</span></span><a class="headerlink" href="#neighbayes.models.SLX.__init__.y" title="Permalink to this definition">¶</a></dt><dd><p>Dependent variable of shape <code class="docutils literal notranslate"><span class="pre">(n,)</span></code>. Required in matrix mode.</p>
 </dd>
@@ -3420,7 +3828,7 @@ to Student-t:</p>
 must exceed 2 so the variance exists.</p>
 <dl class="py method objdesc">
 <dt class="sig sig-object highlight sig-wrap py" id="neighbayes.models.SLX.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.__init__.formula" title="neighbayes.models.SLX.__init__.formula (Python parameter) — Wilkinson-style formula, e.g."><span class="n"><span class="pre">formula</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.__init__.data" title="neighbayes.models.SLX.__init__.data (Python parameter) — Data source for formula mode."><span class="n"><span class="pre">data</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.__init__.y" title="neighbayes.models.SLX.__init__.y (Python parameter) — Dependent variable of shape (n,)."><span class="n"><span class="pre">y</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.__init__.X" title="neighbayes.models.SLX.__init__.X (Python parameter) — Design matrix."><span class="n"><span class="pre">X</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.__init__.W" title="neighbayes.models.SLX.__init__.W (Python parameter) — Spatial weights of shape (n, n)."><span class="n"><span class="pre">W</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.__init__.priors" title="neighbayes.models.SLX.__init__.priors (Python parameter) — Override default priors."><span class="n"><span class="pre">priors</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.__init__.logdet_method" title="neighbayes.models.SLX.__init__.logdet_method (Python parameter) — Accepted for API consistency with the spatial-lag/error models but unused (SLX has no spatial Jacobian)."><span class="n"><span class="pre">logdet_method</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.__init__.robust" title="neighbayes.models.SLX.__init__.robust (Python parameter) — If True, replace the Normal error with Student-t."><span class="n"><span class="pre">robust</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.__init__.w_vars" title="neighbayes.models.SLX.__init__.w_vars (Python parameter) — Names of X columns to spatially lag."><span class="n"><span class="pre">w_vars</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX" title="neighbayes.models.SLX.__init__.logdet_refit (Python parameter)"><span class="n"><span class="pre">logdet_refit</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">True</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX" title="neighbayes.models.SLX.__init__.logdet_refit_pad_sd (Python parameter)"><span class="n"><span class="pre">logdet_refit_pad_sd</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">10.0</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX" title="neighbayes.models.SLX.__init__.logdet_aaa_check (Python parameter)"><span class="n"><span class="pre">logdet_aaa_check</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">True</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX" title="neighbayes.models.SLX.__init__.logdet_probe_check (Python parameter)"><span class="n"><span class="pre">logdet_probe_check</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">True</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/base.py#L127-L224"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SLX.__init__" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.__init__.formula" title="neighbayes.models.SLX.__init__.formula (Python parameter) — Wilkinson-style formula, e.g."><span class="n"><span class="pre">formula</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.__init__.data" title="neighbayes.models.SLX.__init__.data (Python parameter) — Data source for formula mode."><span class="n"><span class="pre">data</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.__init__.y" title="neighbayes.models.SLX.__init__.y (Python parameter) — Dependent variable of shape (n,)."><span class="n"><span class="pre">y</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.__init__.X" title="neighbayes.models.SLX.__init__.X (Python parameter) — Design matrix."><span class="n"><span class="pre">X</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.__init__.W" title="neighbayes.models.SLX.__init__.W (Python parameter) — Spatial weights of shape (n, n)."><span class="n"><span class="pre">W</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.__init__.priors" title="neighbayes.models.SLX.__init__.priors (Python parameter) — Override default priors."><span class="n"><span class="pre">priors</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.__init__.logdet_method" title="neighbayes.models.SLX.__init__.logdet_method (Python parameter) — Accepted for API consistency with the spatial-lag/error models but unused (SLX has no spatial Jacobian)."><span class="n"><span class="pre">logdet_method</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.__init__.robust" title="neighbayes.models.SLX.__init__.robust (Python parameter) — If True, replace the Normal error with Student-t."><span class="n"><span class="pre">robust</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.__init__.w_vars" title="neighbayes.models.SLX.__init__.w_vars (Python parameter) — Names of X columns to spatially lag."><span class="n"><span class="pre">w_vars</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX" title="neighbayes.models.SLX.__init__.logdet_refit (Python parameter)"><span class="n"><span class="pre">logdet_refit</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">True</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX" title="neighbayes.models.SLX.__init__.logdet_refit_pad_sd (Python parameter)"><span class="n"><span class="pre">logdet_refit_pad_sd</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">10.0</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX" title="neighbayes.models.SLX.__init__.logdet_aaa_check (Python parameter)"><span class="n"><span class="pre">logdet_aaa_check</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">True</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX" title="neighbayes.models.SLX.__init__.logdet_probe_check (Python parameter)"><span class="n"><span class="pre">logdet_probe_check</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">True</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/base.py#L127-L227"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SLX.__init__" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <p class="rubric">Methods</p>
@@ -3434,6 +3842,12 @@ must exceed 2 so the variance exists.</p>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#neighbayes.models.SLX.fitted_values" title="neighbayes.models.SLX.fitted_values (Python method) — Return fitted values at posterior mean parameters."><code class="xref py py-obj docutils literal notranslate"><span class="pre">fitted_values</span></code></a>()</p></td>
 <td><p>Return fitted values at posterior mean parameters.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#neighbayes.models.SLX.predict" title="neighbayes.models.SLX.predict (Python method) — Posterior predictive distribution of y at new units."><code class="xref py py-obj docutils literal notranslate"><span class="pre">predict</span></code></a>(X_new, W[, oos, thin, random_seed])</p></td>
+<td><p>Posterior predictive distribution of <code class="docutils literal notranslate"><span class="pre">y</span></code> at new units.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#neighbayes.models.SLX.predict_in_sample" title="neighbayes.models.SLX.predict_in_sample (Python method) — Leave-one-out conditional predictive of each fitted unit."><code class="xref py py-obj docutils literal notranslate"><span class="pre">predict_in_sample</span></code></a>(*[, thin, random_seed])</p></td>
+<td><p>Leave-one-out conditional predictive of each fitted unit.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#neighbayes.models.SLX.residuals" title="neighbayes.models.SLX.residuals (Python method) — Return residuals y - fitted_values."><code class="xref py py-obj docutils literal notranslate"><span class="pre">residuals</span></code></a>()</p></td>
 <td><p>Return residuals <code class="docutils literal notranslate"><span class="pre">y</span> <span class="pre">-</span> <span class="pre">fitted_values</span></code>.</p></td>
@@ -3455,8 +3869,8 @@ must exceed 2 so the variance exists.</p>
 <p class="rubric">Attributes</p>
 <table class="autosummary longtable docutils data align-default">
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="#neighbayes.models.SLX.inference_data" title="neighbayes.models.SLX.inference_data (Python property) — Return the ArviZ InferenceData from the most recent fit."><code class="xref py py-obj docutils literal notranslate"><span class="pre">inference_data</span></code></a></p></td>
-<td><p>Return the ArviZ InferenceData from the most recent fit.</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#neighbayes.models.SLX.inference_data" title="neighbayes.models.SLX.inference_data (Python property) — Return the ArviZ DataTree from the most recent fit."><code class="xref py py-obj docutils literal notranslate"><span class="pre">inference_data</span></code></a></p></td>
+<td><p>Return the ArviZ DataTree from the most recent fit.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#neighbayes.models.SLX.pymc_model" title="neighbayes.models.SLX.pymc_model (Python property) — Return the PyMC model object built for the most recent fit."><code class="xref py py-obj docutils literal notranslate"><span class="pre">pymc_model</span></code></a></p></td>
 <td><p>Return the PyMC model object built for the most recent fit.</p></td>
@@ -3465,7 +3879,7 @@ must exceed 2 so the variance exists.</p>
 </table>
 <dl class="py method objdesc">
 <dt class="sig sig-object highlight sig-wrap py" id="neighbayes.models.SLX.fit">
-<span class="sig-name descname"><span class="pre">fit</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.fit.draws" title="neighbayes.models.SLX.fit.draws (Python parameter) — Post-warmup draws, warmup steps, and number of chains."><span class="n"><span class="pre">draws</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">2000</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.fit.tune" title="neighbayes.models.SLX.fit.tune (Python parameter) — Post-warmup draws, warmup steps, and number of chains."><span class="n"><span class="pre">tune</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">1000</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.fit.chains" title="neighbayes.models.SLX.fit.chains (Python parameter) — Post-warmup draws, warmup steps, and number of chains."><span class="n"><span class="pre">chains</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">4</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.fit.target_accept" title="neighbayes.models.SLX.fit.target_accept (Python parameter) — Target acceptance rate for NUTS."><span class="n"><span class="pre">target_accept</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.fit.random_seed" title="neighbayes.models.SLX.fit.random_seed (Python parameter) — Seed for reproducibility."><span class="n"><span class="pre">random_seed</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.fit.progressbar" title="neighbayes.models.SLX.fit.progressbar (Python parameter) — Show progress bar(s) during sampling."><span class="n"><span class="pre">progressbar</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">True</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.fit.sampler" title="neighbayes.models.SLX.fit.sampler (Python parameter) — Sampling method."><span class="n"><span class="pre">sampler</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.fit.gibbs_backend" title="neighbayes.models.SLX.fit.gibbs_backend (Python parameter) — Execution backend for the Gibbs sampler."><span class="n"><span class="pre">gibbs_backend</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="s1">'auto'</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.fit.thin" title="neighbayes.models.SLX.fit.thin (Python parameter) — Keep every thin-th post-warmup Gibbs draw (Gibbs only)."><span class="n"><span class="pre">thin</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">1</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.fit.n_jobs" title="neighbayes.models.SLX.fit.n_jobs (Python parameter) — Parallel workers for the NumPy Gibbs path (Gibbs only)."><span class="n"><span class="pre">n_jobs</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="o">-</span><span class="mi">1</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.fit.idata_kwargs" title="neighbayes.models.SLX.fit.idata_kwargs (Python parameter) — {&quot;log_likelihood&quot;: True} stores the complete Jacobian-corrected pointwise log-likelihood that az.loo / az.waic / az.compare need, for Gibbs and NUTS alike."><span class="n"><span class="pre">idata_kwargs</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">**</span></span><a class="n reference internal" href="#neighbayes.models.SLX.fit.sample_kwargs" title="neighbayes.models.SLX.fit.sample_kwargs (Python parameter) — For NUTS, forwarded to pm.sample (nuts_sampler=...); for Gibbs, the family's declared options (an unsupported key raises)."><span class="n"><span class="pre">sample_kwargs</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/base.py#L260-L391"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SLX.fit" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">fit</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.fit.draws" title="neighbayes.models.SLX.fit.draws (Python parameter) — Post-warmup draws, warmup steps, and number of chains."><span class="n"><span class="pre">draws</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">2000</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.fit.tune" title="neighbayes.models.SLX.fit.tune (Python parameter) — Post-warmup draws, warmup steps, and number of chains."><span class="n"><span class="pre">tune</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">1000</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.fit.chains" title="neighbayes.models.SLX.fit.chains (Python parameter) — Post-warmup draws, warmup steps, and number of chains."><span class="n"><span class="pre">chains</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">4</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.fit.target_accept" title="neighbayes.models.SLX.fit.target_accept (Python parameter) — Target acceptance rate for NUTS."><span class="n"><span class="pre">target_accept</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.fit.random_seed" title="neighbayes.models.SLX.fit.random_seed (Python parameter) — Seed for reproducibility."><span class="n"><span class="pre">random_seed</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.fit.progressbar" title="neighbayes.models.SLX.fit.progressbar (Python parameter) — Show progress bar(s) during sampling."><span class="n"><span class="pre">progressbar</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">True</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.fit.sampler" title="neighbayes.models.SLX.fit.sampler (Python parameter) — Sampling method."><span class="n"><span class="pre">sampler</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.fit.gibbs_backend" title="neighbayes.models.SLX.fit.gibbs_backend (Python parameter) — Execution backend for the Gibbs sampler."><span class="n"><span class="pre">gibbs_backend</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="s1">'auto'</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.fit.thin" title="neighbayes.models.SLX.fit.thin (Python parameter) — Keep every thin-th post-warmup Gibbs draw (Gibbs only)."><span class="n"><span class="pre">thin</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">1</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.fit.n_jobs" title="neighbayes.models.SLX.fit.n_jobs (Python parameter) — Parallel workers for the NumPy Gibbs path (Gibbs only)."><span class="n"><span class="pre">n_jobs</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="o">-</span><span class="mi">1</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.fit.idata_kwargs" title="neighbayes.models.SLX.fit.idata_kwargs (Python parameter) — {&quot;log_likelihood&quot;: True} stores the complete Jacobian-corrected pointwise log-likelihood that az.loo / az.compare need, for Gibbs and NUTS alike."><span class="n"><span class="pre">idata_kwargs</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">**</span></span><a class="n reference internal" href="#neighbayes.models.SLX.fit.sample_kwargs" title="neighbayes.models.SLX.fit.sample_kwargs (Python parameter) — For NUTS, forwarded to pm.sample (nuts_sampler=...); for Gibbs, the family's declared options (an unsupported key raises)."><span class="n"><span class="pre">sample_kwargs</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/base.py#L263-L394"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SLX.fit" title="Link to this definition">¶</a></dt>
 <dd><p>Draw samples from the posterior.</p>
 <p>Dispatches to this model’s Gibbs sampler (<code class="docutils literal notranslate"><span class="pre">sampler=&quot;gibbs&quot;</span></code>) or NUTS
 (<code class="docutils literal notranslate"><span class="pre">sampler=&quot;nuts&quot;</span></code>).  When <code class="docutils literal notranslate"><span class="pre">sampler</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code> (default), Gibbs is
@@ -3497,7 +3911,7 @@ installed and supported by the family, else NumPy.  Ignored for NUTS.</p>
 <dt id="neighbayes.models.SLX.fit.n_jobs"><span class="sig-name descname">n_jobs</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)">int</a>, default -1</span></span><a class="headerlink" href="#neighbayes.models.SLX.fit.n_jobs" title="Permalink to this definition">¶</a></dt><dd><p>Parallel workers for the NumPy Gibbs path (Gibbs only).</p>
 </dd>
 <dt id="neighbayes.models.SLX.fit.idata_kwargs"><span class="sig-name descname">idata_kwargs</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.14)">dict</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SLX.fit.idata_kwargs" title="Permalink to this definition">¶</a></dt><dd><p><code class="docutils literal notranslate"><span class="pre">{&quot;log_likelihood&quot;:</span> <span class="pre">True}</span></code> stores the complete Jacobian-corrected
-pointwise log-likelihood that <code class="docutils literal notranslate"><span class="pre">az.loo</span></code> / <code class="docutils literal notranslate"><span class="pre">az.waic</span></code> /
+pointwise log-likelihood that <code class="docutils literal notranslate"><span class="pre">az.loo</span></code> /
 <code class="docutils literal notranslate"><span class="pre">az.compare</span></code> need, for Gibbs and NUTS alike.  Off by default, as
 in PyMC: it holds one value per draw, chain, and observation (16 GB
 at n = 250,000 with 4 × 2,000 draws).  For NUTS the dict is also
@@ -3509,14 +3923,14 @@ Gibbs, the family’s declared options (an unsupported key raises).</p>
 </dl>
 </dd>
 <dt class="field-even" id="neighbayes.models.SLX.fit-return-type">Return type<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SLX.fit-return-type" title="Permalink to this headline">¶</a></dt>
-<dd class="field-even"><p>arviz.InferenceData</p>
+<dd class="field-even"><p>xarray.DataTree</p>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="py method objdesc">
 <dt class="sig sig-object highlight py" id="neighbayes.models.SLX.fitted_values">
-<span class="sig-name descname"><span class="pre">fitted_values</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L957-L967"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SLX.fitted_values" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">fitted_values</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L984-L994"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SLX.fitted_values" title="Link to this definition">¶</a></dt>
 <dd><p>Return fitted values at posterior mean parameters.</p>
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.models.SLX.fitted_values-returns">Returns<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SLX.fitted_values-returns" title="Permalink to this headline">¶</a></dt>
@@ -3530,16 +3944,113 @@ fixed-effects-transformed for panel models).</p>
 </dd></dl>
 
 <dl class="py property objdesc">
-<dt class="sig sig-object highlight sig-wrap py" id="neighbayes.models.SLX.inference_data">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">inference_data</span></span><span class="p"> <span class="pre">:</span> </span><span class="desctype"><span class="pre">arviz.data.inference_data.InferenceData</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models.py"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SLX.inference_data" title="Link to this definition">¶</a></dt>
-<dd><p>Return the ArviZ InferenceData from the most recent fit.</p>
+<dt class="sig sig-object highlight py" id="neighbayes.models.SLX.inference_data">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">inference_data</span></span><span class="p"> <span class="pre">:</span> </span><span class="desctype"><span class="pre">xarray.core.datatree.DataTree</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models.py"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SLX.inference_data" title="Link to this definition">¶</a></dt>
+<dd><p>Return the ArviZ DataTree from the most recent fit.</p>
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.models.SLX.inference_data-returns">Returns<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SLX.inference_data-returns" title="Permalink to this headline">¶</a></dt>
 <dd class="field-odd"><p>The inference data object, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if the model has not
 been fit yet.</p>
 </dd>
 <dt class="field-even" id="neighbayes.models.SLX.inference_data-return-type">Return type<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SLX.inference_data-return-type" title="Permalink to this headline">¶</a></dt>
-<dd class="field-even"><p>arviz.InferenceData or None</p>
+<dd class="field-even"><p>xarray.DataTree or None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py method objdesc">
+<dt class="sig sig-object highlight py" id="neighbayes.models.SLX.predict">
+<span class="sig-name descname"><span class="pre">predict</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.predict.X_new" title="neighbayes.models.SLX.predict.X_new (Python parameter) — Covariates of the new units."><span class="n"><span class="pre">X_new</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.predict.W" title="neighbayes.models.SLX.predict.W (Python parameter) — Weights over the union of fitted and new units, n_fit + n_new square, standardized the way the fitted W was."><span class="n"><span class="pre">W</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.predict.oos" title="neighbayes.models.SLX.predict.oos (Python parameter) — Positions of the new units in W, in the row order of X_new; the fitted units fill the remaining positions in their fitted order."><span class="n"><span class="pre">oos</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.predict.thin" title="neighbayes.models.SLX.predict.thin (Python parameter) — Use every thin-th draw of each chain."><span class="n"><span class="pre">thin</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">1</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.predict.random_seed" title="neighbayes.models.SLX.predict.random_seed (Python parameter) — Seed for the predictive draws."><span class="n"><span class="pre">random_seed</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_mixins/_prediction.py#L97-L215"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SLX.predict" title="Link to this definition">¶</a></dt>
+<dd><p>Posterior predictive distribution of <code class="docutils literal notranslate"><span class="pre">y</span></code> at new units.</p>
+<p>For each posterior draw the outcome at the new units <span class="math notranslate nohighlight">\(O\)</span>,
+given the fitted outcomes <span class="math notranslate nohighlight">\(y_S\)</span>, is exactly</p>
+<div class="math notranslate nohighlight">
+\[y_O \mid y_S \sim N\bigl(\mu_O - \Lambda_{OO}^{-1}
+\Lambda_{OS}(y_S - \mu_S),\; \Lambda_{OO}^{-1}\bigr),
+\qquad \Lambda = (I - \theta W)^{\top}(I - \theta W)/\sigma^2,\]</div>
+<p>the best predictor (BP) of <span class="bibtex-citation" id="id1">Goulard <em>et al.</em> [<a class="reference internal" href="../references.html#id23" title="Michel Goulard, Thibault Laurent, and Christine Thomas-Agnan. About predictions in spatial autoregressive models: optimal and almost optimal strategies. Spatial Economic Analysis, 12(2-3):304–325, 2017. doi:10.1080/17421772.2017.1300679.">2017</a>]</span>
+(eq. 9) at that draw.  <span class="math notranslate nohighlight">\(\theta\)</span> is <span class="math notranslate nohighlight">\(\rho\)</span> for SAR and
+SDM, <span class="math notranslate nohighlight">\(\lambda\)</span> for SEM and SDEM, and zero for OLS and SLX,
+whose predictive is <span class="math notranslate nohighlight">\(N(\mu_O, \sigma^2 I)\)</span>.  The marginal mean
+<span class="math notranslate nohighlight">\(\mu\)</span> is <span class="math notranslate nohighlight">\((I - \rho W)^{-1} Z\beta\)</span> for the lag models
+and <span class="math notranslate nohighlight">\(Z\beta\)</span> otherwise, computed on the union graph.</p>
+<dl class="field-list simple">
+<dt class="field-odd" id="neighbayes.models.SLX.predict-parameters">Parameters<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SLX.predict-parameters" title="Permalink to this headline">¶</a></dt>
+<dd class="field-odd"><dl class="simple api-field highlight">
+<dt id="neighbayes.models.SLX.predict.X_new"><span class="sig-name descname">X_new</span><span class="p"> : </span><span class="desctype"><span class="desctype">DataFrame or array of shape (n_new, k)</span></span><a class="headerlink" href="#neighbayes.models.SLX.predict.X_new" title="Permalink to this definition">¶</a></dt><dd><p>Covariates of the new units.  For a model built from a formula,
+a DataFrame with the variables the formula uses; the formula’s
+transforms are replayed on it.  Otherwise, columns in the order
+of the fitted <code class="docutils literal notranslate"><span class="pre">X</span></code> (or a DataFrame with its column names).</p>
+</dd>
+<dt id="neighbayes.models.SLX.predict.W"><span class="sig-name descname">W</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://pysal.org/libpysal/stable/generated/libpysal.graph.Graph.html#libpysal.graph.Graph" title="(in libpysal v4.15.0)">libpysal.graph.Graph</a> or scipy.sparse matrix</span></span><a class="headerlink" href="#neighbayes.models.SLX.predict.W" title="Permalink to this definition">¶</a></dt><dd><p>Weights over the union of fitted and new units,
+<code class="docutils literal notranslate"><span class="pre">n_fit</span> <span class="pre">+</span> <span class="pre">n_new</span></code> square, standardized the way the fitted <code class="docutils literal notranslate"><span class="pre">W</span></code>
+was.  For SLX, SDM and SDEM the lagged covariates of <em>every</em> unit
+are recomputed on this graph, since a fitted unit with a new
+neighbor gets a new <code class="docutils literal notranslate"><span class="pre">WX</span></code> row.</p>
+</dd>
+<dt id="neighbayes.models.SLX.predict.oos"><span class="sig-name descname">oos</span><span class="p"> : </span><span class="desctype"><span class="desctype">array of <a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)">int</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SLX.predict.oos" title="Permalink to this definition">¶</a></dt><dd><p>Positions of the new units in <code class="docutils literal notranslate"><span class="pre">W</span></code>, in the row order of
+<code class="docutils literal notranslate"><span class="pre">X_new</span></code>; the fitted units fill the remaining positions in
+their fitted order.  Defaults to the last <code class="docutils literal notranslate"><span class="pre">n_new</span></code> positions.</p>
+</dd>
+<dt id="neighbayes.models.SLX.predict.thin"><span class="sig-name descname">thin</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)">int</a>, default 1</span></span><a class="headerlink" href="#neighbayes.models.SLX.predict.thin" title="Permalink to this definition">¶</a></dt><dd><p>Use every <code class="docutils literal notranslate"><span class="pre">thin</span></code>-th draw of each chain.</p>
+</dd>
+<dt id="neighbayes.models.SLX.predict.random_seed"><span class="sig-name descname">random_seed</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)">int</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SLX.predict.random_seed" title="Permalink to this definition">¶</a></dt><dd><p>Seed for the predictive draws.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even" id="neighbayes.models.SLX.predict-returns">Returns<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SLX.predict-returns" title="Permalink to this headline">¶</a></dt>
+<dd class="field-even"><p>A <code class="docutils literal notranslate"><span class="pre">predictions</span></code> group with dimensions <code class="docutils literal notranslate"><span class="pre">(chain,</span> <span class="pre">draw,</span> <span class="pre">obs_new)</span></code>
+holding <code class="docutils literal notranslate"><span class="pre">y</span></code> (posterior predictive draws), <code class="docutils literal notranslate"><span class="pre">y_bp</span></code> (the
+conditional mean at each draw; its average over draws is the
+posterior predictive mean) and <code class="docutils literal notranslate"><span class="pre">y_tc</span></code> (the trend predictor
+<span class="math notranslate nohighlight">\(\mu_O\)</span>, which ignores the observed neighbors), and a
+<code class="docutils literal notranslate"><span class="pre">predictions_constant_data</span></code> group with <code class="docutils literal notranslate"><span class="pre">X_new</span></code>.  Comparing
+<code class="docutils literal notranslate"><span class="pre">y_bp</span></code> with <code class="docutils literal notranslate"><span class="pre">y_tc</span></code> shows what the spatial correction adds.</p>
+</dd>
+<dt class="field-odd" id="neighbayes.models.SLX.predict-return-type">Return type<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SLX.predict-return-type" title="Permalink to this headline">¶</a></dt>
+<dd class="field-odd"><p>xarray.DataTree</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The parameters were estimated on the fitted units’ <code class="docutils literal notranslate"><span class="pre">W</span></code>, and the
+prediction uses the union <code class="docutils literal notranslate"><span class="pre">W</span></code>: the feasible practice of
+<span class="bibtex-citation" id="id2">Goulard <em>et al.</em> [<a class="reference internal" href="../references.html#id23" title="Michel Goulard, Thibault Laurent, and Christine Thomas-Agnan. About predictions in spatial autoregressive models: optimal and almost optimal strategies. Spatial Economic Analysis, 12(2-3):304–325, 2017. doi:10.1080/17421772.2017.1300679.">2017</a>]</span> (their eq. 8).</p>
+</dd></dl>
+
+<dl class="py method objdesc">
+<dt class="sig sig-object highlight py" id="neighbayes.models.SLX.predict_in_sample">
+<span class="sig-name descname"><span class="pre">predict_in_sample</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.predict_in_sample.thin" title="neighbayes.models.SLX.predict_in_sample.thin (Python parameter) — Use every thin-th draw of each chain."><span class="n"><span class="pre">thin</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">1</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.predict_in_sample.random_seed" title="neighbayes.models.SLX.predict_in_sample.random_seed (Python parameter) — Seed for the predictive draws."><span class="n"><span class="pre">random_seed</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_mixins/_prediction.py#L217-L298"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SLX.predict_in_sample" title="Link to this definition">¶</a></dt>
+<dd><p>Leave-one-out conditional predictive of each fitted unit.</p>
+<p>For each unit <span class="math notranslate nohighlight">\(i\)</span> and posterior draw, the distribution of
+<span class="math notranslate nohighlight">\(y_i\)</span> given every other fitted outcome is</p>
+<div class="math notranslate nohighlight">
+\[y_i \mid y_{-i} \sim N\bigl(y_i - (\Lambda r)_i/\Lambda_{ii},
+\; 1/\Lambda_{ii}\bigr), \qquad r = y - \mu,\]</div>
+<p>the in-sample BP of <span class="bibtex-citation" id="id3">Goulard <em>et al.</em> [<a class="reference internal" href="../references.html#id23" title="Michel Goulard, Thibault Laurent, and Christine Thomas-Agnan. About predictions in spatial autoregressive models: optimal and almost optimal strategies. Spatial Economic Analysis, 12(2-3):304–325, 2017. doi:10.1080/17421772.2017.1300679.">2017</a>]</span>
+(eq. 14).  All units together cost one sparse matrix-vector product
+per draw.</p>
+<p>The draws condition on the posterior from the <em>full</em> data, which
+includes <span class="math notranslate nohighlight">\(y_i\)</span>, so this is a smoother, not cross-validation;
+use <a class="reference internal" href="neighbayes.diagnostics.spatial_kfold.html#neighbayes.diagnostics.spatial_kfold" title="neighbayes.diagnostics.spatial_kfold (Python function) — Spatial block cross-validation for a fitted Bayesian spatial model."><code class="xref py py-func docutils literal notranslate"><span class="pre">neighbayes.diagnostics.spatial_kfold()</span></code></a> to score held-out
+predictive accuracy.</p>
+<dl class="field-list simple">
+<dt class="field-odd" id="neighbayes.models.SLX.predict_in_sample-parameters">Parameters<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SLX.predict_in_sample-parameters" title="Permalink to this headline">¶</a></dt>
+<dd class="field-odd"><dl class="simple api-field highlight">
+<dt id="neighbayes.models.SLX.predict_in_sample.thin"><span class="sig-name descname">thin</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)">int</a>, default 1</span></span><a class="headerlink" href="#neighbayes.models.SLX.predict_in_sample.thin" title="Permalink to this definition">¶</a></dt><dd><p>Use every <code class="docutils literal notranslate"><span class="pre">thin</span></code>-th draw of each chain.</p>
+</dd>
+<dt id="neighbayes.models.SLX.predict_in_sample.random_seed"><span class="sig-name descname">random_seed</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)">int</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SLX.predict_in_sample.random_seed" title="Permalink to this definition">¶</a></dt><dd><p>Seed for the predictive draws.</p>
+</dd>
+</dl>
+</dd>
+<dt class="field-even" id="neighbayes.models.SLX.predict_in_sample-returns">Returns<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SLX.predict_in_sample-returns" title="Permalink to this headline">¶</a></dt>
+<dd class="field-even"><p>A <code class="docutils literal notranslate"><span class="pre">predictions</span></code> group with dimensions <code class="docutils literal notranslate"><span class="pre">(chain,</span> <span class="pre">draw,</span> <span class="pre">obs)</span></code>
+holding <code class="docutils literal notranslate"><span class="pre">y</span></code> (draws), <code class="docutils literal notranslate"><span class="pre">y_bp</span></code> (the leave-one-out conditional
+mean) and <code class="docutils literal notranslate"><span class="pre">y_tc</span></code> (the marginal mean <span class="math notranslate nohighlight">\(\mu\)</span>).  Each
+unit’s draws follow its own conditional; they are marginally
+correct per unit but not a joint draw across units.</p>
+</dd>
+<dt class="field-odd" id="neighbayes.models.SLX.predict_in_sample-return-type">Return type<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SLX.predict_in_sample-return-type" title="Permalink to this headline">¶</a></dt>
+<dd class="field-odd"><p>xarray.DataTree</p>
 </dd>
 </dl>
 </dd></dl>
@@ -3566,7 +4077,7 @@ has not been fit yet.</p>
 
 <dl class="py method objdesc">
 <dt class="sig sig-object highlight py" id="neighbayes.models.SLX.residuals">
-<span class="sig-name descname"><span class="pre">residuals</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L969-L979"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SLX.residuals" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">residuals</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L996-L1006"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SLX.residuals" title="Link to this definition">¶</a></dt>
 <dd><p>Return residuals <code class="docutils literal notranslate"><span class="pre">y</span> <span class="pre">-</span> <span class="pre">fitted_values</span></code>.</p>
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.models.SLX.residuals-returns">Returns<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SLX.residuals-returns" title="Permalink to this headline">¶</a></dt>
@@ -3581,7 +4092,7 @@ has not been fit yet.</p>
 
 <dl class="py method objdesc">
 <dt class="sig sig-object highlight py" id="neighbayes.models.SLX.spatial_diagnostics">
-<span class="sig-name descname"><span class="pre">spatial_diagnostics</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L1583-L1653"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SLX.spatial_diagnostics" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">spatial_diagnostics</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L1679-L1749"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SLX.spatial_diagnostics" title="Link to this definition">¶</a></dt>
 <dd><p>Run Bayesian LM specification tests and return a summary table.</p>
 <p>Looks up the diagnostic suite registered for this model class
 and calls each test function on this fitted model, collecting the
@@ -3661,13 +4172,13 @@ time.</p>
 
 <dl class="py method objdesc">
 <dt class="sig sig-object highlight py" id="neighbayes.models.SLX.spatial_diagnostics_decision">
-<span class="sig-name descname"><span class="pre">spatial_diagnostics_decision</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.spatial_diagnostics_decision.alpha" title="neighbayes.models.SLX.spatial_diagnostics_decision.alpha (Python parameter) — Significance level for the Bayesian p-values."><span class="n"><span class="pre">alpha</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">0.05</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.spatial_diagnostics_decision.format" title="neighbayes.models.SLX.spatial_diagnostics_decision.format (Python parameter) — Output format."><span class="n"><span class="pre">format</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="s1">'graphviz'</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L1655-L1770"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SLX.spatial_diagnostics_decision" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">spatial_diagnostics_decision</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.spatial_diagnostics_decision.alpha" title="neighbayes.models.SLX.spatial_diagnostics_decision.alpha (Python parameter) — Significance level for the Bayesian p-values."><span class="n"><span class="pre">alpha</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">0.05</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.spatial_diagnostics_decision.format" title="neighbayes.models.SLX.spatial_diagnostics_decision.format (Python parameter) — Output format."><span class="n"><span class="pre">format</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="s1">'graphviz'</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L1751-L1866"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SLX.spatial_diagnostics_decision" title="Link to this definition">¶</a></dt>
 <dd><p>Return a model-selection decision from Bayesian LM test results.</p>
-<p>Implements the decision tree from <span class="bibtex-citation" id="id1">Koley and Bera [<a class="reference internal" href="../references.html#id27" title="Malabika Koley and Anil K. Bera. To use, or not to use the spatial Durbin model? – that is the question. Spatial Economic Analysis, 19(1):30–56, 2024. URL: https://doi.org/10.1080/17421772.2023.2256810 (visited on 2025-05-21), doi:10.1080/17421772.2023.2256810.">2024</a>]</span>
+<p>Implements the decision tree from <span class="bibtex-citation" id="id4">Koley and Bera [<a class="reference internal" href="../references.html#id28" title="Malabika Koley and Anil K. Bera. To use, or not to use the spatial Durbin model? – that is the question. Spatial Economic Analysis, 19(1):30–56, 2024. URL: https://doi.org/10.1080/17421772.2023.2256810 (visited on 2025-05-21), doi:10.1080/17421772.2023.2256810.">2024</a>]</span>
 (the Bayesian analogue of the classical <code class="docutils literal notranslate"><span class="pre">stge_kb</span></code> procedure
-in <span class="bibtex-citation" id="id2">Anselin <em>et al.</em> [<a class="reference internal" href="../references.html#id4" title="Luc Anselin, Anil Bera, Raymond J G M Florax, and M Yoon. Simple diagnostic tests for spatial dependence. Regional Science and Urban Economics, 26:77–104, 1996. doi:10.1016/0166-0462(95)02111-6.">1996</a>]</span>).  Panel models use the
+in <span class="bibtex-citation" id="id5">Anselin <em>et al.</em> [<a class="reference internal" href="../references.html#id4" title="Luc Anselin, Anil Bera, Raymond J G M Florax, and M Yoon. Simple diagnostic tests for spatial dependence. Regional Science and Urban Economics, 26:77–104, 1996. doi:10.1016/0166-0462(95)02111-6.">1996</a>]</span>).  Panel models use the
 <code class="docutils literal notranslate"><span class="pre">Panel-</span></code>-prefixed test analogues and the panel decision specs,
-following <span class="bibtex-citation" id="id3">Elhorst [<a class="reference internal" href="../references.html#id14" title="J. Paul Elhorst. Spatial Econometrics: From Cross-Sectional Data to Spatial Panels. SpringerBriefs in Regional Science. Springer Berlin Heidelberg, 2014. ISBN 978-3-642-40339-2 978-3-642-40340-8. URL: https://link.springer.com/10.1007/978-3-642-40340-8 (visited on 2023-04-30), doi:10.1007/978-3-642-40340-8.">2014</a>]</span>.  The decision
+following <span class="bibtex-citation" id="id6">Elhorst [<a class="reference internal" href="../references.html#id14" title="J. Paul Elhorst. Spatial Econometrics: From Cross-Sectional Data to Spatial Panels. SpringerBriefs in Regional Science. Springer Berlin Heidelberg, 2014. ISBN 978-3-642-40339-2 978-3-642-40340-8. URL: https://link.springer.com/10.1007/978-3-642-40340-8 (visited on 2023-04-30), doi:10.1007/978-3-642-40340-8.">2014</a>]</span>.  The decision
 logic depends on the current model type and the pattern of
 significant tests:</p>
 <p><strong>From OLS</strong> (6-test decision tree):</p>
@@ -3729,20 +4240,20 @@ string when <code class="docutils literal notranslate"><span class="pre">format=
 </dl>
 </div>
 <p class="rubric">References</p>
-<p><span class="bibtex-citation" id="id4">Koley and Bera [<a class="reference internal" href="../references.html#id27" title="Malabika Koley and Anil K. Bera. To use, or not to use the spatial Durbin model? – that is the question. Spatial Economic Analysis, 19(1):30–56, 2024. URL: https://doi.org/10.1080/17421772.2023.2256810 (visited on 2025-05-21), doi:10.1080/17421772.2023.2256810.">2024</a>]</span>, <span class="bibtex-citation" id="id5">Anselin <em>et al.</em> [<a class="reference internal" href="../references.html#id4" title="Luc Anselin, Anil Bera, Raymond J G M Florax, and M Yoon. Simple diagnostic tests for spatial dependence. Regional Science and Urban Economics, 26:77–104, 1996. doi:10.1016/0166-0462(95)02111-6.">1996</a>]</span>,
-<span class="bibtex-citation" id="id6">Elhorst [<a class="reference internal" href="../references.html#id14" title="J. Paul Elhorst. Spatial Econometrics: From Cross-Sectional Data to Spatial Panels. SpringerBriefs in Regional Science. Springer Berlin Heidelberg, 2014. ISBN 978-3-642-40339-2 978-3-642-40340-8. URL: https://link.springer.com/10.1007/978-3-642-40340-8 (visited on 2023-04-30), doi:10.1007/978-3-642-40340-8.">2014</a>]</span></p>
+<p><span class="bibtex-citation" id="id7">Koley and Bera [<a class="reference internal" href="../references.html#id28" title="Malabika Koley and Anil K. Bera. To use, or not to use the spatial Durbin model? – that is the question. Spatial Economic Analysis, 19(1):30–56, 2024. URL: https://doi.org/10.1080/17421772.2023.2256810 (visited on 2025-05-21), doi:10.1080/17421772.2023.2256810.">2024</a>]</span>, <span class="bibtex-citation" id="id8">Anselin <em>et al.</em> [<a class="reference internal" href="../references.html#id4" title="Luc Anselin, Anil Bera, Raymond J G M Florax, and M Yoon. Simple diagnostic tests for spatial dependence. Regional Science and Urban Economics, 26:77–104, 1996. doi:10.1016/0166-0462(95)02111-6.">1996</a>]</span>,
+<span class="bibtex-citation" id="id9">Elhorst [<a class="reference internal" href="../references.html#id14" title="J. Paul Elhorst. Spatial Econometrics: From Cross-Sectional Data to Spatial Panels. SpringerBriefs in Regional Science. Springer Berlin Heidelberg, 2014. ISBN 978-3-642-40339-2 978-3-642-40340-8. URL: https://link.springer.com/10.1007/978-3-642-40340-8 (visited on 2023-04-30), doi:10.1007/978-3-642-40340-8.">2014</a>]</span></p>
 </dd></dl>
 
 <dl class="py method objdesc">
 <dt class="sig sig-object highlight py" id="neighbayes.models.SLX.spatial_effects">
-<span class="sig-name descname"><span class="pre">spatial_effects</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.spatial_effects.return_posterior_samples" title="neighbayes.models.SLX.spatial_effects.return_posterior_samples (Python parameter) — If True, return a (DataFrame, dict) tuple where the dict contains the full posterior draws under keys &quot;direct&quot;, &quot;indirect&quot;, and &quot;total&quot;."><span class="n"><span class="pre">return_posterior_samples</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L1104-L1184"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SLX.spatial_effects" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">spatial_effects</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.spatial_effects.return_posterior_samples" title="neighbayes.models.SLX.spatial_effects.return_posterior_samples (Python parameter) — If True, return a (DataFrame, dict) tuple where the dict contains the full posterior draws under keys &quot;direct&quot;, &quot;indirect&quot;, and &quot;total&quot;."><span class="n"><span class="pre">return_posterior_samples</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L1159-L1239"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SLX.spatial_effects" title="Link to this definition">¶</a></dt>
 <dd><p>Compute Bayesian inference for direct, indirect, and total impacts.</p>
 <p>Computes impact measures for each posterior draw, then summarizes
 the posterior distribution with means, 95% credible intervals, and
 Bayesian p-values.  This is the fully Bayesian analog of the
-simulation-based approach in <span class="bibtex-citation" id="id7">LeSage and Pace [<a class="reference internal" href="../references.html#id30" title="J LeSage and R K Pace. Introduction to Spatial Econometrics. CRC Press, 2009.">2009</a>]</span>
+simulation-based approach in <span class="bibtex-citation" id="id10">LeSage and Pace [<a class="reference internal" href="../references.html#id32" title="J LeSage and R K Pace. Introduction to Spatial Econometrics. CRC Press, 2009.">2009</a>]</span>
 and the asymptotic variance formulas in
-<span class="bibtex-citation" id="id8">Arbia <em>et al.</em> [<a class="reference internal" href="../references.html#id6" title="Giuseppe Arbia, Anil K. Bera, Osman Doğan, and Süleyman Taş pınar. Testing Impact Measures in Spatial Autoregressive Models. International Regional Science Review, 43(1-2):40–75, January 2020. URL: https://doi.org/10.1177/0160017619826264 (visited on 2023-11-18), doi:10.1177/0160017619826264.">2020</a>]</span>.</p>
+<span class="bibtex-citation" id="id11">Arbia <em>et al.</em> [<a class="reference internal" href="../references.html#id6" title="Giuseppe Arbia, Anil K. Bera, Osman Doğan, and Süleyman Taş pınar. Testing Impact Measures in Spatial Autoregressive Models. International Regional Science Review, 43(1-2):40–75, January 2020. URL: https://doi.org/10.1177/0160017619826264 (visited on 2023-11-18), doi:10.1177/0160017619826264.">2020</a>]</span>.</p>
 <p>Models without a spatial lag on y do not exhibit global
 feedback propagation through <span class="math notranslate nohighlight">\((I-\\rho W)^{-1}\)</span>. However,
 models with spatially lagged covariates (SLX, SDEM) can still
@@ -3775,7 +4286,7 @@ to a <code class="docutils literal notranslate"><span class="pre">(G,</span> <sp
 
 <dl class="py method objdesc">
 <dt class="sig sig-object highlight py" id="neighbayes.models.SLX.summary">
-<span class="sig-name descname"><span class="pre">summary</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.summary.var_names" title="neighbayes.models.SLX.summary.var_names (Python parameter) — Variable names to include in the summary."><span class="n"><span class="pre">var_names</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">**</span></span><a class="n reference internal" href="#neighbayes.models.SLX.summary.kwargs" title="neighbayes.models.SLX.summary.kwargs (Python parameter) — Additional arguments passed to arviz.summary()."><span class="n"><span class="pre">kwargs</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L938-L955"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SLX.summary" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">summary</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SLX.summary.var_names" title="neighbayes.models.SLX.summary.var_names (Python parameter) — Variable names to include in the summary."><span class="n"><span class="pre">var_names</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">**</span></span><a class="n reference internal" href="#neighbayes.models.SLX.summary.kwargs" title="neighbayes.models.SLX.summary.kwargs (Python parameter) — Additional arguments passed to arviz.summary()."><span class="n"><span class="pre">kwargs</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L965-L982"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SLX.summary" title="Link to this definition">¶</a></dt>
 <dd><p>Return posterior summary table.</p>
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.models.SLX.summary-parameters">Parameters<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SLX.summary-parameters" title="Permalink to this headline">¶</a></dt>

@@ -30,7 +30,7 @@
       ~PanelSARREPriors.rho_upper
       ~PanelSARREPriors.sigma2_alpha
       ~PanelSARREPriors.sigma2_beta
-      ~PanelSARREPriors.sigma_alpha_sigma
-      ~PanelSARREPriors.sigma_sigma
+      ~PanelSARREPriors.sigma_alpha_nu
+      ~PanelSARREPriors.sigma_alpha_scale
    
    

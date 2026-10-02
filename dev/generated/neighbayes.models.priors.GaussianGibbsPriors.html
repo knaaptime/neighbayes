@@ -757,6 +757,30 @@
 
               
             
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1636,30 +1660,6 @@
 
               
             
-              
-                
-  
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="neighbayes.models.priors.PanelGaussianPriors.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    <span>neighbayes.<wbr>models.<wbr>priors.<wbr>Panel<wbr>Gaussian<wbr>Priors</span>
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
           </ul>
         </nav>
       
@@ -2289,7 +2289,7 @@
 <h1 id="neighbayes-models-priors-gaussiangibbspriors">neighbayes.models.priors.GaussianGibbsPriors<a class="headerlink" href="#neighbayes-models-priors-gaussiangibbspriors" title="Link to this heading">¶</a></h1>
 <dl class="py class objdesc">
 <dt class="sig sig-object highlight sig-wrap py" id="neighbayes.models.priors.GaussianGibbsPriors">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neighbayes.models.priors.</span></span><span class="sig-name descname"><span class="pre">GaussianGibbsPriors</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.GaussianGibbsPriors.__init__.beta_mu" title="neighbayes.models.priors.GaussianGibbsPriors.__init__.beta_mu (Python parameter) — Prior mean for β."><span class="n"><span class="pre">beta_mu</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">0.0</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.GaussianGibbsPriors.__init__.beta_sigma" title="neighbayes.models.priors.GaussianGibbsPriors.__init__.beta_sigma (Python parameter) — Prior standard deviation for β."><span class="n"><span class="pre">beta_sigma</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">1000000.0</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.GaussianGibbsPriors.__init__.sigma2_alpha" title="neighbayes.models.priors.GaussianGibbsPriors.__init__.sigma2_alpha (Python parameter) — Shape hyperparameter of the InverseGamma(sigma2_alpha, sigma2_beta) prior on σ²."><span class="n"><span class="pre">sigma2_alpha</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">2.0</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.GaussianGibbsPriors.__init__.sigma2_beta" title="neighbayes.models.priors.GaussianGibbsPriors.__init__.sigma2_beta (Python parameter) — Scale (rate) hyperparameter of the InverseGamma prior on σ². Models typically resolve this to Var(y) at construction so the prior mean is scale-aware."><span class="n"><span class="pre">sigma2_beta</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">1.0</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.GaussianGibbsPriors.__init__.rho_lower" title="neighbayes.models.priors.GaussianGibbsPriors.__init__.rho_lower (Python parameter) — Lower bound for ρ/λ (from spectral stability)."><span class="n"><span class="pre">rho_lower</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="o">-</span><span class="mf">0.999</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.GaussianGibbsPriors.__init__.rho_upper" title="neighbayes.models.priors.GaussianGibbsPriors.__init__.rho_upper (Python parameter) — Upper bound for ρ/λ (from spectral stability)."><span class="n"><span class="pre">rho_upper</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">0.999</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/priors.py#L539-L570"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.priors.GaussianGibbsPriors" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neighbayes.models.priors.</span></span><span class="sig-name descname"><span class="pre">GaussianGibbsPriors</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.GaussianGibbsPriors.__init__.beta_mu" title="neighbayes.models.priors.GaussianGibbsPriors.__init__.beta_mu (Python parameter) — Prior mean for β."><span class="n"><span class="pre">beta_mu</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">0.0</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.GaussianGibbsPriors.__init__.beta_sigma" title="neighbayes.models.priors.GaussianGibbsPriors.__init__.beta_sigma (Python parameter) — Prior standard deviation for β."><span class="n"><span class="pre">beta_sigma</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">1000000.0</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.GaussianGibbsPriors.__init__.sigma2_alpha" title="neighbayes.models.priors.GaussianGibbsPriors.__init__.sigma2_alpha (Python parameter) — Shape hyperparameter of the InverseGamma(sigma2_alpha, sigma2_beta) prior on σ²."><span class="n"><span class="pre">sigma2_alpha</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">2.0</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.GaussianGibbsPriors.__init__.sigma2_beta" title="neighbayes.models.priors.GaussianGibbsPriors.__init__.sigma2_beta (Python parameter) — Scale (rate) hyperparameter of the InverseGamma prior on σ². Models typically resolve this to Var(y) at construction so the prior mean is scale-aware."><span class="n"><span class="pre">sigma2_beta</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">1.0</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.GaussianGibbsPriors.__init__.rho_lower" title="neighbayes.models.priors.GaussianGibbsPriors.__init__.rho_lower (Python parameter) — Lower bound for ρ/λ (from spectral stability)."><span class="n"><span class="pre">rho_lower</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="o">-</span><span class="mf">0.999</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.GaussianGibbsPriors.__init__.rho_upper" title="neighbayes.models.priors.GaussianGibbsPriors.__init__.rho_upper (Python parameter) — Upper bound for ρ/λ (from spectral stability)."><span class="n"><span class="pre">rho_upper</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">0.999</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/priors.py#L537-L568"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.priors.GaussianGibbsPriors" title="Link to this definition">¶</a></dt>
 <dd><p>Prior hyperparameters for Gaussian spatial Gibbs.</p>
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.models.priors.GaussianGibbsPriors-parameters">Parameters<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.priors.GaussianGibbsPriors-parameters" title="Permalink to this headline">¶</a></dt>

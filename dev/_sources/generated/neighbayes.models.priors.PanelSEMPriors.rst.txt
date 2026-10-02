@@ -30,6 +30,5 @@
       ~PanelSEMPriors.nu
       ~PanelSEMPriors.sigma2_alpha
       ~PanelSEMPriors.sigma2_beta
-      ~PanelSEMPriors.sigma_sigma
    
    

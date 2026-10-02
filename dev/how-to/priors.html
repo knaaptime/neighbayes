@@ -930,6 +930,30 @@
 
               
             
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1598,7 +1622,7 @@ referee asks for a sensitivity analysis.</p>
 <span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">OLS</span><span class="p">,</span> <span class="n">SAR</span><span class="p">,</span> <span class="n">SLX</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models.priors</span><span class="w"> </span><span class="kn">import</span> <span class="n">SARPriors</span><span class="p">,</span> <span class="n">SEMPriors</span>
 
-<span class="n">data</span> <span class="o">=</span> <span class="n">simulate_sar</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">simulate_sar</span><span class="p">(</span><span class="n">n_side</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
 <span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">W</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="s2">"X"</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="s2">"W_graph"</span><span class="p">]</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"n = </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">y</span><span class="p">)</span><span class="si">}</span><span class="s2">, k = </span><span class="si">{</span><span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </code></pre></div>
@@ -1606,6 +1630,10 @@ referee asks for a sensitivity analysis.</p>
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>n = 400, k = 2
+</code></pre></div>
+</div>
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
 </code></pre></div>
 </div>
 </div>
@@ -1647,9 +1675,9 @@ keys that carry a concrete value.</p>
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>class : SARPriors
-object: SARPriors(beta_mu=None, beta_sigma=None, sigma2_alpha=2.0, sigma2_beta=None, sigma_sigma=10.0, nu=4.0, rho_lower=-1.0, rho_upper=1.0)
+object: SARPriors(beta_mu=None, beta_sigma=None, sigma2_alpha=2.0, sigma2_beta=None, nu=4.0, rho_lower=-1.0, rho_upper=1.0)
 
-dict  : {'sigma2_alpha': 2.0, 'sigma_sigma': 10.0, 'nu': 4.0, 'rho_lower': -1.0, 'rho_upper': 1.0}
+dict  : {'sigma2_alpha': 2.0, 'nu': 4.0, 'rho_lower': -1.0, 'rho_upper': 1.0}
 </code></pre></div>
 </div>
 </div>
@@ -1732,7 +1760,7 @@ sampler spend draws in a region you would not believe anyway.</p>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>rho posterior minimum: 0.3603
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>rho posterior minimum: 0.3838
 (the prior bound is a hard constraint, not a nudge)
 </code></pre></div>
 </div>
@@ -1755,7 +1783,7 @@ construction, with the allowed keys in the message.</p>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>TypeError: Unknown prior key(s) for SARPriors: ['rho_lo']. Allowed keys: ['beta_mu', 'beta_sigma', 'nu', 'rho_lower', 'rho_upper', 'sigma2_alpha', 'sigma2_beta', 'sigma_sigma'].
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>TypeError: Unknown prior key(s) for SARPriors: ['rho_lo']. Allowed keys: ['beta_mu', 'beta_sigma', 'nu', 'rho_lower', 'rho_upper', 'sigma2_alpha', 'sigma2_beta'].
 </code></pre></div>
 </div>
 </div>
@@ -1851,7 +1879,7 @@ covariates, under the default prior and under a deliberately diffuse one:</p>
     </tr>
     <tr>
       <th>beta_sigma = 1e6</th>
-      <td>17.804</td>
+      <td>17.805</td>
     </tr>
   </tbody>
 </table>
@@ -1877,7 +1905,7 @@ that is where a prior can still move the answer — at <span class="math notrans
 reasonable would.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">small</span> <span class="o">=</span> <span class="n">simulate_sar</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>  <span class="c1"># 7 x 7 grid = 49 observations</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">small</span> <span class="o">=</span> <span class="n">simulate_sar</span><span class="p">(</span><span class="n">n_side</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>  <span class="c1"># 7 x 7 grid = 49 observations</span>
 <span class="n">ys</span><span class="p">,</span> <span class="n">Xs</span><span class="p">,</span> <span class="n">Ws</span> <span class="o">=</span> <span class="n">small</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">small</span><span class="p">[</span><span class="s2">"X"</span><span class="p">],</span> <span class="n">small</span><span class="p">[</span><span class="s2">"W_graph"</span><span class="p">]</span>
 
 <span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
@@ -1936,27 +1964,27 @@ reasonable would.</p>
   <tbody>
     <tr>
       <th>beta_sigma=0.25</th>
-      <td>0.459</td>
-      <td>1.229</td>
-      <td>1.315</td>
+      <td>0.346</td>
+      <td>1.339</td>
+      <td>1.307</td>
     </tr>
     <tr>
       <th>beta_sigma=1</th>
-      <td>0.459</td>
-      <td>0.937</td>
-      <td>2.058</td>
+      <td>0.441</td>
+      <td>0.966</td>
+      <td>2.061</td>
     </tr>
     <tr>
       <th>beta_sigma=5</th>
-      <td>0.459</td>
-      <td>0.917</td>
-      <td>2.106</td>
+      <td>0.449</td>
+      <td>0.934</td>
+      <td>2.108</td>
     </tr>
     <tr>
       <th>default</th>
-      <td>0.459</td>
-      <td>0.917</td>
-      <td>2.107</td>
+      <td>0.448</td>
+      <td>0.935</td>
+      <td>2.109</td>
     </tr>
   </tbody>
 </table>

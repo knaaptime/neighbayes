@@ -757,6 +757,30 @@
 
               
             
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2452,7 +2476,7 @@
 <span class="sig-prename descclassname"><span class="pre">neighbayes.diagnostics.lmtests.</span></span><span class="sig-name descname"><span class="pre">bayesian_robust_lm_error_sdem_test</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.lmtests.bayesian_robust_lm_error_sdem_test.model" title="neighbayes.diagnostics.lmtests.bayesian_robust_lm_error_sdem_test.model (Python parameter) — Fitted SLX model with inference_data containing posterior draws of beta (covering the stacked [X, WX] design) and sigma."><span class="n"><span class="pre">model</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/diagnostics/lmtests/cross_sectional.py#L1133-L1243"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.diagnostics.lmtests.bayesian_robust_lm_error_sdem_test" title="Link to this definition">¶</a></dt>
 <dd><p>Bayesian robust LM-Error test in SDEM context (H₀: λ = 0, robust to γ).</p>
 <p>Bayesian extension of the robust LM-Error test in the SDEM context
-(<span class="bibtex-citation" id="id1">[<a class="reference internal" href="../references.html#id27" title="Malabika Koley and Anil K. Bera. To use, or not to use the spatial Durbin model? – that is the question. Spatial Economic Analysis, 19(1):30–56, 2024. URL: https://doi.org/10.1080/17421772.2023.2256810 (visited on 2025-05-21), doi:10.1080/17421772.2023.2256810.">Koley and Bera, 2024</a>]</span>) using the Doğan, Taşpınar &amp; Bera (2021)
+(<span class="bibtex-citation" id="id1">[<a class="reference internal" href="../references.html#id28" title="Malabika Koley and Anil K. Bera. To use, or not to use the spatial Durbin model? – that is the question. Spatial Economic Analysis, 19(1):30–56, 2024. URL: https://doi.org/10.1080/17421772.2023.2256810 (visited on 2025-05-21), doi:10.1080/17421772.2023.2256810.">Koley and Bera, 2024</a>]</span>) using the Doğan, Taşpınar &amp; Bera (2021)
 framework (<span class="bibtex-citation" id="id2">[<a class="reference internal" href="../references.html#id13" title="Osman Doğan, Süleyman Taşpınar, and Anil K. Bera. A Bayesian robust chi-squared test for testing simple hypotheses. Journal of Econometrics, 222(2):933–958, 2021. URL: https://www.sciencedirect.com/science/article/pii/S0304407620303018 (visited on 2026-04-21), doi:10.1016/j.jeconom.2020.07.046.">Doğan <em>et al.</em>, 2021</a>]</span>, Proposition 3).</p>
 <p>The alternative model is SDEM (adds <span class="math notranslate nohighlight">\(\lambda\)</span>); the null model
 is <strong>SLX</strong>, in which <span class="math notranslate nohighlight">\(\gamma\)</span> is a free parameter and has
@@ -2465,7 +2489,7 @@ scores are</p>
 g_\rho    = \mathbf{e}^\top W \mathbf{y}.\]</div>
 <p>Under <span class="math notranslate nohighlight">\(H_0\)</span> with spherical errors the cross-block
 <span class="math notranslate nohighlight">\(V_{\lambda\gamma} = 0\)</span> (odd normal moments vanish,
-<span class="bibtex-citation" id="id3">[<a class="reference internal" href="../references.html#id27" title="Malabika Koley and Anil K. Bera. To use, or not to use the spatial Durbin model? – that is the question. Spatial Economic Analysis, 19(1):30–56, 2024. URL: https://doi.org/10.1080/17421772.2023.2256810 (visited on 2025-05-21), doi:10.1080/17421772.2023.2256810.">Koley and Bera, 2024</a>]</span>), so the γ-direction of the
+<span class="bibtex-citation" id="id3">[<a class="reference internal" href="../references.html#id28" title="Malabika Koley and Anil K. Bera. To use, or not to use the spatial Durbin model? – that is the question. Spatial Economic Analysis, 19(1):30–56, 2024. URL: https://doi.org/10.1080/17421772.2023.2256810 (visited on 2025-05-21), doi:10.1080/17421772.2023.2256810.">Koley and Bera, 2024</a>]</span>), so the γ-direction of the
 Neyman-orthogonal adjustment is a no-op.  However the SLX null
 leaves <span class="math notranslate nohighlight">\(\rho\)</span> unconcentrated: when the true DGP is SDM, the
 error score <span class="math notranslate nohighlight">\(g_\lambda\)</span> is biased upward.  We therefore

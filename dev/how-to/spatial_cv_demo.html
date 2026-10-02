@@ -14,7 +14,7 @@
         <link rel="prev" href="bayesian_lmtests.html">
       
       
-        <link rel="next" href="../concept.html">
+        <link rel="next" href="prediction.html">
       
       
       <link rel="icon" href="../_static/pysal_favicon.ico">
@@ -848,6 +848,30 @@
 
               
             
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1420,7 +1444,7 @@
 exchangeable given the parameters, which spatial dependence breaks.
 <code class="docutils literal notranslate"><span class="pre">spatial_kfold</span></code> holds out spatially contiguous <em>blocks</em> instead, refits on the
 remainder, and scores the held-out fold under the full-data joint implied by the
-model <span class="bibtex-citation" id="id1">[<a class="reference internal" href="../references.html#id46" title="David R. Roberts, Volker Bahn, Simone Ciuti, Mark S. Boyce, Jane Elith, Gurutzeta Guillera-Arroita, Severin Hauenstein, José J. Lahoz-Monfort, Boris Schröder, Wilfried Thuiller, David I. Warton, Brendan A. Wintle, Florian Hartig, and Carsten F. Dormann. Cross-validation strategies for data with temporal, spatial, hierarchical, or phylogenetic structure. Ecography, 40(8):913–929, August 2017. URL: https://nsojournals.onlinelibrary.wiley.com/doi/10.1111/ecog.02881 (visited on 2026-05-23), doi:10.1111/ecog.02881.">Roberts <em>et al.</em>, 2017</a>]</span>.</p>
+model <span class="bibtex-citation" id="id1">[<a class="reference internal" href="../references.html#id48" title="David R. Roberts, Volker Bahn, Simone Ciuti, Mark S. Boyce, Jane Elith, Gurutzeta Guillera-Arroita, Severin Hauenstein, José J. Lahoz-Monfort, Boris Schröder, Wilfried Thuiller, David I. Warton, Brendan A. Wintle, Florian Hartig, and Carsten F. Dormann. Cross-validation strategies for data with temporal, spatial, hierarchical, or phylogenetic structure. Ecography, 40(8):913–929, August 2017. URL: https://nsojournals.onlinelibrary.wiley.com/doi/10.1111/ecog.02881 (visited on 2026-05-23), doi:10.1111/ecog.02881.">Roberts <em>et al.</em>, 2017</a>]</span>.</p>
 <p>The scoring rule and its derivation are in
 <a class="reference internal" href="../architecture.html"><span class="std std-doc">Architecture</span></a>.</p>
 <div class="cell docutils container">
@@ -1431,8 +1455,8 @@ model <span class="bibtex-citation" id="id1">[<a class="reference internal" href
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Collecting git+https://github.com/ljwolf/geovalidate/
-  Cloning https://github.com/ljwolf/geovalidate/ to /tmp/pip-req-build-ccn40uwa
-  Running command git clone --filter=blob:none --quiet https://github.com/ljwolf/geovalidate/ /tmp/pip-req-build-ccn40uwa
+  Cloning https://github.com/ljwolf/geovalidate/ to /tmp/pip-req-build-od5ik9mt
+  Running command git clone --filter=blob:none --quiet https://github.com/ljwolf/geovalidate/ /tmp/pip-req-build-od5ik9mt
   Resolved https://github.com/ljwolf/geovalidate/ to commit ab72fa3336a6bcecefd4b69184a06307df1fe24e
   Installing build dependencies ... ?25l-
  \
@@ -1443,7 +1467,7 @@ model <span class="bibtex-citation" id="id1">[<a class="reference internal" href
 ?25hBuilding wheels for collected packages: geovalidate
   Building wheel for geovalidate (pyproject.toml) ... ?25ldone
 ?25h  Created wheel for geovalidate: filename=geovalidate-0.1.0-py3-none-any.whl size=68551 sha256=bb3a33ec9bf9b56be56045d60a3297154d9059b5bda77c8c57689639fa672d91
-  Stored in directory: /tmp/pip-ephem-wheel-cache-5ten0zo6/wheels/07/e1/1c/505deea87953881f24f62e5ffe6dc847b905492d550844705a
+  Stored in directory: /tmp/pip-ephem-wheel-cache-ff4190ri/wheels/07/e1/1c/505deea87953881f24f62e5ffe6dc847b905492d550844705a
 Successfully built geovalidate
 Installing collected packages: geovalidate
 Successfully installed geovalidate-0.1.0
@@ -1469,7 +1493,7 @@ Successfully installed geovalidate-0.1.0
 <span class="n">BETA_TRUE</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.5</span><span class="p">])</span>
 
 <span class="n">gdf</span> <span class="o">=</span> <span class="n">simulate_sar</span><span class="p">(</span>
-    <span class="n">n</span><span class="o">=</span><span class="n">GRID</span><span class="p">,</span>
+    <span class="n">n_side</span><span class="o">=</span><span class="n">GRID</span><span class="p">,</span>
     <span class="n">rho</span><span class="o">=</span><span class="n">RHO_TRUE</span><span class="p">,</span>
     <span class="n">beta</span><span class="o">=</span><span class="n">BETA_TRUE</span><span class="p">,</span>
     <span class="n">sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
@@ -1485,6 +1509,10 @@ Successfully installed geovalidate-0.1.0
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>n = 144, true rho = 0.6, columns = ['y', 'X_0', 'X_1', 'X_2', 'geometry']
+</code></pre></div>
+</div>
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
 </code></pre></div>
 </div>
 </div>
@@ -1518,13 +1546,15 @@ Successfully installed geovalidate-0.1.0
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 5 seconds.
+Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 5 seconds.
+Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
+  W_arr = np.asarray(W, dtype=np.float64)
 /home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
   W_arr = np.asarray(W, dtype=np.float64)
 </code></pre></div>
@@ -1532,14 +1562,24 @@ We recommend running at least 4 chains for robust computation of convergence dia
 </div>
 </div>
 <h2 id="score-them-out-of-sample">Score them out of sample<a class="headerlink" href="#score-them-out-of-sample" title="Link to this heading">¶</a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">spatial_kfold</span></code> derives 5 spatial blocks from the cell centroids via KMeans, refits each model on each train fold, and accumulates the held-out elpd. Higher elpd is better.</p>
+<p><code class="docutils literal notranslate"><span class="pre">spatial_kfold</span></code> takes the fold design as a <em>splitter</em>: any object whose
+<code class="docutils literal notranslate"><span class="pre">split</span></code> method yields <code class="docutils literal notranslate"><span class="pre">(train_idx,</span> <span class="pre">test_idx)</span></code> pairs, the scikit-learn
+convention. Here we cut the 12 × 12 grid into sixteen 3 × 3 blocks and let
+scikit-learn’s <code class="docutils literal notranslate"><span class="pre">GroupKFold</span></code> deal them into 5 folds, so each fold holds out whole
+blocks. <code class="docutils literal notranslate"><span class="pre">spatial_kfold</span></code> refits each model on each training fold and accumulates
+the held-out elpd. Higher elpd is better.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">CV_KW</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">random_seed</span><span class="o">=</span><span class="n">SEED</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.model_selection</span><span class="w"> </span><span class="kn">import</span> <span class="n">GroupKFold</span>
+
+<span class="n">CV_KW</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">random_seed</span><span class="o">=</span><span class="n">SEED</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+
+<span class="n">row</span><span class="p">,</span> <span class="n">col</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">divmod</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">gdf</span><span class="p">)),</span> <span class="n">GRID</span><span class="p">)</span>
+<span class="n">blocks</span> <span class="o">=</span> <span class="p">(</span><span class="n">row</span> <span class="o">//</span> <span class="mi">3</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">GRID</span> <span class="o">//</span> <span class="mi">3</span><span class="p">)</span> <span class="o">+</span> <span class="n">col</span> <span class="o">//</span> <span class="mi">3</span>  <span class="c1"># sixteen 3 x 3 blocks</span>
 
 <span class="n">results</span> <span class="o">=</span> <span class="p">{}</span>
 <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">models</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-    <span class="n">results</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">spatial_kfold</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">geometry</span><span class="o">=</span><span class="n">gdf</span><span class="o">.</span><span class="n">geometry</span><span class="p">,</span> <span class="n">n_blocks</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="o">**</span><span class="n">CV_KW</span><span class="p">)</span>
+    <span class="n">results</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">spatial_kfold</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">GroupKFold</span><span class="p">(</span><span class="n">n_splits</span><span class="o">=</span><span class="mi">5</span><span class="p">),</span> <span class="n">groups</span><span class="o">=</span><span class="n">blocks</span><span class="p">,</span> <span class="o">**</span><span class="n">CV_KW</span><span class="p">)</span>
 
 <span class="n">summary</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
     <span class="p">{</span>
@@ -1582,31 +1622,31 @@ We recommend running at least 4 chains for robust computation of convergence dia
   <tbody>
     <tr>
       <th>SAR</th>
-      <td>-210.455318</td>
-      <td>1.722710</td>
+      <td>-210.101287</td>
+      <td>0.673073</td>
       <td>5</td>
       <td>0.000000</td>
     </tr>
     <tr>
       <th>SLX</th>
-      <td>-236.216386</td>
-      <td>2.348071</td>
+      <td>-234.447969</td>
+      <td>1.061533</td>
       <td>5</td>
-      <td>-25.761069</td>
+      <td>-24.346682</td>
     </tr>
     <tr>
       <th>SEM</th>
-      <td>-239.714462</td>
-      <td>1.364624</td>
+      <td>-235.535469</td>
+      <td>0.579822</td>
       <td>5</td>
-      <td>-29.259144</td>
+      <td>-25.434182</td>
     </tr>
     <tr>
       <th>OLS</th>
-      <td>-282.428976</td>
-      <td>2.467718</td>
+      <td>-281.858445</td>
+      <td>1.283355</td>
       <td>5</td>
-      <td>-71.973659</td>
+      <td>-71.757158</td>
     </tr>
   </tbody>
 </table>
@@ -1614,10 +1654,20 @@ We recommend running at least 4 chains for robust computation of convergence dia
 </div>
 <p>With data simulated from a SAR DGP, spatial block CV should rank <code class="docutils literal notranslate"><span class="pre">SAR</span></code> on top, with the misspecified alternatives trailing behind. The <code class="docutils literal notranslate"><span class="pre">delta_elpd</span></code> column shows the elpd difference relative to the best model — values close to zero indicate near-equivalent predictive performance, while large negative values indicate worse out-of-block prediction.</p>
 <h2 id="swap-in-a-different-fold-design">Swap in a different fold design<a class="headerlink" href="#swap-in-a-different-fold-design" title="Link to this heading">¶</a></h2>
-<p>The built-in KMeans blocking is convenient but coarse. For a richer menu of spatial cross-validation designs — Hilbert space-filling curves, DGGS-cell stratification, clustered hold-outs, and exclusion-buffered leave-one-out — <code class="docutils literal notranslate"><span class="pre">spatial_kfold</span></code> accepts any sklearn-style splitter via the <code class="docutils literal notranslate"><span class="pre">splitter=</span></code> keyword. The
-<a class="reference external" href="https://github.com/ljwolf/geovalidate/"><code class="docutils literal notranslate"><span class="pre">geovalidate</span></code></a> package provides a comprehensive set of these splitters.</p>
+<p>Hand-built blocks are coarse. For a richer menu of spatial cross-validation
+designs — Hilbert space-filling curves, DGGS-cell stratification, clustered
+hold-outs, and exclusion-buffered leave-one-out — use the splitters in
+<a class="reference external" href="https://github.com/ljwolf/geovalidate/"><code class="docutils literal notranslate"><span class="pre">geovalidate</span></code></a>. They take the geometry
+as <code class="docutils literal notranslate"><span class="pre">split</span></code>’s first argument, so pass it as <code class="docutils literal notranslate"><span class="pre">geometry=</span></code>.</p>
 <p>Install with <code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">geovalidate</span></code>.</p>
-<p>Below we re-run CV using <code class="docutils literal notranslate"><span class="pre">HilbertKFold</span></code>, which interleaves observations along a Hilbert curve so every fold covers the entire study area — typically a more balanced design than KMeans blocking.</p>
+<p>Below we re-run CV using <code class="docutils literal notranslate"><span class="pre">HilbertKFold</span></code>, which interleaves observations along a
+Hilbert curve so every fold covers the entire study area.</p>
+<p>Each refit uses the training units’ weights, row-standardized again after the
+held-out units are dropped. When a fold scatters its held-out units, many
+training units lose neighbors, and that refit is biased: on a 10 × 10 rook grid
+with 12% of units held out in a checkerboard, a SAR’s posterior mean of ρ fell
+from 0.57 to 0.42. Contiguous blocks cost far less (0.55 with a 4 × 4 block).
+Prefer designs that hold out compact regions when comparing lag models.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">geovalidate</span><span class="w"> </span><span class="kn">import</span> <span class="n">HilbertKFold</span>
@@ -1625,7 +1675,7 @@ We recommend running at least 4 chains for robust computation of convergence dia
 <span class="n">splitter</span> <span class="o">=</span> <span class="n">HilbertKFold</span><span class="p">(</span><span class="n">n_splits</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="n">SEED</span><span class="p">)</span>
 
 <span class="n">results_hilbert</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="n">name</span><span class="p">:</span> <span class="n">spatial_kfold</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">splitter</span><span class="o">=</span><span class="n">splitter</span><span class="p">,</span> <span class="n">geometry</span><span class="o">=</span><span class="n">gdf</span><span class="o">.</span><span class="n">geometry</span><span class="p">,</span> <span class="o">**</span><span class="n">CV_KW</span><span class="p">)</span>
+    <span class="n">name</span><span class="p">:</span> <span class="n">spatial_kfold</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="n">splitter</span><span class="p">,</span> <span class="n">geometry</span><span class="o">=</span><span class="n">gdf</span><span class="o">.</span><span class="n">geometry</span><span class="p">,</span> <span class="o">**</span><span class="n">CV_KW</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">models</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
 <span class="p">}</span>
 
@@ -1670,37 +1720,37 @@ We recommend running at least 4 chains for robust computation of convergence dia
   <tbody>
     <tr>
       <th>SAR</th>
-      <td>-207.191256</td>
-      <td>0.906427</td>
+      <td>-207.001774</td>
+      <td>0.892350</td>
       <td>HilbertKFold</td>
       <td>0.000000</td>
     </tr>
     <tr>
       <th>SEM</th>
-      <td>-226.684752</td>
-      <td>1.638514</td>
+      <td>-226.617401</td>
+      <td>1.624752</td>
       <td>HilbertKFold</td>
-      <td>-19.493496</td>
+      <td>-19.615627</td>
     </tr>
     <tr>
       <th>SLX</th>
       <td>-237.219069</td>
       <td>1.038330</td>
       <td>HilbertKFold</td>
-      <td>-30.027812</td>
+      <td>-30.217294</td>
     </tr>
     <tr>
       <th>OLS</th>
       <td>-280.125493</td>
       <td>1.441062</td>
       <td>HilbertKFold</td>
-      <td>-72.934237</td>
+      <td>-73.123719</td>
     </tr>
   </tbody>
 </table>
 </div></div></div>
 </div>
-<p>The <code class="docutils literal notranslate"><span class="pre">method</span></code> column now records the splitter class name (<code class="docutils literal notranslate"><span class="pre">HilbertKFold</span></code>) instead of <code class="docutils literal notranslate"><span class="pre">&quot;kmeans&quot;</span></code>. Any other <code class="docutils literal notranslate"><span class="pre">geovalidate</span></code> splitter slots in the same way — for example <code class="docutils literal notranslate"><span class="pre">LeaveClusterOut</span></code> for leave-one-region-out CV, or <code class="docutils literal notranslate"><span class="pre">BallKFold</span></code> for spatially-exclusive folds with an explicit exclusion radius.</p>
+<p>The <code class="docutils literal notranslate"><span class="pre">method</span></code> column records the splitter’s class name (<code class="docutils literal notranslate"><span class="pre">HilbertKFold</span></code>). Any other <code class="docutils literal notranslate"><span class="pre">geovalidate</span></code> splitter slots in the same way — for example <code class="docutils literal notranslate"><span class="pre">LeaveClusterOut</span></code> for leave-one-region-out CV, or <code class="docutils literal notranslate"><span class="pre">BallKFold</span></code> for spatially-exclusive folds with an explicit exclusion radius.</p>
 <h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Link to this heading">¶</a></h2>
 <ul class="simple">
 <li><p><a class="reference internal" href="bayesian_lmtests.html"><span class="std std-doc">How to run Bayesian LM specification tests</span></a> — the

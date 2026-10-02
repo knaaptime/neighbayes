@@ -16,6 +16,8 @@
       ~SDEM.__init__
       ~SDEM.fit
       ~SDEM.fitted_values
+      ~SDEM.predict
+      ~SDEM.predict_in_sample
       ~SDEM.residuals
       ~SDEM.spatial_diagnostics
       ~SDEM.spatial_diagnostics_decision

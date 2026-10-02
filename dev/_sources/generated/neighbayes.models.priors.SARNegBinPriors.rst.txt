@@ -32,6 +32,5 @@
       ~SARNegBinPriors.rho_upper
       ~SARNegBinPriors.sigma2_alpha
       ~SARNegBinPriors.sigma2_beta
-      ~SARNegBinPriors.sigma_sigma
    
    

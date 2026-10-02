@@ -16,6 +16,8 @@
       ~SLX.__init__
       ~SLX.fit
       ~SLX.fitted_values
+      ~SLX.predict
+      ~SLX.predict_in_sample
       ~SLX.residuals
       ~SLX.spatial_diagnostics
       ~SLX.spatial_diagnostics_decision

@@ -757,6 +757,30 @@
 
               
             
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1970,7 +1994,7 @@
       <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.diagnostics.bayes_factor_compare_models.models (Python parameter) — Fitted model objects or InferenceData objects to compare."><span>models</span></span>
+      <span title="neighbayes.diagnostics.bayes_factor_compare_models.models (Python parameter) — Fitted model objects or DataTree objects to compare."><span>models</span></span>
     </span>
   </a>
   
@@ -2528,7 +2552,7 @@
       <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.diagnostics.bayes_factor_compare_models.models (Python parameter) — Fitted model objects or InferenceData objects to compare."><span>models</span></span>
+      <span title="neighbayes.diagnostics.bayes_factor_compare_models.models (Python parameter) — Fitted model objects or DataTree objects to compare."><span>models</span></span>
     </span>
   </a>
   
@@ -2653,9 +2677,9 @@
 <h1 id="neighbayes-diagnostics-bayes-factor-compare-models">neighbayes.diagnostics.bayes_factor_compare_models<a class="headerlink" href="#neighbayes-diagnostics-bayes-factor-compare-models" title="Link to this heading">¶</a></h1>
 <dl class="py function objdesc">
 <dt class="sig sig-object highlight sig-wrap py" id="neighbayes.diagnostics.bayes_factor_compare_models">
-<span class="sig-prename descclassname"><span class="pre">neighbayes.diagnostics.</span></span><span class="sig-name descname"><span class="pre">bayes_factor_compare_models</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.bayes_factor_compare_models.models" title="neighbayes.diagnostics.bayes_factor_compare_models.models (Python parameter) — Fitted model objects or InferenceData objects to compare."><span class="n"><span class="pre">models</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.bayes_factor_compare_models.model_labels" title="neighbayes.diagnostics.bayes_factor_compare_models.model_labels (Python parameter) — Labels for each model (for DataFrame index/columns)."><span class="n"><span class="pre">model_labels</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.bayes_factor_compare_models.method" title="neighbayes.diagnostics.bayes_factor_compare_models.method (Python parameter) — Marginal likelihood estimation method."><span class="n"><span class="pre">method</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="s1">'bridge'</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.bayes_factor_compare_models.prior_note" title="neighbayes.diagnostics.bayes_factor_compare_models.prior_note (Python parameter) — Optional string describing the priors used (for reporting)."><span class="n"><span class="pre">prior_note</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.bayes_factor_compare_models.return_diagnostics" title="neighbayes.diagnostics.bayes_factor_compare_models.return_diagnostics (Python parameter) — If True, also return a dict of diagnostics for each model."><span class="n"><span class="pre">return_diagnostics</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.bayes_factor_compare_models.log" title="neighbayes.diagnostics.bayes_factor_compare_models.log (Python parameter) — If True, return log Bayes factors (i.e."><span class="n"><span class="pre">log</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">**</span></span><a class="n reference internal" href="#neighbayes.diagnostics.bayes_factor_compare_models.kwargs" title="neighbayes.diagnostics.bayes_factor_compare_models.kwargs (Python parameter) — Additional keyword arguments forwarded to the marginal-likelihood estimator."><span class="n"><span class="pre">kwargs</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/diagnostics/bayesfactor.py#L943-L1339"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.diagnostics.bayes_factor_compare_models" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">neighbayes.diagnostics.</span></span><span class="sig-name descname"><span class="pre">bayes_factor_compare_models</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.bayes_factor_compare_models.models" title="neighbayes.diagnostics.bayes_factor_compare_models.models (Python parameter) — Fitted model objects or DataTree objects to compare."><span class="n"><span class="pre">models</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.bayes_factor_compare_models.model_labels" title="neighbayes.diagnostics.bayes_factor_compare_models.model_labels (Python parameter) — Labels for each model (for DataFrame index/columns)."><span class="n"><span class="pre">model_labels</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.bayes_factor_compare_models.method" title="neighbayes.diagnostics.bayes_factor_compare_models.method (Python parameter) — Marginal likelihood estimation method."><span class="n"><span class="pre">method</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="s1">'bridge'</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.bayes_factor_compare_models.prior_note" title="neighbayes.diagnostics.bayes_factor_compare_models.prior_note (Python parameter) — Optional string describing the priors used (for reporting)."><span class="n"><span class="pre">prior_note</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.bayes_factor_compare_models.return_diagnostics" title="neighbayes.diagnostics.bayes_factor_compare_models.return_diagnostics (Python parameter) — If True, also return a dict of diagnostics for each model."><span class="n"><span class="pre">return_diagnostics</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.bayes_factor_compare_models.log" title="neighbayes.diagnostics.bayes_factor_compare_models.log (Python parameter) — If True, return log Bayes factors (i.e."><span class="n"><span class="pre">log</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">**</span></span><a class="n reference internal" href="#neighbayes.diagnostics.bayes_factor_compare_models.kwargs" title="neighbayes.diagnostics.bayes_factor_compare_models.kwargs (Python parameter) — Additional keyword arguments forwarded to the marginal-likelihood estimator."><span class="n"><span class="pre">kwargs</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/diagnostics/bayesfactor.py#L943-L1337"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.diagnostics.bayes_factor_compare_models" title="Link to this definition">¶</a></dt>
 <dd><p>Compute all pairwise Bayes factors for a set of Bayesian models.</p>
-<p>Following bayestestR’s <code class="docutils literal notranslate"><span class="pre">bayesfactor_models()</span></code> (<span class="bibtex-citation" id="id1">[<a class="reference internal" href="../references.html#id34" title="Dominique Makowski, Mattan S. Ben-Shachar, and Daniel Lüdecke. Bayestestr: describing effects and their uncertainty, existence and significance within the Bayesian framework. Journal of Open Source Software, 4(40):1541, 2019. doi:10.21105/joss.01541.">Makowski <em>et al.</em>, 2019</a>]</span>),
+<p>Following bayestestR’s <code class="docutils literal notranslate"><span class="pre">bayesfactor_models()</span></code> (<span class="bibtex-citation" id="id1">[<a class="reference internal" href="../references.html#id36" title="Dominique Makowski, Mattan S. Ben-Shachar, and Daniel Lüdecke. Bayestestr: describing effects and their uncertainty, existence and significance within the Bayesian framework. Journal of Open Source Software, 4(40):1541, 2019. doi:10.21105/joss.01541.">Makowski <em>et al.</em>, 2019</a>]</span>),
 this function estimates marginal likelihoods for
 each model and then computes Bayes factors as ratios of marginal
 likelihoods:</p>
@@ -2668,7 +2692,7 @@ from a single set of marginal likelihood estimates:</p>
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.diagnostics.bayes_factor_compare_models-parameters">Parameters<span class="colon">:</span><a class="headerlink" href="#neighbayes.diagnostics.bayes_factor_compare_models-parameters" title="Permalink to this headline">¶</a></dt>
 <dd class="field-odd"><dl class="simple api-field highlight">
-<dt id="neighbayes.diagnostics.bayes_factor_compare_models.models"><span class="sig-name descname">models</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.14)">list</a> or <a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.14)">dict</a></span></span><a class="headerlink" href="#neighbayes.diagnostics.bayes_factor_compare_models.models" title="Permalink to this definition">¶</a></dt><dd><p><p>Fitted model objects or InferenceData objects to compare.</p>
+<dt id="neighbayes.diagnostics.bayes_factor_compare_models.models"><span class="sig-name descname">models</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.14)">list</a> or <a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.14)">dict</a></span></span><a class="headerlink" href="#neighbayes.diagnostics.bayes_factor_compare_models.models" title="Permalink to this definition">¶</a></dt><dd><p><p>Fitted model objects or DataTree objects to compare.</p>
 <ul class="simple">
 <li><p><strong>Fitted model objects</strong> (recommended): Each object must have
 <code class="docutils literal notranslate"><span class="pre">inference_data</span></code> and <code class="docutils literal notranslate"><span class="pre">pymc_model</span></code> attributes (e.g., a
@@ -2677,7 +2701,7 @@ the log-posterior is automatically compiled from the PyMC model.</p></li>
 <li><p><strong>Dict of {str: model_object}</strong>: Keys are used as model labels
 (unless <code class="docutils literal notranslate"><span class="pre">model_labels</span></code> is also provided), matching the
 convention of <code class="xref py py-func docutils literal notranslate"><span class="pre">arviz.compare()</span></code>.</p></li>
-<li><p><strong>List of InferenceData</strong>: For <code class="docutils literal notranslate"><span class="pre">method='bic'</span></code>, InferenceData
+<li><p><strong>List of DataTree</strong>: For <code class="docutils literal notranslate"><span class="pre">method='bic'</span></code>, DataTree
 objects can be passed directly.  For <code class="docutils literal notranslate"><span class="pre">method='bridge'</span></code>,
 fitted model objects are required so the log-posterior can be
 compiled automatically.</p></li>
@@ -2690,15 +2714,19 @@ a dict).</p>
 </dd>
 <dt id="neighbayes.diagnostics.bayes_factor_compare_models.method"><span class="sig-name descname">method</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)">str</a>, default 'bridge'</span></span><a class="headerlink" href="#neighbayes.diagnostics.bayes_factor_compare_models.method" title="Permalink to this definition">¶</a></dt><dd><p><p>Marginal likelihood estimation method. Supported:</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">'bridge'</span></code>: Bridge sampling (<span class="bibtex-citation" id="id2">[<a class="reference internal" href="../references.html#id35" title="Xiao-Li Meng and Wing Hung Wong. Simulating Ratios of Normalizing Constants Via a Simple Identity: A Theoretical Exploration. Statistica Sinica, 6(4):831–860, 1996. URL: https://www.jstor.org/stable/24306045 (visited on 2026-04-25), arXiv:24306045.">Meng and Wong, 1996</a>]</span>). Uses the
+<li><p><code class="docutils literal notranslate"><span class="pre">'bridge'</span></code>: Bridge sampling (<span class="bibtex-citation" id="id2">[<a class="reference internal" href="../references.html#id37" title="Xiao-Li Meng and Wing Hung Wong. Simulating Ratios of Normalizing Constants Via a Simple Identity: A Theoretical Exploration. Statistica Sinica, 6(4):831–860, 1996. URL: https://www.jstor.org/stable/24306045 (visited on 2026-04-25), arXiv:24306045.">Meng and Wong, 1996</a>]</span>). Uses the
 iterative scheme with a multivariate normal proposal, ESS
 weighting, two-phase convergence, and MCSE diagnostics —
-following the R <code class="docutils literal notranslate"><span class="pre">bridgesampling</span></code> package (<span class="bibtex-citation" id="id3">[<a class="reference internal" href="../references.html#id23" title="Quentin F. Gronau, Henrik Singmann, and Eric-Jan Wagenmakers. Bridgesampling: an r package for estimating normalizing constants. Journal of Statistical Software, 92(10):1–29, 2020. doi:10.18637/jss.v092.i10.">Gronau <em>et al.</em>, 2020</a>]</span>).
+following the R <code class="docutils literal notranslate"><span class="pre">bridgesampling</span></code> package (<span class="bibtex-citation" id="id3">[<a class="reference internal" href="../references.html#id24" title="Quentin F. Gronau, Henrik Singmann, and Eric-Jan Wagenmakers. Bridgesampling: an r package for estimating normalizing constants. Journal of Statistical Software, 92(10):1–29, 2020. doi:10.18637/jss.v092.i10.">Gronau <em>et al.</em>, 2020</a>]</span>).
 <strong>Requires fitted model objects</strong> so the log-posterior can be
 compiled automatically.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">'bic'</span></code>: BIC approximation (<span class="bibtex-citation" id="id4">[<a class="reference internal" href="../references.html#id54" title="Eric-Jan Wagenmakers. A practical solution to the pervasive problems of p values. Psychonomic Bulletin &amp; Review, 14(5):779–804, 2007. doi:10.3758/BF03194105.">Wagenmakers, 2007</a>]</span>).
+<li><p><code class="docutils literal notranslate"><span class="pre">'bic'</span></code>: BIC approximation (<span class="bibtex-citation" id="id4">[<a class="reference internal" href="../references.html#id56" title="Eric-Jan Wagenmakers. A practical solution to the pervasive problems of p values. Psychonomic Bulletin &amp; Review, 14(5):779–804, 2007. doi:10.3758/BF03194105.">Wagenmakers, 2007</a>]</span>).
 Computes <span class="math notranslate nohighlight">\(\log(ML) \approx -BIC/2\)</span>.  Works with either
-fitted model objects or InferenceData.</p></li>
+fitted model objects or DataTree.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">'quadrature'</span></code>: exact marginal likelihood for Gaussian OLS, SLX,
+SAR, SDM, SEM and SDEM models (see <code class="xref py py-func docutils literal notranslate"><span class="pre">log_marginal_likelihood()</span></code>).
+No Monte Carlo error; the models need not be fit.  Accepts
+<code class="docutils literal notranslate"><span class="pre">epsrel</span></code>.</p></li>
 </ul>
 </p>
 </dd>
@@ -2743,7 +2771,7 @@ Each value is a dict containing:</p>
 <li><p><code class="docutils literal notranslate"><span class="pre">logml</span></code>: Estimated log marginal likelihood.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">iterations</span></code>: Number of bridge iterations.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">mcse_logml</span></code>: Monte Carlo standard error of logml
-(<span class="bibtex-citation" id="id5">[<a class="reference internal" href="../references.html#id37" title="Giacomo Micaletto and Aki Vehtari. Monte carlo standard errors for bridge sampling marginal likelihood estimation. arXiv preprint, 2025. arXiv:2508.14487.">Micaletto and Vehtari, 2025</a>]</span>).</p></li>
+(<span class="bibtex-citation" id="id5">[<a class="reference internal" href="../references.html#id39" title="Giacomo Micaletto and Aki Vehtari. Monte carlo standard errors for bridge sampling marginal likelihood estimation. arXiv preprint, 2025. arXiv:2508.14487.">Micaletto and Vehtari, 2025</a>]</span>).</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">converged</span></code>: Whether the iterative scheme converged.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">neff</span></code>: Effective sample size used for weighting (if
 <code class="docutils literal notranslate"><span class="pre">use_neff=True</span></code>).</p></li>
@@ -2759,7 +2787,7 @@ Each value is a dict containing:</p>
 </dl>
 <p class="rubric">Notes</p>
 <p><strong>Bridge sampling algorithm.</strong>  The <code class="docutils literal notranslate"><span class="pre">'bridge'</span></code> method implements the
-iterative bridge sampling estimator of <span class="bibtex-citation" id="id6">Meng and Wong [<a class="reference internal" href="../references.html#id35" title="Xiao-Li Meng and Wing Hung Wong. Simulating Ratios of Normalizing Constants Via a Simple Identity: A Theoretical Exploration. Statistica Sinica, 6(4):831–860, 1996. URL: https://www.jstor.org/stable/24306045 (visited on 2026-04-25), arXiv:24306045.">1996</a>]</span>, eq. 4.1, with
+iterative bridge sampling estimator of <span class="bibtex-citation" id="id6">Meng and Wong [<a class="reference internal" href="../references.html#id37" title="Xiao-Li Meng and Wing Hung Wong. Simulating Ratios of Normalizing Constants Via a Simple Identity: A Theoretical Exploration. Statistica Sinica, 6(4):831–860, 1996. URL: https://www.jstor.org/stable/24306045 (visited on 2026-04-25), arXiv:24306045.">1996</a>]</span>, eq. 4.1, with
 the “optimal” bridge function.  The procedure is:</p>
 <ol class="arabic simple">
 <li><p>Split posterior samples in half: first half fits a multivariate
@@ -2790,7 +2818,7 @@ relative evidence for two competing models given the observed data.</p>
 &gt;100 (extreme).</p></li>
 </ul>
 <p><strong>Sample size.</strong>  For bridge sampling, at least 40,000 posterior
-samples are recommended for precise estimates (<span class="bibtex-citation" id="id7">[<a class="reference internal" href="../references.html#id23" title="Quentin F. Gronau, Henrik Singmann, and Eric-Jan Wagenmakers. Bridgesampling: an r package for estimating normalizing constants. Journal of Statistical Software, 92(10):1–29, 2020. doi:10.18637/jss.v092.i10.">Gronau <em>et al.</em>, 2020</a>]</span>).
+samples are recommended for precise estimates (<span class="bibtex-citation" id="id7">[<a class="reference internal" href="../references.html#id24" title="Quentin F. Gronau, Henrik Singmann, and Eric-Jan Wagenmakers. Bridgesampling: an r package for estimating normalizing constants. Journal of Statistical Software, 92(10):1–29, 2020. doi:10.18637/jss.v092.i10.">Gronau <em>et al.</em>, 2020</a>]</span>).
 A warning is emitted when fewer samples are detected.</p>
 <p><strong>BIC vs. bridge sampling.</strong>  The <code class="docutils literal notranslate"><span class="pre">'bic'</span></code> method approximates
 <span class="math notranslate nohighlight">\(\log(ML) \approx \hat{\ell}_{\max} - \frac{k}{2}\log(n)\)</span>,

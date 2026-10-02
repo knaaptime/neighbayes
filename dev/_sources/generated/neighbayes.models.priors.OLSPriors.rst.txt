@@ -28,6 +28,5 @@
       ~OLSPriors.nu
       ~OLSPriors.sigma2_alpha
       ~OLSPriors.sigma2_beta
-      ~OLSPriors.sigma_sigma
    
    

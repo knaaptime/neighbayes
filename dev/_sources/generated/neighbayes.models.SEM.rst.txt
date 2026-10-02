@@ -16,6 +16,8 @@
       ~SEM.__init__
       ~SEM.fit
       ~SEM.fitted_values
+      ~SEM.predict
+      ~SEM.predict_in_sample
       ~SEM.residuals
       ~SEM.spatial_diagnostics
       ~SEM.spatial_diagnostics_decision

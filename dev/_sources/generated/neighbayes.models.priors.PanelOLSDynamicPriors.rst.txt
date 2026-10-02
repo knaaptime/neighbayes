@@ -30,6 +30,5 @@
       ~PanelOLSDynamicPriors.phi_upper
       ~PanelOLSDynamicPriors.sigma2_alpha
       ~PanelOLSDynamicPriors.sigma2_beta
-      ~PanelOLSDynamicPriors.sigma_sigma
    
    

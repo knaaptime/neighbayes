@@ -30,7 +30,7 @@
       ~PanelSDEMREPriors.nu
       ~PanelSDEMREPriors.sigma2_alpha
       ~PanelSDEMREPriors.sigma2_beta
-      ~PanelSDEMREPriors.sigma_alpha_sigma
-      ~PanelSDEMREPriors.sigma_sigma
+      ~PanelSDEMREPriors.sigma_alpha_nu
+      ~PanelSDEMREPriors.sigma_alpha_scale
    
    

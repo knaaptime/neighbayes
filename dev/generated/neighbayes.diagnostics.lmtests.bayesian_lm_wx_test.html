@@ -757,6 +757,30 @@
 
               
             
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2454,7 +2478,7 @@
 <p>Tests whether spatially lagged covariates (WX) should be added to a
 SAR model — i.e. whether SAR should be extended to SDM.  Bayesian
 extension of the classical LM-WX test
-(<span class="bibtex-citation" id="id1">[<a class="reference internal" href="../references.html#id27" title="Malabika Koley and Anil K. Bera. To use, or not to use the spatial Durbin model? – that is the question. Spatial Economic Analysis, 19(1):30–56, 2024. URL: https://doi.org/10.1080/17421772.2023.2256810 (visited on 2025-05-21), doi:10.1080/17421772.2023.2256810.">Koley and Bera, 2024</a>]</span>, eq. for <code class="docutils literal notranslate"><span class="pre">RS_gamma</span></code>) using the Doğan,
+(<span class="bibtex-citation" id="id1">[<a class="reference internal" href="../references.html#id28" title="Malabika Koley and Anil K. Bera. To use, or not to use the spatial Durbin model? – that is the question. Spatial Economic Analysis, 19(1):30–56, 2024. URL: https://doi.org/10.1080/17421772.2023.2256810 (visited on 2025-05-21), doi:10.1080/17421772.2023.2256810.">Koley and Bera, 2024</a>]</span>, eq. for <code class="docutils literal notranslate"><span class="pre">RS_gamma</span></code>) using the Doğan,
 Taşpınar &amp; Bera (2021) framework
 (<span class="bibtex-citation" id="id2">[<a class="reference internal" href="../references.html#id13" title="Osman Doğan, Süleyman Taşpınar, and Anil K. Bera. A Bayesian robust chi-squared test for testing simple hypotheses. Journal of Econometrics, 222(2):933–958, 2021. URL: https://www.sciencedirect.com/science/article/pii/S0304407620303018 (visited on 2026-04-21), doi:10.1016/j.jeconom.2020.07.046.">Doğan <em>et al.</em>, 2021</a>]</span>, Proposition 1).</p>
 <p>The null model is SAR (includes <span class="math notranslate nohighlight">\(\rho\)</span> but not <span class="math notranslate nohighlight">\(\gamma\)</span>).
@@ -2470,7 +2494,7 @@ the variance of the raw score under <span class="math notranslate nohighlight">\
 \[V_{\gamma\gamma} = \bar{\sigma}^2 \,
     (WX)^\top M_X (WX), \qquad M_X = I - X(X^\top X)^{-1} X^\top.\]</div>
 <p>This is the same Schur-complement quantity used by spreg’s <code class="docutils literal notranslate"><span class="pre">lm_wx</span></code>
-(<span class="bibtex-citation" id="id3">[<a class="reference internal" href="../references.html#id27" title="Malabika Koley and Anil K. Bera. To use, or not to use the spatial Durbin model? – that is the question. Spatial Economic Analysis, 19(1):30–56, 2024. URL: https://doi.org/10.1080/17421772.2023.2256810 (visited on 2025-05-21), doi:10.1080/17421772.2023.2256810.">Koley and Bera, 2024</a>]</span>), evaluated at the posterior mean
+(<span class="bibtex-citation" id="id3">[<a class="reference internal" href="../references.html#id28" title="Malabika Koley and Anil K. Bera. To use, or not to use the spatial Durbin model? – that is the question. Spatial Economic Analysis, 19(1):30–56, 2024. URL: https://doi.org/10.1080/17421772.2023.2256810 (visited on 2025-05-21), doi:10.1080/17421772.2023.2256810.">Koley and Bera, 2024</a>]</span>), evaluated at the posterior mean
 <span class="math notranslate nohighlight">\(\bar{\sigma}^2\)</span>.</p>
 <p>The per-draw LM statistic is</p>
 <div class="math notranslate nohighlight">

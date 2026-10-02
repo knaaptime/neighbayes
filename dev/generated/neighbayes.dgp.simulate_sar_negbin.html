@@ -757,6 +757,30 @@
 
               
             
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1486,12 +1510,12 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#neighbayes.dgp.simulate_sar_negbin.n" class="md-nav__link">
+  <a href="#neighbayes.dgp.simulate_sar_negbin.n_side" class="md-nav__link">
     
       <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.dgp.simulate_sar_negbin.n (Python parameter) — Square-grid side length used when only n is supplied."><span>n</span></span>
+      <span title="neighbayes.dgp.simulate_sar_negbin.n_side (Python parameter) — Side length of the square rook grid used when neither W nor gdf is supplied; the grid has n_side**2 observations."><span>n_<wbr>side</span></span>
     </span>
   </a>
   
@@ -1611,7 +1635,7 @@
       <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.dgp.simulate_sar_negbin.contiguity (Python parameter) — Contiguity type for constructing W when n is given."><span>contiguity</span></span>
+      <span title="neighbayes.dgp.simulate_sar_negbin.contiguity (Python parameter) — Neighbor rule used when W is built from gdf."><span>contiguity</span></span>
     </span>
   </a>
   
@@ -2621,12 +2645,12 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#neighbayes.dgp.simulate_sar_negbin.n" class="md-nav__link">
+  <a href="#neighbayes.dgp.simulate_sar_negbin.n_side" class="md-nav__link">
     
       <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.dgp.simulate_sar_negbin.n (Python parameter) — Square-grid side length used when only n is supplied."><span>n</span></span>
+      <span title="neighbayes.dgp.simulate_sar_negbin.n_side (Python parameter) — Side length of the square rook grid used when neither W nor gdf is supplied; the grid has n_side**2 observations."><span>n_<wbr>side</span></span>
     </span>
   </a>
   
@@ -2746,7 +2770,7 @@
       <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.dgp.simulate_sar_negbin.contiguity (Python parameter) — Contiguity type for constructing W when n is given."><span>contiguity</span></span>
+      <span title="neighbayes.dgp.simulate_sar_negbin.contiguity (Python parameter) — Neighbor rule used when W is built from gdf."><span>contiguity</span></span>
     </span>
   </a>
   
@@ -2833,7 +2857,7 @@
 <h1 id="neighbayes-dgp-simulate-sar-negbin">neighbayes.dgp.simulate_sar_negbin<a class="headerlink" href="#neighbayes-dgp-simulate-sar-negbin" title="Link to this heading">¶</a></h1>
 <dl class="py function objdesc">
 <dt class="sig sig-object highlight sig-wrap py" id="neighbayes.dgp.simulate_sar_negbin">
-<span class="sig-prename descclassname"><span class="pre">neighbayes.dgp.</span></span><span class="sig-name descname"><span class="pre">simulate_sar_negbin</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.dgp.simulate_sar_negbin.n" title="neighbayes.dgp.simulate_sar_negbin.n (Python parameter) — Square-grid side length used when only n is supplied."><span class="n"><span class="pre">n</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.dgp.simulate_sar_negbin.W" title="neighbayes.dgp.simulate_sar_negbin.W (Python parameter) — Spatial weights."><span class="n"><span class="pre">W</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.dgp.simulate_sar_negbin.gdf" title="neighbayes.dgp.simulate_sar_negbin.gdf (Python parameter) — Geodataframe used to construct weights."><span class="n"><span class="pre">gdf</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.dgp.simulate_sar_negbin.rho" title="neighbayes.dgp.simulate_sar_negbin.rho (Python parameter) — Spatial autoregressive parameter."><span class="n"><span class="pre">rho</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">0.5</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.dgp.simulate_sar_negbin.beta" title="neighbayes.dgp.simulate_sar_negbin.beta (Python parameter) — Regression coefficients (including intercept)."><span class="n"><span class="pre">beta</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.dgp.simulate_sar_negbin.alpha" title="neighbayes.dgp.simulate_sar_negbin.alpha (Python parameter) — NB2 dispersion parameter."><span class="n"><span class="pre">alpha</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">2.0</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.dgp.simulate_sar_negbin.sigma2" title="neighbayes.dgp.simulate_sar_negbin.sigma2 (Python parameter) — Structural-form residual variance."><span class="n"><span class="pre">sigma2</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">0.0</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.dgp.simulate_sar_negbin.err_hetero" title="neighbayes.dgp.simulate_sar_negbin.err_hetero (Python parameter) — Heteroskedastic errors (not yet implemented; ignored with a warning)."><span class="n"><span class="pre">err_hetero</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.dgp.simulate_sar_negbin.rng" title="neighbayes.dgp.simulate_sar_negbin.rng (Python parameter) — Random number generator."><span class="n"><span class="pre">rng</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.dgp.simulate_sar_negbin.seed" title="neighbayes.dgp.simulate_sar_negbin.seed (Python parameter) — Random seed (used only if rng is None)."><span class="n"><span class="pre">seed</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.dgp.simulate_sar_negbin.contiguity" title="neighbayes.dgp.simulate_sar_negbin.contiguity (Python parameter) — Contiguity type for constructing W when n is given."><span class="n"><span class="pre">contiguity</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="s1">'queen'</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.dgp.simulate_sar_negbin.create_gdf" title="neighbayes.dgp.simulate_sar_negbin.create_gdf (Python parameter) — Whether to attach a GeoDataFrame to the output."><span class="n"><span class="pre">create_gdf</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.dgp.simulate_sar_negbin.geometry_type" title="neighbayes.dgp.simulate_sar_negbin.geometry_type (Python parameter) — Type of geometry for the GeoDataFrame."><span class="n"><span class="pre">geometry_type</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="s1">'polygon'</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/dgp/cross_sectional.py#L236-L380"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.dgp.simulate_sar_negbin" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">neighbayes.dgp.</span></span><span class="sig-name descname"><span class="pre">simulate_sar_negbin</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.dgp.simulate_sar_negbin.n_side" title="neighbayes.dgp.simulate_sar_negbin.n_side (Python parameter) — Side length of the square rook grid used when neither W nor gdf is supplied; the grid has n_side**2 observations."><span class="n"><span class="pre">n_side</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.dgp.simulate_sar_negbin.W" title="neighbayes.dgp.simulate_sar_negbin.W (Python parameter) — Spatial weights."><span class="n"><span class="pre">W</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.dgp.simulate_sar_negbin.gdf" title="neighbayes.dgp.simulate_sar_negbin.gdf (Python parameter) — Geodataframe used to construct weights."><span class="n"><span class="pre">gdf</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.dgp.simulate_sar_negbin.rho" title="neighbayes.dgp.simulate_sar_negbin.rho (Python parameter) — Spatial autoregressive parameter."><span class="n"><span class="pre">rho</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">0.5</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.dgp.simulate_sar_negbin.beta" title="neighbayes.dgp.simulate_sar_negbin.beta (Python parameter) — Regression coefficients (including intercept)."><span class="n"><span class="pre">beta</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.dgp.simulate_sar_negbin.alpha" title="neighbayes.dgp.simulate_sar_negbin.alpha (Python parameter) — NB2 dispersion parameter."><span class="n"><span class="pre">alpha</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">2.0</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.dgp.simulate_sar_negbin.sigma2" title="neighbayes.dgp.simulate_sar_negbin.sigma2 (Python parameter) — Structural-form residual variance."><span class="n"><span class="pre">sigma2</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">0.0</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.dgp.simulate_sar_negbin.err_hetero" title="neighbayes.dgp.simulate_sar_negbin.err_hetero (Python parameter) — Heteroskedastic errors (not yet implemented; ignored with a warning)."><span class="n"><span class="pre">err_hetero</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.dgp.simulate_sar_negbin.rng" title="neighbayes.dgp.simulate_sar_negbin.rng (Python parameter) — Random number generator."><span class="n"><span class="pre">rng</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.dgp.simulate_sar_negbin.seed" title="neighbayes.dgp.simulate_sar_negbin.seed (Python parameter) — Random seed (used only if rng is None)."><span class="n"><span class="pre">seed</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.dgp.simulate_sar_negbin.contiguity" title="neighbayes.dgp.simulate_sar_negbin.contiguity (Python parameter) — Neighbor rule used when W is built from gdf."><span class="n"><span class="pre">contiguity</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="s1">'queen'</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.dgp.simulate_sar_negbin.create_gdf" title="neighbayes.dgp.simulate_sar_negbin.create_gdf (Python parameter) — Whether to attach a GeoDataFrame to the output."><span class="n"><span class="pre">create_gdf</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.dgp.simulate_sar_negbin.geometry_type" title="neighbayes.dgp.simulate_sar_negbin.geometry_type (Python parameter) — Type of geometry for the GeoDataFrame."><span class="n"><span class="pre">geometry_type</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="s1">'polygon'</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/dgp/cross_sectional.py#L238-L377"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.dgp.simulate_sar_negbin" title="Link to this definition">¶</a></dt>
 <dd><p>Simulate data from a SAR-NB2 DGP.</p>
 <p>The latent log-mean follows the SAR structural form:</p>
 <div class="math notranslate nohighlight">
@@ -2853,10 +2877,10 @@ matching the <code class="xref py py-class docutils literal notranslate"><span c
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.dgp.simulate_sar_negbin-parameters">Parameters<span class="colon">:</span><a class="headerlink" href="#neighbayes.dgp.simulate_sar_negbin-parameters" title="Permalink to this headline">¶</a></dt>
 <dd class="field-odd"><dl class="simple api-field highlight">
-<dt id="neighbayes.dgp.simulate_sar_negbin.n"><span class="sig-name descname">n</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)">int</a>, optional</span></span><a class="headerlink" href="#neighbayes.dgp.simulate_sar_negbin.n" title="Permalink to this definition">¶</a></dt><dd><p>Square-grid side length used when only <code class="docutils literal notranslate"><span class="pre">n</span></code> is supplied. This
-generates <code class="docutils literal notranslate"><span class="pre">n</span> <span class="pre">*</span> <span class="pre">n</span></code> observations on an <code class="docutils literal notranslate"><span class="pre">n</span> <span class="pre">x</span> <span class="pre">n</span></code> rook grid.
-When <code class="docutils literal notranslate"><span class="pre">W</span></code> or <code class="docutils literal notranslate"><span class="pre">gdf</span></code> is provided, <code class="docutils literal notranslate"><span class="pre">n</span></code> (if provided) must match
-the implied number of observations.</p>
+<dt id="neighbayes.dgp.simulate_sar_negbin.n_side"><span class="sig-name descname">n_side</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)">int</a>, optional</span></span><a class="headerlink" href="#neighbayes.dgp.simulate_sar_negbin.n_side" title="Permalink to this definition">¶</a></dt><dd><p>Side length of the square rook grid used when neither <code class="docutils literal notranslate"><span class="pre">W</span></code> nor
+<code class="docutils literal notranslate"><span class="pre">gdf</span></code> is supplied; the grid has <code class="docutils literal notranslate"><span class="pre">n_side**2</span></code> observations.  When
+<code class="docutils literal notranslate"><span class="pre">W</span></code> or <code class="docutils literal notranslate"><span class="pre">gdf</span></code> is provided, <code class="docutils literal notranslate"><span class="pre">n_side**2</span></code> (if given) must match
+the number of units.</p>
 </dd>
 <dt id="neighbayes.dgp.simulate_sar_negbin.W"><span class="sig-name descname">W</span><span class="p"> : </span><span class="desctype"><span class="desctype">Graph or array-like, optional</span></span><a class="headerlink" href="#neighbayes.dgp.simulate_sar_negbin.W" title="Permalink to this definition">¶</a></dt><dd><p>Spatial weights.</p>
 </dd>
@@ -2880,7 +2904,7 @@ warning).</p>
 </dd>
 <dt id="neighbayes.dgp.simulate_sar_negbin.seed"><span class="sig-name descname">seed</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)">int</a>, optional</span></span><a class="headerlink" href="#neighbayes.dgp.simulate_sar_negbin.seed" title="Permalink to this definition">¶</a></dt><dd><p>Random seed (used only if rng is None).</p>
 </dd>
-<dt id="neighbayes.dgp.simulate_sar_negbin.contiguity"><span class="sig-name descname">contiguity</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)">str</a>, default &quot;queen&quot;</span></span><a class="headerlink" href="#neighbayes.dgp.simulate_sar_negbin.contiguity" title="Permalink to this definition">¶</a></dt><dd><p>Contiguity type for constructing W when n is given.</p>
+<dt id="neighbayes.dgp.simulate_sar_negbin.contiguity"><span class="sig-name descname">contiguity</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)">str</a>, default &quot;queen&quot;</span></span><a class="headerlink" href="#neighbayes.dgp.simulate_sar_negbin.contiguity" title="Permalink to this definition">¶</a></dt><dd><p>Neighbor rule used when W is built from <code class="docutils literal notranslate"><span class="pre">gdf</span></code>.</p>
 </dd>
 <dt id="neighbayes.dgp.simulate_sar_negbin.create_gdf"><span class="sig-name descname">create_gdf</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)">bool</a>, default False</span></span><a class="headerlink" href="#neighbayes.dgp.simulate_sar_negbin.create_gdf" title="Permalink to this definition">¶</a></dt><dd><p>Whether to attach a GeoDataFrame to the output.</p>
 </dd>
@@ -2889,7 +2913,7 @@ warning).</p>
 </dl>
 </dd>
 <dt class="field-even" id="neighbayes.dgp.simulate_sar_negbin-returns">Returns<span class="colon">:</span><a class="headerlink" href="#neighbayes.dgp.simulate_sar_negbin-returns" title="Permalink to this headline">¶</a></dt>
-<dd class="field-even"><p>Dictionary with keys <code class="docutils literal notranslate"><span class="pre">y</span></code>, <code class="docutils literal notranslate"><span class="pre">X</span></code>, <code class="docutils literal notranslate"><span class="pre">mu</span></code>, <code class="docutils literal notranslate"><span class="pre">W_dense</span></code>,
+<dd class="field-even"><p>Dictionary with keys <code class="docutils literal notranslate"><span class="pre">y</span></code>, <code class="docutils literal notranslate"><span class="pre">X</span></code>, <code class="docutils literal notranslate"><span class="pre">mu</span></code>, <code class="docutils literal notranslate"><span class="pre">W_sparse</span></code>,
 <code class="docutils literal notranslate"><span class="pre">W_graph</span></code>, and <code class="docutils literal notranslate"><span class="pre">params_true</span></code>. When <code class="docutils literal notranslate"><span class="pre">sigma2</span> <span class="pre">&gt;</span> <span class="pre">0</span></code>,
 <code class="docutils literal notranslate"><span class="pre">params_true</span></code> also includes <code class="docutils literal notranslate"><span class="pre">sigma2</span></code>.</p>
 </dd>

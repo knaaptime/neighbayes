@@ -30,6 +30,5 @@
       ~SDMPriors.rho_upper
       ~SDMPriors.sigma2_alpha
       ~SDMPriors.sigma2_beta
-      ~SDMPriors.sigma_sigma
    
    

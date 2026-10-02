@@ -848,6 +848,30 @@
 
               
             
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1450,7 +1474,7 @@ spatial parameter to be recoverable at all.</p>
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">RHO_TRUE</span><span class="p">,</span> <span class="n">ALPHA_TRUE</span> <span class="o">=</span> <span class="mf">0.4</span><span class="p">,</span> <span class="mf">2.0</span>
 
-<span class="n">data</span> <span class="o">=</span> <span class="n">simulate_sar_negbin</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="mi">25</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="n">RHO_TRUE</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">simulate_sar_negbin</span><span class="p">(</span><span class="n">n_side</span><span class="o">=</span><span class="mi">25</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="n">RHO_TRUE</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
 <span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">W</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="s2">"X"</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="s2">"W_graph"</span><span class="p">]</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"observations   : </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">y</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
@@ -1490,87 +1514,72 @@ variance       : 64.00   (&gt;&gt; mean: overdispersed, as intended)
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output text_html"><div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
+<div class="output text_html"><table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
       <th></th>
       <th>mean</th>
       <th>sd</th>
-      <th>hdi_3%</th>
-      <th>hdi_97%</th>
-      <th>mcse_mean</th>
-      <th>mcse_sd</th>
+      <th>eti89_lb</th>
+      <th>eti89_ub</th>
       <th>ess_bulk</th>
       <th>ess_tail</th>
       <th>r_hat</th>
+      <th>mcse_mean</th>
+      <th>mcse_sd</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <th>rho</th>
-      <td>0.384</td>
-      <td>0.090</td>
-      <td>0.212</td>
-      <td>0.550</td>
-      <td>0.002</td>
+      <td>0.383</td>
+      <td>0.09</td>
+      <td>0.23</td>
+      <td>0.52</td>
+      <td>3128</td>
+      <td>3634</td>
+      <td>1.00</td>
+      <td>0.0016</td>
       <td>0.001</td>
-      <td>3533.0</td>
-      <td>4222.0</td>
-      <td>1.0</td>
     </tr>
     <tr>
       <th>beta[x0]</th>
-      <td>1.055</td>
-      <td>0.154</td>
-      <td>0.768</td>
-      <td>1.343</td>
-      <td>0.003</td>
-      <td>0.002</td>
-      <td>3556.0</td>
-      <td>3854.0</td>
-      <td>1.0</td>
+      <td>1.057</td>
+      <td>0.153</td>
+      <td>0.83</td>
+      <td>1.3</td>
+      <td>3136</td>
+      <td>3929</td>
+      <td>1.00</td>
+      <td>0.0027</td>
+      <td>0.0018</td>
     </tr>
     <tr>
       <th>beta[x1]</th>
-      <td>0.598</td>
-      <td>0.039</td>
-      <td>0.523</td>
-      <td>0.669</td>
-      <td>0.001</td>
-      <td>0.000</td>
-      <td>3117.0</td>
-      <td>4612.0</td>
-      <td>1.0</td>
+      <td>0.597</td>
+      <td>0.0387</td>
+      <td>0.53</td>
+      <td>0.66</td>
+      <td>2682</td>
+      <td>3782</td>
+      <td>1.00</td>
+      <td>0.00075</td>
+      <td>0.0004</td>
     </tr>
     <tr>
       <th>alpha</th>
-      <td>2.029</td>
-      <td>0.158</td>
-      <td>1.738</td>
-      <td>2.333</td>
+      <td>2.027</td>
+      <td>0.16</td>
+      <td>1.8</td>
+      <td>2.3</td>
+      <td>6285</td>
+      <td>4599</td>
+      <td>1.00</td>
       <td>0.002</td>
       <td>0.002</td>
-      <td>5764.0</td>
-      <td>4185.0</td>
-      <td>1.0</td>
     </tr>
   </tbody>
-</table>
-</div></div></div>
+</table></div></div>
 </div>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
@@ -1582,8 +1591,8 @@ variance       : 64.00   (&gt;&gt; mean: overdispersed, as intended)
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>rho   : 0.384   (true 0.4)
-alpha : 2.029   (true 2.0)
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>rho   : 0.383   (true 0.4)
+alpha : 2.027   (true 2.0)
 </code></pre></div>
 </div>
 </div>
@@ -1671,7 +1680,7 @@ additional options; anything else raises <code class="docutils literal notransla
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>rho = 0.381, ess = 1005
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>rho = 0.379, ess = 649
 </code></pre></div>
 </div>
 </div>
@@ -1685,14 +1694,14 @@ no conditional overdispersion for the extra parameter to fit.</p>
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">alpha</span> <span class="o">=</span> <span class="n">idata_gibbs</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s2">"alpha"</span><span class="p">]</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"alpha: mean </span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">alpha</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">, sd </span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">alpha</span><span class="o">.</span><span class="n">std</span><span class="p">())</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span>
-    <span class="sa">f</span><span class="s2">"94% HDI: </span><span class="si">{</span><span class="n">az</span><span class="o">.</span><span class="n">hdi</span><span class="p">(</span><span class="n">idata_gibbs</span><span class="p">,</span><span class="w"> </span><span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s1">'alpha'</span><span class="p">],</span><span class="w"> </span><span class="n">hdi_prob</span><span class="o">=</span><span class="mf">0.94</span><span class="p">)[</span><span class="s1">'alpha'</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
+    <span class="sa">f</span><span class="s2">"94% HDI: </span><span class="si">{</span><span class="n">az</span><span class="o">.</span><span class="n">hdi</span><span class="p">(</span><span class="n">idata_gibbs</span><span class="p">,</span><span class="w"> </span><span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s1">'alpha'</span><span class="p">],</span><span class="w"> </span><span class="n">prob</span><span class="o">=</span><span class="mf">0.94</span><span class="p">)[</span><span class="s1">'alpha'</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
 <span class="p">)</span>
 </code></pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>alpha: mean 2.03, sd 0.16
-94% HDI: [1.74 2.33]
+94% HDI: [1.73 2.33]
 </code></pre></div>
 </div>
 </div>

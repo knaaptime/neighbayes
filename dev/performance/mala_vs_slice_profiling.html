@@ -757,6 +757,30 @@
 
               
             
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1945,16 +1969,16 @@
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="n">SEED</span><span class="p">)</span>
 
 <span class="c1"># SAR-logit data</span>
-<span class="n">sar_logit_out</span> <span class="o">=</span> <span class="n">simulate_sar_logit</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W_dense</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">)</span>
+<span class="n">sar_logit_out</span> <span class="o">=</span> <span class="n">simulate_sar_logit</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">)</span>
 <span class="n">y_sar_logit</span><span class="p">,</span> <span class="n">X_sar_logit</span> <span class="o">=</span> <span class="n">sar_logit_out</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">sar_logit_out</span><span class="p">[</span><span class="s2">"X"</span><span class="p">]</span>
 
 <span class="c1"># SEM-logit data</span>
-<span class="n">sem_logit_out</span> <span class="o">=</span> <span class="n">simulate_sem_logit</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W_dense</span><span class="p">,</span> <span class="n">lam</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">)</span>
+<span class="n">sem_logit_out</span> <span class="o">=</span> <span class="n">simulate_sem_logit</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span> <span class="n">lam</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">)</span>
 <span class="n">y_sem_logit</span><span class="p">,</span> <span class="n">X_sem_logit</span> <span class="o">=</span> <span class="n">sem_logit_out</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">sem_logit_out</span><span class="p">[</span><span class="s2">"X"</span><span class="p">]</span>
 
 <span class="c1"># SAR-NB data</span>
 <span class="n">sar_nb_out</span> <span class="o">=</span> <span class="n">simulate_sar_negbin</span><span class="p">(</span>
-    <span class="n">n</span><span class="o">=</span><span class="n">n</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">2.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.5</span><span class="p">]),</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W_dense</span>
+    <span class="n">rho</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">2.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.5</span><span class="p">]),</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W</span>
 <span class="p">)</span>
 <span class="n">y_sar_nb</span><span class="p">,</span> <span class="n">X_sar_nb</span> <span class="o">=</span> <span class="n">sar_nb_out</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">sar_nb_out</span><span class="p">[</span><span class="s2">"X"</span><span class="p">]</span>
 
@@ -2118,25 +2142,25 @@ SAR-NB:    y=(49,), X=(49, 3)
 Model: SAR-Logit
 ============================================================
   Running SAR-Logit/Gibbs-NumPy...
-11.1s  ρ̂/λ̂=-0.1344  r̂=1.000  ESS=4495
+11.8s  ρ̂/λ̂=-0.1357  r̂=1.001  ESS=4584
   Running SAR-Logit/Gibbs-JAX...
-2.7s  ρ̂/λ̂=-0.1303  r̂=1.000  ESS=4793
+3.0s  ρ̂/λ̂=-0.1383  r̂=1.001  ESS=4904
 
 ============================================================
 Model: SEM-Logit
 ============================================================
   Running SEM-Logit/Gibbs-NumPy...
-17.0s  ρ̂/λ̂=0.0512  r̂=1.010  ESS=638
+16.0s  ρ̂/λ̂=0.0305  r̂=1.004  ESS=541
   Running SEM-Logit/Gibbs-JAX...
-2.1s  ρ̂/λ̂=0.0468  r̂=1.010  ESS=666
+2.1s  ρ̂/λ̂=0.0338  r̂=1.006  ESS=682
 
 ============================================================
 Model: SAR-NB
 ============================================================
   Running SAR-NB/Gibbs-NumPy...
-10.4s  ρ̂/λ̂=0.4288  r̂=1.000  ESS=1217
+11.1s  ρ̂/λ̂=0.4166  r̂=1.003  ESS=988
   Running SAR-NB/Gibbs-JAX...
-2.4s  ρ̂/λ̂=0.4235  r̂=1.000  ESS=1204
+2.6s  ρ̂/λ̂=0.4163  r̂=1.003  ESS=1190
 
 Done! 6 configurations profiled.
 </code></pre></div>
@@ -2196,86 +2220,86 @@ Done! 6 configurations profiled.
 <div class="cell_output docutils container">
 <div class="output text_html"><style type="text/css">
 </style>
-<table id="T_9ffa8">
+<table id="T_3af00">
   <thead>
     <tr>
       <th class="blank level0" >&nbsp;</th>
-      <th id="T_9ffa8_level0_col0" class="col_heading level0 col0" >Model</th>
-      <th id="T_9ffa8_level0_col1" class="col_heading level0 col1" >Sampler</th>
-      <th id="T_9ffa8_level0_col2" class="col_heading level0 col2" >Time (s)</th>
-      <th id="T_9ffa8_level0_col3" class="col_heading level0 col3" >Intercept</th>
-      <th id="T_9ffa8_level0_col4" class="col_heading level0 col4" >ρ̂/λ̂</th>
-      <th id="T_9ffa8_level0_col5" class="col_heading level0 col5" >max R̂</th>
-      <th id="T_9ffa8_level0_col6" class="col_heading level0 col6" >min ESS</th>
-      <th id="T_9ffa8_level0_col7" class="col_heading level0 col7" >α̂</th>
+      <th id="T_3af00_level0_col0" class="col_heading level0 col0" >Model</th>
+      <th id="T_3af00_level0_col1" class="col_heading level0 col1" >Sampler</th>
+      <th id="T_3af00_level0_col2" class="col_heading level0 col2" >Time (s)</th>
+      <th id="T_3af00_level0_col3" class="col_heading level0 col3" >Intercept</th>
+      <th id="T_3af00_level0_col4" class="col_heading level0 col4" >ρ̂/λ̂</th>
+      <th id="T_3af00_level0_col5" class="col_heading level0 col5" >max R̂</th>
+      <th id="T_3af00_level0_col6" class="col_heading level0 col6" >min ESS</th>
+      <th id="T_3af00_level0_col7" class="col_heading level0 col7" >α̂</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <th id="T_9ffa8_level0_row0" class="row_heading level0 row0" >0</th>
-      <td id="T_9ffa8_row0_col0" class="data row0 col0" >SAR-Logit</td>
-      <td id="T_9ffa8_row0_col1" class="data row0 col1" >Gibbs-NumPy</td>
-      <td id="T_9ffa8_row0_col2" class="data row0 col2" >11.1</td>
-      <td id="T_9ffa8_row0_col3" class="data row0 col3" >0.7735</td>
-      <td id="T_9ffa8_row0_col4" class="data row0 col4" >-0.1344</td>
-      <td id="T_9ffa8_row0_col5" class="data row0 col5" >1.000000</td>
-      <td id="T_9ffa8_row0_col6" class="data row0 col6" >4495</td>
-      <td id="T_9ffa8_row0_col7" class="data row0 col7" >nan</td>
+      <th id="T_3af00_level0_row0" class="row_heading level0 row0" >0</th>
+      <td id="T_3af00_row0_col0" class="data row0 col0" >SAR-Logit</td>
+      <td id="T_3af00_row0_col1" class="data row0 col1" >Gibbs-NumPy</td>
+      <td id="T_3af00_row0_col2" class="data row0 col2" >11.8</td>
+      <td id="T_3af00_row0_col3" class="data row0 col3" >0.7555</td>
+      <td id="T_3af00_row0_col4" class="data row0 col4" >-0.1357</td>
+      <td id="T_3af00_row0_col5" class="data row0 col5" >1.001000</td>
+      <td id="T_3af00_row0_col6" class="data row0 col6" >4584</td>
+      <td id="T_3af00_row0_col7" class="data row0 col7" >nan</td>
     </tr>
     <tr>
-      <th id="T_9ffa8_level0_row1" class="row_heading level0 row1" >1</th>
-      <td id="T_9ffa8_row1_col0" class="data row1 col0" >SAR-Logit</td>
-      <td id="T_9ffa8_row1_col1" class="data row1 col1" >Gibbs-JAX</td>
-      <td id="T_9ffa8_row1_col2" class="data row1 col2" >2.7</td>
-      <td id="T_9ffa8_row1_col3" class="data row1 col3" >0.7613</td>
-      <td id="T_9ffa8_row1_col4" class="data row1 col4" >-0.1303</td>
-      <td id="T_9ffa8_row1_col5" class="data row1 col5" >1.000000</td>
-      <td id="T_9ffa8_row1_col6" class="data row1 col6" >4793</td>
-      <td id="T_9ffa8_row1_col7" class="data row1 col7" >nan</td>
+      <th id="T_3af00_level0_row1" class="row_heading level0 row1" >1</th>
+      <td id="T_3af00_row1_col0" class="data row1 col0" >SAR-Logit</td>
+      <td id="T_3af00_row1_col1" class="data row1 col1" >Gibbs-JAX</td>
+      <td id="T_3af00_row1_col2" class="data row1 col2" >3.0</td>
+      <td id="T_3af00_row1_col3" class="data row1 col3" >0.7629</td>
+      <td id="T_3af00_row1_col4" class="data row1 col4" >-0.1383</td>
+      <td id="T_3af00_row1_col5" class="data row1 col5" >1.001000</td>
+      <td id="T_3af00_row1_col6" class="data row1 col6" >4904</td>
+      <td id="T_3af00_row1_col7" class="data row1 col7" >nan</td>
     </tr>
     <tr>
-      <th id="T_9ffa8_level0_row2" class="row_heading level0 row2" >2</th>
-      <td id="T_9ffa8_row2_col0" class="data row2 col0" >SEM-Logit</td>
-      <td id="T_9ffa8_row2_col1" class="data row2 col1" >Gibbs-NumPy</td>
-      <td id="T_9ffa8_row2_col2" class="data row2 col2" >17.0</td>
-      <td id="T_9ffa8_row2_col3" class="data row2 col3" >-0.1776</td>
-      <td id="T_9ffa8_row2_col4" class="data row2 col4" >0.0512</td>
-      <td id="T_9ffa8_row2_col5" class="data row2 col5" >1.010000</td>
-      <td id="T_9ffa8_row2_col6" class="data row2 col6" >638</td>
-      <td id="T_9ffa8_row2_col7" class="data row2 col7" >nan</td>
+      <th id="T_3af00_level0_row2" class="row_heading level0 row2" >2</th>
+      <td id="T_3af00_row2_col0" class="data row2 col0" >SEM-Logit</td>
+      <td id="T_3af00_row2_col1" class="data row2 col1" >Gibbs-NumPy</td>
+      <td id="T_3af00_row2_col2" class="data row2 col2" >16.0</td>
+      <td id="T_3af00_row2_col3" class="data row2 col3" >-0.1795</td>
+      <td id="T_3af00_row2_col4" class="data row2 col4" >0.0305</td>
+      <td id="T_3af00_row2_col5" class="data row2 col5" >1.004000</td>
+      <td id="T_3af00_row2_col6" class="data row2 col6" >541</td>
+      <td id="T_3af00_row2_col7" class="data row2 col7" >nan</td>
     </tr>
     <tr>
-      <th id="T_9ffa8_level0_row3" class="row_heading level0 row3" >3</th>
-      <td id="T_9ffa8_row3_col0" class="data row3 col0" >SEM-Logit</td>
-      <td id="T_9ffa8_row3_col1" class="data row3 col1" >Gibbs-JAX</td>
-      <td id="T_9ffa8_row3_col2" class="data row3 col2" >2.1</td>
-      <td id="T_9ffa8_row3_col3" class="data row3 col3" >-0.1783</td>
-      <td id="T_9ffa8_row3_col4" class="data row3 col4" >0.0468</td>
-      <td id="T_9ffa8_row3_col5" class="data row3 col5" >1.010000</td>
-      <td id="T_9ffa8_row3_col6" class="data row3 col6" >666</td>
-      <td id="T_9ffa8_row3_col7" class="data row3 col7" >nan</td>
+      <th id="T_3af00_level0_row3" class="row_heading level0 row3" >3</th>
+      <td id="T_3af00_row3_col0" class="data row3 col0" >SEM-Logit</td>
+      <td id="T_3af00_row3_col1" class="data row3 col1" >Gibbs-JAX</td>
+      <td id="T_3af00_row3_col2" class="data row3 col2" >2.1</td>
+      <td id="T_3af00_row3_col3" class="data row3 col3" >-0.1865</td>
+      <td id="T_3af00_row3_col4" class="data row3 col4" >0.0338</td>
+      <td id="T_3af00_row3_col5" class="data row3 col5" >1.006000</td>
+      <td id="T_3af00_row3_col6" class="data row3 col6" >682</td>
+      <td id="T_3af00_row3_col7" class="data row3 col7" >nan</td>
     </tr>
     <tr>
-      <th id="T_9ffa8_level0_row4" class="row_heading level0 row4" >4</th>
-      <td id="T_9ffa8_row4_col0" class="data row4 col0" >SAR-NB</td>
-      <td id="T_9ffa8_row4_col1" class="data row4 col1" >Gibbs-NumPy</td>
-      <td id="T_9ffa8_row4_col2" class="data row4 col2" >10.4</td>
-      <td id="T_9ffa8_row4_col3" class="data row4 col3" >2.1803</td>
-      <td id="T_9ffa8_row4_col4" class="data row4 col4" >0.4288</td>
-      <td id="T_9ffa8_row4_col5" class="data row4 col5" >1.000000</td>
-      <td id="T_9ffa8_row4_col6" class="data row4 col6" >1217</td>
-      <td id="T_9ffa8_row4_col7" class="data row4 col7" >4.77</td>
+      <th id="T_3af00_level0_row4" class="row_heading level0 row4" >4</th>
+      <td id="T_3af00_row4_col0" class="data row4 col0" >SAR-NB</td>
+      <td id="T_3af00_row4_col1" class="data row4 col1" >Gibbs-NumPy</td>
+      <td id="T_3af00_row4_col2" class="data row4 col2" >11.1</td>
+      <td id="T_3af00_row4_col3" class="data row4 col3" >2.2282</td>
+      <td id="T_3af00_row4_col4" class="data row4 col4" >0.4166</td>
+      <td id="T_3af00_row4_col5" class="data row4 col5" >1.003000</td>
+      <td id="T_3af00_row4_col6" class="data row4 col6" >988</td>
+      <td id="T_3af00_row4_col7" class="data row4 col7" >4.77</td>
     </tr>
     <tr>
-      <th id="T_9ffa8_level0_row5" class="row_heading level0 row5" >5</th>
-      <td id="T_9ffa8_row5_col0" class="data row5 col0" >SAR-NB</td>
-      <td id="T_9ffa8_row5_col1" class="data row5 col1" >Gibbs-JAX</td>
-      <td id="T_9ffa8_row5_col2" class="data row5 col2" >2.4</td>
-      <td id="T_9ffa8_row5_col3" class="data row5 col3" >2.2004</td>
-      <td id="T_9ffa8_row5_col4" class="data row5 col4" >0.4235</td>
-      <td id="T_9ffa8_row5_col5" class="data row5 col5" >1.000000</td>
-      <td id="T_9ffa8_row5_col6" class="data row5 col6" >1204</td>
-      <td id="T_9ffa8_row5_col7" class="data row5 col7" >4.80</td>
+      <th id="T_3af00_level0_row5" class="row_heading level0 row5" >5</th>
+      <td id="T_3af00_row5_col0" class="data row5 col0" >SAR-NB</td>
+      <td id="T_3af00_row5_col1" class="data row5 col1" >Gibbs-JAX</td>
+      <td id="T_3af00_row5_col2" class="data row5 col2" >2.6</td>
+      <td id="T_3af00_row5_col3" class="data row5 col3" >2.2292</td>
+      <td id="T_3af00_row5_col4" class="data row5 col4" >0.4163</td>
+      <td id="T_3af00_row5_col5" class="data row5 col5" >1.003000</td>
+      <td id="T_3af00_row5_col6" class="data row5 col6" >1190</td>
+      <td id="T_3af00_row5_col7" class="data row5 col7" >4.77</td>
     </tr>
   </tbody>
 </table>
@@ -2340,24 +2364,24 @@ Done! 6 configurations profiled.
   <tbody>
     <tr>
       <th>SAR-Logit</th>
-      <td>2.68</td>
-      <td>11.05</td>
-      <td>0.24</td>
-      <td>4.12</td>
+      <td>2.99</td>
+      <td>11.77</td>
+      <td>0.25</td>
+      <td>3.94</td>
     </tr>
     <tr>
       <th>SAR-NB</th>
-      <td>2.44</td>
-      <td>10.40</td>
+      <td>2.60</td>
+      <td>11.10</td>
       <td>0.23</td>
-      <td>4.26</td>
+      <td>4.27</td>
     </tr>
     <tr>
       <th>SEM-Logit</th>
-      <td>2.09</td>
-      <td>16.97</td>
-      <td>0.12</td>
-      <td>8.12</td>
+      <td>2.07</td>
+      <td>15.97</td>
+      <td>0.13</td>
+      <td>7.71</td>
     </tr>
   </tbody>
 </table>
@@ -2414,7 +2438,7 @@ Done! 6 configurations profiled.
   return model._fit_gibbs(
 </code></pre></div>
 </div>
-<img alt="../_images/55e5de89a3f7b877768c47e841d476c897e3c6765f4891f56beaf4ca1980c0f6.png" src="../_images/55e5de89a3f7b877768c47e841d476c897e3c6765f4891f56beaf4ca1980c0f6.png" />
+<img alt="../_images/34735fffdb5388f05eaacc4282c2a7cb3913f1b0b7180d3adf2c1ae60841b827.png" src="../_images/34735fffdb5388f05eaacc4282c2a7cb3913f1b0b7180d3adf2c1ae60841b827.png" />
 </div>
 </div>
 <h2 id="ess-per-second-comparison">7. ESS per Second Comparison<a class="headerlink" href="#ess-per-second-comparison" title="Link to this heading">¶</a></h2>
@@ -2495,21 +2519,21 @@ Done! 6 configurations profiled.
   <tbody>
     <tr>
       <th>SAR-Logit</th>
-      <td>2401.9</td>
-      <td>601.7</td>
-      <td>4.0</td>
+      <td>2189.6</td>
+      <td>526.7</td>
+      <td>4.2</td>
     </tr>
     <tr>
       <th>SAR-NB</th>
-      <td>694.3</td>
-      <td>178.0</td>
-      <td>3.9</td>
+      <td>689.8</td>
+      <td>161.4</td>
+      <td>4.3</td>
     </tr>
     <tr>
       <th>SEM-Logit</th>
-      <td>2172.2</td>
-      <td>250.1</td>
-      <td>8.7</td>
+      <td>2457.5</td>
+      <td>341.3</td>
+      <td>7.2</td>
     </tr>
   </tbody>
 </table>
@@ -2554,7 +2578,7 @@ Done! 6 configurations profiled.
     <span class="n">W_dense_s</span> <span class="o">=</span> <span class="n">make_rook_W</span><span class="p">(</span><span class="n">side</span><span class="p">)</span>
     <span class="n">W_s</span> <span class="o">=</span> <span class="n">W_to_graph</span><span class="p">(</span><span class="n">W_dense_s</span><span class="p">)</span>
     <span class="n">rng_s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="n">SEED</span><span class="p">)</span>
-    <span class="n">out_s</span> <span class="o">=</span> <span class="n">simulate_sar_logit</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W_dense_s</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng_s</span><span class="p">)</span>
+    <span class="n">out_s</span> <span class="o">=</span> <span class="n">simulate_sar_logit</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W_s</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng_s</span><span class="p">)</span>
     <span class="n">y_s</span><span class="p">,</span> <span class="n">X_s</span> <span class="o">=</span> <span class="n">out_s</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">out_s</span><span class="p">[</span><span class="s2">"X"</span><span class="p">]</span>
 
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="se">\n</span><span class="s2">n = </span><span class="si">{</span><span class="n">n_s</span><span class="si">}</span><span class="s2"> (side=</span><span class="si">{</span><span class="n">side</span><span class="si">}</span><span class="s2">)"</span><span class="p">)</span>
@@ -2576,20 +2600,20 @@ Done! 6 configurations profiled.
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>n = 25 (side=5)
-  Gibbs-NumPy: 8.9s
-  Gibbs-JAX: 2.2s
+  Gibbs-NumPy: 9.1s
+  Gibbs-JAX: 2.5s
 
 n = 49 (side=7)
-  Gibbs-NumPy: 8.5s
-  Gibbs-JAX: 2.1s
+  Gibbs-NumPy: 9.1s
+  Gibbs-JAX: 2.3s
 
 n = 100 (side=10)
-  Gibbs-NumPy: 9.2s
-  Gibbs-JAX: 2.6s
+  Gibbs-NumPy: 9.6s
+  Gibbs-JAX: 2.9s
 
 n = 225 (side=15)
-  Gibbs-NumPy: 10.3s
-  Gibbs-JAX: 3.5s
+  Gibbs-NumPy: 10.6s
+  Gibbs-JAX: 3.6s
 
 Scaling benchmark complete.
 </code></pre></div>
@@ -2621,7 +2645,7 @@ Scaling benchmark complete.
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/a8a30ba97d937fb5e75d2f1f6dc2f21eedcc953111119eebba92607246f10ebc.png" src="../_images/a8a30ba97d937fb5e75d2f1f6dc2f21eedcc953111119eebba92607246f10ebc.png" />
+<img alt="../_images/f5045cf5348bdc7c47a17299d7444c4d215f10ef14b87b13485e915c7efe76de.png" src="../_images/f5045cf5348bdc7c47a17299d7444c4d215f10ef14b87b13485e915c7efe76de.png" />
 </div>
 </div>
 <h2 id="summary">9. Summary<a class="headerlink" href="#summary" title="Link to this heading">¶</a></h2>

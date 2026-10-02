@@ -11,7 +11,7 @@
       
       
       
-        <link rel="prev" href="neighbayes.models.priors.PanelGaussianPriors.html">
+        <link rel="prev" href="neighbayes.models.priors.REGibbsPriors.html">
       
       
         <link rel="next" href="neighbayes.models.priors.SLXPriors.html">
@@ -757,6 +757,30 @@
 
               
             
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1349,18 +1373,6 @@
     
     <span class="md-ellipsis">
       <span title="neighbayes.models.priors.OLSPriors.sigma2_beta (Python attribute)"><span>sigma2_<wbr>beta</span></span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.priors.OLSPriors.sigma_sigma" class="md-nav__link">
-    
-      <span aria-label="Python attribute" class="objinfo-icon objinfo-icon__alias" title="Python attribute">A</span>
-    
-    <span class="md-ellipsis">
-      <span title="neighbayes.models.priors.OLSPriors.sigma_sigma (Python attribute)"><span>sigma_<wbr>sigma</span></span>
     </span>
   </a>
   
@@ -2669,18 +2681,6 @@
   
 </li>
         
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.priors.OLSPriors.sigma_sigma" class="md-nav__link">
-    
-      <span aria-label="Python attribute" class="objinfo-icon objinfo-icon__alias" title="Python attribute">A</span>
-    
-    <span class="md-ellipsis">
-      <span title="neighbayes.models.priors.OLSPriors.sigma_sigma (Python attribute)"><span>sigma_<wbr>sigma</span></span>
-    </span>
-  </a>
-  
-</li>
-        
       </ul>
     </nav>
   
@@ -2713,11 +2713,11 @@
 <h1 id="neighbayes-models-priors-olspriors">neighbayes.models.priors.OLSPriors<a class="headerlink" href="#neighbayes-models-priors-olspriors" title="Link to this heading">¶</a></h1>
 <dl class="py class objdesc">
 <dt class="sig sig-object highlight sig-wrap py" id="neighbayes.models.priors.OLSPriors">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neighbayes.models.priors.</span></span><span class="sig-name descname"><span class="pre">OLSPriors</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.OLSPriors" title="neighbayes.models.priors.OLSPriors.__init__.beta_mu (Python parameter)"><span class="n"><span class="pre">beta_mu</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.OLSPriors" title="neighbayes.models.priors.OLSPriors.__init__.beta_sigma (Python parameter)"><span class="n"><span class="pre">beta_sigma</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.OLSPriors" title="neighbayes.models.priors.OLSPriors.__init__.sigma2_alpha (Python parameter)"><span class="n"><span class="pre">sigma2_alpha</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">2.0</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.OLSPriors" title="neighbayes.models.priors.OLSPriors.__init__.sigma2_beta (Python parameter)"><span class="n"><span class="pre">sigma2_beta</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.OLSPriors" title="neighbayes.models.priors.OLSPriors.__init__.sigma_sigma (Python parameter)"><span class="n"><span class="pre">sigma_sigma</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">10.0</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.OLSPriors" title="neighbayes.models.priors.OLSPriors.__init__.nu (Python parameter)"><span class="n"><span class="pre">nu</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">4.0</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/priors.py#L117-L119"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.priors.OLSPriors" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neighbayes.models.priors.</span></span><span class="sig-name descname"><span class="pre">OLSPriors</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.OLSPriors" title="neighbayes.models.priors.OLSPriors.__init__.beta_mu (Python parameter)"><span class="n"><span class="pre">beta_mu</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.OLSPriors" title="neighbayes.models.priors.OLSPriors.__init__.beta_sigma (Python parameter)"><span class="n"><span class="pre">beta_sigma</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.OLSPriors" title="neighbayes.models.priors.OLSPriors.__init__.sigma2_alpha (Python parameter)"><span class="n"><span class="pre">sigma2_alpha</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">2.0</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.OLSPriors" title="neighbayes.models.priors.OLSPriors.__init__.sigma2_beta (Python parameter)"><span class="n"><span class="pre">sigma2_beta</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.OLSPriors" title="neighbayes.models.priors.OLSPriors.__init__.nu (Python parameter)"><span class="n"><span class="pre">nu</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">4.0</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/priors.py#L111-L113"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.priors.OLSPriors" title="Link to this definition">¶</a></dt>
 <dd><p>Priors for <a class="reference internal" href="neighbayes.models.OLS.html#neighbayes.models.OLS" title="neighbayes.models.OLS (Python class) — Bayesian ordinary least squares cross-sectional regression."><code class="xref py py-class docutils literal notranslate"><span class="pre">neighbayes.models.OLS</span></code></a>.</p>
 <dl class="py method objdesc">
 <dt class="sig sig-object highlight sig-wrap py" id="neighbayes.models.priors.OLSPriors.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.OLSPriors" title="neighbayes.models.priors.OLSPriors.__init__.beta_mu (Python parameter)"><span class="n"><span class="pre">beta_mu</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.OLSPriors" title="neighbayes.models.priors.OLSPriors.__init__.beta_sigma (Python parameter)"><span class="n"><span class="pre">beta_sigma</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.OLSPriors" title="neighbayes.models.priors.OLSPriors.__init__.sigma2_alpha (Python parameter)"><span class="n"><span class="pre">sigma2_alpha</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">2.0</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.OLSPriors" title="neighbayes.models.priors.OLSPriors.__init__.sigma2_beta (Python parameter)"><span class="n"><span class="pre">sigma2_beta</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.OLSPriors" title="neighbayes.models.priors.OLSPriors.__init__.sigma_sigma (Python parameter)"><span class="n"><span class="pre">sigma_sigma</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">10.0</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.OLSPriors" title="neighbayes.models.priors.OLSPriors.__init__.nu (Python parameter)"><span class="n"><span class="pre">nu</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">4.0</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/priors.py"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.priors.OLSPriors.__init__" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.OLSPriors" title="neighbayes.models.priors.OLSPriors.__init__.beta_mu (Python parameter)"><span class="n"><span class="pre">beta_mu</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.OLSPriors" title="neighbayes.models.priors.OLSPriors.__init__.beta_sigma (Python parameter)"><span class="n"><span class="pre">beta_sigma</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.OLSPriors" title="neighbayes.models.priors.OLSPriors.__init__.sigma2_alpha (Python parameter)"><span class="n"><span class="pre">sigma2_alpha</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">2.0</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.OLSPriors" title="neighbayes.models.priors.OLSPriors.__init__.sigma2_beta (Python parameter)"><span class="n"><span class="pre">sigma2_beta</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.priors.OLSPriors" title="neighbayes.models.priors.OLSPriors.__init__.nu (Python parameter)"><span class="n"><span class="pre">nu</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">4.0</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/priors.py"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.priors.OLSPriors.__init__" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <p class="rubric">Methods</p>
@@ -2746,9 +2746,6 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="#neighbayes.models.priors.OLSPriors.sigma2_beta" title="neighbayes.models.priors.OLSPriors.sigma2_beta (Python attribute)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sigma2_beta</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#neighbayes.models.priors.OLSPriors.sigma_sigma" title="neighbayes.models.priors.OLSPriors.sigma_sigma (Python attribute)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sigma_sigma</span></code></a></p></td>
-<td><p></p></td>
-</tr>
 </tbody>
 </table>
 <dl class="py attribute objdesc">
@@ -2774,11 +2771,6 @@
 <dl class="py attribute objdesc">
 <dt class="sig sig-object highlight py" id="neighbayes.models.priors.OLSPriors.sigma2_beta">
 <span class="sig-name descname"><span class="pre">sigma2_beta</span></span><span class="p"> <span class="pre">=</span> </span><code class="code python docutils literal highlight highlight-python"><span class="kc">None</span></code><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/priors.py"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.priors.OLSPriors.sigma2_beta" title="Link to this definition">¶</a></dt>
-<dd></dd></dl>
-
-<dl class="py attribute objdesc">
-<dt class="sig sig-object highlight py" id="neighbayes.models.priors.OLSPriors.sigma_sigma">
-<span class="sig-name descname"><span class="pre">sigma_sigma</span></span><span class="p"> <span class="pre">=</span> </span><code class="code python docutils literal highlight highlight-python"><span class="mf">10.0</span></code><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/priors.py"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.priors.OLSPriors.sigma_sigma" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </dd></dl>

@@ -30,6 +30,5 @@
       ~PanelSLXDynamicPriors.phi_upper
       ~PanelSLXDynamicPriors.sigma2_alpha
       ~PanelSLXDynamicPriors.sigma2_beta
-      ~PanelSLXDynamicPriors.sigma_sigma
    
    

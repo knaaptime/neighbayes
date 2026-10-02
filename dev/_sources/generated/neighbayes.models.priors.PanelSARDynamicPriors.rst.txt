@@ -32,6 +32,5 @@
       ~PanelSARDynamicPriors.rho_upper
       ~PanelSARDynamicPriors.sigma2_alpha
       ~PanelSARDynamicPriors.sigma2_beta
-      ~PanelSARDynamicPriors.sigma_sigma
    
    

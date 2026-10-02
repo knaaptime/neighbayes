@@ -894,6 +894,30 @@
 
               
             
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1603,75 +1627,60 @@ weights graph on <span class="math notranslate nohighlight">\(n\)</span> units. 
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output text_html"><div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
+<div class="output text_html"><table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
       <th></th>
       <th>mean</th>
       <th>sd</th>
-      <th>hdi_3%</th>
-      <th>hdi_97%</th>
-      <th>mcse_mean</th>
-      <th>mcse_sd</th>
+      <th>eti89_lb</th>
+      <th>eti89_ub</th>
       <th>ess_bulk</th>
       <th>ess_tail</th>
       <th>r_hat</th>
+      <th>mcse_mean</th>
+      <th>mcse_sd</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <th>rho_d</th>
-      <td>0.311</td>
+      <td>0.315</td>
       <td>0.047</td>
-      <td>0.228</td>
-      <td>0.405</td>
+      <td>0.24</td>
+      <td>0.39</td>
+      <td>543</td>
+      <td>829</td>
+      <td>1.00</td>
       <td>0.002</td>
-      <td>0.001</td>
-      <td>499.0</td>
-      <td>846.0</td>
-      <td>1.01</td>
+      <td>0.0011</td>
     </tr>
     <tr>
       <th>rho_o</th>
-      <td>0.226</td>
+      <td>0.229</td>
       <td>0.055</td>
-      <td>0.119</td>
-      <td>0.321</td>
-      <td>0.002</td>
-      <td>0.001</td>
-      <td>495.0</td>
-      <td>950.0</td>
+      <td>0.14</td>
+      <td>0.32</td>
+      <td>431</td>
+      <td>639</td>
       <td>1.00</td>
+      <td>0.0026</td>
+      <td>0.0015</td>
     </tr>
     <tr>
       <th>rho_w</th>
-      <td>-0.070</td>
-      <td>0.020</td>
-      <td>-0.108</td>
-      <td>-0.034</td>
-      <td>0.001</td>
-      <td>0.000</td>
-      <td>494.0</td>
-      <td>1017.0</td>
+      <td>-0.072</td>
+      <td>0.021</td>
+      <td>-0.11</td>
+      <td>-0.041</td>
+      <td>501</td>
+      <td>615</td>
       <td>1.00</td>
+      <td>0.00096</td>
+      <td>0.00053</td>
     </tr>
   </tbody>
-</table>
-</div></div></div>
+</table></div></div>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">rho_w</span></code> is deterministic here — the separable model pins it to
 <span class="math notranslate nohighlight">\(-\rho_d\rho_o\)</span> rather than sampling it — so it carries no independent
@@ -1687,8 +1696,8 @@ all three.</p>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>rho_d: 0.311  (true 0.35)
-rho_o: 0.226  (true 0.25)
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>rho_d: 0.315  (true 0.35)
+rho_o: 0.229  (true 0.25)
 </code></pre></div>
 </div>
 </div>
@@ -1743,44 +1752,44 @@ covariate into origin, destination, intra-regional and network components.</p>
       <th>x0</th>
       <th>dest</th>
       <th>origin</th>
-      <td>0.0079</td>
-      <td>0.0044</td>
-      <td>0.0124</td>
+      <td>0.0081</td>
+      <td>0.0045</td>
+      <td>0.0125</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>dest</th>
       <th>origin</th>
-      <td>0.0068</td>
-      <td>0.0033</td>
-      <td>0.0114</td>
+      <td>0.0070</td>
+      <td>0.0034</td>
+      <td>0.0115</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x0</th>
       <th>dest</th>
       <th>destination</th>
-      <td>0.4034</td>
-      <td>0.3710</td>
-      <td>0.4391</td>
+      <td>0.4031</td>
+      <td>0.3714</td>
+      <td>0.4368</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>dest</th>
       <th>destination</th>
-      <td>0.3911</td>
-      <td>0.3603</td>
-      <td>0.4236</td>
+      <td>0.3928</td>
+      <td>0.3623</td>
+      <td>0.4238</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x0</th>
       <th>dest</th>
       <th>intra</th>
-      <td>0.0188</td>
-      <td>0.0129</td>
+      <td>0.0187</td>
+      <td>0.0131</td>
       <td>0.0247</td>
       <td>0.0</td>
     </tr>
@@ -1789,62 +1798,62 @@ covariate into origin, destination, intra-regional and network components.</p>
       <th>dest</th>
       <th>intra</th>
       <td>0.0161</td>
-      <td>0.0101</td>
-      <td>0.0221</td>
+      <td>0.0100</td>
+      <td>0.0224</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x0</th>
       <th>dest</th>
       <th>network</th>
-      <td>0.1705</td>
-      <td>0.1086</td>
-      <td>0.2406</td>
+      <td>0.1735</td>
+      <td>0.1124</td>
+      <td>0.2423</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>dest</th>
       <th>network</th>
-      <td>0.1657</td>
-      <td>0.1052</td>
-      <td>0.2405</td>
+      <td>0.1695</td>
+      <td>0.1047</td>
+      <td>0.2412</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x0</th>
       <th>dest</th>
       <th>total</th>
-      <td>0.6006</td>
-      <td>0.5321</td>
-      <td>0.6761</td>
+      <td>0.6034</td>
+      <td>0.5364</td>
+      <td>0.6759</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>dest</th>
       <th>total</th>
-      <td>0.5797</td>
-      <td>0.5053</td>
-      <td>0.6704</td>
+      <td>0.5854</td>
+      <td>0.5073</td>
+      <td>0.6732</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x0</th>
       <th>orig</th>
       <th>origin</th>
-      <td>0.4544</td>
-      <td>0.4140</td>
-      <td>0.4960</td>
+      <td>0.4529</td>
+      <td>0.4104</td>
+      <td>0.4978</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>orig</th>
       <th>origin</th>
-      <td>0.4659</td>
-      <td>0.4350</td>
-      <td>0.4974</td>
+      <td>0.4663</td>
+      <td>0.4323</td>
+      <td>0.5007</td>
       <td>0.0</td>
     </tr>
     <tr>
@@ -1853,16 +1862,16 @@ covariate into origin, destination, intra-regional and network components.</p>
       <th>destination</th>
       <td>0.0054</td>
       <td>0.0024</td>
-      <td>0.0089</td>
+      <td>0.0092</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>orig</th>
       <th>destination</th>
-      <td>0.0055</td>
+      <td>0.0056</td>
       <td>0.0025</td>
-      <td>0.0090</td>
+      <td>0.0092</td>
       <td>0.0</td>
     </tr>
     <tr>
@@ -1870,7 +1879,7 @@ covariate into origin, destination, intra-regional and network components.</p>
       <th>orig</th>
       <th>intra</th>
       <td>0.0189</td>
-      <td>0.0173</td>
+      <td>0.0171</td>
       <td>0.0207</td>
       <td>0.0</td>
     </tr>
@@ -1879,44 +1888,44 @@ covariate into origin, destination, intra-regional and network components.</p>
       <th>orig</th>
       <th>intra</th>
       <td>0.0194</td>
-      <td>0.0181</td>
-      <td>0.0207</td>
+      <td>0.0180</td>
+      <td>0.0209</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x0</th>
       <th>orig</th>
       <th>network</th>
-      <td>0.1287</td>
-      <td>0.0579</td>
-      <td>0.2138</td>
+      <td>0.1303</td>
+      <td>0.0572</td>
+      <td>0.2209</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>orig</th>
       <th>network</th>
-      <td>0.1316</td>
-      <td>0.0601</td>
-      <td>0.2160</td>
+      <td>0.1337</td>
+      <td>0.0594</td>
+      <td>0.2203</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x0</th>
       <th>orig</th>
       <th>total</th>
-      <td>0.6073</td>
-      <td>0.5102</td>
-      <td>0.7275</td>
+      <td>0.6075</td>
+      <td>0.4976</td>
+      <td>0.7266</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>orig</th>
       <th>total</th>
-      <td>0.6224</td>
-      <td>0.5286</td>
-      <td>0.7248</td>
+      <td>0.6249</td>
+      <td>0.5315</td>
+      <td>0.7324</td>
       <td>0.0</td>
     </tr>
   </tbody>
@@ -1942,75 +1951,60 @@ free dispersion parameter <code class="docutils literal notranslate"><span class
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output text_html"><div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
+<div class="output text_html"><table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
       <th></th>
       <th>mean</th>
       <th>sd</th>
-      <th>hdi_3%</th>
-      <th>hdi_97%</th>
-      <th>mcse_mean</th>
-      <th>mcse_sd</th>
+      <th>eti89_lb</th>
+      <th>eti89_ub</th>
       <th>ess_bulk</th>
       <th>ess_tail</th>
       <th>r_hat</th>
+      <th>mcse_mean</th>
+      <th>mcse_sd</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <th>rho_d</th>
-      <td>0.312</td>
-      <td>0.052</td>
-      <td>0.212</td>
-      <td>0.414</td>
+      <td>0.31</td>
+      <td>0.05</td>
+      <td>0.23</td>
+      <td>0.39</td>
+      <td>270</td>
+      <td>333</td>
+      <td>1.00</td>
+      <td>0.0031</td>
       <td>0.002</td>
-      <td>0.001</td>
-      <td>556.0</td>
-      <td>896.0</td>
-      <td>1.0</td>
     </tr>
     <tr>
       <th>rho_o</th>
-      <td>0.226</td>
-      <td>0.058</td>
-      <td>0.116</td>
-      <td>0.333</td>
-      <td>0.003</td>
-      <td>0.002</td>
-      <td>393.0</td>
-      <td>729.0</td>
-      <td>1.0</td>
+      <td>0.228</td>
+      <td>0.059</td>
+      <td>0.13</td>
+      <td>0.32</td>
+      <td>284</td>
+      <td>453</td>
+      <td>1.01</td>
+      <td>0.0035</td>
+      <td>0.0019</td>
     </tr>
     <tr>
       <th>alpha</th>
-      <td>121.873</td>
-      <td>79.086</td>
-      <td>35.647</td>
-      <td>258.705</td>
-      <td>2.151</td>
-      <td>4.054</td>
-      <td>1780.0</td>
-      <td>1223.0</td>
-      <td>1.0</td>
+      <td>127</td>
+      <td>8.95e+01</td>
+      <td>52</td>
+      <td>290</td>
+      <td>1632</td>
+      <td>1310</td>
+      <td>1.00</td>
+      <td>2.5</td>
+      <td>5.2</td>
     </tr>
   </tbody>
-</table>
-</div></div></div>
+</table></div></div>
 </div>
 <p>Look at <code class="docutils literal notranslate"><span class="pre">alpha</span></code> before anything else. Under the negative binomial,
 <span class="math notranslate nohighlight">\(\operatorname{Var}(y) = \mu + \mu^2/\alpha\)</span>, so <span class="math notranslate nohighlight">\(\alpha \to \infty\)</span> <em>is</em> the
@@ -2085,18 +2079,18 @@ signal, not a rounding difference.</p>
     <tr>
       <th>rho_d</th>
       <td>0.35</td>
-      <td>0.3112</td>
-      <td>0.3117</td>
-      <td>0.0473</td>
-      <td>0.0522</td>
+      <td>0.3153</td>
+      <td>0.3104</td>
+      <td>0.0472</td>
+      <td>0.0501</td>
     </tr>
     <tr>
       <th>rho_o</th>
       <td>0.25</td>
-      <td>0.2259</td>
-      <td>0.2260</td>
-      <td>0.0551</td>
-      <td>0.0583</td>
+      <td>0.2286</td>
+      <td>0.2275</td>
+      <td>0.0554</td>
+      <td>0.0586</td>
     </tr>
   </tbody>
 </table>
@@ -2167,19 +2161,19 @@ scheme draws one mixing weight — so equal draws are not equal work.</p>
   <tbody>
     <tr>
       <th>Poisson</th>
-      <td>39.676</td>
-      <td>499.179</td>
-      <td>494.786</td>
-      <td>12.581</td>
+      <td>32.602</td>
+      <td>543.691</td>
+      <td>431.425</td>
+      <td>16.677</td>
       <td>1.005</td>
     </tr>
     <tr>
       <th>NegBin</th>
-      <td>10.982</td>
-      <td>556.337</td>
-      <td>393.144</td>
-      <td>50.661</td>
-      <td>1.004</td>
+      <td>46.978</td>
+      <td>270.205</td>
+      <td>284.764</td>
+      <td>5.752</td>
+      <td>1.005</td>
     </tr>
   </tbody>
 </table>
@@ -2256,7 +2250,7 @@ variance-to-mean ratio and the share of zeros.</p>
     <tr>
       <th>var/mean</th>
       <td>6.383</td>
-      <td>6.589</td>
+      <td>6.601</td>
     </tr>
     <tr>
       <th>zeros</th>
@@ -2266,7 +2260,7 @@ variance-to-mean ratio and the share of zeros.</p>
     <tr>
       <th>max</th>
       <td>43.000</td>
-      <td>47.518</td>
+      <td>47.816</td>
     </tr>
   </tbody>
 </table>

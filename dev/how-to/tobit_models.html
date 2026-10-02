@@ -858,6 +858,30 @@
 
               
             
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1487,7 +1511,7 @@ there.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">data_sar</span> <span class="o">=</span> <span class="n">simulate_sar_tobit</span><span class="p">(</span>
-    <span class="n">n</span><span class="o">=</span><span class="mi">18</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">]),</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">censoring</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">1</span>
+    <span class="n">n_side</span><span class="o">=</span><span class="mi">18</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">]),</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">censoring</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">1</span>
 <span class="p">)</span>
 <span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">W</span> <span class="o">=</span> <span class="n">data_sar</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">data_sar</span><span class="p">[</span><span class="s2">"X"</span><span class="p">],</span> <span class="n">data_sar</span><span class="p">[</span><span class="s2">"W_graph"</span><span class="p">]</span>
 
@@ -1503,6 +1527,10 @@ censored at 0  : 21.0%
 true parameters: rho=0.4, beta=[1.0, 1.5], sigma=0.8
 </code></pre></div>
 </div>
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
+</code></pre></div>
+</div>
 </div>
 </div>
 <div class="cell docutils container">
@@ -1515,87 +1543,72 @@ true parameters: rho=0.4, beta=[1.0, 1.5], sigma=0.8
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output text_html"><div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
+<div class="output text_html"><table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
       <th></th>
       <th>mean</th>
       <th>sd</th>
-      <th>hdi_3%</th>
-      <th>hdi_97%</th>
-      <th>mcse_mean</th>
-      <th>mcse_sd</th>
+      <th>eti89_lb</th>
+      <th>eti89_ub</th>
       <th>ess_bulk</th>
       <th>ess_tail</th>
       <th>r_hat</th>
+      <th>mcse_mean</th>
+      <th>mcse_sd</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <th>rho</th>
-      <td>0.404</td>
-      <td>0.044</td>
-      <td>0.321</td>
-      <td>0.486</td>
-      <td>0.001</td>
-      <td>0.001</td>
-      <td>2342.0</td>
-      <td>2731.0</td>
-      <td>1.0</td>
+      <td>0.405</td>
+      <td>0.043</td>
+      <td>0.33</td>
+      <td>0.47</td>
+      <td>2057</td>
+      <td>2306</td>
+      <td>1.00</td>
+      <td>0.00094</td>
+      <td>0.00065</td>
     </tr>
     <tr>
       <th>beta[x0]</th>
-      <td>1.040</td>
-      <td>0.080</td>
-      <td>0.898</td>
-      <td>1.197</td>
-      <td>0.002</td>
-      <td>0.001</td>
-      <td>2303.0</td>
-      <td>2329.0</td>
-      <td>1.0</td>
+      <td>1.038</td>
+      <td>0.078</td>
+      <td>0.91</td>
+      <td>1.2</td>
+      <td>2054</td>
+      <td>2251</td>
+      <td>1.00</td>
+      <td>0.0017</td>
+      <td>0.0012</td>
     </tr>
     <tr>
       <th>beta[x1]</th>
-      <td>1.537</td>
-      <td>0.057</td>
-      <td>1.436</td>
-      <td>1.652</td>
-      <td>0.001</td>
-      <td>0.001</td>
-      <td>2595.0</td>
-      <td>2614.0</td>
-      <td>1.0</td>
+      <td>1.542</td>
+      <td>0.058</td>
+      <td>1.4</td>
+      <td>1.6</td>
+      <td>2365</td>
+      <td>2743</td>
+      <td>1.00</td>
+      <td>0.0012</td>
+      <td>0.00079</td>
     </tr>
     <tr>
       <th>sigma</th>
-      <td>0.792</td>
-      <td>0.037</td>
-      <td>0.725</td>
-      <td>0.860</td>
-      <td>0.001</td>
-      <td>0.001</td>
-      <td>2954.0</td>
-      <td>2966.0</td>
-      <td>1.0</td>
+      <td>0.794</td>
+      <td>0.036</td>
+      <td>0.74</td>
+      <td>0.85</td>
+      <td>2995</td>
+      <td>2671</td>
+      <td>1.00</td>
+      <td>0.00066</td>
+      <td>0.00053</td>
     </tr>
   </tbody>
-</table>
-</div></div></div>
+</table></div></div>
 </div>
 <div class="important tip admonition">
 <p class="admonition-title">Important</p>
@@ -1670,17 +1683,17 @@ indirect and total components.</p>
   <tbody>
     <tr>
       <th>x1</th>
-      <td>1.6126</td>
-      <td>1.496</td>
-      <td>1.735</td>
+      <td>1.6178</td>
+      <td>1.4985</td>
+      <td>1.7387</td>
       <td>0.0</td>
-      <td>0.9779</td>
-      <td>0.6694</td>
-      <td>1.3501</td>
+      <td>0.9848</td>
+      <td>0.6791</td>
+      <td>1.355</td>
       <td>0.0</td>
-      <td>2.5906</td>
-      <td>2.2155</td>
-      <td>3.0315</td>
+      <td>2.6026</td>
+      <td>2.233</td>
+      <td>3.0483</td>
       <td>0.0</td>
     </tr>
   </tbody>
@@ -1698,7 +1711,7 @@ spillovers, the effects decomposition collapses to the coefficient itself.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">data_sem</span> <span class="o">=</span> <span class="n">simulate_sem_tobit</span><span class="p">(</span>
-    <span class="n">n</span><span class="o">=</span><span class="mi">18</span><span class="p">,</span> <span class="n">lam</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">]),</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">censoring</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">1</span>
+    <span class="n">n_side</span><span class="o">=</span><span class="mi">18</span><span class="p">,</span> <span class="n">lam</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">]),</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">censoring</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">1</span>
 <span class="p">)</span>
 <span class="n">model_sem</span> <span class="o">=</span> <span class="n">SEMTobit</span><span class="p">(</span>
     <span class="n">y</span><span class="o">=</span><span class="n">data_sem</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">X</span><span class="o">=</span><span class="n">data_sem</span><span class="p">[</span><span class="s2">"X"</span><span class="p">],</span> <span class="n">W</span><span class="o">=</span><span class="n">data_sem</span><span class="p">[</span><span class="s2">"W_graph"</span><span class="p">],</span> <span class="n">censoring</span><span class="o">=</span><span class="mf">0.0</span>
@@ -1710,87 +1723,72 @@ spillovers, the effects decomposition collapses to the coefficient itself.</p>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output text_html"><div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
+<div class="output text_html"><table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
       <th></th>
       <th>mean</th>
       <th>sd</th>
-      <th>hdi_3%</th>
-      <th>hdi_97%</th>
-      <th>mcse_mean</th>
-      <th>mcse_sd</th>
+      <th>eti89_lb</th>
+      <th>eti89_ub</th>
       <th>ess_bulk</th>
       <th>ess_tail</th>
       <th>r_hat</th>
+      <th>mcse_mean</th>
+      <th>mcse_sd</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <th>lam</th>
-      <td>0.439</td>
-      <td>0.071</td>
-      <td>0.307</td>
-      <td>0.571</td>
-      <td>0.001</td>
-      <td>0.001</td>
-      <td>3489.0</td>
-      <td>3178.0</td>
-      <td>1.0</td>
+      <td>0.441</td>
+      <td>0.073</td>
+      <td>0.33</td>
+      <td>0.56</td>
+      <td>2940</td>
+      <td>2951</td>
+      <td>1.00</td>
+      <td>0.0013</td>
+      <td>0.0011</td>
     </tr>
     <tr>
       <th>beta[x0]</th>
-      <td>1.100</td>
-      <td>0.079</td>
-      <td>0.953</td>
-      <td>1.250</td>
-      <td>0.001</td>
-      <td>0.001</td>
-      <td>4434.0</td>
-      <td>2802.0</td>
-      <td>1.0</td>
+      <td>1.095</td>
+      <td>0.082</td>
+      <td>0.96</td>
+      <td>1.2</td>
+      <td>3604</td>
+      <td>2811</td>
+      <td>1.00</td>
+      <td>0.0014</td>
+      <td>0.0014</td>
     </tr>
     <tr>
       <th>beta[x1]</th>
-      <td>1.505</td>
+      <td>1.513</td>
       <td>0.058</td>
-      <td>1.402</td>
-      <td>1.617</td>
-      <td>0.001</td>
-      <td>0.001</td>
-      <td>2449.0</td>
-      <td>2800.0</td>
-      <td>1.0</td>
+      <td>1.4</td>
+      <td>1.6</td>
+      <td>1863</td>
+      <td>1957</td>
+      <td>1.00</td>
+      <td>0.0014</td>
+      <td>0.00093</td>
     </tr>
     <tr>
       <th>sigma</th>
-      <td>0.757</td>
+      <td>0.759</td>
       <td>0.037</td>
-      <td>0.691</td>
-      <td>0.825</td>
-      <td>0.001</td>
-      <td>0.001</td>
-      <td>4311.0</td>
-      <td>3180.0</td>
-      <td>1.0</td>
+      <td>0.7</td>
+      <td>0.82</td>
+      <td>3472</td>
+      <td>3052</td>
+      <td>1.00</td>
+      <td>0.00063</td>
+      <td>0.00053</td>
     </tr>
   </tbody>
-</table>
-</div></div></div>
+</table></div></div>
 </div>
 <h2 id="add-spatially-lagged-covariates">Add spatially lagged covariates<a class="headerlink" href="#add-spatially-lagged-covariates" title="Link to this heading">¶</a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">SDMTobit</span></code> includes <span class="math notranslate nohighlight">\(WX\)</span> alongside <span class="math notranslate nohighlight">\(X\)</span>, so a neighbour’s covariates enter your
@@ -1801,7 +1799,7 @@ error channel register.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">data_sdm</span> <span class="o">=</span> <span class="n">simulate_sdm_tobit</span><span class="p">(</span>
-    <span class="n">n</span><span class="o">=</span><span class="mi">18</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">beta1</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">]),</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">censoring</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">1</span>
+    <span class="n">n_side</span><span class="o">=</span><span class="mi">18</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">beta1</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.5</span><span class="p">]),</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">0.8</span><span class="p">,</span> <span class="n">censoring</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">1</span>
 <span class="p">)</span>
 <span class="n">model_sdm</span> <span class="o">=</span> <span class="n">SDMTobit</span><span class="p">(</span>
     <span class="n">y</span><span class="o">=</span><span class="n">data_sdm</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">X</span><span class="o">=</span><span class="n">data_sdm</span><span class="p">[</span><span class="s2">"X"</span><span class="p">],</span> <span class="n">W</span><span class="o">=</span><span class="n">data_sdm</span><span class="p">[</span><span class="s2">"W_graph"</span><span class="p">],</span> <span class="n">censoring</span><span class="o">=</span><span class="mf">0.0</span>
@@ -1817,63 +1815,48 @@ error channel register.</p>
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>coefficients: 3 (X and WX)
 </code></pre></div>
 </div>
-<div class="output text_html"><div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
+<div class="output text_html"><table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
       <th></th>
       <th>mean</th>
       <th>sd</th>
-      <th>hdi_3%</th>
-      <th>hdi_97%</th>
-      <th>mcse_mean</th>
-      <th>mcse_sd</th>
+      <th>eti89_lb</th>
+      <th>eti89_ub</th>
       <th>ess_bulk</th>
       <th>ess_tail</th>
       <th>r_hat</th>
+      <th>mcse_mean</th>
+      <th>mcse_sd</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <th>rho</th>
       <td>0.385</td>
-      <td>0.062</td>
-      <td>0.273</td>
-      <td>0.507</td>
-      <td>0.001</td>
-      <td>0.001</td>
-      <td>1747.0</td>
-      <td>2351.0</td>
-      <td>1.0</td>
+      <td>0.061</td>
+      <td>0.29</td>
+      <td>0.48</td>
+      <td>1681</td>
+      <td>2135</td>
+      <td>1.00</td>
+      <td>0.0015</td>
+      <td>0.00097</td>
     </tr>
     <tr>
       <th>sigma</th>
-      <td>0.778</td>
-      <td>0.036</td>
-      <td>0.715</td>
-      <td>0.846</td>
-      <td>0.001</td>
-      <td>0.001</td>
-      <td>3882.0</td>
-      <td>2955.0</td>
-      <td>1.0</td>
+      <td>0.783</td>
+      <td>0.035</td>
+      <td>0.73</td>
+      <td>0.84</td>
+      <td>3319</td>
+      <td>2835</td>
+      <td>1.00</td>
+      <td>0.00061</td>
+      <td>0.00055</td>
     </tr>
   </tbody>
-</table>
-</div></div></div>
+</table></div></div>
 </div>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
@@ -1931,29 +1914,29 @@ error channel register.</p>
     <tr>
       <th>SARTobit</th>
       <td>rho</td>
-      <td>0.404</td>
-      <td>0.044</td>
-      <td>26.807</td>
-      <td>2342.069</td>
+      <td>0.405</td>
+      <td>0.043</td>
+      <td>60.964</td>
+      <td>2057.504</td>
       <td>1.003</td>
     </tr>
     <tr>
       <th>SEMTobit</th>
       <td>lam</td>
-      <td>0.439</td>
-      <td>0.071</td>
-      <td>19.738</td>
-      <td>3488.875</td>
-      <td>1.001</td>
+      <td>0.441</td>
+      <td>0.073</td>
+      <td>15.408</td>
+      <td>2940.104</td>
+      <td>1.000</td>
     </tr>
     <tr>
       <th>SDMTobit</th>
       <td>rho</td>
       <td>0.385</td>
-      <td>0.062</td>
-      <td>21.263</td>
-      <td>1747.178</td>
-      <td>1.000</td>
+      <td>0.061</td>
+      <td>62.086</td>
+      <td>1681.740</td>
+      <td>1.001</td>
     </tr>
   </tbody>
 </table>
@@ -2016,20 +1999,20 @@ any divergences at all are worth investigating before reading the posterior.</p>
     <tr>
       <th>SARTobit</th>
       <td>0.0</td>
-      <td>1366.0</td>
-      <td>1.00</td>
+      <td>1402.682560</td>
+      <td>1.005548</td>
     </tr>
     <tr>
       <th>SEMTobit</th>
       <td>0.0</td>
-      <td>1831.0</td>
-      <td>1.01</td>
+      <td>1061.788799</td>
+      <td>1.004480</td>
     </tr>
     <tr>
       <th>SDMTobit</th>
       <td>0.0</td>
-      <td>1624.0</td>
-      <td>1.00</td>
+      <td>1476.984900</td>
+      <td>1.004241</td>
     </tr>
   </tbody>
 </table>

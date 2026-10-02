@@ -28,6 +28,5 @@
       ~PanelOLSPriors.nu
       ~PanelOLSPriors.sigma2_alpha
       ~PanelOLSPriors.sigma2_beta
-      ~PanelOLSPriors.sigma_sigma
    
    

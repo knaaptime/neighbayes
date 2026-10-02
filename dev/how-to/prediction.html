@@ -1,0 +1,2529 @@
+
+
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="spatial_cv_demo.html">
+      
+      
+        <link rel="next" href="../concept.html">
+      
+      
+      <link rel="icon" href="../_static/pysal_favicon.ico">
+    
+    
+      
+        <title>How to predict at new locations - neighbayes</title>
+      
+    
+    
+      
+        
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.74c816e3f9967dd6e.min.css?v=6cfe2491" />
+        <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
+        <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+        <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=93c5fc88" />
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#fit-on-the-observed-units" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="neighbayes" class="md-header__button md-logo" aria-label="neighbayes" data-md-component="logo">
+      <img src="../_static/pysal_logo.svg" alt="logo">
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            neighbayes
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              How to predict at new locations
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="red"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7M9 21a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-1H9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="red"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7M9 21v-1h6v1a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1m3-17a5 5 0 0 0-5 5c0 2.05 1.23 3.81 3 4.58V16h4v-2.42c1.77-.77 3-2.53 3-4.58a5 5 0 0 0-5-5"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/pysal/neighbayes/" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    pysal/neighbayes
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="neighbayes" class="md-nav__button md-logo" aria-label="neighbayes" data-md-component="logo">
+      <img src="../_static/pysal_logo.svg" alt="logo">
+    </a>
+    neighbayes
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/pysal/neighbayes/" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    pysal/neighbayes
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Home</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Installation</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>Tutorial</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Tutorial</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorial/quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Getting Started with neighbayes</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorial/pedagogical_spatial_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Bayesian spatial models:<wbr> a walkthrough</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorial/pedagogical_panel_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Spatial panel models:<wbr> a walkthrough</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>How-<wbr>to guides</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            <span>How-<wbr>to guides</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="priors.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to set priors</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="gibbs_sampler.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to choose and configure the Gibbs sampler</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="spatial_logit.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to fit spatial logit models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="negbin_estimation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to estimate spatial negative binomial models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="zinb_estimation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to fit zero-<wbr>inflated SAR negative binomial models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="poisson_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to estimate Poisson origin–destination flow models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="tobit_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to fit spatial tobit models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="tobit_panel_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to fit spatial tobit panel models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="flow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to estimate origin–destination flow models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="panel_flow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to estimate panel flow models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="bayesian_lmtests.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to run Bayesian LM specification tests</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="spatial_cv_demo.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to run spatial block cross-<wbr>validation</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="#" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary">
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#fit-on-the-observed-units" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Fit on the observed units</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#predict" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Predict</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#check-what-the-correction-is-worth" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Check what the correction is worth</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-the-conditional-is-not-what-you-want" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>When the conditional is not what you want</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>See also</span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>Explanation</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Explanation</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concept.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Why neighbayes</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Architecture</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>Reference</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Reference</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Supported Models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>API reference</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../references.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>References</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>Validation</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Validation</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validation/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>External Validation &amp; Replication</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>Performance</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Performance</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Performance &amp; Profiling</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>For contributors</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            <span>For contributors</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/knaaptime/neighbayes" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Git<wbr>Hub</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/knaaptime/neighbayes/releases" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Changelog</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary">
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#fit-on-the-observed-units" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Fit on the observed units</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#predict" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Predict</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#check-what-the-correction-is-worth" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Check what the correction is worth</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-the-conditional-is-not-what-you-want" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>When the conditional is not what you want</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>See also</span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset" role="main">
+                
+                
+                  
+
+
+  
+    <a href="https://github.com/pysal/neighbayes/blob/main/docs/how-to/prediction.ipynb" title="Edit this page" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 9h5.5L13 3.5zM6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4c0-1.11.89-2 2-2m.12 13.5 3.74 3.74 1.42-1.41-2.33-2.33 2.33-2.33-1.42-1.41zm11.16 0-3.74-3.74-1.42 1.41 2.33 2.33-2.33 2.33 1.42 1.41z"/></svg>
+    </a>
+  
+  
+
+<h1 id="how-to-predict-at-new-locations">How to predict at new locations<a class="headerlink" href="#how-to-predict-at-new-locations" title="Link to this heading">¶</a></h1>
+<p>You have fitted a spatial model and want the outcome at units you did not
+observe: new tracts, a region withheld for validation, or places where the
+survey missed. <code class="docutils literal notranslate"><span class="pre">model.predict</span></code> returns the posterior predictive distribution
+of those outcomes given every observed one. For each posterior draw it uses
+the exact conditional Gaussian, the best predictor (BP) of
+<span class="bibtex-citation" id="id1">Goulard <em>et al.</em> [<a class="reference internal" href="../references.html#id23" title="Michel Goulard, Thibault Laurent, and Christine Thomas-Agnan. About predictions in spatial autoregressive models: optimal and almost optimal strategies. Spatial Economic Analysis, 12(2-3):304–325, 2017. doi:10.1080/17421772.2017.1300679.">2017</a>]</span>, so the result carries parameter
+uncertainty instead of plugging in point estimates.</p>
+<p>It also returns the <em>trend</em> predictor (TC), the model’s mean at the new units
+with no correction from observed neighbors. TC is the floor BP has to beat.
+This page shows how to call <code class="docutils literal notranslate"><span class="pre">predict</span></code>, and how to check what the spatial
+correction is worth on your data.</p>
+<p><code class="docutils literal notranslate"><span class="pre">predict</span></code> covers OLS, SLX, SAR, SDM, SEM and SDEM with Gaussian errors.
+Models with <code class="docutils literal notranslate"><span class="pre">robust=True</span></code> raise, because the Gaussian conditional does not
+hold for Student-t errors.</p>
+<h2 id="fit-on-the-observed-units">Fit on the observed units<a class="headerlink" href="#fit-on-the-observed-units" title="Link to this heading">¶</a></h2>
+<p>We simulate a SAR on a 20 × 20 rook grid, hold out four 4 × 4 blocks, and fit
+on the rest. The training weights are the contiguity graph of the observed
+units, row-standardized.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">scipy.sparse</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">sp</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">libpysal.graph</span><span class="w"> </span><span class="kn">import</span> <span class="n">Graph</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.dgp</span><span class="w"> </span><span class="kn">import</span> <span class="n">simulate_sar</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">SAR</span>
+
+<span class="n">GRID</span> <span class="o">=</span> <span class="mi">20</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">held_out_blocks</span><span class="p">(</span><span class="n">n_side</span><span class="p">,</span> <span class="n">rng</span><span class="p">,</span> <span class="n">n_blocks</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="mi">4</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Mask of ``n_blocks`` non-overlapping ``size`` x ``size`` blocks."""</span>
+    <span class="n">row</span><span class="p">,</span> <span class="n">col</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">divmod</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">n_side</span> <span class="o">*</span> <span class="n">n_side</span><span class="p">),</span> <span class="n">n_side</span><span class="p">)</span>
+    <span class="n">slots</span> <span class="o">=</span> <span class="p">[</span>
+        <span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">c</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n_side</span> <span class="o">-</span> <span class="n">size</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">n_side</span> <span class="o">-</span> <span class="n">size</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="mi">5</span><span class="p">)</span>
+    <span class="p">]</span>
+    <span class="n">held</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">n_side</span> <span class="o">*</span> <span class="n">n_side</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">rng</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">slots</span><span class="p">),</span> <span class="n">n_blocks</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="n">r0</span><span class="p">,</span> <span class="n">c0</span> <span class="o">=</span> <span class="n">slots</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+        <span class="n">held</span> <span class="o">|=</span> <span class="p">(</span><span class="n">row</span> <span class="o">&gt;=</span> <span class="n">r0</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">row</span> <span class="o">&lt;</span> <span class="n">r0</span> <span class="o">+</span> <span class="n">size</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">col</span> <span class="o">&gt;=</span> <span class="n">c0</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">col</span> <span class="o">&lt;</span> <span class="n">c0</span> <span class="o">+</span> <span class="n">size</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">held</span>
+
+
+<span class="n">gdf</span> <span class="o">=</span> <span class="n">simulate_sar</span><span class="p">(</span>
+    <span class="n">n_side</span><span class="o">=</span><span class="n">GRID</span><span class="p">,</span>
+    <span class="n">rho</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span>
+    <span class="n">beta</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">]),</span>
+    <span class="n">sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">seed</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
+    <span class="n">create_gdf</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">geometry_type</span><span class="o">=</span><span class="s2">"polygon"</span><span class="p">,</span>
+    <span class="n">contiguity</span><span class="o">=</span><span class="s2">"rook"</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">held</span> <span class="o">=</span> <span class="n">held_out_blocks</span><span class="p">(</span><span class="n">GRID</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">0</span><span class="p">))</span>
+<span class="n">train</span> <span class="o">=</span> <span class="n">gdf</span><span class="p">[</span><span class="o">~</span><span class="n">held</span><span class="p">]</span>
+<span class="n">new</span> <span class="o">=</span> <span class="n">gdf</span><span class="p">[</span><span class="n">held</span><span class="p">]</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">SAR</span><span class="p">(</span>
+    <span class="n">formula</span><span class="o">=</span><span class="s2">"y ~ X_1"</span><span class="p">,</span>
+    <span class="n">data</span><span class="o">=</span><span class="n">train</span><span class="p">,</span>
+    <span class="n">W</span><span class="o">=</span><span class="n">Graph</span><span class="o">.</span><span class="n">build_contiguity</span><span class="p">(</span><span class="n">train</span><span class="p">,</span> <span class="n">rook</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="s2">"r"</span><span class="p">),</span>
+<span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">random_seed</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">summary</span><span class="p">()</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
+  W_arr = np.asarray(W, dtype=np.float64)
+</code></pre></div>
+</div>
+<div class="output text_html"><table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>mean</th>
+      <th>sd</th>
+      <th>eti89_lb</th>
+      <th>eti89_ub</th>
+      <th>ess_bulk</th>
+      <th>ess_tail</th>
+      <th>r_hat</th>
+      <th>mcse_mean</th>
+      <th>mcse_sd</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>rho</th>
+      <td>0.535</td>
+      <td>0.032</td>
+      <td>0.48</td>
+      <td>0.59</td>
+      <td>839</td>
+      <td>574</td>
+      <td>1.00</td>
+      <td>0.0011</td>
+      <td>0.00088</td>
+    </tr>
+    <tr>
+      <th>sigma</th>
+      <td>1.065</td>
+      <td>0.042</td>
+      <td>1</td>
+      <td>1.1</td>
+      <td>938</td>
+      <td>870</td>
+      <td>1.00</td>
+      <td>0.0014</td>
+      <td>0.001</td>
+    </tr>
+    <tr>
+      <th>sigma2</th>
+      <td>1.136</td>
+      <td>0.091</td>
+      <td>1</td>
+      <td>1.3</td>
+      <td>938</td>
+      <td>870</td>
+      <td>1.00</td>
+      <td>0.003</td>
+      <td>0.0022</td>
+    </tr>
+    <tr>
+      <th>Intercept</th>
+      <td>1.117393</td>
+      <td>0.097595</td>
+      <td>0.955297</td>
+      <td>1.269568</td>
+      <td>724.995771</td>
+      <td>806.324662</td>
+      <td>0.999748</td>
+      <td>0.003603</td>
+      <td>0.002433</td>
+    </tr>
+    <tr>
+      <th>X_1</th>
+      <td>2.140645</td>
+      <td>0.060728</td>
+      <td>2.046112</td>
+      <td>2.235844</td>
+      <td>880.91071</td>
+      <td>830.565354</td>
+      <td>1.004345</td>
+      <td>0.002023</td>
+      <td>0.0014</td>
+    </tr>
+  </tbody>
+</table></div></div>
+</div>
+<h2 id="predict">Predict<a class="headerlink" href="#predict" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">predict</span></code> needs the covariates of the new units and a weights matrix over
+<em>all</em> units, observed and new. By default the new units come last in that
+matrix. Here they sit among the observed ones, so <code class="docutils literal notranslate"><span class="pre">oos</span></code> gives their positions.
+For a formula-built model, pass the new covariates as a DataFrame; the
+formula’s transforms are replayed on it.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">W_all</span> <span class="o">=</span> <span class="n">Graph</span><span class="o">.</span><span class="n">build_contiguity</span><span class="p">(</span><span class="n">gdf</span><span class="p">,</span> <span class="n">rook</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="s2">"r"</span><span class="p">)</span>
+<span class="n">oos</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="n">held</span><span class="p">)</span>
+
+<span class="n">pred</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">new</span><span class="p">,</span> <span class="n">W_all</span><span class="p">,</span> <span class="n">oos</span><span class="o">=</span><span class="n">oos</span><span class="p">,</span> <span class="n">random_seed</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<span class="n">pred</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><div><svg style="position: absolute; width: 0; height: 0; overflow: hidden">
+<defs>
+<symbol id="icon-database" viewBox="0 0 32 32">
+<path d="M16 0c-8.837 0-16 2.239-16 5v4c0 2.761 7.163 5 16 5s16-2.239 16-5v-4c0-2.761-7.163-5-16-5z"></path>
+<path d="M16 17c-8.837 0-16-2.239-16-5v6c0 2.761 7.163 5 16 5s16-2.239 16-5v-6c0 2.761-7.163 5-16 5z"></path>
+<path d="M16 26c-8.837 0-16-2.239-16-5v6c0 2.761 7.163 5 16 5s16-2.239 16-5v-6c0 2.761-7.163 5-16 5z"></path>
+</symbol>
+<symbol id="icon-file-text2" viewBox="0 0 32 32">
+<path d="M28.681 7.159c-0.694-0.947-1.662-2.053-2.724-3.116s-2.169-2.030-3.116-2.724c-1.612-1.182-2.393-1.319-2.841-1.319h-15.5c-1.378 0-2.5 1.121-2.5 2.5v27c0 1.378 1.122 2.5 2.5 2.5h23c1.378 0 2.5-1.122 2.5-2.5v-19.5c0-0.448-0.137-1.23-1.319-2.841zM24.543 5.457c0.959 0.959 1.712 1.825 2.268 2.543h-4.811v-4.811c0.718 0.556 1.584 1.309 2.543 2.268zM28 29.5c0 0.271-0.229 0.5-0.5 0.5h-23c-0.271 0-0.5-0.229-0.5-0.5v-27c0-0.271 0.229-0.5 0.5-0.5 0 0 15.499-0 15.5 0v7c0 0.552 0.448 1 1 1h7v19.5z"></path>
+<path d="M23 26h-14c-0.552 0-1-0.448-1-1s0.448-1 1-1h14c0.552 0 1 0.448 1 1s-0.448 1-1 1z"></path>
+<path d="M23 22h-14c-0.552 0-1-0.448-1-1s0.448-1 1-1h14c0.552 0 1 0.448 1 1s-0.448 1-1 1z"></path>
+<path d="M23 18h-14c-0.552 0-1-0.448-1-1s0.448-1 1-1h14c0.552 0 1 0.448 1 1s-0.448 1-1 1z"></path>
+</symbol>
+</defs>
+</svg>
+<style>/* CSS stylesheet for displaying xarray objects in notebooks */
+
+:root {
+  --xr-font-color0: var(
+    --jp-content-font-color0,
+    var(--pst-color-text-base rgba(0, 0, 0, 1))
+  );
+  --xr-font-color2: var(
+    --jp-content-font-color2,
+    var(--pst-color-text-base, rgba(0, 0, 0, 0.54))
+  );
+  --xr-font-color3: var(
+    --jp-content-font-color3,
+    var(--pst-color-text-base, rgba(0, 0, 0, 0.38))
+  );
+  --xr-border-color: var(
+    --jp-border-color2,
+    hsl(from var(--pst-color-on-background, white) h s calc(l - 10))
+  );
+  --xr-disabled-color: var(
+    --jp-layout-color3,
+    hsl(from var(--pst-color-on-background, white) h s calc(l - 40))
+  );
+  --xr-background-color: var(
+    --jp-layout-color0,
+    var(--pst-color-on-background, white)
+  );
+  --xr-background-color-row-even: var(
+    --jp-layout-color1,
+    hsl(from var(--pst-color-on-background, white) h s calc(l - 5))
+  );
+  --xr-background-color-row-odd: var(
+    --jp-layout-color2,
+    hsl(from var(--pst-color-on-background, white) h s calc(l - 15))
+  );
+}
+
+html[theme="dark"],
+html[data-theme="dark"],
+body[data-theme="dark"],
+body.vscode-dark {
+  --xr-font-color0: var(
+    --jp-content-font-color0,
+    var(--pst-color-text-base, rgba(255, 255, 255, 1))
+  );
+  --xr-font-color2: var(
+    --jp-content-font-color2,
+    var(--pst-color-text-base, rgba(255, 255, 255, 0.54))
+  );
+  --xr-font-color3: var(
+    --jp-content-font-color3,
+    var(--pst-color-text-base, rgba(255, 255, 255, 0.38))
+  );
+  --xr-border-color: var(
+    --jp-border-color2,
+    hsl(from var(--pst-color-on-background, #111111) h s calc(l + 10))
+  );
+  --xr-disabled-color: var(
+    --jp-layout-color3,
+    hsl(from var(--pst-color-on-background, #111111) h s calc(l + 40))
+  );
+  --xr-background-color: var(
+    --jp-layout-color0,
+    var(--pst-color-on-background, #111111)
+  );
+  --xr-background-color-row-even: var(
+    --jp-layout-color1,
+    hsl(from var(--pst-color-on-background, #111111) h s calc(l + 5))
+  );
+  --xr-background-color-row-odd: var(
+    --jp-layout-color2,
+    hsl(from var(--pst-color-on-background, #111111) h s calc(l + 15))
+  );
+}
+
+.xr-wrap {
+  display: block !important;
+  min-width: 300px;
+  max-width: 700px;
+  line-height: 1.6;
+  padding-bottom: 4px;
+}
+
+.xr-text-repr-fallback {
+  /* fallback to plain text repr when CSS is not injected (untrusted notebook) */
+  display: none;
+}
+
+.xr-header {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+.xr-header {
+  border-bottom: solid 1px var(--xr-border-color);
+  margin-bottom: 4px;
+}
+
+.xr-header > div,
+.xr-header > ul {
+  display: inline;
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.xr-obj-type,
+.xr-obj-name {
+  margin-left: 2px;
+  margin-right: 10px;
+}
+
+.xr-obj-type,
+.xr-group-box-contents > label {
+  color: var(--xr-font-color2);
+  display: block;
+}
+
+.xr-sections {
+  padding-left: 0 !important;
+  display: grid;
+  grid-template-columns: 150px auto auto 1fr 0 20px 0 20px;
+  margin-block-start: 0;
+  margin-block-end: 0;
+}
+
+.xr-section-item {
+  display: contents;
+}
+
+.xr-section-item > input,
+.xr-group-box-contents > input,
+.xr-array-wrap > input {
+  display: block;
+  opacity: 0;
+  height: 0;
+  margin: 0;
+}
+
+.xr-section-item > input + label,
+.xr-var-item > input + label {
+  color: var(--xr-disabled-color);
+}
+
+.xr-section-item > input:enabled + label,
+.xr-var-item > input:enabled + label,
+.xr-array-wrap > input:enabled + label,
+.xr-group-box-contents > input:enabled + label {
+  cursor: pointer;
+  color: var(--xr-font-color2);
+}
+
+.xr-section-item > input:focus-visible + label,
+.xr-var-item > input:focus-visible + label,
+.xr-array-wrap > input:focus-visible + label,
+.xr-group-box-contents > input:focus-visible + label {
+  outline: auto;
+}
+
+.xr-section-item > input:enabled + label:hover,
+.xr-var-item > input:enabled + label:hover,
+.xr-array-wrap > input:enabled + label:hover,
+.xr-group-box-contents > input:enabled + label:hover {
+  color: var(--xr-font-color0);
+}
+
+.xr-section-summary {
+  grid-column: 1;
+  color: var(--xr-font-color2);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.xr-section-summary > em {
+  font-weight: normal;
+}
+
+.xr-span-grid {
+  grid-column-end: -1;
+}
+
+.xr-section-summary > span {
+  display: inline-block;
+  padding-left: 0.3em;
+}
+
+.xr-group-box-contents > input:checked + label > span {
+  display: inline-block;
+  padding-left: 0.6em;
+}
+
+.xr-section-summary-in:disabled + label {
+  color: var(--xr-font-color2);
+}
+
+.xr-section-summary-in + label:before {
+  display: inline-block;
+  content: "►";
+  font-size: 11px;
+  width: 15px;
+  text-align: center;
+}
+
+.xr-section-summary-in:disabled + label:before {
+  color: var(--xr-disabled-color);
+}
+
+.xr-section-summary-in:checked + label:before {
+  content: "▼";
+}
+
+.xr-section-summary-in:checked + label > span {
+  display: none;
+}
+
+.xr-section-summary,
+.xr-section-inline-details,
+.xr-group-box-contents > label {
+  padding-top: 4px;
+}
+
+.xr-section-inline-details {
+  grid-column: 2 / -1;
+}
+
+.xr-section-details {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  margin-bottom: 5px;
+}
+
+.xr-section-summary-in ~ .xr-section-details {
+  display: none;
+}
+
+.xr-section-summary-in:checked ~ .xr-section-details {
+  display: contents;
+}
+
+.xr-children {
+  display: inline-grid;
+  grid-template-columns: 100%;
+  grid-column: 1 / -1;
+  padding-top: 4px;
+}
+
+.xr-group-box {
+  display: inline-grid;
+  grid-template-columns: 0px 30px auto;
+}
+
+.xr-group-box-vline {
+  grid-column-start: 1;
+  border-right: 0.2em solid;
+  border-color: var(--xr-border-color);
+  width: 0px;
+}
+
+.xr-group-box-hline {
+  grid-column-start: 2;
+  grid-row-start: 1;
+  height: 1em;
+  width: 26px;
+  border-bottom: 0.2em solid;
+  border-color: var(--xr-border-color);
+}
+
+.xr-group-box-contents {
+  grid-column-start: 3;
+  padding-bottom: 4px;
+}
+
+.xr-group-box-contents > label::before {
+  content: "📂";
+  padding-right: 0.3em;
+}
+
+.xr-group-box-contents > input:checked + label::before {
+  content: "📁";
+}
+
+.xr-group-box-contents > input:checked + label {
+  padding-bottom: 0px;
+}
+
+.xr-group-box-contents > input:checked ~ .xr-sections {
+  display: none;
+}
+
+.xr-group-box-contents > input + label > span {
+  display: none;
+}
+
+.xr-group-box-ellipsis {
+  font-size: 1.4em;
+  font-weight: 900;
+  color: var(--xr-font-color2);
+  letter-spacing: 0.15em;
+  cursor: default;
+}
+
+.xr-array-wrap {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 20px auto;
+}
+
+.xr-array-wrap > label {
+  grid-column: 1;
+  vertical-align: top;
+}
+
+.xr-preview {
+  color: var(--xr-font-color3);
+}
+
+.xr-array-preview,
+.xr-array-data {
+  padding: 0 5px !important;
+  grid-column: 2;
+}
+
+.xr-array-data,
+.xr-array-in:checked ~ .xr-array-preview {
+  display: none;
+}
+
+.xr-array-in:checked ~ .xr-array-data,
+.xr-array-preview {
+  display: inline-block;
+}
+
+.xr-dim-list {
+  display: inline-block !important;
+  list-style: none;
+  padding: 0 !important;
+  margin: 0;
+}
+
+.xr-dim-list li {
+  display: inline-block;
+  padding: 0;
+  margin: 0;
+}
+
+.xr-dim-list:before {
+  content: "(";
+}
+
+.xr-dim-list:after {
+  content: ")";
+}
+
+.xr-dim-list li:not(:last-child):after {
+  content: ",";
+  padding-right: 5px;
+}
+
+.xr-has-index {
+  font-weight: bold;
+}
+
+.xr-var-list,
+.xr-var-item {
+  display: contents;
+}
+
+.xr-var-item > div,
+.xr-var-item label,
+.xr-var-item > .xr-var-name span {
+  background-color: var(--xr-background-color-row-even);
+  border-color: var(--xr-background-color-row-odd);
+  margin-bottom: 0;
+  padding-top: 2px;
+}
+
+.xr-var-item > .xr-var-name:hover span {
+  padding-right: 5px;
+}
+
+.xr-var-list > li:nth-child(odd) > div,
+.xr-var-list > li:nth-child(odd) > label,
+.xr-var-list > li:nth-child(odd) > .xr-var-name span {
+  background-color: var(--xr-background-color-row-odd);
+  border-color: var(--xr-background-color-row-even);
+}
+
+.xr-var-name {
+  grid-column: 1;
+}
+
+.xr-var-dims {
+  grid-column: 2;
+}
+
+.xr-var-dtype {
+  grid-column: 3;
+  text-align: right;
+  color: var(--xr-font-color2);
+}
+
+.xr-var-preview {
+  grid-column: 4;
+}
+
+.xr-index-preview {
+  grid-column: 2 / 5;
+  color: var(--xr-font-color2);
+}
+
+.xr-var-name,
+.xr-var-dims,
+.xr-var-dtype,
+.xr-preview,
+.xr-attrs dt {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 10px;
+}
+
+.xr-var-name:hover,
+.xr-var-dims:hover,
+.xr-var-dtype:hover,
+.xr-attrs dt:hover {
+  overflow: visible;
+  width: auto;
+  z-index: 1;
+}
+
+.xr-var-attrs,
+.xr-var-data,
+.xr-index-data {
+  display: none;
+  border-top: 2px dotted var(--xr-background-color);
+  padding-bottom: 20px !important;
+  padding-top: 10px !important;
+}
+
+.xr-var-attrs-in + label,
+.xr-var-data-in + label,
+.xr-index-data-in + label {
+  padding: 0 1px;
+}
+
+.xr-var-attrs-in:checked ~ .xr-var-attrs,
+.xr-var-data-in:checked ~ .xr-var-data,
+.xr-index-data-in:checked ~ .xr-index-data {
+  display: block;
+}
+
+.xr-var-data > table {
+  float: right;
+}
+
+.xr-var-data > pre,
+.xr-index-data > pre,
+.xr-var-data > table > tbody > tr {
+  background-color: transparent !important;
+}
+
+.xr-var-name span,
+.xr-var-data,
+.xr-index-name div,
+.xr-index-data,
+.xr-attrs {
+  padding-left: 25px !important;
+}
+
+.xr-attrs,
+.xr-var-attrs,
+.xr-var-data,
+.xr-index-data {
+  grid-column: 1 / -1;
+}
+
+dl.xr-attrs {
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 125px auto;
+}
+
+.xr-attrs dt,
+.xr-attrs dd {
+  padding: 0;
+  margin: 0;
+  float: left;
+  padding-right: 10px;
+  width: auto;
+}
+
+.xr-attrs dt {
+  font-weight: normal;
+  grid-column: 1;
+}
+
+.xr-attrs dt:hover span {
+  display: inline-block;
+  background: var(--xr-background-color);
+  padding-right: 10px;
+}
+
+.xr-attrs dd {
+  grid-column: 2;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.xr-icon-database,
+.xr-icon-file-text2,
+.xr-no-icon {
+  display: inline-block;
+  vertical-align: middle;
+  width: 1em;
+  height: 1.5em !important;
+  stroke-width: 0;
+  stroke: currentColor;
+  fill: currentColor;
+}
+
+.xr-var-attrs-in:checked + label > .xr-icon-file-text2,
+.xr-var-data-in:checked + label > .xr-icon-database,
+.xr-index-data-in:checked + label > .xr-icon-database {
+  color: var(--xr-font-color0);
+  filter: drop-shadow(1px 1px 5px var(--xr-font-color2));
+  stroke-width: 0.8px;
+}
+</style><pre class='xr-text-repr-fallback'>&lt;xarray.DataTree&gt;
+Group: /
+├── Group: /predictions
+│       Dimensions:  (chain: 2, draw: 500, obs_new: 64)
+│       Coordinates:
+│         * chain    (chain) int64 16B 0 1
+│         * draw     (draw) int64 4kB 0 1 2 3 4 5 6 7 ... 493 494 495 496 497 498 499
+│         * obs_new  (obs_new) int64 512B 100 101 102 103 115 ... 263 275 276 277 278
+│       Data variables:
+│           y        (chain, draw, obs_new) float64 512kB 5.958 6.032 ... 2.623 0.1546
+│           y_bp     (chain, draw, obs_new) float64 512kB 5.199 5.679 ... 0.3889 -0.8048
+│           y_tc     (chain, draw, obs_new) float64 512kB 4.634 4.998 ... -0.9451
+│       Attributes:
+│           created_at:                 2026-10-02T17:42:40.385352+00:00
+│           creation_library:           ArviZ
+│           creation_library_version:   1.3.1
+│           creation_library_language:  Python
+│           sample_dims:                [&#x27;chain&#x27;, &#x27;draw&#x27;]
+└── Group: /predictions_constant_data
+        Dimensions:      (obs_new: 64, coefficient: 2)
+        Coordinates:
+          * obs_new      (obs_new) int64 512B 100 101 102 103 115 ... 275 276 277 278
+          * coefficient  (coefficient) &lt;U9 72B &#x27;Intercept&#x27; &#x27;X_1&#x27;
+        Data variables:
+            X_new        (obs_new, coefficient) float64 1kB 1.0 0.5027 ... 1.0 -1.287
+        Attributes:
+            created_at:                 2026-10-02T17:42:40.386884+00:00
+            creation_library:           ArviZ
+            creation_library_version:   1.3.1
+            creation_library_language:  Python
+            sample_dims:                []</pre><div class='xr-wrap' style='display:none'><div class='xr-header'><div class='xr-obj-type'>xarray.DataTree</div></div><ul class='xr-sections'><li class='xr-section-item'><div class='xr-children'><div class='xr-group-box'><div class='xr-group-box-vline' style='height: 100%'></div><div class='xr-group-box-hline'></div><div class='xr-group-box-contents'><input id='group-5d139992-96b8-4cf8-9982-78f131e87cff' type='checkbox' checked /><label for='group-5d139992-96b8-4cf8-9982-78f131e87cff' title='Expand/collapse group'>/predictions<span>(11)</span></label><ul class='xr-sections'><li class='xr-section-item'><input id='section-33086512-5e02-466d-b8b4-a242fa0ae493' class='xr-section-summary-in' type='checkbox' disabled /><label for='section-33086512-5e02-466d-b8b4-a242fa0ae493' class='xr-section-summary'>Dimensions:</label><div class='xr-section-inline-details'><ul class='xr-dim-list'><li><span class='xr-has-index'>chain</span>: 2</li><li><span class='xr-has-index'>draw</span>: 500</li><li><span class='xr-has-index'>obs_new</span>: 64</li></ul></div></li><li class='xr-section-item'><input id='section-e8631958-3148-4475-b58d-db8a8d1bf39a' class='xr-section-summary-in' type='checkbox' checked /><label for='section-e8631958-3148-4475-b58d-db8a8d1bf39a' class='xr-section-summary' title='Expand/collapse section'>Coordinates: <span>(3)</span></label><div class='xr-section-inline-details'></div><div class='xr-section-details'><ul class='xr-var-list'><li class='xr-var-item'><div class='xr-var-name'><span class='xr-has-index'>chain</span></div><div class='xr-var-dims'>(chain)</div><div class='xr-var-dtype'>int64</div><div class='xr-var-preview xr-preview'>0 1</div><input id='attrs-5a4ef504-ab39-4cbb-b4c6-7febfda4060e' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-5a4ef504-ab39-4cbb-b4c6-7febfda4060e' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-e96fa8cb-0b7d-4c6a-a259-d15f9998ce83' class='xr-var-data-in' type='checkbox'><label for='data-e96fa8cb-0b7d-4c6a-a259-d15f9998ce83' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([0, 1])</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span class='xr-has-index'>draw</span></div><div class='xr-var-dims'>(draw)</div><div class='xr-var-dtype'>int64</div><div class='xr-var-preview xr-preview'>0 1 2 3 4 5 ... 495 496 497 498 499</div><input id='attrs-7fcab951-55ac-44cb-b2ef-165d735616e9' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-7fcab951-55ac-44cb-b2ef-165d735616e9' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-2210e3fc-bbf0-4f8c-af7d-b7083ab7563e' class='xr-var-data-in' type='checkbox'><label for='data-2210e3fc-bbf0-4f8c-af7d-b7083ab7563e' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([  0,   1,   2, ..., 497, 498, 499], shape=(500,))</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span class='xr-has-index'>obs_new</span></div><div class='xr-var-dims'>(obs_new)</div><div class='xr-var-dtype'>int64</div><div class='xr-var-preview xr-preview'>100 101 102 103 ... 275 276 277 278</div><input id='attrs-bd1023a8-c678-4cff-89f5-a8b8fe2ea84e' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-bd1023a8-c678-4cff-89f5-a8b8fe2ea84e' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-0b4d8ef9-dc8d-4198-a5bc-4c3a6eb89bde' class='xr-var-data-in' type='checkbox'><label for='data-0b4d8ef9-dc8d-4198-a5bc-4c3a6eb89bde' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([100, 101, 102, 103, 115, 116, 117, 118, 120, 121, 122, 123, 135, 136,137, 138, 140, 141, 142, 143, 155, 156, 157, 158, 160, 161, 162, 163,175, 176, 177, 178, 200, 201, 202, 203, 215, 216, 217, 218, 220, 221,222, 223, 235, 236, 237, 238, 240, 241, 242, 243, 255, 256, 257, 258,260, 261, 262, 263, 275, 276, 277, 278])</pre></div></li></ul></div></li><li class='xr-section-item'><input id='section-2c6053e1-fa45-4177-ac1e-51a8d448b8d5' class='xr-section-summary-in' type='checkbox' checked /><label for='section-2c6053e1-fa45-4177-ac1e-51a8d448b8d5' class='xr-section-summary' title='Expand/collapse section'>Data variables: <span>(3)</span></label><div class='xr-section-inline-details'></div><div class='xr-section-details'><ul class='xr-var-list'><li class='xr-var-item'><div class='xr-var-name'><span>y</span></div><div class='xr-var-dims'>(chain, draw, obs_new)</div><div class='xr-var-dtype'>float64</div><div class='xr-var-preview xr-preview'>5.958 6.032 0.4089 ... 2.623 0.1546</div><input id='attrs-33aaa1b3-ee72-482b-b3a9-0c67a74ee078' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-33aaa1b3-ee72-482b-b3a9-0c67a74ee078' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-8c4ea2e2-4250-43c5-af74-d8c2ee8cf2c1' class='xr-var-data-in' type='checkbox'><label for='data-8c4ea2e2-4250-43c5-af74-d8c2ee8cf2c1' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([[[ 5.95799815,  6.03155041,  0.40890542, ...,  0.77202518,2.25181497, -0.54715102],[ 7.71688513,  6.96836045,  2.95957071, ...,  0.51416421,-1.17502939, -0.91370143],[ 4.2867419 ,  6.6191479 ,  3.6638295 , ...,  0.21551801,-2.11252955, -0.92821452],...,[ 5.91719818,  4.4600033 ,  1.69150563, ...,  0.97671751,-0.22302523, -1.67938856],[ 5.1662487 ,  8.15629263,  3.26233393, ...,  2.17509901,2.88950157, -0.64346423],[ 4.30200673,  5.52697817,  2.53862711, ...,  2.53918593,-0.01317111, -1.60497771]],[[ 5.58337104,  7.23197212,  2.92082623, ...,  0.38149493,-1.23945536,  0.27662687],[ 4.64071276,  5.95592242,  3.64505004, ...,  4.01950995,2.03678845,  0.80333657],[ 5.04459658,  5.80322326,  2.53657197, ...,  0.87723078,0.68302739, -1.52984685],...,[ 4.63567785,  6.99502767,  2.7131389 , ...,  3.76600535,0.38863233,  0.06519292],[ 5.04598587,  5.01366369,  0.74279932, ...,  2.97592571,1.41559846, -0.32071732],[ 3.3996032 ,  5.19792316,  1.88079873, ...,  2.83854239,2.62329248,  0.15458068]]], shape=(2, 500, 64))</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>y_bp</span></div><div class='xr-var-dims'>(chain, draw, obs_new)</div><div class='xr-var-dtype'>float64</div><div class='xr-var-preview xr-preview'>5.199 5.679 ... 0.3889 -0.8048</div><input id='attrs-ecae29d2-06fb-4420-b2dc-d7b457bbd475' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-ecae29d2-06fb-4420-b2dc-d7b457bbd475' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-424a49e7-3a44-4ab9-b4d0-8cc23d6b04c3' class='xr-var-data-in' type='checkbox'><label for='data-424a49e7-3a44-4ab9-b4d0-8cc23d6b04c3' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([[[ 5.19868184,  5.67877965,  1.92268461, ...,  1.66409247,0.33724326, -0.83634496],[ 4.91091318,  5.37287707,  1.83472309, ...,  1.65946702,0.42228102, -0.67018083],[ 5.16992975,  5.71852228,  1.96158641, ...,  1.77912232,0.37852194, -0.86143815],...,[ 5.23282299,  5.72416489,  1.94117813, ...,  1.68212327,0.33434582, -0.85886575],[ 5.1376528 ,  5.66277398,  1.89954394, ...,  1.69042358,0.31105274, -0.89582878],[ 5.04583791,  5.47869693,  1.83087494, ...,  1.57283248,0.33228636, -0.75572871]],[[ 4.9670078 ,  5.52378948,  1.80217268, ...,  1.64982933,0.24624773, -0.95369461],[ 5.14074862,  5.68427958,  1.92129792, ...,  1.73206803,0.33350966, -0.89373546],[ 5.13074259,  5.6672308 ,  1.8215733 , ...,  1.59007232,0.16770159, -1.04543989],...,[ 5.03160026,  5.59870478,  1.93983816, ...,  1.81928847,0.42987492, -0.79713285],[ 5.12852129,  5.69954306,  1.96052171, ...,  1.81008895,0.39106553, -0.86210431],[ 5.03532359,  5.56867285,  1.90239648, ...,  1.74504642,0.38892904, -0.80479705]]], shape=(2, 500, 64))</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span>y_tc</span></div><div class='xr-var-dims'>(chain, draw, obs_new)</div><div class='xr-var-dtype'>float64</div><div class='xr-var-preview xr-preview'>4.634 4.998 ... 0.08364 -0.9451</div><input id='attrs-f9c3a84c-e422-4ce4-93e8-a10f28a7f358' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-f9c3a84c-e422-4ce4-93e8-a10f28a7f358' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-ff7ef1c3-7ce4-4bc7-9478-b661319381d2' class='xr-var-data-in' type='checkbox'><label for='data-ff7ef1c3-7ce4-4bc7-9478-b661319381d2' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([[[ 4.633807  ,  4.99819858,  1.85664903, ...,  1.63161861,-0.04513906, -1.02453251],[ 4.32016084,  4.70042011,  1.76524584, ...,  1.60751746,0.02576882, -0.9301855 ],[ 4.69791449,  5.12396932,  1.96395432, ...,  1.81497645,0.10571371, -0.94016211],...,[ 4.68718807,  5.05754998,  1.88830603, ...,  1.66506711,-0.02752037, -1.01842815],[ 4.60028681,  5.00554043,  1.84352635, ...,  1.6680128 ,-0.03430602, -1.05969824],[ 4.38452401,  4.72365454,  1.69329014, ...,  1.45904734,-0.15366806, -1.08540667]],[[ 4.40735661,  4.85004639,  1.71220621, ...,  1.58803141,-0.11672168, -1.17459029],[ 4.63597224,  5.05762069,  1.89147997, ...,  1.73573942,0.02515703, -1.01753244],[ 4.52854677,  4.93450137,  1.68711292, ...,  1.49364742,-0.2507368 , -1.2933975 ],...,[ 4.57992783,  5.03638137,  1.95914752, ...,  1.8634128 ,0.18306005, -0.87591443],[ 4.67765541,  5.12671393,  1.9759158 , ...,  1.85661043,0.14308394, -0.92357517],[ 4.53000933,  4.95587357,  1.88179961, ...,  1.75076648,0.08364428, -0.9450562 ]]], shape=(2, 500, 64))</pre></div></li></ul></div></li><li class='xr-section-item'><input id='section-97f7dd0a-14f4-4227-bfaf-8c85e5d90ad8' class='xr-section-summary-in' type='checkbox' checked /><label for='section-97f7dd0a-14f4-4227-bfaf-8c85e5d90ad8' class='xr-section-summary' title='Expand/collapse section'>Attributes: <span>(5)</span></label><div class='xr-section-inline-details'></div><div class='xr-section-details'><dl class='xr-attrs'><dt><span>created_at :</span></dt><dd>2026-10-02T17:42:40.385352+00:00</dd><dt><span>creation_library :</span></dt><dd>ArviZ</dd><dt><span>creation_library_version :</span></dt><dd>1.3.1</dd><dt><span>creation_library_language :</span></dt><dd>Python</dd><dt><span>sample_dims :</span></dt><dd>[&#x27;chain&#x27;, &#x27;draw&#x27;]</dd></dl></div></li></ul></div></div><div class='xr-group-box'><div class='xr-group-box-vline' style='height: 1.2em'></div><div class='xr-group-box-hline'></div><div class='xr-group-box-contents'><input id='group-16fe0890-f090-491f-8325-af22a7f0a8e0' type='checkbox' checked /><label for='group-16fe0890-f090-491f-8325-af22a7f0a8e0' title='Expand/collapse group'>/predictions_constant_data<span>(8)</span></label><ul class='xr-sections'><li class='xr-section-item'><input id='section-d38e141b-c03c-4450-aa59-1a1bc30ae937' class='xr-section-summary-in' type='checkbox' disabled /><label for='section-d38e141b-c03c-4450-aa59-1a1bc30ae937' class='xr-section-summary'>Dimensions:</label><div class='xr-section-inline-details'><ul class='xr-dim-list'><li><span class='xr-has-index'>obs_new</span>: 64</li><li><span class='xr-has-index'>coefficient</span>: 2</li></ul></div></li><li class='xr-section-item'><input id='section-5c3fc956-fa12-47b7-bbf4-0a17e55e32f6' class='xr-section-summary-in' type='checkbox' checked /><label for='section-5c3fc956-fa12-47b7-bbf4-0a17e55e32f6' class='xr-section-summary' title='Expand/collapse section'>Coordinates: <span>(2)</span></label><div class='xr-section-inline-details'></div><div class='xr-section-details'><ul class='xr-var-list'><li class='xr-var-item'><div class='xr-var-name'><span class='xr-has-index'>obs_new</span></div><div class='xr-var-dims'>(obs_new)</div><div class='xr-var-dtype'>int64</div><div class='xr-var-preview xr-preview'>100 101 102 103 ... 275 276 277 278</div><input id='attrs-226101f7-d5da-4bd9-bf26-6b09bfa8811d' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-226101f7-d5da-4bd9-bf26-6b09bfa8811d' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-595f1625-d61b-446d-9d83-398c8076fba1' class='xr-var-data-in' type='checkbox'><label for='data-595f1625-d61b-446d-9d83-398c8076fba1' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([100, 101, 102, 103, 115, 116, 117, 118, 120, 121, 122, 123, 135, 136,137, 138, 140, 141, 142, 143, 155, 156, 157, 158, 160, 161, 162, 163,175, 176, 177, 178, 200, 201, 202, 203, 215, 216, 217, 218, 220, 221,222, 223, 235, 236, 237, 238, 240, 241, 242, 243, 255, 256, 257, 258,260, 261, 262, 263, 275, 276, 277, 278])</pre></div></li><li class='xr-var-item'><div class='xr-var-name'><span class='xr-has-index'>coefficient</span></div><div class='xr-var-dims'>(coefficient)</div><div class='xr-var-dtype'>&lt;U9</div><div class='xr-var-preview xr-preview'>&#x27;Intercept&#x27; &#x27;X_1&#x27;</div><input id='attrs-a83c7dce-86d5-449c-bf5f-a3d839d461ca' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-a83c7dce-86d5-449c-bf5f-a3d839d461ca' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-31319664-ed5e-4286-8bcf-7ef7220b2d0b' class='xr-var-data-in' type='checkbox'><label for='data-31319664-ed5e-4286-8bcf-7ef7220b2d0b' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([&#x27;Intercept&#x27;, &#x27;X_1&#x27;], dtype=&#x27;&lt;U9&#x27;)</pre></div></li></ul></div></li><li class='xr-section-item'><input id='section-3bb4314f-37bd-476f-b28d-e931247bc1bd' class='xr-section-summary-in' type='checkbox' checked /><label for='section-3bb4314f-37bd-476f-b28d-e931247bc1bd' class='xr-section-summary' title='Expand/collapse section'>Data variables: <span>(1)</span></label><div class='xr-section-inline-details'></div><div class='xr-section-details'><ul class='xr-var-list'><li class='xr-var-item'><div class='xr-var-name'><span>X_new</span></div><div class='xr-var-dims'>(obs_new, coefficient)</div><div class='xr-var-dtype'>float64</div><div class='xr-var-preview xr-preview'>1.0 0.5027 1.0 ... 1.0 -1.287</div><input id='attrs-3b88cec3-70b0-4e32-8349-be835ffb8054' class='xr-var-attrs-in' type='checkbox' disabled><label for='attrs-3b88cec3-70b0-4e32-8349-be835ffb8054' title='Show/Hide attributes'><svg class='icon xr-icon-file-text2'><use xlink:href='#icon-file-text2'></use></svg></label><input id='data-2897cf60-7ea2-4db8-b4ed-4ea3ab4147ee' class='xr-var-data-in' type='checkbox'><label for='data-2897cf60-7ea2-4db8-b4ed-4ea3ab4147ee' title='Show/Hide data repr'><svg class='icon xr-icon-database'><use xlink:href='#icon-database'></use></svg></label><div class='xr-var-attrs'><dl class='xr-attrs'></dl></div><div class='xr-var-data'><pre>array([[ 1.        ,  0.50268285],[ 1.        ,  0.98971303],[ 1.        , -0.16429459],[ 1.        , -1.07436486],[ 1.        , -0.75836975],[ 1.        ,  1.42098202],[ 1.        ,  0.72609379],[ 1.        ,  0.84373266],[ 1.        ,  0.78758822],[ 1.        ,  0.84407868],[ 1.        ,  0.07559361],[ 1.        , -1.42677385],[ 1.        ,  1.04183976],[ 1.        ,  1.40226483],[ 1.        ,  1.15016564],[ 1.        , -2.36530391],[ 1.        ,  0.33962001],[ 1.        ,  0.42377135],[ 1.        ,  0.37122742],[ 1.        ,  0.38275716],...[ 1.        , -1.18168298],[ 1.        , -1.76851186],[ 1.        , -0.96385423],[ 1.        , -3.1063368 ],[ 1.        ,  1.2969154 ],[ 1.        , -0.34567253],[ 1.        ,  0.85458423],[ 1.        , -0.48896906],[ 1.        ,  0.85274847],[ 1.        , -0.66768729],[ 1.        ,  0.16324401],[ 1.        , -0.83075196],[ 1.        , -0.70413956],[ 1.        , -0.45307444],[ 1.        , -1.06583802],[ 1.        , -0.34612128],[ 1.        , -0.02169086],[ 1.        ,  0.03472779],[ 1.        , -0.7443606 ],[ 1.        , -1.28657447]])</pre></div></li></ul></div></li><li class='xr-section-item'><input id='section-1675df94-8ec0-4090-b22e-9d531e29a815' class='xr-section-summary-in' type='checkbox' checked /><label for='section-1675df94-8ec0-4090-b22e-9d531e29a815' class='xr-section-summary' title='Expand/collapse section'>Attributes: <span>(5)</span></label><div class='xr-section-inline-details'></div><div class='xr-section-details'><dl class='xr-attrs'><dt><span>created_at :</span></dt><dd>2026-10-02T17:42:40.386884+00:00</dd><dt><span>creation_library :</span></dt><dd>ArviZ</dd><dt><span>creation_library_version :</span></dt><dd>1.3.1</dd><dt><span>creation_library_language :</span></dt><dd>Python</dd><dt><span>sample_dims :</span></dt><dd>[]</dd></dl></div></li></ul></div></div></div></li></ul></div></div></div></div>
+</div>
+<p>The <code class="docutils literal notranslate"><span class="pre">predictions</span></code> group holds three variables over <code class="docutils literal notranslate"><span class="pre">(chain,</span> <span class="pre">draw,</span> <span class="pre">obs_new)</span></code>:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">y</span></code>, draws from the posterior predictive, for intervals;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">y_bp</span></code>, the conditional mean at each draw, whose average over draws is the
+posterior predictive mean;</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">y_tc</span></code>, the trend at each draw, ignoring observed neighbors.</p></li>
+</ul>
+<p>The coordinate <code class="docutils literal notranslate"><span class="pre">obs_new</span></code> carries the index of <code class="docutils literal notranslate"><span class="pre">new</span></code>.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">arviz</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">az</span>
+
+<span class="n">p</span> <span class="o">=</span> <span class="n">pred</span><span class="o">.</span><span class="n">predictions</span>
+<span class="n">table</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+    <span class="p">{</span>
+        <span class="s2">"observed"</span><span class="p">:</span> <span class="n">new</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span>
+        <span class="s2">"bp"</span><span class="p">:</span> <span class="n">p</span><span class="p">[</span><span class="s2">"y_bp"</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">((</span><span class="s2">"chain"</span><span class="p">,</span> <span class="s2">"draw"</span><span class="p">))</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
+        <span class="s2">"tc"</span><span class="p">:</span> <span class="n">p</span><span class="p">[</span><span class="s2">"y_tc"</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">((</span><span class="s2">"chain"</span><span class="p">,</span> <span class="s2">"draw"</span><span class="p">))</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
+    <span class="p">},</span>
+    <span class="n">index</span><span class="o">=</span><span class="n">p</span><span class="p">[</span><span class="s2">"obs_new"</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="n">hdi</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">hdi</span><span class="p">(</span><span class="n">p</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">prob</span><span class="o">=</span><span class="mf">0.9</span><span class="p">)</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="s2">"obs_new"</span><span class="p">,</span> <span class="o">...</span><span class="p">)</span><span class="o">.</span><span class="n">values</span>
+<span class="n">table</span><span class="p">[</span><span class="s2">"lo90"</span><span class="p">],</span> <span class="n">table</span><span class="p">[</span><span class="s2">"hi90"</span><span class="p">]</span> <span class="o">=</span> <span class="n">hdi</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">],</span> <span class="n">hdi</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span>
+<span class="n">table</span><span class="o">.</span><span class="n">head</span><span class="p">()</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>observed</th>
+      <th>bp</th>
+      <th>tc</th>
+      <th>lo90</th>
+      <th>hi90</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>100</th>
+      <td>6.298116</td>
+      <td>5.000411</td>
+      <td>4.477441</td>
+      <td>2.892733</td>
+      <td>6.779004</td>
+    </tr>
+    <tr>
+      <th>101</th>
+      <td>5.471063</td>
+      <td>5.536332</td>
+      <td>4.906450</td>
+      <td>3.711894</td>
+      <td>7.508204</td>
+    </tr>
+    <tr>
+      <th>102</th>
+      <td>-0.065245</td>
+      <td>1.874002</td>
+      <td>1.831561</td>
+      <td>-0.000438</td>
+      <td>3.678448</td>
+    </tr>
+    <tr>
+      <th>103</th>
+      <td>-1.581416</td>
+      <td>-0.476253</td>
+      <td>-0.836302</td>
+      <td>-2.427346</td>
+      <td>1.342954</td>
+    </tr>
+    <tr>
+      <th>115</th>
+      <td>1.792536</td>
+      <td>2.154230</td>
+      <td>2.206624</td>
+      <td>0.111600</td>
+      <td>3.931489</td>
+    </tr>
+  </tbody>
+</table>
+</div></div></div>
+</div>
+<p>For models with lagged covariates (SLX, SDM, SDEM), <code class="docutils literal notranslate"><span class="pre">predict</span></code>
+recomputes <span class="math notranslate nohighlight">\(WX\)</span> for <em>every</em> unit on the full graph: an observed unit that
+gains a new neighbor gets a new lagged covariate.</p>
+<h2 id="check-what-the-correction-is-worth">Check what the correction is worth<a class="headerlink" href="#check-what-the-correction-is-worth" title="Link to this heading">¶</a></h2>
+<p>BP improves on TC only through observed neighbors. A new unit deep inside a
+held-out block has none, and its prediction falls back almost entirely to the
+trend. <span class="bibtex-citation" id="id2">Goulard <em>et al.</em> [<a class="reference internal" href="../references.html#id23" title="Michel Goulard, Thibault Laurent, and Christine Thomas-Agnan. About predictions in spatial autoregressive models: optimal and almost optimal strategies. Spatial Economic Analysis, 12(2-3):304–325, 2017. doi:10.1080/17421772.2017.1300679.">2017</a>]</span> found TC within 94–97% of BP’s
+efficiency on sparse weights, and closer still as more neighbors are missing.
+So before relying on BP, compare the two on held-out data, stratified by how
+many of each unit’s neighbors were observed. We repeat the exercise over eight
+simulated maps and report each stratum’s gain with its Monte Carlo standard
+error.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">A</span> <span class="o">=</span> <span class="p">(</span><span class="n">sp</span><span class="o">.</span><span class="n">csr_matrix</span><span class="p">(</span><span class="n">W_all</span><span class="o">.</span><span class="n">sparse</span><span class="p">)</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+<span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">rep</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">8</span><span class="p">):</span>
+    <span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="n">rep</span><span class="p">)</span>
+    <span class="n">g</span> <span class="o">=</span> <span class="n">simulate_sar</span><span class="p">(</span>
+        <span class="n">n_side</span><span class="o">=</span><span class="n">GRID</span><span class="p">,</span>
+        <span class="n">rho</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span>
+        <span class="n">beta</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">]),</span>
+        <span class="n">sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+        <span class="n">seed</span><span class="o">=</span><span class="n">rep</span><span class="p">,</span>
+        <span class="n">create_gdf</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">geometry_type</span><span class="o">=</span><span class="s2">"polygon"</span><span class="p">,</span>
+        <span class="n">contiguity</span><span class="o">=</span><span class="s2">"rook"</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">h</span> <span class="o">=</span> <span class="n">held_out_blocks</span><span class="p">(</span><span class="n">GRID</span><span class="p">,</span> <span class="n">rng</span><span class="p">)</span>
+    <span class="n">tr</span> <span class="o">=</span> <span class="n">g</span><span class="p">[</span><span class="o">~</span><span class="n">h</span><span class="p">]</span>
+    <span class="n">m</span> <span class="o">=</span> <span class="n">SAR</span><span class="p">(</span>
+        <span class="n">formula</span><span class="o">=</span><span class="s2">"y ~ X_1"</span><span class="p">,</span>
+        <span class="n">data</span><span class="o">=</span><span class="n">tr</span><span class="p">,</span>
+        <span class="n">W</span><span class="o">=</span><span class="n">Graph</span><span class="o">.</span><span class="n">build_contiguity</span><span class="p">(</span><span class="n">tr</span><span class="p">,</span> <span class="n">rook</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="s2">"r"</span><span class="p">),</span>
+    <span class="p">)</span>
+    <span class="n">m</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">random_seed</span><span class="o">=</span><span class="n">rep</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">o</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">flatnonzero</span><span class="p">(</span><span class="n">h</span><span class="p">)</span>
+    <span class="n">pp</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">g</span><span class="p">[</span><span class="n">h</span><span class="p">],</span> <span class="n">W_all</span><span class="p">,</span> <span class="n">oos</span><span class="o">=</span><span class="n">o</span><span class="p">,</span> <span class="n">random_seed</span><span class="o">=</span><span class="n">rep</span><span class="p">)</span><span class="o">.</span><span class="n">predictions</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">g</span><span class="p">[</span><span class="s2">"y"</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()[</span><span class="n">o</span><span class="p">]</span>
+    <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+        <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+            <span class="p">{</span>
+                <span class="s2">"observed_neighbors"</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">A</span><span class="p">[</span><span class="n">o</span><span class="p">][:,</span> <span class="o">~</span><span class="n">h</span><span class="p">]</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span><span class="o">.</span><span class="n">ravel</span><span class="p">(),</span>
+                <span class="s2">"se_bp"</span><span class="p">:</span> <span class="p">(</span><span class="n">y</span> <span class="o">-</span> <span class="n">pp</span><span class="p">[</span><span class="s2">"y_bp"</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">((</span><span class="s2">"chain"</span><span class="p">,</span> <span class="s2">"draw"</span><span class="p">))</span><span class="o">.</span><span class="n">values</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">,</span>
+                <span class="s2">"se_tc"</span><span class="p">:</span> <span class="p">(</span><span class="n">y</span> <span class="o">-</span> <span class="n">pp</span><span class="p">[</span><span class="s2">"y_tc"</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">((</span><span class="s2">"chain"</span><span class="p">,</span> <span class="s2">"draw"</span><span class="p">))</span><span class="o">.</span><span class="n">values</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">,</span>
+            <span class="p">}</span>
+        <span class="p">)</span>
+    <span class="p">)</span>
+<span class="n">errors</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">concat</span><span class="p">(</span><span class="n">rows</span><span class="p">,</span> <span class="n">ignore_index</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">errors</span><span class="p">[</span><span class="s2">"gain"</span><span class="p">]</span> <span class="o">=</span> <span class="n">errors</span><span class="p">[</span><span class="s2">"se_tc"</span><span class="p">]</span> <span class="o">-</span> <span class="n">errors</span><span class="p">[</span><span class="s2">"se_bp"</span><span class="p">]</span>
+<span class="n">errors</span><span class="o">.</span><span class="n">groupby</span><span class="p">(</span><span class="s2">"observed_neighbors"</span><span class="p">)</span><span class="o">.</span><span class="n">agg</span><span class="p">(</span>
+    <span class="n">n</span><span class="o">=</span><span class="p">(</span><span class="s2">"gain"</span><span class="p">,</span> <span class="s2">"size"</span><span class="p">),</span>
+    <span class="n">mse_bp</span><span class="o">=</span><span class="p">(</span><span class="s2">"se_bp"</span><span class="p">,</span> <span class="s2">"mean"</span><span class="p">),</span>
+    <span class="n">mse_tc</span><span class="o">=</span><span class="p">(</span><span class="s2">"se_tc"</span><span class="p">,</span> <span class="s2">"mean"</span><span class="p">),</span>
+    <span class="n">gain</span><span class="o">=</span><span class="p">(</span><span class="s2">"gain"</span><span class="p">,</span> <span class="s2">"mean"</span><span class="p">),</span>
+    <span class="n">gain_se</span><span class="o">=</span><span class="p">(</span><span class="s2">"gain"</span><span class="p">,</span> <span class="s2">"sem"</span><span class="p">),</span>
+<span class="p">)</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
+  W_arr = np.asarray(W, dtype=np.float64)
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
+  W_arr = np.asarray(W, dtype=np.float64)
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
+  W_arr = np.asarray(W, dtype=np.float64)
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
+  W_arr = np.asarray(W, dtype=np.float64)
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
+  W_arr = np.asarray(W, dtype=np.float64)
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
+  W_arr = np.asarray(W, dtype=np.float64)
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
+  W_arr = np.asarray(W, dtype=np.float64)
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
+  W_arr = np.asarray(W, dtype=np.float64)
+</code></pre></div>
+</div>
+<div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>n</th>
+      <th>mse_bp</th>
+      <th>mse_tc</th>
+      <th>gain</th>
+      <th>gain_se</th>
+    </tr>
+    <tr>
+      <th>observed_neighbors</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>159</td>
+      <td>1.256</td>
+      <td>1.298</td>
+      <td>0.042</td>
+      <td>0.028</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>254</td>
+      <td>1.296</td>
+      <td>1.460</td>
+      <td>0.164</td>
+      <td>0.063</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>99</td>
+      <td>1.089</td>
+      <td>1.614</td>
+      <td>0.525</td>
+      <td>0.106</td>
+    </tr>
+  </tbody>
+</table>
+</div></div></div>
+</div>
+<p>Read <code class="docutils literal notranslate"><span class="pre">gain</span></code> against <code class="docutils literal notranslate"><span class="pre">gain_se</span></code>. For units with no observed neighbor the gain
+is within two standard errors of zero; BP still draws on neighbors of
+neighbors, but not enough to matter. The gain grows with each observed
+neighbor. If your held-out units are mostly surrounded by other
+missing units, the cheap trend predictor is as good as the correction; if
+they are scattered among observed ones, the correction pays.</p>
+<h2 id="when-the-conditional-is-not-what-you-want">When the conditional is not what you want<a class="headerlink" href="#when-the-conditional-is-not-what-you-want" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">predict_in_sample()</span></code> gives each fitted unit’s leave-one-out conditional,
+the in-sample BP of <span class="bibtex-citation" id="id3">Goulard <em>et al.</em> [<a class="reference internal" href="../references.html#id23" title="Michel Goulard, Thibault Laurent, and Christine Thomas-Agnan. About predictions in spatial autoregressive models: optimal and almost optimal strategies. Spatial Economic Analysis, 12(2-3):304–325, 2017. doi:10.1080/17421772.2017.1300679.">2017</a>]</span>. It conditions
+on a posterior fitted to all the data, so it smooths rather than
+validates.</p></li>
+<li><p>To <em>score</em> held-out predictive accuracy across models, use
+<a class="reference internal" href="spatial_cv_demo.html"><span class="std std-doc">spatial block cross-validation</span></a>, which refits on
+each fold and evaluates this same conditional density.</p></li>
+</ul>
+<p>The parameters come from the observed units’ own weights, row-standardized
+after the new units are removed, and the prediction uses the full weights:
+the feasible practice of <span class="bibtex-citation" id="id4">Goulard <em>et al.</em> [<a class="reference internal" href="../references.html#id23" title="Michel Goulard, Thibault Laurent, and Christine Thomas-Agnan. About predictions in spatial autoregressive models: optimal and almost optimal strategies. Spatial Economic Analysis, 12(2-3):304–325, 2017. doi:10.1080/17421772.2017.1300679.">2017</a>]</span>. When the
+missing units are scattered, many observed units lose neighbors and the fit
+drifts. On a 10 × 10 grid with 12% of units missing in a checkerboard, the
+posterior mean of ρ fell from 0.57 to 0.42, and 90% intervals covered 95–96%
+of held-out values instead of 90%. Compact missing regions cost far less.</p>
+<h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><a class="reference internal" href="spatial_cv_demo.html"><span class="std std-doc">How to run spatial block cross-validation</span></a></p></li>
+<li><p><a class="reference internal" href="../models.html"><span class="std std-doc">Supported Models</span></a></p></li>
+</ul>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  
+  
+  <div class="md-footer-meta md-typeset">
+    
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-footer-copyright__highlight">
+        &#169; Copyright 2018-, pysal developers.
+        
+    </div>
+  
+    Created using
+    <a href="https://www.sphinx-doc.org/" target="_blank" rel="noopener">Sphinx</a>
+    8.2.3.
+     and
+    <a href="https://github.com/jbms/sphinx-immaterial/" target="_blank" rel="noopener">Sphinx-Immaterial</a>
+  
+</div>
+      
+    </div>
+    
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.sections", "navigation.top", "search.share", "search.suggest", "toc.follow", "toc.sticky", "content.code.copy", "content.action.edit"], "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike", "staticVersions": null, "versionPath": "https://pysal.org/neighbayes/versions.json"}}</script>
+    
+      
+        <script src="../_static/sphinx_immaterial_theme.32136f45f91ae6956.min.js?v=a7a9472a"></script>
+        <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+        <script src="../_static/copybutton.js?v=f281be69"></script>
+        <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+        <script id="MathJax-script" src="../_static/mathjax/tex-mml-chtml.js"></script>
+    
+  </body>
+</html>

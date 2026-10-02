@@ -30,6 +30,5 @@
       ~PanelSARPriors.rho_upper
       ~PanelSARPriors.sigma2_alpha
       ~PanelSARPriors.sigma2_beta
-      ~PanelSARPriors.sigma_sigma
    
    

@@ -31,8 +31,6 @@
    .. autosummary::
    
       ~SEMPanelRE.inference_data
-      ~SEMPanelRE.mundlak
-      ~SEMPanelRE.mundlak_names
       ~SEMPanelRE.pymc_model
    
    

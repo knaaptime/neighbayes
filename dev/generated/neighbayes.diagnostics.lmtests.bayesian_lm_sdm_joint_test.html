@@ -757,6 +757,30 @@
 
               
             
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2452,7 +2476,7 @@
 <span class="sig-prename descclassname"><span class="pre">neighbayes.diagnostics.lmtests.</span></span><span class="sig-name descname"><span class="pre">bayesian_lm_sdm_joint_test</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.lmtests.bayesian_lm_sdm_joint_test.model" title="neighbayes.diagnostics.lmtests.bayesian_lm_sdm_joint_test.model (Python parameter) — Fitted OLS-like model with inference_data attribute providing posterior draws of beta and sigma."><span class="n"><span class="pre">model</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/diagnostics/lmtests/cross_sectional.py#L345-L443"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.diagnostics.lmtests.bayesian_lm_sdm_joint_test" title="Link to this definition">¶</a></dt>
 <dd><p>Bayesian joint LM test for SDM (H₀: ρ = 0 AND γ = 0 | OLS).</p>
 <p>Bayesian extension of the joint LM-SDM test
-(<span class="bibtex-citation" id="id1">[<a class="reference internal" href="../references.html#id27" title="Malabika Koley and Anil K. Bera. To use, or not to use the spatial Durbin model? – that is the question. Spatial Economic Analysis, 19(1):30–56, 2024. URL: https://doi.org/10.1080/17421772.2023.2256810 (visited on 2025-05-21), doi:10.1080/17421772.2023.2256810.">Koley and Bera, 2024</a>]</span>, <code class="docutils literal notranslate"><span class="pre">lm_spdurbin</span></code>) using the Doğan,
+(<span class="bibtex-citation" id="id1">[<a class="reference internal" href="../references.html#id28" title="Malabika Koley and Anil K. Bera. To use, or not to use the spatial Durbin model? – that is the question. Spatial Economic Analysis, 19(1):30–56, 2024. URL: https://doi.org/10.1080/17421772.2023.2256810 (visited on 2025-05-21), doi:10.1080/17421772.2023.2256810.">Koley and Bera, 2024</a>]</span>, <code class="docutils literal notranslate"><span class="pre">lm_spdurbin</span></code>) using the Doğan,
 Taşpınar &amp; Bera (2021) framework
 (<span class="bibtex-citation" id="id2">[<a class="reference internal" href="../references.html#id13" title="Osman Doğan, Süleyman Taşpınar, and Anil K. Bera. A Bayesian robust chi-squared test for testing simple hypotheses. Journal of Econometrics, 222(2):933–958, 2021. URL: https://www.sciencedirect.com/science/article/pii/S0304407620303018 (visited on 2026-04-21), doi:10.1016/j.jeconom.2020.07.046.">Doğan <em>et al.</em>, 2021</a>]</span>, Proposition 1).</p>
 <p>The null model is OLS.  For each posterior draw of
@@ -2464,7 +2488,7 @@ Taşpınar &amp; Bera (2021) framework
 \end{pmatrix},
 \qquad \mathbf{e}^{(d)} = \mathbf{y} - X \beta^{(d)}.\end{split}\]</div>
 <p>Concentrating <span class="math notranslate nohighlight">\(\beta\)</span> out of the SDM information matrix
-(<span class="bibtex-citation" id="id3">[<a class="reference internal" href="../references.html#id27" title="Malabika Koley and Anil K. Bera. To use, or not to use the spatial Durbin model? – that is the question. Spatial Economic Analysis, 19(1):30–56, 2024. URL: https://doi.org/10.1080/17421772.2023.2256810 (visited on 2025-05-21), doi:10.1080/17421772.2023.2256810.">Koley and Bera, 2024</a>]</span>) gives the
+(<span class="bibtex-citation" id="id3">[<a class="reference internal" href="../references.html#id28" title="Malabika Koley and Anil K. Bera. To use, or not to use the spatial Durbin model? – that is the question. Spatial Economic Analysis, 19(1):30–56, 2024. URL: https://doi.org/10.1080/17421772.2023.2256810 (visited on 2025-05-21), doi:10.1080/17421772.2023.2256810.">Koley and Bera, 2024</a>]</span>) gives the
 <span class="math notranslate nohighlight">\((1 + k_{wx}) \times (1 + k_{wx})\)</span> variance matrix of the raw
 score:</p>
 <div class="math notranslate nohighlight">

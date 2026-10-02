@@ -30,6 +30,5 @@
       ~PanelDynamicBasePriors.phi_upper
       ~PanelDynamicBasePriors.sigma2_alpha
       ~PanelDynamicBasePriors.sigma2_beta
-      ~PanelDynamicBasePriors.sigma_sigma
    
    

@@ -35,7 +35,7 @@
     "\n",
     "from neighbayes.models import SDMPanelFE\n",
     "\n",
-    "az.style.use(\"arviz-white\")\n",
+    "az.style.use(\"arviz-variat\")\n",
     "pd.options.display.float_format = lambda x: f\"{x:,.6f}\""
    ]
   },

@@ -757,6 +757,30 @@
 
               
             
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="how-to/prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -3239,8 +3263,10 @@ Gaussian panel families, that means Gibbs unless you ask for something else.</p>
 <p>NUTS is not universally available. The Pólya–Gamma logit classes
 (<code class="docutils literal notranslate"><span class="pre">SARLogit</span></code>, <code class="docutils literal notranslate"><span class="pre">SARLogitStructural</span></code>, <code class="docutils literal notranslate"><span class="pre">SEMLogit</span></code>) and the auxiliary-mixture
 Poisson flow classes build no PyMC graph at all, and <code class="docutils literal notranslate"><span class="pre">fit(sampler=&quot;nuts&quot;)</span></code>
-raises <code class="docutils literal notranslate"><span class="pre">NotImplementedError</span></code>. Robust (Student-t) models are the mirror case:
-no Gibbs sampler supports them, so <code class="docutils literal notranslate"><span class="pre">robust=True</span></code> requires NUTS.</p>
+raises <code class="docutils literal notranslate"><span class="pre">NotImplementedError</span></code>. Robust (Student-t) SAR/SEM/SDM/SDEM and
+Gaussian panel FE models keep Gibbs: the Student-t error is sampled as a
+normal scale mixture with the same fixed <code class="docutils literal notranslate"><span class="pre">nu</span></code> the NUTS path uses. Robust
+random-effects and Tobit models still require NUTS.</p>
 <p><code class="docutils literal notranslate"><span class="pre">target_accept</span></code> is NUTS-only and raises <code class="docutils literal notranslate"><span class="pre">TypeError</span></code> if passed with Gibbs.</p>
 <h3 id="execution-backends">Execution backends<a class="headerlink" href="#execution-backends" title="Link to this heading">¶</a></h3>
 <p>For any Gibbs sampler, <code class="docutils literal notranslate"><span class="pre">gibbs_backend</span></code> selects the execution path:</p>

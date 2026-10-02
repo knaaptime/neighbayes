@@ -16,6 +16,8 @@
       ~SAR.__init__
       ~SAR.fit
       ~SAR.fitted_values
+      ~SAR.predict
+      ~SAR.predict_in_sample
       ~SAR.residuals
       ~SAR.spatial_diagnostics
       ~SAR.spatial_diagnostics_decision

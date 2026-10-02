@@ -30,6 +30,5 @@
       ~SARPriors.rho_upper
       ~SARPriors.sigma2_alpha
       ~SARPriors.sigma2_beta
-      ~SARPriors.sigma_sigma
    
    

@@ -757,6 +757,30 @@
 
               
             
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2201,7 +2225,7 @@
       <span aria-label="Python attribute" class="objinfo-icon objinfo-icon__alias" title="Python attribute">A</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.diagnostics.SpatialCVResult.fold_ids (Python attribute) — Integer fold assignment for each observation, shape (n,)."><span>fold_<wbr>ids</span></span>
+      <span title="neighbayes.diagnostics.SpatialCVResult.fold_ids (Python attribute) — Fold in which each observation was held out, shape (n,); -1 for observations never held out.  When a splitter tests an observation more than once, the last fold wins."><span>fold_<wbr>ids</span></span>
     </span>
   </a>
   
@@ -2213,7 +2237,7 @@
       <span aria-label="Python attribute" class="objinfo-icon objinfo-icon__alias" title="Python attribute">A</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.diagnostics.SpatialCVResult.method (Python attribute) — &#34;explicit&#34; if fold_ids was supplied, &#34;kmeans&#34; if folds were derived from geometry."><span>method</span></span>
+      <span title="neighbayes.diagnostics.SpatialCVResult.method (Python attribute) — Class name of the splitter that produced the folds."><span>method</span></span>
     </span>
   </a>
   
@@ -2903,7 +2927,7 @@
       <span aria-label="Python attribute" class="objinfo-icon objinfo-icon__alias" title="Python attribute">A</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.diagnostics.SpatialCVResult.fold_ids (Python attribute) — Integer fold assignment for each observation, shape (n,)."><span>fold_<wbr>ids</span></span>
+      <span title="neighbayes.diagnostics.SpatialCVResult.fold_ids (Python attribute) — Fold in which each observation was held out, shape (n,); -1 for observations never held out.  When a splitter tests an observation more than once, the last fold wins."><span>fold_<wbr>ids</span></span>
     </span>
   </a>
   
@@ -2915,7 +2939,7 @@
       <span aria-label="Python attribute" class="objinfo-icon objinfo-icon__alias" title="Python attribute">A</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.diagnostics.SpatialCVResult.method (Python attribute) — &#34;explicit&#34; if fold_ids was supplied, &#34;kmeans&#34; if folds were derived from geometry."><span>method</span></span>
+      <span title="neighbayes.diagnostics.SpatialCVResult.method (Python attribute) — Class name of the splitter that produced the folds."><span>method</span></span>
     </span>
   </a>
   
@@ -2989,7 +3013,7 @@
 <h1 id="neighbayes-diagnostics-spatialcvresult">neighbayes.diagnostics.SpatialCVResult<a class="headerlink" href="#neighbayes-diagnostics-spatialcvresult" title="Link to this heading">¶</a></h1>
 <dl class="py class objdesc">
 <dt class="sig sig-object highlight sig-wrap py" id="neighbayes.diagnostics.SpatialCVResult">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neighbayes.diagnostics.</span></span><span class="sig-name descname"><span class="pre">SpatialCVResult</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.SpatialCVResult" title="neighbayes.diagnostics.SpatialCVResult.__init__.elpd (Python parameter)"><span class="n"><span class="pre">elpd</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.SpatialCVResult" title="neighbayes.diagnostics.SpatialCVResult.__init__.se (Python parameter)"><span class="n"><span class="pre">se</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.SpatialCVResult" title="neighbayes.diagnostics.SpatialCVResult.__init__.elpd_per_fold (Python parameter)"><span class="n"><span class="pre">elpd_per_fold</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.SpatialCVResult" title="neighbayes.diagnostics.SpatialCVResult.__init__.n_per_fold (Python parameter)"><span class="n"><span class="pre">n_per_fold</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.SpatialCVResult" title="neighbayes.diagnostics.SpatialCVResult.__init__.fold_ids (Python parameter)"><span class="n"><span class="pre">fold_ids</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.SpatialCVResult" title="neighbayes.diagnostics.SpatialCVResult.__init__.n_folds (Python parameter)"><span class="n"><span class="pre">n_folds</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.SpatialCVResult" title="neighbayes.diagnostics.SpatialCVResult.__init__.method (Python parameter)"><span class="n"><span class="pre">method</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/diagnostics/spatial_cv.py#L65-L96"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.diagnostics.SpatialCVResult" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neighbayes.diagnostics.</span></span><span class="sig-name descname"><span class="pre">SpatialCVResult</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.SpatialCVResult" title="neighbayes.diagnostics.SpatialCVResult.__init__.elpd (Python parameter)"><span class="n"><span class="pre">elpd</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.SpatialCVResult" title="neighbayes.diagnostics.SpatialCVResult.__init__.se (Python parameter)"><span class="n"><span class="pre">se</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.SpatialCVResult" title="neighbayes.diagnostics.SpatialCVResult.__init__.elpd_per_fold (Python parameter)"><span class="n"><span class="pre">elpd_per_fold</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.SpatialCVResult" title="neighbayes.diagnostics.SpatialCVResult.__init__.n_per_fold (Python parameter)"><span class="n"><span class="pre">n_per_fold</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.SpatialCVResult" title="neighbayes.diagnostics.SpatialCVResult.__init__.fold_ids (Python parameter)"><span class="n"><span class="pre">fold_ids</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.SpatialCVResult" title="neighbayes.diagnostics.SpatialCVResult.__init__.n_folds (Python parameter)"><span class="n"><span class="pre">n_folds</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.SpatialCVResult" title="neighbayes.diagnostics.SpatialCVResult.__init__.method (Python parameter)"><span class="n"><span class="pre">method</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/diagnostics/spatial_cv.py#L66-L98"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.diagnostics.SpatialCVResult" title="Link to this definition">¶</a></dt>
 <dd><p>Result of <a class="reference internal" href="neighbayes.diagnostics.spatial_kfold.html#neighbayes.diagnostics.spatial_kfold" title="neighbayes.diagnostics.spatial_kfold (Python function) — Spatial block cross-validation for a fitted Bayesian spatial model."><code class="xref py py-func docutils literal notranslate"><span class="pre">spatial_kfold()</span></code></a>.</p>
 <dl class="py attribute objdesc">
 <dt class="sig sig-object highlight py" id="neighbayes.diagnostics.SpatialCVResult.elpd">
@@ -3040,7 +3064,9 @@ fold’s elpd uniformly over its observations.</p>
 <dl class="py attribute objdesc">
 <dt class="sig sig-object highlight py" id="neighbayes.diagnostics.SpatialCVResult.fold_ids">
 <span class="sig-name descname"><span class="pre">fold_ids</span></span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/diagnostics.py"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.diagnostics.SpatialCVResult.fold_ids" title="Link to this definition">¶</a></dt>
-<dd><p>Integer fold assignment for each observation, shape <code class="docutils literal notranslate"><span class="pre">(n,)</span></code>.</p>
+<dd><p>Fold in which each observation was held out, shape <code class="docutils literal notranslate"><span class="pre">(n,)</span></code>; <code class="docutils literal notranslate"><span class="pre">-1</span></code>
+for observations never held out.  When a splitter tests an
+observation more than once, the last fold wins.</p>
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.diagnostics.SpatialCVResult.fold_ids-type">Type<span class="colon">:</span><a class="headerlink" href="#neighbayes.diagnostics.SpatialCVResult.fold_ids-type" title="Permalink to this headline">¶</a></dt>
 <dd class="field-odd"><p>np.ndarray</p>
@@ -3062,8 +3088,7 @@ fold’s elpd uniformly over its observations.</p>
 <dl class="py attribute objdesc">
 <dt class="sig sig-object highlight py" id="neighbayes.diagnostics.SpatialCVResult.method">
 <span class="sig-name descname"><span class="pre">method</span></span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/diagnostics.py"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.diagnostics.SpatialCVResult.method" title="Link to this definition">¶</a></dt>
-<dd><p><code class="docutils literal notranslate"><span class="pre">&quot;explicit&quot;</span></code> if <code class="docutils literal notranslate"><span class="pre">fold_ids</span></code> was supplied, <code class="docutils literal notranslate"><span class="pre">&quot;kmeans&quot;</span></code> if
-folds were derived from geometry.</p>
+<dd><p>Class name of the splitter that produced the folds.</p>
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.diagnostics.SpatialCVResult.method-type">Type<span class="colon">:</span><a class="headerlink" href="#neighbayes.diagnostics.SpatialCVResult.method-type" title="Permalink to this headline">¶</a></dt>
 <dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)">str</a></p>
@@ -3099,13 +3124,13 @@ folds were derived from geometry.</p>
 <tr class="row-even"><td><p><a class="reference internal" href="#id5" title="neighbayes.diagnostics.SpatialCVResult.n_per_fold (Python attribute) — Number of observations in each fold, shape (n_folds,)."><code class="xref py py-obj docutils literal notranslate"><span class="pre">n_per_fold</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#id2" title="neighbayes.diagnostics.SpatialCVResult.fold_ids (Python attribute) — Integer fold assignment for each observation, shape (n,)."><code class="xref py py-obj docutils literal notranslate"><span class="pre">fold_ids</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#id2" title="neighbayes.diagnostics.SpatialCVResult.fold_ids (Python attribute) — Fold in which each observation was held out, shape (n,); -1 for observations never held out.  When a splitter tests an observation more than once, the last fold wins."><code class="xref py py-obj docutils literal notranslate"><span class="pre">fold_ids</span></code></a></p></td>
 <td><p></p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#id4" title="neighbayes.diagnostics.SpatialCVResult.n_folds (Python attribute) — Number of folds actually used."><code class="xref py py-obj docutils literal notranslate"><span class="pre">n_folds</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#id3" title="neighbayes.diagnostics.SpatialCVResult.method (Python attribute) — &quot;explicit&quot; if fold_ids was supplied, &quot;kmeans&quot; if folds were derived from geometry."><code class="xref py py-obj docutils literal notranslate"><span class="pre">method</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#id3" title="neighbayes.diagnostics.SpatialCVResult.method (Python attribute) — Class name of the splitter that produced the folds."><code class="xref py py-obj docutils literal notranslate"><span class="pre">method</span></code></a></p></td>
 <td><p></p></td>
 </tr>
 </tbody>

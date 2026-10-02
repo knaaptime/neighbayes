@@ -30,6 +30,5 @@
       ~PanelSDMPriors.rho_upper
       ~PanelSDMPriors.sigma2_alpha
       ~PanelSDMPriors.sigma2_beta
-      ~PanelSDMPriors.sigma_sigma
    
    

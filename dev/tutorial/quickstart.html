@@ -874,6 +874,30 @@
 
               
             
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1483,7 +1507,13 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.dgp</span><span class="w"> </span><span class="kn">import</span> <span class="n">simulate_sar</span>
 
-<span class="n">gdf</span> <span class="o">=</span> <span class="n">simulate_sar</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mf">0.4</span><span class="p">,</span> <span class="mf">2.5</span><span class="p">],</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span> <span class="n">create_gdf</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">gdf</span> <span class="o">=</span> <span class="n">simulate_sar</span><span class="p">(</span><span class="n">n_side</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span> <span class="mf">0.4</span><span class="p">,</span> <span class="mf">2.5</span><span class="p">],</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span> <span class="n">create_gdf</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
 </code></pre></div>
 </div>
 </div>
@@ -1523,42 +1553,42 @@
   <tbody>
     <tr>
       <th>0</th>
-      <td>-1.716666</td>
+      <td>8.668872</td>
       <td>1.0</td>
-      <td>1.368686</td>
-      <td>-0.479446</td>
+      <td>-1.167994</td>
+      <td>1.374588</td>
       <td>POLYGON ((1 0, 1 1, 0 1, 0 0, 1 0))</td>
     </tr>
     <tr>
       <th>1</th>
-      <td>-1.530569</td>
+      <td>4.269612</td>
       <td>1.0</td>
-      <td>1.202883</td>
-      <td>-0.950804</td>
+      <td>-1.919492</td>
+      <td>0.329605</td>
       <td>POLYGON ((2 0, 2 1, 1 1, 1 0, 2 0))</td>
     </tr>
     <tr>
       <th>2</th>
-      <td>5.189375</td>
+      <td>1.120813</td>
       <td>1.0</td>
-      <td>1.588926</td>
-      <td>0.228557</td>
+      <td>-1.450289</td>
+      <td>-0.197234</td>
       <td>POLYGON ((3 0, 3 1, 2 1, 2 0, 3 0))</td>
     </tr>
     <tr>
       <th>3</th>
-      <td>1.541955</td>
+      <td>-1.077315</td>
       <td>1.0</td>
-      <td>-1.688356</td>
-      <td>0.036750</td>
+      <td>1.432836</td>
+      <td>-0.805560</td>
       <td>POLYGON ((4 0, 4 1, 3 1, 3 0, 4 0))</td>
     </tr>
     <tr>
       <th>4</th>
-      <td>2.720938</td>
+      <td>1.128495</td>
       <td>1.0</td>
-      <td>0.876481</td>
-      <td>0.829664</td>
+      <td>-0.487436</td>
+      <td>-0.522589</td>
       <td>POLYGON ((5 0, 5 1, 4 1, 4 0, 5 0))</td>
     </tr>
     <tr>
@@ -1571,42 +1601,42 @@
     </tr>
     <tr>
       <th>395</th>
-      <td>1.550096</td>
+      <td>1.729227</td>
       <td>1.0</td>
-      <td>0.368440</td>
-      <td>-0.087750</td>
+      <td>0.216659</td>
+      <td>-0.065031</td>
       <td>POLYGON ((16 19, 16 20, 15 20, 15 19, 16 19))</td>
     </tr>
     <tr>
       <th>396</th>
-      <td>-2.119850</td>
+      <td>-0.227996</td>
       <td>1.0</td>
-      <td>1.132278</td>
-      <td>-2.081790</td>
+      <td>-0.865249</td>
+      <td>-0.291414</td>
       <td>POLYGON ((17 19, 17 20, 16 20, 16 19, 17 19))</td>
     </tr>
     <tr>
       <th>397</th>
-      <td>3.197489</td>
+      <td>-2.508462</td>
       <td>1.0</td>
-      <td>-1.632464</td>
-      <td>1.110387</td>
+      <td>-0.122703</td>
+      <td>-0.541823</td>
       <td>POLYGON ((18 19, 18 20, 17 20, 17 19, 18 19))</td>
     </tr>
     <tr>
       <th>398</th>
-      <td>-0.675859</td>
+      <td>0.928894</td>
       <td>1.0</td>
-      <td>-0.263960</td>
-      <td>-1.208256</td>
+      <td>-1.370523</td>
+      <td>0.021873</td>
       <td>POLYGON ((19 19, 19 20, 18 20, 18 19, 19 19))</td>
     </tr>
     <tr>
       <th>399</th>
-      <td>0.721306</td>
+      <td>5.302012</td>
       <td>1.0</td>
-      <td>0.942406</td>
-      <td>-0.253673</td>
+      <td>1.564570</td>
+      <td>0.872325</td>
       <td>POLYGON ((20 19, 20 20, 19 20, 19 19, 20 19))</td>
     </tr>
   </tbody>
@@ -1624,7 +1654,7 @@
 <div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Text(0.5, 1.0, 'X1')
 </code></pre></div>
 </div>
-<img alt="../_images/edd93fee8b3e0b2d82b1a4b1a5e365bc02ca3fea11d266d2a9eadcb6b563a36e.png" src="../_images/edd93fee8b3e0b2d82b1a4b1a5e365bc02ca3fea11d266d2a9eadcb6b563a36e.png" />
+<img alt="../_images/b38ed78daecf4208a67ebd246d70a87f89f7ecafdc0e66821be9050141534b74.png" src="../_images/b38ed78daecf4208a67ebd246d70a87f89f7ecafdc0e66821be9050141534b74.png" />
 </div>
 </div>
 <div class="cell docutils container">
@@ -1637,7 +1667,7 @@
 <div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Text(0.5, 1.0, 'y')
 </code></pre></div>
 </div>
-<img alt="../_images/001ef198ce386b207c0d265b35654c0d883780325937b9ed45877b03c02345cc.png" src="../_images/001ef198ce386b207c0d265b35654c0d883780325937b9ed45877b03c02345cc.png" />
+<img alt="../_images/3541ed95e34e01ef3896fc3acb14b12d3a8ca7fd58d65eb3276f1b4cc2f666bb.png" src="../_images/3541ed95e34e01ef3896fc3acb14b12d3a8ca7fd58d65eb3276f1b4cc2f666bb.png" />
 </div>
 </div>
 <h2 id="create-a-spatial-weights-matrix">1. Create a Spatial Weights Matrix<a class="headerlink" href="#create-a-spatial-weights-matrix" title="Link to this heading">¶</a></h2>
@@ -1675,7 +1705,7 @@
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 500 tune and 1_000 draw iterations (1_000 + 2_000 draws total) took 5 seconds.
+Sampling 2 chains for 500 tune and 1_000 draw iterations (1_000 + 2_000 draws total) took 3 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 </code></pre></div>
 </div>
@@ -1684,99 +1714,84 @@ for Jupyter support
   warnings.warn('install "ipywidgets" for Jupyter support')
 </pre>
 </div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
-</div><div class="output text_html"><div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
+</div><div class="output text_html"><table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
       <th></th>
       <th>mean</th>
       <th>sd</th>
-      <th>hdi_3%</th>
-      <th>hdi_97%</th>
-      <th>mcse_mean</th>
-      <th>mcse_sd</th>
+      <th>eti89_lb</th>
+      <th>eti89_ub</th>
       <th>ess_bulk</th>
       <th>ess_tail</th>
       <th>r_hat</th>
+      <th>mcse_mean</th>
+      <th>mcse_sd</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <th>X_0</th>
-      <td>2.314</td>
-      <td>0.080</td>
-      <td>2.171</td>
-      <td>2.464</td>
-      <td>0.002</td>
-      <td>0.001</td>
-      <td>2234.0</td>
-      <td>1697.0</td>
-      <td>1.0</td>
+      <td>2.251381</td>
+      <td>0.084008</td>
+      <td>2.115804</td>
+      <td>2.392504</td>
+      <td>1932.235303</td>
+      <td>1279.407117</td>
+      <td>0.999534</td>
+      <td>0.001913</td>
+      <td>0.001917</td>
     </tr>
     <tr>
       <th>X_1</th>
-      <td>0.505</td>
-      <td>0.084</td>
-      <td>0.337</td>
-      <td>0.656</td>
-      <td>0.002</td>
-      <td>0.002</td>
-      <td>1889.0</td>
-      <td>1663.0</td>
-      <td>1.0</td>
+      <td>0.474274</td>
+      <td>0.080305</td>
+      <td>0.348452</td>
+      <td>0.599562</td>
+      <td>2222.110827</td>
+      <td>1642.15413</td>
+      <td>1.001455</td>
+      <td>0.001704</td>
+      <td>0.001759</td>
     </tr>
     <tr>
       <th>X_2</th>
-      <td>2.787</td>
-      <td>0.083</td>
-      <td>2.625</td>
-      <td>2.940</td>
-      <td>0.002</td>
-      <td>0.002</td>
-      <td>2208.0</td>
-      <td>1446.0</td>
-      <td>1.0</td>
+      <td>2.8892</td>
+      <td>0.080733</td>
+      <td>2.756167</td>
+      <td>3.014162</td>
+      <td>2168.124538</td>
+      <td>1529.147863</td>
+      <td>1.001796</td>
+      <td>0.001759</td>
+      <td>0.001719</td>
     </tr>
     <tr>
       <th>sigma2</th>
-      <td>2.686</td>
-      <td>0.195</td>
-      <td>2.328</td>
-      <td>3.034</td>
-      <td>0.004</td>
-      <td>0.004</td>
-      <td>2005.0</td>
-      <td>1688.0</td>
-      <td>1.0</td>
+      <td>2.737</td>
+      <td>0.194</td>
+      <td>2.4</td>
+      <td>3.1</td>
+      <td>2281</td>
+      <td>1769</td>
+      <td>1.00</td>
+      <td>0.0041</td>
+      <td>0.0039</td>
     </tr>
     <tr>
       <th>sigma</th>
-      <td>1.638</td>
-      <td>0.059</td>
-      <td>1.529</td>
-      <td>1.745</td>
-      <td>0.001</td>
-      <td>0.001</td>
-      <td>2005.0</td>
-      <td>1688.0</td>
-      <td>1.0</td>
+      <td>1.653</td>
+      <td>0.058</td>
+      <td>1.6</td>
+      <td>1.7</td>
+      <td>2281</td>
+      <td>1769</td>
+      <td>1.00</td>
+      <td>0.0012</td>
+      <td>0.0011</td>
     </tr>
   </tbody>
-</table>
-</div></div></div>
+</table></div></div>
 </div>
 <p>Notice all the estimated beta parameters are biased upward.</p>
 <h3 id="use-arviz-to-inspect-fit">Use <code class="docutils literal notranslate"><span class="pre">arviz</span></code> to inspect fit<a class="headerlink" href="#use-arviz-to-inspect-fit" title="Link to this heading">¶</a></h3>
@@ -1790,28 +1805,23 @@ for Jupyter support
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>array([&lt;Axes: title={'center': '94.0% HDI'}&gt;], dtype=object)
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>&lt;arviz_plots.plot_collection.PlotCollection at 0x7f78148546e0&gt;
 </code></pre></div>
 </div>
-<img alt="../_images/138d59cb972173848213b99c1652c5cd31466f8379680cf1e0cc41da433106cb.png" src="../_images/138d59cb972173848213b99c1652c5cd31466f8379680cf1e0cc41da433106cb.png" />
+<img alt="../_images/9abb5043ed1459a6e8d9b7dc30564d653f524f1a30d60628edff14d907cb4283.png" src="../_images/9abb5043ed1459a6e8d9b7dc30564d653f524f1a30d60628edff14d907cb4283.png" />
 </div>
 </div>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">az</span><span class="o">.</span><span class="n">plot_trace</span><span class="p">(</span><span class="n">ols</span><span class="o">.</span><span class="n">inference_data</span><span class="p">)</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">az</span><span class="o">.</span><span class="n">plot_trace_dist</span><span class="p">(</span><span class="n">ols</span><span class="o">.</span><span class="n">inference_data</span><span class="p">)</span>
 </code></pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>array([[&lt;Axes: title={'center': 'beta'}&gt;,
-        &lt;Axes: title={'center': 'beta'}&gt;],
-       [&lt;Axes: title={'center': 'sigma2'}&gt;,
-        &lt;Axes: title={'center': 'sigma2'}&gt;],
-       [&lt;Axes: title={'center': 'sigma'}&gt;,
-        &lt;Axes: title={'center': 'sigma'}&gt;]], dtype=object)
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>&lt;arviz_plots.plot_collection.PlotCollection at 0x7f781353c910&gt;
 </code></pre></div>
 </div>
-<img alt="../_images/784e088ef105fabc40c363ee99264b99a4b7e1a17ee9d40459f049fc80993716.png" src="../_images/784e088ef105fabc40c363ee99264b99a4b7e1a17ee9d40459f049fc80993716.png" />
+<img alt="../_images/6b2ca81f149e7dc44dd1693aba0ee442c1053efce1358596db953b9f9fcd5c7b.png" src="../_images/6b2ca81f149e7dc44dd1693aba0ee442c1053efce1358596db953b9f9fcd5c7b.png" />
 </div>
 </div>
 <h2 id="run-bayesian-lm-diagnostics">3. Run Bayesian LM Diagnostics<a class="headerlink" href="#run-bayesian-lm-diagnostics" title="Link to this heading">¶</a></h2>
@@ -1830,10 +1840,6 @@ for Jupyter support
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
-  from .autonotebook import tqdm as notebook_tqdm
-</code></pre></div>
-</div>
 <div class="output text_html"><div>
 <style scoped>
     .dataframe tbody tr th:only-of-type {
@@ -1872,57 +1878,57 @@ for Jupyter support
   <tbody>
     <tr>
       <th>LM-Lag</th>
-      <td>339.442549</td>
-      <td>338.238976</td>
+      <td>385.096211</td>
+      <td>383.764617</td>
       <td>1</td>
       <td>0.000000</td>
-      <td>238.210494</td>
-      <td>452.134961</td>
+      <td>283.608979</td>
+      <td>493.661079</td>
     </tr>
     <tr>
       <th>LM-Error</th>
-      <td>206.009770</td>
-      <td>204.774155</td>
+      <td>213.421008</td>
+      <td>212.070186</td>
       <td>1</td>
       <td>0.000000</td>
-      <td>158.103305</td>
-      <td>259.707695</td>
+      <td>161.387706</td>
+      <td>277.244932</td>
     </tr>
     <tr>
       <th>LM-SDM-Joint</th>
-      <td>357.158393</td>
-      <td>351.438243</td>
+      <td>403.645093</td>
+      <td>397.369215</td>
       <td>3</td>
       <td>0.000000</td>
-      <td>238.680210</td>
-      <td>516.014165</td>
+      <td>287.587267</td>
+      <td>553.116886</td>
     </tr>
     <tr>
       <th>LM-SLX-Error-Joint</th>
-      <td>351.364158</td>
-      <td>350.084587</td>
+      <td>402.840245</td>
+      <td>400.583133</td>
       <td>3</td>
       <td>0.000000</td>
-      <td>301.570851</td>
-      <td>409.153415</td>
+      <td>342.688566</td>
+      <td>476.564908</td>
     </tr>
     <tr>
       <th>Robust-LM-Lag</th>
-      <td>147.561998</td>
-      <td>146.547828</td>
+      <td>189.593593</td>
+      <td>188.052407</td>
       <td>1</td>
       <td>0.000000</td>
-      <td>109.775017</td>
-      <td>191.637620</td>
+      <td>141.936016</td>
+      <td>247.132632</td>
     </tr>
     <tr>
       <th>Robust-LM-Error</th>
-      <td>12.109967</td>
-      <td>12.026737</td>
+      <td>11.918079</td>
+      <td>11.821198</td>
       <td>1</td>
-      <td>0.000502</td>
-      <td>9.008903</td>
-      <td>15.727119</td>
+      <td>0.000556</td>
+      <td>8.922267</td>
+      <td>15.535052</td>
     </tr>
   </tbody>
 </table>
@@ -1941,7 +1947,7 @@ for Jupyter support
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>LM-Lag *  (p=0.0000, alpha=0.05)
 ├── &lt;sig&gt; LM-Error *  (p=0.0000, alpha=0.05)
 │   ├── &lt;sig&gt; Robust-LM-Lag *  (p=0.0000, alpha=0.05)
-│   │   ├── &lt;sig&gt; Robust-LM-Error *  (p=0.0005, alpha=0.05)
+│   │   ├── &lt;sig&gt; Robust-LM-Error *  (p=0.0006, alpha=0.05)
 │   │   │   ├── &lt;sig&gt; Robust-LM-Lag p &lt;= Robust-LM-Error p *
 │   │   │   │   ├── [SAR] * ← SELECTED
 │   │   │   │   └── [SEM]
@@ -1996,131 +2002,110 @@ for Jupyter support
   warnings.warn('install "ipywidgets" for Jupyter support')
 </pre>
 </div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 4s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">076</span> draws/s<span style="font-weight: bold">)</span>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 4s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">367</span> draws/s<span style="font-weight: bold">)</span>
 </pre>
-</div><div class="output text_html"><div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
+</div><div class="output text_html"><table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
       <th></th>
       <th>mean</th>
       <th>sd</th>
-      <th>hdi_3%</th>
-      <th>hdi_97%</th>
-      <th>mcse_mean</th>
-      <th>mcse_sd</th>
+      <th>eti89_lb</th>
+      <th>eti89_ub</th>
       <th>ess_bulk</th>
       <th>ess_tail</th>
       <th>r_hat</th>
+      <th>mcse_mean</th>
+      <th>mcse_sd</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <th>rho</th>
-      <td>0.603</td>
-      <td>0.030</td>
-      <td>0.550</td>
-      <td>0.661</td>
-      <td>0.000</td>
-      <td>0.000</td>
-      <td>8212.0</td>
-      <td>5740.0</td>
-      <td>1.0</td>
+      <td>0.6339</td>
+      <td>0.0271</td>
+      <td>0.59</td>
+      <td>0.68</td>
+      <td>7764</td>
+      <td>5956</td>
+      <td>1.00</td>
+      <td>0.00031</td>
+      <td>0.00032</td>
     </tr>
     <tr>
       <th>sigma</th>
-      <td>1.159</td>
-      <td>0.041</td>
-      <td>1.082</td>
-      <td>1.236</td>
-      <td>0.000</td>
-      <td>0.000</td>
-      <td>7598.0</td>
-      <td>7809.0</td>
-      <td>1.0</td>
+      <td>1.0678</td>
+      <td>0.0381</td>
+      <td>1</td>
+      <td>1.1</td>
+      <td>7371</td>
+      <td>7490</td>
+      <td>1.00</td>
+      <td>0.00044</td>
+      <td>0.00031</td>
     </tr>
     <tr>
       <th>sigma2</th>
-      <td>1.345</td>
-      <td>0.096</td>
-      <td>1.171</td>
-      <td>1.528</td>
-      <td>0.001</td>
-      <td>0.001</td>
-      <td>7598.0</td>
-      <td>7809.0</td>
-      <td>1.0</td>
+      <td>1.142</td>
+      <td>0.082</td>
+      <td>1</td>
+      <td>1.3</td>
+      <td>7371</td>
+      <td>7490</td>
+      <td>1.00</td>
+      <td>0.00095</td>
+      <td>0.00068</td>
     </tr>
     <tr>
       <th>X_0</th>
-      <td>1.039</td>
-      <td>0.086</td>
-      <td>0.883</td>
-      <td>1.204</td>
-      <td>0.001</td>
-      <td>0.001</td>
-      <td>7834.0</td>
-      <td>6836.0</td>
-      <td>1.0</td>
+      <td>0.987725</td>
+      <td>0.07699</td>
+      <td>0.865664</td>
+      <td>1.110338</td>
+      <td>7805.288704</td>
+      <td>7686.044627</td>
+      <td>1.000065</td>
+      <td>0.000871</td>
+      <td>0.000694</td>
     </tr>
     <tr>
       <th>X_1</th>
-      <td>0.556</td>
-      <td>0.059</td>
-      <td>0.448</td>
-      <td>0.668</td>
-      <td>0.001</td>
-      <td>0.000</td>
-      <td>7805.0</td>
-      <td>8014.0</td>
-      <td>1.0</td>
+      <td>0.375358</td>
+      <td>0.05203</td>
+      <td>0.291257</td>
+      <td>0.458404</td>
+      <td>7829.660193</td>
+      <td>7815.521619</td>
+      <td>1.000062</td>
+      <td>0.000588</td>
+      <td>0.000396</td>
     </tr>
     <tr>
       <th>X_2</th>
-      <td>2.526</td>
-      <td>0.062</td>
-      <td>2.411</td>
-      <td>2.644</td>
-      <td>0.001</td>
-      <td>0.001</td>
-      <td>7932.0</td>
-      <td>7855.0</td>
-      <td>1.0</td>
+      <td>2.527742</td>
+      <td>0.055764</td>
+      <td>2.438941</td>
+      <td>2.616693</td>
+      <td>7726.152564</td>
+      <td>7294.199983</td>
+      <td>1.000131</td>
+      <td>0.000635</td>
+      <td>0.000454</td>
     </tr>
   </tbody>
-</table>
-</div></div></div>
+</table></div></div>
 </div>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">az</span><span class="o">.</span><span class="n">plot_trace</span><span class="p">(</span><span class="n">sar</span><span class="o">.</span><span class="n">inference_data</span><span class="p">)</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">az</span><span class="o">.</span><span class="n">plot_trace_dist</span><span class="p">(</span><span class="n">sar</span><span class="o">.</span><span class="n">inference_data</span><span class="p">)</span>
 </code></pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>array([[&lt;Axes: title={'center': 'rho'}&gt;, &lt;Axes: title={'center': 'rho'}&gt;],
-       [&lt;Axes: title={'center': 'sigma'}&gt;,
-        &lt;Axes: title={'center': 'sigma'}&gt;],
-       [&lt;Axes: title={'center': 'sigma2'}&gt;,
-        &lt;Axes: title={'center': 'sigma2'}&gt;],
-       [&lt;Axes: title={'center': 'beta'}&gt;,
-        &lt;Axes: title={'center': 'beta'}&gt;]], dtype=object)
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>&lt;arviz_plots.plot_collection.PlotCollection at 0x7f77f0a0a210&gt;
 </code></pre></div>
 </div>
-<img alt="../_images/a6ffe67a70e46df85f324f86a6a4c75badd47d98e10bb65dd334f0681f6f5923.png" src="../_images/a6ffe67a70e46df85f324f86a6a4c75badd47d98e10bb65dd334f0681f6f5923.png" />
+<img alt="../_images/a0193ea8b2e8121200fe1195b62184c5d88bf5f9671664cb07cf46cc8e87c14c.png" src="../_images/a0193ea8b2e8121200fe1195b62184c5d88bf5f9671664cb07cf46cc8e87c14c.png" />
 </div>
 </div>
 <h2 id="compute-spatial-effects">6. Compute Spatial Effects<a class="headerlink" href="#compute-spatial-effects" title="Link to this heading">¶</a></h2>
@@ -2188,32 +2173,32 @@ for Jupyter support
   <tbody>
     <tr>
       <th>X_1</th>
-      <td>0.599563</td>
-      <td>0.474461</td>
-      <td>0.723587</td>
+      <td>0.408826</td>
+      <td>0.298984</td>
+      <td>0.517419</td>
       <td>0.0</td>
-      <td>0.811567</td>
-      <td>0.577404</td>
-      <td>1.099162</td>
+      <td>0.621222</td>
+      <td>0.426984</td>
+      <td>0.848547</td>
       <td>0.0</td>
-      <td>1.411130</td>
-      <td>1.071334</td>
-      <td>1.795207</td>
+      <td>1.030047</td>
+      <td>0.740246</td>
+      <td>1.346293</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>X_2</th>
-      <td>2.722486</td>
-      <td>2.582336</td>
-      <td>2.866970</td>
+      <td>2.753324</td>
+      <td>2.637671</td>
+      <td>2.872576</td>
       <td>0.0</td>
-      <td>3.684312</td>
-      <td>2.862156</td>
-      <td>4.718468</td>
+      <td>4.187077</td>
+      <td>3.329343</td>
+      <td>5.213347</td>
       <td>0.0</td>
-      <td>6.406798</td>
-      <td>5.501925</td>
-      <td>7.526817</td>
+      <td>6.940402</td>
+      <td>6.033662</td>
+      <td>8.030454</td>
       <td>0.0</td>
     </tr>
   </tbody>

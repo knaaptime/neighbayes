@@ -757,6 +757,30 @@
 
               
             
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -2065,11 +2089,11 @@
 <h1 id="neighbayes-graph-flow-design-matrix">neighbayes.graph.flow_design_matrix<a class="headerlink" href="#neighbayes-graph-flow-design-matrix" title="Link to this heading">¶</a></h1>
 <dl class="py function objdesc">
 <dt class="sig sig-object highlight sig-wrap py" id="neighbayes.graph.flow_design_matrix">
-<span class="sig-prename descclassname"><span class="pre">neighbayes.graph.</span></span><span class="sig-name descname"><span class="pre">flow_design_matrix</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.graph.flow_design_matrix.X" title="neighbayes.graph.flow_design_matrix.X (Python parameter) — Array of k regional attributes for n spatial units. Should not include an intercept column."><span class="n"><span class="pre">X</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.graph.flow_design_matrix.col_names" title="neighbayes.graph.flow_design_matrix.col_names (Python parameter) — Names for the k columns of X."><span class="n"><span class="pre">col_names</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.graph.flow_design_matrix.dist" title="neighbayes.graph.flow_design_matrix.dist (Python parameter) — Distance or cost matrix."><span class="n"><span class="pre">dist</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.graph.flow_design_matrix.log_distance" title="neighbayes.graph.flow_design_matrix.log_distance (Python parameter) — If True and dist is provided, the appended column is log(1 + dist).ravel() and is named &quot;log_distance&quot;."><span class="n"><span class="pre">log_distance</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">True</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/graph.py#L263-L418"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.graph.flow_design_matrix" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">neighbayes.graph.</span></span><span class="sig-name descname"><span class="pre">flow_design_matrix</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.graph.flow_design_matrix.X" title="neighbayes.graph.flow_design_matrix.X (Python parameter) — Array of k regional attributes for n spatial units. Should not include an intercept column."><span class="n"><span class="pre">X</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.graph.flow_design_matrix.col_names" title="neighbayes.graph.flow_design_matrix.col_names (Python parameter) — Names for the k columns of X."><span class="n"><span class="pre">col_names</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.graph.flow_design_matrix.dist" title="neighbayes.graph.flow_design_matrix.dist (Python parameter) — Distance or cost matrix."><span class="n"><span class="pre">dist</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.graph.flow_design_matrix.log_distance" title="neighbayes.graph.flow_design_matrix.log_distance (Python parameter) — If True and dist is provided, the appended column is log(1 + dist).ravel() and is named &quot;log_distance&quot;."><span class="n"><span class="pre">log_distance</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">True</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/graph.py#L309-L464"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.graph.flow_design_matrix" title="Link to this definition">¶</a></dt>
 <dd><p>Build a flow regression design matrix from regional attribute data.</p>
 <p>Constructs the standard LeSage-Fischer O-D design matrix with separate
 destination, origin, and intra-zonal blocks, plus an optional distance
-column, following <span class="bibtex-citation" id="id1">LeSage and Pace [<a class="reference internal" href="../references.html#id29" title="James P. LeSage and R Kelley Pace. Spatial Econometric Modeling Of Origin-Destination Flows. Journal of Regional Science, 48(5):941–967, 2008. doi:10.1111/j.1467-9787.2008.00573.x.">2008</a>]</span> (Section 4.2).</p>
+column, following <span class="bibtex-citation" id="id1">LeSage and Pace [<a class="reference internal" href="../references.html#id31" title="James P. LeSage and R Kelley Pace. Spatial Econometric Modeling Of Origin-Destination Flows. Journal of Regional Science, 48(5):941–967, 2008. doi:10.1111/j.1467-9787.2008.00573.x.">2008</a>]</span> (Section 4.2).</p>
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.graph.flow_design_matrix-parameters">Parameters<span class="colon">:</span><a class="headerlink" href="#neighbayes.graph.flow_design_matrix-parameters" title="Permalink to this headline">¶</a></dt>
 <dd class="field-odd"><dl class="simple api-field highlight">

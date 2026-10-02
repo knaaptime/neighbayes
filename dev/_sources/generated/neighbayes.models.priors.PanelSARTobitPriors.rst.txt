@@ -25,12 +25,10 @@
    
       ~PanelSARTobitPriors.beta_mu
       ~PanelSARTobitPriors.beta_sigma
-      ~PanelSARTobitPriors.censor_sigma
       ~PanelSARTobitPriors.nu
       ~PanelSARTobitPriors.rho_lower
       ~PanelSARTobitPriors.rho_upper
       ~PanelSARTobitPriors.sigma2_alpha
       ~PanelSARTobitPriors.sigma2_beta
-      ~PanelSARTobitPriors.sigma_sigma
    
    

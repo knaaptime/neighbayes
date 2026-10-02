@@ -25,12 +25,10 @@
    
       ~SEMTobitPriors.beta_mu
       ~SEMTobitPriors.beta_sigma
-      ~SEMTobitPriors.censor_sigma
       ~SEMTobitPriors.lam_lower
       ~SEMTobitPriors.lam_upper
       ~SEMTobitPriors.nu
       ~SEMTobitPriors.sigma2_alpha
       ~SEMTobitPriors.sigma2_beta
-      ~SEMTobitPriors.sigma_sigma
    
    

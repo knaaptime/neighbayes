@@ -757,6 +757,30 @@
 
               
             
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1630,7 +1654,7 @@
 <span class="sd">    Uses ``dgp.simulate_sar`` with ``create_gdf=True`` to generate the polygon</span>
 <span class="sd">    geometry, then builds a contiguity graph from the returned GeoDataFrame.</span>
 <span class="sd">    """</span>
-    <span class="n">gdf</span> <span class="o">=</span> <span class="n">dgp</span><span class="o">.</span><span class="n">simulate_sar</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="n">n_side</span><span class="p">,</span> <span class="n">create_gdf</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">gdf</span> <span class="o">=</span> <span class="n">dgp</span><span class="o">.</span><span class="n">simulate_sar</span><span class="p">(</span><span class="n">n_side</span><span class="o">=</span><span class="n">n_side</span><span class="p">,</span> <span class="n">create_gdf</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">W</span> <span class="o">=</span> <span class="p">(</span>
         <span class="n">graph</span><span class="o">.</span><span class="n">Graph</span><span class="o">.</span><span class="n">build_contiguity</span><span class="p">(</span><span class="n">gdf</span><span class="p">,</span> <span class="n">rook</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="s2">"r"</span><span class="p">)</span>
@@ -1802,6 +1826,10 @@ Profiling n_side=50 (2500 obs)...
 Profiling n_side=75 (5625 obs)...
 </code></pre></div>
 </div>
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
+</code></pre></div>
+</div>
 <div class="output text_html"><div>
 <style scoped>
     .dataframe tbody tr th:only-of-type {
@@ -1840,9 +1868,9 @@ Profiling n_side=75 (5625 obs)...
       <td>aaa</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>1632.837219</td>
-      <td>5.208350</td>
-      <td>1633.253887</td>
+      <td>25.315403</td>
+      <td>5.928725</td>
+      <td>25.789701</td>
     </tr>
     <tr>
       <th>1</th>
@@ -1852,9 +1880,9 @@ Profiling n_side=75 (5625 obs)...
       <td>aaa</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>22.328461</td>
-      <td>5.619463</td>
-      <td>22.778018</td>
+      <td>23.638833</td>
+      <td>5.500175</td>
+      <td>24.078847</td>
     </tr>
     <tr>
       <th>2</th>
@@ -1864,9 +1892,9 @@ Profiling n_side=75 (5625 obs)...
       <td>aaa</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>25.364306</td>
-      <td>5.276950</td>
-      <td>25.786462</td>
+      <td>26.331404</td>
+      <td>4.999987</td>
+      <td>26.731403</td>
     </tr>
     <tr>
       <th>3</th>
@@ -1876,9 +1904,9 @@ Profiling n_side=75 (5625 obs)...
       <td>aaa</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>50.338054</td>
-      <td>5.010675</td>
-      <td>50.738908</td>
+      <td>52.698585</td>
+      <td>5.222788</td>
+      <td>53.116408</td>
     </tr>
     <tr>
       <th>4</th>
@@ -1888,9 +1916,9 @@ Profiling n_side=75 (5625 obs)...
       <td>aaa</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>86.124837</td>
-      <td>5.360325</td>
-      <td>86.553663</td>
+      <td>82.124544</td>
+      <td>5.112700</td>
+      <td>82.533560</td>
     </tr>
     <tr>
       <th>5</th>
@@ -1900,9 +1928,9 @@ Profiling n_side=75 (5625 obs)...
       <td>aaa</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>307.762102</td>
-      <td>5.685075</td>
-      <td>308.216908</td>
+      <td>338.398659</td>
+      <td>5.092288</td>
+      <td>338.806042</td>
     </tr>
     <tr>
       <th>6</th>
@@ -1912,9 +1940,9 @@ Profiling n_side=75 (5625 obs)...
       <td>cheb_cholesky</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>1320.619155</td>
-      <td>4.156638</td>
-      <td>1320.951686</td>
+      <td>425.636157</td>
+      <td>5.509313</td>
+      <td>426.076902</td>
     </tr>
     <tr>
       <th>7</th>
@@ -1924,9 +1952,9 @@ Profiling n_side=75 (5625 obs)...
       <td>cheb_cholesky</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>1173.600120</td>
-      <td>4.488887</td>
-      <td>1173.959231</td>
+      <td>708.465155</td>
+      <td>5.041188</td>
+      <td>708.868450</td>
     </tr>
     <tr>
       <th>8</th>
@@ -1936,9 +1964,9 @@ Profiling n_side=75 (5625 obs)...
       <td>cheb_cholesky</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>1176.445918</td>
-      <td>4.242513</td>
-      <td>1176.785319</td>
+      <td>439.064772</td>
+      <td>5.392100</td>
+      <td>439.496140</td>
     </tr>
     <tr>
       <th>9</th>
@@ -1948,9 +1976,9 @@ Profiling n_side=75 (5625 obs)...
       <td>cheb_cholesky</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>1414.467354</td>
-      <td>4.500150</td>
-      <td>1414.827366</td>
+      <td>453.789310</td>
+      <td>5.143012</td>
+      <td>454.200751</td>
     </tr>
     <tr>
       <th>10</th>
@@ -1960,9 +1988,9 @@ Profiling n_side=75 (5625 obs)...
       <td>cheb_cholesky</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>1257.295766</td>
-      <td>4.167150</td>
-      <td>1257.629138</td>
+      <td>497.296681</td>
+      <td>5.414138</td>
+      <td>497.729812</td>
     </tr>
     <tr>
       <th>11</th>
@@ -1972,9 +2000,9 @@ Profiling n_side=75 (5625 obs)...
       <td>cheb_cholesky</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>1513.283902</td>
-      <td>4.342300</td>
-      <td>1513.631286</td>
+      <td>845.483423</td>
+      <td>5.369550</td>
+      <td>845.912987</td>
     </tr>
     <tr>
       <th>12</th>
@@ -1984,9 +2012,9 @@ Profiling n_side=75 (5625 obs)...
       <td>cheb_stochastic</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>1181.215630</td>
-      <td>4.214100</td>
-      <td>1181.552758</td>
+      <td>433.473472</td>
+      <td>5.598475</td>
+      <td>433.921350</td>
     </tr>
     <tr>
       <th>13</th>
@@ -1996,9 +2024,9 @@ Profiling n_side=75 (5625 obs)...
       <td>cheb_stochastic</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>1176.236673</td>
-      <td>4.383850</td>
-      <td>1176.587381</td>
+      <td>428.642887</td>
+      <td>5.593850</td>
+      <td>429.090395</td>
     </tr>
     <tr>
       <th>14</th>
@@ -2008,9 +2036,9 @@ Profiling n_side=75 (5625 obs)...
       <td>cheb_stochastic</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>1190.999463</td>
-      <td>4.204213</td>
-      <td>1191.335800</td>
+      <td>440.721825</td>
+      <td>4.899050</td>
+      <td>441.113749</td>
     </tr>
     <tr>
       <th>15</th>
@@ -2020,9 +2048,9 @@ Profiling n_side=75 (5625 obs)...
       <td>cheb_stochastic</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>1210.114749</td>
-      <td>4.554613</td>
-      <td>1210.479118</td>
+      <td>826.690710</td>
+      <td>5.162163</td>
+      <td>827.103683</td>
     </tr>
     <tr>
       <th>16</th>
@@ -2032,9 +2060,9 @@ Profiling n_side=75 (5625 obs)...
       <td>cheb_stochastic</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>1307.784939</td>
-      <td>4.539350</td>
-      <td>1308.148087</td>
+      <td>563.101046</td>
+      <td>5.275625</td>
+      <td>563.523096</td>
     </tr>
     <tr>
       <th>17</th>
@@ -2044,9 +2072,9 @@ Profiling n_side=75 (5625 obs)...
       <td>cheb_stochastic</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>1887.963294</td>
-      <td>4.125600</td>
-      <td>1888.293342</td>
+      <td>1122.419533</td>
+      <td>5.429662</td>
+      <td>1122.853906</td>
     </tr>
     <tr>
       <th>18</th>
@@ -2056,9 +2084,9 @@ Profiling n_side=75 (5625 obs)...
       <td>chebyshev</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>783.749045</td>
-      <td>3.938312</td>
-      <td>784.064110</td>
+      <td>140.152504</td>
+      <td>5.372688</td>
+      <td>140.582319</td>
     </tr>
     <tr>
       <th>19</th>
@@ -2068,9 +2096,9 @@ Profiling n_side=75 (5625 obs)...
       <td>chebyshev</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>817.699140</td>
-      <td>3.992025</td>
-      <td>818.018502</td>
+      <td>177.466283</td>
+      <td>4.929975</td>
+      <td>177.860681</td>
     </tr>
     <tr>
       <th>20</th>
@@ -2080,9 +2108,9 @@ Profiling n_side=75 (5625 obs)...
       <td>chebyshev</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>903.328660</td>
-      <td>4.162525</td>
-      <td>903.661662</td>
+      <td>259.450671</td>
+      <td>4.901812</td>
+      <td>259.842816</td>
     </tr>
     <tr>
       <th>21</th>
@@ -2092,9 +2120,9 @@ Profiling n_side=75 (5625 obs)...
       <td>chebyshev</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>1746.387891</td>
-      <td>4.015800</td>
-      <td>1746.709155</td>
+      <td>1109.539302</td>
+      <td>4.802863</td>
+      <td>1109.923531</td>
     </tr>
     <tr>
       <th>22</th>
@@ -2104,9 +2132,9 @@ Profiling n_side=75 (5625 obs)...
       <td>chebyshev</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>833.691631</td>
-      <td>3.976613</td>
-      <td>834.009760</td>
+      <td>185.400313</td>
+      <td>5.302800</td>
+      <td>185.824537</td>
     </tr>
     <tr>
       <th>23</th>
@@ -2116,9 +2144,9 @@ Profiling n_side=75 (5625 obs)...
       <td>chebyshev</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>981.869596</td>
-      <td>4.066750</td>
-      <td>982.194936</td>
+      <td>333.447709</td>
+      <td>5.061350</td>
+      <td>333.852617</td>
     </tr>
     <tr>
       <th>24</th>
@@ -2128,9 +2156,9 @@ Profiling n_side=75 (5625 obs)...
       <td>eigenvalue</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>3175.775488</td>
-      <td>5.527325</td>
-      <td>3176.217674</td>
+      <td>199.306666</td>
+      <td>6.116450</td>
+      <td>199.795982</td>
     </tr>
     <tr>
       <th>25</th>
@@ -2140,9 +2168,9 @@ Profiling n_side=75 (5625 obs)...
       <td>eigenvalue</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>67.766561</td>
-      <td>7.762450</td>
-      <td>68.387557</td>
+      <td>62.656383</td>
+      <td>7.397100</td>
+      <td>63.248151</td>
     </tr>
     <tr>
       <th>26</th>
@@ -2152,9 +2180,9 @@ Profiling n_side=75 (5625 obs)...
       <td>eigenvalue</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>148.486745</td>
-      <td>9.293763</td>
-      <td>149.230246</td>
+      <td>144.132139</td>
+      <td>8.525713</td>
+      <td>144.814196</td>
     </tr>
     <tr>
       <th>27</th>
@@ -2164,9 +2192,9 @@ Profiling n_side=75 (5625 obs)...
       <td>eigenvalue</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>980.726394</td>
-      <td>16.513012</td>
-      <td>982.047435</td>
+      <td>969.248680</td>
+      <td>13.200850</td>
+      <td>970.304748</td>
     </tr>
     <tr>
       <th>28</th>
@@ -2176,9 +2204,9 @@ Profiling n_side=75 (5625 obs)...
       <td>eigenvalue</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>3124.906038</td>
-      <td>23.348063</td>
-      <td>3126.773883</td>
+      <td>2993.291479</td>
+      <td>18.065200</td>
+      <td>2994.736695</td>
     </tr>
     <tr>
       <th>29</th>
@@ -2188,9 +2216,9 @@ Profiling n_side=75 (5625 obs)...
       <td>eigenvalue</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>31044.751205</td>
-      <td>46.054162</td>
-      <td>31048.435538</td>
+      <td>30147.619740</td>
+      <td>34.378512</td>
+      <td>30150.370021</td>
     </tr>
     <tr>
       <th>30</th>
@@ -2200,9 +2228,9 @@ Profiling n_side=75 (5625 obs)...
       <td>slq</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>800.253411</td>
-      <td>3.975750</td>
-      <td>800.571471</td>
+      <td>349.438846</td>
+      <td>4.791225</td>
+      <td>349.822144</td>
     </tr>
     <tr>
       <th>31</th>
@@ -2212,9 +2240,9 @@ Profiling n_side=75 (5625 obs)...
       <td>slq</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>796.214980</td>
-      <td>3.708225</td>
-      <td>796.511638</td>
+      <td>152.868184</td>
+      <td>5.523587</td>
+      <td>153.310071</td>
     </tr>
     <tr>
       <th>32</th>
@@ -2224,9 +2252,9 @@ Profiling n_side=75 (5625 obs)...
       <td>slq</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>1012.666343</td>
-      <td>3.675537</td>
-      <td>1012.960386</td>
+      <td>161.448957</td>
+      <td>5.411013</td>
+      <td>161.881838</td>
     </tr>
     <tr>
       <th>33</th>
@@ -2236,9 +2264,9 @@ Profiling n_side=75 (5625 obs)...
       <td>slq</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>853.471883</td>
-      <td>3.720613</td>
-      <td>853.769532</td>
+      <td>210.812842</td>
+      <td>5.304937</td>
+      <td>211.237237</td>
     </tr>
     <tr>
       <th>34</th>
@@ -2248,9 +2276,9 @@ Profiling n_side=75 (5625 obs)...
       <td>slq</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>923.370374</td>
-      <td>3.668900</td>
-      <td>923.663886</td>
+      <td>276.702861</td>
+      <td>5.229163</td>
+      <td>277.121194</td>
     </tr>
     <tr>
       <th>35</th>
@@ -2260,9 +2288,9 @@ Profiling n_side=75 (5625 obs)...
       <td>slq</td>
       <td>-0.95</td>
       <td>0.95</td>
-      <td>1367.610526</td>
-      <td>3.877838</td>
-      <td>1367.920753</td>
+      <td>706.277466</td>
+      <td>5.132363</td>
+      <td>706.688055</td>
     </tr>
   </tbody>
 </table>
@@ -2325,7 +2353,7 @@ Profiling n_side=75 (5625 obs)...
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/244a7433f8849fa12c2acdd69bd4ee223b83d68061a19a4261cdbeec44e99156.png" src="../_images/244a7433f8849fa12c2acdd69bd4ee223b83d68061a19a4261cdbeec44e99156.png" />
+<img alt="../_images/52ca66e78c21372e8d5cec64b3e5cf508a65e6a153f96a98c9af6958fe142970.png" src="../_images/52ca66e78c21372e8d5cec64b3e5cf508a65e6a153f96a98c9af6958fe142970.png" />
 </div>
 </div>
 <div class="cell docutils container">
@@ -2417,129 +2445,129 @@ Profiling n_side=75 (5625 obs)...
   <tbody>
     <tr>
       <th>100</th>
-      <td>5.208350</td>
-      <td>4.156638</td>
-      <td>4.214100</td>
-      <td>3.938312</td>
-      <td>5.527325</td>
-      <td>3.975750</td>
-      <td>1632.837219</td>
-      <td>1320.619155</td>
-      <td>1181.215630</td>
-      <td>783.749045</td>
-      <td>3175.775488</td>
-      <td>800.253411</td>
-      <td>1633.253887</td>
-      <td>1320.951686</td>
-      <td>1181.552758</td>
-      <td>784.064110</td>
-      <td>3176.217674</td>
-      <td>800.571471</td>
+      <td>5.928725</td>
+      <td>5.509313</td>
+      <td>5.598475</td>
+      <td>5.372688</td>
+      <td>6.116450</td>
+      <td>4.791225</td>
+      <td>25.315403</td>
+      <td>425.636157</td>
+      <td>433.473472</td>
+      <td>140.152504</td>
+      <td>199.306666</td>
+      <td>349.438846</td>
+      <td>25.789701</td>
+      <td>426.076902</td>
+      <td>433.921350</td>
+      <td>140.582319</td>
+      <td>199.795982</td>
+      <td>349.822144</td>
     </tr>
     <tr>
       <th>400</th>
-      <td>5.619463</td>
-      <td>4.488887</td>
-      <td>4.383850</td>
-      <td>3.992025</td>
-      <td>7.762450</td>
-      <td>3.708225</td>
-      <td>22.328461</td>
-      <td>1173.600120</td>
-      <td>1176.236673</td>
-      <td>817.699140</td>
-      <td>67.766561</td>
-      <td>796.214980</td>
-      <td>22.778018</td>
-      <td>1173.959231</td>
-      <td>1176.587381</td>
-      <td>818.018502</td>
-      <td>68.387557</td>
-      <td>796.511638</td>
+      <td>5.500175</td>
+      <td>5.041188</td>
+      <td>5.593850</td>
+      <td>4.929975</td>
+      <td>7.397100</td>
+      <td>5.523587</td>
+      <td>23.638833</td>
+      <td>708.465155</td>
+      <td>428.642887</td>
+      <td>177.466283</td>
+      <td>62.656383</td>
+      <td>152.868184</td>
+      <td>24.078847</td>
+      <td>708.868450</td>
+      <td>429.090395</td>
+      <td>177.860681</td>
+      <td>63.248151</td>
+      <td>153.310071</td>
     </tr>
     <tr>
       <th>625</th>
-      <td>5.276950</td>
-      <td>4.242513</td>
-      <td>4.204213</td>
-      <td>4.162525</td>
-      <td>9.293763</td>
-      <td>3.675537</td>
-      <td>25.364306</td>
-      <td>1176.445918</td>
-      <td>1190.999463</td>
-      <td>903.328660</td>
-      <td>148.486745</td>
-      <td>1012.666343</td>
-      <td>25.786462</td>
-      <td>1176.785319</td>
-      <td>1191.335800</td>
-      <td>903.661662</td>
-      <td>149.230246</td>
-      <td>1012.960386</td>
+      <td>4.999987</td>
+      <td>5.392100</td>
+      <td>4.899050</td>
+      <td>4.901812</td>
+      <td>8.525713</td>
+      <td>5.411013</td>
+      <td>26.331404</td>
+      <td>439.064772</td>
+      <td>440.721825</td>
+      <td>259.450671</td>
+      <td>144.132139</td>
+      <td>161.448957</td>
+      <td>26.731403</td>
+      <td>439.496140</td>
+      <td>441.113749</td>
+      <td>259.842816</td>
+      <td>144.814196</td>
+      <td>161.881838</td>
     </tr>
     <tr>
       <th>1600</th>
-      <td>5.010675</td>
-      <td>4.500150</td>
-      <td>4.554613</td>
-      <td>4.015800</td>
-      <td>16.513012</td>
-      <td>3.720613</td>
-      <td>50.338054</td>
-      <td>1414.467354</td>
-      <td>1210.114749</td>
-      <td>1746.387891</td>
-      <td>980.726394</td>
-      <td>853.471883</td>
-      <td>50.738908</td>
-      <td>1414.827366</td>
-      <td>1210.479118</td>
-      <td>1746.709155</td>
-      <td>982.047435</td>
-      <td>853.769532</td>
+      <td>5.222788</td>
+      <td>5.143012</td>
+      <td>5.162163</td>
+      <td>4.802863</td>
+      <td>13.200850</td>
+      <td>5.304937</td>
+      <td>52.698585</td>
+      <td>453.789310</td>
+      <td>826.690710</td>
+      <td>1109.539302</td>
+      <td>969.248680</td>
+      <td>210.812842</td>
+      <td>53.116408</td>
+      <td>454.200751</td>
+      <td>827.103683</td>
+      <td>1109.923531</td>
+      <td>970.304748</td>
+      <td>211.237237</td>
     </tr>
     <tr>
       <th>2500</th>
-      <td>5.360325</td>
-      <td>4.167150</td>
-      <td>4.539350</td>
-      <td>3.976613</td>
-      <td>23.348063</td>
-      <td>3.668900</td>
-      <td>86.124837</td>
-      <td>1257.295766</td>
-      <td>1307.784939</td>
-      <td>833.691631</td>
-      <td>3124.906038</td>
-      <td>923.370374</td>
-      <td>86.553663</td>
-      <td>1257.629138</td>
-      <td>1308.148087</td>
-      <td>834.009760</td>
-      <td>3126.773883</td>
-      <td>923.663886</td>
+      <td>5.112700</td>
+      <td>5.414138</td>
+      <td>5.275625</td>
+      <td>5.302800</td>
+      <td>18.065200</td>
+      <td>5.229163</td>
+      <td>82.124544</td>
+      <td>497.296681</td>
+      <td>563.101046</td>
+      <td>185.400313</td>
+      <td>2993.291479</td>
+      <td>276.702861</td>
+      <td>82.533560</td>
+      <td>497.729812</td>
+      <td>563.523096</td>
+      <td>185.824537</td>
+      <td>2994.736695</td>
+      <td>277.121194</td>
     </tr>
     <tr>
       <th>5625</th>
-      <td>5.685075</td>
-      <td>4.342300</td>
-      <td>4.125600</td>
-      <td>4.066750</td>
-      <td>46.054162</td>
-      <td>3.877838</td>
-      <td>307.762102</td>
-      <td>1513.283902</td>
-      <td>1887.963294</td>
-      <td>981.869596</td>
-      <td>31044.751205</td>
-      <td>1367.610526</td>
-      <td>308.216908</td>
-      <td>1513.631286</td>
-      <td>1888.293342</td>
-      <td>982.194936</td>
-      <td>31048.435538</td>
-      <td>1367.920753</td>
+      <td>5.092288</td>
+      <td>5.369550</td>
+      <td>5.429662</td>
+      <td>5.061350</td>
+      <td>34.378512</td>
+      <td>5.132363</td>
+      <td>338.398659</td>
+      <td>845.483423</td>
+      <td>1122.419533</td>
+      <td>333.447709</td>
+      <td>30147.619740</td>
+      <td>706.277466</td>
+      <td>338.806042</td>
+      <td>845.912987</td>
+      <td>1122.853906</td>
+      <td>333.852617</td>
+      <td>30150.370021</td>
+      <td>706.688055</td>
     </tr>
   </tbody>
 </table>
@@ -2720,7 +2748,7 @@ Profiling n_side=75 (5625 obs)...
       <th>2</th>
       <td>cheb_cholesky</td>
       <td>cheb_cholesky</td>
-      <td>4.601689e-08</td>
+      <td>4.601691e-08</td>
       <td>1.405270e-08</td>
       <td>1.684522e-08</td>
     </tr>
@@ -2734,7 +2762,7 @@ Profiling n_side=75 (5625 obs)...
     </tr>
   </tbody>
 </table>
-</div></div><img alt="../_images/bb7365c9aad75040d737cbd29ac938ac346aedc63cbb01f37d67d9c0d6869dbc.png" src="../_images/bb7365c9aad75040d737cbd29ac938ac346aedc63cbb01f37d67d9c0d6869dbc.png" />
+</div></div><img alt="../_images/669d52c36cf010bff134627e3b987978c1323b89daabc9dd14910272d68528c0.png" src="../_images/669d52c36cf010bff134627e3b987978c1323b89daabc9dd14910272d68528c0.png" />
 </div>
 </div>
 <h2 id="coefficient-and-fit-time-comparison-across-logdet-methods">Coefficient and Fit-Time Comparison Across Logdet Methods<a class="headerlink" href="#coefficient-and-fit-time-comparison-across-logdet-methods" title="Link to this heading">¶</a></h2>
@@ -2758,7 +2786,7 @@ Profiling n_side=75 (5625 obs)...
     <span class="n">sigma_true</span> <span class="o">=</span> <span class="mf">0.7</span>
 
     <span class="n">gdf</span> <span class="o">=</span> <span class="n">dgp</span><span class="o">.</span><span class="n">simulate_sar</span><span class="p">(</span>
-        <span class="n">n</span><span class="o">=</span><span class="n">n_side</span><span class="p">,</span>
+        <span class="n">n_side</span><span class="o">=</span><span class="n">n_side</span><span class="p">,</span>
         <span class="n">rho</span><span class="o">=</span><span class="n">rho_true</span><span class="p">,</span>
         <span class="n">beta</span><span class="o">=</span><span class="n">beta_true</span><span class="p">,</span>
         <span class="n">sigma</span><span class="o">=</span><span class="n">sigma_true</span><span class="p">,</span>
@@ -2888,49 +2916,49 @@ Fitting SAR with logdet_method=aaa ...
       <th>0</th>
       <td>eigenvalue</td>
       <td>eigenvalue</td>
-      <td>[0.8829390472288875, 0.810449676856428, -0.520...</td>
-      <td>0.381051</td>
-      <td>4.712746</td>
+      <td>[0.8820324831551521, 0.8103994184107828, -0.52...</td>
+      <td>0.381646</td>
+      <td>3.669840</td>
     </tr>
     <tr>
       <th>1</th>
       <td>slq</td>
       <td>slq</td>
-      <td>[0.8826773783402142, 0.8104350777546576, -0.52...</td>
-      <td>0.381204</td>
-      <td>3.651208</td>
+      <td>[0.8826457843206342, 0.810439015674586, -0.520...</td>
+      <td>0.381231</td>
+      <td>3.445105</td>
     </tr>
     <tr>
       <th>2</th>
       <td>chebyshev</td>
       <td>chebyshev</td>
-      <td>[0.882350057385162, 0.8104140460408557, -0.520...</td>
-      <td>0.381346</td>
-      <td>3.486652</td>
+      <td>[0.8820946309365248, 0.8104057145747099, -0.52...</td>
+      <td>0.381604</td>
+      <td>3.296784</td>
     </tr>
     <tr>
       <th>3</th>
       <td>cheb_stochastic</td>
       <td>cheb_stochastic</td>
-      <td>[0.8829390472288875, 0.810449676856428, -0.520...</td>
-      <td>0.381051</td>
-      <td>3.249297</td>
+      <td>[0.8814502926895494, 0.8103630977683296, -0.52...</td>
+      <td>0.382039</td>
+      <td>3.144816</td>
     </tr>
     <tr>
       <th>4</th>
       <td>cheb_cholesky</td>
       <td>cheb_cholesky</td>
-      <td>[0.881127514064843, 0.8103407296240626, -0.520...</td>
-      <td>0.382184</td>
-      <td>3.143481</td>
+      <td>[0.8829036548303136, 0.8104526273014498, -0.52...</td>
+      <td>0.381063</td>
+      <td>2.953907</td>
     </tr>
     <tr>
       <th>5</th>
       <td>aaa</td>
       <td>aaa</td>
-      <td>[0.8817424383728726, 0.8103785199214184, -0.52...</td>
-      <td>0.381834</td>
-      <td>2.980293</td>
+      <td>[0.8828075119163992, 0.810444943468056, -0.520...</td>
+      <td>0.381129</td>
+      <td>2.762962</td>
     </tr>
   </tbody>
 </table>
@@ -2978,7 +3006,7 @@ Fitting SAR with logdet_method=aaa ...
             <span class="s2">"ess_rho"</span><span class="p">:</span> <span class="n">ess</span><span class="p">,</span>
         <span class="p">}</span>
     <span class="p">)</span>
-    <span class="n">az</span><span class="o">.</span><span class="n">plot_trace</span><span class="p">(</span><span class="n">idata</span><span class="p">,</span> <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s2">"rho"</span><span class="p">],</span> <span class="n">compact</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">legend</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+    <span class="n">az</span><span class="o">.</span><span class="n">plot_trace_dist</span><span class="p">(</span><span class="n">idata</span><span class="p">,</span> <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s2">"rho"</span><span class="p">],</span> <span class="n">compact</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="n">label</span><span class="p">)</span>
 
 <span class="n">ess_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">ess_rows</span><span class="p">)</span>
@@ -3023,49 +3051,49 @@ Fitting SAR with logdet_method=aaa ...
       <th>0</th>
       <td>eigenvalue</td>
       <td>eigenvalue</td>
-      <td>1826.0</td>
+      <td>1678.495157</td>
     </tr>
     <tr>
       <th>1</th>
       <td>slq</td>
       <td>slq</td>
-      <td>1810.0</td>
+      <td>1671.776260</td>
     </tr>
     <tr>
       <th>2</th>
       <td>chebyshev</td>
       <td>chebyshev</td>
-      <td>1986.0</td>
+      <td>1873.465755</td>
     </tr>
     <tr>
       <th>3</th>
       <td>cheb_stochastic</td>
       <td>cheb_stochastic</td>
-      <td>1826.0</td>
+      <td>1700.709890</td>
     </tr>
     <tr>
       <th>4</th>
       <td>cheb_cholesky</td>
       <td>cheb_cholesky</td>
-      <td>2022.0</td>
+      <td>1928.780258</td>
     </tr>
     <tr>
       <th>5</th>
       <td>aaa</td>
       <td>aaa</td>
-      <td>2116.0</td>
+      <td>1950.916246</td>
     </tr>
   </tbody>
 </table>
 </div></div><div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>&lt;Axes: title={'center': 'Effective Sample Size for rho by Logdet Configuration'}, xlabel='method', ylabel='ESS (rho)'&gt;
 </code></pre></div>
 </div>
-<img alt="../_images/64b1b70aaaa6865b73647c3fd87a540d52a30ef26de8cb473cfd7e89c19a0b50.png" src="../_images/64b1b70aaaa6865b73647c3fd87a540d52a30ef26de8cb473cfd7e89c19a0b50.png" />
-<img alt="../_images/4dda60f7ffe6de229879e01acad0b128528cfb5489afc88228be2ba25069d85f.png" src="../_images/4dda60f7ffe6de229879e01acad0b128528cfb5489afc88228be2ba25069d85f.png" />
-<img alt="../_images/922514ed70e9944d6e79d0951a5ca621434517d18379358af6dc0597fbd2caa4.png" src="../_images/922514ed70e9944d6e79d0951a5ca621434517d18379358af6dc0597fbd2caa4.png" />
-<img alt="../_images/ea278b3b4199c3a011b40d3f1db5a33aaa9801d879e917d0e2b9e59dc61e1fc6.png" src="../_images/ea278b3b4199c3a011b40d3f1db5a33aaa9801d879e917d0e2b9e59dc61e1fc6.png" />
-<img alt="../_images/b7185f8d0393145e2de2db3e111eb9fa18dcacf64fa977b20c37eb0f370e48a8.png" src="../_images/b7185f8d0393145e2de2db3e111eb9fa18dcacf64fa977b20c37eb0f370e48a8.png" />
-<img alt="../_images/f81c4838a58602e282d5b0be2f7626324e817c19212e4c8f15f4fe4fbc71f63b.png" src="../_images/f81c4838a58602e282d5b0be2f7626324e817c19212e4c8f15f4fe4fbc71f63b.png" />
+<img alt="../_images/73dd7a8313e8e4135dc258ae70c6a6c305380b893fe89c24023fe5fb1ff3e4b7.png" src="../_images/73dd7a8313e8e4135dc258ae70c6a6c305380b893fe89c24023fe5fb1ff3e4b7.png" />
+<img alt="../_images/9b139ada988358d65f427b546041962852fc1cab35fb6fead2e903c7fb0614e2.png" src="../_images/9b139ada988358d65f427b546041962852fc1cab35fb6fead2e903c7fb0614e2.png" />
+<img alt="../_images/baf54bac679aa52b685a02c8b89707bda59466a1066781fc465319f6077adf95.png" src="../_images/baf54bac679aa52b685a02c8b89707bda59466a1066781fc465319f6077adf95.png" />
+<img alt="../_images/3f92c915dff2bc1de9adf39a46373580f998602109abd33e3b826b788c57bd36.png" src="../_images/3f92c915dff2bc1de9adf39a46373580f998602109abd33e3b826b788c57bd36.png" />
+<img alt="../_images/914511ad93b60b0cbcf3dbd578ae7a2e248e81dc8cb5d1274d07b97583eac018.png" src="../_images/914511ad93b60b0cbcf3dbd578ae7a2e248e81dc8cb5d1274d07b97583eac018.png" />
+<img alt="../_images/16ece7ac153998557ebf525a5ccdb8ab8576316a11828ad0127fb6e9d94c0673.png" src="../_images/16ece7ac153998557ebf525a5ccdb8ab8576316a11828ad0127fb6e9d94c0673.png" />
 </div>
 </div>
 <h2 id="method-selection-policy">Method selection policy<a class="headerlink" href="#method-selection-policy" title="Link to this heading">¶</a></h2>

@@ -30,6 +30,5 @@
       ~PanelSDEMPriors.nu
       ~PanelSDEMPriors.sigma2_alpha
       ~PanelSDEMPriors.sigma2_beta
-      ~PanelSDEMPriors.sigma_sigma
    
    

@@ -32,6 +32,5 @@
       ~PanelSEMDynamicPriors.phi_upper
       ~PanelSEMDynamicPriors.sigma2_alpha
       ~PanelSEMDynamicPriors.sigma2_beta
-      ~PanelSEMDynamicPriors.sigma_sigma
    
    

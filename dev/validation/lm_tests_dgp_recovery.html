@@ -757,6 +757,30 @@
 
               
             
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1624,6 +1648,10 @@ SDM    n=144  X.shape=(144, 2)  true params: ['rho', 'beta1', 'beta2', 'sigma']
 SDEM   n=144  X.shape=(144, 2)  true params: ['lam', 'beta1', 'beta2', 'sigma']
 </code></pre></div>
 </div>
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
+</code></pre></div>
+</div>
 </div>
 </div>
 <div class="cell docutils container">
@@ -1691,38 +1719,36 @@ SDEM   n=144  X.shape=(144, 2)  true params: ['lam', 'beta1', 'beta2', 'sigma']
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 5 seconds.
-We recommend running at least 4 chains for robust computation of convergence diagnostics
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
-  from .autonotebook import tqdm as notebook_tqdm
-Initializing NUTS using jitter+adapt_diag...
-Multiprocess sampling (2 chains in 2 jobs)
-NUTS: [beta, sigma2]
-Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 5 seconds.
+Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 5 seconds.
+Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 5 seconds.
+Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 2 seconds.
+We recommend running at least 4 chains for robust computation of convergence diagnostics
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (2 chains in 2 jobs)
+NUTS: [beta, sigma2]
+Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 /home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
   W_arr = np.asarray(W, dtype=np.float64)
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 5 seconds.
+Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 /home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
   W_arr = np.asarray(W, dtype=np.float64)
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 5 seconds.
+Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 </code></pre></div>
 </div>
@@ -1788,9 +1814,9 @@ We recommend running at least 4 chains for robust computation of convergence dia
       <th>4</th>
       <td>SDM</td>
       <td>SAR</td>
-      <td>SARAR</td>
       <td>SDM</td>
-      <td>no</td>
+      <td>SDM</td>
+      <td>yes</td>
     </tr>
     <tr>
       <th>5</th>
@@ -1871,13 +1897,13 @@ LM-Error                 0.1117   1   0.7382
 Robust-LM-Lag-SDM        1.0495   1   0.3056
 Robust-LM-Error-SDEM     0.9400   1   0.3323
 
-=== DGP=SDM | start=SAR | recommended=SARAR (no expected SDM) ===
+=== DGP=SDM | start=SAR | recommended=SDM (yes expected SDM) ===
                  statistic  df  p_value
 test                                   
-LM-Error            4.3588   1   0.0368
-LM-WX              12.6550   1   0.0004
-Robust-LM-WX        1.5853   1   0.2080
-Robust-LM-Error     7.8158   1   0.0052
+LM-Error            4.5949   1   0.0321
+LM-WX              13.5011   1   0.0002
+Robust-LM-WX       11.2220   1   0.0008
+Robust-LM-Error     8.0599   1   0.0045
 
 === DGP=SDM | start=SLX | recommended=SDM (yes expected SDM) ===
                       statistic  df  p_value
@@ -1890,10 +1916,10 @@ Robust-LM-Error-SDEM     0.2169   1   0.6414
 === DGP=SDEM | start=SEM | recommended=SDEM (yes expected SDEM) ===
                statistic  df  p_value
 test                                 
-LM-Lag           69.7847   1   0.0000
-LM-WX            44.2379   1   0.0000
-Robust-LM-Lag     0.6776   1   0.4104
-Robust-LM-WX     24.9730   1   0.0000
+LM-Lag           69.6001   1   0.0000
+LM-WX            44.1725   1   0.0000
+Robust-LM-Lag     0.3852   1   0.5349
+Robust-LM-WX     25.2116   1   0.0000
 
 === DGP=SDEM | start=SLX | recommended=SDEM (yes expected SDEM) ===
                       statistic  df  p_value
@@ -2047,39 +2073,37 @@ inspect <code class="docutils literal notranslate"><span class="pre">spatial_dia
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 5 seconds.
+Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 5 seconds.
+Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 4 seconds.
+Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 5 seconds.
-We recommend running at least 4 chains for robust computation of convergence diagnostics
-The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
-  W_arr = np.asarray(W, dtype=np.float64)
-Initializing NUTS using jitter+adapt_diag...
-Multiprocess sampling (2 chains in 2 jobs)
-NUTS: [beta, sigma2]
-Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 5 seconds.
+Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 /home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
   W_arr = np.asarray(W, dtype=np.float64)
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 5 seconds.
+Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
-The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
+  W_arr = np.asarray(W, dtype=np.float64)
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (2 chains in 2 jobs)
+NUTS: [beta, sigma2]
+Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 2 seconds.
+We recommend running at least 4 chains for robust computation of convergence diagnostics
 </code></pre></div>
 </div>
 <div class="output text_html"><div>
@@ -2194,69 +2218,69 @@ The rhat statistic is larger than 1.01 for some parameters. This indicates probl
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>=== DGP=OLS | start=OLSPanelFE | recommended=OLSPanelFE (yes expected OLSPanelFE) ===
                           statistic  df  p_value
 test                                            
-Panel-LM-Lag                 0.3659   1   0.5453
-Panel-LM-Error               0.0028   1   0.9577
-Panel-LM-SDM-Joint           0.5264   2   0.7686
-Panel-LM-SLX-Error-Joint     0.5278   2   0.7681
-Panel-Robust-LM-Lag          0.5128   1   0.4739
-Panel-Robust-LM-Error        0.1525   1   0.6962
+Panel-LM-Lag                 0.2694   1   0.6037
+Panel-LM-Error               0.0020   1   0.9645
+Panel-LM-SDM-Joint           0.4227   2   0.8095
+Panel-LM-SLX-Error-Joint     0.4238   2   0.8091
+Panel-Robust-LM-Lag          0.4072   1   0.5234
+Panel-Robust-LM-Error        0.1439   1   0.7045
 
 === DGP=SAR | start=OLSPanelFE | recommended=SARPanelFE (yes expected SARPanelFE) ===
                           statistic  df  p_value
 test                                            
-Panel-LM-Lag               158.1953   1   0.0000
-Panel-LM-Error              50.2981   1   0.0000
-Panel-LM-SDM-Joint         159.3719   2   0.0000
-Panel-LM-SLX-Error-Joint   159.6871   2   0.0000
-Panel-Robust-LM-Lag        110.7468   1   0.0000
-Panel-Robust-LM-Error        1.1803   1   0.2773
+Panel-LM-Lag               112.9169   1   0.0000
+Panel-LM-Error              31.4205   1   0.0000
+Panel-LM-SDM-Joint         117.4424   2   0.0000
+Panel-LM-SLX-Error-Joint   117.6991   2   0.0000
+Panel-Robust-LM-Lag         87.6747   1   0.0000
+Panel-Robust-LM-Error        4.6305   1   0.0314
 
 === DGP=SEM | start=OLSPanelFE | recommended=SEMPanelFE (yes expected SEMPanelFE) ===
                           statistic  df  p_value
 test                                            
-Panel-LM-Lag                16.9363   1   0.0000
-Panel-LM-Error              60.3938   1   0.0000
-Panel-LM-SDM-Joint          61.1549   2   0.0000
-Panel-LM-SLX-Error-Joint    61.2138   2   0.0000
-Panel-Robust-LM-Lag          0.8092   1   0.3684
-Panel-Robust-LM-Error       44.6549   1   0.0000
+Panel-LM-Lag                12.1460   1   0.0005
+Panel-LM-Error              38.0299   1   0.0000
+Panel-LM-SDM-Joint          38.6526   2   0.0000
+Panel-LM-SLX-Error-Joint    38.6952   2   0.0000
+Panel-Robust-LM-Lag          0.6420   1   0.4230
+Panel-Robust-LM-Error       26.7773   1   0.0000
 
 === DGP=SLX | start=SLXPanelFE | recommended=SLXPanelFE (yes expected SLXPanelFE) ===
                             statistic  df  p_value
 test                                              
-Panel-LM-Lag                   1.8591   1   0.1727
-Panel-LM-Error                 0.0058   1   0.9394
-Panel-Robust-LM-Lag-SDM        7.4781   1   0.0062
-Panel-Robust-LM-Error-SDEM     5.6128   1   0.0178
+Panel-LM-Lag                   1.5576   1   0.2120
+Panel-LM-Error                 0.0056   1   0.9405
+Panel-Robust-LM-Lag-SDM        7.5278   1   0.0061
+Panel-Robust-LM-Error-SDEM     5.9651   1   0.0146
 
 === DGP=SDM | start=SARPanelFE | recommended=SDMPanelFE (yes expected SDMPanelFE) ===
                     statistic  df  p_value
 test                                      
-Panel-LM-Error      1163.0711   1      0.0
-Panel-LM-WX           52.4066   1      0.0
-Panel-Robust-LM-WX    48.1504   1      0.0
+Panel-LM-Error       746.1242   1      0.0
+Panel-LM-WX           39.1148   1      0.0
+Panel-Robust-LM-WX    35.3201   1      0.0
 
 === DGP=SDM | start=SLXPanelFE | recommended=SDMPanelFE (yes expected SDMPanelFE) ===
                             statistic  df  p_value
 test                                              
-Panel-LM-Lag                  57.0450   1   0.0000
-Panel-LM-Error                21.9613   1   0.0000
-Panel-Robust-LM-Lag-SDM       37.4341   1   0.0000
-Panel-Robust-LM-Error-SDEM     2.2783   1   0.1312
+Panel-LM-Lag                  38.6111   1   0.0000
+Panel-LM-Error                13.5990   1   0.0002
+Panel-Robust-LM-Lag-SDM       28.7092   1   0.0000
+Panel-Robust-LM-Error-SDEM     3.6180   1   0.0572
 
 === DGP=SDEM | start=SEMPanelFE | recommended=SDEMPanelFE (yes expected SDEMPanelFE) ===
               statistic  df  p_value
 test                                
-Panel-LM-Lag   211.9758   1      0.0
-Panel-LM-WX    189.2647   1      0.0
+Panel-LM-Lag   156.4333   1      0.0
+Panel-LM-WX    152.3167   1      0.0
 
 === DGP=SDEM | start=SLXPanelFE | recommended=SDEMPanelFE (yes expected SDEMPanelFE) ===
                             statistic  df  p_value
 test                                              
-Panel-LM-Lag                  23.8309   1   0.0000
-Panel-LM-Error                34.2883   1   0.0000
-Panel-Robust-LM-Lag-SDM        9.2329   1   0.0024
-Panel-Robust-LM-Error-SDEM    19.8298   1   0.0000
+Panel-LM-Lag                  15.4672   1   0.0001
+Panel-LM-Error                21.5943   1   0.0000
+Panel-Robust-LM-Lag-SDM        8.8652   1   0.0029
+Panel-Robust-LM-Error-SDEM    15.0720   1   0.0001
 </code></pre></div>
 </div>
 </div>

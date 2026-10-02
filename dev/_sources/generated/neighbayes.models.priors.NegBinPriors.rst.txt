@@ -30,6 +30,5 @@
       ~NegBinPriors.nu
       ~NegBinPriors.sigma2_alpha
       ~NegBinPriors.sigma2_beta
-      ~NegBinPriors.sigma_sigma
    
    

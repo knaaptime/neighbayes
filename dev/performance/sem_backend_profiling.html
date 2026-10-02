@@ -757,6 +757,30 @@
 
               
             
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1670,7 +1694,7 @@
 <span class="sd">    """</span>
     <span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
     <span class="n">gdf</span> <span class="o">=</span> <span class="n">dgp</span><span class="o">.</span><span class="n">simulate_sem</span><span class="p">(</span>
-        <span class="n">n</span><span class="o">=</span><span class="n">n_side</span><span class="p">,</span>
+        <span class="n">n_side</span><span class="o">=</span><span class="n">n_side</span><span class="p">,</span>
         <span class="n">lam</span><span class="o">=</span><span class="n">TRUE_LAM</span><span class="p">,</span>
         <span class="n">beta</span><span class="o">=</span><span class="n">TRUE_BETA</span><span class="p">,</span>
         <span class="n">sigma</span><span class="o">=</span><span class="n">TRUE_SIGMA</span><span class="p">,</span>
@@ -1776,6 +1800,10 @@
 </div>
 </div>
 <div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
+</code></pre></div>
+</div>
 <img alt="../_images/89b591dfd5e7c23a790846a6f2c88dffd3808f04e964f3e299abb19b52e1d68e.png" src="../_images/89b591dfd5e7c23a790846a6f2c88dffd3808f04e964f3e299abb19b52e1d68e.png" />
 </div>
 </div>
@@ -1827,13 +1855,14 @@ Profiling backend=nutpie...
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 2 jobs)
 NUTS: [lam, beta, sigma2]
-Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws total) took 10 seconds.
+Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws total) took 4 seconds.
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 2 jobs)
 NUTS: [lam, beta, sigma2]
-Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws total) took 10 seconds.
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
-  from .autonotebook import tqdm as notebook_tqdm
+Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws total) took 4 seconds.
+NUTS[numpyro]: [lam, beta, sigma2]
+NUTS[blackjax]: [lam, beta, sigma2]
+NUTS[nutpie]: [lam, beta, sigma2]
 </code></pre></div>
 </div>
 <div class="output text_html"><div>
@@ -1871,33 +1900,20 @@ Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws tota
       <th>0</th>
       <td>nutpie</td>
       <td>True</td>
-      <td>5.091</td>
-      <td>0.449</td>
-      <td>0.049</td>
+      <td>4.316</td>
+      <td>0.453</td>
+      <td>0.053</td>
       <td>0.692</td>
       <td>0.032</td>
       <td>0.0</td>
-      <td>False</td>
+      <td>True</td>
       <td></td>
     </tr>
     <tr>
       <th>1</th>
-      <td>numpyro</td>
-      <td>True</td>
-      <td>9.306</td>
-      <td>0.448</td>
-      <td>0.048</td>
-      <td>0.693</td>
-      <td>0.033</td>
-      <td>0.0</td>
-      <td>True</td>
-      <td></td>
-    </tr>
-    <tr>
-      <th>2</th>
       <td>numba</td>
       <td>True</td>
-      <td>13.092</td>
+      <td>5.493</td>
       <td>0.451</td>
       <td>0.051</td>
       <td>0.693</td>
@@ -1907,10 +1923,23 @@ Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws tota
       <td></td>
     </tr>
     <tr>
+      <th>2</th>
+      <td>numpyro</td>
+      <td>True</td>
+      <td>8.406</td>
+      <td>0.449</td>
+      <td>0.049</td>
+      <td>0.692</td>
+      <td>0.032</td>
+      <td>0.0</td>
+      <td>True</td>
+      <td></td>
+    </tr>
+    <tr>
       <th>3</th>
       <td>c</td>
       <td>True</td>
-      <td>25.952</td>
+      <td>8.917</td>
       <td>0.451</td>
       <td>0.051</td>
       <td>0.693</td>
@@ -1954,7 +1983,7 @@ Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws tota
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/eb69d5587d0c4d021474293feadd9acd4e5ff946c3008033c676a3a9ff03d0a1.png" src="../_images/eb69d5587d0c4d021474293feadd9acd4e5ff946c3008033c676a3a9ff03d0a1.png" />
+<img alt="../_images/4d8bf10518e7cab383c3ce35dd087396732d614faaeb7e6848a831f8ddfc8e09.png" src="../_images/4d8bf10518e7cab383c3ce35dd087396732d614faaeb7e6848a831f8ddfc8e09.png" />
 </div>
 </div>
 <h2 id="log-likelihood-equivalence-across-backends">Log-likelihood equivalence across backends<a class="headerlink" href="#log-likelihood-equivalence-across-backends" title="Link to this heading">¶</a></h2>
@@ -1989,7 +2018,7 @@ Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws tota
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Backends with native log_likelihood capture: ['numpyro', 'numba', 'c']
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Backends with native log_likelihood capture: ['nutpie', 'numba', 'numpyro', 'c']
 </code></pre></div>
 </div>
 <div class="output text_html"><div>
@@ -2018,9 +2047,9 @@ Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws tota
   <tbody>
     <tr>
       <th>0</th>
-      <td>numpyro</td>
-      <td>-275.8618</td>
-      <td>-1.0776</td>
+      <td>nutpie</td>
+      <td>-275.8027</td>
+      <td>-1.0774</td>
     </tr>
     <tr>
       <th>1</th>
@@ -2030,6 +2059,12 @@ Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws tota
     </tr>
     <tr>
       <th>2</th>
+      <td>numpyro</td>
+      <td>-275.7517</td>
+      <td>-1.0772</td>
+    </tr>
+    <tr>
+      <th>3</th>
       <td>c</td>
       <td>-275.8633</td>
       <td>-1.0776</td>
@@ -2067,7 +2102,7 @@ Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws tota
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/4a25b3ea91ec31a44243e44a79a22018772360c1db4071b0fcbaacdb59feed57.png" src="../_images/4a25b3ea91ec31a44243e44a79a22018772360c1db4071b0fcbaacdb59feed57.png" />
+<img alt="../_images/949263913b7a6ad04acf4cc7873bc0f9ee4e76c447efd3496f7eb9bc0e63c610.png" src="../_images/949263913b7a6ad04acf4cc7873bc0f9ee4e76c447efd3496f7eb9bc0e63c610.png" />
 </div>
 </div>
 <div class="cell docutils container">
@@ -2078,9 +2113,9 @@ Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws tota
     <span class="n">loo_rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
         <span class="p">{</span>
             <span class="s2">"backend"</span><span class="p">:</span> <span class="n">name</span><span class="p">,</span>
-            <span class="s2">"elpd_loo"</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">loo</span><span class="o">.</span><span class="n">elpd_loo</span><span class="p">),</span>
+            <span class="s2">"elpd_loo"</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">loo</span><span class="o">.</span><span class="n">elpd</span><span class="p">),</span>
             <span class="s2">"se"</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">loo</span><span class="o">.</span><span class="n">se</span><span class="p">),</span>
-            <span class="s2">"p_loo"</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">loo</span><span class="o">.</span><span class="n">p_loo</span><span class="p">),</span>
+            <span class="s2">"p_loo"</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">loo</span><span class="o">.</span><span class="n">p</span><span class="p">),</span>
         <span class="p">}</span>
     <span class="p">)</span>
 <span class="n">loo_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">loo_rows</span><span class="p">)</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
@@ -2116,23 +2151,30 @@ Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws tota
   <tbody>
     <tr>
       <th>0</th>
-      <td>numpyro</td>
-      <td>-278.175</td>
-      <td>12.005</td>
-      <td>4.499</td>
+      <td>nutpie</td>
+      <td>-278.041</td>
+      <td>12.006</td>
+      <td>4.366</td>
     </tr>
     <tr>
       <th>1</th>
       <td>numba</td>
       <td>-278.150</td>
-      <td>11.969</td>
+      <td>11.992</td>
       <td>4.460</td>
     </tr>
     <tr>
       <th>2</th>
+      <td>numpyro</td>
+      <td>-277.940</td>
+      <td>12.040</td>
+      <td>4.265</td>
+    </tr>
+    <tr>
+      <th>3</th>
       <td>c</td>
       <td>-278.150</td>
-      <td>11.969</td>
+      <td>11.992</td>
       <td>4.460</td>
     </tr>
   </tbody>
@@ -2142,7 +2184,7 @@ Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws tota
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">successful</span><span class="p">)</span> <span class="o">&gt;=</span> <span class="mi">2</span><span class="p">:</span>
-    <span class="n">cmp</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">successful</span><span class="p">,</span> <span class="n">ic</span><span class="o">=</span><span class="s2">"loo"</span><span class="p">)</span>
+    <span class="n">cmp</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">successful</span><span class="p">)</span>
     <span class="n">display</span><span class="p">(</span><span class="n">cmp</span><span class="p">)</span>
 </code></pre></div>
 </div>
@@ -2167,52 +2209,69 @@ Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws tota
     <tr style="text-align: right;">
       <th></th>
       <th>rank</th>
-      <th>elpd_loo</th>
-      <th>p_loo</th>
       <th>elpd_diff</th>
-      <th>weight</th>
-      <th>se</th>
       <th>dse</th>
-      <th>warning</th>
-      <th>scale</th>
+      <th>p_worse</th>
+      <th>diag_diff</th>
+      <th>diag_elpd</th>
+      <th>p</th>
+      <th>elpd</th>
+      <th>se</th>
+      <th>weight</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <th>numba</th>
+      <th>numpyro</th>
       <td>0</td>
-      <td>-278.149779</td>
-      <td>4.460481</td>
-      <td>0.000000e+00</td>
-      <td>0.5</td>
-      <td>11.969022</td>
-      <td>0.000000e+00</td>
-      <td>False</td>
-      <td>log</td>
+      <td>0.0</td>
+      <td>0.000</td>
+      <td>NaN</td>
+      <td></td>
+      <td></td>
+      <td>4.3</td>
+      <td>-280.0</td>
+      <td>12.0</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>nutpie</th>
+      <td>1</td>
+      <td>-0.1</td>
+      <td>0.080</td>
+      <td>0.9</td>
+      <td>|elpd_diff| &lt; 4</td>
+      <td></td>
+      <td>4.4</td>
+      <td>-280.0</td>
+      <td>12.0</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>numba</th>
+      <td>2</td>
+      <td>-0.2</td>
+      <td>0.061</td>
+      <td>1.0</td>
+      <td>|elpd_diff| &lt; 4</td>
+      <td></td>
+      <td>4.5</td>
+      <td>-280.0</td>
+      <td>12.0</td>
+      <td>0.0</td>
     </tr>
     <tr>
       <th>c</th>
-      <td>1</td>
-      <td>-278.149779</td>
-      <td>4.460481</td>
-      <td>1.650484e-10</td>
-      <td>0.5</td>
-      <td>11.969022</td>
-      <td>1.041621e-10</td>
-      <td>False</td>
-      <td>log</td>
-    </tr>
-    <tr>
-      <th>numpyro</th>
-      <td>2</td>
-      <td>-278.175221</td>
-      <td>4.498922</td>
-      <td>2.544176e-02</td>
+      <td>3</td>
+      <td>-0.2</td>
+      <td>0.061</td>
+      <td>1.0</td>
+      <td>|elpd_diff| &lt; 4</td>
+      <td></td>
+      <td>4.5</td>
+      <td>-280.0</td>
+      <td>12.0</td>
       <td>0.0</td>
-      <td>12.005298</td>
-      <td>5.208505e-02</td>
-      <td>False</td>
-      <td>log</td>
     </tr>
   </tbody>
 </table>

@@ -878,6 +878,30 @@
 
               
             
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
           </ul>
         </nav>
       
@@ -1592,7 +1616,7 @@ tuning difference — and this is the cheapest validation available.</p>
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 2 jobs)
 NUTS: [rho, beta, sigma2]
-Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 15 seconds.
+Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 12 seconds.
 </code></pre></div>
 </div>
 <div class="output text_html"><div>
@@ -1620,13 +1644,13 @@ Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws 
   <tbody>
     <tr>
       <th>rho</th>
-      <td>0.4041</td>
-      <td>0.4105</td>
+      <td>0.4076</td>
+      <td>0.4058</td>
     </tr>
     <tr>
       <th>sigma</th>
-      <td>10.5043</td>
-      <td>10.5068</td>
+      <td>10.4985</td>
+      <td>10.4952</td>
     </tr>
   </tbody>
 </table>
@@ -1673,21 +1697,21 @@ Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws 
   <tbody>
     <tr>
       <th>Gibbs</th>
-      <td>4.666</td>
-      <td>7514.982</td>
-      <td>1610.632</td>
-      <td>6721.629</td>
-      <td>1440.598</td>
-      <td>1.001</td>
+      <td>4.284</td>
+      <td>7560.816</td>
+      <td>1764.797</td>
+      <td>6275.383</td>
+      <td>1464.759</td>
+      <td>1.000</td>
     </tr>
     <tr>
       <th>NUTS</th>
-      <td>19.741</td>
-      <td>3989.158</td>
-      <td>202.078</td>
-      <td>4820.380</td>
-      <td>244.186</td>
-      <td>1.000</td>
+      <td>15.530</td>
+      <td>3540.462</td>
+      <td>227.973</td>
+      <td>4178.557</td>
+      <td>269.060</td>
+      <td>1.001</td>
     </tr>
   </tbody>
 </table>
@@ -1770,21 +1794,21 @@ path’s vectorised chains (<code class="docutils literal notranslate"><span cla
   <tbody>
     <tr>
       <th>numpy</th>
-      <td>3.382</td>
-      <td>8206.235</td>
-      <td>2426.115</td>
-      <td>6931.595</td>
-      <td>2049.277</td>
+      <td>2.403</td>
+      <td>7387.877</td>
+      <td>3074.813</td>
+      <td>6393.722</td>
+      <td>2661.049</td>
       <td>1.001</td>
     </tr>
     <tr>
       <th>jax</th>
-      <td>3.271</td>
-      <td>7514.982</td>
-      <td>2297.520</td>
-      <td>6721.629</td>
-      <td>2054.972</td>
-      <td>1.001</td>
+      <td>3.123</td>
+      <td>7560.816</td>
+      <td>2420.728</td>
+      <td>6275.383</td>
+      <td>2009.174</td>
+      <td>1.000</td>
     </tr>
   </tbody>
 </table>
@@ -1818,11 +1842,11 @@ sampler adapts from there during warmup.</p>
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>draws kept per chain with thin=2: 1000
 </code></pre></div>
 </div>
-<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>seconds             3.630
-ess rho          3587.911
-ess/sec rho       988.345
-ess sigma        3983.721
-ess/sec sigma    1097.377
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>seconds             2.528
+ess rho          4130.204
+ess/sec rho      1633.541
+ess sigma        3825.296
+ess/sec sigma    1512.947
 max rhat            1.001
 Name: slice_width=0.25, thin=2, dtype: float64
 </code></pre></div>
@@ -1911,24 +1935,24 @@ On a small problem the exact answer is free, so there is no excuse not to.</p>
   <tbody>
     <tr>
       <th>eigenvalue</th>
-      <td>0.4041</td>
-      <td>0.1252</td>
-      <td>3.2297</td>
-      <td>7514.9820</td>
+      <td>0.4076</td>
+      <td>0.1249</td>
+      <td>3.1234</td>
+      <td>7560.8158</td>
     </tr>
     <tr>
       <th>chebyshev</th>
-      <td>0.4033</td>
-      <td>0.1252</td>
-      <td>3.4651</td>
-      <td>7709.4712</td>
+      <td>0.4062</td>
+      <td>0.1271</td>
+      <td>3.4683</td>
+      <td>7735.2688</td>
     </tr>
     <tr>
       <th>cheb_stochastic</th>
-      <td>0.4042</td>
-      <td>0.1245</td>
-      <td>3.7540</td>
-      <td>7708.9704</td>
+      <td>0.4073</td>
+      <td>0.1250</td>
+      <td>3.7378</td>
+      <td>7343.7792</td>
     </tr>
   </tbody>
 </table>
@@ -2008,34 +2032,34 @@ parameter changes (<code class="docutils literal notranslate"><span class="pre">
     <tr>
       <th>SAR</th>
       <td>rho</td>
-      <td>0.4041</td>
+      <td>0.4076</td>
       <td>3</td>
-      <td>7514.9820</td>
-      <td>1.0009</td>
+      <td>7560.8158</td>
+      <td>1.0002</td>
     </tr>
     <tr>
       <th>SDM</th>
       <td>rho</td>
-      <td>0.3928</td>
+      <td>0.4019</td>
       <td>5</td>
-      <td>8000.6033</td>
+      <td>7110.9566</td>
       <td>0.9999</td>
     </tr>
     <tr>
       <th>SEM</th>
       <td>lam</td>
-      <td>0.5507</td>
+      <td>0.5490</td>
       <td>3</td>
-      <td>7904.1809</td>
-      <td>0.9999</td>
+      <td>7270.7910</td>
+      <td>1.0002</td>
     </tr>
     <tr>
       <th>SDEM</th>
       <td>lam</td>
-      <td>0.4945</td>
+      <td>0.4925</td>
       <td>5</td>
-      <td>8168.0759</td>
-      <td>0.9998</td>
+      <td>7571.1615</td>
+      <td>1.0001</td>
     </tr>
   </tbody>
 </table>
@@ -2051,63 +2075,48 @@ non-conjugate block, so it is where trouble shows up.</p>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output text_html"><div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
+<div class="output text_html"><table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
       <th></th>
       <th>mean</th>
       <th>sd</th>
-      <th>hdi_3%</th>
-      <th>hdi_97%</th>
-      <th>mcse_mean</th>
-      <th>mcse_sd</th>
+      <th>eti89_lb</th>
+      <th>eti89_ub</th>
       <th>ess_bulk</th>
       <th>ess_tail</th>
       <th>r_hat</th>
+      <th>mcse_mean</th>
+      <th>mcse_sd</th>
     </tr>
   </thead>
   <tbody>
     <tr>
       <th>rho</th>
-      <td>0.404</td>
+      <td>0.408</td>
       <td>0.125</td>
-      <td>0.174</td>
-      <td>0.644</td>
-      <td>0.001</td>
-      <td>0.001</td>
-      <td>7515.0</td>
-      <td>5656.0</td>
-      <td>1.0</td>
+      <td>0.2</td>
+      <td>0.6</td>
+      <td>7560</td>
+      <td>5542</td>
+      <td>1.00</td>
+      <td>0.0014</td>
+      <td>0.0014</td>
     </tr>
     <tr>
       <th>sigma</th>
-      <td>10.504</td>
-      <td>1.088</td>
-      <td>8.640</td>
-      <td>12.647</td>
-      <td>0.013</td>
-      <td>0.010</td>
-      <td>6722.0</td>
-      <td>7374.0</td>
-      <td>1.0</td>
+      <td>10.5</td>
+      <td>1.09</td>
+      <td>8.9</td>
+      <td>12</td>
+      <td>6275</td>
+      <td>7168</td>
+      <td>1.00</td>
+      <td>0.014</td>
+      <td>0.01</td>
     </tr>
   </tbody>
-</table>
-</div></div></div>
+</table></div></div>
 </div>
 <div class="caution warning admonition">
 <p class="admonition-title">Caution</p>

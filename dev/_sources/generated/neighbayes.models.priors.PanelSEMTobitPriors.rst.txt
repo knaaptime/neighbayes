@@ -25,12 +25,10 @@
    
       ~PanelSEMTobitPriors.beta_mu
       ~PanelSEMTobitPriors.beta_sigma
-      ~PanelSEMTobitPriors.censor_sigma
       ~PanelSEMTobitPriors.lam_lower
       ~PanelSEMTobitPriors.lam_upper
       ~PanelSEMTobitPriors.nu
       ~PanelSEMTobitPriors.sigma2_alpha
       ~PanelSEMTobitPriors.sigma2_beta
-      ~PanelSEMTobitPriors.sigma_sigma
    
    

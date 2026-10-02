@@ -28,6 +28,5 @@
       ~PanelSLXPriors.nu
       ~PanelSLXPriors.sigma2_alpha
       ~PanelSLXPriors.sigma2_beta
-      ~PanelSLXPriors.sigma_sigma
    
    

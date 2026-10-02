@@ -16,6 +16,8 @@
       ~OLS.__init__
       ~OLS.fit
       ~OLS.fitted_values
+      ~OLS.predict
+      ~OLS.predict_in_sample
       ~OLS.residuals
       ~OLS.spatial_diagnostics
       ~OLS.spatial_diagnostics_decision

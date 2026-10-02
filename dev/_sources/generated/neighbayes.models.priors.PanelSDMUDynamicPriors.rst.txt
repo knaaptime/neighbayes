@@ -32,7 +32,6 @@
       ~PanelSDMUDynamicPriors.rho_upper
       ~PanelSDMUDynamicPriors.sigma2_alpha
       ~PanelSDMUDynamicPriors.sigma2_beta
-      ~PanelSDMUDynamicPriors.sigma_sigma
       ~PanelSDMUDynamicPriors.theta_lower
       ~PanelSDMUDynamicPriors.theta_upper
    

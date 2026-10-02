@@ -28,6 +28,5 @@
       ~SLXPriors.nu
       ~SLXPriors.sigma2_alpha
       ~SLXPriors.sigma2_beta
-      ~SLXPriors.sigma_sigma
    
    
