@@ -361,8 +361,8 @@ class _SharedCounterReporter:
         if shm is not None:
             try:
                 shm.close()
-            except Exception:
-                pass
+            except (BufferError, OSError):
+                pass  # a view still holds the buffer, or it is already gone
             self._shm = None
             self._buf = None
 

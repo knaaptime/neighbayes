@@ -219,9 +219,11 @@ class TestLUBackendRouting:
 
         real = aaa_mod._load_lu_backend
 
+        from sksparse.klu import KLUError
+
         def broken_klu(name):
             if name == "klu":
-                raise RuntimeError("klu wedged for test")
+                raise KLUError("klu wedged for test")
             return real(name)
 
         aaa_mod._load_lu_backend = broken_klu

@@ -1335,13 +1335,6 @@ class _FlowCountPanelMixin(CountPanelFEMixin):
         # observed counts is already the complete pointwise likelihood.
         return None
 
-    def _require_numpy_for_fe(self, gibbs_backend: str) -> None:
-        if self._count_effects and gibbs_backend != "numpy":
-            raise NotImplementedError(
-                "Pair and period effects run on the NumPy Gibbs backend only; pass "
-                "gibbs_backend='numpy'."
-            )
-
     def _eta_reduced(self, rho: dict, beta: np.ndarray) -> np.ndarray:
         """``(I_T ⊗ A(ρ))⁻¹ Xβ`` for one draw, time-first stacked."""
         raise NotImplementedError
@@ -1589,7 +1582,7 @@ class SARNegBinFlowPanel(_UnrestrictedCountFlowPanel, SARFlowPanel):
         random_seed: Optional[int] = None,
         *,
         sampler: str = "gibbs",
-        gibbs_backend: str = "numpy",
+        gibbs_backend: str = "auto",
         attach_log_abs_det: bool = True,
         progressbar: bool = True,
         n_jobs: int = -1,
@@ -1609,8 +1602,10 @@ class SARNegBinFlowPanel(_UnrestrictedCountFlowPanel, SARFlowPanel):
         ``log_likelihood``); set it ``False`` to skip the per-draw resolvent cost
         at very large ``N``.
 
-        The unrestricted Gibbs kernel runs on ``gibbs_backend="numpy"`` only; the
-        JAX kernel is cross-section only.  With pair or period effects
+        ``gibbs_backend="auto"`` (default) takes JAX when it is installed and the
+        configuration has a JAX kernel, else NumPy.  The unrestricted JAX kernel
+        covers the cross-section (``T = 1``) without effects; panels and pair or
+        period effects run on NumPy.  With pair or period effects
         (``effects != 0``) the sweep also integrates out the pair effects; see
         the class docstring.
 
@@ -1620,8 +1615,10 @@ class SARNegBinFlowPanel(_UnrestrictedCountFlowPanel, SARFlowPanel):
         """
         log_lik = bool((idata_kwargs or {}).get("log_likelihood", False))
         if sampler == "gibbs":
+            gibbs_backend = self._resolve_gibbs_backend(
+                gibbs_backend, jax=not self._count_effects and self._T == 1
+            )
             if self._count_effects:
-                self._require_numpy_for_fe(gibbs_backend)
                 pv = self._flow_count_priors()
                 idata = self._run_count_panel_gibbs(
                     self._unrestricted_filter(),
@@ -1677,7 +1674,6 @@ class SARNegBinFlowPanel(_UnrestrictedCountFlowPanel, SARFlowPanel):
         progressbar: bool = True,
         n_jobs: int = -1,
         gibbs_backend: str = "numpy",
-        krylov_reuse: bool = True,
         log_likelihood: bool = False,
     ) -> xr.DataTree:
         """Sample the pooled posterior via reduced-form PG-Gibbs (unrestricted 3-ρ)."""
@@ -1696,7 +1692,6 @@ class SARNegBinFlowPanel(_UnrestrictedCountFlowPanel, SARFlowPanel):
             progressbar=progressbar,
             n_jobs=n_jobs,
             gibbs_backend=gibbs_backend,
-            krylov_reuse=krylov_reuse,
             log_likelihood=log_likelihood,
         )
 
@@ -1752,7 +1747,7 @@ class SARNegBinFlowSeparablePanel(_SeparableCountFlowPanel, SARFlowSeparablePane
         random_seed: Optional[int] = None,
         *,
         sampler: str = "gibbs",
-        gibbs_backend: str = "numpy",
+        gibbs_backend: str = "auto",
         attach_log_abs_det: bool = True,
         progressbar: bool = True,
         n_jobs: int = -1,
@@ -1771,7 +1766,8 @@ class SARNegBinFlowSeparablePanel(_SeparableCountFlowPanel, SARFlowSeparablePane
         count model's ``log_likelihood``.
 
         ``gibbs_backend="jax"`` runs the same structured sweep compiled with JAX,
-        chains on threads; ``"numpy"`` (default) runs it on the host.  With
+        chains on threads; ``"numpy"`` runs it on the host; ``"auto"`` (default)
+        takes JAX when it is installed, else NumPy.  With
         effects (``effects != 0``) the structured sweep also integrates
         out the pair and period effects, on either backend (see the class
         docstring).
@@ -1782,11 +1778,8 @@ class SARNegBinFlowSeparablePanel(_SeparableCountFlowPanel, SARFlowSeparablePane
         """
         log_lik = bool((idata_kwargs or {}).get("log_likelihood", False))
         if sampler == "gibbs":
+            gibbs_backend = self._resolve_gibbs_backend(gibbs_backend, jax=True)
             if self._count_effects:
-                if gibbs_backend not in ("numpy", "jax"):
-                    raise ValueError(
-                        f"gibbs_backend must be 'numpy' or 'jax', got {gibbs_backend!r}"
-                    )
                 idata = self._fit_gibbs_fe(
                     gibbs_backend=gibbs_backend,
                     draws=draws,
@@ -1835,7 +1828,6 @@ class SARNegBinFlowSeparablePanel(_SeparableCountFlowPanel, SARFlowSeparablePane
         progressbar: bool = True,
         n_jobs: int = -1,
         gibbs_backend: str = "numpy",
-        krylov_reuse: bool = True,
         log_likelihood: bool = False,
     ) -> xr.DataTree:
         """Sample the pooled posterior via reduced-form PG-Gibbs (separable 2-ρ)."""
@@ -1854,7 +1846,6 @@ class SARNegBinFlowSeparablePanel(_SeparableCountFlowPanel, SARFlowSeparablePane
             progressbar=progressbar,
             n_jobs=n_jobs,
             gibbs_backend=gibbs_backend,
-            krylov_reuse=krylov_reuse,
             log_likelihood=log_likelihood,
         )
 
@@ -2207,7 +2198,7 @@ class SARZINBFlowSeparablePanel(
         random_seed: Optional[int] = None,
         *,
         sampler: str = "gibbs",
-        gibbs_backend: str = "numpy",
+        gibbs_backend: str = "auto",
         progressbar: bool = True,
         n_jobs: int = -1,
         idata_kwargs: Optional[dict] = None,
@@ -2216,7 +2207,8 @@ class SARZINBFlowSeparablePanel(
     ) -> xr.DataTree:
         """Sample the posterior: structured Gibbs (default) or ``sampler="nuts"``.
 
-        ``gibbs_backend`` is ``"numpy"`` (default) or ``"jax"``.
+        ``gibbs_backend="auto"`` (default) takes JAX when it is installed, else
+        NumPy; ``"numpy"`` or ``"jax"`` pins one.
         ``store_group_effects`` keeps every draw of the pair effects (default:
         when they fit in about 500 MB).  ``idata_kwargs={"log_likelihood":
         True}`` stores the marginal ZINB pointwise log-likelihood.
@@ -2236,12 +2228,8 @@ class SARZINBFlowSeparablePanel(
             raise ValueError(f"sampler must be 'gibbs' or 'nuts', got {sampler!r}")
         if sample_kwargs:
             raise TypeError(f"Unexpected keyword arguments: {sorted(sample_kwargs)}")
-        if gibbs_backend not in ("numpy", "jax"):
-            raise ValueError(
-                f"gibbs_backend must be 'numpy' or 'jax', got {gibbs_backend!r}"
-            )
         return self._fit_gibbs_zinb(
-            backend=gibbs_backend,
+            backend=self._resolve_gibbs_backend(gibbs_backend, jax=True),
             draws=draws,
             tune=tune,
             chains=chains,

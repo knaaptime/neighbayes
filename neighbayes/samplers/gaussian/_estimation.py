@@ -144,7 +144,6 @@ class GibbsEstimation:
         progressbar: bool = True,
         gibbs_method: str = "jax",
         slice_width: float | None = None,
-        chain_method: str | None = None,
         log_likelihood: bool = False,
     ) -> xr.DataTree:
         """Run Gibbs chains and assemble DataTree.
@@ -166,7 +165,8 @@ class GibbsEstimation:
             ``-1`` uses all CPUs.  When ``n_jobs=1``, chains run
             sequentially with progress bars.  When ``n_jobs>1``
             (or ``-1``), chains run in parallel via ``joblib``.
-            Ignored for the JAX path (use ``chain_method`` instead).
+            Ignored for the JAX path, whose chains run vectorized under
+            ``jax.vmap``.
         progressbar : bool, default True
             Show per-chain progress bars.
         gibbs_method : str, default "jax"
@@ -179,11 +179,6 @@ class GibbsEstimation:
             path.  If None, defaults to ``(rho_upper - rho_lower) * 0.1``.
             Ignored when ``gibbs_method="numpy"`` (the NumPy path adapts
             its own slice width).
-        chain_method : str or None, default None
-            How to run multiple chains for the JAX path.  Chains always run
-            in parallel, vectorized under ``jax.vmap`` on one device, so
-            ``"vectorized"`` is the only value.  Ignored for the NumPy path
-            (use ``n_jobs`` to control parallelism instead).
         log_likelihood : bool, default False
             Store the pointwise log-likelihood (one value per draw and
             observation) for LOO/WAIC, as PyMC's
@@ -196,10 +191,6 @@ class GibbsEstimation:
             ``log_likelihood`` when requested.
         """
         self.log_likelihood = bool(log_likelihood)
-        # Default chain_method for JAX path
-        if chain_method is None:
-            chain_method = "vectorized" if gibbs_method == "jax" else None
-
         if gibbs_method == "jax":
             return self._fit_jax(
                 draws=draws,
@@ -210,7 +201,6 @@ class GibbsEstimation:
                 n_jobs=n_jobs,
                 progressbar=progressbar,
                 slice_width=slice_width,
-                chain_method=chain_method,
             )
 
         # ── NumPy path (default) ──
@@ -360,7 +350,6 @@ class GibbsEstimation:
         n_jobs: int = 1,
         progressbar: bool = True,
         slice_width: float | None = None,
-        chain_method: str = "vectorized",
     ) -> xr.DataTree:
         """Run JAX JIT Gibbs chains and assemble DataTree.
 
@@ -386,25 +375,12 @@ class GibbsEstimation:
         slice_width : float or None, default None
             Initial step-out width for the ρ/λ slice sampler.  If None,
             defaults to ``(rho_upper - rho_lower) * 0.1``.
-        chain_method : str, default "vectorized"
-            Chains always run in parallel, vectorized under ``jax.vmap`` on
-            one device.  ``"parallel"`` is not supported.
 
         Returns
         -------
         xr.DataTree
         """
         from ._jax import run_chains_jax_gibbs_vectorized
-
-        if chain_method == "parallel":
-            raise NotImplementedError(
-                "chain_method='parallel' is not supported for the JAX path. "
-                "Use chain_method='vectorized' for JAX-native parallelism."
-            )
-        if chain_method != "vectorized":
-            raise ValueError(
-                f"Unknown chain_method {chain_method!r}; use 'vectorized'."
-            )
 
         self.warmup_jacobian = None
         # Build JAX-native logdet function

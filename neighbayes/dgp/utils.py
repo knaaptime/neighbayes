@@ -353,7 +353,7 @@ def make_output_geodataframe(
     try:
         import geopandas as gpd
         from shapely.geometry import Point, box
-    except Exception as exc:  # pragma: no cover
+    except ImportError as exc:  # pragma: no cover
         raise ImportError(
             "create_gdf=True requires optional dependencies geopandas and shapely."
         ) from exc
@@ -449,7 +449,7 @@ def make_panel_output_geodataframe(
     try:
         import geopandas as gpd
         from shapely.geometry import Point, box
-    except Exception as exc:  # pragma: no cover
+    except ImportError as exc:  # pragma: no cover
         raise ImportError(
             "create_gdf=True requires optional dependencies geopandas and shapely."
         ) from exc
@@ -527,7 +527,7 @@ def synth_point_geodataframe(n: int) -> Any:
     try:
         import geopandas as gpd
         from shapely.geometry import Point
-    except Exception as exc:  # pragma: no cover
+    except ImportError as exc:  # pragma: no cover
         raise ImportError(
             "synth_point_geodataframe requires optional dependencies "
             "geopandas and shapely."

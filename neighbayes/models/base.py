@@ -418,7 +418,6 @@ class SpatialModel(SharedSpatialMethods, ABC):
         progressbar: bool = True,
         gibbs_method: str = "numpy",
         slice_width: float | None = None,
-        chain_method: str | None = None,
         log_likelihood: bool = False,
     ) -> xr.DataTree:
         """Sample the posterior with the partially collapsed Gaussian Gibbs sampler.
@@ -451,8 +450,6 @@ class SpatialModel(SharedSpatialMethods, ABC):
             slice-sample ρ/λ.
         slice_width : float or None, default None
             Initial step-out width for slice sampling.
-        chain_method : str or None, default None
-            How to run multiple chains for the JAX path.
 
         Returns
         -------
@@ -554,7 +551,6 @@ class SpatialModel(SharedSpatialMethods, ABC):
             progressbar=progressbar,
             gibbs_method=gibbs_method,
             slice_width=slice_width,
-            chain_method=chain_method,
             log_likelihood=log_likelihood,
         )
         return self._idata

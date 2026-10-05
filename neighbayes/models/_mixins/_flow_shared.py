@@ -32,6 +32,7 @@ import scipy.sparse as sp
 
 from ..._backends.sampler_helpers import (
     enforce_c_backend,
+    jax_available,
     prepare_compile_kwargs,
     prepare_idata_kwargs,
 )
@@ -47,6 +48,18 @@ class FlowSharedMethods:
     ``self._N`` (cross-section)
     or ``self._N_flow`` (panel) before calling any mixin method.
     """
+
+    def _resolve_gibbs_backend(self, requested: str, *, jax: bool) -> str:
+        """``gibbs_backend`` resolved for this flow configuration.
+
+        ``jax`` says whether the configuration has a JAX Gibbs kernel.
+        ``"auto"`` takes it when JAX is installed and NumPy otherwise; an
+        explicit ``"jax"`` without one raises.
+        """
+        from ...samplers._registry import resolve_backend_for
+
+        backends = {"jax", "numpy"} if jax else {"numpy"}
+        return resolve_backend_for(requested, backends, jax_ok=jax_available())
 
     # Subclasses override these as needed.
     _panel_diagnostics: bool = False

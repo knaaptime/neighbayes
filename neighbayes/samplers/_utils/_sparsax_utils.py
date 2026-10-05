@@ -441,7 +441,7 @@ class CachedSparseSolver:
         """
         try:
             return use(self._last_token)
-        except Exception as exc:  # noqa: BLE001 - re-raised unless stale
+        except ValueError as exc:  # sparsax's INVALID_ARGUMENT, as JAX raises it
             if "stale factor token" not in str(exc):
                 raise
             coeffs, self._last_token = self._last_coeffs, None
@@ -627,6 +627,7 @@ def profile_loglik_rho_grid(
     rho_min: float = 0.05,
     rho_max: float = 0.95,
     rho_step: float = 0.05,
+    rows=None,
 ):
     r"""Profile-log-likelihood ρ-grid search with cached sparse solves.
 
@@ -647,12 +648,16 @@ def profile_loglik_rho_grid(
 
     Parameters
     ----------
-    y, X : ndarray, shapes (n,) and (n, k)
-        Response and design matrix.
+    y, X : ndarray, shapes (m,) and (n, k)
+        Response and design matrix; ``m = n`` unless ``rows`` is given.
     W_sparse : scipy.sparse matrix, shape (n, n)
         Row-standardized spatial weights.
     rho_min, rho_max, rho_step : float
         Grid definition.
+    rows : boolean ndarray of shape (n,), optional
+        Fit only these rows of :math:`\tilde X`, as when ``y`` is observed on a
+        subset.  The filter is applied to all of ``X`` first, since it mixes
+        every row.
 
     Returns
     -------
@@ -667,6 +672,7 @@ def profile_loglik_rho_grid(
     y = np.asarray(y, dtype=np.float64)
     X = np.asarray(X, dtype=np.float64)
     n, k = X.shape
+    m = len(y)
     solver = CachedSparseSolver([W_sparse], n)
     # Inclusive of rho_max (up to floating-point slack): np.arange would drop
     # the endpoint, silently truncating the default grid at 0.90.
@@ -677,6 +683,8 @@ def profile_loglik_rho_grid(
     for rho_g in grid:
         try:
             Xtilde = solver.solve([-float(rho_g)], X)
+            if rows is not None:
+                Xtilde = Xtilde[rows]
         except (RuntimeError, ValueError, np.linalg.LinAlgError) as exc:
             # A singular / indefinite A_ρ means this ρ is outside the valid
             # range for W; skip it but keep a record so an all-failed grid
@@ -687,7 +695,7 @@ def profile_loglik_rho_grid(
         eta_g = Xtilde @ beta_g
         sig2_g = float(np.mean((y - eta_g) ** 2))
         if sig2_g > 1e-10:
-            ll_g = -0.5 * n * np.log(sig2_g) - 0.5 * n
+            ll_g = -0.5 * m * np.log(sig2_g) - 0.5 * m
             if ll_g > best_ll:
                 best_ll, best_rho, best_beta = ll_g, float(rho_g), beta_g.copy()
     if not np.isfinite(best_ll) and failures:

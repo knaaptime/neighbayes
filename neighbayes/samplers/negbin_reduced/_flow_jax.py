@@ -117,40 +117,6 @@ def _max_steps(acc, new):
     return (jnp.maximum(acc[0], new[0]), jnp.maximum(acc[1], new[1]))
 
 
-def make_flow_solve(pattern: dict):
-    """Build a JIT-compiled ``solve(ρ_d, ρ_o, ρ_w, rhs) -> A(ρ)⁻¹ rhs``.
-
-    Uses sparsax's sparse LU (KLU or UMFPACK, as
-    :func:`.._utils._sparsax_lu.sparsax_lu` routes the pattern): the fill-reducing
-    analysis is cached by the shared pattern, so each call only rebuilds the
-    value vector ``Ax(ρ)``.  ``rhs`` may be a vector ``(N,)`` or matrix
-    ``(N, k)`` (batched solve — used for ``X̃ = A⁻¹X``).
-    """
-    import jax
-    import jax.numpy as jnp
-
-    from ..._jax_dispatch import ensure_x64
-    from .._utils._sparsax_lu import sparsax_lu
-
-    ensure_x64()
-
-    Ai = jnp.asarray(pattern["Ai"], jnp.int32)
-    Aj = jnp.asarray(pattern["Aj"], jnp.int32)
-    eye_vals = jnp.asarray(pattern["eye_vals"])
-    wd_vals = jnp.asarray(pattern["wd_vals"])
-    wo_vals = jnp.asarray(pattern["wo_vals"])
-    ww_vals = jnp.asarray(pattern["ww_vals"])
-    # Route on ρ = 0.2 in each direction, inside the stable region.
-    lu_solve = sparsax_lu(Ai, Aj, pattern["N"]).solve
-
-    @jax.jit
-    def solve(rho_d, rho_o, rho_w, rhs):
-        Ax = eye_vals - rho_d * wd_vals - rho_o * wo_vals - rho_w * ww_vals
-        return lu_solve(Ai, Aj, Ax, rhs)
-
-    return solve
-
-
 def build_flow_ctx(Wd, Wo, Ww, N) -> dict:
     """Sparse solve context for the unrestricted flow (W never densified).
 
@@ -428,7 +394,6 @@ def run_chains_jax_flow(
     jax_seeds=None,
     progressbar=False,
     slice_width=0.4,
-    krylov_reuse=True,
     store_log_lik=True,
 ):
     """Run the unrestricted flow NB Gibbs sampler on the JAX backend.
@@ -458,9 +423,6 @@ def run_chains_jax_flow(
         N, k, lu_solve, int(krylov_degree), bool(positive), int(n_cycles),
         getattr(priors, "alpha_fixed", None) is not None, bool(store_log_lik),
     )  # fmt: skip
-    # A reused ρ_k basis evaluates the density at stale values of the other
-    # two ρ's, which biased the posterior; ``krylov_reuse`` is ignored.
-    del krylov_reuse
     sweep = cached_sweep(("nb_flow", *static), lambda: _flow_sweep(*static))
 
     chains = len(inits)

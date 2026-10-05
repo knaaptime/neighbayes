@@ -186,13 +186,21 @@ def _lu_logdet(A: sp.csc_matrix) -> float:
     :func:`_make_reusable_lu_logdet` instead: it reuses the symbolic analysis
     *and* routes between the two SuiteSparse backends by measurement.
     """
+    from .._lu_route import lu_backend_errors
+
     A = A.tocsc()
     for name in _LU_BACKENDS:
         try:
             factory, logdet_fn = _load_lu_backend(name)
             return logdet_fn(factory(A))
-        except Exception:
-            continue
+        except lu_backend_errors() as exc:
+            if not isinstance(exc, ImportError):
+                warnings.warn(
+                    f"Sparse LU backend {name!r} failed during log-determinant "
+                    f"evaluation ({type(exc).__name__}: {exc}); trying the next.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
     return _superlu_logdet(A)
 
 
@@ -280,10 +288,9 @@ class _ReusableLULogdet:
     def _drop(self, name: str, exc: Exception) -> None:
         """Retire a backend that failed, saying so rather than failing silently.
 
-        The distinction this preserves is the one a bare ``except Exception``
-        loses: a backend that is merely absent, and a backend that broke on
-        *this* matrix, both retire — but only to the next SuiteSparse backend,
-        never straight past it to SuperLU.
+        A backend that is merely absent and one that broke on *this* matrix
+        both retire, but only to the next SuiteSparse backend, never straight
+        past it to SuperLU; only the second is worth a warning.
         """
         if name in self._candidates:
             self._candidates.remove(name)
@@ -318,11 +325,13 @@ class _ReusableLULogdet:
             self._candidates = [winner] + [n for n in self._candidates if n != winner]
             self._routing = False
         # The chosen backend, with the ladder still beneath it.
+        from .._lu_route import lu_backend_errors
+
         while self._candidates:
             name = self._candidates[0]
             try:
                 return self._evaluate_one(name, A)
-            except Exception as exc:  # noqa: BLE001 - retire, don't abort
+            except lu_backend_errors() as exc:
                 self._drop(name, exc)
         return _superlu_logdet(A)
 

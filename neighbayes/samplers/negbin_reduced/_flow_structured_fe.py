@@ -47,6 +47,7 @@ from .._utils._slice import (
     slice_sample_1d_adaptive,
     update_slice_width,
 )
+from .._utils._spatial_normal import FACTORIZATION_ERRORS
 from ..negbin._core import GibbsState as _StructuralState
 from ..negbin._core import _nb_loglik_pointwise, _sample_alpha
 from ._core import ReducedGibbsPriors, _sample_omega
@@ -380,8 +381,8 @@ class StructuredEquation:
                     return -np.inf
                 try:
                     eta_f, Av, Bv_ = _parts(rv)
-                except Exception:
-                    return -np.inf
+                except FACTORIZATION_ERRORS:
+                    return -np.inf  # ρ at the edge of its support
                 Rs = []
                 for t in range(T):
                     R = zc[t] - eta_f[self.full_keys[t]]

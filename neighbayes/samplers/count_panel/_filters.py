@@ -119,17 +119,9 @@ class FlowUnrestrictedFilter:
         self.T = int(T)
         self.positive = bool(positive)
         self._bounds = (0.0 if positive else float(lower), float(upper))
-        W_csc = sp.csc_matrix(W, dtype=np.float64)
-        try:
-            self.eig_max = float(
-                np.max(np.abs(sp.linalg.eigsh(W_csc, k=1, which="LM")[0]))
-            )
-        except Exception:
-            self.eig_max = 1.0
-        try:
-            self.eig_min = float(sp.linalg.eigsh(W_csc, k=1, which="SA")[0][0])
-        except Exception:
-            self.eig_min = -1.0
+        from ..negbin_reduced._flow import real_spectrum_bounds
+
+        self.eig_min, self.eig_max = real_spectrum_bounds(W)
 
     def admissible(self, rho: dict) -> bool:
         from ..negbin_reduced._flow import flow_system_is_invertible

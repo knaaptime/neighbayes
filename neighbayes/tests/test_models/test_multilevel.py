@@ -512,3 +512,25 @@ def test_recovery():
     # effects: posterior means track the truth
     th = _flat(post, "theta_1").mean(0)
     assert np.corrcoef(th, d["levels"][0]["theta"])[0, 1] > 0.8
+
+
+def test_unit_variance_prior_scale_is_within_group():
+    """σ₀²'s default scale leaves out the upper levels' variance.
+
+    ``Var(y)`` counts every upper level, and an Inv-Γ(a, b) prior shifts the
+    posterior mean of σ₀² by about ``2b/n``: with strong upper levels that was
+    3–4 posterior sd.  The default is the pooled variance within level-1 groups.
+    """
+    from neighbayes.models.priors import MultilevelPriors
+
+    d = _data(n_side=8, blocks=(2, 2), sigmas=(1.0, 3.0, 3.0))
+    m = _model(d)
+    y = np.asarray(d["y"], dtype=float)
+    g = d["frames"][0]["g1"].to_numpy()
+    within = sum(((y[g == k] - y[g == k].mean()) ** 2).sum() for k in np.unique(g))
+    expected = within / (y.size - np.unique(g).size)
+    scale = m._variance_priors()["sigma2_beta"]
+    assert scale == pytest.approx(expected)
+    assert scale < np.var(y)  # the upper levels' variance is excluded
+    pinned = _model(d, priors=MultilevelPriors(sigma2_beta=2.5))
+    assert pinned._variance_priors()["sigma2_beta"] == 2.5

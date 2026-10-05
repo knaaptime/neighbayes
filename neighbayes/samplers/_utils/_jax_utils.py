@@ -319,12 +319,12 @@ def make_pg_draw():
     Cached, so every caller gets the same function — a sweep closing over it
     keeps a stable identity, and its compiled program can be reused.
 
-    Prefers ``pgjax.pg_sample`` (exact Devroye sampler, on-device, no
-    host round-trip) when installed — it dominates every alternative on
-    speed, works inside ``jax.lax.scan``, and is exact for any ``h``
-    (integer or non-integer).  Falls back to the ``polyagamma`` C extension
-    via ``jax.pure_callback``; this is slower (host round-trip per call)
-    but still correct for any ``h``.
+    Prefers ``pgjax.pg_sample`` (on-device, no host round-trip) when
+    installed — it dominates every alternative on speed, works inside
+    ``jax.lax.scan``, and is exact for any ``h`` (integer or non-integer).
+    Falls back to the ``polyagamma`` C extension via ``jax.pure_callback``,
+    which is slower (a host round-trip per call) and, without pgjax, carries
+    polyagamma's bias for ``h < 8`` (see :mod:`._polyagamma`).
 
     Returns
     -------
@@ -341,8 +341,8 @@ def make_pg_draw():
     except ImportError:
         pass
 
-    # Fallback: numpy polyagamma via pure_callback (slower but correct).
-    # Numpy polyagamma beats the old on-device "exp" approximation at every
+    # Fallback: numpy polyagamma via pure_callback, slower and biased for
+    # h < 8.  It still beats the old on-device "exp" approximation at every
     # size tested, so there is no reason to keep the truncated-series path.
     def _draw_pg(h, z, key):
         import jax
@@ -368,6 +368,7 @@ def make_pg_draw():
                 np.asarray(h_np, dtype=np.float64),
                 np.asarray(z_np, dtype=np.float64),
                 rng=rng,
+                warn=False,  # the warning is for the NumPy backend only
             )
 
         result = jax.pure_callback(_callback, result_shape, h_j, z_j, cb_seed)

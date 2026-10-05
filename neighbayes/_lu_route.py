@@ -68,6 +68,25 @@ _DENSITY: dict[tuple, float | None] = {}
 _DENSITY_LOCK = threading.Lock()
 
 
+def lu_backend_errors() -> tuple[type[BaseException], ...]:
+    """What a scikit-sparse LU backend raises when it is absent or cannot factor.
+
+    ``ImportError`` for a missing backend, plus KLU's and UMFPACK's own error
+    classes, which share no base class but ``Exception``.  A singular matrix
+    is not among them: both backends warn and return a factor instead.
+    """
+    errors: list[type[BaseException]] = [ImportError, np.linalg.LinAlgError]
+    for module, name in (
+        ("sksparse.klu", "KLUError"),
+        ("sksparse.umfpack", "UMFPACKError"),
+    ):
+        try:
+            errors.append(getattr(__import__(module, fromlist=[name]), name))
+        except ImportError:
+            pass
+    return tuple(errors)
+
+
 def _structure(rows, cols, n: int) -> sp.csr_matrix:
     """The pattern as a canonical CSR matrix of ones (sorted, no duplicates)."""
     S = sp.csr_matrix(

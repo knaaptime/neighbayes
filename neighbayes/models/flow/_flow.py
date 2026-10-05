@@ -1352,6 +1352,9 @@ class _NegBinFlowMixin:
     to the Gaussian :class:`FlowModel.fit` NUTS path.
     """
 
+    #: Whether this model has a JAX Gibbs kernel (see ``gibbs_backend``).
+    _gibbs_jax = True
+
     def fit(
         self,
         draws: int = 2000,
@@ -1359,7 +1362,7 @@ class _NegBinFlowMixin:
         chains: int = 4,
         random_seed: Optional[int] = None,
         sampler: str = "gibbs",
-        gibbs_backend: str = "numpy",
+        gibbs_backend: str = "auto",
         store_lambda: bool = False,
         idata_kwargs: Optional[dict] = None,
         progressbar: bool = True,
@@ -1383,12 +1386,13 @@ class _NegBinFlowMixin:
             Sampling method: ``"gibbs"`` (default) for the reduced-form
             Pólya–Gamma Gibbs sampler, or ``"nuts"`` for PyMC NUTS on the
             exact count likelihood (much slower).
-        gibbs_backend : {"numpy", "jax", "auto"}, default "numpy"
+        gibbs_backend : {"auto", "jax", "numpy"}, default "auto"
             Execution backend for the Gibbs sampler (only used when
             ``sampler="gibbs"``).  ``"jax"`` compiles the sweep with JAX and
             sparsax sparse LU solves, chains on threads; ``"numpy"`` uses the
-            host CHOLMOD/KLU path.  ``"auto"`` currently resolves to
-            ``"numpy"``.
+            host CHOLMOD/KLU path.  ``"auto"`` takes JAX when it is installed
+            and the model has a JAX kernel (the aspatial ``NegBinFlow`` does
+            not), else NumPy.
         store_lambda : bool, default False
             If True, include the high-dimensional fitted mean ``lambda`` in the
             stored posterior (NUTS only).
@@ -1415,12 +1419,9 @@ class _NegBinFlowMixin:
         xarray.DataTree
         """
         if sampler == "gibbs":
-            if gibbs_backend not in {"numpy", "jax", "auto"}:
-                raise ValueError(
-                    "Negative-Binomial flow Gibbs supports "
-                    "gibbs_backend in {'numpy', 'jax', 'auto'}; "
-                    f"got {gibbs_backend!r}."
-                )
+            gibbs_backend = self._resolve_gibbs_backend(
+                gibbs_backend, jax=self._gibbs_jax
+            )
             idata = self._fit_gibbs(
                 draws=draws,
                 tune=tune,
@@ -1576,7 +1577,6 @@ class SARNegBinFlow(_NegBinFlowMixin, SARFlow):
         progressbar: bool = True,
         n_jobs: int = -1,
         gibbs_backend: str = "numpy",
-        krylov_reuse: bool = True,
         sample_kwargs: dict[str, Any] | None = None,
         log_likelihood: bool = False,
     ) -> xr.DataTree:
@@ -1595,7 +1595,6 @@ class SARNegBinFlow(_NegBinFlowMixin, SARFlow):
             random_seed=random_seed,
             progressbar=progressbar,
             n_jobs=n_jobs,
-            krylov_reuse=krylov_reuse,
             log_likelihood=log_likelihood,
         )
 
@@ -1711,7 +1710,6 @@ class SARNegBinFlowSeparable(_NegBinFlowMixin, SARFlowSeparable):
         progressbar: bool = True,
         n_jobs: int = -1,
         gibbs_backend: str = "numpy",
-        krylov_reuse: bool = True,
         sample_kwargs: dict[str, Any] | None = None,
         log_likelihood: bool = False,
     ) -> xr.DataTree:
@@ -1730,13 +1728,14 @@ class SARNegBinFlowSeparable(_NegBinFlowMixin, SARFlowSeparable):
             random_seed=random_seed,
             progressbar=progressbar,
             n_jobs=n_jobs,
-            krylov_reuse=krylov_reuse,
             log_likelihood=log_likelihood,
         )
 
 
 class NegBinFlow(_NegBinFlowMixin, OLSFlow):
     """Aspatial OD-flow Negative Binomial gravity baseline."""
+
+    _gibbs_jax = False  # NumPy Gibbs only
 
     def __init__(self, y, X, W, **kwargs):
         y_arr = np.asarray(y)

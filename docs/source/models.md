@@ -149,8 +149,10 @@ parent label. The posterior follows the levels: `rho_ℓ` (or `lam_ℓ` for an
 error process), `beta_ℓ`, `sigma_ℓ`, and the effects `theta_ℓ` (coordinate
 `group_ℓ`).
 
-**Priors.** $\sigma_0^2 \sim \text{Inv-}\Gamma(2, \operatorname{Var} y)$; each
-upper level's $\sigma_\ell \sim \text{half-}t_3(0, \operatorname{sd} y)$, since
+**Priors.** $\sigma_0^2 \sim \text{Inv-}\Gamma(2, s_w^2)$, the data-informed prior
+of the single-level models with $s_w^2$ the pooled variance of $y$ within level-1
+groups: $\operatorname{Var} y$ would also count the upper levels' variance and
+bias $\sigma_0$ upward when those levels are strong. Each upper level's $\sigma_\ell \sim \text{half-}t_3(0, \operatorname{sd} y)$, since
 every level's effects are in the outcome's units; Gelman et al. (2008) priors on
 each level's $\beta_\ell$; uniform priors on each graph's stability bounds for
 $\rho_\ell$. See `MultilevelPriors`.
@@ -611,7 +613,7 @@ For any Gibbs sampler, `gibbs_backend` selects the execution path:
 | Value | Behaviour |
 |---|---|
 | `"auto"` | **default** — JAX when installed and supported by the family, else NumPy |
-| `"jax"` | the sweep JIT-compiled into one XLA kernel; chains vectorised under `jax.vmap`, controlled by `chain_method` |
+| `"jax"` | the sweep compiled into one XLA program; chains run in parallel, vectorized under `jax.vmap` for the Gaussian families and one thread per chain for the others |
 | `"numpy"` | pure NumPy/SciPy; chains as separate processes via `joblib`, controlled by `n_jobs` |
 
 Both backends implement the same sampler and target the same posterior.
@@ -641,9 +643,8 @@ model = SAR(y=y, X=X, W=W)
 idata = model.fit(draws=2000, tune=1000, chains=4)   # Gibbs, by default
 ```
 
-The family accepts two options beyond the shared `fit()` arguments:
-`slice_width` (initial slice interval for ρ/λ) and `chain_method` (JAX
-backend chain mapping). See the
+The family accepts one option beyond the shared `fit()` arguments:
+`slice_width`, the initial slice interval for ρ/λ. See the
 [Gibbs sampler how-to](how-to/gibbs_sampler.ipynb) for details.
 
 ### Gibbs Sampler (SAR Negative Binomial)

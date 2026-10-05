@@ -339,10 +339,7 @@ def _symmetrizing_diagonal(W_csc: sp.csc_matrix) -> np.ndarray | None:
     """
     from ..._logdet._slq import _recover_symmetrizing_diagonal
 
-    try:
-        d = _recover_symmetrizing_diagonal(sp.csr_matrix(W_csc))
-    except Exception:
-        return None
+    d = _recover_symmetrizing_diagonal(sp.csr_matrix(W_csc))
     if d is None or not np.all(np.isfinite(d)) or np.any(d <= 0.0):
         return None
     sq = np.sqrt(d)

@@ -131,3 +131,33 @@ def test_cache_size_sets_both_backends(monkeypatch):
     monkeypatch.setattr(sparsax, "set_umf_cache_size", lambda k: seen.update(umfpack=k))
     lu_mod.set_sparsax_lu_cache_size(48)
     assert seen == {"klu": 48, "umfpack": 48}
+
+
+def test_cached_solver_refactors_a_stale_token():
+    """A token the token cache released is refactored, not raised.
+
+    sparsax reports a stale token as INVALID_ARGUMENT, which JAX raises as
+    ``ValueError``; catching ``RuntimeError`` instead let it escape.
+    """
+    from neighbayes.samplers._utils._sparsax_utils import CachedSparseSolver
+
+    if not hasattr(sparsax, "set_token_cache_size"):
+        pytest.skip("sparsax without a token cache")
+    W = _rook(6)
+    n = W.shape[0]
+    b = np.linspace(-1.0, 1.0, n)
+    held = CachedSparseSolver([W], n)
+    other = CachedSparseSolver([W], n)
+    if held._lu is None or not held._has_lu_factor:
+        pytest.skip("solver does not hold factor tokens")
+    expected = np.linalg.solve(np.eye(n) - 0.3 * W.toarray(), b)
+    sparsax.set_token_cache_size(16)
+    try:
+        np.testing.assert_allclose(held.solve([-0.3], b), expected, atol=1e-10)
+        stale = held._last_token
+        for rho in np.linspace(0.01, 0.2, 40):  # release the held token
+            other.solve([-float(rho)], b)
+        np.testing.assert_allclose(held.solve([-0.3], b), expected, atol=1e-10)
+        assert held._last_token is not stale  # the refactor path ran
+    finally:
+        lu_mod.set_sparsax_lu_cache_size(32)

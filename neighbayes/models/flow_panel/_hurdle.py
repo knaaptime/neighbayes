@@ -187,7 +187,7 @@ class SARHurdleNBFlowSeparablePanel(
         random_seed: Optional[int] = None,
         *,
         sampler: str = "gibbs",
-        gibbs_backend: str = "numpy",
+        gibbs_backend: str = "auto",
         progressbar: bool = True,
         n_jobs: int = -1,
         idata_kwargs: Optional[dict] = None,
@@ -196,7 +196,8 @@ class SARHurdleNBFlowSeparablePanel(
     ) -> xr.DataTree:
         """Sample the posterior: structured Gibbs (default) or ``sampler="nuts"``.
 
-        ``gibbs_backend`` is ``"numpy"`` (default) or ``"jax"``.
+        ``gibbs_backend="auto"`` (default) takes JAX when it is installed, else
+        NumPy; ``"numpy"`` or ``"jax"`` pins one.
         ``store_group_effects`` keeps every draw of both halves' pair effects
         (default: when they fit in about 500 MB).  ``idata_kwargs=
         {"log_likelihood": True}`` stores the pointwise hurdle log-likelihood.
@@ -216,12 +217,8 @@ class SARHurdleNBFlowSeparablePanel(
             raise ValueError(f"sampler must be 'gibbs' or 'nuts', got {sampler!r}")
         if sample_kwargs:
             raise TypeError(f"Unexpected keyword arguments: {sorted(sample_kwargs)}")
-        if gibbs_backend not in ("numpy", "jax"):
-            raise ValueError(
-                f"gibbs_backend must be 'numpy' or 'jax', got {gibbs_backend!r}"
-            )
         return self._fit_gibbs_hurdle(
-            backend=gibbs_backend,
+            backend=self._resolve_gibbs_backend(gibbs_backend, jax=True),
             draws=draws,
             tune=tune,
             chains=chains,

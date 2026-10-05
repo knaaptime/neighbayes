@@ -932,7 +932,6 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         progressbar: bool = True,
         gibbs_method: str = "numpy",
         slice_width: float | None = None,
-        chain_method: str | None = None,
         log_likelihood: bool = False,
     ) -> xr.DataTree:
         """Sample a Gaussian FE panel posterior via 3-block Gaussian Gibbs.
@@ -1033,7 +1032,6 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
             progressbar=progressbar,
             gibbs_method=gibbs_method,
             slice_width=slice_width,
-            chain_method=chain_method,
             log_likelihood=log_likelihood,
         )
         return self._idata

@@ -197,9 +197,11 @@ know about it:
 
 `backends` / `auto_backend`
 : Which of `{"jax", "numpy"}` the family supports, and which one `"auto"` should prefer.
-  The Gaussian families prefer JAX, where a vmapped Gibbs is the fast path. The
-  Pólya–Gamma families pin `auto` to NumPy, because there the CHOLMOD `factorize` path
-  is fastest and the dense JAX path is an opt-in for GPU work.
+  Every family with a JAX sampler prefers it. The JAX path solves with sparse
+  factorizations (sparsax), compiles once per model structure, and draws Pólya–Gamma
+  variables exactly (pgjax), where the NumPy path's draws carry a known bias in the
+  `polyagamma` package and warn. The random-effects, count-panel and hurdle families
+  are NumPy-only.
 
 `options`
 : The family-specific `fit` keywords this runner accepts, e.g. `slice_width`,

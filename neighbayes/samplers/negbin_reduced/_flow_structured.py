@@ -53,6 +53,7 @@ from .._utils._slice import (
     slice_sample_1d_adaptive,
     update_slice_width,
 )
+from .._utils._spatial_normal import FACTORIZATION_ERRORS
 from ..negbin._core import GibbsState as _StructuralState
 from ..negbin._core import _nb_loglik_pointwise, _sample_alpha
 from ._core import ReducedGibbsPriors, _sample_omega
@@ -413,8 +414,8 @@ def run_chain_separable_structured(
                     return -np.inf
                 try:
                     eta_f, Av, Bv_ = _parts(rv)
-                except Exception:
-                    return -np.inf
+                except FACTORIZATION_ERRORS:
+                    return -np.inf  # ρ at the edge of its support
                 Rbases = [zs[t] - eta_f[full_keys[t]] for t in range(T)]
                 val = _rho_log_density(Oms, Rbases, Av, Bv_, struct, mu_c, prec_c)
                 return val if np.isfinite(val) else -np.inf

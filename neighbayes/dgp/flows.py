@@ -76,10 +76,12 @@ class _FlowFilter:
         self.separable = abs(self.r_w + self.r_d * self.r_o) <= 1e-12 * max(
             1.0, abs(self.r_w)
         )
+        from ..samplers._utils._spatial_normal import FACTORIZATION_ERRORS
+
         try:
             self._solve_o = spatial_filter_factor(self.W, self.r_o)
             self._solve_d = spatial_filter_factor(self.W, self.r_d)
-        except Exception as exc:
+        except FACTORIZATION_ERRORS as exc:
             raise ValueError(_singular_flow_message(letter, prefix)) from exc
 
     def _right_W(self, Y: np.ndarray) -> np.ndarray:

@@ -268,11 +268,8 @@ class SARZINB(ZINBMixin, SpatialModel):
         gamma_init = _best_gamma + 0.1 * rng.standard_normal(p)
 
         # η^sel from the selection profile
-        try:
-            _sel_solver = CachedSparseSolver([W_sel_csc], n)
-            eta_sel_init = _sel_solver.solve([-lam_init], Z @ gamma_init)
-        except Exception:
-            eta_sel_init = Z @ gamma_init
+        _sel_solver = CachedSparseSolver([W_sel_csc], n)
+        eta_sel_init = _sel_solver.solve([-lam_init], Z @ gamma_init)
 
         # ω^sel: PG(1, η^sel)
         from ...samplers._utils._polyagamma import sample_polyagamma
@@ -293,24 +290,12 @@ class SARZINB(ZINBMixin, SpatialModel):
             _log_y = np.log(y + 0.5)
             pos_mask = np.ones(n, dtype=bool)
             n_pos = n
+        # The filter mixes every row, zeros included, so the grid filters all
+        # of X and fits on the positive rows.
+        _best_rho, _best_beta, _ = profile_loglik_rho_grid(
+            _log_y, X, W_cnt_csc, rows=pos_mask
+        )
         _cnt_grid_solver = CachedSparseSolver([W_cnt_csc], n)
-        _best_rho, _best_beta, _best_ll_cnt = 0.0, np.zeros(k), -np.inf
-        for _rho_g in np.arange(0.05, 0.96, 0.05):
-            try:
-                # Filter all of X, then keep the positive rows: the filter
-                # mixes every row, zeros included.
-                _Xtilde_g = _cnt_grid_solver.solve([-float(_rho_g)], X)[pos_mask]
-                _beta_g = np.linalg.lstsq(_Xtilde_g, _log_y, rcond=None)[0]
-                _eta_g = _Xtilde_g @ _beta_g
-                _sig2_g = float(np.mean((_log_y - _eta_g) ** 2))
-                if _sig2_g > 1e-10:
-                    _ll_g = -0.5 * n_pos * np.log(_sig2_g) - 0.5 * n_pos
-                    if _ll_g > _best_ll_cnt:
-                        _best_ll_cnt = _ll_g
-                        _best_rho = _rho_g
-                        _best_beta = _beta_g.copy()
-            except Exception:
-                pass
 
         rho_init = float(
             np.clip(
@@ -322,13 +307,10 @@ class SARZINB(ZINBMixin, SpatialModel):
         beta_init = _best_beta + 0.1 * rng.standard_normal(k)
 
         # Estimate α from Pearson residuals on positive observations
-        try:
-            _Xtilde_init = _cnt_grid_solver.solve([-rho_init], X)
-            _eta_init = _Xtilde_init[pos_mask] @ beta_init
-            _resid2 = float(np.mean((_log_y - _eta_init) ** 2))
-            alpha_init = float(np.clip(1.0 / max(_resid2, 0.01), 0.5, 50.0))
-        except Exception:
-            alpha_init = 1.0
+        _Xtilde_init = _cnt_grid_solver.solve([-rho_init], X)
+        _eta_init = _Xtilde_init[pos_mask] @ beta_init
+        _resid2 = float(np.mean((_log_y - _eta_init) ** 2))
+        alpha_init = float(np.clip(1.0 / max(_resid2, 0.01), 0.5, 50.0))
 
         # Jitter α
         alpha_init = float(

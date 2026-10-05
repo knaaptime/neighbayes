@@ -568,7 +568,7 @@ class LogdetRefitter:
                     )
                 sing = 1.0 / np.asarray(lam, dtype=complex)
                 self._sigma_left = complex(sing[np.argmin(np.abs(sing + 1.0))])
-            except Exception:  # noqa: BLE001 - any eigensolver failure falls back
+            except (RuntimeError, np.linalg.LinAlgError):  # ARPACK or a singular shift
                 _log.info(
                     "logdet AAA check: eigensolver failed; using -1 as the left singularity."
                 )

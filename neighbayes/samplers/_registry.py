@@ -162,21 +162,39 @@ def resolve_backend(requested: str, entry: GibbsEntry, *, jax_ok: bool) -> str:
     the runner builds any array: an array built while it is off is silently
     float32, and a model that caches one would carry it into every later fit.
     """
+    return resolve_backend_for(
+        requested, entry.backends, auto_backend=entry.auto_backend, jax_ok=jax_ok
+    )
+
+
+def resolve_backend_for(
+    requested: str, backends, *, jax_ok: bool, auto_backend: str | None = None
+) -> str:
+    """:func:`resolve_backend` for a sampler outside the registry.
+
+    ``backends`` is the subset of ``{"jax", "numpy"}`` the sampler supports for
+    this model; ``auto_backend`` defaults to ``"jax"`` when it is among them.
+    The flow models use it, since which of their configurations have a JAX
+    kernel depends on the model's own options.
+    """
+    backends = frozenset(backends)
+    if auto_backend is None:
+        auto_backend = "jax" if "jax" in backends else "numpy"
     valid = {"auto", "jax", "numpy"}
     if requested not in valid:
         raise ValueError(
             f"gibbs_backend must be one of {sorted(valid)}, got {requested!r}"
         )
     if requested == "auto":
-        # Prefer the entry's declared auto backend; only escalate to JAX when the
-        # family prefers it *and* JAX is importable, else fall back to NumPy.
-        if entry.auto_backend == "jax" and "jax" in entry.backends and jax_ok:
+        # Prefer the declared auto backend; only escalate to JAX when it is
+        # preferred *and* importable, else fall back to NumPy.
+        if auto_backend == "jax" and "jax" in backends and jax_ok:
             return _jax_backend()
-        return "numpy" if "numpy" in entry.backends else next(iter(entry.backends))
-    if requested not in entry.backends:
+        return "numpy" if "numpy" in backends else next(iter(backends))
+    if requested not in backends:
         raise ValueError(
             f"gibbs_backend={requested!r} is not supported for this model "
-            f"(supported: {sorted(entry.backends)})"
+            f"(supported: {sorted(backends)})"
         )
     if requested == "jax" and not jax_ok:
         raise ImportError(

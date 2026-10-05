@@ -48,7 +48,10 @@ import numpy as np
 from ._core import MultilevelGibbsPriors, MultilevelStructure, initialize
 
 _EDGE = 1e-6  # fraction of a ρ support kept clear of each end
-SCHUR_MAX = 160  # largest top block handled as a dense Schur complement
+# Largest top block handled as a dense Schur complement.  At n = 20,736 (a
+# 325-group top level) the dense path cut a collapsed sweep from 18.2 to
+# 16.0 ms; below 160 it is used either way.
+SCHUR_MAX = 400
 
 
 @dataclass

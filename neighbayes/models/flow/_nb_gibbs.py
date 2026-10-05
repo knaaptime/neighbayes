@@ -27,7 +27,6 @@ def run_negbin_flow_gibbs(
     progressbar: bool = True,
     n_jobs: int = -1,
     gibbs_backend: str = "numpy",
-    krylov_reuse: bool = True,
     log_likelihood: bool = False,
 ) -> xr.DataTree:
     """Run the reduced-form PG-Gibbs sampler for an NB SAR flow model.
@@ -86,7 +85,6 @@ def run_negbin_flow_gibbs(
         rho_lower=model.priors.get("rho_lower", -0.999),
         rho_upper=model.priors.get("rho_upper", 0.999),
         T=T,
-        krylov_reuse=krylov_reuse,
     )
     if not separable:
         cache_kwargs["positive"] = model.restrict_positive
@@ -222,7 +220,6 @@ def run_negbin_flow_gibbs(
                 n_cycles=cache.n_rho_omega_cycles,
                 jax_seeds=seeds,
                 progressbar=progressbar,
-                krylov_reuse=krylov_reuse,
                 store_log_lik=log_likelihood,
             )
     else:

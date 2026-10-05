@@ -71,7 +71,13 @@ def _sparsax_available() -> bool:
         return False
     try:
         importlib.import_module("sparsax")
-    except Exception:
+    except (ImportError, OSError) as exc:
+        warnings.warn(
+            f"sparsax is installed but failed to import ({type(exc).__name__}: "
+            f"{exc}); continuing without it.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
         return False
     return True
 

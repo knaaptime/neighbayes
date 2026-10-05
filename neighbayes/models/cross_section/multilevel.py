@@ -510,13 +510,35 @@ class SpatialMultilevel(SpatialModel):
                 arr[:] = np.broadcast_to(np.asarray(val, dtype=np.float64), (k,))
         return mu, sd
 
+    def _within_group_variance(self) -> float:
+        """Pooled variance of ``y`` within level-1 groups: the units' share of Var(y).
+
+        The data-informed scale of the σ₀² prior.  ``Var(y)``, the single-level
+        choice, also counts every upper level's variance, and an
+        Inv-Γ(a, b) prior shifts the posterior mean of σ₀² by about ``2b/n``:
+        with the upper levels holding most of Var(y) that was 3–4 posterior sd.
+        Falls back to ``Var(y)`` when there are no groups or no group has two
+        units.
+        """
+        y = self._y
+        parent = self._levels[0].parent if len(self._levels) > 1 else None
+        if parent is None:
+            return float(np.var(y))
+        counts = np.bincount(parent)
+        means = np.bincount(parent, weights=y) / np.maximum(counts, 1)
+        resid = y - means[parent]
+        dof = y.size - np.count_nonzero(counts)
+        return float(resid @ resid / dof) if dof > 0 else float(np.var(y))
+
     def _variance_priors(self) -> dict[str, float]:
         p = self.priors_obj
         sd_y = float(np.std(self._y)) or 1.0
         return {
             "sigma2_alpha": float(p.sigma2_alpha),
             "sigma2_beta": float(
-                p.sigma2_beta if p.sigma2_beta is not None else np.var(self._y)
+                p.sigma2_beta
+                if p.sigma2_beta is not None
+                else self._within_group_variance()
             ),
             "sigma_nu": float(p.sigma_nu),
             "sigma_scale": float(p.sigma_scale if p.sigma_scale is not None else sd_y),

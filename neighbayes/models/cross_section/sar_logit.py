@@ -178,11 +178,8 @@ class SARLogit(SpatialModel):
         )
 
         # ω₀: draw from PG(1, η) at the profile η.
-        try:
-            _init_solver = CachedSparseSolver([W_csc], n)
-            eta_init = _init_solver.solve([-rho_init], X @ beta_init)
-        except Exception:
-            eta_init = X @ beta_init
+        _init_solver = CachedSparseSolver([W_csc], n)
+        eta_init = _init_solver.solve([-rho_init], X @ beta_init)
         from ...samplers._utils._polyagamma import sample_polyagamma
 
         omega_init = sample_polyagamma(np.ones(n), eta_init, rng=rng)

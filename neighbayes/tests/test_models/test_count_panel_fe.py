@@ -156,7 +156,7 @@ class TestConstruction:
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             m = _flow_model(SARNegBinFlowPanel, data, 3, effects=1)
-        with pytest.raises(NotImplementedError, match="NumPy"):
+        with pytest.raises(ValueError, match="not supported"):
             m.fit(gibbs_backend="jax", **QUICK)
 
 

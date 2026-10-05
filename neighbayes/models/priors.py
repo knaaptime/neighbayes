@@ -236,7 +236,13 @@ class MultilevelPriors(BasePriors):
         Normal prior on the units' coefficients :math:`\beta_0`; default
         Gelman et al. (2008).
     sigma2_alpha, sigma2_beta
-        :math:`\sigma_0^2 \sim \text{Inv-}\Gamma`, default ``(2, Var(y))``.
+        :math:`\sigma_0^2 \sim \text{Inv-}\Gamma`, the data-informed prior
+        of the single-level models (LeSage).  ``sigma2_beta`` defaults to the
+        pooled variance of ``y`` within level-1 groups, the units' share of
+        ``Var(y)``: ``Var(y)`` itself also counts the upper levels' variance,
+        and the prior shifts the posterior mean of :math:`\sigma_0^2` by about
+        ``2 * sigma2_beta / n``, which with strong upper levels was several
+        posterior standard deviations.
     rho_lower, rho_upper
         Uniform bounds on every level's autoregressive parameter (ρ or λ);
         default each graph's stability bounds, ``(-1, 1)`` when

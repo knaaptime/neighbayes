@@ -105,7 +105,7 @@ from .._utils._slice import (
     SliceWidthState,
     slice_sample_1d_adaptive,
 )
-from .._utils._spatial_normal import CholmodFactor
+from .._utils._spatial_normal import CholmodFactor, NotPositiveDefiniteError
 
 # ---------------------------------------------------------------------------
 # State and configuration dataclasses
@@ -577,18 +577,13 @@ def _sem_re_lam_log_density(
     Ar = r - lam * (W_sparse @ r)
     AtAr = Ar - lam * (W_sparse.T @ Ar)
     q = np.bincount(unit_idx, weights=AtAr, minlength=N)
+    s2 = sigma2
     try:
         factor.factorize(sem_alpha.precision(lam, sigma2, sigma_alpha2))
-    except Exception:
-        # Not positive definite: λ at the edge of its support.
-        return -np.inf
-    s2 = sigma2
-    return (
-        logdet_fn(lam)
-        - 0.5 * factor.logdet()
-        - 0.5 * (Ar @ Ar) / s2
-        + 0.5 * (q @ factor.solve(q)) / (s2 * s2)
-    )
+        quad = 0.5 * (q @ factor.solve(q)) / (s2 * s2) - 0.5 * factor.logdet()
+    except NotPositiveDefiniteError:
+        return -np.inf  # λ at the edge of its support
+    return logdet_fn(lam) - 0.5 * (Ar @ Ar) / s2 + quad
 
 
 def _sample_rho_re_sar(

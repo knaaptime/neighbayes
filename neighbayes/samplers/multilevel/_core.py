@@ -77,7 +77,7 @@ import scipy.sparse as sp
 
 from .._utils._group_effects import noncentered_effect_sd
 from .._utils._slice import SliceWidthState, slice_sample_1d_adaptive
-from .._utils._spatial_normal import CholmodFactor
+from .._utils._spatial_normal import CholmodFactor, NotPositiveDefiniteError
 
 PROCESSES = ("lag", "error", "none")
 PARAMETRIZATIONS = ("collapsed", "interweave", "centred", "noncentred")
@@ -544,18 +544,14 @@ def _sample_rho_units(
 
         def log_density(lam):
             rho[0] = lam
-            try:
-                factor.factorize(st.precision(rho, state.sig2))
-            except Exception:
-                return -np.inf
             q = _unit_q(st, lam, s2)
             u = y - lam * Wy
-            return (
-                lv0.logdet(lam)
-                - 0.5 * factor.logdet()
-                - 0.5 * (u @ u) / s2
-                + 0.5 * (q @ factor.solve(q))
-            )
+            try:
+                factor.factorize(st.precision(rho, state.sig2))
+                quad = 0.5 * (q @ factor.solve(q)) - 0.5 * factor.logdet()
+            except NotPositiveDefiniteError:
+                return -np.inf  # λ at the edge of its support
+            return lv0.logdet(lam) - 0.5 * (u @ u) / s2 + quad
 
         state.rho[0], _, _, _ = slice_sample_1d_adaptive(
             log_density,
@@ -630,9 +626,9 @@ def _collapsed_level(
     def marginal():
         try:
             factor.factorize(st.precision(rho, sig2))
-        except Exception:
-            return -np.inf
-        val = -0.5 * factor.logdet() + 0.5 * (q @ factor.solve(q))
+            val = -0.5 * factor.logdet() + 0.5 * (q @ factor.solve(q))
+        except NotPositiveDefiniteError:
+            return -np.inf  # ρ or σ at the edge of its support
         return val if np.isfinite(val) else -np.inf
 
     if lv.spatial:

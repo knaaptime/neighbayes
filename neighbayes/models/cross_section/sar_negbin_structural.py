@@ -154,7 +154,8 @@ class SARNegBinStructural(SpatialModel):
         # ω₀: draw from PG(y + α, η)
         from ...samplers._utils._polyagamma import sample_polyagamma
 
-        omega_init = sample_polyagamma(y + alpha_init, eta_init, rng=rng)
+        # A starting value: polyagamma's bias cannot matter here.
+        omega_init = sample_polyagamma(y + alpha_init, eta_init, rng=rng, warn=False)
 
         return GibbsState(
             eta=eta_init,

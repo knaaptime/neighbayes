@@ -364,9 +364,17 @@ def _make_cached_sparse_solver(
         backend = _select_sparse_backend()
     if not _is_suitesparse(backend):
         return None
+    from .._lu_route import lu_backend_errors
+
     try:
         return _SparseFactorSolver(_sparse_factor(A.tocsc(), backend))
-    except Exception:
+    except lu_backend_errors() as exc:
+        warnings.warn(
+            f"Sparse LU backend {backend!r} failed ({type(exc).__name__}: {exc}); "
+            "falling back to SciPy's SuperLU.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
         return None
 
 
