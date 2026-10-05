@@ -131,7 +131,7 @@ class TestLUBackendRouting:
             assert abs(evaluate(A) - np.linalg.slogdet(A.toarray())[1]) < 1e-8
         assert evaluate.backend == backend
 
-    def test_pinned_backend_skips_the_probe(self, small_nonsymmetric_W):
+    def test_pinned_backend_uses_only_that_backend(self, small_nonsymmetric_W):
         """Pinning a backend must not factorize with the other one."""
         pytest.importorskip("sksparse.umfpack")
         import neighbayes._logdet._aaa as aaa_mod
@@ -153,28 +153,18 @@ class TestLUBackendRouting:
             aaa_mod._load_lu_backend = real
         assert set(seen) == {"umfpack"}
 
-    def test_auto_probes_once_then_uses_the_winner(
-        self, small_nonsymmetric_W, monkeypatch
-    ):
-        """Auto factorizes with every candidate on call 1 and one thereafter.
+    def test_auto_factorizes_with_the_routed_backend_only(self, small_nonsymmetric_W):
+        """Auto routes by the pattern, then factorizes with that backend alone.
 
-        This is the probe's whole cost model: one extra factorization per
-        losing backend, never one per node.
+        No call factorizes with the other backend, so the grid's values come
+        from one library and do not depend on which one a timing favoured.
         """
         pytest.importorskip("sksparse.klu")
         pytest.importorskip("sksparse.umfpack")
         import neighbayes._logdet._aaa as aaa_mod
-        from neighbayes._logdet._aaa import _LU_BACKENDS, _ReusableLULogdet
+        from neighbayes._logdet._aaa import _ReusableLULogdet
+        from neighbayes._lu_route import LOGDET_THRESHOLD, route_matrix
 
-        # This test pins the full-race behaviour: both candidates factorize
-        # once, fastest keeps the work.  The stakes gate would short-circuit
-        # the race on a matrix this small, and a memoized route from an
-        # earlier test would skip it entirely, so neutralize both.
-        monkeypatch.setenv("NEIGHBAYES_LOGDET_LU_PROBE_GATE", "0")
-        monkeypatch.setattr(aaa_mod, "_LU_ROUTE_MEMO", {})
-
-        # _evaluate_one resolves the backend on every factorization, so
-        # counting here counts factorizations per backend.
         counts: dict[str, int] = {}
         real = aaa_mod._load_lu_backend
 
@@ -185,6 +175,7 @@ class TestLUBackendRouting:
         aaa_mod._load_lu_backend = counting
         try:
             evaluate = _ReusableLULogdet(backend=None)
+            assert evaluate.backend == "auto"
             grid = self._grid(small_nonsymmetric_W, (0.1, 0.3, 0.5, 0.7))
             values = [evaluate(A) for A in grid]
         finally:
@@ -192,11 +183,28 @@ class TestLUBackendRouting:
 
         for A, value in zip(grid, values, strict=True):
             assert abs(value - np.linalg.slogdet(A.toarray())[1]) < 1e-8
-        winner = evaluate.backend
-        assert winner in _LU_BACKENDS
-        assert counts[winner] == len(grid)
-        for loser in set(_LU_BACKENDS) - {winner}:
-            assert counts.get(loser, 0) == 1
+        winner = route_matrix(grid[0], LOGDET_THRESHOLD)
+        assert evaluate.backend == winner
+        assert counts == {winner: len(grid)}
+
+    def test_auto_routes_dense_patterns_to_umfpack(self):
+        """A dense flow pattern goes to UMFPACK and a sparse graph to KLU."""
+        pytest.importorskip("sksparse.klu")
+        pytest.importorskip("sksparse.umfpack")
+        from neighbayes._logdet._aaa import _ReusableLULogdet
+
+        W = _knn_W(36, k=6)
+        eye = sp.identity(36)
+        flow = (
+            sp.identity(36 * 36)
+            - 0.2 * (sp.kron(W, eye) + sp.kron(eye, W) + sp.kron(W, W))
+        ).tocsc()
+        dense = _ReusableLULogdet(backend=None)
+        dense(flow)
+        assert dense.backend == "umfpack"
+        sparse = _ReusableLULogdet(backend=None)
+        sparse(self._grid(_knn_W(300, k=4), (0.3,))[0])
+        assert sparse.backend == "klu"
 
     def test_broken_klu_falls_to_umfpack_not_superlu(self, small_nonsymmetric_W):
         """A KLU failure must demote to the other SuiteSparse backend, loudly.
@@ -306,98 +314,6 @@ class TestReusableLULogdet:
             reused = evaluate(eye - rho * W)
             dense = np.linalg.slogdet((eye - rho * W).toarray())[1]
             assert abs(reused - dense) < 1e-6
-
-    def test_route_memo_skips_second_race(self, small_nonsymmetric_W, monkeypatch):
-        """A second context on the same pattern must not re-pay the race.
-
-        The memo's whole value is that the routing decision — a function of
-        the sparsity pattern alone, since per-node cost under symbolic reuse
-        carries no value dependence — transfers across instances: the refit,
-        the matched-budget comparison, one fit per model on a shared W.
-        """
-        pytest.importorskip("sksparse.klu")
-        pytest.importorskip("sksparse.umfpack")
-        import neighbayes._logdet._aaa as aaa_mod
-        from neighbayes._logdet._aaa import _make_reusable_lu_logdet
-
-        # Pin the race on (no gate, no inherited route), because the point is
-        # to observe the memo being *written*, then observe it being *read*.
-        monkeypatch.setenv("NEIGHBAYES_LOGDET_LU_PROBE_GATE", "0")
-        monkeypatch.setattr(aaa_mod, "_LU_ROUTE_MEMO", {})
-
-        n = small_nonsymmetric_W.shape[0]
-        eye = sp.eye(n, format="csc")
-        W = sp.csc_matrix(small_nonsymmetric_W)
-        grid = [eye - rho * W for rho in (0.2, 0.5)]
-
-        counts: dict[str, int] = {}
-        real = aaa_mod._load_lu_backend
-
-        def counting(name):
-            counts[name] = counts.get(name, 0) + 1
-            return real(name)
-
-        aaa_mod._load_lu_backend = counting
-        try:
-            first = _make_reusable_lu_logdet()
-            for A in grid:
-                first(A)
-            winner = first.backend
-            settled = dict(counts)
-            second = _make_reusable_lu_logdet()
-            for A in grid:
-                second(A)
-        finally:
-            aaa_mod._load_lu_backend = real
-
-        # The second context factorized with the memoized winner only.
-        for name, count in counts.items():
-            if name == winner:
-                assert count == 2 * len(grid)
-            else:
-                assert count == settled.get(name, 0)  # no new factorizations
-        assert second.backend == winner
-
-    def test_stakes_gate_skips_race_on_cheap_grid(
-        self, small_nonsymmetric_W, monkeypatch
-    ):
-        """A first candidate under the gate settles without racing the other.
-
-        Below the gate the grid is milliseconds outright, so the second
-        backend's probe factorization cannot pay for itself; the gate
-        bounds the possible misroute by the gate value itself.
-        """
-        pytest.importorskip("sksparse.klu")
-        pytest.importorskip("sksparse.umfpack")
-        import neighbayes._logdet._aaa as aaa_mod
-        from neighbayes._logdet._aaa import _make_reusable_lu_logdet
-
-        monkeypatch.setenv("NEIGHBAYES_LOGDET_LU_PROBE_GATE", "10")
-        monkeypatch.setattr(aaa_mod, "_LU_ROUTE_MEMO", {})
-
-        seen = []
-        real = aaa_mod._load_lu_backend
-
-        def spy(name):
-            seen.append(name)
-            return real(name)
-
-        aaa_mod._load_lu_backend = spy
-        try:
-            evaluate = _make_reusable_lu_logdet()
-            n = small_nonsymmetric_W.shape[0]
-            eye = sp.eye(n, format="csc")
-            W = sp.csc_matrix(small_nonsymmetric_W)
-            value = evaluate(eye - 0.3 * W)
-        finally:
-            aaa_mod._load_lu_backend = real
-
-        # Small-W factorizations land far under a 10s gate, so only the
-        # KLU-first candidate ran — no UMFPACK probe.
-        assert seen == ["klu"]
-        dense = np.linalg.slogdet((eye - 0.3 * W).toarray())[1]
-        assert abs(value - dense) < 1e-8
-        assert evaluate.backend == "klu"
 
 
 # ---------------------------------------------------------------------------

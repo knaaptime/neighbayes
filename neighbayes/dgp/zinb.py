@@ -45,9 +45,11 @@ def simulate_sar_zinb(
     .. math::
 
         d_i \sim \text{Bernoulli}(\text{logit}^{-1}(\eta^{\text{sel}}_i)),
-        \quad \eta^{\text{sel}} = (I - \lambda W_{\text{sel}})^{-1}(Z\gamma + \nu)
+        \quad \eta^{\text{sel}} = (I - \lambda W_{\text{sel}})^{-1} Z\gamma,
 
-    where :math:`\nu \sim N(0, I)`.
+    the reduced-form selection :class:`~neighbayes.models.SARZINB` fits.  (Until
+    2026-10-03 a latent ``ν ~ N(0, I)`` was added inside the filter, a random
+    effect the model does not have, which attenuated the γ estimates.)
 
     **Count** (flow volume — reduced-form SAR-NB):
 
@@ -103,7 +105,8 @@ def simulate_sar_zinb(
     target_pi : float, optional
         If given, an intercept shift is solved so that the marginal
         corridor activation probability ``mean(pi) == target_pi``.
-        The shift is added to ``gamma[0]``.
+        The shift is added to ``gamma[0]`` (inside the filter, so the
+        reported ``gamma`` generates ``eta_sel``).
     err_hetero : bool, default False
         Not implemented for ZINB models. If True, a warning is issued
         and the parameter is ignored (homoskedastic errors are used).
@@ -164,17 +167,19 @@ def simulate_sar_zinb(
     _check_rho_stability(lam, name="lam")
 
     # --- Selection equation: SAR-logit ---
-    # eta_sel = (I - lam * W_sel)^{-1} (Z @ gamma + nu), nu ~ N(0, I)
-    nu = rng.standard_normal(nobs)
-    eta_sel = spatial_filter_factor(W_sel_s, lam)(Z @ gamma + nu)
+    # Reduced form, as the model: eta_sel = (I - lam * W_sel)^{-1} Z gamma.
+    solve_sel = spatial_filter_factor(W_sel_s, lam)
+    eta_sel = solve_sel(Z @ gamma)
 
-    # Apply target_pi shift if requested
+    # Apply target_pi shift if requested.  The shift moves gamma[0] inside the
+    # filter, so eta_sel moves by c·(I − λW_sel)⁻¹Z[:, 0], not by c.
     if target_pi is not None:
         if not 0.0 < float(target_pi) < 1.0:
             raise ValueError(f"target_pi must lie in (0, 1); got {target_pi!r}")
+        a0 = np.asarray(solve_sel(Z[:, 0]), dtype=float)
 
         def _mean_pi(c: float) -> float:
-            return float(np.mean(1.0 / (1.0 + np.exp(-(eta_sel + c)))))
+            return float(np.mean(1.0 / (1.0 + np.exp(-(eta_sel + c * a0)))))
 
         lo, hi = -50.0, 50.0
         for _ in range(60):
@@ -184,7 +189,7 @@ def simulate_sar_zinb(
             else:
                 hi = mid
         c = 0.5 * (lo + hi)
-        eta_sel = eta_sel + c
+        eta_sel = eta_sel + c * a0
         gamma = gamma.copy()
         gamma[0] = gamma[0] + c
 

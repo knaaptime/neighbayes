@@ -54,6 +54,7 @@ EXPECTED: dict[str, dict[str, float]] = {
         "lam_lower": -1.0,
         "lam_upper": 1.0,
     },
+    "MultilevelPriors": {"nu": NU, "sigma2_alpha": 2.0, "sigma_nu": 3.0},
     "NegBinPriors": {
         "nu": NU,
         "sigma2_alpha": 2.0,

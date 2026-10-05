@@ -414,7 +414,7 @@ class GibbsEstimation:
         # The refit and the AAA node check pool ρ across chains halfway through
         # warmup, inside the vectorized runner.
         wj = self._warmup_jacobian()
-        param_fn = params0 = refit_hook = None
+        param_fn = params0 = refit_hook = kind_params = None
         if wj is not None:
             param_fn = wj.param_fn()
             start = wj.initial(tune, jax=True)
@@ -432,7 +432,9 @@ class GibbsEstimation:
                 "sampler_builds_evaluators and GibbsEstimation._warmup_jacobian disagree."
             )
         else:
-            logdet_jax = self._build_logdet_jax()
+            # As parameters, so the compiled program is reused by later fits.
+            kind_params = self._build_logdet_jax_params()
+            logdet_jax = self._build_logdet_jax() if kind_params is None else None
         # A refit that replaces the interpolant must also replace the evaluator
         # the post-chain pointwise log-likelihood uses, and that evaluator is
         # passed to the runner before the refit happens — so pass a late-binding
@@ -498,6 +500,7 @@ class GibbsEstimation:
             nu=self.nu,
             n_eff=self.n_eff,
             jacobian_shift=self.jacobian_shift,
+            logdet_kind_params=kind_params,
         )
 
         # Assemble DataTree
@@ -633,6 +636,30 @@ class GibbsEstimation:
             rho_max=self.priors.rho_upper,
             T=self.jacobian_T,
         )
+
+    def _build_logdet_jax_params(self):
+        """``(kind, params, T)`` of the JAX log-determinant, or ``None``.
+
+        The same function :meth:`_build_logdet_jax` builds, as parameters the
+        compiled sweep takes as data (:func:`neighbayes._logdet._jax.
+        logdet_jax_params`).  ``None`` for a method with no array form.
+        """
+        from ..._logdet._jax import logdet_jax_params
+
+        W = self.W_sparse
+        n_units = W.shape[0] // self.T  # per-period unit count
+        W_input = W[:n_units, :n_units] if self.T > 1 else W
+        method = "eigenvalue" if self.W_eigs is not None else self.logdet_method
+        kind, params = logdet_jax_params(
+            W_input,
+            method,
+            self.priors.rho_lower,
+            self.priors.rho_upper,
+            eigs=self.W_eigs,
+        )
+        if kind == "closure":
+            return None
+        return kind, params, self.jacobian_T
 
     def _build_cache(self) -> GaussianGibbsCache:
         """Build the GibbsCache from model data."""

@@ -155,6 +155,12 @@ def resolve_backend(requested: str, entry: GibbsEntry, *, jax_ok: bool) -> str:
         For an invalid value, or an explicit backend the family does not support.
     ImportError
         For an explicit ``"jax"`` request when JAX is not installed.
+
+    Notes
+    -----
+    Resolving to ``"jax"`` enables JAX's float64 mode here, before the model or
+    the runner builds any array: an array built while it is off is silently
+    float32, and a model that caches one would carry it into every later fit.
     """
     valid = {"auto", "jax", "numpy"}
     if requested not in valid:
@@ -165,7 +171,7 @@ def resolve_backend(requested: str, entry: GibbsEntry, *, jax_ok: bool) -> str:
         # Prefer the entry's declared auto backend; only escalate to JAX when the
         # family prefers it *and* JAX is importable, else fall back to NumPy.
         if entry.auto_backend == "jax" and "jax" in entry.backends and jax_ok:
-            return "jax"
+            return _jax_backend()
         return "numpy" if "numpy" in entry.backends else next(iter(entry.backends))
     if requested not in entry.backends:
         raise ValueError(
@@ -176,7 +182,15 @@ def resolve_backend(requested: str, entry: GibbsEntry, *, jax_ok: bool) -> str:
         raise ImportError(
             "gibbs_backend='jax' requires JAX. Install with: pip install jax"
         )
-    return requested
+    return _jax_backend() if requested == "jax" else requested
+
+
+def _jax_backend() -> str:
+    """``"jax"``, with JAX's float64 mode on (see :func:`resolve_backend`)."""
+    from .._jax_dispatch import ensure_x64
+
+    ensure_x64()
+    return "jax"
 
 
 def pop_options(sample_kwargs: dict, entry: GibbsEntry) -> dict:

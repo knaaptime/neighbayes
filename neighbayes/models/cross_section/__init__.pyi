@@ -1,7 +1,10 @@
 from .logit import Logit as Logit
+from .multilevel import Level as Level
+from .multilevel import SpatialMultilevel as SpatialMultilevel
 from .negbin import NegBin as NegBin
 from .ols import OLS as OLS
 from .sar import SAR as SAR
+from .sar_hurdle import SARHurdleNB as SARHurdleNB
 from .sar_logit import SARLogit as SARLogit
 from .sar_logit_structural import SARLogitStructural as SARLogitStructural
 from .sar_negbin import SARNegBin as SARNegBin

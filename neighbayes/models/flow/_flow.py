@@ -29,6 +29,7 @@ Two variants are provided:
 
 from __future__ import annotations
 
+import warnings
 from abc import abstractmethod
 from typing import Any, Optional, Union
 
@@ -44,6 +45,7 @@ from ..._logdet import (
 )
 from ..._ops import kron_solve_vec
 from ...graph import _weights_to_csr, flow_lags, flow_trace_blocks
+from .._base._nb import nb_alpha_rv
 from .._mixins._flow_shared import FlowSharedMethods
 from ..base import SpatialModel
 
@@ -1513,7 +1515,7 @@ class SARNegBinFlow(_NegBinFlowMixin, SARFlow):
                 )
 
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            alpha = pm.HalfStudentT("alpha", nu=alpha_nu, sigma=alpha_sigma)
+            alpha = nb_alpha_rv(pv["alpha_fixed"], alpha_nu, alpha_sigma)
 
             Xb = pt.dot(X_t, beta)
             solve_op = SparseFlowSolveOp(self._Wd, self._Wo, self._Ww)
@@ -1646,7 +1648,7 @@ class SARNegBinFlowSeparable(_NegBinFlowMixin, SARFlowSeparable):
             pm.Deterministic("rho_w", -rho_d * rho_o)
 
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            alpha = pm.HalfStudentT("alpha", nu=alpha_nu, sigma=alpha_sigma)
+            alpha = nb_alpha_rv(pv["alpha_fixed"], alpha_nu, alpha_sigma)
 
             Xb = pt.dot(X_t, beta)
             solve_op = KroneckerFlowSolveOp(self._W_sparse, n)
@@ -1764,7 +1766,7 @@ class NegBinFlow(_NegBinFlowMixin, OLSFlow):
 
         with pm.Model(coords=self._model_coords()) as model:
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            alpha = pm.HalfStudentT("alpha", nu=alpha_nu, sigma=alpha_sigma)
+            alpha = nb_alpha_rv(pv["alpha_fixed"], alpha_nu, alpha_sigma)
             eta = pt.dot(X_t, beta)
             lam = pm.Deterministic("lambda", pt.exp(eta))
             pm.NegativeBinomial("obs", mu=lam, alpha=alpha, observed=self._y_int_vec)
@@ -1839,6 +1841,7 @@ class NegBinFlow(_NegBinFlowMixin, OLSFlow):
             beta_sigma=pv["beta_sigma"],
             alpha_sigma=pv["alpha_sigma"],
             alpha_nu=pv["alpha_nu"],
+            alpha_fixed=pv["alpha_fixed"],
             rho_lower=-0.999,
             rho_upper=0.999,
         )
@@ -1976,14 +1979,29 @@ class NegBinFlow(_NegBinFlowMixin, OLSFlow):
 # ---------------------------------------------------------------------------
 
 
+#: Pearson dispersion above which a Poisson flow fit warns.
+_POISSON_DISPERSION_WARN = 2.0
+
+
 class _PoissonFlowMixin:
     """Shared ``fit`` dispatch for Poisson flow models.
 
     Mirrors :class:`_NegBinFlowMixin`, but dispatches to the auxiliary-mixture
     Gibbs sampler (Frühwirth-Schnatter & Wagner 2006) rather than Pólya–Gamma.
-    Poisson admits no exact PG representation, and the NB-with-large-alpha
-    approximation degenerates precisely in the Poisson limit — the PG working
-    precision outruns the Fisher information without bound, collapsing ESS.
+
+    **Use it for counts that are close to Poisson.**  The augmentation draws
+    are exact, but the finite normal mixture standing in for the
+    ``−log Gamma`` error has quadratic log-tails where the true density's are
+    linear.  When counts sit far from their fitted means — overdispersion the
+    model does not capture — their working residuals land deep in those tails
+    and pull the fit toward the large counts.  Against an exact intercept-only
+    posterior: no bias on Poisson data, about one posterior sd at Pearson
+    dispersion ≈ 4, seven at ≈ 13.  ``fit`` reports the dispersion in
+    ``idata.attrs["pearson_dispersion"]`` and warns above
+    ``_POISSON_DISPERSION_WARN``.  For overdispersed data use the NB flow
+    models; Pólya–Gamma is exact there.  ``priors={"alpha_fixed": a}`` on an NB
+    model with ``a`` 10-20 times the typical mean is an essentially Poisson
+    model on that exact sampler (mixing degrades only for ``a`` ≳ 1000).
 
     Gibbs-only: unlike the NB classes there is no ``sampler="nuts"`` path yet.
     """
@@ -2027,7 +2045,7 @@ class _PoissonFlowMixin:
             )
         if sample_kwargs:
             raise TypeError(f"Unexpected keyword arguments: {sorted(sample_kwargs)}")
-        return self._fit_gibbs(
+        idata = self._fit_gibbs(
             draws=draws,
             tune=tune,
             chains=chains,
@@ -2036,6 +2054,33 @@ class _PoissonFlowMixin:
             n_jobs=n_jobs,
             log_likelihood=bool((idata_kwargs or {}).get("log_likelihood", False)),
         )
+        self._check_dispersion(idata)
+        return idata
+
+    def _poisson_eta(self, rho_d, rho_o, rho_w, beta) -> np.ndarray:
+        """``A(ρ)⁻¹Xβ`` for one parameter value."""
+        raise NotImplementedError
+
+    def _check_dispersion(self, idata) -> float:
+        """Pearson dispersion at the posterior mean; warn when well above 1."""
+        post = idata.posterior
+        mean = {k: float(post[k].mean()) for k in ("rho_d", "rho_o", "rho_w")}
+        beta = post["beta"].mean(("chain", "draw")).values
+        mu = np.exp(np.clip(self._poisson_eta(**mean, beta=beta), -50.0, 50.0))
+        y = self._y_int_vec.astype(np.float64)
+        phi = float(np.sum((y - mu) ** 2 / mu) / max(y.size - beta.size, 1))
+        idata.attrs["pearson_dispersion"] = phi
+        if phi > _POISSON_DISPERSION_WARN:
+            warnings.warn(
+                f"Pearson dispersion {phi:.2f}: the counts are overdispersed "
+                "relative to this Poisson fit, and the auxiliary-mixture sampler "
+                "is biased toward large counts under overdispersion (about one "
+                "posterior sd at dispersion 4).  Use the negative binomial flow "
+                "model instead.",
+                UserWarning,
+                stacklevel=3,
+            )
+        return phi
 
 
 def _require_counts(y, cls_name: str) -> np.ndarray:
@@ -2101,12 +2146,15 @@ class SARPoissonFlow(_PoissonFlowMixin, SARFlow):
         rng = np.random.default_rng(random_seed)
         out = np.empty((total, self._N), dtype=np.float64)
         for g in range(total):
-            eta = self._solve_A(
-                rho_d_draws[g], rho_o_draws[g], rho_w_draws[g], self._X @ beta_draws[g]
+            eta = self._poisson_eta(
+                rho_d_draws[g], rho_o_draws[g], rho_w_draws[g], beta_draws[g]
             )
             lam = np.exp(np.clip(eta, -50.0, 50.0))
             out[g] = rng.poisson(lam).astype(np.float64)
         return out
+
+    def _poisson_eta(self, rho_d, rho_o, rho_w, beta) -> np.ndarray:
+        return self._solve_A(rho_d, rho_o, rho_w, self._X @ beta)
 
     def _fit_gibbs(
         self,
@@ -2140,7 +2188,9 @@ class SARPoissonFlowSeparable(_PoissonFlowMixin, SARFlowSeparable):
 
     ``rho_w = -rho_d * rho_o`` is deterministic, which removes the ρ ridge that
     makes the unrestricted variant intractable.  This is the recommended
-    Poisson flow model.
+    Poisson flow model, for counts close to Poisson: under overdispersion the
+    auxiliary-mixture sampler is biased (see the warning ``fit`` raises, and
+    use :class:`SARNegBinFlowSeparable` instead).
     """
 
     def __init__(self, y, X, W, **kwargs):
@@ -2174,15 +2224,19 @@ class SARPoissonFlowSeparable(_PoissonFlowMixin, SARFlowSeparable):
 
         rng = np.random.default_rng(random_seed)
         out = np.empty((total, self._N), dtype=np.float64)
-        n = self._n
-        I_n = sp.eye(n, format="csr", dtype=np.float64)
         for g in range(total):
-            Ld = I_n - float(rho_d_draws[g]) * self._W_sparse
-            Lo = I_n - float(rho_o_draws[g]) * self._W_sparse
-            eta = kron_solve_vec(Lo, Ld, self._X @ beta_draws[g], n)
+            eta = self._poisson_eta(rho_d_draws[g], rho_o_draws[g], None, beta_draws[g])
             lam = np.exp(np.clip(eta, -50.0, 50.0))
             out[g] = rng.poisson(lam).astype(np.float64)
         return out
+
+    def _poisson_eta(self, rho_d, rho_o, rho_w, beta) -> np.ndarray:
+        """``(L_o ⊗ L_d)⁻¹Xβ``; ``rho_w`` is implied (``−ρ_d ρ_o``) and ignored."""
+        n = self._n
+        I_n = sp.eye(n, format="csr", dtype=np.float64)
+        Ld = I_n - float(rho_d) * self._W_sparse
+        Lo = I_n - float(rho_o) * self._W_sparse
+        return kron_solve_vec(Lo, Ld, self._X @ beta, n)
 
     def _fit_gibbs(
         self,

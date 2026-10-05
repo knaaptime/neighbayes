@@ -174,3 +174,34 @@ class TestPosteriorPredictive:
         )
         m.fit(draws=100, tune=80, chains=2, random_seed=2, progressbar=False, n_jobs=1)
         assert m.posterior_predictive(n_draws=25, random_seed=0).shape[0] == 25
+
+
+class TestDispersionCheck:
+    """``fit`` reports the Pearson dispersion and warns under overdispersion.
+
+    The auxiliary-mixture sampler is exact for Poisson data and biased toward
+    large counts when the data are overdispersed relative to the fit.
+    """
+
+    def _fit(self, data):
+        m = SARPoissonFlowSeparable(data["y_vec"], data["X"], data["G"])
+        return m.fit(draws=150, tune=150, chains=1, progressbar=False, random_seed=0)
+
+    def test_poisson_data_is_quiet(self):
+        import warnings
+
+        data = generate_poisson_flow_data_separable(n=10, seed=4)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("error", message="Pearson dispersion")
+            idata = self._fit(data)
+        assert 0.6 < idata.attrs["pearson_dispersion"] < 1.5
+
+    def test_overdispersed_data_warns(self):
+        from neighbayes.dgp.flows import generate_negbin_flow_data_separable
+
+        data = generate_negbin_flow_data_separable(
+            n=10, seed=5, alpha=0.5, beta_d=[0.3, 0.3], beta_o=[0.3, 0.3]
+        )
+        with pytest.warns(UserWarning, match="Pearson dispersion"):
+            idata = self._fit(data)
+        assert idata.attrs["pearson_dispersion"] > 2.0

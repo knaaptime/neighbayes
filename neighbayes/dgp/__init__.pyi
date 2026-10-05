@@ -26,6 +26,9 @@ from .flows import (
     generate_flow_data_separable as generate_flow_data_separable,
 )
 from .flows import (
+    generate_hurdle_flow_data_separable as generate_hurdle_flow_data_separable,
+)
+from .flows import (
     generate_negbin_flow_data as generate_negbin_flow_data,
 )
 from .flows import (
@@ -55,6 +58,18 @@ from .flows import (
 from .flows import (
     generate_sem_flow_data_separable as generate_sem_flow_data_separable,
 )
+from .flows import (
+    generate_zinb_flow_data_separable as generate_zinb_flow_data_separable,
+)
+from .hurdle import (
+    simulate_panel_sar_hurdle as simulate_panel_sar_hurdle,
+)
+from .hurdle import (
+    simulate_sar_hurdle as simulate_sar_hurdle,
+)
+from .multilevel import (
+    simulate_spatial_multilevel as simulate_spatial_multilevel,
+)
 from .nonlinear import (
     simulate_sar_logit as simulate_sar_logit,
 )
@@ -72,6 +87,12 @@ from .nonlinear import (
 )
 from .nonlinear import (
     simulate_spatial_probit as simulate_spatial_probit,
+)
+from .panel_count import (
+    simulate_panel_sar_negbin as simulate_panel_sar_negbin,
+)
+from .panel_count import (
+    simulate_panel_sar_zinb as simulate_panel_sar_zinb,
 )
 from .panel_dynamic import (
     simulate_panel_dlm_fe as simulate_panel_dlm_fe,

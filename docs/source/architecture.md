@@ -239,9 +239,13 @@ working default rather than an error:
   family prefers it, NumPy otherwise. Requesting `"jax"` explicitly without JAX
   installed raises, because a silent downgrade of an explicit request would be
   misleading.
-- **Sparse solves** prefer KLU, then UMFPACK (both from `scikit-sparse`), then SciPy's
-  SuperLU, with a one-time advisory warning when it falls back so the performance loss
-  is visible.
+- **Sparse solves** use KLU or UMFPACK (both from `scikit-sparse` and `sparsax`), chosen
+  for each sparsity pattern by the work per factor entry of its factorization: KLU on
+  the sparse graphs of contiguity and few-neighbour KNN weights, UMFPACK once the
+  factor's fronts grow dense. The choice depends on the pattern alone, never on a
+  timing, so a fixed seed reproduces the same draws. Without `scikit-sparse` they fall
+  back to SciPy's SuperLU, with a one-time advisory warning so the performance loss is
+  visible.
 - **A dense LAPACK fast path** handles small problems: below `NEIGHBAYES_KRON_DENSE_MAX`
   (512), `lu_factor` on a dense $I - \rho W$ beats `splu`, because SuperLU spends most of
   its time in symbolic-factorisation overhead at that size while `dgetrf` is a single

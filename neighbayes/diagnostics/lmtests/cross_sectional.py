@@ -1589,7 +1589,7 @@ def _sar_null_lambda_info(
     W_csc = W_sparse.tocsc()
 
     # One sparse factorization, reused for every solve below.  Prefer
-    # sparsax's LU (KLU or UMFPACK, whichever measures faster on this pattern)
+    # sparsax's LU (KLU or UMFPACK, routed by this pattern)
     # when available, falling back to the configured scikit-sparse / scipy
     # backend.  sparsax's factor + solve-factor pair lets the numeric factor be
     # reused across all chunked column solves; the scikit-sparse / scipy
@@ -1607,7 +1607,7 @@ def _sar_null_lambda_info(
         _Ai = jnp.asarray(_A_coo.row, dtype=jnp.int32)
         _Aj = jnp.asarray(_A_coo.col, dtype=jnp.int32)
         _Ax = jnp.asarray(_A_coo.data, dtype=jnp.float64)
-        _lu = sparsax_lu(_Ai, _Aj, _Ax, n)
+        _lu = sparsax_lu(_Ai, _Aj, n)
         _factor = _lu.factor(_Ai, _Aj, _Ax, n)
 
         def solve(rhs):

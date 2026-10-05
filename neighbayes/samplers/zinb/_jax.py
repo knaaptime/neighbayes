@@ -24,76 +24,56 @@ from ..negbin_reduced._core import _KRYLOV_DEGREE_DEFAULT, _KRYLOV_DMAX_DEFAULT
 
 
 def _make_zinb_gibbs_step(
-    y_jax,
-    d_jax,
-    Z_jax,
-    X_jax,
-    sel_ctx,
-    cnt_ctx,
     n,
     p,
     k,
-    priors,
     *,
+    lu_sel,
+    lu_cnt,
     krylov_degree,
-    krylov_dmax,
+    alpha_fixed=False,
 ):
-    """Build a JIT-compiled reduced-form ZINB Gibbs step (9 blocks)."""
+    """Build a JIT-compiled reduced-form ZINB Gibbs step (9 blocks).
+
+    Static settings only; the model's arrays come in as the step's ``data``
+    argument (:func:`_zinb_data`), so one compiled program serves every fit of
+    the same structure.
+    """
     import jax
     import jax.numpy as jnp
 
-    from ..._jax_dispatch import ensure_x64
     from .._utils._jax_slice import jax_slice_sample_1d
+    from .._utils._jax_utils import make_pg_draw
     from ..logit_reduced._jax import _rho_log_density_logit
     from ..negbin_reduced._jax import (
+        _bind_sparse_solvers,
         _build_krylov_basis_jax,
         _eval_U_from_basis_jax,
-        _make_sparse_solvers,
         _rho_log_density_marginal_jax,
         _series_radius_jax,
     )
 
-    ensure_x64()
-
-    from .._utils._jax_utils import make_pg_draw
-
     _draw_pg = make_pg_draw()
-
-    _solve_sel, _matvec_Wsel = _make_sparse_solvers(sel_ctx)
-    _solve_cnt, _matvec_Wcnt = _make_sparse_solvers(cnt_ctx)
-
-    def _prior_vec(mu, sigma, dim):
-        v0 = (
-            jnp.full(dim, 1.0 / float(sigma) ** 2)
-            if np.isscalar(sigma)
-            else 1.0 / jnp.asarray(sigma, dtype=jnp.float64) ** 2
-        )
-        m0 = (
-            jnp.full(dim, float(mu))
-            if np.isscalar(mu)
-            else jnp.asarray(mu, dtype=jnp.float64)
-        )
-        return v0, m0
-
-    V0g, mu0g = _prior_vec(priors.gamma_mu, priors.gamma_sigma, p)
-    V0b, mu0b = _prior_vec(priors.beta_mu, priors.beta_sigma, k)
-    lam_lo, lam_hi = jnp.float64(priors.lam_lower), jnp.float64(priors.lam_upper)
-    rho_lo, rho_hi = jnp.float64(priors.rho_lower), jnp.float64(priors.rho_upper)
-    a_sigma, a_nu = jnp.float64(priors.alpha_sigma), jnp.float64(priors.alpha_nu)
-    dmax = jnp.float64(krylov_dmax)
     _deg = int(krylov_degree)
     _IC = -1  # reparam disabled (target unchanged); simpler/robust
 
     from .._utils._jax_utils import conjugate_normal as _conjugate_normal
 
     @jax.jit
-    def gibbs_step(state, key, slice_widths):
+    def gibbs_step(state, key, slice_widths, data):
         """One sweep; ``slice_widths`` is ``(λ width, ρ width)``.
 
         Returns ``(new_state, trace, steps)``, where ``steps`` holds the λ and ρ
         slices' ``(left, right)`` step-out counts for warmup width adaptation.
         """
         w_lam, w_rho = slice_widths
+        y_jax, Z_jax, X_jax = data["y"], data["Z"], data["X"]
+        V0g, mu0g, V0b, mu0b = data["V0g"], data["mu0g"], data["V0b"], data["mu0b"]
+        lam_lo, lam_hi = data["lam_lower"], data["lam_upper"]
+        rho_lo, rho_hi = data["rho_lower"], data["rho_upper"]
+        a_sigma, a_nu, dmax = data["alpha_sigma"], data["alpha_nu"], data["krylov_dmax"]
+        _solve_sel, _matvec_Wsel = _bind_sparse_solvers(lu_sel, data["sel"])
+        _solve_cnt, _matvec_Wcnt = _bind_sparse_solvers(lu_cnt, data["cnt"])
         gamma = state["gamma"]
         lam = state["lam"]
         beta = state["beta"]
@@ -224,15 +204,21 @@ def _make_zinb_gibbs_step(
             )
             return log_a + total + log_prior
 
-        log_a_new, _ = jax_slice_sample_1d(
-            _alpha_logdens,
-            jnp.log(alpha),
-            jnp.float64(-4.0),
-            jnp.float64(4.0),
-            key=kα,
-            w=jnp.float64(1.0),
-        )
-        alpha = jnp.exp(log_a_new)
+        if not alpha_fixed:
+            # Same log-α support as the NumPy sampler (``_sample_alpha``): the
+            # earlier [−4, 4] capped α at e⁴ ≈ 55, so the backends sampled
+            # different supports.
+            log_a_new, _ = jax_slice_sample_1d(
+                _alpha_logdens,
+                jnp.log(alpha),
+                jnp.float64(-10.0),
+                jnp.float64(10.0),
+                key=kα,
+                w=jnp.float64(1.0),
+            )
+            alpha = jnp.exp(log_a_new)
+        else:
+            alpha = data["alpha_fixed"]
 
         new_state = {
             "gamma": gamma,
@@ -246,6 +232,38 @@ def _make_zinb_gibbs_step(
         return new_state, trace, ((lam_left, lam_right), (rho_left, rho_right))
 
     return gibbs_step
+
+
+def _zinb_data(y, Z, X, sel_arrays, cnt_arrays, priors, krylov_dmax):
+    """The ZINB step's ``data``: every data-dependent array and scalar."""
+    import jax.numpy as jnp
+
+    from ..negbin_reduced._jax import prior_precision_and_mean
+
+    V0g, mu0g = prior_precision_and_mean(
+        priors.gamma_mu, priors.gamma_sigma, Z.shape[1]
+    )
+    V0b, mu0b = prior_precision_and_mean(priors.beta_mu, priors.beta_sigma, X.shape[1])
+    alpha_fixed = getattr(priors, "alpha_fixed", None)
+    return {
+        "y": jnp.asarray(y, dtype=jnp.float64),
+        "Z": jnp.asarray(Z, dtype=jnp.float64),
+        "X": jnp.asarray(X, dtype=jnp.float64),
+        "V0g": V0g,
+        "mu0g": mu0g,
+        "V0b": V0b,
+        "mu0b": mu0b,
+        "lam_lower": jnp.float64(priors.lam_lower),
+        "lam_upper": jnp.float64(priors.lam_upper),
+        "rho_lower": jnp.float64(priors.rho_lower),
+        "rho_upper": jnp.float64(priors.rho_upper),
+        "alpha_sigma": jnp.float64(priors.alpha_sigma),
+        "alpha_nu": jnp.float64(priors.alpha_nu),
+        "alpha_fixed": jnp.float64(alpha_fixed if alpha_fixed is not None else 1.0),
+        "krylov_dmax": jnp.float64(krylov_dmax),
+        "sel": sel_arrays,
+        "cnt": cnt_arrays,
+    }
 
 
 def run_chains_jax_zinb(
@@ -286,19 +304,16 @@ def run_chains_jax_zinb(
 
     from ..._jax_dispatch import ensure_x64
     from .._utils._progress import GibbsProgressBarManager
-    from ..negbin_reduced._jax import _build_sparse_ctx
+    from ..negbin_reduced._jax import _build_sparse_ctx, _sparse_solve_parts
     from ._core import _zinb_loglik_pointwise
 
     ensure_x64()
     chains = len(inits)
     n, k = X.shape
     p = Z.shape[1]
-    y_jax = jnp.asarray(y, dtype=jnp.float64)
-    d_jax = jnp.asarray(d, dtype=jnp.float64)
-    Z_jax = jnp.asarray(Z, dtype=jnp.float64)
-    X_jax = jnp.asarray(X, dtype=jnp.float64)
-    sel_ctx = _build_sparse_ctx(W_sel_sparse, n)
-    cnt_ctx = _build_sparse_ctx(W_cnt_sparse, n)
+    lu_sel, sel_arrays = _sparse_solve_parts(_build_sparse_ctx(W_sel_sparse, n))
+    lu_cnt, cnt_arrays = _sparse_solve_parts(_build_sparse_ctx(W_cnt_sparse, n))
+    data = _zinb_data(y, Z, X, sel_arrays, cnt_arrays, priors, krylov_dmax)
 
     from .._utils._sparsax_lu import set_sparsax_lu_cache_size
 
@@ -307,21 +322,6 @@ def run_chains_jax_zinb(
 
     if jax_seeds is None:
         jax_seeds = list(range(chains))
-
-    gibbs_step = _make_zinb_gibbs_step(
-        y_jax,
-        d_jax,
-        Z_jax,
-        X_jax,
-        sel_ctx,
-        cnt_ctx,
-        n,
-        p,
-        k,
-        priors,
-        krylov_degree=krylov_degree,
-        krylov_dmax=krylov_dmax,
-    )
 
     state0 = {
         "gamma": jnp.asarray(np.stack([i.gamma for i in inits]), dtype=jnp.float64),
@@ -340,22 +340,41 @@ def run_chains_jax_zinb(
     # Chains run in parallel threads, in compiled chunks, and the progress bar
     # advances between chunks (see run_chains_chunked).
     from .._utils._jax_slice import adapt_slice_width
-    from .._utils._jax_utils import run_chains_chunked
+    from .._utils._jax_utils import cached_sweep, run_chains_chunked
 
-    def _sweep(st, key, tuning):
-        widths = st["slice_widths"]
-        core = {name: v for name, v in st.items() if name != "slice_widths"}
-        core, trace, steps = gibbs_step(core, key, widths)
-        widths = tuple(
-            adapt_slice_width(w, left, right, tuning)
-            for w, (left, right) in zip(widths, steps)
+    # One step and sweep per structure (see run_chains_chunked).
+    alpha_fixed = getattr(priors, "alpha_fixed", None) is not None
+    static = (n, p, k, krylov_degree, alpha_fixed, lu_sel, lu_cnt)
+
+    def _build():
+        gibbs_step = _make_zinb_gibbs_step(
+            n,
+            p,
+            k,
+            lu_sel=lu_sel,
+            lu_cnt=lu_cnt,
+            krylov_degree=krylov_degree,
+            alpha_fixed=alpha_fixed,
         )
-        if not store_log_lik:
-            # Keep the per-draw mean selection probability, not the two
-            # length-n linear predictors the log-likelihood would need.
-            eta_sel = trace[5]
-            trace = trace[:5] + (jnp.mean(1.0 / (1.0 + jnp.exp(-eta_sel))),)
-        return dict(core, slice_widths=widths), trace
+
+        def _sweep(st, key, tuning, data):
+            widths = st["slice_widths"]
+            core = {name: v for name, v in st.items() if name != "slice_widths"}
+            core, trace, steps = gibbs_step(core, key, widths, data)
+            widths = tuple(
+                adapt_slice_width(w, left, right, tuning)
+                for w, (left, right) in zip(widths, steps)
+            )
+            if not store_log_lik:
+                # Keep the per-draw mean selection probability, not the two
+                # length-n linear predictors the log-likelihood would need.
+                eta_sel = trace[5]
+                trace = trace[:5] + (jnp.mean(1.0 / (1.0 + jnp.exp(-eta_sel))),)
+            return dict(core, slice_widths=widths), trace
+
+        return _sweep
+
+    _sweep = cached_sweep(("sar_zinb", *static, bool(store_log_lik)), _build)
 
     with GibbsProgressBarManager(
         chains=chains,
@@ -384,6 +403,7 @@ def run_chains_jax_zinb(
             tune=tune,
             draws=draws,
             on_chunk=_progress,
+            consts=data,
         )
 
     lam_all, gamma_all, rho_all, beta_all, alpha_all = traces[:5]

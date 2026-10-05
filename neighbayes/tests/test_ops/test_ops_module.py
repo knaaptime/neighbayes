@@ -857,7 +857,7 @@ class TestSparseFactorCache:
         # The copy handed out earlier still solves at its own values.
         np.testing.assert_allclose(A(0.3) @ held.solve(b), b, atol=1e-12)
 
-    def test_auto_probe_returns_a_working_factor(self, monkeypatch):
+    def test_auto_route_returns_a_working_factor(self, monkeypatch):
         pytest.importorskip("sksparse.klu")
         pytest.importorskip("sksparse.umfpack")
         from neighbayes._ops import _backend

@@ -1,3 +1,5 @@
+from ._count import NegBinPanel as NegBinPanel
+from ._count import SARNegBinPanel as SARNegBinPanel
 from ._dynamic import OLSPanelDynamic as OLSPanelDynamic
 from ._dynamic import SARPanelDynamic as SARPanelDynamic
 from ._dynamic import SDEMPanelDynamic as SDEMPanelDynamic
@@ -11,9 +13,13 @@ from ._fe import SDEMPanelFE as SDEMPanelFE
 from ._fe import SDMPanelFE as SDMPanelFE
 from ._fe import SEMPanelFE as SEMPanelFE
 from ._fe import SLXPanelFE as SLXPanelFE
+from ._hurdle import HurdleNBPanel as HurdleNBPanel
+from ._hurdle import SARHurdleNBPanel as SARHurdleNBPanel
 from ._re import OLSPanelRE as OLSPanelRE
 from ._re import SARPanelRE as SARPanelRE
 from ._re import SDEMPanelRE as SDEMPanelRE
 from ._re import SEMPanelRE as SEMPanelRE
 from ._tobit import SARPanelTobit as SARPanelTobit
 from ._tobit import SEMPanelTobit as SEMPanelTobit
+from ._zinb import SARZINBPanel as SARZINBPanel
+from ._zinb import ZINBPanel as ZINBPanel

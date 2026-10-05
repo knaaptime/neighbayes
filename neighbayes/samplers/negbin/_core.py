@@ -946,8 +946,11 @@ def _sample_alpha(
     Returns
     -------
     alpha_new : float
-        New draw of α.
+        New draw of α, or ``priors.alpha_fixed`` when the priors hold α fixed.
     """
+    fixed = getattr(priors, "alpha_fixed", None)
+    if fixed is not None:
+        return float(fixed)
     alpha_sigma = priors.alpha_sigma
     alpha_nu = priors.alpha_nu
     eta = state.eta

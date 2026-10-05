@@ -310,8 +310,11 @@ class FlowSharedMethods:
         ``beta`` gets the Gelman et al. (2008) default on the log scale: the
         intercept is centred on ``log(mean(y))`` with scale 2.5 and each slope
         has scale ``2.5 / sd(x_j)``.  The NB2 dispersion ``alpha`` gets a
-        half-t(``alpha_nu``, ``alpha_sigma``), default half-t(3, 2.5).
+        half-t(``alpha_nu``, ``alpha_sigma``), default half-t(3, 2.5), unless
+        ``alpha_fixed`` holds it (see :mod:`neighbayes.models._base._nb`).
         """
+        from .._base._nb import nb_alpha_fixed
+
         k = self._X.shape[1]
         names = list(self._feature_names) or [f"x{j}" for j in range(k)]
         mu, sd = self._resolved_beta_prior(self._X, names, link="log")
@@ -320,6 +323,7 @@ class FlowSharedMethods:
             "beta_sigma": sd,
             "alpha_sigma": float(self.priors.get("alpha_sigma", 2.5)),
             "alpha_nu": float(self.priors.get("alpha_nu", 3.0)),
+            "alpha_fixed": nb_alpha_fixed(self.priors),
         }
 
     def _flow_sigma(self, pv: dict):

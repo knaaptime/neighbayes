@@ -41,7 +41,6 @@ from __future__ import annotations
 
 import importlib
 import os
-import time
 import warnings
 from dataclasses import dataclass
 
@@ -140,13 +139,9 @@ def _lu_backend_preference() -> str:
     Environment
     -----------
     NEIGHBAYES_LOGDET_LU_BACKEND : {"auto", "klu", "umfpack", "scipy"}
-        Default ``auto``, which times both backends on the grid itself and
-        keeps the faster (see :class:`_ReusableLULogdet`).  Naming a backend
-        pins it and skips the probe; ``scipy`` forces SuperLU.
-    NEIGHBAYES_LOGDET_LU_PROBE_GATE : float, seconds
-        Default 0.005.  When the first candidate's probe call comes in under
-        this, the second backend's probe factorization is skipped (see the
-        stakes gate in :class:`_ReusableLULogdet`).  ``0`` disables the gate.
+        Default ``auto``, which routes by the sparsity pattern (see
+        :class:`_ReusableLULogdet`).  Naming a backend pins it; ``scipy``
+        forces SuperLU.
     """
     requested = os.environ.get("NEIGHBAYES_LOGDET_LU_BACKEND", "auto").strip().lower()
     if requested in {"", "auto"}:
@@ -201,49 +196,8 @@ def _lu_logdet(A: sp.csc_matrix) -> float:
     return _superlu_logdet(A)
 
 
-#: Per-sparsity-pattern routing decisions, shared across every
-#: :class:`_ReusableLULogdet` instance (and therefore across every
-#: :class:`AAAContext` / :class:`~._chol_cheb.LUChebContext` / grid-spline fit
-#: on the same ``W``).  Keyed on ``(n, hash of the CSC structure)`` — the
-#: quantities the decision depends on, since per-node cost under symbolic
-#: reuse is a function of the pattern alone, not of the values.  Values are
-#: the resolved backend name, so the memo is a few bytes per pattern.
-_LU_ROUTE_MEMO: dict[tuple, str] = {}
-
-
-def _pattern_key(A) -> tuple:
-    """Key identifying the sparsity pattern of a CSC matrix.
-
-    Structural fingerprints — shape plus the bytes of ``indptr`` and
-    ``indices`` — rather than a content hash: the routing decision is made
-    once per *pattern*, and every ``I - ρW`` on a grid shares one.
-    """
-    Acsc = A.tocsc()
-    return (
-        Acsc.shape,
-        hash((Acsc.indptr.tobytes(), Acsc.indices.tobytes())),
-    )
-
-
-def _probe_gate_threshold() -> float:
-    """First-call seconds below which the routing probe is skipped.
-
-    Read from ``NEIGHBAYES_LOGDET_LU_PROBE_GATE`` (default 0.005).  Below the
-    gate the grid is milliseconds outright, so paying a second backend's
-    probe factorization to potentially save a fraction of it cannot win;
-    settling on the first candidate bounds the misroute by the gate itself.
-    Set to ``0`` to disable the gate and always race.
-    """
-    raw = os.environ.get("NEIGHBAYES_LOGDET_LU_PROBE_GATE", "0.005")
-    try:
-        gate = float(raw)
-    except ValueError:
-        return 0.005
-    return gate if gate > 0.0 else 0.0
-
-
 class _ReusableLULogdet:
-    """``A -> log|det(A)|`` reusing symbolic analysis, routed by measurement.
+    """``A -> log|det(A)|`` reusing symbolic analysis, routed by the pattern.
 
     Two independent things happen here.
 
@@ -253,84 +207,23 @@ class _ReusableLULogdet:
     on the grid shares one sparsity pattern.  This mirrors the CHOLMOD symbolic
     reuse in :func:`chol_cheb_logdet_precompute`.
 
-    **Backend routing.**  KLU and UMFPACK trade places on this workload, and
-    the crossover is a property of the graph, not a constant.  Measured at
-    ``n = 3,000`` over a 16-node Chebyshev grid on a directed graph, total grid
-    time in ms:
-
-    ==========  =========  =========  ===========
-    mean deg          KLU    UMFPACK  winner
-    ==========  =========  =========  ===========
-    2                 6.2       17.4  KLU 2.8×
-    5                23.4       64.6  KLU 2.8×
-    8                92.5       98.3  KLU 1.1×
-    12              251.3      152.5  UMF 1.7×
-    21             1025.1      224.0  UMF 4.6×
-    40             4414.5      333.6  UMF 13.2×
-    65            11763.5      628.8  UMF 18.7×
-    ==========  =========  =========  ===========
-
-    So a pinned backend is wrong by up to 18.7× at one end or 2.8× at the
-    other, and **a mean-degree cutoff is wrong too** — the crossover moves with
-    ``n``, so a constant calibrated at one size misroutes at every other size.
-    Instead the grid times itself: the **first** call factorizes with every
-    surviving backend, and the fastest keeps the work.  Later calls refactorize
-    on the winner alone.
-
-    The timings cover extraction as well as factorization, because the two
-    backends do not extract alike: KLU must materialize ``L`` and ``U`` to read
-    their diagonals, which is 52% of its per-node cost at mean degree 2, while
+    **Backend routing.**  KLU and UMFPACK trade places on this workload, by up
+    to 18.7× in either direction, and the crossover is a property of the
+    graph rather than of its mean degree or size.  The route is
+    :func:`neighbayes._lu_route.route` at its log-determinant threshold:
+    UMFPACK when KLU's work per factor entry exceeds 47, else KLU.  The
+    threshold sits below the one for solves because the backends do not
+    extract alike: KLU must materialize ``L`` and ``U`` to read their
+    diagonals, which is 52% of its per-node cost at mean degree 2, while
     UMFPACK reads the determinant out of the library in ``O(n)``
-    (:func:`_umf_logdet_from_factor`).  Timing factorization alone would route
-    on the wrong quantity.
+    (:func:`_umf_logdet_from_factor`).
 
-    **Why one probe call and not two.**  A first call also pays symbolic
-    analysis, so it overstates steady-state cost — by 1.1-3.8× for KLU and
-    1.2-4.7× for UMFPACK — and the tempting fix is to route on a second,
-    numeric-only call instead.  It is not worth it.  Measured across nine
-    densities, the first call already picks the same backend as the
-    steady-state cost everywhere except mean degree 8, where the true gap is
-    1.04× and misrouting therefore costs 4%.  The inflation largely cancels
-    because it falls hardest on whichever backend has the cheaper numeric
-    phase, which is the winner.
-
-    A second call would double the one cost that actually bites.  The probe's
-    overhead is one factorization on each losing backend, and at mean degree 65
-    a single KLU factorization (812ms) already exceeds the entire 16-node
-    UMFPACK grid (634ms) — so the probe is bounded by roughly one node, but a
-    node can be a large fraction of the grid precisely where the backends
-    diverge most.  Measured end to end on the same grids, against the KLU-only
-    path this replaces:
-
-    ==========  =========  =========  ===========
-    mean deg      routed    KLU-only  change
-    ==========  =========  =========  ===========
-    2                 7.2        4.6  1.6× slower
-    5                28.9       22.9  1.3× slower
-    8               107.7       89.9  1.2× slower
-    12              181.0      250.3  1.4× faster
-    21              340.1     1010.4  3.0× faster
-    40              645.8     4431.5  6.9× faster
-    65             1439.1    12084.7  8.4× faster
-    ==========  =========  =========  ===========
-
-    The regression is confined to the regime where the grid is a few
-    milliseconds outright, so it is bounded in absolute terms (+2.6ms at degree
-    2, +18ms at degree 8) against savings of seconds at the dense end.  That
-    asymmetry is the whole case for probing: the measurement costs the most
-    exactly where it matters least.
-
-    Two refinements bound that regression further.  **The stakes gate** skips
-    the race when the first candidate's call comes in under
-    ``NEIGHBAYES_LOGDET_LU_PROBE_GATE`` (default 5ms): a grid that cheap cannot
-    repay the second backend's probe factorization, and since the candidate
-    list runs KLU-first — and KLU wins the cheap regime — the gate settles on
-    the likely winner.  **The route memo** records the winner against the
-    sparsity pattern, so a second context on the same ``W`` — the warmup refit,
-    the matched-budget comparisons, one fit per model on a shared weights
-    matrix — skips the race entirely.  Because per-node cost under symbolic
-    reuse is a function of the pattern alone, the decision transfers exactly
-    across instances.
+    The route depends on the pattern alone, so every context on the same
+    ``W`` makes the same choice and the grid's values do not move between
+    runs.  The first call used to time both backends instead; timing is noisy,
+    so the choice, and the backends' last-digit differences with it, varied
+    from run to run.  A backend that fails retires to the other SuiteSparse
+    backend, then to SuperLU.
 
     **Why scikit-sparse and not sparsax here.**  sparsax (0.9) exposes
     host-callable ``lu_logdet`` / ``umf_logdet`` with the same O(n) C-side
@@ -351,24 +244,19 @@ class _ReusableLULogdet:
     fit — so it keeps scikit-sparse's object-level ``factorize()`` reuse,
     where 16 nodes cost 16 numeric refactorizations and no dispatch.
 
-    One numeric factor per candidate is held during the first call, so peak
-    memory there is that of the candidates together; the losers are freed as
-    soon as the decision is taken.
-
     Parameters
     ----------
     backend : {"auto", "klu", "umfpack", "scipy"} or None, optional
-        Overrides ``NEIGHBAYES_LOGDET_LU_BACKEND``.  Naming a backend pins it
-        and skips the probe entirely.
+        Overrides ``NEIGHBAYES_LOGDET_LU_BACKEND``.  Naming a backend pins it.
 
     Attributes
     ----------
     backend : str
         The backend in use: ``"klu"``, ``"umfpack"``, ``"scipy"``, or
-        ``"probing"`` before the routing decision is taken.
+        ``"auto"`` until the first call routes the pattern.
     """
 
-    __slots__ = ("_candidates", "_factors", "_timings", "_probing")
+    __slots__ = ("_candidates", "_factors", "_routing")
 
     def __init__(self, backend: str | None = None) -> None:
         preference = backend if backend is not None else _lu_backend_preference()
@@ -380,14 +268,13 @@ class _ReusableLULogdet:
             candidates = [preference]
         self._candidates = candidates
         self._factors: dict[str, object] = {}
-        self._timings: dict[str, float] = {}
-        # Only worth probing when there is an actual choice to make.
-        self._probing = preference == "auto" and len(candidates) > 1
+        # Only worth routing when there is an actual choice to make.
+        self._routing = preference == "auto" and len(candidates) > 1
 
     @property
     def backend(self) -> str:
-        if self._probing:
-            return "probing"
+        if self._routing:
+            return "auto"
         return self._candidates[0] if self._candidates else "scipy"
 
     def _drop(self, name: str, exc: Exception) -> None:
@@ -401,7 +288,6 @@ class _ReusableLULogdet:
         if name in self._candidates:
             self._candidates.remove(name)
         self._factors.pop(name, None)
-        self._timings.pop(name, None)
         remaining = self._candidates[0] if self._candidates else "scipy SuperLU"
         if not isinstance(exc, ImportError):
             warnings.warn(
@@ -412,87 +298,33 @@ class _ReusableLULogdet:
                 stacklevel=3,
             )
 
-    def _evaluate_one(self, name: str, A) -> tuple[float, float]:
-        """Factorize with ``name`` and return ``(logdet, elapsed_seconds)``."""
+    def _evaluate_one(self, name: str, A) -> float:
+        """Factorize with ``name``, reusing its symbolic analysis, and return the logdet."""
         factory, logdet_fn = _load_lu_backend(name)
         factor = self._factors.get(name)
-        start = time.perf_counter()
         if factor is None:
             factor = factory(A)
         else:
             factor.factorize(A)
-        value = logdet_fn(factor)
-        elapsed = time.perf_counter() - start
         self._factors[name] = factor
-        return value, elapsed
+        return logdet_fn(factor)
 
     def __call__(self, A) -> float:
         A = A.tocsc()
-        value: float | None = None
+        if self._routing:
+            from .._lu_route import LOGDET_THRESHOLD, route_matrix
 
-        # Memoized route from a previous context on this same pattern: the
-        # probe's whole cost (one factorization per losing backend) is skipped
-        # and the recorded winner does all the work.  Failures are memoized
-        # too, by _drop removing the backend before the memo is written.
-        if self._probing:
-            key = _pattern_key(A)
-            memo = _LU_ROUTE_MEMO.get(key)
-            if memo is not None and memo in self._candidates:
-                self._candidates = [memo] + [n for n in self._candidates if n != memo]
-                self._probing = False
-
-        # Probe phase (first call only): every candidate factorizes, fastest wins.
-        if self._probing:
-            gate = _probe_gate_threshold()
-            for name in list(self._candidates):
-                try:
-                    result, elapsed = self._evaluate_one(name, A)
-                except Exception as exc:  # noqa: BLE001 - retire, don't abort
-                    self._drop(name, exc)
-                    continue
-                if value is None:
-                    value = result
-                self._timings[name] = elapsed
-                # Stakes gate: the first candidate was this cheap, so the grid
-                # is milliseconds outright and racing the second backend cannot
-                # pay — a misroute is bounded by the gate itself.  The
-                # candidate list is KLU-first, and KLU wins the cheap regime,
-                # so this settles on the likely winner without the race.
-                if gate > 0.0 and elapsed <= gate:
-                    break
-            self._settle(key)
-            if value is not None:
-                return value
-            return _superlu_logdet(A)
-
-        # Settled: the chosen backend, with the ladder still beneath it.
+            winner = route_matrix(A, LOGDET_THRESHOLD)
+            self._candidates = [winner] + [n for n in self._candidates if n != winner]
+            self._routing = False
+        # The chosen backend, with the ladder still beneath it.
         while self._candidates:
             name = self._candidates[0]
             try:
-                return self._evaluate_one(name, A)[0]
+                return self._evaluate_one(name, A)
             except Exception as exc:  # noqa: BLE001 - retire, don't abort
                 self._drop(name, exc)
         return _superlu_logdet(A)
-
-    def _settle(self, key: tuple | None = None) -> None:
-        """Keep the backend that was fastest on the probe call.
-
-        ``key``, when given, is the pattern key the decision is memoized
-        under, so the next context on this pattern skips the race entirely.
-        Failures are memoized implicitly: ``_drop`` has already removed the
-        broken backend from ``self._candidates`` before this runs.
-        """
-        self._probing = False
-        if not self._timings:
-            return
-        winner = min(self._timings, key=self._timings.__getitem__)
-        self._candidates = [winner] + [n for n in self._candidates if n != winner]
-        for name in list(self._factors):
-            if name != winner:
-                # Free the losers' factors; fill-in makes these large.
-                del self._factors[name]
-        if key is not None:
-            _LU_ROUTE_MEMO[key] = winner
 
 
 def _make_reusable_lu_logdet(backend: str | None = None):

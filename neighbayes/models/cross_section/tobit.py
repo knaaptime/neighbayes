@@ -81,7 +81,7 @@ def _batched_sar_mean(W_sp, rho_f, rhs, n):
         Aj = jnp.asarray(const_coo.col, dtype=jnp.int32)
         const_vals = jnp.asarray(const_coo.data, dtype=jnp.float64)
         w_vals = jnp.asarray(w_coo.data, dtype=jnp.float64)
-        lu_solve = sparsax_lu(Ai, Aj, const_vals - 0.5 * w_vals, n).solve
+        lu_solve = sparsax_lu(Ai, Aj, n).solve
         for i in range(s):
             Ax = const_vals - float(rho_f[i]) * w_vals
             mu[i] = np.asarray(

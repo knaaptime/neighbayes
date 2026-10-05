@@ -192,13 +192,18 @@ def resolve_pg_jax_backend(backend, *, W_sparse, W_sym, WtW, n, logdet_bounds):
         One of ``"cholmod"`` (numpy), ``"jax_dense"``, ``"cholmod_jax"`` —
         used for all three of the cache's solve/logdet_P/sample methods.
     jax_parts : dict
-        ``W_sym_dense``, ``WtW_dense``, ``logdet_jax``, ``sparsax_pattern``
-        (all ``None`` on the numpy path).
+        ``W_sym_dense``, ``WtW_dense``, ``logdet_jax``, ``logdet_params``,
+        ``sparsax_pattern`` (all ``None`` on the numpy path).
+        ``logdet_params`` is ``(kind, params)`` from
+        :func:`neighbayes._logdet._jax.logdet_jax_params`, which a runner passes
+        as data so its compiled program serves every fit of the structure;
+        ``logdet_jax`` evaluates the same function.
     """
     jax_parts = {
         "W_sym_dense": None,
         "WtW_dense": None,
         "logdet_jax": None,
+        "logdet_params": None,
         "sparsax_pattern": None,
     }
     if backend != "jax":
@@ -227,14 +232,13 @@ def resolve_pg_jax_backend(backend, *, W_sparse, W_sym, WtW, n, logdet_bounds):
         jax_parts["W_sym_dense"] = jnp.asarray(W_sym.toarray(), dtype=jnp.float64)
         jax_parts["WtW_dense"] = jnp.asarray(WtW.toarray(), dtype=jnp.float64)
 
-    from ..._logdet import make_logdet_jax_fn
+    from ..._logdet._jax import eval_logdet_params, logdet_jax_params
 
-    jax_parts["logdet_jax"] = make_logdet_jax_fn(
-        W_sparse,
-        method=logdet_bounds.method,
-        rho_min=logdet_bounds.rho_min,
-        rho_max=logdet_bounds.rho_max,
+    kind, params = logdet_jax_params(
+        W_sparse, logdet_bounds.method, logdet_bounds.rho_min, logdet_bounds.rho_max
     )
+    jax_parts["logdet_params"] = (kind, params)
+    jax_parts["logdet_jax"] = lambda rho: eval_logdet_params(kind, params, rho)
 
     if method == "cholmod_jax":
         # Pass the raw (row-standardized) W; the helper derives W+Wᵀ and WᵀW
@@ -402,12 +406,8 @@ class CachedSparseSolver:
             self._has_lu_factor = hasattr(sparsax_mod, "lu_factor") and hasattr(
                 sparsax_mod, "lu_solve_factor"
             )
-            # KLU or UMFPACK, whichever is faster on this pattern, probed at
-            # A = I - Σ_k (0.5 / K) W_k, inside the stable region.
-            probe_coeffs = [-0.5 / max(len(mats), 1)] * len(mats)
-            self._lu = sparsax_lu(
-                self._Ai_jax, self._Aj_jax, self._assemble_Ax(probe_coeffs), self.n
-            )
+            # KLU or UMFPACK, routed by the merged pattern.
+            self._lu = sparsax_lu(self._Ai_jax, self._Aj_jax, self.n)
         # Last (coeffs -> LU token) pair, so back-to-back solves at the same
         # θ (e.g. several RHS blocks per posterior draw) skip the refactor.
         self._last_coeffs = None
@@ -468,6 +468,10 @@ class CachedSparseSolver:
         single = rhs_np.ndim == 1
         if single:
             rhs_np = rhs_np[:, None]
+        # sparsax does not check the row count: KLU fails and UMFPACK reads
+        # past the right-hand side.
+        if rhs_np.ndim != 2 or rhs_np.shape[0] != self.n:
+            raise ValueError(f"rhs must have {self.n} rows, got shape {np.shape(rhs)}")
         if self._use_sparsax:
             import jax.numpy as jnp
 
@@ -580,7 +584,7 @@ class KluSarSolver:
     ``W`` it squares the condition number and :math:`W^\top W` carries
     several times the nonzeros of ``W`` (two-hop fill-in), so the Cholesky
     is both slower and less accurate than an LU of ``A`` itself.  A sparse LU
-    (KLU or UMFPACK, whichever measures faster) factorizes the unsymmetric
+    (KLU or UMFPACK, routed by the pattern) factorizes the unsymmetric
     ``A`` once per ρ and additionally hands back :math:`\log\det A` for free
     via :meth:`logdet`.
 

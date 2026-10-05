@@ -312,7 +312,7 @@ def flow_logdet_grad(
                 const_vals - rho_d * coef_d - rho_o * coef_o - rho_w * coef_w,
                 dtype=jnp.float64,
             )
-            lu_solve = sparsax_lu(Ai, Aj, Ax, kron.N).solve
+            lu_solve = sparsax_lu(Ai, Aj, kron.N).solve
             Xt = np.asarray(
                 lu_solve(Ai, Aj, Ax, jnp.asarray(probes, dtype=jnp.float64)),
                 dtype=np.float64,
@@ -530,11 +530,8 @@ def _make_flow_kron_jax(kron: FlowKron, probes: np.ndarray, n_quad: int = 8):
     _coef_d = jnp.asarray(coef_d, dtype=jnp.float64)
     _coef_o = jnp.asarray(coef_o, dtype=jnp.float64)
     _coef_w = jnp.asarray(coef_w, dtype=jnp.float64)
-    # KLU or UMFPACK, whichever is faster on this pattern, probed at ρ = 0.2 in
-    # each direction (inside the stable region).
-    lu_solve = sparsax_lu(
-        Ai, Aj, _const_vals - 0.2 * (_coef_d + _coef_o + _coef_w), kron.N
-    ).solve
+    # KLU or UMFPACK, routed by the pattern.
+    lu_solve = sparsax_lu(Ai, Aj, kron.N).solve
 
     # Frozen probes as JAX array
     probes_jax = jnp.asarray(probes, dtype=jnp.float64)  # (N, P)

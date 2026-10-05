@@ -62,6 +62,16 @@ Dynamic Panel Spatial Models
    SLXPanelDynamic
 
 
+Multilevel Spatial Models
+-------------------------
+
+.. autosummary::
+   :toctree: generated/
+
+   SpatialMultilevel
+   Level
+
+
 Non-Linear Spatial Models
 -------------------------
 
@@ -75,6 +85,7 @@ Non-Linear Spatial Models
    SARNegBin
    SARNegBinStructural
    SARZINB
+   SARHurdleNB
    Logit
    NegBin
    SARLogit
@@ -91,6 +102,20 @@ Panel Spatial Models (Tobit)
    SEMPanelTobit
 
 
+Panel Count Models
+------------------
+
+.. autosummary::
+   :toctree: generated/
+
+   SARNegBinPanel
+   NegBinPanel
+   SARZINBPanel
+   ZINBPanel
+   SARHurdleNBPanel
+   HurdleNBPanel
+
+
 Flow Models
 -----------
 
@@ -105,6 +130,8 @@ Flow Models
    NegBinFlow
    SARNegBinFlow
    SARNegBinFlowSeparable
+   SARPoissonFlow
+   SARPoissonFlowSeparable
    SEMFlow
    SEMFlowSeparable
 
@@ -123,6 +150,10 @@ Panel Flow Models
    NegBinFlowPanel
    SARNegBinFlowPanel
    SARNegBinFlowSeparablePanel
+   SARZINBFlowSeparable
+   SARZINBFlowSeparablePanel
+   SARHurdleNBFlowSeparable
+   SARHurdleNBFlowSeparablePanel
    SEMFlowPanel
    SEMFlowSeparablePanel
 
@@ -178,6 +209,12 @@ Default NUTS Priors
    PanelSEMREPriors
    PanelSDEMREPriors
    PanelSARTobitPriors
+   PanelCountPriors
+   PanelZINBPriors
+   SARZINBPriors
+   PanelHurdlePriors
+   SARHurdlePriors
+   MultilevelPriors
    PanelSEMTobitPriors
    PanelDynamicBasePriors
    PanelOLSDynamicPriors
@@ -372,6 +409,8 @@ Data Generating Processes
    simulate_sdem
    simulate_sar_negbin
    simulate_sar_zinb
+   simulate_sar_hurdle
+   simulate_spatial_multilevel
    simulate_spatial_probit
    simulate_sar_tobit
    simulate_sem_tobit
@@ -394,6 +433,9 @@ Data Generating Processes
    simulate_panel_slx_dynamic_fe
    simulate_panel_sar_tobit_fe
    simulate_panel_sem_tobit_fe
+   simulate_panel_sar_negbin
+   simulate_panel_sar_zinb
+   simulate_panel_sar_hurdle
 
 
 Flow Data Generating Processes
@@ -429,6 +471,8 @@ Binomial DGPs are unchanged.
    generate_panel_negbin_flow_data_separable
    generate_panel_sem_flow_data
    generate_panel_sem_flow_data_separable
+   generate_zinb_flow_data_separable
+   generate_hurdle_flow_data_separable
 
 
 

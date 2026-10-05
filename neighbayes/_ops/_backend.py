@@ -6,7 +6,6 @@ import importlib
 import importlib.util
 import os
 import threading
-import time
 import warnings
 from collections import OrderedDict
 from functools import lru_cache
@@ -89,12 +88,13 @@ def _select_sparse_backend() -> str:
     Notes
     -----
     Under ``auto`` the returned name is ``"klu"``, but
-    :func:`_sparse_factor` then times KLU against UMFPACK on the first
-    factorization of each sparsity pattern and keeps the faster (see
-    :func:`_refactor`).  The crossover is size-dependent: with the symbolic
-    analysis reused, KLU is 2× faster than UMFPACK at ``n = 10,000`` (k-NN,
-    k = 8) and UMFPACK 1.6–1.8× faster at ``n = 160,000``.  Naming a backend
-    explicitly disables the probe.
+    :func:`_sparse_factor` then routes each sparsity pattern to KLU or
+    UMFPACK by the work per factor entry of its factorization
+    (:func:`neighbayes._lu_route.route`, see :func:`_new_working_factor`).
+    The crossover is a property of the graph, not of its size: with the
+    symbolic analysis reused, KLU is 6× faster than UMFPACK on a KNN graph
+    with 4 neighbours at ``n = 6,400`` and UMFPACK 2.6× faster with 32.
+    Naming a backend explicitly disables the routing.
     """
     requested = os.environ.get("NEIGHBAYES_SPARSE_BACKEND", "auto").strip().lower()
     strict = os.environ.get("NEIGHBAYES_SPARSE_STRICT", "0").strip().lower() in {
@@ -157,10 +157,6 @@ _FACTOR_CLASSES = {"klu": _get_klu_factor, "umfpack": _get_umf_factor}
 _FACTOR_CACHE_SIZE = 16
 _factor_cache = threading.local()
 
-# ``auto`` prefers UMFPACK over KLU only when it is clearly faster: UMFPACK's
-# per-call cost varies more, and KLU wins at every size up to ~40,000.
-_UMF_PROBE_MARGIN = 0.8
-
 
 def _auto_backend_requested() -> bool:
     requested = os.environ.get("NEIGHBAYES_SPARSE_BACKEND", "auto").strip().lower()
@@ -180,21 +176,19 @@ def _pattern_key(A_csc, backend: str):
 def _new_working_factor(A_csc, backend: str):
     """``(backend, factor)`` for a new pattern, numerically factored at ``A_csc``.
 
-    Under ``auto`` with both bindings importable, KLU and UMFPACK are each
-    factored once and the faster kept.
+    Under ``auto`` with both bindings importable, the pattern is routed to KLU
+    or UMFPACK at the factor-and-solve threshold of
+    :func:`neighbayes._lu_route.route`.  The route depends on the pattern
+    alone, so every thread and every run makes the same choice, and with it
+    the same rounding.
     """
-    candidates = [backend]
     if backend == "klu" and _auto_backend_requested() and _umfpack_available():
-        candidates.append("umfpack")
-    timed = []
-    for name in candidates:
-        factor = _FACTOR_CLASSES[name]()(A_csc)  # symbolic analysis
-        t0 = time.perf_counter()
-        factor.factorize(A_csc)
-        timed.append((time.perf_counter() - t0, name, factor))
-    if len(timed) == 2 and timed[1][0] < _UMF_PROBE_MARGIN * timed[0][0]:
-        return timed[1][1], timed[1][2]
-    return timed[0][1], timed[0][2]
+        from .._lu_route import SOLVE_THRESHOLD, route_matrix
+
+        backend = route_matrix(A_csc, SOLVE_THRESHOLD)
+    factor = _FACTOR_CLASSES[backend]()(A_csc)  # symbolic analysis
+    factor.factorize(A_csc)
+    return backend, factor
 
 
 def _refactor(A_csc, backend: str):

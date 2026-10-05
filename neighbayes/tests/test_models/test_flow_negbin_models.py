@@ -103,17 +103,22 @@ class TestNegativeBinomialPanelFlowConstruction:
         pm_model = model._build_pymc_model()
         assert "alpha" in pm_model.named_vars
 
-    def test_negbin_panel_requires_model_zero(self):
+    def test_negbin_panel_pair_effects_build(self):
+        """Pair effects are pooled parameters (see test_count_panel_fe.py), not demeaning."""
         data = _small_panel_negbin_flow(seed=7)
-        with pytest.raises(ValueError, match="effects=0 only"):
-            SARNegBinFlowPanel(
-                y=data["y"],
-                W=data["G"],
-                X=data["X"],
-                T=3,
-                col_names=data["col_names"],
-                effects=1,
-            )
+        model = SARNegBinFlowPanel(
+            y=data["y"],
+            W=data["G"],
+            X=data["X"],
+            T=3,
+            col_names=data["col_names"],
+            effects=3,
+        )
+        assert list(model._feature_names) == list(data["col_names"])
+        pm_model = model._build_pymc_model()
+        assert {"alpha", "group_effect", "group_sd", "time_effect"} <= set(
+            pm_model.named_vars
+        )
 
 
 def _check_beta_recovery(

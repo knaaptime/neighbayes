@@ -8,10 +8,17 @@ RE panel models.  Each sweep draws
 3. σ_α² | α                 — conjugate inverse-gamma
 4. ρ/λ | β, σ², σ_α², y     — 1-D slice sampling with α integrated out
 5. α | β, σ², σ_α², ρ/λ, y  — conjugate normal
+6. σ_α | α̃, β, σ², ρ/λ, y  — the non-centred half (α̃ = α/σ_α held, α rescaled)
 
 Step 4 marginalizes α, so step 5 must redraw α straight after it; the
 stored state is then a draw from the joint posterior.  Integrating α out of
 the ρ/λ update removes the α–ρ/λ correlation that would otherwise slow it.
+
+Steps 3 and 6 interweave the centred and non-centred updates of σ_α (Yu &
+Meng 2011).  The centred step alone mixes badly when each unit's periods say
+little about its effect — small σ_α against σ/√T, the usual large-N, small-T
+spatial panel (ESS ~1% of draws at N = 900, T = 3, σ_α = 0.3σ).  Given α̃ the
+likelihood is Gaussian in σ_α, so step 6 is exact.
 
 The key difference from the FE (within-transformed) Gibbs sampler is:
 - FE models demean the data, eliminating α and σ_α²
@@ -472,6 +479,47 @@ def _sample_sigma_alpha2(
     return 1.0 / rng.gamma(a_post, 1.0 / b_post), a
 
 
+def _noncentered_sigma_alpha(
+    state: REGibbsState,
+    cache: REGibbsCache,
+    y: np.ndarray,
+    X: np.ndarray,
+    priors: REGibbsPriors,
+    rng: np.random.Generator,
+) -> None:
+    """σ_α | α̃ with α̃ = α/σ_α held, then α = σ_α α̃ (in place).
+
+    The residual ``r`` (``y − ρWy − Xβ`` for SAR-RE, ``A(y − Xβ)`` for
+    SEM-RE with ``a`` filtered alike) is ``N(σ_α a, σ²I)`` with
+    ``a = α̃[unit]``, a Gaussian likelihood in σ_α; the prior is the marginal
+    half-t, and the Huang–Wand mixture variable is redrawn given σ_α² before
+    its next use.
+    """
+    from .._utils._group_effects import noncentered_effect_sd
+
+    sd = np.sqrt(state.sigma_alpha2)
+    ct = state.alpha / sd
+    a = ct[cache.unit_idx]
+    if cache.model_type in ("sar", "sdm"):
+        r = y - state.rho * cache.Wy - X @ state.beta
+    else:
+        W = cache.W_sparse
+        e = y - X @ state.beta
+        r = e - state.rho * (W @ e)
+        a = a - state.rho * (W @ a)
+    s2 = state.sigma2
+    new = noncentered_effect_sd(
+        sd,
+        float(a @ a) / s2,
+        float(a @ r) / s2,
+        priors.sigma_alpha_scale,
+        rng,
+        nu=priors.sigma_alpha_nu,
+    )
+    state.sigma_alpha2 = new * new
+    state.alpha = new * ct
+
+
 # ---------------------------------------------------------------------------
 # ρ/λ | β, σ², σ_α², y with α integrated out
 # ---------------------------------------------------------------------------
@@ -851,6 +899,9 @@ def run_re_chain(
             cache.sem_alpha,
             factor,
         )
+
+        # --- Block 6: σ_α | α̃, rest — non-centred, interwoven with block 3 ---
+        _noncentered_sigma_alpha(state, cache, y, X, priors, rng)
 
         # Store post-warmup draws
         if i >= tune and (i - tune) % thin == 0:

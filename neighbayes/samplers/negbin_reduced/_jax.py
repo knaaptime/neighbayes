@@ -93,41 +93,76 @@ def _build_sparse_ctx(W_sparse, n) -> dict:
     return pat
 
 
-def _make_sparse_solvers(sparse_ctx):
-    """Build vmap-safe sparse-LU solve closures over a sparse context (W never densified).
+def _sparse_solve_parts(sparse_ctx):
+    """Host side of the sparse ``I − ρW`` solve: ``(lu_solve, arrays)``.
 
-    Returns ``(solve, matvec_W)`` where
-
-    - ``solve(rho, rhs)`` → ``(I − ρW)⁻¹ rhs`` via sparsax's sparse LU,
-    - ``matvec_W(v)`` → ``W @ v`` via BCOO.
-
-    The LU is KLU or UMFPACK, whichever :func:`.._utils._sparsax_lu.sparsax_lu`
-    measures faster on this pattern.  Both are vmap-safe *and* reuse their
-    numeric factorization: the fill-reducing analysis is cached by pattern, and
-    a content-addressed factor cache keyed on ``Ax`` means the m+1 solves of a
-    Krylov basis at a fixed ρ pay one factorization and m cheap solves per
-    chain.  See ``set_sparsax_lu_cache_size``: the factor cache must hold at
-    least one factor per chain for the reuse to land.
+    ``lu_solve`` is sparsax's KLU or UMFPACK solve, as
+    :func:`.._utils._sparsax_lu.sparsax_lu` routes this pattern.
+    It is a module-level function, so a sweep that closes over it keeps a
+    stable identity and its compiled program can be reused; the arrays reach
+    the sweep as data, through :func:`_bind_sparse_solvers`.  Both backends are
+    vmap-safe and reuse their numeric factorization by content (see
+    ``set_sparsax_lu_cache_size``: the factor cache must hold at least one
+    factor per chain for that reuse to land).
     """
     import jax.numpy as jnp
 
     from .._utils._sparsax_lu import sparsax_lu
 
-    Ai = jnp.asarray(sparse_ctx["Ai"], jnp.int32)
-    Aj = jnp.asarray(sparse_ctx["Aj"], jnp.int32)
-    eye_vals = jnp.asarray(sparse_ctx["eye_vals"])
-    w_vals = jnp.asarray(sparse_ctx["w_vals"])
-    W_bcoo = sparse_ctx["W_bcoo"]
+    arrays = {
+        "Ai": jnp.asarray(sparse_ctx["Ai"], jnp.int32),
+        "Aj": jnp.asarray(sparse_ctx["Aj"], jnp.int32),
+        "eye": jnp.asarray(sparse_ctx["eye_vals"]),
+        "w": jnp.asarray(sparse_ctx["w_vals"]),
+        "W": sparse_ctx["W_bcoo"],
+    }
     # Route on a mid-range ρ; the probe must factorize a nonsingular matrix.
-    lu_solve = sparsax_lu(Ai, Aj, eye_vals - 0.5 * w_vals, W_bcoo.shape[0]).solve
+    lu_solve = sparsax_lu(
+        arrays["Ai"], arrays["Aj"], sparse_ctx["W_bcoo"].shape[0]
+    ).solve
+    return lu_solve, arrays
+
+
+def _bind_sparse_solvers(lu_solve, arrays):
+    """``(solve, matvec_W)`` over the sparse arrays: ``(I − ρW)⁻¹ rhs`` and ``W v``."""
 
     def solve(rho, rhs):
-        return lu_solve(Ai, Aj, eye_vals - rho * w_vals, rhs)
+        return lu_solve(
+            arrays["Ai"], arrays["Aj"], arrays["eye"] - rho * arrays["w"], rhs
+        )
 
     def matvec_W(v):
-        return W_bcoo @ v
+        return arrays["W"] @ v
 
     return solve, matvec_W
+
+
+def _make_sparse_solvers(sparse_ctx):
+    """Build vmap-safe sparse-LU solve closures over a sparse context (W never densified).
+
+    Returns ``(solve, matvec_W)``: ``solve(rho, rhs)`` → ``(I − ρW)⁻¹ rhs`` via
+    sparsax's sparse LU, ``matvec_W(v)`` → ``W @ v`` via BCOO.  The closures
+    hold the arrays; a sweep meant to be compiled once per structure takes them
+    as data instead (:func:`_sparse_solve_parts`, :func:`_bind_sparse_solvers`).
+    """
+    return _bind_sparse_solvers(*_sparse_solve_parts(sparse_ctx))
+
+
+def prior_precision_and_mean(mu, sigma, dim):
+    """``(1/σ², μ)`` as length-``dim`` float64 arrays from scalar or vector priors."""
+    import jax.numpy as jnp
+
+    prec = (
+        jnp.full(dim, 1.0 / float(sigma) ** 2)
+        if np.isscalar(sigma)
+        else 1.0 / jnp.asarray(sigma, dtype=jnp.float64) ** 2
+    )
+    mean = (
+        jnp.full(dim, float(mu))
+        if np.isscalar(mu)
+        else jnp.asarray(mu, dtype=jnp.float64)
+    )
+    return prec, mean
 
 
 def _build_krylov_basis_jax(solve1, X_jax, matvec_W, n, k, degree):
@@ -486,16 +521,14 @@ def _slice_sample_rho_jax(
 
 
 def _make_reduced_gibbs_step(
-    y_jax,
-    X_jax,
-    sparse_ctx,
     n,
     k,
-    priors,
+    *,
+    lu_solve,
     intercept_col=0,
     krylov_degree=8,
-    krylov_dmax=0.15,
     krylov_reuse=True,
+    alpha_fixed=False,
 ):
     """Build a JIT-compiled reduced-form Gibbs step (ω → ρ → β → α).
 
@@ -505,38 +538,36 @@ def _make_reduced_gibbs_step(
     systematic bias of the Gamma-series approximation that caused
     α to collapse over many Gibbs iterations.
 
+    The step closes over static settings only — sizes, flags and the routed
+    LU function — and takes everything data-dependent as its ``data``
+    argument (:func:`_reduced_data`), so one compiled program serves every fit
+    of the same structure.
+
     Parameters
     ----------
-    y_jax : jax.numpy.ndarray of shape (n,)
-        Response vector (JAX array).
-    X_jax : jax.numpy.ndarray of shape (n, k)
-        Design matrix (JAX array).
-    sparse_ctx : dict
-        Sparse sparsax context from :func:`_build_sparse_ctx`: keys ``Ai``,
-        ``Aj``, ``eye_vals``, ``w_vals`` (aligned COO of ``I − ρW``),
-        ``symbolic`` (cached sparsax symbolic factorization) and ``W_bcoo``
-        (BCOO ``W`` for matvecs).  ``W`` is never densified.
     n : int
         Number of spatial units.
     k : int
         Number of regression coefficients.
-    priors : ReducedGibbsPriors
-        Prior hyperparameters.
+    lu_solve : callable
+        The routed sparse LU solve (:func:`_sparse_solve_parts`).
     intercept_col : int, default 0
         Column index of the intercept in X. Set to -1 to disable
         the reparameterization.
     krylov_degree : int, default 8
         Krylov basis degree m for the shift-invert polynomial
         approximation of (I − ρW)⁻¹X.
-    krylov_dmax : float, default 0.15
-        Maximum |Δρ| for which the Krylov basis is used.
+    krylov_reuse : bool, default True
+        Reuse the basis while ρ moves less than 0.15.
+    alpha_fixed : bool, default False
+        Hold α at ``data["alpha_fixed"]`` instead of sampling it.
 
     Returns
     -------
     gibbs_step : callable
         A JIT-compiled function with signature::
 
-            gibbs_step(state, key, slice_width) -> (new_state, eta, rho_steps)
+            gibbs_step(state, key, slice_width, data) -> (new_state, eta, rho_steps)
 
         where ``state`` is a dict with keys ``beta``, ``rho``, ``alpha``,
         ``omega``, ``V_stack``, ``rho_basis``; ``key`` is a JAX PRNG key;
@@ -555,34 +586,13 @@ def _make_reduced_gibbs_step(
 
     _draw_pg = make_pg_draw()
 
-    # ── Sparse sparsax solve closures (W is never densified; vmap-safe) ──
-    _solve, _matvec_W = _make_sparse_solvers(sparse_ctx)
-
-    # Prior hyperparameters
-    beta_mu = priors.beta_mu
-    beta_sigma = priors.beta_sigma
-    if np.isscalar(beta_sigma):
-        V0_inv_diag = jnp.full(k, 1.0 / (float(beta_sigma) ** 2))
-    else:
-        V0_inv_diag = 1.0 / jnp.asarray(beta_sigma, dtype=jnp.float64) ** 2
-    if np.isscalar(beta_mu):
-        mu0 = jnp.full(k, float(beta_mu))
-    else:
-        mu0 = jnp.asarray(beta_mu, dtype=jnp.float64)
-
-    rho_lower_jax = jnp.float64(priors.rho_lower)
-    rho_upper_jax = jnp.float64(priors.rho_upper)
-    alpha_sigma_jax = jnp.float64(priors.alpha_sigma)
-    alpha_nu_jax = jnp.float64(priors.alpha_nu)
-
     _intercept_col = intercept_col
     _krylov_degree = krylov_degree
-    _krylov_dmax = jnp.float64(krylov_dmax)
     _reuse_threshold = jnp.float64(0.15) if krylov_reuse else jnp.float64(0.0)
     V_stack_init = jnp.zeros((krylov_degree + 1, n, k), dtype=jnp.float64)
 
     @jax.jit
-    def gibbs_step(state, key, slice_width):
+    def gibbs_step(state, key, slice_width, data):
         """One reduced-form Gibbs sweep: ω → ρ (slice+Krylov) → β → α.
 
         Parameters
@@ -594,6 +604,8 @@ def _make_reduced_gibbs_step(
             JAX random key.
         slice_width : jax.numpy.float64
             Stepping-out width for the ρ slice sampler.
+        data : dict
+            The model's arrays (:func:`_reduced_data`).
 
         Returns
         -------
@@ -605,6 +617,12 @@ def _make_reduced_gibbs_step(
         beta = state["beta"]
         rho = state["rho"]
         alpha = state["alpha"]
+        y_jax, X_jax = data["y"], data["X"]
+        V0_inv_diag, mu0 = data["V0_inv_diag"], data["mu0"]
+        rho_lower_jax, rho_upper_jax = data["rho_lower"], data["rho_upper"]
+        alpha_sigma_jax, alpha_nu_jax = data["alpha_sigma"], data["alpha_nu"]
+        _krylov_dmax = data["krylov_dmax"]
+        _solve, _matvec_W = _bind_sparse_solvers(lu_solve, data["sparse"])
 
         key_rho, key_beta, key_alpha = jax.random.split(key, 3)
 
@@ -740,9 +758,12 @@ def _make_reduced_gibbs_step(
 
         # ── Block 3: α | y, η — JAX slice sampling ──
         eta_new = Xtilde @ beta_new
-        alpha_new = _sample_alpha_jax_reduced(
-            eta_new, y_jax, alpha, alpha_sigma_jax, alpha_nu_jax, key_alpha
-        )
+        if not alpha_fixed:
+            alpha_new = _sample_alpha_jax_reduced(
+                eta_new, y_jax, alpha, alpha_sigma_jax, alpha_nu_jax, key_alpha
+            )
+        else:
+            alpha_new = data["alpha_fixed"]
 
         new_state = {
             "beta": beta_new,
@@ -760,6 +781,28 @@ def _make_reduced_gibbs_step(
         return new_state, eta_new, (steps_left, steps_right)
 
     return gibbs_step
+
+
+def _reduced_data(y, X, sparse_arrays, priors, krylov_dmax):
+    """The reduced-form step's ``data``: every data-dependent array and scalar."""
+    import jax.numpy as jnp
+
+    k = X.shape[1]
+    V0_inv_diag, mu0 = prior_precision_and_mean(priors.beta_mu, priors.beta_sigma, k)
+    alpha_fixed = getattr(priors, "alpha_fixed", None)
+    return {
+        "y": jnp.asarray(y, dtype=jnp.float64),
+        "X": jnp.asarray(X, dtype=jnp.float64),
+        "V0_inv_diag": V0_inv_diag,
+        "mu0": mu0,
+        "rho_lower": jnp.float64(priors.rho_lower),
+        "rho_upper": jnp.float64(priors.rho_upper),
+        "alpha_sigma": jnp.float64(priors.alpha_sigma),
+        "alpha_nu": jnp.float64(priors.alpha_nu),
+        "alpha_fixed": jnp.float64(alpha_fixed if alpha_fixed is not None else 1.0),
+        "krylov_dmax": jnp.float64(krylov_dmax),
+        "sparse": sparse_arrays,
+    }
 
 
 def _sample_alpha_jax_reduced(eta, y_jax, alpha_current, alpha_sigma, alpha_nu, key):
@@ -950,9 +993,9 @@ def run_chains_jax_reduced(
     chains = len(inits)
     n, k = X.shape
 
-    y_jax = jnp.asarray(y, dtype=jnp.float64)
-    X_jax = jnp.asarray(X, dtype=jnp.float64)
     sparse_ctx = _build_sparse_ctx(W_sparse, n)
+    lu_solve, sparse_arrays = _sparse_solve_parts(sparse_ctx)
+    data = _reduced_data(y, X, sparse_arrays, priors, krylov_dmax)
 
     # sparsax's LU factor cache must hold at least one factor per chain (each
     # chain has its own ρ) for the Krylov basis to reuse the factorization
@@ -967,19 +1010,38 @@ def run_chains_jax_reduced(
     if jax_seeds is None:
         jax_seeds = list(range(chains))
 
-    # Build the Gibbs step once; every chain runs the same compiled program.
-    gibbs_step = _make_reduced_gibbs_step(
-        y_jax=y_jax,
-        X_jax=X_jax,
-        sparse_ctx=sparse_ctx,
-        n=n,
-        k=k,
-        priors=priors,
-        intercept_col=intercept_col,
-        krylov_degree=krylov_degree,
-        krylov_dmax=krylov_dmax,
-        krylov_reuse=krylov_reuse,
-    )
+    from .._utils._jax_slice import adapt_slice_width
+    from .._utils._jax_utils import cached_sweep, run_chains_chunked
+
+    # One step and sweep per structure: a refit, or new data of the same
+    # shape, reuses the compiled program (see run_chains_chunked).
+    alpha_fixed = getattr(priors, "alpha_fixed", None) is not None
+    static = (n, k, intercept_col, krylov_degree, krylov_reuse, alpha_fixed, lu_solve)
+
+    def _build():
+        gibbs_step = _make_reduced_gibbs_step(
+            n,
+            k,
+            lu_solve=lu_solve,
+            intercept_col=intercept_col,
+            krylov_degree=krylov_degree,
+            krylov_reuse=krylov_reuse,
+            alpha_fixed=alpha_fixed,
+        )
+
+        def _sweep(st, key, tuning, data):
+            width = st["slice_width"]
+            core = {name: value for name, value in st.items() if name != "slice_width"}
+            core, eta, (steps_left, steps_right) = gibbs_step(core, key, width, data)
+            width = adapt_slice_width(width, steps_left, steps_right, tuning)
+            trace = (core["rho"], core["beta"], core["alpha"])
+            if store_log_lik:  # η is traced only to build the log-likelihood
+                trace += (eta,)
+            return dict(core, slice_width=width), trace
+
+        return _sweep
+
+    _sweep = cached_sweep(("sar_negbin_reduced", *static, bool(store_log_lik)), _build)
 
     # V_stack and rho_basis start at zero — the first sweep always rebuilds the
     # basis because |rho_init - 0| > reuse_threshold.
@@ -998,19 +1060,6 @@ def run_chains_jax_reduced(
     ]
     warm_keys = [jax.random.PRNGKey(int(s)) for s in jax_seeds]
     draw_keys = [jax.random.fold_in(jax.random.PRNGKey(int(s)), 1) for s in jax_seeds]
-
-    from .._utils._jax_slice import adapt_slice_width
-    from .._utils._jax_utils import run_chains_chunked
-
-    def _sweep(st, key, tuning):
-        width = st["slice_width"]
-        core = {name: value for name, value in st.items() if name != "slice_width"}
-        core, eta, (steps_left, steps_right) = gibbs_step(core, key, width)
-        width = adapt_slice_width(width, steps_left, steps_right, tuning)
-        trace = (core["rho"], core["beta"], core["alpha"])
-        if store_log_lik:  # η is traced only to build the log-likelihood
-            trace += (eta,)
-        return dict(core, slice_width=width), trace
 
     with GibbsProgressBarManager(
         chains=chains,
@@ -1036,6 +1085,7 @@ def run_chains_jax_reduced(
             tune=tune,
             draws=draws,
             on_chunk=_progress,
+            consts=data,
         )
 
     rho_all, beta_all, alpha_all = traces[:3]

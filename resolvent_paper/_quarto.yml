@@ -1,0 +1,6 @@
+project:
+  type: default
+  title: "resolvent-paper"
+
+execute:
+  daemon: false

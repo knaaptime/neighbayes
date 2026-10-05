@@ -819,6 +819,7 @@ def run_chain_unrestricted(
         beta_sigma=priors.beta_sigma,
         alpha_sigma=priors.alpha_sigma,
         alpha_nu=priors.alpha_nu,
+        alpha_fixed=getattr(priors, "alpha_fixed", None),
         rho_lower=priors.rho_lower,
         rho_upper=priors.rho_upper,
     )
@@ -1056,6 +1057,7 @@ def run_chain_separable(
         beta_sigma=priors.beta_sigma,
         alpha_sigma=priors.alpha_sigma,
         alpha_nu=priors.alpha_nu,
+        alpha_fixed=getattr(priors, "alpha_fixed", None),
         rho_lower=priors.rho_lower,
         rho_upper=priors.rho_upper,
     )

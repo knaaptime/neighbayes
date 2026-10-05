@@ -224,6 +224,7 @@ def simulate_sar_logit(
     contiguity: str = "queen",
     create_gdf: bool = False,
     geometry_type: str = "polygon",
+    structural: bool = True,
     **kwargs,
 ) -> dict:
     """Simulate SAR-logit binary outcome data.
@@ -231,7 +232,10 @@ def simulate_sar_logit(
     DGP
     ---
     ``eta = (I - rho W)^{-1} (X beta + nu)``, ``nu ~ N(0, I)``,
-    ``y ~ Bernoulli(logit^{-1}(eta))``.
+    ``y ~ Bernoulli(logit^{-1}(eta))`` — the latent-field model
+    :class:`~neighbayes.models.SARLogitStructural` fits.  With
+    ``structural=False`` the noise is omitted, ``eta = (I - rho W)^{-1} X beta``,
+    which is the reduced-form :class:`~neighbayes.models.SARLogit`.
 
     Parameters
     ----------
@@ -256,6 +260,9 @@ def simulate_sar_logit(
     geometry_type : {"point", "polygon"}, default="polygon"
         Geometry to generate when ``create_gdf=True`` and no source
         ``gdf`` is provided.
+    structural : bool, default True
+        Include the latent ``nu`` (``SARLogitStructural``); ``False`` gives the
+        reduced form (``SARLogit``).
 
     Returns
     -------
@@ -275,8 +282,8 @@ def simulate_sar_logit(
 
     X = make_design_matrix(rng, n_obs, k=max(len(beta) - 1, 0), add_intercept=True)
 
-    # Generate latent field: eta = (I - rho W)^{-1} (X beta + nu)
-    nu = rng.standard_normal(n_obs)
+    # Latent field eta = (I - rho W)^{-1} (X beta + nu); nu = 0 in the reduced form.
+    nu = rng.standard_normal(n_obs) if structural else 0.0
     Xbeta = X @ beta
     eta = spatial_filter_factor(W_sparse, rho)(Xbeta + nu)
 

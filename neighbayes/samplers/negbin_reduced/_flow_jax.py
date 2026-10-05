@@ -120,8 +120,8 @@ def _max_steps(acc, new):
 def make_flow_solve(pattern: dict):
     """Build a JIT-compiled ``solve(ρ_d, ρ_o, ρ_w, rhs) -> A(ρ)⁻¹ rhs``.
 
-    Uses sparsax's sparse LU (KLU or UMFPACK, whichever
-    :func:`.._utils._sparsax_lu.sparsax_lu` measures faster): the fill-reducing
+    Uses sparsax's sparse LU (KLU or UMFPACK, as
+    :func:`.._utils._sparsax_lu.sparsax_lu` routes the pattern): the fill-reducing
     analysis is cached by the shared pattern, so each call only rebuilds the
     value vector ``Ax(ρ)``.  ``rhs`` may be a vector ``(N,)`` or matrix
     ``(N, k)`` (batched solve — used for ``X̃ = A⁻¹X``).
@@ -141,9 +141,7 @@ def make_flow_solve(pattern: dict):
     wo_vals = jnp.asarray(pattern["wo_vals"])
     ww_vals = jnp.asarray(pattern["ww_vals"])
     # Route on ρ = 0.2 in each direction, inside the stable region.
-    lu_solve = sparsax_lu(
-        Ai, Aj, eye_vals - 0.2 * (wd_vals + wo_vals + ww_vals), pattern["N"]
-    ).solve
+    lu_solve = sparsax_lu(Ai, Aj, pattern["N"]).solve
 
     @jax.jit
     def solve(rho_d, rho_o, rho_w, rhs):
@@ -169,75 +167,75 @@ def build_flow_ctx(Wd, Wo, Ww, N) -> dict:
     return ctx
 
 
-def _make_flow_solvers(ctx):
-    """Build sparse-LU solve closures for ``A(ρ_d,ρ_o,ρ_w) = I−ρ_dWd−ρ_oWo−ρ_wWw``.
+def _flow_data(y, X, ctx, priors, krylov_dmax):
+    """Host side of the unrestricted flow sweep: ``(lu_solve, data)``.
 
-    Returns ``(solve, matvec)`` where ``solve(ρ_d,ρ_o,ρ_w,rhs)`` →
-    ``A(ρ)⁻¹ rhs`` via sparsax's sparse LU and ``matvec`` is a dict
-    ``{"d","o","w"}`` of sparse (BCOO) lag matvecs.
-
-    The LU is KLU or UMFPACK, whichever :func:`.._utils._sparsax_lu.sparsax_lu`
-    measures faster on this pattern.  Both reuse their numeric factorization
-    via a content-addressed cache: the m+1 solves of a Krylov basis at a fixed
-    (ρ_d,ρ_o,ρ_w) pay one factorization and m cheap solves per chain; see
-    ``set_sparsax_lu_cache_size``.
+    ``lu_solve`` is sparsax's KLU or UMFPACK solve, as
+    :func:`.._utils._sparsax_lu.sparsax_lu` routes the pattern (a
+    module-level function, so the sweep keeps a stable identity); ``data`` is
+    every data-dependent array and scalar, which the sweep takes as an
+    argument.  The LU reuses its numeric factorization via a content-addressed
+    cache: the m+1 solves of a Krylov basis at a fixed (ρ_d,ρ_o,ρ_w) pay one
+    factorization and m cheap solves per chain; see ``set_sparsax_lu_cache_size``.
     """
     import jax.numpy as jnp
 
     from .._utils._sparsax_lu import sparsax_lu
 
-    Ai = jnp.asarray(ctx["Ai"], jnp.int32)
-    Aj = jnp.asarray(ctx["Aj"], jnp.int32)
-    eye_vals = jnp.asarray(ctx["eye_vals"])
-    wd_vals = jnp.asarray(ctx["wd_vals"])
-    wo_vals = jnp.asarray(ctx["wo_vals"])
-    ww_vals = jnp.asarray(ctx["ww_vals"])
-    Wd_bcoo, Wo_bcoo, Ww_bcoo = ctx["Wd_bcoo"], ctx["Wo_bcoo"], ctx["Ww_bcoo"]
-    # Route on ρ = 0.2 in each direction, inside the stable region.
-    lu_solve = sparsax_lu(
-        Ai, Aj, eye_vals - 0.2 * (wd_vals + wo_vals + ww_vals), ctx["N"]
-    ).solve
-
-    def solve(rho_d, rho_o, rho_w, rhs):
-        Ax = eye_vals - rho_d * wd_vals - rho_o * wo_vals - rho_w * ww_vals
-        return lu_solve(Ai, Aj, Ax, rhs)
-
-    matvec = {
-        "d": lambda v: Wd_bcoo @ v,
-        "o": lambda v: Wo_bcoo @ v,
-        "w": lambda v: Ww_bcoo @ v,
+    k = X.shape[1]
+    arrays = {
+        "Ai": jnp.asarray(ctx["Ai"], jnp.int32),
+        "Aj": jnp.asarray(ctx["Aj"], jnp.int32),
+        "eye": jnp.asarray(ctx["eye_vals"]),
+        "wd": jnp.asarray(ctx["wd_vals"]),
+        "wo": jnp.asarray(ctx["wo_vals"]),
+        "ww": jnp.asarray(ctx["ww_vals"]),
     }
-    return solve, matvec
+    # Route on ρ = 0.2 in each direction, inside the stable region.
+    lu_solve = sparsax_lu(arrays["Ai"], arrays["Aj"], ctx["N"]).solve
+    beta_sigma = np.broadcast_to(np.asarray(priors.beta_sigma, dtype=np.float64), (k,))
+    beta_mu = np.broadcast_to(np.asarray(priors.beta_mu, dtype=np.float64), (k,))
+    alpha_fixed = getattr(priors, "alpha_fixed", None)
+    data = {
+        "y": jnp.asarray(y, dtype=jnp.float64),
+        "X": jnp.asarray(X, dtype=jnp.float64),
+        **arrays,
+        "Wd": ctx["Wd_bcoo"],
+        "Wo": ctx["Wo_bcoo"],
+        "Ww": ctx["Ww_bcoo"],
+        "V0_inv_diag": jnp.asarray(1.0 / beta_sigma**2),
+        "mu0": jnp.asarray(beta_mu),
+        "rho_lo": jnp.float64(priors.rho_lower),
+        "rho_hi": jnp.float64(priors.rho_upper),
+        "alpha_sigma": jnp.float64(priors.alpha_sigma),
+        "alpha_nu": jnp.float64(priors.alpha_nu),
+        "alpha_fixed": jnp.float64(alpha_fixed if alpha_fixed is not None else 1.0),
+        "dmax": jnp.float64(krylov_dmax),
+    }
+    return lu_solve, data
 
 
-def _make_flow_gibbs_step(
-    y_jax,
-    X_jax,
-    ctx,
-    n,
-    k,
-    priors,
-    *,
-    krylov_degree,
-    krylov_dmax,
-    positive,
-    n_cycles,
-    krylov_reuse=True,
+def _flow_sweep(
+    n, k, lu_solve, krylov_degree, positive, n_cycles, has_alpha_fixed, store_log_lik
 ):
-    """Build a JIT-compiled unrestricted-flow NB Gibbs step (ω → 3×ρ → β → α).
+    """The unrestricted-flow NB sweep (ω → 3×ρ → β → α) for one structure.
+
+    ``sweep(state, key, tuning, data) -> (state, trace)``; the trace is
+    ``(ρ_d, ρ_o, ρ_w, β, α[, η])``.  Each ρ slice adapts its width in warmup.
 
     Reuses the reduced-form cross-section blocks: sampling one ρ_k (holding the
     other two fixed) is ``(A_0 − Δρ_k W_k)⁻¹X``, structurally identical to the
     single-ρ SAR slice, so the same shift-invert Krylov basis + slice sampler
     apply with ``W_k`` as the direction and the current ``A_0`` as the base.
     The joint stability wall ``|ρ_d|+|ρ_o|+|ρ_w| < ρ_upper`` is enforced through
-    the per-ρ_k slice bounds.  W is never densified.
+    the per-ρ_k slice bounds.  W is never densified.  The sweep closes over
+    the structure only, so it compiles once per structure.
     """
     import jax
     import jax.numpy as jnp
     from jax.scipy.linalg import cho_solve, solve_triangular
 
-    from ..._jax_dispatch import ensure_x64
+    from .._utils._jax_slice import adapt_slice_width
     from .._utils._jax_utils import make_pg_draw
     from ._jax import (
         _build_krylov_basis_jax,
@@ -246,39 +244,25 @@ def _make_flow_gibbs_step(
     )
 
     _draw_pg = make_pg_draw()
-
-    ensure_x64()
-    solve, matvec = _make_flow_solvers(ctx)
-
-    beta_sigma = priors.beta_sigma
-    if np.isscalar(beta_sigma):
-        V0_inv_diag = jnp.full(k, 1.0 / (float(beta_sigma) ** 2))
-    else:
-        V0_inv_diag = 1.0 / jnp.asarray(beta_sigma, dtype=jnp.float64) ** 2
-    beta_mu = priors.beta_mu
-    mu0 = (
-        jnp.full(k, float(beta_mu))
-        if np.isscalar(beta_mu)
-        else jnp.asarray(beta_mu, dtype=jnp.float64)
-    )
-    rho_lo = jnp.float64(priors.rho_lower)
-    rho_hi = jnp.float64(priors.rho_upper)
-    B = jnp.float64(priors.rho_upper)  # joint stability wall bound
-    alpha_sigma = jnp.float64(priors.alpha_sigma)
-    alpha_nu = jnp.float64(priors.alpha_nu)
-    dmax = jnp.float64(krylov_dmax)
-    # A ρ_k basis depends on the other two ρ's, which move every slice, so a
-    # reused basis evaluates the density at stale values of them.  That biased
-    # the posterior; the basis is rebuilt at the current state every time and
-    # ``krylov_reuse`` is ignored.
-    del krylov_reuse
-    _reuse_threshold = jnp.float64(0.0)
     _pos = bool(positive)
 
-    def _wall_bounds(other_abs_sum):
-        room = B - other_abs_sum
-        lo = jnp.maximum(rho_lo, -room)
-        hi = jnp.minimum(rho_hi, room)
+    def _solver(data):
+        def solve(rho_d, rho_o, rho_w, rhs):
+            Ax = (
+                data["eye"]
+                - rho_d * data["wd"]
+                - rho_o * data["wo"]
+                - rho_w * data["ww"]
+            )
+            return lu_solve(data["Ai"], data["Aj"], Ax, rhs)
+
+        return solve
+
+    def _wall_bounds(other_abs_sum, data):
+        # ρ_upper is also the joint stability wall's bound.
+        room = data["rho_hi"] - other_abs_sum
+        lo = jnp.maximum(data["rho_lo"], -room)
+        hi = jnp.minimum(data["rho_hi"], room)
         if _pos:
             lo = jnp.maximum(lo, 0.0)
         return lo, hi
@@ -288,8 +272,9 @@ def _make_flow_gibbs_step(
         z = jnp.clip(eta - jnp.log(alpha), -20.0, 20.0)
         return _draw_pg(h, z, key)
 
-    def _draw_beta(Xtilde, omega, alpha, key):
-        kappa = 0.5 * (y_jax - alpha)
+    def _draw_beta(Xtilde, omega, alpha, key, data):
+        V0_inv_diag, mu0 = data["V0_inv_diag"], data["mu0"]
+        kappa = 0.5 * (data["y"] - alpha)
         log_alpha = jnp.log(alpha)
         Xt_omega = Xtilde * omega[:, None]
         Sig_inv = Xt_omega.T @ Xtilde + jnp.diag(V0_inv_diag) + 1e-10 * jnp.eye(k)
@@ -299,22 +284,7 @@ def _make_flow_gibbs_step(
         z = jax.random.normal(key, shape=(k,), dtype=jnp.float64)
         return m + solve_triangular(L.T, z, lower=False)
 
-    def _slice_one(
-        rho_k,
-        rd,
-        ro,
-        rw,
-        wkey,
-        other_abs,
-        omega,
-        alpha,
-        slice_width,
-        key,
-        V_stack_prev,
-        rd_basis,
-        ro_basis,
-        rw_basis,
-    ):
+    def _slice_one(rho_k, rd, ro, rw, wkey, other_abs, omega, alpha, width, key, data):
         """One ρ_k slice with a W_k-direction basis at the current A_0.
 
         Candidates inside the Krylov radius are evaluated from the basis; those
@@ -324,186 +294,119 @@ def _make_flow_gibbs_step(
         state-dependent truncation that does not leave the conditional
         invariant.
 
-        The basis is rebuilt at the current (ρ_d, ρ_o, ρ_w) every call: it
-        depends on all three, so reusing it would evaluate stale values.
+        The basis is built at the current (ρ_d, ρ_o, ρ_w) every call: it
+        depends on all three, and reusing one evaluated the density at stale
+        values of the other two, which biased the posterior.
         """
-
-        def _rebuild(_):
-            V = _build_krylov_basis_jax(
-                lambda rhs: solve(rd, ro, rw, rhs),
-                X_jax,
-                matvec[wkey],
-                n,
-                k,
-                krylov_degree,
-            )
-            return V, rd, ro, rw
-
-        def _reuse(_):
-            return V_stack_prev, rd_basis, ro_basis, rw_basis
-
-        can_reuse = (
-            (jnp.abs(rd - rd_basis) < _reuse_threshold)
-            & (jnp.abs(ro - ro_basis) < _reuse_threshold)
-            & (jnp.abs(rw - rw_basis) < _reuse_threshold)
+        solve = _solver(data)
+        W_k = data["W" + wkey]
+        V_stack = _build_krylov_basis_jax(
+            lambda rhs: solve(rd, ro, rw, rhs),
+            data["X"],
+            lambda v: W_k @ v,
+            n,
+            k,
+            krylov_degree,
         )
-        V_stack, rd_b, ro_b, rw_b = jax.lax.cond(
-            can_reuse,
-            _reuse,
-            _rebuild,
-            operand=None,
-        )
-
-        # Horner origin must be the center V_stack was *built* at, not the
-        # current ρ_k: on the reuse branch they differ by up to
-        # ``_reuse_threshold``, and measuring Δρ from ρ_k would evaluate
-        # U at ρ_basis + (ρ − ρ_k) instead of at ρ.  ``wkey`` is a static
-        # Python string, so this selects at trace time.
-        rho_basis_k = {"d": rd_b, "o": ro_b, "w": rw_b}[wkey]
 
         def _with_candidate(v):
             """(ρ_d, ρ_o, ρ_w) with the candidate ``v`` in ρ_k's slot."""
             return {"d": (v, ro, rw), "o": (rd, v, rw), "w": (rd, ro, v)}[wkey]
 
-        lo, hi = _wall_bounds(other_abs)
-
+        lo, hi = _wall_bounds(other_abs, data)
         rho_new, steps_left, steps_right = _slice_sample_rho_jax(
             rho_current=rho_k,
             V_stack=V_stack,
-            rho_basis=rho_basis_k,
+            rho_basis=rho_k,
             omega=omega,
-            y_jax=y_jax,
+            y_jax=data["y"],
             alpha=alpha,
-            V0_inv_diag=V0_inv_diag,
-            mu0=mu0,
+            V0_inv_diag=data["V0_inv_diag"],
+            mu0=data["mu0"],
             intercept_col=-1,
             rho_lower=lo,
             rho_upper=hi,
-            krylov_dmax=dmax,
-            slice_width=slice_width,
+            krylov_dmax=data["dmax"],
+            slice_width=width,
             key=key,
-            X_jax=X_jax,
+            X_jax=data["X"],
             solve_at=lambda v, rhs: solve(*_with_candidate(v), rhs),
             return_steps=True,
         )
-        return rho_new, (steps_left, steps_right), V_stack, rd_b, ro_b, rw_b
+        return rho_new, (steps_left, steps_right)
 
-    @jax.jit
-    def gibbs_step(state, key, slice_widths):
-        """One sweep; ``slice_widths`` holds the ρ_d, ρ_o and ρ_w slice widths.
+    def sweep(st, key, tuning, data):
+        y, X = data["y"], data["X"]
+        solve = _solver(data)
+        w_d, w_o, w_w = st["slice_widths"]
+        beta = st["beta"]
+        rd, ro, rw = st["rho_d"], st["rho_o"], st["rho_w"]
+        alpha = st["alpha"]
 
-        Returns ``(new_state, η, steps)``, where ``steps`` holds each ρ slice's
-        ``(left, right)`` step-out counts (the maximum over the sweep's cycles)
-        for warmup width adaptation.
-        """
-        w_d, w_o, w_w = slice_widths
-        beta = state["beta"]
-        rd, ro, rw = state["rho_d"], state["rho_o"], state["rho_w"]
-        alpha = state["alpha"]
-
-        # Basis caches from previous sweep (for reuse)
-        Vd_prev = state["V_stack_d"]
-        Vo_prev = state["V_stack_o"]
-        Vw_prev = state["V_stack_w"]
-        rd_b_prev = state["rd_basis"]
-        ro_b_prev = state["ro_basis"]
-        rw_b_prev = state["rw_basis"]
-
-        eta = solve(rd, ro, rw, X_jax @ beta)
+        eta = solve(rd, ro, rw, X @ beta)
         key, kpg = jax.random.split(key)
-        omega = _draw_omega(y_jax, alpha, eta, kpg)
+        omega = _draw_omega(y, alpha, eta, kpg)
 
         no_steps = (jnp.float64(0.0), jnp.float64(0.0))
         steps_d = steps_o = steps_w = no_steps
         for cyc in range(n_cycles):
             key, kd, ko, kw, kb = jax.random.split(key, 5)
-            rd, s_d, Vd, rd_b, ro_b_d, rw_b_d = _slice_one(
-                rd,
-                rd,
-                ro,
-                rw,
-                "d",
-                jnp.abs(ro) + jnp.abs(rw),
-                omega,
-                alpha,
-                w_d,
-                kd,
-                V_stack_prev=Vd_prev,
-                rd_basis=rd_b_prev,
-                ro_basis=ro_b_prev,
-                rw_basis=rw_b_prev,
-            )
+            rd, s_d = _slice_one(
+                rd, rd, ro, rw, "d", jnp.abs(ro) + jnp.abs(rw), omega, alpha, w_d,
+                kd, data,
+            )  # fmt: skip
             steps_d = _max_steps(steps_d, s_d)
-            ro, s_o, Vo, rd_b_o, ro_b, rw_b_o = _slice_one(
-                ro,
-                rd,
-                ro,
-                rw,
-                "o",
-                jnp.abs(rd) + jnp.abs(rw),
-                omega,
-                alpha,
-                w_o,
-                ko,
-                V_stack_prev=Vo_prev,
-                rd_basis=rd_b_prev,
-                ro_basis=ro_b_prev,
-                rw_basis=rw_b_prev,
-            )
+            ro, s_o = _slice_one(
+                ro, rd, ro, rw, "o", jnp.abs(rd) + jnp.abs(rw), omega, alpha, w_o,
+                ko, data,
+            )  # fmt: skip
             steps_o = _max_steps(steps_o, s_o)
-            rw, s_w, Vw, rd_b_w, ro_b_w, rw_b = _slice_one(
-                rw,
-                rd,
-                ro,
-                rw,
-                "w",
-                jnp.abs(rd) + jnp.abs(ro),
-                omega,
-                alpha,
-                w_w,
-                kw,
-                V_stack_prev=Vw_prev,
-                rd_basis=rd_b_prev,
-                ro_basis=ro_b_prev,
-                rw_basis=rw_b_prev,
-            )
+            rw, s_w = _slice_one(
+                rw, rd, ro, rw, "w", jnp.abs(rd) + jnp.abs(ro), omega, alpha, w_w,
+                kw, data,
+            )  # fmt: skip
             steps_w = _max_steps(steps_w, s_w)
 
             # β step needs X̃ = A(ρ_new)⁻¹X at the just-updated (ρ_d,ρ_o,ρ_w);
             # all three moved, so no single basis covers it — one direct solve.
-            Xtilde = solve(rd, ro, rw, X_jax)
-            beta = _draw_beta(Xtilde, omega, alpha, kb)
+            Xtilde = solve(rd, ro, rw, X)
+            beta = _draw_beta(Xtilde, omega, alpha, kb, data)
             eta = Xtilde @ beta
             if cyc < n_cycles - 1:
                 key, kpg2 = jax.random.split(key)
-                omega = _draw_omega(y_jax, alpha, eta, kpg2)
+                omega = _draw_omega(y, alpha, eta, kpg2)
 
         key, ka = jax.random.split(key)
-        alpha = _sample_alpha_jax_reduced(eta, y_jax, alpha, alpha_sigma, alpha_nu, ka)
+        if not has_alpha_fixed:
+            alpha = _sample_alpha_jax_reduced(
+                eta, y, alpha, data["alpha_sigma"], data["alpha_nu"], ka
+            )
+        else:
+            alpha = data["alpha_fixed"]
 
-        # Return the fitted latent η so the runner forms the pointwise NB
-        # log-likelihood on-device (reusing the sweep's solve) instead of a
-        # post-hoc per-draw host-solve loop.
-        return (
-            {
-                "beta": beta,
-                "rho_d": rd,
-                "rho_o": ro,
-                "rho_w": rw,
-                "alpha": alpha,
-                "omega": omega,
-                "V_stack_d": Vd,
-                "V_stack_o": Vo,
-                "V_stack_w": Vw,
-                "rd_basis": rd_b,
-                "ro_basis": ro_b,
-                "rw_basis": rw_b,
-            },
-            eta,
-            (steps_d, steps_o, steps_w),
+        widths = tuple(
+            adapt_slice_width(w, left, right, tuning)
+            for w, (left, right) in zip(
+                (w_d, w_o, w_w), (steps_d, steps_o, steps_w), strict=True
+            )
         )
+        new = {
+            "beta": beta,
+            "rho_d": rd,
+            "rho_o": ro,
+            "rho_w": rw,
+            "alpha": alpha,
+            "omega": omega,
+            "slice_widths": widths,
+        }
+        trace = (rd, ro, rw, beta, alpha)
+        # The fitted latent η, traced only so the runner forms the pointwise
+        # NB log-likelihood from it rather than re-solving per draw.
+        if store_log_lik:
+            trace += (eta,)
+        return new, trace
 
-    return gibbs_step
+    return sweep
 
 
 def run_chains_jax_flow(
@@ -532,7 +435,7 @@ def run_chains_jax_flow(
 
     Chains run in parallel threads (see
     :func:`.._utils._jax_utils.run_chains_chunked`).  The non-symmetric LU solve
-    goes through sparsax (KLU or UMFPACK, whichever is faster on the pattern)
+    goes through sparsax (KLU or UMFPACK, routed by the pattern)
     with numeric factor reuse.  ``W`` is never densified.  Each ρ slice starts
     at ``slice_width`` and adapts its own width during warmup.
 
@@ -544,26 +447,21 @@ def run_chains_jax_flow(
     from scipy.special import gammaln
 
     from ..._jax_dispatch import ensure_x64
+    from .._utils._jax_utils import cached_sweep, run_chains_chunked
+    from .._utils._sparsax_lu import set_sparsax_lu_cache_size
 
     ensure_x64()
     N, k = X.shape
-    y_jax = jnp.asarray(y, dtype=jnp.float64)
-    X_jax = jnp.asarray(X, dtype=jnp.float64)
     ctx = build_flow_ctx(Wd, Wo, Ww, N)
-
-    gibbs_step = _make_flow_gibbs_step(
-        y_jax,
-        X_jax,
-        ctx,
-        N,
-        k,
-        priors,
-        krylov_degree=krylov_degree,
-        krylov_dmax=krylov_dmax,
-        positive=positive,
-        n_cycles=n_cycles,
-        krylov_reuse=krylov_reuse,
-    )
+    lu_solve, data = _flow_data(y, X, ctx, priors, krylov_dmax)
+    static = (
+        N, k, lu_solve, int(krylov_degree), bool(positive), int(n_cycles),
+        getattr(priors, "alpha_fixed", None) is not None, bool(store_log_lik),
+    )  # fmt: skip
+    # A reused ρ_k basis evaluates the density at stale values of the other
+    # two ρ's, which biased the posterior; ``krylov_reuse`` is ignored.
+    del krylov_reuse
+    sweep = cached_sweep(("nb_flow", *static), lambda: _flow_sweep(*static))
 
     chains = len(inits)
     if jax_seeds is None:
@@ -571,11 +469,8 @@ def run_chains_jax_flow(
 
     # sparsax's LU factor cache must hold each chain's distinct factors live
     # across the sweep's several solves (η, the 3 directional bases, X̃).
-    from .._utils._sparsax_lu import set_sparsax_lu_cache_size
-
     set_sparsax_lu_cache_size(max(32, 8 * chains))
 
-    _V_init = jnp.zeros((krylov_degree + 1, N, k), dtype=jnp.float64)
     states = [
         {
             "beta": jnp.asarray(i.beta, dtype=jnp.float64),
@@ -584,38 +479,14 @@ def run_chains_jax_flow(
             "rho_w": jnp.float64(float(i.rho_w if i.rho_w is not None else 0.0)),
             "alpha": jnp.float64(float(i.alpha)),
             "omega": jnp.asarray(i.omega, dtype=jnp.float64),
-            "V_stack_d": _V_init,
-            "V_stack_o": _V_init,
-            "V_stack_w": _V_init,
-            "rd_basis": jnp.float64(0.0),
-            "ro_basis": jnp.float64(0.0),
-            "rw_basis": jnp.float64(0.0),
             "slice_widths": (jnp.float64(slice_width),) * 3,
         }
         for i in inits
     ]
     warm_keys = [jax.random.PRNGKey(int(s)) for s in jax_seeds]
     draw_keys = [jax.random.fold_in(jax.random.PRNGKey(int(s)), 1) for s in jax_seeds]
-
-    from .._utils._jax_slice import adapt_slice_width
-    from .._utils._jax_utils import run_chains_chunked
-
-    def _sweep(st, key, tuning):
-        widths = st["slice_widths"]
-        core = {name: v for name, v in st.items() if name != "slice_widths"}
-        core, eta, steps = gibbs_step(core, key, widths)
-        widths = tuple(
-            adapt_slice_width(w, left, right, tuning)
-            for w, (left, right) in zip(widths, steps)
-        )
-        trace = (core["rho_d"], core["rho_o"], core["rho_w"])
-        trace += (core["beta"], core["alpha"])
-        if store_log_lik:  # η is traced only to build the log-likelihood
-            trace += (eta,)
-        return dict(core, slice_widths=widths), trace
-
     _, traces = run_chains_chunked(
-        _sweep, states, warm_keys, draw_keys, tune=tune, draws=draws
+        sweep, states, warm_keys, draw_keys, tune=tune, draws=draws, consts=data
     )
     rd_all, ro_all, rw_all, beta_all, alpha_all = traces[:5]
     eta_all = traces[5] if store_log_lik else None
@@ -663,28 +534,35 @@ def run_chains_jax_flow(
 # ---------------------------------------------------------------------------
 
 
-def _build_sar_solver_jax(W_csc, n):
-    """Build a sparsax-based n×n solver for ``L(ρ) = I − ρW``.
+def _sar_solver_parts(W_csc, n):
+    """Host side of the ``I − ρW`` solve: ``(lu_solve, arrays)``.
 
-    Returns ``solve(rho, rhs)`` where ``rhs`` is ``(n,)`` or ``(n, m)``.
-    The symbolic analysis is cached by sparsax keyed on the constant
-    COO pattern, so only the numeric factorization is redone per ρ.  The LU is
-    KLU or UMFPACK, whichever :func:`.._utils._sparsax_lu.sparsax_lu` measures
-    faster on the pattern.
+    ``lu_solve`` is sparsax's KLU or UMFPACK solve, as
+    :func:`.._utils._sparsax_lu.sparsax_lu` routes the pattern — a
+    module-level function, so a sweep closing over it keeps a stable identity.
+    The arrays reach the sweep as data (:func:`_bind_sar_solver`).
     """
     import jax.numpy as jnp
 
     from .._utils._sparsax_lu import sparsax_lu
 
     pat = build_sar_pattern(W_csc.tocsr(), n)
-    Ai = jnp.asarray(pat["Ai"], jnp.int32)
-    Aj = jnp.asarray(pat["Aj"], jnp.int32)
-    eye_vals = jnp.asarray(pat["eye_vals"])
-    w_vals = jnp.asarray(pat["w_vals"])
-    lu_solve = sparsax_lu(Ai, Aj, eye_vals - 0.5 * w_vals, n).solve
+    arrays = {
+        "Ai": jnp.asarray(pat["Ai"], jnp.int32),
+        "Aj": jnp.asarray(pat["Aj"], jnp.int32),
+        "eye": jnp.asarray(pat["eye_vals"]),
+        "w": jnp.asarray(pat["w_vals"]),
+    }
+    lu_solve = sparsax_lu(arrays["Ai"], arrays["Aj"], n).solve
+    return lu_solve, arrays
+
+
+def _bind_sar_solver(lu_solve, arrays):
+    """``solve(rho, rhs)``: ``(I − ρW)⁻¹ rhs`` over the arrays of :func:`_sar_solver_parts`."""
 
     def solve(rho, rhs):
-        Ax = eye_vals - rho * w_vals
-        return lu_solve(Ai, Aj, Ax, rhs)
+        return lu_solve(
+            arrays["Ai"], arrays["Aj"], arrays["eye"] - rho * arrays["w"], rhs
+        )
 
     return solve

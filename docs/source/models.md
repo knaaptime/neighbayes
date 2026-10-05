@@ -7,14 +7,17 @@ The package organizes models along three column dimensions — **likelihood** (l
 
 | | Linear · Cross-section | Linear · Panel | Non-linear · Cross-section | Non-linear · Panel |
 |---|---|---|---|---|
-| **Single** | Aspatial, SLX, SAR, SEM, SDM, SDEM | Aspatial, SLX, SAR, SEM, SDM, SDEM | Aspatial, SAR, SEM, SDM | SAR, SEM |
+| **Single** | Aspatial, SLX, SAR, SEM, SDM, SDEM | Aspatial, SLX, SAR, SEM, SDM, SDEM | Aspatial, SAR, SEM, SDM | Aspatial, SAR, SEM |
 | **Flow** | Aspatial, SAR, SEM | Aspatial, SAR, SEM | Aspatial, SAR | Aspatial, SAR |
 
 Panel models come in fixed-effects and random-effects variants, and the linear
 panel family additionally has dynamic (lagged-dependent-variable) forms. Every
 spatial flow model has a **separable** counterpart that pins
-$\rho_w = -\rho_d \rho_o$; the non-linear flow cell covers both negative
-binomial and Poisson observation models. The sections below list every class
+$\rho_w = -\rho_d \rho_o$. The non-linear cells include negative binomial,
+zero-inflated NB and hurdle NB count models (and Poisson for cross-sectional
+flows). Outside the table, `SpatialMultilevel` nests units in groups in larger
+groups, with a graph and a process at every level
+([multilevel models](multilevel-models)). The sections below list every class
 individually.
 
 ## Cross Sectional Models
@@ -73,6 +76,13 @@ $$y_{it} = x_{it}' \beta + Wx_{it}' \theta + a_i + \tau_t + \epsilon_{it}$$
 
 $$y_{it} = x_{it}' \beta + \alpha_i + \tau_t + \epsilon_{it}, \quad \alpha_i \sim N(0, \sigma_\alpha^2)$$
 
+The random-effects Gibbs sampler (this and the spatial variants below) updates
+$\sigma_\alpha$ by interweaving a centred step ($\sigma_\alpha \mid \alpha$) with
+a non-centred one ($\sigma_\alpha \mid \alpha/\sigma_\alpha$, exact under the
+Gaussian likelihood). The centred step alone mixes at about 1% of draws when the
+unit effects are small against $\sigma/\sqrt{T}$, the common many-units,
+few-periods spatial panel.
+
 ### SAR panel (Random Effects)
 
 $$y_{it} = \rho W y_{it} + x_{it}' \beta + \alpha_i + \tau_t + \epsilon_{it}, \quad \alpha_i \sim N(0, \sigma_\alpha^2)$$
@@ -84,6 +94,115 @@ $$y_{it} = x_{it}' \beta + \alpha_i + \tau_t + u_{it}, \quad u_{it} = \lambda W 
 ### SDEM panel (Random Effects)
 
 $$y_{it} = x_{it}' \beta + W x_{it}' \theta + \alpha_i + u_{it}, \quad u_{it} = \lambda W u_{it} + \epsilon_{it}, \quad \alpha_i \sim N(0, \sigma_\alpha^2)$$
+
+(multilevel-models)=
+## Multilevel Models
+
+### SpatialMultilevel
+
+$$\theta_\ell = \rho_\ell W_\ell \theta_\ell + X_\ell \beta_\ell + \Delta_\ell \theta_{\ell+1} + \varepsilon_\ell, \quad \varepsilon_\ell \sim N(0, \sigma_\ell^2 I), \quad \ell = 0, \dots, L, \quad \theta_0 \equiv y$$
+
+Units (level 0) nest in groups (level 1), which nest in larger groups, up to
+level $L$: schools in districts in states, tracts in counties in states. Each
+level has its own graph $W_\ell$, covariates $X_\ell$, innovation sd
+$\sigma_\ell$ and process, and each level's effect $\theta_\ell$ enters the
+equation of the level below through $\Delta_\ell$, which maps a row to its
+parent. In place of the lag, any level may carry an error process,
+$\theta_\ell = X_\ell\beta_\ell + \Delta_\ell\theta_{\ell+1} + v_\ell$ with
+$v_\ell = \lambda_\ell W_\ell v_\ell + \varepsilon_\ell$, or none, and any level
+may add the Durbin terms $W_\ell X_\ell$.
+
+Every graph spans all groups at its level, whatever their parent: a West Texas
+county neighbours New Mexico counties. Because each level's effect passes
+through the filter of the level below, a shift at the top reaches the units
+through every filter beneath it. In the reduced form with a lag at every level,
+
+$$y = S_0\big(X_0\beta_0 + \varepsilon_0 + \Delta_0 S_1(X_1\beta_1 + \varepsilon_1 + \Delta_1 S_2(X_2\beta_2 + \varepsilon_2))\big), \qquad S_\ell = (I - \rho_\ell W_\ell)^{-1},$$
+
+so a Texas policy spreads into Oklahoma's border districts and from there into
+their schools. With two levels this chain and an additive entry of the effects
+coincide, and the model nests the two-level hierarchical SAR models: Dong &
+Harris's HSAR (a lag at the units, an error process with no covariates above),
+the dual spatial-error model of Wolf et al. (spvcm), and Lacombe & McIntyre's
+upper-level lag or error with Durbin terms. The units carry the only intercept;
+upper levels drop theirs, since through row-standardized filters constants at
+different levels are confounded.
+
+```python
+from neighbayes.models import Level, SpatialMultilevel
+
+m = SpatialMultilevel(
+    Level("score ~ frl + log_enroll", data=schools, W=W_schools),         # level 0
+    Level("~ income + segregation", data=districts, W=W_districts,
+          key="district_id"),                                             # level 1
+    Level("~ spending", data=states, W=W_states, key="fips",
+          process="error"),                                               # level 2
+)
+idata = m.fit()
+```
+
+A level's position is its index $\ell$. `key` names the id column shared with
+the level below; it is looked up in the level below's data, then in the units'
+data, where strict nesting is checked. A Graph's ids order a level's groups (its
+data are reindexed to them). In matrix mode, `groups` gives each lower row's
+parent label. The posterior follows the levels: `rho_ℓ` (or `lam_ℓ` for an
+error process), `beta_ℓ`, `sigma_ℓ`, and the effects `theta_ℓ` (coordinate
+`group_ℓ`).
+
+**Priors.** $\sigma_0^2 \sim \text{Inv-}\Gamma(2, \operatorname{Var} y)$; each
+upper level's $\sigma_\ell \sim \text{half-}t_3(0, \operatorname{sd} y)$, since
+every level's effects are in the outcome's units; Gelman et al. (2008) priors on
+each level's $\beta_\ell$; uniform priors on each graph's stability bounds for
+$\rho_\ell$. See `MultilevelPriors`.
+
+**Sampling.** Given the $\rho$'s and $\sigma$'s, the coefficients of every level
+and all the effects are jointly Gaussian with a sparse precision, so the Gibbs
+sampler draws them in one sparse Cholesky block. Drawing them together removes
+the ridge between the units' intercept and the mean of the effects. Every
+$\rho_\ell$ and upper-level $\sigma_\ell$ is drawn from its conditional with that
+block integrated out (`parametrization="collapsed"`, the default), at one
+refactorization per evaluation. Three other schemes update the upper levels'
+$\rho_\ell$ and $\sigma_\ell$ given the block instead:
+- `"centred"`, given the effects;
+- `"noncentred"`, given the standardized innovations $\varepsilon_\ell/\sigma_\ell$, a move that needs no Jacobian;
+- `"interweave"`, both in turn (Yu & Meng 2011).
+
+These need only the block's conditional, so they carry over to non-Gaussian
+likelihoods.
+
+On a three-level lag model with 16 units per group, the collapsed scheme gave
+7–14× the effective sample size of interweaving for the upper levels' $\rho$
+and $\sigma$, and the most per second.
+
+`gibbs_backend="jax"`, the default when JAX is installed, runs the same sweep
+compiled, using sparsax's CHOLMOD and LU. When the top level is small (a few
+dozen states, say), its $\rho$ and $\sigma$ are updated through a dense Schur
+complement, which spares the large factorizations. The sweep is compiled once
+per model structure and reused by later fits, including fits to new data of
+the same shape, so a simulation study pays for compilation once. Per sweep it
+ran:
+- 2–10× faster than NumPy with about 600 units;
+- 1.5–4× faster with 14,400 units, where the collapsed scheme's cost is
+  CHOLMOD's own factorization. `sampler="nuts"` fits the same model
+non-centred. Gibbs and NUTS agree across lag, error and no-process
+configurations. The units' intercept is heavy-tailed: its spread grows as the top
+level's $\rho$ nears 1, where NUTS diverges.
+
+**Effects.** `spatial_effects(level=ℓ)` reports the effects of level $\ell$'s
+covariates on the units, through the composed multiplier
+$S_0\Delta_0 S_1 \cdots \Delta_{\ell-1}S_\ell$, where $S_m$ is the identity for a
+level with an error process or none:
+- *direct*: the mean effect on a unit of a shift in its own group;
+- *total*: the mean effect of a shift in every group;
+- *indirect*: the difference, which is what reaches a unit from other groups through the filters.
+
+`on="level"` gives the effects on $\theta_\ell$ itself, through $S_\ell$ alone.
+The own-group trace is exact up to `exact_max` groups and estimated with
+Rademacher probes above.
+
+- **SpatialMultilevel**: Gaussian, cross-sectional, $L \ge 1$ nested levels.
+  Panels, count likelihoods and crossed (non-nested) classifications are
+  planned.
 
 ## Dynamic Panel Models
 
@@ -148,6 +267,43 @@ $$y_{it} = \max(c, y_{it}^*), \quad y_t^* = \rho W y_t^* + X_t\beta + \varepsilo
 
 $$y_{it} = \max(c, y_{it}^*), \quad y_t^* = X_t\beta + u_t, \quad u_t = \lambda W u_t + \varepsilon_t$$
 
+### Panel count models (SARNegBinPanel, NegBinPanel)
+
+$$y_{it} \sim \operatorname{NegBin}(\mu_{it}, \alpha), \quad \log \boldsymbol{\mu}_t = (I - \rho W)^{-1} X_t\beta + c + \tau_t$$
+
+Unit effects $c$ and period effects $\tau_t$ are selected by `effects`
+(`"pooled"`, `"unit"`, `"time"`, `"two_way"`). The Gaussian panels' within
+transform does not carry to a log link, so the effects are parameters, held as
+a unit index rather than dummy columns. Unit effects sit outside the spatial
+filter: $(I_T \otimes A^{-1})$ commutes with the unit dummies, so this is the
+inside-filter model reparameterized. The Gibbs sampler integrates the unit
+effects out of every $\rho$ update by an ω-weighted analogue of the within
+transform, recomputed each sweep from the Pólya–Gamma weights.
+
+The unit effects are **partially pooled**: $c_i \sim N(\mu, \sigma^2)$ with
+$\sigma$ learned (a half-$t_3$ prior with scale `group_effect_sd_scale`,
+default 1), so a unit seen in few periods is shrunk toward the common mean in
+proportion to how little its data say. Spatial panels typically have many units
+and few periods (Elhorst 2014), and there a fixed, wide prior leaves each
+unit's level pinned only by its own few periods, which biases the dispersion $\alpha$ and $\rho$ (the incidental-parameter problem)
+and lets $\rho$ drift toward 1, where the filter's amplification of an
+unanchored level goes unchecked. The unit effects absorb no column: the
+intercept and time-invariant covariates stay in the design. Period effects keep
+a fixed prior and absorb the columns that vary only over time. Pooling assumes
+the effects are unrelated to $X$; when they are not, `mundlak=True` adds the
+unit means of the time-varying columns to the design inside the filter (Mundlak
+1978), which absorbs the correlation (in a nonlinear model only approximately).
+The Gibbs sampler updates $\sigma$ by interweaving a centred step
+($\sigma \mid c$) with a non-centred one ($\sigma \mid \tilde c$,
+$\tilde c = (c - \mu)/\sigma$; Yu & Meng 2011), the latter on the exact
+likelihood rather than the Pólya–Gamma working one, so no augmentation layer
+stands between $\sigma$ and the data (Papaspiliopoulos, Roberts & Sermaidis
+2011). That keeps $\sigma$ mixing in the large-$N$, small-$T$ regime, where each
+unit's data say little about its effect.
+Both classes default to Gibbs; `sampler="nuts"` runs the PyMC model. `priors={"alpha_fixed": a}` holds $\alpha$ fixed; a large value
+(10-20 times the typical mean count) gives an essentially Poisson model that
+keeps the exact Pólya–Gamma sampler.
+
 ### SARNegBin (Reduced Form)
 
 $$y_i \sim \operatorname{NegBin}(\mu_i, \alpha), \quad \mu = \exp(\eta), \quad \eta = (I - \rho W)^{-1} X\beta$$
@@ -162,9 +318,89 @@ Includes latent $\sigma$ — structural form with explicit noise. Gibbs sampling
 
 ### SARZINB
 
-$$y_i \sim \operatorname{ZINB}(\mu_i, \alpha, \pi), \quad \mu = \exp(\eta), \quad \eta = (I - \rho W)^{-1} X\beta$$
+$$y_i \sim \operatorname{ZINB}(\mu_i, \alpha, \pi_i), \quad \log \boldsymbol{\mu} = (I - \rho W)^{-1} X\beta, \quad \operatorname{logit} \boldsymbol{\pi} = (I - \lambda W_{\mathrm{sel}})^{-1} Z\gamma$$
 
-Zero-inflated negative binomial with spatial lag on the log-mean.
+Zero-inflated negative binomial: a spatial-lag logit selection (is the unit
+active?) and a spatial-lag NB count, both in reduced form. Pólya–Gamma Gibbs
+by default; `sampler="nuts"` fits the same model in PyMC. Corridor
+probabilities, zero attribution and fitted means are posterior expectations;
+`posterior_predictive` simulates the zero process too.
+
+**Identification.** Only the shape of the count distribution separates
+structural zeros from sampling zeros. When active units average about one
+count, NB with a smaller α explains the zeros nearly as well as zero inflation
+does. The selection equation is then weakly identified, the posterior of λ is
+close to its prior, and the Gibbs chain mixes slowly. Repeated periods fix this:
+in a panel with unit (or pair) effects, a unit's other periods pin down its
+count distribution, and the zeros in excess of it are structural. For "any
+versus none" questions on sparse counts, use a hurdle model
+({ref}`below <hurdle-models>`), whose binary half is fit to the observed
+zeros.
+
+### ZINB panels (SARZINBPanel, ZINBPanel)
+
+The same two equations per period, $T$ periods stacked time-first, with
+per-period structural zeros and unit and period effects on the count
+equation (`effects`, pooled as for the NB panels). The selection design `Z` may vary
+over time.
+
+### Flow ZINB (SARZINBFlowSeparable, SARZINBFlowSeparablePanel)
+
+Both equations are separable flow models,
+$\eta^{\mathrm{sel}} = (L^{\lambda}_o \otimes L^{\lambda}_d)^{-1} Z\gamma$ and
+$\eta^{\mathrm{cnt}} = (L^{\rho}_o \otimes L^{\rho}_d)^{-1} X\beta$, sampled by a
+structured $n \times n$ sweep (NumPy or `gibbs_backend="jax"`) that never forms
+an $n^2 \times n^2$ matrix. The panel adds pair and period effects on the count
+equation; the cross-section is the panel with $T = 1$. Flow counts are usually
+sparse, so the identification caveat above bites hardest here: use the panel
+with pair effects, or the flow hurdle.
+
+(hurdle-models)=
+### Hurdle models (SARHurdleNB and family)
+
+$$P(y > 0) = \operatorname{logit}^{-1}(\eta^{\mathrm{b}}), \quad y \mid y > 0 \sim \operatorname{NB}(\mu, \alpha) \text{ truncated at } 0, \quad \eta^{\mathrm{b}} = (I - \lambda W_{\mathrm{sel}})^{-1} Z\gamma, \quad \log \boldsymbol{\mu} = (I - \rho W)^{-1} X\beta$$
+
+A hurdle separates *whether* a count is positive from *how large* it is when
+it is. Both halves are reduced form: the spatial lag acts on the linear
+predictor and no latent noise field enters, so neither half has a Jacobian.
+
+**Hurdle or ZINB.** Both give positive counts the same zero-truncated NB
+distribution; they differ only in the probability of a positive count. The
+hurdle models it directly, $P(y > 0) = \pi$. ZINB splits it into an
+activation probability and the NB's own chance of a positive count,
+$\pi\,(1 - \operatorname{NB}(0))$, and so can call a zero structural. The data
+see that split only through the shape of the positive counts, which on sparse
+counts barely constrains it (see SARZINB). The hurdle's binary half is fit to
+the observed zeros, so it is identified however sparse the counts are. What it
+gives up is the split: its γ and λ describe whether any count occurs, not
+whether a unit is "open". Use the hurdle when the question is "any versus none",
+and ZINB, in a panel with unit or pair effects, when the question is
+"structurally closed versus open but quiet".
+
+**Sampling.** The binary half is a Pólya–Gamma logit. In the count half the
+truncation is augmented exactly: each positive cell gets a geometric count of
+the zeros the truncation hid, after which the cell is Pólya–Gamma conjugate.
+When the positive counts are mostly ones, the count level and α trade off along
+a ridge, so they are drawn jointly by a slice sampler that moves along it.
+`sampler="nuts"` fits the same model in PyMC (`HurdleNegativeBinomial`).
+
+- **SARHurdleNB**: cross-section, with separate `Z` (or `sel_formula`) and
+  `W_sel` for the binary half.
+- **SARHurdleNBPanel**, **HurdleNBPanel**: $T$ periods stacked time-first,
+  with unit and period effects (`effects`) in **both** halves. In the binary
+  half a unit effect absorbs the unit's baseline chance of a positive count,
+  so γ comes mostly from within-unit switches between zero and positive
+  periods. Both halves' unit effects are partially pooled, with their own
+  learned sds; the pooling is what keeps α and ρ unbiased when units have few
+  positive periods (about three per unit in simulations, where a fixed, wide
+  prior gave α at half its true value).
+- **SARHurdleNBFlowSeparable**, **SARHurdleNBFlowSeparablePanel**: both halves
+  are separable flow models, sampled by the structured $n \times n$ sweep
+  (NumPy or `gibbs_backend="jax"`), with pair and period effects in both
+  halves.
+
+The halves share no parameters, so the posterior factorizes. Linking them
+through correlated unit (pair) effects is a planned extension.
 
 ### Logit
 
@@ -180,17 +416,18 @@ Non-spatial negative binomial baseline.
 
 ### SARLogit (Reduced Form)
 
-$$y_i \sim \operatorname{Bernoulli}(p_i), \quad \eta = (I - \rho W)^{-1}(X\beta + \nu), \quad \nu \sim \mathcal{N}(0, I)$$
+$$y_i \sim \operatorname{Bernoulli}(p_i), \quad \eta = (I - \rho W)^{-1}X\beta$$
 
-Spatial lag on the latent log-odds, written with the multiplier applied to the
-mean. Pólya–Gamma Gibbs sampler only — no NUTS path.
+The reduced form: the spatial multiplier acts on the mean of the log-odds, with
+no latent noise field (that is `SARLogitStructural`). Pólya–Gamma Gibbs sampler
+only — no NUTS path.
 
 ### SARLogitStructural (Structural Form)
 
 $$y_i \sim \operatorname{Bernoulli}(p_i), \quad \eta = \rho W \eta + X\beta + \nu, \quad \nu \sim \mathcal{N}(0, I)$$
 
-The same model as `SARLogit`, parameterised without inverting $(I - \rho W)$.
-Pólya–Gamma Gibbs sampler only.
+A latent-field model: unlike `SARLogit`, the log-odds carry a noise term $\nu$
+that the spatial multiplier also propagates. Pólya–Gamma Gibbs sampler only.
 
 ### SEMLogit
 
@@ -233,7 +470,13 @@ $$y_{ij} \sim \operatorname{Poisson}(\mu_{ij}), \quad \log \boldsymbol{\mu} = A(
 
 No dispersion parameter. Sampled by auxiliary-mixture Gibbs
 (Frühwirth-Schnatter & Wagner 2006) rather than Pólya–Gamma, which admits no
-exact Poisson representation.
+exact Poisson representation. Use it for counts close to Poisson: the normal
+mixture behind the sampler has lighter tails than the error it replaces, so
+under overdispersion it is biased toward large counts (`fit` reports the
+Pearson dispersion and warns above 2). For overdispersed counts use the NB
+flow models; an NB with `priors={"alpha_fixed": a}`, `a` 10-20 times the
+typical mean, is an essentially Poisson model on the exact Pólya–Gamma
+sampler.
 
 ### SARPoissonFlowSeparable
 
@@ -252,7 +495,13 @@ $$y = X\beta + u, \quad u = \lambda_d W_d u + \lambda_o W_o u - \lambda_d \lambd
 
 ## Panel Flow Models
 
-Stack the flow models above across $T$ periods in time-first order. The NB panel variants currently operate in pooled mode.
+Stack the flow models above across $T$ periods in time-first order. The NB
+panels take pair and period effects as parameters, the pair effects partially
+pooled,
+$\log \boldsymbol{\mu}_t = A(\boldsymbol{\rho})^{-1} X_t\beta + c + \tau_t$,
+with one effect per origin-destination pair held as an index, never as $n^2$
+dummy columns; see the panel count models above. The separable NB panel keeps
+its structured $n \times n$ sweep with effects.
 
 ### OLSFlowPanel
 
@@ -366,6 +615,12 @@ For any Gibbs sampler, `gibbs_backend` selects the execution path:
 | `"numpy"` | pure NumPy/SciPy; chains as separate processes via `joblib`, controlled by `n_jobs` |
 
 Both backends implement the same sampler and target the same posterior.
+
+A JAX sweep is compiled once per model structure (its dimensions and its
+process, effect and prior options) and reused for the rest of the session. The
+first fit pays for compilation, from under a second to a few seconds; a refit,
+a longer run, or new data of the same dimensions on the same graph does not, so
+a simulation study compiles once rather than once per replicate.
 
 ### Gibbs Sampler (Gaussian models)
 

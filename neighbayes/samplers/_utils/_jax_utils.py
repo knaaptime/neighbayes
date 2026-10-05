@@ -9,6 +9,7 @@ Not part of the public API.
 
 from __future__ import annotations
 
+import functools
 import importlib.util
 
 
@@ -98,6 +99,65 @@ def run_chains_in_threads(fn, per_chain_args):
         )
 
 
+#: Sweeps per compiled chunk.  Fixed, so the compiled program does not depend
+#: on ``tune`` or ``draws`` and a refit of any length reuses it.  Each chunk
+#: costs one host round trip; at this length that is negligible, and a short
+#: run only idles through the held iterations.  Chunking never changes the
+#: draws: each active sweep splits the carried key once, wherever the chunk
+#: boundaries fall.
+CHUNK_LEN = 128
+
+
+def _chunk_length(tune: int, draws: int) -> int:
+    """Sweeps per compiled chunk (:data:`CHUNK_LEN`, whatever the run length)."""
+    return CHUNK_LEN
+
+
+def _shape_signature(tree) -> tuple:
+    """Structure, shapes and dtypes of a pytree: what a compiled program fixes."""
+    import jax
+    import numpy as np
+
+    def dtype(x):
+        dt = getattr(x, "dtype", None)
+        return (np.dtype(dt) if dt is not None else np.result_type(x)).str
+
+    leaves, treedef = jax.tree_util.tree_flatten(tree)
+    return treedef, tuple((np.shape(x), dtype(x)) for x in leaves)
+
+
+def _compile_chunk(sweep, state0, key0, consts, chunk_len):
+    """``(chunk, trace_avals)``: the jitted fixed-length scan of ``sweep``, compiled."""
+    import jax
+    import jax.numpy as jnp
+
+    trace_avals = jax.eval_shape(sweep, state0, key0, True, consts)[1]
+
+    def _chunk(state, key, n_active, tuning, consts):
+        def body(carry, i):
+            st, kk = carry
+
+            def _run(_):
+                kk_next, sk = jax.random.split(kk)
+                st_next, trace = sweep(st, sk, tuning, consts)
+                return (st_next, kk_next), trace
+
+            def _hold(_):
+                return (st, kk), jax.tree_util.tree_map(
+                    lambda a: jnp.zeros(a.shape, a.dtype), trace_avals
+                )
+
+            return jax.lax.cond(i < n_active, _run, _hold, None)
+
+        return jax.lax.scan(body, (state, key), jnp.arange(chunk_len))
+
+    chunk = jax.jit(_chunk)
+    # A zero-sweep call compiles here; threads reaching an uncompiled function
+    # together would each compile their own copy.
+    jax.block_until_ready(chunk(state0, key0, 0, True, consts))
+    return chunk, trace_avals
+
+
 def run_chains_chunked(
     sweep, states, warm_keys, draw_keys, *, tune, draws, on_chunk=None, consts=None
 ):
@@ -110,6 +170,13 @@ def run_chains_chunked(
     calling thread, before the chains fan out to
     :func:`run_chains_in_threads`.  Between chunks the caller can report
     progress.
+
+    The compiled chunk is cached on ``sweep`` itself, keyed by the chunk length
+    and the shapes of the state and ``consts``.  A runner that keeps one
+    ``sweep`` per model structure, with every data-dependent value passed in
+    ``consts``, compiles once and reuses the program on later fits.  A runner
+    that builds a fresh ``sweep`` per fit compiles per fit, and its cache is
+    collected along with it.
 
     Parameters
     ----------
@@ -142,42 +209,28 @@ def run_chains_chunked(
         ``trace`` stacked with leading axes ``(chains, draws)``.
     """
     import jax
-    import jax.numpy as jnp
     import numpy as np
 
     states = list(states)
     chains = len(states)
-    chunk_len = max(50, max(tune, draws) // 10)
+    chunk_len = _chunk_length(tune, draws)
+
+    owner = sweep
     if consts is None:
-        _sweep = sweep
 
         def sweep(st, key, tuning, _consts):
-            return _sweep(st, key, tuning)
+            return owner(st, key, tuning)
 
-    trace_avals = jax.eval_shape(sweep, states[0], warm_keys[0], True, consts)[1]
-
-    def _chunk(state, key, n_active, tuning, consts):
-        def body(carry, i):
-            st, kk = carry
-
-            def _run(_):
-                kk_next, sk = jax.random.split(kk)
-                st_next, trace = sweep(st, sk, tuning, consts)
-                return (st_next, kk_next), trace
-
-            def _hold(_):
-                return (st, kk), jax.tree_util.tree_map(
-                    lambda a: jnp.zeros(a.shape, a.dtype), trace_avals
-                )
-
-            return jax.lax.cond(i < n_active, _run, _hold, None)
-
-        return jax.lax.scan(body, (state, key), jnp.arange(chunk_len))
-
-    chunk = jax.jit(_chunk)
-    # A zero-sweep call compiles here; threads reaching an uncompiled function
-    # together would each compile their own copy.
-    jax.block_until_ready(chunk(states[0], warm_keys[0], 0, True, consts))
+    try:
+        cache = owner.__dict__.setdefault("_compiled_chunks", {})
+    except AttributeError:  # a callable without attributes: no caching
+        cache = {}
+    cache_key = (chunk_len, consts is None, _shape_signature((states[0], consts)))
+    if cache_key not in cache:
+        cache[cache_key] = _compile_chunk(
+            sweep, states[0], warm_keys[0], consts, chunk_len
+        )
+    chunk, trace_avals = cache[cache_key]
 
     def _advance(keys, n_active, tuning):
         out = run_chains_in_threads(
@@ -224,8 +277,47 @@ def run_chains_chunked(
     return states, jax.tree_util.tree_map(lambda *xs: np.stack(xs), *per_chain)
 
 
+#: One sweep per structure key, shared by every fit of that structure; each
+#: carries its compiled chunks (see :func:`run_chains_chunked`).
+_SWEEPS: dict = {}
+
+
+def cached_sweep(key, build):
+    """The sweep for ``key``, built once with ``build()`` and then reused.
+
+    ``key`` must determine everything the sweep closes over — sizes, flags,
+    the identities of the functions it calls — and nothing data-dependent,
+    which reaches the sweep through ``consts``.  Then a refit, or a new dataset
+    of the same structure, reuses the compiled program.
+    """
+    if key not in _SWEEPS:
+        _SWEEPS[key] = build()
+    return _SWEEPS[key]
+
+
+def padded_value_counts(y):
+    """``(values, counts)`` of ``y``, zero-padded to a power-of-two length.
+
+    A sum over distinct values, ``counts @ f(values)``, is cheaper than one over
+    observations, but the number of distinct values changes with the data, and
+    with it the shapes of the compiled program.  Padding with zero-count
+    entries of value 0 (which every ``f`` must accept) keeps the shape fixed
+    until that number crosses a power of two.
+    """
+    import numpy as np
+
+    vals, counts = np.unique(np.asarray(y, dtype=np.float64), return_counts=True)
+    size = max(16, 1 << (vals.size - 1).bit_length())
+    pad = size - vals.size
+    return np.pad(vals, (0, pad)), np.pad(counts.astype(np.float64), (0, pad))
+
+
+@functools.lru_cache(maxsize=1)
 def make_pg_draw():
     """Return a JAX-compatible Pólya-Gamma draw function.
+
+    Cached, so every caller gets the same function — a sweep closing over it
+    keeps a stable identity, and its compiled program can be reused.
 
     Prefers ``pgjax.pg_sample`` (exact Devroye sampler, on-device, no
     host round-trip) when installed — it dominates every alternative on

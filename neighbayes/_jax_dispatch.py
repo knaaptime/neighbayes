@@ -339,8 +339,8 @@ def register_jax_dispatch() -> bool:
 
         ``Ld = I − ρ_d W`` and ``Lo = I − ρ_o W`` are sparse (``W`` is sparse),
         so we solve them with sparsax's asymmetric sparse LU (KLU or UMFPACK,
-        whichever :func:`~neighbayes.samplers._utils._sparsax_lu.sparsax_lu`
-        measures faster) instead of forming a dense ``n×n`` and calling
+        as :func:`~neighbayes.samplers._utils._sparsax_lu.sparsax_lu` routes
+        the pattern) instead of forming a dense ``n×n`` and calling
         ``jsla.solve``.  Both share the ``I ∪ W`` pattern, whose fill-reducing
         analysis sparsax computes once and caches (content-addressed), reusing
         it across forward (``solve`` → ``lu_solve(Ai, Aj, ·)``) and adjoint
@@ -370,7 +370,7 @@ def register_jax_dispatch() -> bool:
         w_vals = jnp.asarray(w_c.data, dtype=jnp.float64)
         W_bcoo = jsparse.BCOO.from_scipy_sparse(op._W.tocsr())
 
-        lu_solve = sparsax_lu(Ai, Aj, eye_vals - 0.5 * w_vals, n).solve
+        lu_solve = sparsax_lu(Ai, Aj, n).solve
 
         def solve(Ax, rhs):  # L x = rhs
             return lu_solve(Ai, Aj, Ax, rhs)
@@ -1017,7 +1017,7 @@ def register_jax_dispatch() -> bool:
 
                 from .samplers._utils._sparsax_lu import sparsax_lu
 
-                lu_solve = sparsax_lu(Ai, Aj, const_vals - 0.5 * w_vals, n).solve
+                lu_solve = sparsax_lu(Ai, Aj, n).solve
 
                 def sparse_sar_solve(rho, b):
                     return lu_solve(Ai, Aj, const_vals - rho * w_vals, b)

@@ -326,6 +326,7 @@ def run_chain_separable_structured(
         beta_sigma=priors.beta_sigma,
         alpha_sigma=priors.alpha_sigma,
         alpha_nu=priors.alpha_nu,
+        alpha_fixed=getattr(priors, "alpha_fixed", None),
         rho_lower=rho_lower,
         rho_upper=rho_upper,
     )
