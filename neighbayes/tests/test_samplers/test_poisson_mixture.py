@@ -180,3 +180,34 @@ class TestAugmentation:
         # Within 4 Monte-Carlo/asymptotic standard errors of the truth.
         se = 1.0 / np.sqrt((np.exp(X @ beta_true)[:, None] * X**2).sum(axis=0))
         assert np.all(np.abs(post - beta_true) < 4 * se)
+
+
+@pytest.mark.parametrize("count", [1, 10, 60, 150, 400])
+def test_augmented_gibbs_matches_exact_posterior(count):
+    """One observation, ``η ~ N(0, 3²)``: Gibbs on the augmentation vs quadrature.
+
+    Pins the last-arrival draw.  Given ``y`` arrivals in ``[0, 1]`` the last
+    one is ``Beta(y, 1)``; drawing it from ``Gamma(y, λ)`` truncated to
+    ``(0, 1)`` instead put the posterior mean 4.6 sd off at ``y = 400`` and
+    tripled its spread, while every mixture-table test still passed.
+    """
+    rng = np.random.default_rng(count)
+    y = np.array([float(count)])
+    design = build_augmented_index(y)
+    eta, draws = np.log(count + 0.5), []
+    for it in range(6000):
+        s, om = draw_augmentation(y, np.array([eta]), design, rng=rng)
+        prec = om.sum() + 1.0 / 9.0
+        eta = (om * s).sum() / prec + rng.standard_normal() / np.sqrt(prec)
+        if it >= 500:
+            draws.append(eta)
+    draws = np.asarray(draws)
+
+    grid = np.linspace(-15.0, 10.0, 40001)
+    lp = count * grid - np.exp(grid) - 0.5 * grid**2 / 9.0
+    w = np.exp(lp - lp.max())
+    w /= w.sum()
+    mean = float((w * grid).sum())
+    sd = float(np.sqrt((w * (grid - mean) ** 2).sum()))
+    assert abs(draws.mean() - mean) < 0.15 * sd
+    assert abs(draws.std() / sd - 1.0) < 0.1

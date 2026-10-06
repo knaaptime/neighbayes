@@ -18,6 +18,8 @@ sparse LU in numpy and evaluates via JAX-native barycentric formula.
 
 from __future__ import annotations
 
+import functools
+
 import numpy as np
 import scipy.sparse as sp
 
@@ -103,6 +105,7 @@ def jax_logdet_chebyshev(
     return c[0] + x * b_curr - b_next
 
 
+@functools.lru_cache(maxsize=None)
 def make_logdet_jax_param_fn(method: str, T: int = 1):
     """Return ``fn(rho, params) -> logdet`` for a refittable method.
 
@@ -130,7 +133,8 @@ def make_logdet_jax_param_fn(method: str, T: int = 1):
     -------
     callable
         ``(rho, params) -> jax.numpy.ndarray``, differentiable and
-        JIT-compatible.
+        JIT-compatible.  Cached, so a ``(method, T)`` always returns the same
+        function and a sweep closing over it keeps a stable identity.
     """
     T = int(T)
 
@@ -162,6 +166,108 @@ def make_logdet_jax_param_fn(method: str, T: int = 1):
         "only 'cheb_cholesky', 'lu_cheb', 'aaa' and 'chol_aaa' carry a refittable "
         "parameterization."
     )
+
+
+def logdet_jax_params(W, method: str, rho_min: float, rho_max: float, eigs=None):
+    """``(kind, params)``: ``log|I − ρW|`` in a form a compiled sweep takes as data.
+
+    :func:`make_logdet_jax_fn` closes over the precomputed coefficients, so a
+    sweep built on it is new for every model and recompiles every fit.  Passed
+    as an argument instead, the coefficients let one compiled sweep serve every
+    fit — and every dataset — of the same structure.  The precompute is the one
+    the NumPy evaluator of ``method`` uses, so both backends evaluate one
+    function.
+
+    ``kind`` is ``"eig"`` (eigenvalues, exact), ``"cheb"`` (Chebyshev
+    coefficients and interval) or ``"aaa"`` (barycentric nodes, values and
+    weights).  Methods with no array form (``grid_spline``, ``cholmod``,
+    ``slq``) return ``("closure", fn)``: a sweep using one compiles per fit.
+    Evaluate with :func:`eval_logdet_params`.  Requires JAX's float64 mode.
+    """
+    import jax.numpy as jnp
+
+    from ._factories import _cheb_precompute_for, _cheb_stochastic_coeffs
+
+    W_sparse = W if sp.issparse(W) else sp.csr_matrix(np.asarray(W))
+    n = W_sparse.shape[0]
+    method = resolve_logdet_method(method, n=n, W=W_sparse)
+    if method == "eigenvalue":
+        ev = np.asarray(
+            eigs if eigs is not None else np.linalg.eigvals(W_sparse.toarray()),
+            dtype=np.complex128,
+        )
+        return "eig", (jnp.asarray(ev.real), jnp.asarray(ev.imag))
+    if method in ("cheb_cholesky", "lu_cheb"):
+        pre = _cheb_precompute_for(method)(
+            W_sparse, order=None, rho_min=rho_min, rho_max=rho_max
+        )
+        return "cheb", (
+            jnp.asarray(pre.coeffs, dtype=jnp.float64),
+            jnp.float64(pre.rho_min),
+            jnp.float64(pre.rho_max),
+        )
+    if method == "cheb_stochastic":
+        coeffs, rmin, rmax = _cheb_stochastic_coeffs(W_sparse, rho_min, rho_max)
+        return "cheb", (jnp.asarray(coeffs), jnp.float64(rmin), jnp.float64(rmax))
+    if method == "chebyshev":
+        out = chebyshev(W_sparse, order=20, rmin=rho_min, rmax=rho_max, eigs=eigs)
+        return "cheb", (
+            jnp.asarray(out["coeffs"]),
+            jnp.float64(out["rmin"]),
+            jnp.float64(out["rmax"]),
+        )
+    if method in ("aaa", "chol_aaa"):
+        from . import _aaa
+
+        fn = (
+            _aaa.aaa_logdet_precompute
+            if method == "aaa"
+            else _aaa.chol_aaa_logdet_precompute
+        )
+        pre = fn(W_sparse, rho_min=rho_min, rho_max=rho_max)
+        return "aaa", (
+            jnp.asarray(pre.support_points, dtype=jnp.float64),
+            jnp.asarray(pre.support_values, dtype=jnp.float64),
+            jnp.asarray(pre.weights, dtype=jnp.float64),
+        )
+    return "closure", make_logdet_jax_fn(W_sparse, method, rho_min, rho_max)
+
+
+@functools.lru_cache(maxsize=None)
+def logdet_param_evaluator(kind: str, T: int = 1):
+    """A stable ``(rho, params) -> T·log|I − ρW|`` for :func:`logdet_jax_params` output.
+
+    Cached per ``(kind, T)``, so a sweep that closes over it keeps one identity
+    and its compiled program can be reused.  ``kind`` must be an array kind
+    (``"eig"``, ``"cheb"``, ``"aaa"``); a ``"closure"`` has no params to carry.
+    """
+    if kind == "closure":
+        raise ValueError("a 'closure' log-determinant has no parameters to evaluate")
+
+    def evaluate(rho, params):
+        val = eval_logdet_params(kind, params, rho)
+        return val if T == 1 else T * val
+
+    return evaluate
+
+
+def eval_logdet_params(kind: str, params, rho):
+    """``log|I − ρW|`` from :func:`logdet_jax_params` output (JIT-compatible)."""
+    import jax.numpy as jnp
+
+    if kind == "closure":
+        return params(rho)
+    if kind == "eig":
+        re, im = params
+        return 0.5 * jnp.sum(jnp.log((1.0 - rho * re) ** 2 + (rho * im) ** 2))
+    if kind == "cheb":
+        coeffs, rmin, rmax = params
+        return jax_logdet_chebyshev_traced(rho, coeffs, rmin, rmax)
+    if kind == "aaa":
+        z_j, f_j, w_j = params
+        diff = rho - z_j
+        return jnp.sum(w_j * f_j / diff) / jnp.sum(w_j / diff)
+    raise ValueError(f"unknown logdet kind {kind!r}")
 
 
 def make_logdet_jax_fn(

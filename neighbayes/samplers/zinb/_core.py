@@ -624,6 +624,7 @@ def run_zinb_chain(
             alpha_priors = _NBGibbsPriors(
                 alpha_sigma=priors.alpha_sigma,
                 alpha_nu=priors.alpha_nu,
+                alpha_fixed=getattr(priors, "alpha_fixed", None),
             )
             state.alpha = _sample_alpha(alpha_state, y[z1], alpha_priors, rng=rng)
         # else: all z=0 → no count data; keep current alpha

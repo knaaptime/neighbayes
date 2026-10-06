@@ -32,6 +32,7 @@ import scipy.sparse as sp
 
 from ..._backends.sampler_helpers import (
     enforce_c_backend,
+    jax_available,
     prepare_compile_kwargs,
     prepare_idata_kwargs,
 )
@@ -47,6 +48,22 @@ class FlowSharedMethods:
     ``self._N`` (cross-section)
     or ``self._N_flow`` (panel) before calling any mixin method.
     """
+
+    # True on the separable classes, whose filter A = L_o ⊗ L_d has a closed-form
+    # log-determinant (see :meth:`_attach_flow_log_abs_det`).
+    _separable_filter: bool = False
+
+    def _resolve_gibbs_backend(self, requested: str, *, jax: bool) -> str:
+        """``gibbs_backend`` resolved for this flow configuration.
+
+        ``jax`` says whether the configuration has a JAX Gibbs kernel.
+        ``"auto"`` takes it when JAX is installed and NumPy otherwise; an
+        explicit ``"jax"`` without one raises.
+        """
+        from ...samplers._registry import resolve_backend_for
+
+        backends = {"jax", "numpy"} if jax else {"numpy"}
+        return resolve_backend_for(requested, backends, jax_ok=jax_available())
 
     # Subclasses override these as needed.
     _panel_diagnostics: bool = False
@@ -310,8 +327,11 @@ class FlowSharedMethods:
         ``beta`` gets the Gelman et al. (2008) default on the log scale: the
         intercept is centred on ``log(mean(y))`` with scale 2.5 and each slope
         has scale ``2.5 / sd(x_j)``.  The NB2 dispersion ``alpha`` gets a
-        half-t(``alpha_nu``, ``alpha_sigma``), default half-t(3, 2.5).
+        half-t(``alpha_nu``, ``alpha_sigma``), default half-t(3, 2.5), unless
+        ``alpha_fixed`` holds it (see :mod:`neighbayes.models._base._nb`).
         """
+        from .._base._nb import nb_alpha_fixed
+
         k = self._X.shape[1]
         names = list(self._feature_names) or [f"x{j}" for j in range(k)]
         mu, sd = self._resolved_beta_prior(self._X, names, link="log")
@@ -320,6 +340,7 @@ class FlowSharedMethods:
             "beta_sigma": sd,
             "alpha_sigma": float(self.priors.get("alpha_sigma", 2.5)),
             "alpha_nu": float(self.priors.get("alpha_nu", 3.0)),
+            "alpha_fixed": nb_alpha_fixed(self.priors),
         }
 
     def _flow_sigma(self, pv: dict):
@@ -392,15 +413,34 @@ class FlowSharedMethods:
         Used by the count (NB) flow models: the discrete likelihood carries no
         ``|A|`` change-of-variables term (so it must not enter the LOO
         ``log_likelihood``), but the spatial-filter log-determinant is still
-        exposed for inspection — computed with the scalable resolvent value
-        estimator and scaled by the panel length ``T``.
+        exposed for inspection, scaled by the panel length ``T``.  Separable
+        classes use the closed form :math:`n\\log|L_o| + n\\log|L_d|`; the
+        unrestricted classes use the scalable resolvent value estimator.
         """
+        import xarray as xr
+
+        T = int(getattr(self, "_T", 1))
+        if self._separable_filter and self._separable_logdet_numpy_fn is not None:
+            # log|L_o ⊗ L_d| = n log|L_o| + n log|L_d|: n × n work, exact up to
+            # the single-W logdet method.  The resolvent route below would
+            # factor the N × N system, which runs out of memory at metro scale.
+            post = idata.posterior
+            rd = np.asarray(post["rho_d"].values)
+            ro = np.asarray(post["rho_o"].values)
+            vals = self._separable_logdet_numpy_fn(rd, ro).reshape(rd.shape[:2])
+            da = xr.DataArray(T * vals, dims=("chain", "draw"), name="log_abs_det")
+            if "sample_stats" in idata.children:
+                idata.sample_stats["log_abs_det"] = da
+            else:
+                idata["sample_stats"] = xr.DataTree(xr.Dataset({"log_abs_det": da}))
+            return idata
+
         from ...samplers.gaussian._flow_resolvent import attach_flow_log_abs_det
 
         attach_flow_log_abs_det(
             idata,
             self._W_sparse,
-            T=int(getattr(self, "_T", 1)),
+            T=T,
             n_probes=n_probes,
             n_quad=n_quad,
         )

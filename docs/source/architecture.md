@@ -197,9 +197,11 @@ know about it:
 
 `backends` / `auto_backend`
 : Which of `{"jax", "numpy"}` the family supports, and which one `"auto"` should prefer.
-  The Gaussian families prefer JAX, where a vmapped Gibbs is the fast path. The
-  Pólya–Gamma families pin `auto` to NumPy, because there the CHOLMOD `factorize` path
-  is fastest and the dense JAX path is an opt-in for GPU work.
+  Every family with a JAX sampler prefers it. The JAX path solves with sparse
+  factorizations (sparsax), compiles once per model structure, and draws Pólya–Gamma
+  variables exactly (pgjax), where the NumPy path's draws carry a known bias in the
+  `polyagamma` package and warn. The random-effects, count-panel and hurdle families
+  are NumPy-only.
 
 `options`
 : The family-specific `fit` keywords this runner accepts, e.g. `slice_width`,
@@ -239,9 +241,13 @@ working default rather than an error:
   family prefers it, NumPy otherwise. Requesting `"jax"` explicitly without JAX
   installed raises, because a silent downgrade of an explicit request would be
   misleading.
-- **Sparse solves** prefer KLU, then UMFPACK (both from `scikit-sparse`), then SciPy's
-  SuperLU, with a one-time advisory warning when it falls back so the performance loss
-  is visible.
+- **Sparse solves** use KLU or UMFPACK (both from `scikit-sparse` and `sparsax`), chosen
+  for each sparsity pattern by the work per factor entry of its factorization: KLU on
+  the sparse graphs of contiguity and few-neighbour KNN weights, UMFPACK once the
+  factor's fronts grow dense. The choice depends on the pattern alone, never on a
+  timing, so a fixed seed reproduces the same draws. Without `scikit-sparse` they fall
+  back to SciPy's SuperLU, with a one-time advisory warning so the performance loss is
+  visible.
 - **A dense LAPACK fast path** handles small problems: below `NEIGHBAYES_KRON_DENSE_MAX`
   (512), `lu_factor` on a dense $I - \rho W$ beats `splu`, because SuperLU spends most of
   its time in symbolic-factorisation overhead at that size while `dgetrf` is a single

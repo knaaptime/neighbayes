@@ -192,13 +192,18 @@ def resolve_pg_jax_backend(backend, *, W_sparse, W_sym, WtW, n, logdet_bounds):
         One of ``"cholmod"`` (numpy), ``"jax_dense"``, ``"cholmod_jax"`` —
         used for all three of the cache's solve/logdet_P/sample methods.
     jax_parts : dict
-        ``W_sym_dense``, ``WtW_dense``, ``logdet_jax``, ``sparsax_pattern``
-        (all ``None`` on the numpy path).
+        ``W_sym_dense``, ``WtW_dense``, ``logdet_jax``, ``logdet_params``,
+        ``sparsax_pattern`` (all ``None`` on the numpy path).
+        ``logdet_params`` is ``(kind, params)`` from
+        :func:`neighbayes._logdet._jax.logdet_jax_params`, which a runner passes
+        as data so its compiled program serves every fit of the structure;
+        ``logdet_jax`` evaluates the same function.
     """
     jax_parts = {
         "W_sym_dense": None,
         "WtW_dense": None,
         "logdet_jax": None,
+        "logdet_params": None,
         "sparsax_pattern": None,
     }
     if backend != "jax":
@@ -227,14 +232,13 @@ def resolve_pg_jax_backend(backend, *, W_sparse, W_sym, WtW, n, logdet_bounds):
         jax_parts["W_sym_dense"] = jnp.asarray(W_sym.toarray(), dtype=jnp.float64)
         jax_parts["WtW_dense"] = jnp.asarray(WtW.toarray(), dtype=jnp.float64)
 
-    from ..._logdet import make_logdet_jax_fn
+    from ..._logdet._jax import eval_logdet_params, logdet_jax_params
 
-    jax_parts["logdet_jax"] = make_logdet_jax_fn(
-        W_sparse,
-        method=logdet_bounds.method,
-        rho_min=logdet_bounds.rho_min,
-        rho_max=logdet_bounds.rho_max,
+    kind, params = logdet_jax_params(
+        W_sparse, logdet_bounds.method, logdet_bounds.rho_min, logdet_bounds.rho_max
     )
+    jax_parts["logdet_params"] = (kind, params)
+    jax_parts["logdet_jax"] = lambda rho: eval_logdet_params(kind, params, rho)
 
     if method == "cholmod_jax":
         # Pass the raw (row-standardized) W; the helper derives W+Wᵀ and WᵀW
@@ -402,12 +406,8 @@ class CachedSparseSolver:
             self._has_lu_factor = hasattr(sparsax_mod, "lu_factor") and hasattr(
                 sparsax_mod, "lu_solve_factor"
             )
-            # KLU or UMFPACK, whichever is faster on this pattern, probed at
-            # A = I - Σ_k (0.5 / K) W_k, inside the stable region.
-            probe_coeffs = [-0.5 / max(len(mats), 1)] * len(mats)
-            self._lu = sparsax_lu(
-                self._Ai_jax, self._Aj_jax, self._assemble_Ax(probe_coeffs), self.n
-            )
+            # KLU or UMFPACK, routed by the merged pattern.
+            self._lu = sparsax_lu(self._Ai_jax, self._Aj_jax, self.n)
         # Last (coeffs -> LU token) pair, so back-to-back solves at the same
         # θ (e.g. several RHS blocks per posterior draw) skip the refactor.
         self._last_coeffs = None
@@ -441,7 +441,7 @@ class CachedSparseSolver:
         """
         try:
             return use(self._last_token)
-        except Exception as exc:  # noqa: BLE001 - re-raised unless stale
+        except ValueError as exc:  # sparsax's INVALID_ARGUMENT, as JAX raises it
             if "stale factor token" not in str(exc):
                 raise
             coeffs, self._last_token = self._last_coeffs, None
@@ -468,6 +468,10 @@ class CachedSparseSolver:
         single = rhs_np.ndim == 1
         if single:
             rhs_np = rhs_np[:, None]
+        # sparsax does not check the row count: KLU fails and UMFPACK reads
+        # past the right-hand side.
+        if rhs_np.ndim != 2 or rhs_np.shape[0] != self.n:
+            raise ValueError(f"rhs must have {self.n} rows, got shape {np.shape(rhs)}")
         if self._use_sparsax:
             import jax.numpy as jnp
 
@@ -580,7 +584,7 @@ class KluSarSolver:
     ``W`` it squares the condition number and :math:`W^\top W` carries
     several times the nonzeros of ``W`` (two-hop fill-in), so the Cholesky
     is both slower and less accurate than an LU of ``A`` itself.  A sparse LU
-    (KLU or UMFPACK, whichever measures faster) factorizes the unsymmetric
+    (KLU or UMFPACK, routed by the pattern) factorizes the unsymmetric
     ``A`` once per ρ and additionally hands back :math:`\log\det A` for free
     via :meth:`logdet`.
 
@@ -623,6 +627,7 @@ def profile_loglik_rho_grid(
     rho_min: float = 0.05,
     rho_max: float = 0.95,
     rho_step: float = 0.05,
+    rows=None,
 ):
     r"""Profile-log-likelihood ρ-grid search with cached sparse solves.
 
@@ -643,12 +648,16 @@ def profile_loglik_rho_grid(
 
     Parameters
     ----------
-    y, X : ndarray, shapes (n,) and (n, k)
-        Response and design matrix.
+    y, X : ndarray, shapes (m,) and (n, k)
+        Response and design matrix; ``m = n`` unless ``rows`` is given.
     W_sparse : scipy.sparse matrix, shape (n, n)
         Row-standardized spatial weights.
     rho_min, rho_max, rho_step : float
         Grid definition.
+    rows : boolean ndarray of shape (n,), optional
+        Fit only these rows of :math:`\tilde X`, as when ``y`` is observed on a
+        subset.  The filter is applied to all of ``X`` first, since it mixes
+        every row.
 
     Returns
     -------
@@ -663,6 +672,7 @@ def profile_loglik_rho_grid(
     y = np.asarray(y, dtype=np.float64)
     X = np.asarray(X, dtype=np.float64)
     n, k = X.shape
+    m = len(y)
     solver = CachedSparseSolver([W_sparse], n)
     # Inclusive of rho_max (up to floating-point slack): np.arange would drop
     # the endpoint, silently truncating the default grid at 0.90.
@@ -673,6 +683,8 @@ def profile_loglik_rho_grid(
     for rho_g in grid:
         try:
             Xtilde = solver.solve([-float(rho_g)], X)
+            if rows is not None:
+                Xtilde = Xtilde[rows]
         except (RuntimeError, ValueError, np.linalg.LinAlgError) as exc:
             # A singular / indefinite A_ρ means this ρ is outside the valid
             # range for W; skip it but keep a record so an all-failed grid
@@ -683,7 +695,7 @@ def profile_loglik_rho_grid(
         eta_g = Xtilde @ beta_g
         sig2_g = float(np.mean((y - eta_g) ** 2))
         if sig2_g > 1e-10:
-            ll_g = -0.5 * n * np.log(sig2_g) - 0.5 * n
+            ll_g = -0.5 * m * np.log(sig2_g) - 0.5 * m
             if ll_g > best_ll:
                 best_ll, best_rho, best_beta = ll_g, float(rho_g), beta_g.copy()
     if not np.isfinite(best_ll) and failures:

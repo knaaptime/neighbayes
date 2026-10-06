@@ -7,7 +7,8 @@ equations.
 
 The ZINB DGP has two equations:
 - **Selection** (SAR-logit): ``d ~ Bernoulli(logit^{-1}(eta^sel))`` where
-  ``eta^sel = (I - lam W)^{-1}(Z gamma + nu)``, ``nu ~ N(0, I)``
+  ``eta^sel = (I - lam W)^{-1} Z gamma`` — the reduced form the model fits
+  (the DGP's former latent ``nu`` was removed on 2026-10-03)
 - **Count** (reduced-form SAR-NB): ``y|d=1 ~ NegBin(exp(eta^cnt), alpha)``
   where ``eta^cnt = (I - rho W)^{-1} X beta``
 

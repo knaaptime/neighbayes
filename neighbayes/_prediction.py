@@ -169,9 +169,11 @@ class GaussianConditional:
         return (-th * (self._B1_OS @ r_S) + th * th * (self._B2_OS @ r_S)) / s2
 
     def _solve(self, rhs: np.ndarray) -> np.ndarray:
+        from .samplers._utils._spatial_normal import NotPositiveDefiniteError
+
         try:
             return self._factor.solve(rhs)
-        except Exception as exc:  # noqa: BLE001 - re-raised with context
+        except NotPositiveDefiniteError as exc:
             raise np.linalg.LinAlgError(
                 "The held-out precision block is not numerically positive "
                 f"definite at theta={self._theta!r}, sigma={self._sigma!r}."
@@ -212,10 +214,12 @@ class GaussianConditional:
         """One draw of ``y_O`` from the conditional at this draw."""
         if self.is_iid:
             return mean_O + self._sigma * rng.standard_normal(self.n_oos)
+        from .samplers._utils._spatial_normal import NotPositiveDefiniteError
+
         # CholmodFactor.sample draws N(Λ⁻¹ t, Λ⁻¹); t = 0 leaves the noise.
         try:
             return mean_O + self._factor.sample(np.zeros(self.n_oos), rng=rng)
-        except Exception as exc:  # noqa: BLE001 - re-raised with context
+        except NotPositiveDefiniteError as exc:
             raise np.linalg.LinAlgError(
                 "The held-out precision block is not numerically positive "
                 f"definite at theta={self._theta!r}, sigma={self._sigma!r}."

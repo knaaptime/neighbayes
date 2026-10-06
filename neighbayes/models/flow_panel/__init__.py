@@ -1,3 +1,4 @@
+from ._hurdle import SARHurdleNBFlowSeparable, SARHurdleNBFlowSeparablePanel
 from ._panel import (
     FlowPanelModel,
     NegBinFlowPanel,
@@ -6,6 +7,8 @@ from ._panel import (
     SARFlowSeparablePanel,
     SARNegBinFlowPanel,
     SARNegBinFlowSeparablePanel,
+    SARZINBFlowSeparable,
+    SARZINBFlowSeparablePanel,
     SEMFlowPanel,
     SEMFlowSeparablePanel,
 )

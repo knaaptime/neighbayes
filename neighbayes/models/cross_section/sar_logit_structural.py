@@ -165,11 +165,8 @@ class SARLogitStructural(SpatialModel):
         )
 
         # η₀: (I − ρ₀W)⁻¹Xβ₀ — spatially structured starting values
-        try:
-            _init_solver = CachedSparseSolver([W_csc], n)
-            eta_init = _init_solver.solve([-rho_init], X @ beta_init)
-        except Exception:
-            eta_init = X @ beta_init
+        _init_solver = CachedSparseSolver([W_csc], n)
+        eta_init = _init_solver.solve([-rho_init], X @ beta_init)
 
         # ω₀: draw from PG(1, η)
         from ...samplers._utils._polyagamma import sample_polyagamma
@@ -346,6 +343,7 @@ class SARLogitStructural(SpatialModel):
                 krylov_degree=krylov_degree,
                 krylov_dmax=krylov_dmax,
                 store_log_lik=log_likelihood,
+                logdet_params=_jax_parts["logdet_params"],
             )
         else:
 

@@ -562,7 +562,6 @@ class TestPanelGibbsJAX:
             n_jobs=1,
             progressbar=False,
             gibbs_backend="jax",
-            chain_method="vectorized",
         )
         assert idata.posterior["rho"].shape[0] == 2  # 2 chains
 
@@ -592,6 +591,5 @@ class TestPanelGibbsJAX:
             n_jobs=1,
             progressbar=False,
             gibbs_backend="jax",
-            chain_method="vectorized",
         )
         assert idata.posterior["lam"].shape[0] == 2  # 2 chains

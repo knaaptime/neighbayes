@@ -37,6 +37,7 @@ import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 from sksparse.cholmod import CholeskyFactor as _SkCholeskyFactor
+from sksparse.cholmod import CholmodNotPositiveDefiniteError
 
 # ---------------------------------------------------------------------------
 # CHOLMOD factorization wrapper
@@ -45,6 +46,32 @@ from sksparse.cholmod import CholeskyFactor as _SkCholeskyFactor
 
 # CHOLMOD solve modes (cholmod.h): A x = b, L' x = b, and x = P' b.
 _MODE_A, _MODE_LT, _MODE_PT = 0, 5, 8
+
+
+class NotPositiveDefiniteError(np.linalg.LinAlgError):
+    """A matrix handed to :class:`CholmodFactor` is not positive definite.
+
+    Raised by whichever call first factorizes: ``factorize`` on the
+    scikit-sparse path, the first ``solve``/``logdet``/``sample`` on the
+    sparsax path, which factors on first use.
+    """
+
+
+#: What a sparse factorization of ``I − ρW`` (or of a precision built from
+#: it) raises when the matrix is singular or indefinite, as at the edge of a
+#: parameter's support: :class:`NotPositiveDefiniteError` and numpy's errors
+#: are ``LinAlgError``; sparsax's LU and SuperLU raise ``RuntimeError``.
+FACTORIZATION_ERRORS = (np.linalg.LinAlgError, RuntimeError)
+
+
+def _sparsax_call(fn, *args):
+    """``fn(*args)``, re-raising sparsax's not-positive-definite failure as ours."""
+    try:
+        return fn(*args)
+    except RuntimeError as exc:
+        if "not positive definite" in str(exc):
+            raise NotPositiveDefiniteError(str(exc)) from exc
+        raise
 
 
 class CholmodFactor:
@@ -147,12 +174,17 @@ class CholmodFactor:
         if self._sparsax is not None:
             # sparsax factors on first use and caches the factor by value.
             self._Ax = self._upper_values(matrix)
-        else:
+            return
+        try:
             self._factor = self._symbolic.copy().factorize(sp.csc_matrix(matrix))
+        except CholmodNotPositiveDefiniteError as exc:
+            raise NotPositiveDefiniteError(str(exc)) from exc
 
     def _solve(self, rhs: np.ndarray, mode: int) -> np.ndarray:
         rhs = np.ascontiguousarray(rhs, dtype=np.float64)
-        return self._sparsax.solve_np(self._Ai, self._Aj, self._Ax, rhs, mode)
+        return _sparsax_call(
+            self._sparsax.solve_np, self._Ai, self._Aj, self._Ax, rhs, mode
+        )
 
     def solve(self, rhs: np.ndarray) -> np.ndarray:
         """Solve P x = rhs."""
@@ -163,7 +195,11 @@ class CholmodFactor:
     def logdet(self) -> float:
         """Return log|P|."""
         if self._sparsax is not None:
-            return float(self._sparsax.logdet_np(self._Ai, self._Aj, self._Ax, self._n))
+            return float(
+                _sparsax_call(
+                    self._sparsax.logdet_np, self._Ai, self._Aj, self._Ax, self._n
+                )
+            )
         return self._factor.logdet()
 
     def sample(

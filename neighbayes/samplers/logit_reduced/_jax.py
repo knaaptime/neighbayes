@@ -114,60 +114,43 @@ def _rho_log_density_logit(
 
 
 def _make_reduced_logit_gibbs_step(
-    y_jax,
-    X_jax,
-    sparse_ctx,
     n,
     k,
-    priors,
     *,
+    lu_solve,
     intercept_col,
     krylov_degree,
-    krylov_dmax,
     krylov_reuse=True,
 ):
-    """Build a JIT-compiled reduced-form SAR-logit Gibbs step (ω → ρ → β)."""
+    """Build a JIT-compiled reduced-form SAR-logit Gibbs step (ω → ρ → β).
+
+    Static settings only; the model's arrays come in as the step's ``data``
+    argument (:func:`_reduced_logit_data`), so one compiled program serves
+    every fit of the same structure.
+    """
     import jax
     import jax.numpy as jnp
     from jax.scipy.linalg import cho_solve, solve_triangular
 
-    from ..._jax_dispatch import ensure_x64
     from .._utils._jax_slice import jax_slice_sample_1d
     from .._utils._jax_utils import make_pg_draw
     from ..negbin_reduced._jax import (
+        _bind_sparse_solvers,
         _build_krylov_basis_jax,
         _eval_U_from_basis_jax,
-        _make_sparse_solvers,
         _series_radius_jax,
     )
 
     # Pólya-Gamma: pgjax (on-device, exact) or numpy C extension fallback.
     _draw_pg = make_pg_draw()
 
-    ensure_x64()
-    _solve, _matvec_W = _make_sparse_solvers(sparse_ctx)
-
-    beta_sigma = priors.beta_sigma
-    if np.isscalar(beta_sigma):
-        V0_inv_diag = jnp.full(k, 1.0 / (float(beta_sigma) ** 2))
-    else:
-        V0_inv_diag = 1.0 / jnp.asarray(beta_sigma, dtype=jnp.float64) ** 2
-    beta_mu = priors.beta_mu
-    mu0 = (
-        jnp.full(k, float(beta_mu))
-        if np.isscalar(beta_mu)
-        else jnp.asarray(beta_mu, dtype=jnp.float64)
-    )
-    rho_lo = jnp.float64(priors.rho_lower)
-    rho_hi = jnp.float64(priors.rho_upper)
-    dmax = jnp.float64(krylov_dmax)
     _reuse_threshold = jnp.float64(0.15) if krylov_reuse else jnp.float64(0.0)
     _V_init = jnp.zeros((krylov_degree + 1, n, k), dtype=jnp.float64)
     _ic = int(intercept_col)
     _deg = int(krylov_degree)
 
     @jax.jit
-    def gibbs_step(state, key, slice_width):
+    def gibbs_step(state, key, slice_width, data):
         """One sweep; returns ``(new_state, η, (steps_left, steps_right))``.
 
         The step-out counts come from the ρ slice and drive the runner's warmup
@@ -175,6 +158,10 @@ def _make_reduced_logit_gibbs_step(
         """
         beta = state["beta"]
         rho = state["rho"]
+        y_jax, X_jax = data["y"], data["X"]
+        V0_inv_diag, mu0 = data["V0_inv_diag"], data["mu0"]
+        rho_lo, rho_hi, dmax = data["rho_lower"], data["rho_upper"], data["krylov_dmax"]
+        _solve, _matvec_W = _bind_sparse_solvers(lu_solve, data["sparse"])
         key_rho, key_beta, key_pg = jax.random.split(key, 3)
 
         # ── Krylov basis: reuse or rebuild ──
@@ -281,6 +268,27 @@ def _make_reduced_logit_gibbs_step(
     return gibbs_step
 
 
+def _reduced_logit_data(y, X, sparse_arrays, priors, krylov_dmax):
+    """The reduced-logit step's ``data``: every data-dependent array and scalar."""
+    import jax.numpy as jnp
+
+    from ..negbin_reduced._jax import prior_precision_and_mean
+
+    V0_inv_diag, mu0 = prior_precision_and_mean(
+        priors.beta_mu, priors.beta_sigma, X.shape[1]
+    )
+    return {
+        "y": jnp.asarray(y, dtype=jnp.float64),
+        "X": jnp.asarray(X, dtype=jnp.float64),
+        "V0_inv_diag": V0_inv_diag,
+        "mu0": mu0,
+        "rho_lower": jnp.float64(priors.rho_lower),
+        "rho_upper": jnp.float64(priors.rho_upper),
+        "krylov_dmax": jnp.float64(krylov_dmax),
+        "sparse": sparse_arrays,
+    }
+
+
 def run_chains_jax_reduced_logit(
     y,
     X,
@@ -310,15 +318,14 @@ def run_chains_jax_reduced_logit(
     import jax.numpy as jnp
 
     from ..._jax_dispatch import ensure_x64
-    from .._utils._jax_utils import run_chains_chunked
-    from ..negbin_reduced._jax import _build_sparse_ctx
+    from .._utils._jax_utils import cached_sweep, run_chains_chunked
+    from ..negbin_reduced._jax import _build_sparse_ctx, _sparse_solve_parts
 
     ensure_x64()
     chains = len(inits)
     n, k = X.shape
-    y_jax = jnp.asarray(y, dtype=jnp.float64)
-    X_jax = jnp.asarray(X, dtype=jnp.float64)
-    sparse_ctx = _build_sparse_ctx(W_sparse, n)
+    lu_solve, sparse_arrays = _sparse_solve_parts(_build_sparse_ctx(W_sparse, n))
+    data = _reduced_logit_data(y, X, sparse_arrays, priors, krylov_dmax)
 
     from .._utils._sparsax_lu import set_sparsax_lu_cache_size
 
@@ -326,19 +333,6 @@ def run_chains_jax_reduced_logit(
 
     if jax_seeds is None:
         jax_seeds = list(range(chains))
-
-    gibbs_step = _make_reduced_logit_gibbs_step(
-        y_jax=y_jax,
-        X_jax=X_jax,
-        sparse_ctx=sparse_ctx,
-        n=n,
-        k=k,
-        priors=priors,
-        intercept_col=intercept_col,
-        krylov_degree=krylov_degree,
-        krylov_dmax=krylov_dmax,
-        krylov_reuse=krylov_reuse,
-    )
 
     _V_init = jnp.zeros((krylov_degree + 1, n, k), dtype=jnp.float64)
     states = [
@@ -357,18 +351,34 @@ def run_chains_jax_reduced_logit(
 
     from .._utils._jax_slice import adapt_slice_width
 
-    def _sweep(st, key, tuning):
-        width = st["slice_width"]
-        core = {name: value for name, value in st.items() if name != "slice_width"}
-        core, eta, (steps_left, steps_right) = gibbs_step(core, key, width)
-        width = adapt_slice_width(width, steps_left, steps_right, tuning)
-        trace = (core["rho"], core["beta"])
-        if store_log_lik:  # η is traced only to build the log-likelihood
-            trace += (eta,)
-        return dict(core, slice_width=width), trace
+    # One step and sweep per structure (see run_chains_chunked).
+    static = (n, k, int(intercept_col), krylov_degree, krylov_reuse, lu_solve)
 
+    def _build():
+        gibbs_step = _make_reduced_logit_gibbs_step(
+            n,
+            k,
+            lu_solve=lu_solve,
+            intercept_col=intercept_col,
+            krylov_degree=krylov_degree,
+            krylov_reuse=krylov_reuse,
+        )
+
+        def _sweep(st, key, tuning, data):
+            width = st["slice_width"]
+            core = {name: value for name, value in st.items() if name != "slice_width"}
+            core, eta, (steps_left, steps_right) = gibbs_step(core, key, width, data)
+            width = adapt_slice_width(width, steps_left, steps_right, tuning)
+            trace = (core["rho"], core["beta"])
+            if store_log_lik:  # η is traced only to build the log-likelihood
+                trace += (eta,)
+            return dict(core, slice_width=width), trace
+
+        return _sweep
+
+    _sweep = cached_sweep(("sar_logit_reduced", *static, bool(store_log_lik)), _build)
     _, traces = run_chains_chunked(
-        _sweep, states, warm_keys, draw_keys, tune=tune, draws=draws
+        _sweep, states, warm_keys, draw_keys, tune=tune, draws=draws, consts=data
     )
     rho_all, beta_all = traces[:2]
     eta_all = traces[2] if store_log_lik else None

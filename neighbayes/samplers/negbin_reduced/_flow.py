@@ -106,7 +106,8 @@ class FlowReducedGibbsCache:
         Krylov basis degree for the separable variant.  Default 8.
         Ignored for the unrestricted variant.
     krylov_dmax : float
-        Maximum |Δρ| for Krylov basis reuse.  Default 0.15.
+        Largest |Δρ| from a Krylov basis's centre at which its series is
+        evaluated; farther candidates take a direct solve.
     n_rho_omega_cycles : int
         Number of (ω, ρ, β) Gibbs cycles per sweep.  Default 1.
     positive : bool
@@ -136,8 +137,6 @@ class FlowReducedGibbsCache:
         n_rho_omega_cycles: int = 1,
         positive: bool = False,
         T: int = 1,
-        krylov_reuse: bool = True,
-        krylov_reuse_threshold: float = 0.15,
     ):
         self.Wd = Wd
         self.Wo = Wo
@@ -155,21 +154,9 @@ class FlowReducedGibbsCache:
         self.Nf = int(n) * int(n)  # per-period flow count (n²)
         if not separable and Wd is None:
             raise ValueError("the unrestricted flow sampler needs Wd, Wo and Ww")
-        self.krylov_reuse = krylov_reuse
-        self.krylov_reuse_threshold = krylov_reuse_threshold
 
-        # Eigenvalue bounds for the regional W (n×n).
-        # For row-standardized W: eigenvalues in [-1, 1].
-        try:
-            eigvals = sp.linalg.eigsh(W_csc.astype(np.float64), k=1, which="LM")
-            self.W_eig_max = float(np.max(np.abs(eigvals[0])))
-        except Exception:
-            self.W_eig_max = 1.0
-        try:
-            eigvals = sp.linalg.eigsh(W_csc.astype(np.float64), k=1, which="SA")
-            self.W_eig_min = float(eigvals[0][0])
-        except Exception:
-            self.W_eig_min = -1.0
+        # Bounds on the regional W's (n×n) real spectrum.
+        self.W_eig_min, self.W_eig_max = real_spectrum_bounds(W_csc)
 
         # Adaptive slice width states for each ρ parameter
         self.rho_d_slice_width_state = SliceWidthState()
@@ -194,6 +181,29 @@ def _assemble_A_unrestricted(
     """Assemble A = I_N - rho_d*Wd - rho_o*Wo - rho_w*Ww."""
     eye = sp.eye(N, format="csr", dtype=np.float64)
     return eye - rho_d * Wd - rho_o * Wo - rho_w * Ww
+
+
+def real_spectrum_bounds(W) -> tuple[float, float]:
+    """``(λ_min, λ_max)``: the extreme real parts of ``W``'s eigenvalues.
+
+    ``eigsh`` assumes a symmetric matrix and misreads a row-standardized
+    ``W``, which is not one: it put λ_max at 1.0101 on a 6 × 6 rook grid,
+    where it is exactly 1, and λ_min at −0.61 on a 4-nearest-neighbour graph,
+    where it is −0.56.  Small ``W`` is decomposed densely; larger ``W`` goes to
+    ARPACK's non-symmetric driver, and if that does not converge, to the
+    Gershgorin bound ``±max_i Σ_j |W_ij|``, which is valid but loose.
+    """
+    W = sp.csc_matrix(W, dtype=np.float64)
+    if W.shape[0] <= 256:
+        real = np.linalg.eigvals(W.toarray()).real
+        return float(real.min()), float(real.max())
+    try:
+        hi = sp.linalg.eigs(W, k=1, which="LR", return_eigenvectors=False)
+        lo = sp.linalg.eigs(W, k=1, which="SR", return_eigenvectors=False)
+    except sp.linalg.ArpackNoConvergence:
+        radius = float(abs(W).sum(axis=1).max())
+        return -radius, radius
+    return float(lo.real[0]), float(hi.real[0])
 
 
 def flow_system_is_invertible(
@@ -819,6 +829,7 @@ def run_chain_unrestricted(
         beta_sigma=priors.beta_sigma,
         alpha_sigma=priors.alpha_sigma,
         alpha_nu=priors.alpha_nu,
+        alpha_fixed=getattr(priors, "alpha_fixed", None),
         rho_lower=priors.rho_lower,
         rho_upper=priors.rho_upper,
     )
@@ -1056,22 +1067,13 @@ def run_chain_separable(
         beta_sigma=priors.beta_sigma,
         alpha_sigma=priors.alpha_sigma,
         alpha_nu=priors.alpha_nu,
+        alpha_fixed=getattr(priors, "alpha_fixed", None),
         rho_lower=priors.rho_lower,
         rho_upper=priors.rho_upper,
     )
 
     use_krylov = cache.krylov_degree > 0 and cache.T == 1
     krylov_degree = cache.krylov_degree
-    # Never reuse a basis across sweeps: the ρ_d basis is built at (ρ_d, ρ_o) and
-    # ρ_o is re-sliced every sweep, so a reused basis evaluates U at a stale ρ_o
-    # (this biased the ρ posterior; see _flow_jax.py).
-    reuse = False
-
-    # Per-chain Krylov basis caches for reuse across sweeps.
-    _prev_basis_d = None
-    _prev_rho_d = None
-    _prev_basis_o = None
-    _prev_rho_o = None
 
     for i in range(total_iters):
         # Compute η = A⁻¹ Xβ at current ρ's (per period for panels)
@@ -1088,53 +1090,27 @@ def run_chain_separable(
         _n_cycles = cache.n_rho_omega_cycles
         Xtilde = None
 
-        # Build Krylov bases for ρ_d and ρ_o at current values (with reuse)
+        # Krylov bases for ρ_d and ρ_o at the current values.  Each depends on
+        # both ρ's, and ρ_o is re-sliced every sweep, so a basis is never
+        # reused across sweeps: that evaluated U at a stale ρ_o and biased ρ.
         basis_d = None
         basis_o = None
         if use_krylov:
-            if (
-                reuse
-                and _prev_basis_d is not None
-                and abs(state.rho_d - _prev_rho_d) < cache.krylov_reuse_threshold
-            ):
-                basis_d = _prev_basis_d
-            else:
+            bases = {}
+            for direction in ("rho_d", "rho_o"):
                 try:
-                    basis_d = _build_kron_krylov_basis(
+                    bases[direction] = _build_kron_krylov_basis(
                         state.rho_d,
                         state.rho_o,
                         X,
                         W_csc,
                         n,
-                        direction="rho_d",
+                        direction=direction,
                         degree=krylov_degree,
                     )
                 except (RuntimeError, ValueError):
-                    basis_d = None
-                _prev_basis_d = basis_d
-                _prev_rho_d = state.rho_d
-
-            if (
-                reuse
-                and _prev_basis_o is not None
-                and abs(state.rho_o - _prev_rho_o) < cache.krylov_reuse_threshold
-            ):
-                basis_o = _prev_basis_o
-            else:
-                try:
-                    basis_o = _build_kron_krylov_basis(
-                        state.rho_d,
-                        state.rho_o,
-                        X,
-                        W_csc,
-                        n,
-                        direction="rho_o",
-                        degree=krylov_degree,
-                    )
-                except (RuntimeError, ValueError):
-                    basis_o = None
-                _prev_basis_o = basis_o
-                _prev_rho_o = state.rho_o
+                    bases[direction] = None
+            basis_d, basis_o = bases["rho_d"], bases["rho_o"]
 
         for _cycle in range(_n_cycles):
             # --- ρ_d | ω, α, y (β marginalized) ---

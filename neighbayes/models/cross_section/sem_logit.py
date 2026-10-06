@@ -337,6 +337,7 @@ class SEMLogit(SpatialModel):
                 krylov_degree=krylov_degree,
                 krylov_dmax=krylov_dmax,
                 store_log_lik=log_likelihood,
+                logdet_params=_jax_parts["logdet_params"],
             )
         else:
 

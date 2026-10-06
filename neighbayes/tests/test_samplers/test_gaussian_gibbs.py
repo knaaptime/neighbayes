@@ -1381,7 +1381,7 @@ class TestInformativeOutput:
 
 
 class TestChainParallelism:
-    """Tests for chain parallelism (n_jobs for NumPy, chain_method for JAX)."""
+    """Tests for chain parallelism (n_jobs for NumPy, vectorized chains for JAX)."""
 
     def test_sequential_numpy(self):
         """n_jobs=1 runs NumPy chains sequentially."""
@@ -1441,28 +1441,7 @@ class TestChainParallelism:
         assert idata.posterior["beta"].shape[0] == 2  # 2 chains
 
     def test_vectorized_jax(self):
-        """chain_method='vectorized' works for JAX path."""
-        pytest.importorskip("jax")
-        from neighbayes.models.cross_section.sar import SAR
-
-        y, X, W_dense, n = _make_sar_data()
-        W = W_to_graph(W_dense)
-        model = SAR(y=y, X=X, W=W)
-        idata = model.fit(
-            sampler="gibbs",
-            draws=10,
-            tune=5,
-            chains=2,
-            random_seed=42,
-            progressbar=False,
-            gibbs_backend="jax",
-            chain_method="vectorized",
-        )
-        assert "posterior" in idata.children
-        assert idata.posterior["beta"].shape[0] == 2  # 2 chains
-
-    def test_jax_default_is_vectorized(self):
-        """JAX path defaults to chain_method='vectorized'."""
+        """The JAX path runs every chain, vectorized."""
         pytest.importorskip("jax")
         from neighbayes.models.cross_section.sar import SAR
 
@@ -1480,26 +1459,6 @@ class TestChainParallelism:
         )
         assert "posterior" in idata.children
         assert idata.posterior["beta"].shape[0] == 2  # 2 chains
-
-    def test_parallel_jax_raises(self):
-        """chain_method='parallel' raises NotImplementedError for JAX."""
-        pytest.importorskip("jax")
-        from neighbayes.models.cross_section.sar import SAR
-
-        y, X, W_dense, n = _make_sar_data()
-        W = W_to_graph(W_dense)
-        model = SAR(y=y, X=X, W=W)
-        with pytest.raises(NotImplementedError, match="vectorized"):
-            model.fit(
-                sampler="gibbs",
-                draws=10,
-                tune=5,
-                chains=2,
-                random_seed=42,
-                progressbar=False,
-                gibbs_backend="jax",
-                chain_method="parallel",
-            )
 
     def test_vectorized_runner_valid_results(self):
         """JAX vectorized runner returns valid multi-chain slice results."""

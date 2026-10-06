@@ -74,6 +74,11 @@ markers = [
     "recovery: marks parameter recovery tests (fit model, assert posterior ≈ true params)",
     "requires_jax: marks tests that activate a JAX backend (gibbs_backend='jax', numpyro/blackjax NUTS) — auto-skipped on Windows",
 ]
+# The NumPy count samplers are tested on purpose; their known-bias warning
+# would otherwise fill the summary.  pytest.warns still sees it.
+filterwarnings = [
+    "ignore:Pólya–Gamma draws on the NumPy backend:RuntimeWarning",
+]
 
 [tool.coverage.run]
 source = ["neighbayes"]

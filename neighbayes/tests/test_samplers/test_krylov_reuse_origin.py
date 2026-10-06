@@ -23,7 +23,7 @@ from neighbayes.samplers.negbin_reduced._core import (
     _eval_U_from_basis,
 )
 
-REUSE_THRESHOLD = 0.15  # matches _flow_jax._reuse_threshold / krylov_reuse_threshold
+REUSE_THRESHOLD = 0.15  # matches krylov_reuse_threshold
 
 
 def _ring_W(n):
@@ -69,24 +69,23 @@ def test_offset_must_be_measured_from_basis_center(rho_c, drift):
     )
 
 
-def test_flow_jax_slice_uses_the_reused_basis_center():
-    """``_slice_one`` must hand the slice sampler the basis's own center.
+def test_flow_jax_slice_builds_its_basis_at_the_current_rho():
+    """The JAX flow sweep carries no basis between slices.
 
-    On the rebuild branch the center equals the current ρ, so the bug is
-    invisible there; it only appears once a basis is reused.  Assert on the
-    source that the Horner origin is selected from the returned basis
-    centers rather than from ``rho_k``.
+    A ρ_k basis depends on the other two ρ's, which move every slice; reusing
+    one evaluated the density at stale values of them and biased the
+    posterior.  Each slice therefore builds its basis at the state it slices
+    from, so the Horner origin is the current ρ_k.  Assert on the source that
+    no basis or basis center rides in the sweep state.
     """
     import inspect
 
     from neighbayes.samplers.negbin_reduced import _flow_jax
 
-    src = inspect.getsource(_flow_jax)
-    assert "rho_basis=rho_k," not in src, (
-        "slice sampler is being given the current ρ as the Horner origin; "
-        "on the reuse branch that is not where V_stack was built"
-    )
-    assert 'rho_basis_k = {"d": rd_b, "o": ro_b, "w": rw_b}[wkey]' in src
+    src = inspect.getsource(_flow_jax._flow_sweep)
+    for stale in ("V_stack_prev", "rd_basis", "ro_basis", "rw_basis"):
+        assert stale not in src, f"the flow sweep carries {stale} between slices"
+    assert "rho_basis=rho_k," in src
 
 
 class TestSafeRadius:

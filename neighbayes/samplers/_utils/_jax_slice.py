@@ -30,6 +30,7 @@ def jax_slice_sample_1d(
     max_steps_out=50,
     max_shrink_iters=200,
     return_steps=False,
+    log_density_x0=None,
 ):
     """Draw one sample from a univariate distribution via slice sampling.
 
@@ -56,6 +57,9 @@ def jax_slice_sample_1d(
     return_steps : bool, default False
         Also return the left and right stepping-out counts, which drive warmup
         width adaptation (:func:`adapt_slice_width`).
+    log_density_x0 : jax.numpy scalar, optional
+        ``log_density(x0)`` when the caller already has it, saving one
+        evaluation (worth it when each costs a factorization).
 
     Returns
     -------
@@ -70,7 +74,7 @@ def jax_slice_sample_1d(
     key, key_u, key_Lu, key_Ru = jax.random.split(key, 4)
 
     # Evaluate log-density at current point
-    log_y0 = log_density(x0)
+    log_y0 = log_density(x0) if log_density_x0 is None else log_density_x0
 
     # Draw vertical level: log(u) where u ~ Uniform(0, f(x0))
     log_u = log_y0 + jnp.log(jax.random.uniform(key_u))

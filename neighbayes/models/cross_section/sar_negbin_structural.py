@@ -36,6 +36,7 @@ from ...samplers._utils._spatial_normal import CholmodFactor
 from ...samplers.gaussian._chain_runner import run_chains
 from ...samplers.negbin import GibbsCache, GibbsPriors, GibbsState, run_chain
 from ...samplers.negbin._jax import run_chains_jax_vectorized
+from .._base._nb import nb_alpha_fixed
 from ..base import SpatialModel
 from ..priors import SARNegBinPriors
 
@@ -153,7 +154,8 @@ class SARNegBinStructural(SpatialModel):
         # ω₀: draw from PG(y + α, η)
         from ...samplers._utils._polyagamma import sample_polyagamma
 
-        omega_init = sample_polyagamma(y + alpha_init, eta_init, rng=rng)
+        # A starting value: polyagamma's bias cannot matter here.
+        omega_init = sample_polyagamma(y + alpha_init, eta_init, rng=rng, warn=False)
 
         return GibbsState(
             eta=eta_init,
@@ -251,6 +253,7 @@ class SARNegBinStructural(SpatialModel):
             sigma2_beta=self.priors.get("sigma2_beta", 1.0),
             alpha_sigma=self.priors.get("alpha_sigma", 2.5),
             alpha_nu=self.priors.get("alpha_nu", 3.0),
+            alpha_fixed=nb_alpha_fixed(self.priors),
             rho_lower=self._logdet_bounds.rho_min,
             rho_upper=self._logdet_bounds.rho_max,
         )
@@ -375,6 +378,7 @@ class SARNegBinStructural(SpatialModel):
                 krylov_degree=krylov_degree,
                 krylov_dmax=krylov_dmax,
                 store_log_lik=log_likelihood,
+                logdet_params=_jax_parts["logdet_params"],
             )
         else:
 

@@ -157,11 +157,7 @@ def _is_symmetric_W(W) -> bool:
     # libpysal Graph: use built-in topology asymmetry check (intrinsic=False
     # ignores weight values, so row-standardization does not read as directed).
     if hasattr(W, "asymmetry"):
-        try:
-            asym = W.asymmetry(intrinsic=False)
-            return asym.empty
-        except Exception:
-            pass
+        return W.asymmetry(intrinsic=False).empty
 
     if sp.issparse(W):
         # Sparse difference stays sparse — never densify (n=20k dense is ~3.2GB).
@@ -177,7 +173,7 @@ def _is_symmetric_W(W) -> bool:
 
             _d_symmetrize(Wc)
             return True
-        except Exception:
+        except ValueError:  # no symmetrizing diagonal: directed W
             return False
     else:
         W_arr = np.asarray(W)
@@ -190,7 +186,7 @@ def _is_symmetric_W(W) -> bool:
 
             _d_symmetrize(sp.csr_matrix(W_arr))
             return True
-        except Exception:
+        except ValueError:  # no symmetrizing diagonal: directed W
             return False
 
 

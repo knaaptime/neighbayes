@@ -17,6 +17,7 @@ import numpy as np
 import pytensor.tensor as pt
 
 from ..._lazy_deps import pm
+from .._base._nb import nb_alpha_fixed, nb_alpha_rv
 from ..base import SpatialModel
 from ..priors import NegBinPriors
 
@@ -100,7 +101,7 @@ class NegBin(SpatialModel):
 
         with pm.Model(coords=self._model_coords()) as model:
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            alpha = pm.HalfStudentT("alpha", nu=alpha_nu, sigma=alpha_sigma)
+            alpha = nb_alpha_rv(nb_alpha_fixed(self.priors), alpha_nu, alpha_sigma)
             mu = pt.exp(pt.dot(X, beta))
             pm.NegativeBinomial("obs", mu=mu, alpha=alpha, observed=self._y_int)
         return model

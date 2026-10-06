@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import numpy as np
 
-from ._flow_jax import _build_sar_solver_jax
 from ._flow_structured import FlowDesignStructure, classify_flow_design
 
 
@@ -57,15 +56,75 @@ def _cheap_pair_slots(struct: FlowDesignStructure):
     return I.astype(np.int32), J.astype(np.int32), P, Q, slot
 
 
-def make_structured_sweep(y, W_csc, struct: FlowDesignStructure, priors):
-    """Build ``sweep(state, key, tuning, data) -> (state, trace)`` for one chain.
+def _structured_parts(y, W_csc, struct: FlowDesignStructure, priors):
+    """Host side of the structured sweep: ``(static, data)``.
 
-    Returns ``(sweep, initial_eta, data)``; ``data`` holds the data-sized arrays
-    both functions take as an argument.
+    ``static`` is everything the compiled sweep closes over — sizes, the
+    design's column split and the routed LU function — and keys its cache;
+    ``data`` is every data-dependent array and scalar, passed as an argument.
+    Arrays of data size must not be closure constants either: XLA embeds and
+    constant-folds them, which cost gigabytes at compile time on large panels.
+    """
+    import jax.numpy as jnp
 
-    ``state`` holds ``beta, rho_d, rho_o, alpha``, the current ``eta`` (``T × n ×
-    n``) and the two ρ slice widths; ``trace`` is ``(rho_d, rho_o, beta, alpha,
-    eta)``.
+    from .._utils._jax_utils import padded_value_counts
+    from ._flow_jax import _sar_solver_parts
+
+    n, T, k = struct.n, struct.T, struct.k
+    cc = np.asarray(struct.cheap_cols, dtype=np.int32)
+    fc = np.asarray(struct.full_cols, dtype=np.int32)
+    k_c, k_e = len(cc), len(fc)
+    mu0 = np.broadcast_to(np.asarray(priors.beta_mu, dtype=np.float64), (k,)).copy()
+    sd0 = np.broadcast_to(np.asarray(priors.beta_sigma, dtype=np.float64), (k,))
+    alpha_fixed = getattr(priors, "alpha_fixed", None)
+    y_np = np.asarray(y, dtype=np.float64)
+    y_vals, y_counts = padded_value_counts(y_np)
+    keys = sorted({tuple(int(i) for i in struct.f_idx[t]) for t in range(T)})
+    lu_solve, sar = _sar_solver_parts(W_csc, n)
+    data = {
+        "y": jnp.asarray(y_np),
+        "F": jnp.asarray(np.stack(struct.F)) if k_e else jnp.zeros((0, n, n)),
+        "U": jnp.asarray(struct.U),  # (n, n_u)
+        "V": jnp.asarray(struct.V),  # (n, n_v)
+        "mu0": jnp.asarray(mu0),
+        "prec0": jnp.asarray(1.0 / sd0**2),
+        "rho_lo": jnp.float64(priors.rho_lower),
+        "rho_hi": jnp.float64(priors.rho_upper),
+        "alpha_sigma": jnp.float64(priors.alpha_sigma),
+        "alpha_nu": jnp.float64(priors.alpha_nu),
+        "alpha_fixed": jnp.float64(alpha_fixed if alpha_fixed is not None else 1.0),
+        "y_vals": jnp.asarray(y_vals),
+        "y_counts": jnp.asarray(y_counts),
+        "ui": jnp.asarray(struct.u_idx, dtype=jnp.int32),  # (T, k_c)
+        "vi": jnp.asarray(struct.v_idx, dtype=jnp.int32),
+        "f_idx": jnp.asarray(struct.f_idx, dtype=jnp.int32),  # (T, k_e)
+        "key_of_t": jnp.asarray(
+            [keys.index(tuple(int(i) for i in struct.f_idx[t])) for t in range(T)],
+            dtype=jnp.int32,
+        ),
+        "key_idx": jnp.asarray(
+            np.asarray(keys, dtype=np.int32).reshape(len(keys), k_e)
+        ),
+        "sar": sar,
+    }
+    if k_c:
+        tI, tJ, pP, pQ, slot = _cheap_pair_slots(struct)
+        data.update(
+            tI=jnp.asarray(tI), tJ=jnp.asarray(tJ), pP=jnp.asarray(pP),
+            pQ=jnp.asarray(pQ), slot=jnp.asarray(slot),
+        )  # fmt: skip
+    static = (
+        n, T, k, tuple(int(c) for c in cc), tuple(int(c) for c in fc), len(keys),
+        float(y_np.size), lu_solve, alpha_fixed is not None,
+    )  # fmt: skip
+    return static, data
+
+
+def _structured_fns(n, T, k, cc_t, fc_t, n_keys, n_obs, lu_solve, has_alpha_fixed):
+    """``(sweep, initial_eta, bind)`` for one structure (see :func:`make_structured_sweep`).
+
+    ``bind(data)`` builds the sweep's kernels over one model's data; the
+    returned ``sweep``/``initial_eta`` take that data as an argument.
     """
     import jax
     import jax.numpy as jnp
@@ -74,269 +133,288 @@ def make_structured_sweep(y, W_csc, struct: FlowDesignStructure, priors):
 
     from .._utils._jax_slice import adapt_slice_width, jax_slice_sample_1d
     from .._utils._jax_utils import make_pg_draw
+    from ._flow_jax import _bind_sar_solver
 
-    n, T, k = struct.n, struct.T, struct.k
-    cc = np.asarray(struct.cheap_cols, dtype=np.int32)
-    fc = np.asarray(struct.full_cols, dtype=np.int32)
+    cc = np.asarray(cc_t, dtype=np.int32)
+    fc = np.asarray(fc_t, dtype=np.int32)
     k_c, k_e = len(cc), len(fc)
-
-    # --- priors ---
-    mu0 = np.broadcast_to(np.asarray(priors.beta_mu, dtype=np.float64), (k,)).copy()
-    sd0 = np.broadcast_to(np.asarray(priors.beta_sigma, dtype=np.float64), (k,))
-    prec0 = 1.0 / sd0**2
-    mu0_j, prec0_j = jnp.asarray(mu0), jnp.asarray(prec0)
-    mu_c, prec_c = jnp.asarray(mu0[cc]), jnp.asarray(prec0[cc])
-    rho_lo, rho_hi = float(priors.rho_lower), float(priors.rho_upper)
-    alpha_sigma, alpha_nu = float(priors.alpha_sigma), float(priors.alpha_nu)
-
-    # --- data and static structure ---
-    # Arrays of data size enter the compiled sweep as arguments (``data``), not
-    # closure constants: XLA embeds and constant-folds closed-over arrays, which
-    # cost gigabytes at compile time on large panels.
-    y_np = np.asarray(y, dtype=np.float64)
-    y_vals, y_counts = np.unique(y_np, return_counts=True)
-    y_vals, y_counts = jnp.asarray(y_vals), jnp.asarray(y_counts, dtype=jnp.float64)
-    n_obs = float(y_np.size)
-
-    ui = jnp.asarray(struct.u_idx, dtype=jnp.int32)  # (T, k_c)
-    vi = jnp.asarray(struct.v_idx, dtype=jnp.int32)
-    tI, tJ, pP, pQ, slot = _cheap_pair_slots(struct) if k_c else (None,) * 5
-    if k_c:
-        tI, tJ = jnp.asarray(tI), jnp.asarray(tJ)
-        pP, pQ, slot = jnp.asarray(pP), jnp.asarray(pQ), jnp.asarray(slot)
-
-    data = {
-        "y": jnp.asarray(y_np),
-        "F": jnp.asarray(np.stack(struct.F)) if k_e else jnp.zeros((0, n, n)),
-        "U": jnp.asarray(struct.U),  # (n, n_u)
-        "V": jnp.asarray(struct.V),  # (n, n_v)
-    }
-    n_F = data["F"].shape[0]
-    f_idx = jnp.asarray(struct.f_idx, dtype=jnp.int32)  # (T, k_e)
-    keys = sorted({tuple(int(i) for i in struct.f_idx[t]) for t in range(T)})
-    n_keys = len(keys)
-    key_of_t = jnp.asarray(
-        [keys.index(tuple(int(i) for i in struct.f_idx[t])) for t in range(T)],
-        dtype=jnp.int32,
-    )
-    key_idx = jnp.asarray(np.asarray(keys, dtype=np.int32).reshape(n_keys, k_e))
-
-    solve = _build_sar_solver_jax(W_csc, n)
     draw_pg = make_pg_draw()
-    period_idx = jnp.arange(T)
 
-    # --- helpers ---
-    def key_arrays(C, arrays):
-        """``Σ_i C[key, i] arrays[i]`` for each key: ``(n_keys, n, n)``."""
-        return jnp.tensordot(C, arrays, axes=1)
+    def bind(data):
+        mu0_j, prec0_j = data["mu0"], data["prec0"]
+        mu_c, prec_c = mu0_j[cc], prec0_j[cc]
+        rho_lo, rho_hi = data["rho_lo"], data["rho_hi"]
+        alpha_sigma, alpha_nu = data["alpha_sigma"], data["alpha_nu"]
+        alpha_fixed = data["alpha_fixed"] if has_alpha_fixed else None
+        y_vals, y_counts = data["y_vals"], data["y_counts"]
+        ui, vi, f_idx = data["ui"], data["vi"], data["f_idx"]
+        key_of_t, key_idx = data["key_of_t"], data["key_idx"]
+        n_F = data["F"].shape[0]
+        if k_c:
+            tI, tJ = data["tI"], data["tJ"]
+            pP, pQ, slot = data["pP"], data["pQ"], data["slot"]
+        solve = _bind_sar_solver(lu_solve, data["sar"])
+        period_idx = jnp.arange(T)
 
-    def key_coefs(b_full):
-        """``(n_keys, n_F)`` coefficient matrix of ``B_key = Σ_j β_j F_{key_j}``."""
-        rows = jnp.repeat(jnp.arange(n_keys), k_e)
-        return (
-            jnp.zeros((n_keys, n_F))
-            .at[rows, key_idx.ravel()]
-            .add(jnp.tile(b_full, n_keys))
-        )
+        # --- helpers ---
+        def key_arrays(C, arrays):
+            """``Σ_i C[key, i] arrays[i]`` for each key: ``(n_keys, n, n)``."""
+            return jnp.tensordot(C, arrays, axes=1)
 
-    def solve_left(rho, stack, extra):
-        """``L⁻¹ S_i`` for every ``n × n`` slice of ``stack`` plus ``L⁻¹ extra``."""
-        m = stack.shape[0]
-        rhs = jnp.concatenate(
-            [stack.transpose(1, 0, 2).reshape(n, m * n), extra], axis=1
-        )
-        out = solve(rho, rhs)
-        return out[:, : m * n].reshape(n, m, n).transpose(1, 0, 2), out[:, m * n :]
+        def key_coefs(b_full):
+            """``(n_keys, n_F)`` coefficient matrix of ``B_key = Σ_j β_j F_{key_j}``."""
+            rows = jnp.repeat(jnp.arange(n_keys), k_e)
+            return (
+                jnp.zeros((n_keys, n_F))
+                .at[rows, key_idx.ravel()]
+                .add(jnp.tile(b_full, n_keys))
+            )
 
-    def solve_right(rho, stack, extra):
-        """``S_i L⁻ᵀ`` for every slice of ``stack`` plus ``L⁻¹ extra``."""
-        m = stack.shape[0]
-        rhs = jnp.concatenate(
-            [stack.transpose(2, 0, 1).reshape(n, m * n), extra], axis=1
-        )
-        out = solve(rho, rhs)
-        return out[:, : m * n].reshape(n, m, n).transpose(1, 2, 0), out[:, m * n :]
+        def solve_left(rho, stack, extra):
+            """``L⁻¹ S_i`` for every ``n × n`` slice of ``stack`` plus ``L⁻¹ extra``."""
+            m = stack.shape[0]
+            rhs = jnp.concatenate(
+                [stack.transpose(1, 0, 2).reshape(n, m * n), extra], axis=1
+            )
+            out = solve(rho, rhs)
+            return out[:, : m * n].reshape(n, m, n).transpose(1, 0, 2), out[:, m * n :]
 
-    def cheap_terms(Om, R, Ac, Bc, B, t):
-        """Period ``t``'s rank-one Gram ``U_cᵀΩU_c`` and cross ``U_cᵀΩR``."""
-        Bprod = B[:, pP[t]] * B[:, pQ[t]]
-        OmB = Om @ Bprod  # (n, p_max)
-        a2 = Ac[:, tI] * Ac[:, tJ]
-        vals = jnp.sum(a2 * OmB[:, slot[t]], axis=0)
-        M = jnp.zeros((k_c, k_c)).at[tI, tJ].set(vals).at[tJ, tI].set(vals)
-        v = jnp.sum(Ac * ((Om * R) @ Bc), axis=0)
-        return M, v
+        def solve_right(rho, stack, extra):
+            """``S_i L⁻ᵀ`` for every slice of ``stack`` plus ``L⁻¹ extra``."""
+            m = stack.shape[0]
+            rhs = jnp.concatenate(
+                [stack.transpose(2, 0, 1).reshape(n, m * n), extra], axis=1
+            )
+            out = solve(rho, rhs)
+            return out[:, : m * n].reshape(n, m, n).transpose(1, 2, 0), out[:, m * n :]
 
-    def rho_log_density(Om_all, Z_all, eta_f, A, B):
-        """``log p(ρ | ω, α, β_full, y)`` with ``β_c`` integrated out."""
+        def cheap_terms(Om, R, Ac, Bc, B, t):
+            """Period ``t``'s rank-one Gram ``U_cᵀΩU_c`` and cross ``U_cᵀΩR``."""
+            Bprod = B[:, pP[t]] * B[:, pQ[t]]
+            OmB = Om @ Bprod  # (n, p_max)
+            a2 = Ac[:, tI] * Ac[:, tJ]
+            vals = jnp.sum(a2 * OmB[:, slot[t]], axis=0)
+            M = jnp.zeros((k_c, k_c)).at[tI, tJ].set(vals).at[tJ, tI].set(vals)
+            v = jnp.sum(Ac * ((Om * R) @ Bc), axis=0)
+            return M, v
 
-        def period(t):
-            R = Z_all[t] - eta_f[key_of_t[t]]
-            if k_c:
-                Ac, Bc = A[:, ui[t]], B[:, vi[t]]
-                R = R - (Ac * mu_c) @ Bc.T
-                M, v = cheap_terms(Om_all[t], R, Ac, Bc, B, t)
-            else:
-                M, v = jnp.zeros((0, 0)), jnp.zeros(0)
-            return M, v, jnp.sum(Om_all[t] * R * R)
+        def rho_log_density(Om_all, Z_all, eta_f, A, B):
+            """``log p(ρ | ω, α, β_full, y)`` with ``β_c`` integrated out."""
 
-        M, v, quad = jax.lax.map(period, period_idx)
-        quad = quad.sum()
-        if not k_c:
-            return -0.5 * quad
-        L = jnp.linalg.cholesky(jnp.diag(prec_c) + M.sum(0))
-        w = solve_triangular(L, v.sum(0), lower=True)
-        val = -jnp.sum(jnp.log(jnp.diag(L))) - 0.5 * (quad - w @ w)
-        return jnp.where(jnp.isfinite(val), val, -jnp.inf)
-
-    def beta_gram(Om_all, Z_all, Ufull, A, B):
-        """``G = Σ_t U_tᵀΩ_tU_t`` and ``h = Σ_t U_tᵀΩ_t z_t``."""
-
-        def period(t):
-            Om, Z = Om_all[t], Z_all[t]
-            G = jnp.zeros((k, k))
-            h = jnp.zeros(k)
-            if k_c:
-                Ac, Bc = A[:, ui[t]], B[:, vi[t]]
-                M, v = cheap_terms(Om, Z, Ac, Bc, B, t)
-                G = G.at[cc[:, None], cc[None, :]].add(M)
-                h = h.at[cc].add(v)
-            if k_e:
-                Uf = Ufull[f_idx[t]]  # (k_e, n, n)
-                OU = Om[None] * Uf
-                G = G.at[fc[:, None], fc[None, :]].add(
-                    jnp.einsum("iod,jod->ij", OU, Uf)
-                )
-                h = h.at[fc].add(jnp.einsum("iod,od->i", OU, Z))
+            def period(t):
+                R = Z_all[t] - eta_f[key_of_t[t]]
                 if k_c:
-                    cross = jnp.einsum("iod,dj,oj->ij", OU, Bc, Ac)
-                    G = G.at[fc[:, None], cc[None, :]].add(cross)
-                    G = G.at[cc[:, None], fc[None, :]].add(cross.T)
-            return G, h
+                    Ac, Bc = A[:, ui[t]], B[:, vi[t]]
+                    R = R - (Ac * mu_c) @ Bc.T
+                    M, v = cheap_terms(Om_all[t], R, Ac, Bc, B, t)
+                else:
+                    M, v = jnp.zeros((0, 0)), jnp.zeros(0)
+                return M, v, jnp.sum(Om_all[t] * R * R)
 
-        G, h = jax.lax.map(period, period_idx)
-        return G.sum(0), h.sum(0)
+            M, v, quad = jax.lax.map(period, period_idx)
+            quad = quad.sum()
+            if not k_c:
+                return -0.5 * quad
+            L = jnp.linalg.cholesky(jnp.diag(prec_c) + M.sum(0))
+            w = solve_triangular(L, v.sum(0), lower=True)
+            val = -jnp.sum(jnp.log(jnp.diag(L))) - 0.5 * (quad - w @ w)
+            return jnp.where(jnp.isfinite(val), val, -jnp.inf)
 
-    def eta_of(beta, Ufull, A, B):
-        eta_key = key_arrays(key_coefs(beta[fc]), Ufull)
+        def beta_gram(Om_all, Z_all, Ufull, A, B):
+            """``G = Σ_t U_tᵀΩ_tU_t`` and ``h = Σ_t U_tᵀΩ_t z_t``."""
 
-        def period(t):
-            e = eta_key[key_of_t[t]]
-            if k_c:
-                e = e + (A[:, ui[t]] * beta[cc]) @ B[:, vi[t]].T
-            return e
+            def period(t):
+                Om, Z = Om_all[t], Z_all[t]
+                G = jnp.zeros((k, k))
+                h = jnp.zeros(k)
+                if k_c:
+                    Ac, Bc = A[:, ui[t]], B[:, vi[t]]
+                    M, v = cheap_terms(Om, Z, Ac, Bc, B, t)
+                    G = G.at[cc[:, None], cc[None, :]].add(M)
+                    h = h.at[cc].add(v)
+                if k_e:
+                    Uf = Ufull[f_idx[t]]  # (k_e, n, n)
+                    OU = Om[None] * Uf
+                    G = G.at[fc[:, None], fc[None, :]].add(
+                        jnp.einsum("iod,jod->ij", OU, Uf)
+                    )
+                    h = h.at[fc].add(jnp.einsum("iod,od->i", OU, Z))
+                    if k_c:
+                        cross = jnp.einsum("iod,dj,oj->ij", OU, Bc, Ac)
+                        G = G.at[fc[:, None], cc[None, :]].add(cross)
+                        G = G.at[cc[:, None], fc[None, :]].add(cross.T)
+                return G, h
 
-        return jax.lax.map(period, period_idx)
+            G, h = jax.lax.map(period, period_idx)
+            return G.sum(0), h.sum(0)
 
-    def alpha_log_density(log_a, y_j, y_dot_eta, mu):
-        a = jnp.exp(log_a)
-        log_mu_a = jnp.log(mu + a)
-        ll = (
-            y_counts @ gammaln(y_vals + a)
-            - n_obs * gammaln(a)
-            + y_dot_eta
-            - y_j @ log_mu_a
-            - a * log_mu_a.sum()
-            + n_obs * a * log_a
-        )
-        prior = -0.5 * (alpha_nu + 1.0) * jnp.log1p(a * a / (alpha_nu * alpha_sigma**2))
-        return log_a + ll + prior
+        def eta_of(beta, Ufull, A, B):
+            eta_key = key_arrays(key_coefs(beta[fc]), Ufull)
+
+            def period(t):
+                e = eta_key[key_of_t[t]]
+                if k_c:
+                    e = e + (A[:, ui[t]] * beta[cc]) @ B[:, vi[t]].T
+                return e
+
+            return jax.lax.map(period, period_idx)
+
+        def alpha_log_density(log_a, y_j, y_dot_eta, mu):
+            a = jnp.exp(log_a)
+            log_mu_a = jnp.log(mu + a)
+            ll = (
+                y_counts @ gammaln(y_vals + a)
+                - n_obs * gammaln(a)
+                + y_dot_eta
+                - y_j @ log_mu_a
+                - a * log_mu_a.sum()
+                + n_obs * a * log_a
+            )
+            prior = (
+                -0.5 * (alpha_nu + 1.0) * jnp.log1p(a * a / (alpha_nu * alpha_sigma**2))
+            )
+            return log_a + ll + prior
+
+        def sweep(state, key, tuning):
+            y_j, F, U, V = data["y"], data["F"], data["U"], data["V"]
+            beta, rd, ro, alpha = (
+                state["beta"],
+                state["rho_d"],
+                state["rho_o"],
+                state["alpha"],
+            )
+            w_d, w_o = state["slice_widths"]
+            k_pg, k_d, k_o, k_b, k_a = jax.random.split(key, 5)
+
+            # ω and the working response, all periods
+            eta_flat = state["eta"].ravel()
+            omega = draw_pg(
+                jnp.maximum(y_j + alpha, 1e-3),
+                jnp.clip(eta_flat - jnp.log(alpha), -30.0, 30.0),
+                k_pg,
+            )
+            Om_all = omega.reshape(T, n, n)
+            Z_all = (0.5 * (y_j - alpha) / omega + jnp.log(alpha)).reshape(T, n, n)
+            B_keys = key_arrays(key_coefs(beta[fc]), F)
+
+            # ρ_d: origin side fixed at ρ_o
+            P, A_fix = solve_left(ro, B_keys, U)
+
+            def ld_d(rv):
+                eta_f, Bv = solve_right(rv, P, V)
+                return rho_log_density(Om_all, Z_all, eta_f, A_fix, Bv)
+
+            rd, _, sl_d, sr_d = jax_slice_sample_1d(
+                ld_d, rd, rho_lo, rho_hi, key=k_d, w=w_d, return_steps=True
+            )
+
+            # ρ_o: destination side fixed at the new ρ_d
+            P, B_fix = solve_right(rd, B_keys, V)
+
+            def ld_o(rv):
+                eta_f, Av = solve_left(rv, P, U)
+                return rho_log_density(Om_all, Z_all, eta_f, Av, B_fix)
+
+            ro, _, sl_o, sr_o = jax_slice_sample_1d(
+                ld_o, ro, rho_lo, rho_hi, key=k_o, w=w_o, return_steps=True
+            )
+
+            # β = (β_c, β_full) jointly
+            half, A = solve_left(ro, F, U)
+            Ufull, B = solve_right(rd, half, V)
+            G, h = beta_gram(Om_all, Z_all, Ufull, A, B)
+            Lg = jnp.linalg.cholesky(G + jnp.diag(prec0_j))
+            mean = jax.scipy.linalg.cho_solve((Lg, True), h + prec0_j * mu0_j)
+            beta = mean + solve_triangular(
+                Lg.T, jax.random.normal(k_b, (k,), dtype=jnp.float64), lower=False
+            )
+            eta = eta_of(beta, Ufull, A, B)
+
+            # α on log α
+            eta_flat = eta.ravel()
+            y_dot_eta, mu = y_j @ eta_flat, jnp.exp(eta_flat)
+            if alpha_fixed is None:
+                log_alpha, _ = jax_slice_sample_1d(
+                    lambda la: alpha_log_density(la, y_j, y_dot_eta, mu),
+                    jnp.log(alpha),
+                    -10.0,
+                    10.0,
+                    key=k_a,
+                    w=0.5,
+                )
+                alpha = jnp.exp(log_alpha)
+            else:
+                alpha = alpha_fixed
+
+            widths = (
+                adapt_slice_width(w_d, sl_d, sr_d, tuning),
+                adapt_slice_width(w_o, sl_o, sr_o, tuning),
+            )
+            new = {
+                "beta": beta,
+                "rho_d": rd,
+                "rho_o": ro,
+                "alpha": alpha,
+                "eta": eta,
+                "slice_widths": widths,
+            }
+            return new, (rd, ro, beta, alpha, eta)
+
+        def initial_eta(beta, rd, ro):
+            half, A = solve_left(ro, data["F"], data["U"])
+            Ufull, B = solve_right(rd, half, data["V"])
+            return eta_of(beta, Ufull, A, B)
+
+        return {
+            "sweep": sweep,
+            "initial_eta": initial_eta,
+            "rho_log_density": rho_log_density,
+            "beta_gram": beta_gram,
+            "solve_left": solve_left,
+            "solve_right": solve_right,
+        }
 
     def sweep(state, key, tuning, data):
-        y_j, F, U, V = data["y"], data["F"], data["U"], data["V"]
-        beta, rd, ro, alpha = (
-            state["beta"],
-            state["rho_d"],
-            state["rho_o"],
-            state["alpha"],
-        )
-        w_d, w_o = state["slice_widths"]
-        k_pg, k_d, k_o, k_b, k_a = jax.random.split(key, 5)
-
-        # ω and the working response, all periods
-        eta_flat = state["eta"].ravel()
-        omega = draw_pg(
-            jnp.maximum(y_j + alpha, 1e-3),
-            jnp.clip(eta_flat - jnp.log(alpha), -30.0, 30.0),
-            k_pg,
-        )
-        Om_all = omega.reshape(T, n, n)
-        Z_all = (0.5 * (y_j - alpha) / omega + jnp.log(alpha)).reshape(T, n, n)
-        B_keys = key_arrays(key_coefs(beta[fc]), F)
-
-        # ρ_d: origin side fixed at ρ_o
-        P, A_fix = solve_left(ro, B_keys, U)
-
-        def ld_d(rv):
-            eta_f, Bv = solve_right(rv, P, V)
-            return rho_log_density(Om_all, Z_all, eta_f, A_fix, Bv)
-
-        rd, _, sl_d, sr_d = jax_slice_sample_1d(
-            ld_d, rd, rho_lo, rho_hi, key=k_d, w=w_d, return_steps=True
-        )
-
-        # ρ_o: destination side fixed at the new ρ_d
-        P, B_fix = solve_right(rd, B_keys, V)
-
-        def ld_o(rv):
-            eta_f, Av = solve_left(rv, P, U)
-            return rho_log_density(Om_all, Z_all, eta_f, Av, B_fix)
-
-        ro, _, sl_o, sr_o = jax_slice_sample_1d(
-            ld_o, ro, rho_lo, rho_hi, key=k_o, w=w_o, return_steps=True
-        )
-
-        # β = (β_c, β_full) jointly
-        half, A = solve_left(ro, F, U)
-        Ufull, B = solve_right(rd, half, V)
-        G, h = beta_gram(Om_all, Z_all, Ufull, A, B)
-        Lg = jnp.linalg.cholesky(G + jnp.diag(prec0_j))
-        mean = jax.scipy.linalg.cho_solve((Lg, True), h + prec0_j * mu0_j)
-        beta = mean + solve_triangular(
-            Lg.T, jax.random.normal(k_b, (k,), dtype=jnp.float64), lower=False
-        )
-        eta = eta_of(beta, Ufull, A, B)
-
-        # α on log α
-        eta_flat = eta.ravel()
-        y_dot_eta, mu = y_j @ eta_flat, jnp.exp(eta_flat)
-        log_alpha, _ = jax_slice_sample_1d(
-            lambda la: alpha_log_density(la, y_j, y_dot_eta, mu),
-            jnp.log(alpha),
-            -10.0,
-            10.0,
-            key=k_a,
-            w=0.5,
-        )
-        alpha = jnp.exp(log_alpha)
-
-        widths = (
-            adapt_slice_width(w_d, sl_d, sr_d, tuning),
-            adapt_slice_width(w_o, sl_o, sr_o, tuning),
-        )
-        new = {
-            "beta": beta,
-            "rho_d": rd,
-            "rho_o": ro,
-            "alpha": alpha,
-            "eta": eta,
-            "slice_widths": widths,
-        }
-        return new, (rd, ro, beta, alpha, eta)
+        return bind(data)["sweep"](state, key, tuning)
 
     def initial_eta(beta, rd, ro, data):
-        half, A = solve_left(ro, data["F"], data["U"])
-        Ufull, B = solve_right(rd, half, data["V"])
-        return eta_of(beta, Ufull, A, B)
+        return bind(data)["initial_eta"](beta, rd, ro)
 
-    # The blocks, for tests that pin them against the NumPy sampler's algebra.
+    return sweep, jax.jit(initial_eta), bind
+
+
+def _structured_cached(static):
+    from .._utils._jax_utils import cached_sweep
+
+    return cached_sweep(
+        ("nb_flow_structured", *static), lambda: _structured_fns(*static)
+    )
+
+
+def make_structured_sweep(y, W_csc, struct: FlowDesignStructure, priors):
+    """Build ``sweep(state, key, tuning, data) -> (state, trace)`` for one chain.
+
+    Returns ``(sweep, initial_eta, data)``; ``data`` holds the data-dependent
+    arrays both functions take as an argument.  The compiled program is shared
+    by every model of the same structure (:func:`_structured_parts`).
+
+    ``state`` holds ``beta, rho_d, rho_o, alpha``, the current ``eta`` (``T × n ×
+    n``) and the two ρ slice widths; ``trace`` is ``(rho_d, rho_o, beta, alpha,
+    eta)``.  ``sweep.kernels`` holds the blocks bound to this model's data, for
+    tests that pin them against the NumPy sampler's algebra.
+    """
+    static, data = _structured_parts(y, W_csc, struct, priors)
+    core, initial_eta, bind = _structured_cached(static)
+
+    def sweep(state, key, tuning, data_):
+        return core(state, key, tuning, data_)
+
+    kernels = bind(data)
     sweep.kernels = {
-        "rho_log_density": rho_log_density,
-        "beta_gram": beta_gram,
-        "solve_left": solve_left,
-        "solve_right": solve_right,
+        name: kernels[name]
+        for name in ("rho_log_density", "beta_gram", "solve_left", "solve_right")
     }
-    return sweep, jax.jit(initial_eta), data
+    return sweep, initial_eta, data
 
 
 def run_chains_jax_flow_structured(
@@ -377,14 +455,22 @@ def run_chains_jax_flow_structured(
         jax_seeds = list(range(chains))
     set_sparsax_lu_cache_size(max(32, 8 * chains))
 
-    sweep, initial_eta, data = make_structured_sweep(y, W_csc, struct, priors)
+    from .._utils._jax_utils import cached_sweep
+
+    static, data = _structured_parts(y, W_csc, struct, priors)
+    sweep, initial_eta, _ = _structured_cached(static)
     if store_log_lik:
         trace_sweep = sweep
     else:
 
-        def trace_sweep(state, key, tuning, data):  # η is traced only for log_lik
-            new, trace = sweep(state, key, tuning, data)
-            return new, trace[:4]
+        def _without_eta():
+            def trace_sweep(state, key, tuning, data):  # η is traced for log_lik only
+                new, trace = sweep(state, key, tuning, data)
+                return new, trace[:4]
+
+            return trace_sweep
+
+        trace_sweep = cached_sweep(("nb_flow_structured_no_eta", *static), _without_eta)
 
     states = []
     for i in inits:

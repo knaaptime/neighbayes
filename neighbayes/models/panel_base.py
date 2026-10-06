@@ -145,6 +145,17 @@ def _demean_panel(y: np.ndarray, X: np.ndarray, N: int, T: int, effects: int):
     return y_with.reshape(-1), X_with.reshape(-1, X.shape[1])
 
 
+def _absorbed_columns(X_within: np.ndarray, X_raw: np.ndarray) -> np.ndarray:
+    """Columns the fixed effects absorb: zero after the within transform.
+
+    ``X_within`` is ``X_raw`` after :func:`_demean_panel`.  A column fixed
+    within the demeaning groups (an intercept, a time-invariant attribute under
+    unit effects) is not identified alongside the effects.
+    """
+    scale = np.maximum(np.abs(X_raw).max(axis=0), 1.0)
+    return np.abs(X_within).max(axis=0) <= 1e-10 * scale
+
+
 def _as_dense_W(W: Union[Graph, sp.spmatrix, np.ndarray], N: int, T: int) -> np.ndarray:
     """Convert graph/sparse/array weights into dense panel-compatible matrix.
 
@@ -921,7 +932,6 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         progressbar: bool = True,
         gibbs_method: str = "numpy",
         slice_width: float | None = None,
-        chain_method: str | None = None,
         log_likelihood: bool = False,
     ) -> xr.DataTree:
         """Sample a Gaussian FE panel posterior via 3-block Gaussian Gibbs.
@@ -1022,7 +1032,6 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
             progressbar=progressbar,
             gibbs_method=gibbs_method,
             slice_width=slice_width,
-            chain_method=chain_method,
             log_likelihood=log_likelihood,
         )
         return self._idata

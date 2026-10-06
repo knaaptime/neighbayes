@@ -41,7 +41,6 @@ for logistic models using Pólya–Gamma latent variables.
 from __future__ import annotations
 
 import warnings
-from functools import cached_property
 from typing import Optional
 
 import numpy as np
@@ -60,11 +59,41 @@ from ...samplers.zinb import (
     ZINBGibbsState,
     run_zinb_chain,
 )
+from .._base._nb import nb_alpha_fixed, nb_alpha_rv
 from .._base._shared import _parse_W
+from .._mixins._zinb import ZINBMixin
 from ..base import SpatialModel
+from ..priors import SARZINBPriors
 
 
-class SARZINB(SpatialModel):
+def _selection_design(Z, sel_formula, data, n: int):
+    """The selection design and its column names, or ``(None, None)`` for ``Z = X``."""
+    if Z is not None and sel_formula is not None:
+        raise ValueError("Pass Z or sel_formula, not both.")
+    if sel_formula is not None:
+        if data is None:
+            raise ValueError("sel_formula needs data (formula mode).")
+        from formulaic import model_matrix
+
+        rhs = sel_formula.split("~", 1)[-1].strip()
+        mm = model_matrix(rhs, data)
+        names, Z_arr = list(mm.columns), np.asarray(mm, dtype=np.float64)
+    elif Z is not None:
+        if isinstance(Z, pd.DataFrame):
+            names = [str(c) for c in Z.columns]
+        Z_arr = np.asarray(Z, dtype=np.float64)
+        if Z_arr.ndim == 1:
+            Z_arr = Z_arr.reshape(-1, 1)
+        if not isinstance(Z, pd.DataFrame):
+            names = [f"z{j}" for j in range(Z_arr.shape[1])]
+    else:
+        return None, None
+    if Z_arr.shape[0] != n:
+        raise ValueError(f"Z has {Z_arr.shape[0]} rows but y has {n} observations.")
+    return Z_arr, names
+
+
+class SARZINB(ZINBMixin, SpatialModel):
     """Bayesian zero-inflated SAR Negative Binomial with PG-Gibbs sampler.
 
     Parameters
@@ -80,9 +109,13 @@ class SARZINB(SpatialModel):
     X : array-like, optional
         Count covariate matrix of shape ``(n, k)``. Required in matrix
         mode.
-    Z : array-like, optional
-        Selection covariate matrix of shape ``(n, p)``. If ``None``,
-        defaults to ``X`` (same covariates for both equations).
+    Z : array-like or pandas.DataFrame, optional
+        Selection covariate matrix of shape ``(n, p)``; a DataFrame's column
+        names label γ. If ``None`` (and no ``sel_formula``), defaults to ``X``
+        (same covariates for both equations).
+    sel_formula : str, optional
+        Right-hand side for the **selection** equation, e.g. ``"~ z1 + z2"``,
+        evaluated on ``data`` (formula mode). Alternative to ``Z``.
     W : libpysal.graph.Graph or scipy.sparse matrix
         Spatial weights for the **count** equation, shape ``(n, n)``.
     W_sel : libpysal.graph.Graph or scipy.sparse matrix, optional
@@ -100,8 +133,13 @@ class SARZINB(SpatialModel):
           ``log(mean(y))`` with scale 2.5 and slopes ``2.5 / sd(x_j)``.
         - ``rho_lower`` (float, default -0.999): Lower bound for ρ.
         - ``rho_upper`` (float, default 0.999): Upper bound for ρ.
-        - ``alpha_sigma`` (float, default 2.5): Half-Normal scale for α.
-        - ``alpha_nu`` (float, default 3.0): Half-Normal ν for α.
+        - ``alpha_sigma``, ``alpha_nu`` (float, default 2.5 and 3.0):
+          Half-Student-t(ν, σ) prior on the NB dispersion α.
+        - ``alpha_fixed`` (float, optional): hold α at this value instead;
+          a large value (10-20 times the typical mean count) makes the count
+          equation essentially Poisson on the same exact sampler.
+
+        See :class:`~neighbayes.models.priors.SARZINBPriors`.
 
     logdet_method : str, optional
         How to compute log|I − ρW|. ``None`` (default) auto-selects.
@@ -110,11 +148,14 @@ class SARZINB(SpatialModel):
 
     Notes
     -----
-    The model is fit with a custom 9-block Gibbs sampler that composes
-    the SAR-logit blocks (ω^sel, η^sel, γ, λ), the zero-allocation
-    block (z), and the reduced-form SAR-NB blocks (ω^cnt, β, ρ, α).
-    No PyMC model is constructed; calling ``_build_pymc_model``
-    raises ``NotImplementedError``.
+    ``fit()`` defaults to a 9-block Gibbs sampler that composes the SAR-logit
+    blocks (ω^sel, η^sel, γ, λ), the zero-allocation block (z), and the
+    reduced-form SAR-NB blocks (ω^cnt, β, ρ, α); ``sampler="nuts"`` fits the
+    same model and priors in PyMC (``ZeroInflatedNegativeBinomial``).
+
+    ``corridor_probabilities``, ``zero_attribution`` and the fitted means are
+    posterior expectations averaged over draws; ``posterior_predictive``
+    simulates ``d ~ Bern(π)``, ``y = d · NB``.
     """
 
     _spatial_params: tuple[str, ...] = ("rho", "lam")
@@ -124,6 +165,7 @@ class SARZINB(SpatialModel):
     _model_type: str = "zinb_sar"
     _likelihood: str = "count"
     _gibbs_key: tuple[str, str] | None = ("zinb", "cross_section")
+    _priors_cls = SARZINBPriors
 
     def __init__(
         self,
@@ -133,6 +175,7 @@ class SARZINB(SpatialModel):
         X=None,
         Z=None,
         W=None,
+        sel_formula=None,
         W_sel=None,
         priors=None,
         logdet_method=None,
@@ -168,17 +211,10 @@ class SARZINB(SpatialModel):
         self._d = (self._y > 0).astype(np.float64)
 
         # Selection covariates Z
-        if Z is not None:
-            Z_arr = np.asarray(Z, dtype=np.float64)
-            if Z_arr.ndim == 1:
-                Z_arr = Z_arr.reshape(-1, 1)
-            if Z_arr.shape[0] != len(self._y):
-                raise ValueError(
-                    f"Z has {Z_arr.shape[0]} rows but y has {len(self._y)} observations."
-                )
-            self._Z = Z_arr
-            self._sel_feature_names = [f"z{j}" for j in range(Z_arr.shape[1])]
-        else:
+        self._Z, self._sel_feature_names = _selection_design(
+            Z, sel_formula, data, len(self._y)
+        )
+        if self._Z is None:
             self._Z = self._X.copy()
             self._sel_feature_names = list(self._feature_names)
 
@@ -193,62 +229,6 @@ class SARZINB(SpatialModel):
 
         # Precompute logdet callable for the count equation ρ slice sampler
         self._logdet_fn = self._logdet_numpy_fn
-
-    # ------------------------------------------------------------------
-    # Selection-equation helpers
-    # ------------------------------------------------------------------
-
-    @cached_property
-    def _sel_logdet_grad_numpy_vec_fn(self):
-        """Vectorized ``(λ_arr) -> g(λ)`` logdet-gradient evaluator for W_sel.
-
-        Mirrors :attr:`SpatialModel._logdet_grad_numpy_vec_fn` on the
-        selection-equation weights; ``method=None`` auto-resolves to the fast
-        surrogate for ``W_sel``'s own size/symmetry, only touching the
-        eigenvalue path when that is the resolved method (tiny n).
-        """
-        from ..._logdet import make_logdet_grad_numpy_vec_fn
-
-        return make_logdet_grad_numpy_vec_fn(
-            self._W_sel_sparse,
-            eigs=None,
-            method=None,
-            rho_min=float(self.priors.get("lam_lower", self._logdet_bounds.rho_min)),
-            rho_max=float(self.priors.get("lam_upper", self._logdet_bounds.rho_max)),
-        )
-
-    def _sel_batch_mean_diag(self, lam_draws: np.ndarray) -> np.ndarray:
-        """``(1/n) tr((I − λ W_sel)⁻¹)`` per draw for the selection equation.
-
-        Direct analogue of :meth:`SpatialModel._batch_mean_diag` on the
-        selection-equation weights.  When ``W_sel`` is the count-equation
-        ``W`` the shared helper is reused; otherwise a resolvent
-        (logdet-gradient) evaluator is built once for ``W_sel`` so the
-        selection direct effect avoids the O(n³) eigendecomposition too.
-        """
-        if self._same_W:
-            return self._batch_mean_diag(lam_draws)
-        lam_draws = np.asarray(lam_draws, dtype=np.float64)
-        n = int(self._W_sel_sparse.shape[0])
-        g = np.asarray(self._sel_logdet_grad_numpy_vec_fn(lam_draws), dtype=np.float64)
-        return 1.0 - (lam_draws / n) * g
-
-    @cached_property
-    def _sel_nonintercept_indices(self) -> list[int]:
-        """Indices of non-constant columns in Z (selection covariates)."""
-        indices: list[int] = []
-        for j, name in enumerate(self._sel_feature_names):
-            column = self._Z[:, j]
-            is_named_intercept = name.lower() == "intercept"
-            is_constant = np.allclose(column, column[0])
-            if not (is_named_intercept or is_constant):
-                indices.append(j)
-        return indices
-
-    @cached_property
-    def _sel_nonintercept_feature_names(self) -> list[str]:
-        """Feature names for non-intercept selection covariates."""
-        return [self._sel_feature_names[i] for i in self._sel_nonintercept_indices]
 
     def _initialize_from_ols(self, rng):
         """Warm-start the ZINB Gibbs sampler.
@@ -288,11 +268,8 @@ class SARZINB(SpatialModel):
         gamma_init = _best_gamma + 0.1 * rng.standard_normal(p)
 
         # η^sel from the selection profile
-        try:
-            _sel_solver = CachedSparseSolver([W_sel_csc], n)
-            eta_sel_init = _sel_solver.solve([-lam_init], Z @ gamma_init)
-        except Exception:
-            eta_sel_init = Z @ gamma_init
+        _sel_solver = CachedSparseSolver([W_sel_csc], n)
+        eta_sel_init = _sel_solver.solve([-lam_init], Z @ gamma_init)
 
         # ω^sel: PG(1, η^sel)
         from ...samplers._utils._polyagamma import sample_polyagamma
@@ -308,29 +285,17 @@ class SARZINB(SpatialModel):
         n_pos = int(np.sum(pos_mask))
         if n_pos > k:
             _log_y = np.log(y[pos_mask] + 0.5)
-            _X_pos = X[pos_mask]
         else:
             # Too few positive obs — use all with log(y+0.5)
             _log_y = np.log(y + 0.5)
-            _X_pos = X
             pos_mask = np.ones(n, dtype=bool)
             n_pos = n
+        # The filter mixes every row, zeros included, so the grid filters all
+        # of X and fits on the positive rows.
+        _best_rho, _best_beta, _ = profile_loglik_rho_grid(
+            _log_y, X, W_cnt_csc, rows=pos_mask
+        )
         _cnt_grid_solver = CachedSparseSolver([W_cnt_csc], n)
-        _best_rho, _best_beta, _best_ll_cnt = 0.0, np.zeros(k), -np.inf
-        for _rho_g in np.arange(0.05, 0.96, 0.05):
-            try:
-                _Xtilde_g = _cnt_grid_solver.solve([-float(_rho_g)], _X_pos)
-                _beta_g = np.linalg.lstsq(_Xtilde_g, _log_y, rcond=None)[0]
-                _eta_g = _Xtilde_g @ _beta_g
-                _sig2_g = float(np.mean((_log_y - _eta_g) ** 2))
-                if _sig2_g > 1e-10:
-                    _ll_g = -0.5 * n_pos * np.log(_sig2_g) - 0.5 * n_pos
-                    if _ll_g > _best_ll_cnt:
-                        _best_ll_cnt = _ll_g
-                        _best_rho = _rho_g
-                        _best_beta = _beta_g.copy()
-            except Exception:
-                pass
 
         rho_init = float(
             np.clip(
@@ -342,13 +307,10 @@ class SARZINB(SpatialModel):
         beta_init = _best_beta + 0.1 * rng.standard_normal(k)
 
         # Estimate α from Pearson residuals on positive observations
-        try:
-            _Xtilde_init = _cnt_grid_solver.solve([-rho_init], X)
-            _eta_init = _Xtilde_init[pos_mask] @ beta_init
-            _resid2 = float(np.mean((_log_y - _eta_init) ** 2))
-            alpha_init = float(np.clip(1.0 / max(_resid2, 0.01), 0.5, 50.0))
-        except Exception:
-            alpha_init = 1.0
+        _Xtilde_init = _cnt_grid_solver.solve([-rho_init], X)
+        _eta_init = _Xtilde_init[pos_mask] @ beta_init
+        _resid2 = float(np.mean((_log_y - _eta_init) ** 2))
+        alpha_init = float(np.clip(1.0 / max(_resid2, 0.01), 0.5, 50.0))
 
         # Jitter α
         alpha_init = float(
@@ -358,6 +320,10 @@ class SARZINB(SpatialModel):
                 50.0,
             )
         )
+
+        fixed = nb_alpha_fixed(self.priors)
+        if fixed is not None:
+            alpha_init = fixed
 
         # ω^cnt: start at 0.25 (uninformative)
         omega_cnt_init = 0.25 * np.ones(n, dtype=np.float64)
@@ -381,6 +347,43 @@ class SARZINB(SpatialModel):
             alpha=alpha_init,
             omega_cnt=omega_cnt_init,
             z=z_init,
+        )
+
+    def _zinb_priors(self) -> ZINBGibbsPriors:
+        """Resolved priors, shared by the Gibbs and NUTS paths.
+
+        Gelman et al. (2008) defaults on each equation's link scale: log for
+        the count equation; logit for the latent selection, centred at even
+        odds because the structural zeros are not observed.
+        """
+        from .._base._shared import gelman_default_beta_prior
+
+        bounds = self._logdet_bounds
+        rho_lower, rho_upper = float(bounds.rho_min), float(bounds.rho_max)
+        beta_mu, beta_sigma = self._resolved_beta_prior(link="log")
+        g_mu, g_sd = gelman_default_beta_prior(
+            np.full(self._Z.shape[0], 0.5),
+            self._Z,
+            list(self._sel_feature_names),
+            link="logit",
+        )
+        p = self._Z.shape[1]
+        return ZINBGibbsPriors(
+            gamma_mu=np.broadcast_to(
+                np.asarray(self.priors.get("gamma_mu", g_mu), dtype=float), (p,)
+            ).copy(),
+            gamma_sigma=np.broadcast_to(
+                np.asarray(self.priors.get("gamma_sigma", g_sd), dtype=float), (p,)
+            ).copy(),
+            lam_lower=float(self.priors.get("lam_lower", rho_lower)),
+            lam_upper=float(self.priors.get("lam_upper", rho_upper)),
+            beta_mu=beta_mu,
+            beta_sigma=beta_sigma,
+            rho_lower=float(self.priors.get("rho_lower", rho_lower)),
+            rho_upper=float(self.priors.get("rho_upper", rho_upper)),
+            alpha_sigma=float(self.priors.get("alpha_sigma", 2.5)),
+            alpha_nu=float(self.priors.get("alpha_nu", 3.0)),
+            alpha_fixed=nb_alpha_fixed(self.priors),
         )
 
     def _fit_gibbs(
@@ -439,36 +442,7 @@ class SARZINB(SpatialModel):
                 stacklevel=2,
             )
 
-        bounds = self._logdet_bounds
-        rho_lower = float(bounds.rho_min)
-        rho_upper = float(bounds.rho_max)
-
-        # Build priors
-        # Gelman et al. (2008) defaults on each equation's link scale: log for
-        # the count equation; logit for the latent selection, centred at even
-        # odds because the structural zeros are not observed.
-        beta_mu, beta_sigma = self._resolved_beta_prior(link="log")
-        from .._base._shared import gelman_default_beta_prior
-
-        p_sel = self._Z.shape[1]
-        g_mu, g_sd = gelman_default_beta_prior(
-            np.full(self._Z.shape[0], 0.5),
-            self._Z,
-            [f"z{j}" for j in range(p_sel)],
-            link="logit",
-        )
-        priors = ZINBGibbsPriors(
-            gamma_mu=self.priors.get("gamma_mu", g_mu),
-            gamma_sigma=self.priors.get("gamma_sigma", g_sd),
-            lam_lower=self.priors.get("lam_lower", rho_lower),
-            lam_upper=self.priors.get("lam_upper", rho_upper),
-            beta_mu=beta_mu,
-            beta_sigma=beta_sigma,
-            rho_lower=self.priors.get("rho_lower", rho_lower),
-            rho_upper=self.priors.get("rho_upper", rho_upper),
-            alpha_sigma=self.priors.get("alpha_sigma", 2.5),
-            alpha_nu=self.priors.get("alpha_nu", 3.0),
-        )
+        priors = self._zinb_priors()
 
         # ── JAX path ──
         # Both equations reduced-form (Krylov-only slice, sparsax-KLU solves,
@@ -680,240 +654,59 @@ class SARZINB(SpatialModel):
         return idata
 
     def _build_pymc_model(self):
-        """Not supported — SARZINB uses a Gibbs sampler, not NUTS."""
-        raise NotImplementedError(
-            "SARZINB does not build a PyMC model. "
-            "Use the fit() method for Gibbs sampling."
-        )
+        r"""Reduced-form ZINB for NUTS: the same model and priors as the Gibbs path.
 
-    def _compute_spatial_effects_posterior(
-        self, equation: str = "count"
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Compute posterior impacts for each draw.
-
-        Parameters
-        ----------
-        equation : {"count", "selection"}, default "count"
-            Which equation to compute impacts for.
+        ``y ~ ZINB(ψ = π, μ = exp(η_cnt), α)`` with
+        ``η_sel = (I − λW_sel)⁻¹Zγ`` and ``η_cnt = (I − ρW)⁻¹Xβ``; PyMC's ``ψ`` is
+        the probability of the NB component, i.e. the activation probability π.
+        No ``log|I − ρW|`` terms: neither ``y`` nor ``d`` is transformed.
         """
-        from ...diagnostics.lmtests import _get_posterior_draws
+        import pytensor.tensor as pt
 
-        idata = self.inference_data
+        from ..._lazy_deps import pm
+        from ..._ops import SparseSARSolveOp
 
-        if equation == "count":
-            rho_draws = _get_posterior_draws(idata, "rho")
-            beta_draws = _get_posterior_draws(idata, "beta")
-
-            mean_diag = self._batch_mean_diag(rho_draws)
-            mean_row_sum = self._batch_mean_row_sum(rho_draws)
-
-            ni = self._nonintercept_indices
-            direct_samples = mean_diag[:, None] * beta_draws[:, ni]
-            total_samples = mean_row_sum[:, None] * beta_draws[:, ni]
-            indirect_samples = total_samples - direct_samples
-        elif equation == "selection":
-            lam_draws = _get_posterior_draws(idata, "lam")
-            gamma_draws = _get_posterior_draws(idata, "gamma")
-
-            # Direct-effect trace (1/n)tr((I−λW_sel)⁻¹) via the resolvent
-            # (logdet gradient) — no eigendecomposition of W_sel.
-            mean_diag = self._sel_batch_mean_diag(lam_draws)
-
-            # Mean row sum of (I - lam * W_sel)^{-1}
-            if self._is_sel_row_std:
-                mean_row_sum = 1.0 / (1.0 - lam_draws)
-            else:
-                # The non-row-standardized total effect is a column-weighted
-                # bilinear form (1'S1), not a trace, so it keeps the
-                # eigenvector decomposition of W_sel.
-                from ...diagnostics.spatial_effects import _chunked_eig_means
-
-                n = self._Z.shape[0]
-                W_sel_dense = self._W_sel_sparse.toarray().astype(np.float64)
-                eigvals_sel, V_sel = np.linalg.eig(W_sel_dense)
-                c_sel = np.linalg.solve(V_sel, np.ones(n))
-                V_col_sums_sel = V_sel.sum(axis=0)
-                mean_row_sum = _chunked_eig_means(
-                    lam_draws, eigvals_sel, weights=V_col_sums_sel * c_sel
-                )
-
-            ni = self._sel_nonintercept_indices
-            direct_samples = mean_diag[:, None] * gamma_draws[:, ni]
-            total_samples = mean_row_sum[:, None] * gamma_draws[:, ni]
-            indirect_samples = total_samples - direct_samples
-        else:
-            raise ValueError(
-                f"equation must be 'count' or 'selection', got '{equation}'"
+        pv = self._zinb_priors()
+        with pm.Model(coords=self._model_coords(self._zinb_coords())) as model:
+            lam = pm.Uniform("lam", lower=pv.lam_lower, upper=pv.lam_upper)
+            gamma = pm.Normal(
+                "gamma", mu=pv.gamma_mu, sigma=pv.gamma_sigma, dims="sel_coefficient"
             )
+            rho = pm.Uniform("rho", lower=pv.rho_lower, upper=pv.rho_upper)
+            beta = pm.Normal(
+                "beta", mu=pv.beta_mu, sigma=pv.beta_sigma, dims="coefficient"
+            )
+            alpha = nb_alpha_rv(pv.alpha_fixed, pv.alpha_nu, pv.alpha_sigma)
+            eta_sel = SparseSARSolveOp(self._W_sel_sparse)(
+                lam, pt.dot(pt.as_tensor_variable(self._Z), gamma)
+            )
+            eta_cnt = SparseSARSolveOp(self._W_sparse)(
+                rho, pt.dot(pt.as_tensor_variable(self._X), beta)
+            )
+            pm.ZeroInflatedNegativeBinomial(
+                "obs",
+                psi=pm.math.sigmoid(eta_sel),
+                mu=pt.exp(eta_cnt),
+                alpha=alpha,
+                observed=self._y_int,
+            )
+        return model
 
-        return direct_samples, indirect_samples, total_samples
+    def _zinb_coords(self) -> dict:
+        return {"sel_coefficient": list(self._sel_feature_names)}
 
-    def spatial_effects(
-        self,
-        equation: str = "count",
-        return_posterior_samples: bool = False,
-    ) -> "pd.DataFrame | tuple[pd.DataFrame, dict[str, np.ndarray]]":
-        """Compute Bayesian inference for direct, indirect, and total impacts.
-
-        The ZINB-SAR model has two spatial lag equations — a count
-        equation with parameter ρ and a selection (logit) equation
-        with parameter λ — each with its own LeSage–Pace impact
-        decomposition.  Use the ``equation`` parameter to select which
-        equation's impacts to report.
-
-        Parameters
-        ----------
-        equation : {"count", "selection"}, default "count"
-            Which equation to compute impacts for.
-
-            - ``"count"``: impacts of X on E[y | d=1] through
-              (I − ρW)⁻¹ Xβ.
-            - ``"selection"``: impacts of Z on P(d=1) on the log-odds
-              scale through (I − λW_sel)⁻¹ Zγ.
-        return_posterior_samples : bool, default False
-            If ``True``, return a ``(DataFrame, dict)`` tuple where the
-            dict contains the full posterior draws.
-
-        Returns
-        -------
-        pd.DataFrame or tuple of (pd.DataFrame, dict)
-            Impact summary table, optionally with posterior draws.
-        """
-        from ...diagnostics.spatial_effects import _build_effects_dataframe
-
-        self._require_fit()
-        direct_samples, indirect_samples, total_samples = (
-            self._compute_spatial_effects_posterior(equation=equation)
+    def _part_etas(self, g: int) -> tuple[np.ndarray, np.ndarray]:
+        """``(η_sel, η_cnt)`` at posterior draw ``g``."""
+        n = self._X.shape[0]
+        lam = float(self._flat_draw("lam")[g])
+        rho = float(self._flat_draw("rho")[g])
+        gamma = self._flat_draw("gamma")[g]
+        beta = self._flat_draw("beta")[g]
+        eye = sp.eye(n, format="csc", dtype=np.float64)
+        eta_sel = sp.linalg.splu((eye - lam * self._W_sel_sparse).tocsc()).solve(
+            self._Z @ gamma
         )
-
-        # Determine feature names for the selected equation.
-        if equation == "selection":
-            k_effects = direct_samples.shape[1]
-            sel_names = self._sel_nonintercept_feature_names
-            if len(sel_names) == k_effects:
-                feature_names = list(sel_names)
-            else:
-                feature_names = list(self._sel_feature_names[:k_effects])
-        else:
-            k_effects = direct_samples.shape[1]
-            if (
-                hasattr(self, "_wx_feature_names")
-                and len(self._wx_feature_names) == k_effects
-            ):
-                feature_names = list(self._wx_feature_names)
-            elif len(self._nonintercept_feature_names) == k_effects:
-                feature_names = list(self._nonintercept_feature_names)
-            else:
-                feature_names = list(self._feature_names[:k_effects])
-
-        model_type = f"{self.__class__.__name__} ({equation})"
-
-        df = _build_effects_dataframe(
-            direct_samples=direct_samples,
-            indirect_samples=indirect_samples,
-            total_samples=total_samples,
-            feature_names=feature_names,
-            model_type=model_type,
+        eta_cnt = sp.linalg.splu((eye - rho * self._W_sparse).tocsc()).solve(
+            self._X @ beta
         )
-
-        if return_posterior_samples:
-            posterior_samples = {
-                "direct": direct_samples,
-                "indirect": indirect_samples,
-                "total": total_samples,
-            }
-            return df, posterior_samples
-        return df
-
-    def _fitted_mean_from_posterior(self) -> np.ndarray:
-        """Compute posterior-mean fitted expected counts.
-
-        E[y_i] = π_i · exp(η_i^cnt) where π_i = logit⁻¹(η_i^sel)
-        and η_i^cnt = (I - ρW)^{-1} Xβ at posterior means.
-        """
-        rho = float(self._posterior_mean("rho"))
-        beta = self._posterior_mean("beta")
-        lam = float(self._posterior_mean("lam"))
-        gamma = self._posterior_mean("gamma")
-        n = self._X.shape[0]
-
-        # Count equation: η^cnt = (I - ρW)^{-1} Xβ
-        A_cnt = sp.eye(n, format="csr", dtype=np.float64) - rho * self._W_sparse
-        eta_cnt = sp.linalg.spsolve(A_cnt, self._X @ beta)
-
-        # Selection equation: η^sel = (I - λW_sel)^{-1} Zγ
-        A_sel = sp.eye(n, format="csr", dtype=np.float64) - lam * self._W_sel_sparse
-        eta_sel = sp.linalg.spsolve(A_sel, self._Z @ gamma)
-
-        pi = 1.0 / (1.0 + np.exp(-eta_sel))
-        return pi * np.exp(eta_cnt)
-
-    def corridor_probabilities(self) -> np.ndarray:
-        """Posterior-mean corridor activation probabilities.
-
-        Returns π_i = logit⁻¹(η_i^sel) at posterior means of λ and γ.
-
-        Returns
-        -------
-        pi : ndarray of shape (n,)
-            Fitted activation probabilities.
-        """
-        lam = float(self._posterior_mean("lam"))
-        gamma = self._posterior_mean("gamma")
-        n = self._X.shape[0]
-
-        A_sel = sp.eye(n, format="csr", dtype=np.float64) - lam * self._W_sel_sparse
-        eta_sel = sp.linalg.spsolve(A_sel, self._Z @ gamma)
-        return 1.0 / (1.0 + np.exp(-eta_sel))
-
-    def zero_attribution(self) -> dict[str, np.ndarray]:
-        """Decompose observed zeros into structural vs sampling zeros.
-
-        For each observation with y_i = 0, computes the posterior
-        probability that the zero is structural (d_i = 0) versus
-        sampling (d_i = 1 but NB draw was zero).
-
-        Returns
-        -------
-        dict with keys:
-            ``structural_prob`` : ndarray of shape (n_zero,)
-                P(d_i = 0 | y_i = 0) for each zero observation.
-            ``sampling_prob`` : ndarray of shape (n_zero,)
-                P(d_i = 1, NB zero | y_i = 0) for each zero observation.
-            ``zero_indices`` : ndarray of shape (n_zero,)
-                Indices of zero observations.
-        """
-        self._require_fit()
-        rho = float(self._posterior_mean("rho"))
-        beta = self._posterior_mean("beta")
-        lam = float(self._posterior_mean("lam"))
-        gamma = self._posterior_mean("gamma")
-        alpha = float(self._posterior_mean("alpha"))
-        n = self._X.shape[0]
-
-        # Count equation: η^cnt
-        A_cnt = sp.eye(n, format="csr", dtype=np.float64) - rho * self._W_sparse
-        eta_cnt = sp.linalg.spsolve(A_cnt, self._X @ beta)
-
-        # Selection equation: η^sel
-        A_sel = sp.eye(n, format="csr", dtype=np.float64) - lam * self._W_sel_sparse
-        eta_sel = sp.linalg.spsolve(A_sel, self._Z @ gamma)
-
-        zero_mask = self._y == 0
-        zero_idx = np.where(zero_mask)[0]
-
-        pi = 1.0 / (1.0 + np.exp(-eta_sel[zero_mask]))
-        log_p_nb_zero = alpha * np.log(alpha / (np.exp(eta_cnt[zero_mask]) + alpha))
-        p_nb_zero = np.exp(np.clip(log_p_nb_zero, -700, 0))
-
-        # P(structural | y=0) = (1-π) / ((1-π) + π·p_nb_zero)
-        structural = 1.0 - pi
-        sampling = pi * p_nb_zero
-        total = structural + sampling
-        total = np.where(total > 0, total, 1.0)
-
-        return {
-            "structural_prob": structural / total,
-            "sampling_prob": sampling / total,
-            "zero_indices": zero_idx,
-        }
+        return eta_sel, eta_cnt

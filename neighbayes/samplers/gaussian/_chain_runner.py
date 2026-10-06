@@ -1,9 +1,9 @@
 """Parallel chain dispatch for Gibbs samplers.
 
-Supports sequential execution with rich progress bars, process-based
-parallelism via ``joblib.Parallel`` (with per-chain progress bars
-fed via a shared-memory counter block), and JAX vectorized chains
-via ``jax.vmap``.
+Supports sequential execution with rich progress bars and process-based
+parallelism via ``joblib.Parallel`` (with per-chain progress bars fed via a
+shared-memory counter block).  Warnings a worker raises are relayed to the
+parent, which raises each distinct one once.
 """
 
 from __future__ import annotations
@@ -11,12 +11,39 @@ from __future__ import annotations
 import gc
 import logging
 import threading
+import warnings
 from multiprocessing import shared_memory
 from typing import Callable
 
 import numpy as np
 
 _log = logging.getLogger(__name__)
+
+
+def _call_recording(fn, *args, **kwargs):
+    """``(fn(*args, **kwargs), warnings)``, the warnings as picklable pairs.
+
+    A loky worker's warnings go to its own stderr, which a notebook never
+    shows; returning them lets :func:`run_chains` raise them in the parent,
+    under the parent's warning filters.
+    """
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("default")
+        result = fn(*args, **kwargs)
+    return result, [(w.category, str(w.message)) for w in caught]
+
+
+def _unpack_relayed(outputs) -> list:
+    """The chains' results, raising each distinct relayed warning once."""
+    seen = set()
+    for _, records in outputs:
+        for category, text in records:
+            if (category, text) in seen:
+                continue
+            seen.add((category, text))
+            # stacklevel 3: this function, run_chains, then run_chains' caller.
+            warnings.warn(text, category, stacklevel=3)
+    return [result for result, _ in outputs]
 
 
 def run_chains(
@@ -120,12 +147,9 @@ def run_chains(
         # thread settings, which can cause BLAS deadlocks on macOS
         # with Apple Accelerate after many parallel calls.
         if not reuse_workers:
-            try:
-                from joblib.externals.loky import get_reusable_executor
+            from joblib.externals.loky import get_reusable_executor
 
-                get_reusable_executor(reuse=True).shutdown(wait=True)
-            except Exception:
-                pass  # executor may not exist yet
+            get_reusable_executor(reuse=True).shutdown(wait=True)
 
             # Force garbage collection before spawning workers.  Each fit()
             # call creates CholmodFactor objects that hold C-level resources
@@ -184,8 +208,12 @@ def run_chains(
                             # the chain raises an exception.
                             def _run_with_cleanup(cid, seed, pm):
                                 try:
-                                    return chain_fn(
-                                        cid, seed, progress_manager=pm, chain_id_kw=cid
+                                    return _call_recording(
+                                        chain_fn,
+                                        cid,
+                                        seed,
+                                        progress_manager=pm,
+                                        chain_id_kw=cid,
                                     )
                                 finally:
                                     if pm is not None and hasattr(pm, "close"):
@@ -200,7 +228,7 @@ def run_chains(
                     finally:
                         stop_event.set()
                         poll_thread.join(timeout=5.0)
-                return list(results)
+                return _unpack_relayed(results)
             finally:
                 shm.close()
                 try:
@@ -211,10 +239,10 @@ def run_chains(
             # No progress bar — silent parallel execution.
             with parallel_config(backend="loky", inner_max_num_threads=inner_threads):
                 results = Parallel(n_jobs=n_workers, timeout=timeout)(
-                    delayed(chain_fn)(chain_id, seed)
+                    delayed(_call_recording)(chain_fn, chain_id, seed)
                     for chain_id, seed in enumerate(seeds)
                 )
-            return list(results)
+            return _unpack_relayed(results)
 
     # Sequential execution with progress bars
     from .._utils._progress import GibbsProgressBarManager

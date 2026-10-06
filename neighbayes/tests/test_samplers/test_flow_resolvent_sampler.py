@@ -431,6 +431,53 @@ def test_attach_flow_log_abs_det_skips_aspatial_posterior():
     )
 
 
+def test_separable_count_flow_log_abs_det_uses_closed_form(monkeypatch):
+    """Separable count flow classes take log|A| from n f(rho_d) + n f(rho_o),
+    never from the resolvent route, which factors the N x N system (KLU ran out
+    of memory at N = 9.68M).  The value equals the exact double sum with
+    rho_w = -rho_d rho_o, and T rescales it."""
+    import arviz as az
+
+    import neighbayes.samplers.gaussian._flow_resolvent as fr
+    from neighbayes.models.flow import SARNegBinFlowSeparable
+
+    W, _, X = _directed_flow_data(n=12, seed=4)
+    y = np.random.default_rng(4).poisson(3.0, size=X.shape[0])
+    model = SARNegBinFlowSeparable(y, X, W, logdet_method="eigenvalue")
+
+    def _no_resolvent(*args, **kwargs):
+        raise AssertionError("separable class reached the resolvent route")
+
+    monkeypatch.setattr(fr, "attach_flow_log_abs_det", _no_resolvent)
+
+    nchain, ndraw = 2, 3
+    rd = np.array([[0.3, 0.1, -0.2], [0.25, 0.0, 0.4]])
+    ro = np.array([[0.2, -0.3, 0.15], [0.05, 0.35, -0.1]])
+    idata = az.from_dict(
+        {"posterior": {"rho_d": rd, "rho_o": ro, "rho_w": -rd * ro}}
+    )
+    model._attach_flow_log_abs_det(idata)
+    lad = idata.sample_stats["log_abs_det"].values
+    assert lad.shape == (nchain, ndraw)
+    assert "log_likelihood" not in idata.children
+
+    lam = np.linalg.eigvals(W)
+    li, lj = lam[:, None], lam[None, :]
+    exact = np.array(
+        [
+            np.sum(np.log(np.abs(1.0 - (b * li + a * lj - a * b * (li * lj)))))
+            for a, b in zip(rd.ravel(), ro.ravel())
+        ]
+    ).reshape(nchain, ndraw)
+    np.testing.assert_allclose(lad, exact, rtol=1e-8, atol=1e-8)
+
+    model._T = 3
+    model._attach_flow_log_abs_det(idata)
+    np.testing.assert_allclose(
+        idata.sample_stats["log_abs_det"].values, 3.0 * exact, rtol=1e-8, atol=1e-8
+    )
+
+
 def test_short_chain_with_exact_logdet_recovers_signs():
     """A short MALA-within-Gibbs run (exact ld, no GMRES) moves ρ toward the truth."""
     from neighbayes.samplers.gaussian._flow_resolvent import run_flow_resolvent_gibbs

@@ -134,139 +134,37 @@ def _check_jax_available() -> None:
     _check_jax_available_impl(require_equinox=True)
 
 
-def _make_gibbs_step_with_data(
-    y_jax,
-    X_jax,
-    W_bcoo,
-    Wt_bcoo,
+def _make_nb_structural_step(
     n,
     k,
-    W_sym_dense,
-    WtW_dense,
-    logdet_jax,
-    XtX_jax,
-    priors,
-    pg_n_terms,
-    n_probes,
-    lanczos_deg,
-    sparsax_pattern=None,
+    *,
+    logdet_kind,
+    logdet_closure=None,
+    pg_n_terms=25,
+    use_sparsax=True,
     krylov_degree: int = 0,
     krylov_dmax: float = 0.4,
+    alpha_fixed: bool = False,
 ):
-    """Build a JIT-compiled Gibbs step with data bound into the closure.
+    """The structural SAR-NB Gibbs step, closing over static settings only.
 
-    This function creates a ``@jax.jit``-compiled function that performs
-    one complete Gibbs sweep (ω, η, β, σ², ρ slice) in a single XLA
-    kernel call, eliminating all Python→JAX dispatch overhead.
-
-    Parameters
-    ----------
-    y_jax : jax.numpy.ndarray of shape (n,)
-        Response vector (JAX array).
-    X_jax : jax.numpy.ndarray of shape (n, k)
-        Design matrix (JAX array).
-    W_bcoo : jax.experimental.sparse.BCOO of shape (n, n)
-        Row-standardized W as a sparse BCOO matrix (for ``W @ x``).
-    Wt_bcoo : jax.experimental.sparse.BCOO of shape (n, n)
-        Transpose ``Wᵀ`` as a sparse BCOO matrix (for ``Wᵀ @ x``).
-    n : int
-        Number of spatial units.
-    k : int
-        Number of regression coefficients.
-    W_sym_dense : jax.numpy.ndarray of shape (n, n) or None
-        Dense (W + W^T).  Only needed for the dense-Cholesky fallback
-        (``sparsax_pattern is None``); pass ``None`` on the sparse path.
-    WtW_dense : jax.numpy.ndarray of shape (n, n) or None
-        Dense W^T W.  Only needed for the dense-Cholesky fallback.
-    logdet_jax : callable
-        JAX-native function ``(rho) -> jax.numpy.ndarray`` computing
-        log|I - rho*W|.  Built by :func:`~neighbayes.logdet.make_logdet_jax_fn`.
-        Replaces the former ``W_eigs`` eigenvalue-based logdet, allowing
-        trace-seeded Chebyshev or other methods that avoid the O(n³)
-        eigendecomposition.
-    XtX_jax : jax.numpy.ndarray of shape (k, k)
-        Precomputed X^T X.
-    priors : GibbsPriors
-        Prior hyperparameters.
-    pg_n_terms : int
-        Number of alternating-series terms for the PG draw (mean-exact
-        via tail correction; see :func:`_pg_gamma_series_draw`).
-        Values below 20 can destabilize the Gibbs chain.
-    n_probes : int
-        Number of Lanczos probes for log|P| estimation.
-    lanczos_deg : int
-        Lanczos iteration depth.
-
-    Returns
-    -------
-    gibbs_step : callable
-        A JIT-compiled function with signature::
-
-            gibbs_step(state, key) -> (new_state, accept)
-
-        where ``state`` is a :class:`~neighbayes.samplers.negbin._core.JAXGibbsState`
-        and ``key`` is a JAX PRNG key.  ``accept`` is always ``True``
-        (slice sampling has no rejection step).
+    Returns ``gibbs_step(state, key, data, slice_width=0.2, return_steps=False)``
+    where ``data`` (:func:`_nb_structural_data`) carries every data-dependent
+    array and scalar, so one compiled program serves every fit of the same
+    structure.  ``logdet_kind`` is a :func:`neighbayes._logdet._jax.
+    logdet_jax_params` kind; ``logdet_closure`` the function when it is
+    ``"closure"``.
     """
     import equinox as eqx
     import jax
     import jax.numpy as jnp
     from jax.scipy.linalg import cho_solve, solve_triangular
 
-    ensure_x64()
-
-    use_sparsax = sparsax_pattern is not None
-
-    # Sparse W matvecs — never densify W: W @ x and Wᵀ @ x go through BCOO
-    # (O(nnz), O(nnz) memory) instead of a dense n×n materialization.
-    def W_matvec(x):
-        return W_bcoo @ x
-
-    def Wt_matvec(x):
-        return Wt_bcoo @ x
-
-    # Dense (W+Wᵀ) and WᵀW are only needed to assemble the dense P in the
-    # no-sparsax fallback; skip building them on the sparse path.
-    if not use_sparsax:
-        W_sym = jnp.asarray(W_sym_dense, dtype=jnp.float64)
-        WtW = jnp.asarray(WtW_dense, dtype=jnp.float64)
-    # Prior hyperparameters
-    # Note: priors.beta_sigma is the standard deviation, not the variance
-    beta_mu_jax = jnp.broadcast_to(jnp.asarray(priors.beta_mu, dtype=jnp.float64), (k,))
-    beta_sigma2_jax = jnp.broadcast_to(
-        jnp.asarray(priors.beta_sigma, dtype=jnp.float64) ** 2, (k,)
-    )
-    rho_lower_jax = jnp.float64(priors.rho_lower)
-    rho_upper_jax = jnp.float64(priors.rho_upper)
-
-    # Prior precision for beta
-    beta_prior_prec = jnp.diag(1.0 / beta_sigma2_jax)
-
-    # ── sparsax setup (optional sparse SPD Cholesky path) ──
-    if use_sparsax:
-        _Ai = jnp.asarray(sparsax_pattern["Ai"], dtype=jnp.int32)
-        _Aj = jnp.asarray(sparsax_pattern["Aj"], dtype=jnp.int32)
-        _W_sym_vals = jnp.asarray(sparsax_pattern["W_sym_vals"], dtype=jnp.float64)
-        _WtW_vals = jnp.asarray(sparsax_pattern["WtW_vals"], dtype=jnp.float64)
-        _diag_idx = jnp.asarray(sparsax_pattern["diag_idx"], dtype=jnp.int32)
-        _nnz = len(sparsax_pattern["Ai"])
-        _n_static = int(sparsax_pattern["n"])
-        # Factor-once closures: the η-draw and each ρ-density eval do exactly ONE
-        # numeric factorization (matching numpy's CholmodFactor reuse), via
-        # sparsax 0.4 `sample_gaussian` / `factor_solve` (0.3 fallback inside).
-        from .._utils._sparsax_utils import make_sparsax_ops
-
-        _eta_sample, _solve_logdet = make_sparsax_ops(_Ai, _Aj, _n_static)
-
-        def _assemble_Ax(omega, rho_val, inv_s2):
-            """Assemble COO values for P = I/σ² + diag(ω) − (ρ/σ²)(W+Wᵀ) + (ρ²/σ²)WᵀW."""
-            Ax = -rho_val * _W_sym_vals * inv_s2 + rho_val**2 * _WtW_vals * inv_s2
-            diag_vals = jnp.zeros(_nnz, dtype=jnp.float64)
-            diag_vals = diag_vals.at[_diag_idx].set(inv_s2 + omega)
-            return Ax + diag_vals
+    from ..._logdet._jax import eval_logdet_params
+    from .._utils._sparsax_utils import make_sparsax_ops
 
     @eqx.filter_jit
-    def gibbs_step(state, key, slice_width=0.2, return_steps=False):
+    def gibbs_step(state, key, data, slice_width=0.2, return_steps=False):
         """One complete Gibbs sweep: ω → η → β → σ² → ρ (slice) → α (slice).
 
         Parameters
@@ -294,6 +192,44 @@ def _make_gibbs_step_with_data(
         sigma2 = state.sigma2
         rho = state.rho
         alpha = state.alpha
+
+        y_jax, X_jax, XtX_jax = data["y"], data["X"], data["XtX"]
+        beta_mu_jax, beta_sigma2_jax = data["beta_mu"], data["beta_sigma2"]
+        beta_prior_prec = jnp.diag(1.0 / beta_sigma2_jax)
+        rho_lower_jax, rho_upper_jax = data["rho_lower"], data["rho_upper"]
+        W_bcoo, Wt_bcoo = data["W"], data["Wt"]
+
+        def W_matvec(x):
+            return W_bcoo @ x
+
+        def Wt_matvec(x):
+            return Wt_bcoo @ x
+
+        def logdet_jax(r):
+            prm = logdet_closure if logdet_kind == "closure" else data["logdet"]
+            return eval_logdet_params(logdet_kind, prm, r)
+
+        if use_sparsax:
+            sp_ = data["sparsax"]
+            _Ai, _Aj = sp_["Ai"], sp_["Aj"]
+            _W_sym_vals, _WtW_vals = sp_["W_sym_vals"], sp_["WtW_vals"]
+            _diag_idx = sp_["diag_idx"]
+            _nnz = _Ai.shape[0]
+            _n_static = n
+            # Factor-once closures: the η-draw and each ρ-density eval do
+            # exactly ONE numeric factorization (sparsax sample_gaussian /
+            # factor_solve).
+            _eta_sample, _solve_logdet = make_sparsax_ops(_Ai, _Aj, _n_static)
+
+            def _assemble_Ax(omega, rho_val, inv_s2):
+                """COO values of P = I/σ² + diag(ω) − (ρ/σ²)(W+Wᵀ) + (ρ²/σ²)WᵀW."""
+                Ax = -rho_val * _W_sym_vals * inv_s2 + rho_val**2 * _WtW_vals * inv_s2
+                diag_vals = jnp.zeros(_nnz, dtype=jnp.float64)
+                diag_vals = diag_vals.at[_diag_idx].set(inv_s2 + omega)
+                return Ax + diag_vals
+
+        else:
+            W_sym, WtW = data["W_sym_dense"], data["WtW_dense"]
 
         key_omega, key_eta, key_beta, key_sigma2, key_rho = jax.random.split(key, 5)
 
@@ -335,8 +271,8 @@ def _make_gibbs_step_with_data(
         # ── Block 4: σ² | η, ρ, β — conjugate inverse-Gamma ──
         Xbeta_new = X_jax @ beta_new
         r = A_rho_eta - Xbeta_new
-        a_post = jnp.float64(priors.sigma2_alpha + n / 2.0)
-        b_post = jnp.float64(priors.sigma2_beta + r @ r / 2.0)
+        a_post = data["sigma2_alpha"] + n / 2.0
+        b_post = data["sigma2_beta"] + r @ r / 2.0
         sigma2_inv = jax.random.gamma(key_sigma2, a_post) / b_post
         sigma2_new = jnp.maximum(1.0 / sigma2_inv, 1e-10)
 
@@ -475,21 +411,24 @@ def _make_gibbs_step_with_data(
         # Accept flag is always True for slice sampling (no rejection)
         accept = jnp.bool_(True)
 
-        # ── Block 6: α | y, η — JAX slice sampling ──
-        alpha_new = _sample_alpha_jax(
-            JAXGibbsState(
-                eta=eta_new,
-                beta=beta_new,
-                sigma2=sigma2_new,
-                rho=rho_new,
-                omega=omega_new,
-                alpha=alpha,
-            ),
-            y_jax,
-            priors.alpha_sigma,
-            priors.alpha_nu,
-            key_alpha,
-        )
+        # ── Block 6: α | y, η — JAX slice sampling (held when alpha_fixed) ──
+        if alpha_fixed:
+            alpha_new = data["alpha_fixed"]
+        else:
+            alpha_new = _sample_alpha_jax(
+                JAXGibbsState(
+                    eta=eta_new,
+                    beta=beta_new,
+                    sigma2=sigma2_new,
+                    rho=rho_new,
+                    omega=omega_new,
+                    alpha=alpha,
+                ),
+                y_jax,
+                data["alpha_sigma"],
+                data["alpha_nu"],
+                key_alpha,
+            )
 
         new_state = JAXGibbsState(
             eta=eta_new,
@@ -502,6 +441,100 @@ def _make_gibbs_step_with_data(
         if return_steps:
             return new_state, accept, (steps_left, steps_right)
         return new_state, accept
+
+    return gibbs_step
+
+
+def _nb_structural_data(
+    y, X, W_bcoo, Wt_bcoo, priors, logdet_params, *, W_sym_dense=None,
+    WtW_dense=None, sparsax_pattern=None, XtX=None,
+):  # fmt: skip
+    """The structural SAR-NB step's ``data``: every data-dependent array and scalar."""
+    import jax.numpy as jnp
+
+    k = X.shape[1]
+    alpha_fixed = getattr(priors, "alpha_fixed", None)
+    data = {
+        "y": jnp.asarray(y, dtype=jnp.float64),
+        "X": jnp.asarray(X, dtype=jnp.float64),
+        "XtX": jnp.asarray(X.T @ X if XtX is None else XtX, dtype=jnp.float64),
+        "W": W_bcoo,
+        "Wt": Wt_bcoo,
+        "beta_mu": jnp.broadcast_to(
+            jnp.asarray(priors.beta_mu, dtype=jnp.float64), (k,)
+        ),
+        "beta_sigma2": jnp.broadcast_to(
+            jnp.asarray(priors.beta_sigma, dtype=jnp.float64) ** 2, (k,)
+        ),
+        "rho_lower": jnp.float64(priors.rho_lower),
+        "rho_upper": jnp.float64(priors.rho_upper),
+        "sigma2_alpha": jnp.float64(priors.sigma2_alpha),
+        "sigma2_beta": jnp.float64(priors.sigma2_beta),
+        "alpha_sigma": jnp.float64(priors.alpha_sigma),
+        "alpha_nu": jnp.float64(priors.alpha_nu),
+        "alpha_fixed": jnp.float64(alpha_fixed if alpha_fixed is not None else 1.0),
+        "logdet": None if logdet_params[0] == "closure" else logdet_params[1],
+    }
+    if sparsax_pattern is not None:
+        data["sparsax"] = {
+            "Ai": jnp.asarray(sparsax_pattern["Ai"], dtype=jnp.int32),
+            "Aj": jnp.asarray(sparsax_pattern["Aj"], dtype=jnp.int32),
+            "W_sym_vals": jnp.asarray(sparsax_pattern["W_sym_vals"], dtype=jnp.float64),
+            "WtW_vals": jnp.asarray(sparsax_pattern["WtW_vals"], dtype=jnp.float64),
+            "diag_idx": jnp.asarray(sparsax_pattern["diag_idx"], dtype=jnp.int32),
+        }
+    else:
+        data["W_sym_dense"] = jnp.asarray(W_sym_dense, dtype=jnp.float64)
+        data["WtW_dense"] = jnp.asarray(WtW_dense, dtype=jnp.float64)
+    return data
+
+
+def _make_gibbs_step_with_data(
+    y_jax,
+    X_jax,
+    W_bcoo,
+    Wt_bcoo,
+    n,
+    k,
+    W_sym_dense,
+    WtW_dense,
+    logdet_jax,
+    XtX_jax,
+    priors,
+    pg_n_terms,
+    n_probes,
+    lanczos_deg,
+    sparsax_pattern=None,
+    krylov_degree: int = 0,
+    krylov_dmax: float = 0.4,
+):
+    """A structural SAR-NB Gibbs step with the data bound in.
+
+    ``gibbs_step(state, key, slice_width=0.2, return_steps=False)``: the core
+    step (:func:`_make_nb_structural_step`) with ``data`` fixed to this model's
+    arrays, for single-chain use and tests.  The chunked runner passes the data
+    as an argument instead, so its program is compiled once per structure.
+    ``logdet_jax`` is a ``(rho) -> logdet`` function; ``n_probes`` and
+    ``lanczos_deg`` are accepted for signature compatibility and unused.
+    """
+    from ..._jax_dispatch import ensure_x64
+
+    ensure_x64()
+    use_sparsax = sparsax_pattern is not None
+    data = _nb_structural_data(
+        y_jax, X_jax, W_bcoo, Wt_bcoo, priors, ("closure", logdet_jax),
+        W_sym_dense=W_sym_dense, WtW_dense=WtW_dense,
+        sparsax_pattern=sparsax_pattern, XtX=XtX_jax,
+    )  # fmt: skip
+    core = _make_nb_structural_step(
+        n, k, logdet_kind="closure", logdet_closure=logdet_jax,
+        pg_n_terms=pg_n_terms, use_sparsax=use_sparsax,
+        krylov_degree=krylov_degree, krylov_dmax=krylov_dmax,
+        alpha_fixed=getattr(priors, "alpha_fixed", None) is not None,
+    )  # fmt: skip
+
+    def gibbs_step(state, key, slice_width=0.2, return_steps=False):
+        return core(state, key, data, slice_width, return_steps)
 
     return gibbs_step
 
@@ -999,8 +1032,13 @@ def run_chains_jax_vectorized(
     krylov_degree: int = 0,
     krylov_dmax: float = 0.4,
     store_log_lik: bool = True,
+    logdet_params=None,
 ) -> list[dict]:
     """Run multiple SAR-NB Gibbs chains in parallel.
+
+    ``logdet_params`` (from :func:`neighbayes._logdet._jax.logdet_jax_params`)
+    lets the compiled program be reused by later fits of the same structure;
+    with only ``logdet_jax`` (a closure) it is compiled per fit.
 
     Chains run in parallel threads, each an ordinary ``jax.jit`` program, and
     the Gibbs step is compiled once (see
@@ -1025,32 +1063,19 @@ def run_chains_jax_vectorized(
     chains = len(inits)
     n, k = X.shape
 
-    y_jax = jnp.asarray(y, dtype=jnp.float64)
-    X_jax = jnp.asarray(X, dtype=jnp.float64)
-    XtX_jax = jnp.asarray(X.T @ X, dtype=jnp.float64)
-    from .._utils._jax_utils import build_w_bcoo
+    from .._utils._jax_utils import build_w_bcoo, cached_sweep
 
     W_bcoo, Wt_bcoo = build_w_bcoo(W_sparse)
-
-    gibbs_step = _make_gibbs_step_with_data(
-        y_jax=y_jax,
-        X_jax=X_jax,
-        W_bcoo=W_bcoo,
-        Wt_bcoo=Wt_bcoo,
-        n=n,
-        k=k,
-        W_sym_dense=W_sym_dense,
-        WtW_dense=WtW_dense,
-        logdet_jax=logdet_jax,
-        XtX_jax=XtX_jax,
-        priors=priors,
-        pg_n_terms=pg_n_terms,
-        n_probes=n_probes,
-        lanczos_deg=lanczos_deg,
-        sparsax_pattern=sparsax_pattern,
-        krylov_degree=krylov_degree,
-        krylov_dmax=krylov_dmax,
-    )
+    if logdet_params is None:
+        logdet_params = ("closure", logdet_jax)
+    logdet_kind = logdet_params[0]
+    logdet_closure = logdet_params[1] if logdet_kind == "closure" else None
+    data = _nb_structural_data(
+        y, X, W_bcoo, Wt_bcoo, priors, logdet_params,
+        W_sym_dense=W_sym_dense, WtW_dense=WtW_dense, sparsax_pattern=sparsax_pattern,
+    )  # fmt: skip
+    use_sparsax = sparsax_pattern is not None
+    alpha_fixed = getattr(priors, "alpha_fixed", None) is not None
 
     init_states = _stack_nb_inits(inits)
 
@@ -1065,24 +1090,41 @@ def run_chains_jax_vectorized(
 
     draw_keys = jax.random.split(jax.random.fold_in(master_key, 1), chains)
 
-    def _sweep(carry, key, tuning):
-        # The slice starts at width 0.2, as in the NumPy sampler, and adapts
-        # during warmup.
-        state, width = carry
-        state, _, (steps_left, steps_right) = gibbs_step(
-            state, key, width, return_steps=True
-        )
-        width = adapt_slice_width(width, steps_left, steps_right, tuning)
-        trace = (
-            state.rho,
-            state.beta,
-            state.sigma2,
-            state.alpha,
-            state.eta @ state.eta,
-        )
-        if store_log_lik:
-            trace += (_nb_loglik_pointwise_jax_op(y_jax, state.eta, state.alpha),)
-        return (state, width), trace
+    static = (n, k, logdet_kind, logdet_closure, pg_n_terms, use_sparsax,
+              krylov_degree, krylov_dmax, alpha_fixed, bool(store_log_lik))  # fmt: skip
+
+    def _build():
+        gibbs_step = _make_nb_structural_step(
+            n, k, logdet_kind=logdet_kind, logdet_closure=logdet_closure,
+            pg_n_terms=pg_n_terms, use_sparsax=use_sparsax,
+            krylov_degree=krylov_degree, krylov_dmax=krylov_dmax,
+            alpha_fixed=alpha_fixed,
+        )  # fmt: skip
+
+        def _sweep(carry, key, tuning, data):
+            # The slice starts at width 0.2, as in the NumPy sampler, and
+            # adapts during warmup.
+            state, width = carry
+            state, _, (steps_left, steps_right) = gibbs_step(
+                state, key, data, width, return_steps=True
+            )
+            width = adapt_slice_width(width, steps_left, steps_right, tuning)
+            trace = (
+                state.rho,
+                state.beta,
+                state.sigma2,
+                state.alpha,
+                state.eta @ state.eta,
+            )
+            if store_log_lik:
+                trace += (
+                    _nb_loglik_pointwise_jax_op(data["y"], state.eta, state.alpha),
+                )
+            return (state, width), trace
+
+        return _sweep
+
+    _sweep = cached_sweep(("sar_negbin_structural", *static), _build)
 
     with GibbsProgressBarManager(
         chains=chains,
@@ -1111,6 +1153,7 @@ def run_chains_jax_vectorized(
             tune=tune,
             draws=draws,
             on_chunk=_progress,
+            consts=data,
         )
 
     rhos, betas, sigma2s, alphas, eta_norms = traces[:5]

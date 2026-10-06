@@ -103,17 +103,22 @@ class TestNegativeBinomialPanelFlowConstruction:
         pm_model = model._build_pymc_model()
         assert "alpha" in pm_model.named_vars
 
-    def test_negbin_panel_requires_model_zero(self):
+    def test_negbin_panel_pair_effects_build(self):
+        """Pair effects are pooled parameters (see test_count_panel_fe.py), not demeaning."""
         data = _small_panel_negbin_flow(seed=7)
-        with pytest.raises(ValueError, match="effects=0 only"):
-            SARNegBinFlowPanel(
-                y=data["y"],
-                W=data["G"],
-                X=data["X"],
-                T=3,
-                col_names=data["col_names"],
-                effects=1,
-            )
+        model = SARNegBinFlowPanel(
+            y=data["y"],
+            W=data["G"],
+            X=data["X"],
+            T=3,
+            col_names=data["col_names"],
+            effects=3,
+        )
+        assert list(model._feature_names) == list(data["col_names"])
+        pm_model = model._build_pymc_model()
+        assert {"alpha", "group_effect", "group_sd", "time_effect"} <= set(
+            pm_model.named_vars
+        )
 
 
 def _check_beta_recovery(
@@ -467,3 +472,55 @@ class TestNegBinFlowPanelAspatialRecovery:
             f"alpha: {alpha_hat:.3f} vs {alpha_true}"
         )
         _check_beta_recovery(idata, beta_d_true, beta_o_true, gamma_dist_true)
+
+
+class TestFlowGibbsBackend:
+    """Flow models default to ``gibbs_backend="auto"``, resolved per configuration."""
+
+    def test_public_fits_default_to_auto(self):
+        import inspect
+
+        from neighbayes.models.flow_panel._hurdle import SARHurdleNBFlowSeparablePanel
+        from neighbayes.models.flow_panel._panel import SARZINBFlowSeparablePanel
+
+        for cls in (
+            SARNegBinFlow,
+            SARNegBinFlowSeparable,
+            NegBinFlow,
+            SARNegBinFlowPanel,
+            SARNegBinFlowSeparablePanel,
+            SARZINBFlowSeparablePanel,
+            SARHurdleNBFlowSeparablePanel,
+        ):
+            default = inspect.signature(cls.fit).parameters["gibbs_backend"].default
+            assert default == "auto", cls.__name__
+
+    def test_auto_takes_jax_only_where_a_kernel_exists(self):
+        pytest.importorskip("jax")
+        data = _small_negbin_flow(seed=3)
+        model = SARNegBinFlow(data["y_vec"], data["X"], data["G"])
+        assert model._resolve_gibbs_backend("auto", jax=True) == "jax"
+        assert model._resolve_gibbs_backend("auto", jax=False) == "numpy"
+        assert model._resolve_gibbs_backend("numpy", jax=True) == "numpy"
+
+    def test_explicit_jax_without_a_kernel_raises(self):
+        """The aspatial flow used to ignore ``"jax"`` and run NumPy."""
+        data = _small_negbin_flow(seed=4)
+        model = NegBinFlow(data["y_vec"], data["X"], data["G"])
+        with pytest.raises(ValueError, match="not supported"):
+            model.fit(draws=5, tune=5, chains=1, progressbar=False, gibbs_backend="jax")
+
+    def test_unrestricted_panel_auto_runs_numpy(self):
+        """The unrestricted JAX kernel is cross-section only, so a panel stays NumPy."""
+        data = _small_panel_negbin_flow(seed=5)
+        model = SARNegBinFlowPanel(
+            data["y"], data["X"], data["G"], T=3, col_names=data["col_names"]
+        )
+        assert (
+            model._resolve_gibbs_backend(
+                "auto", jax=not model._count_effects and model._T == 1
+            )
+            == "numpy"
+        )
+        with pytest.raises(ValueError, match="not supported"):
+            model.fit(draws=5, tune=5, chains=1, progressbar=False, gibbs_backend="jax")

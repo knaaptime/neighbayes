@@ -61,6 +61,7 @@ from ...samplers.negbin_reduced._core import (
     _KRYLOV_DEGREE_DEFAULT,
     _KRYLOV_DMAX_DEFAULT,
 )
+from .._base._nb import nb_alpha_fixed, nb_alpha_rv
 from ..base import SpatialModel
 from ..priors import SARNegBinPriors
 
@@ -129,7 +130,7 @@ class SARNegBin(SpatialModel):
         with pm.Model(coords=self._model_coords()) as model:
             rho = pm.Uniform("rho", lower=rho_lower, upper=rho_upper)
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            alpha = pm.HalfStudentT("alpha", nu=alpha_nu, sigma=alpha_sigma)
+            alpha = nb_alpha_rv(nb_alpha_fixed(self.priors), alpha_nu, alpha_sigma)
 
             # Reduced form: η = (I - ρW)⁻¹ Xβ
             from ..._ops import SparseSARSolveOp
@@ -242,6 +243,7 @@ class SARNegBin(SpatialModel):
             beta_sigma=beta_sigma,
             alpha_sigma=self.priors.get("alpha_sigma", 2.5),
             alpha_nu=self.priors.get("alpha_nu", 3.0),
+            alpha_fixed=nb_alpha_fixed(self.priors),
             rho_lower=rho_lower,
             rho_upper=rho_upper,
         )
@@ -269,14 +271,11 @@ class SARNegBin(SpatialModel):
                 np.clip(_best_rho, rho_lower + 0.05, rho_upper - 0.05)
             )
             _beta_init_mle = _best_beta
-            try:
-                _init_solver = CachedSparseSolver([W_csc], n)
-                _Xtilde_init = _init_solver.solve([-_rho_init_mle], X)
-                _eta_init = _Xtilde_init @ _beta_init_mle
-                _resid2 = float(np.mean((_log_y - _eta_init) ** 2))
-                _alpha_init_mle = float(np.clip(1.0 / max(_resid2, 0.01), 0.5, 50.0))
-            except Exception:
-                _alpha_init_mle = 1.0
+            _init_solver = CachedSparseSolver([W_csc], n)
+            _Xtilde_init = _init_solver.solve([-_rho_init_mle], X)
+            _eta_init = _Xtilde_init @ _beta_init_mle
+            _resid2 = float(np.mean((_log_y - _eta_init) ** 2))
+            _alpha_init_mle = float(np.clip(1.0 / max(_resid2, 0.01), 0.5, 50.0))
 
             # Detect intercept column
             intercept_col = -1
@@ -415,14 +414,11 @@ class SARNegBin(SpatialModel):
         # log-likelihood gives the dispersion on the log scale.
         # For NB data: Var(log y) ≈ 1/α + 1/(2μ) (delta method), so
         # α ≈ 1/σ² when μ is large.  Cap at a reasonable range.
-        try:
-            _init_solver = CachedSparseSolver([W_csc], n)
-            _Xtilde_init = _init_solver.solve([-_rho_init_mle], X)
-            _eta_init = _Xtilde_init @ _beta_init_mle
-            _resid2 = float(np.mean((_log_y - _eta_init) ** 2))
-            _alpha_init_mle = float(np.clip(1.0 / max(_resid2, 0.01), 0.5, 50.0))
-        except Exception:
-            _alpha_init_mle = 1.0
+        _init_solver = CachedSparseSolver([W_csc], n)
+        _Xtilde_init = _init_solver.solve([-_rho_init_mle], X)
+        _eta_init = _Xtilde_init @ _beta_init_mle
+        _resid2 = float(np.mean((_log_y - _eta_init) ** 2))
+        _alpha_init_mle = float(np.clip(1.0 / max(_resid2, 0.01), 0.5, 50.0))
 
         def _run_one_chain(chain_id, seed, progress_manager=None, chain_id_kw=None):
             chain_rng = np.random.default_rng(seed)

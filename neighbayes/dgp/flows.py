@@ -76,10 +76,12 @@ class _FlowFilter:
         self.separable = abs(self.r_w + self.r_d * self.r_o) <= 1e-12 * max(
             1.0, abs(self.r_w)
         )
+        from ..samplers._utils._spatial_normal import FACTORIZATION_ERRORS
+
         try:
             self._solve_o = spatial_filter_factor(self.W, self.r_o)
             self._solve_d = spatial_filter_factor(self.W, self.r_d)
-        except Exception as exc:
+        except FACTORIZATION_ERRORS as exc:
             raise ValueError(_singular_flow_message(letter, prefix)) from exc
 
     def _right_W(self, Y: np.ndarray) -> np.ndarray:
@@ -925,6 +927,9 @@ def generate_panel_negbin_flow_data(
     err_hetero: bool = False,
     gdf: object = None,
     knn_k: int = 4,
+    pair_effect_sd: float = 0.0,
+    time_effect_sd: float = 0.0,
+    fe_x_corr: float = 0.0,
 ) -> dict:
     r"""Generate panel NB2 flow counts from a spatial autoregressive DGP.
 
@@ -980,6 +985,18 @@ def generate_panel_negbin_flow_data(
     gdf : object, optional
         Accepted for API parity with other DGP functions; not used
         (pass *G* directly instead).
+    pair_effect_sd : float, default 0.0
+        Standard deviation of origin-destination pair effects ``c_od`` added
+        to the log-mean outside the filter, :math:`\eta_t = A^{-1}X_t\beta
+        + c + \tau_t`.  Zero (the default) gives the pooled DGP.
+    time_effect_sd : float, default 0.0
+        Standard deviation of the period effects ``τ_t`` (``τ_0 = 0``).
+    fe_x_corr : float, default 0.0
+        Correlation, in ``[0, 1)``, between the pair effects and the first
+        destination and origin attributes: each attribute gets a persistent
+        unit-level component of this weight, and ``c_od`` loads on the
+        persistent components of origin ``o`` and destination ``d``.  Makes a
+        pooled fit biased, so fixed-effects recovery tests have power.
 
     Returns
     -------
@@ -995,6 +1012,8 @@ def generate_panel_negbin_flow_data(
         - ``"beta_d"``, ``"beta_o"``: true coefficient vectors.
         - ``"alpha"``: true NB2 dispersion parameter.
         - ``"params_true"`` dict: nested dict of all true parameters.
+        - ``"pair_effect"`` (n²,), ``"time_effect"`` (T,): the fixed effects
+          (zeros when their sd is zero).
 
     Raises
     ------
@@ -1003,6 +1022,8 @@ def generate_panel_negbin_flow_data(
     """
     if alpha <= 0:
         raise ValueError("alpha must be strictly positive.")
+    if not 0.0 <= fe_x_corr < 1.0:
+        raise ValueError("fe_x_corr must lie in [0, 1).")
 
     from .utils import _resolve_flow_geometry
 
@@ -1025,10 +1046,31 @@ def generate_panel_negbin_flow_data(
     # Distance matrix (time-invariant)
     dist = pairwise_distance_matrix(gdf)
 
-    for _ in range(T):
+    # Fixed effects.  No extra random draws when every knob is zero, so the
+    # pooled DGP's stream (and every test pinned to it) is unchanged.
+    pair_effect = np.zeros(n * n)
+    time_effect = np.zeros(T)
+    u_d = u_o = None
+    if fe_x_corr > 0.0:
+        u_d = rng.standard_normal((n, k_d_val))
+        u_o = rng.standard_normal((n, k_o_val))
+    if pair_effect_sd > 0.0:
+        e_od = rng.standard_normal((n, n))
+        if u_d is not None:
+            common = (u_o[:, :1] + u_d[:, :1].T) / np.sqrt(2.0)
+            e_od = fe_x_corr * common + np.sqrt(1.0 - fe_x_corr**2) * e_od
+        pair_effect = pair_effect_sd * e_od.ravel()
+    if time_effect_sd > 0.0 and T > 1:
+        time_effect[1:] = time_effect_sd * rng.standard_normal(T - 1)
+
+    for t in range(T):
         # Generate fresh regional attributes each period
         Xd_raw = rng.standard_normal((n, k_d_val))
         Xo_raw = rng.standard_normal((n, k_o_val))
+        if u_d is not None:
+            keep = np.sqrt(1.0 - fe_x_corr**2)
+            Xd_raw = fe_x_corr * u_d + keep * Xd_raw
+            Xo_raw = fe_x_corr * u_o + keep * Xo_raw
 
         design = flow_design_matrix_with_orig(
             Xd_raw,
@@ -1047,7 +1089,7 @@ def generate_panel_negbin_flow_data(
         Xbeta = design.combined @ beta_full  # (N,)
 
         # Solve A eta = Xbeta  (reduced form: no sigma, no noise)
-        eta_t = solve_A(Xbeta)
+        eta_t = solve_A(Xbeta) + pair_effect + time_effect[t]
         lambda_t = np.exp(eta_t)
         p_nb = alpha / (alpha + lambda_t)
         y_t = rng.negative_binomial(alpha, p_nb).astype(np.int64)
@@ -1075,6 +1117,8 @@ def generate_panel_negbin_flow_data(
         "beta_o": beta_o_arr,
         "gamma_dist": gamma_dist,
         "alpha": float(alpha),
+        "pair_effect": pair_effect,
+        "time_effect": time_effect,
         "params_true": {
             "rho_d": rho_d,
             "rho_o": rho_o,
@@ -1217,6 +1261,234 @@ def generate_panel_negbin_flow_data_separable(
         rho_w=rho_w,
         **kwargs,
     )
+
+
+def generate_zinb_flow_data_separable(
+    n: int | None = None,
+    T: int = 1,
+    rho_d: float = 0.3,
+    rho_o: float = 0.2,
+    lam_d: float = 0.2,
+    lam_o: float = 0.1,
+    gamma: np.ndarray | None = None,
+    target_pi: float | None = None,
+    seed: int = 42,
+    **kwargs,
+) -> dict:
+    r"""Zero-inflated separable SAR flow counts, cross-section (``T=1``) or panel.
+
+    The count equation is :func:`generate_panel_negbin_flow_data_separable`
+    (its ``pair_effect_sd``, ``time_effect_sd`` and ``fe_x_corr`` included);
+    the selection equation uses the same flow design ``X``:
+
+    .. math::
+
+        \eta^{\mathrm{sel}}_t = (L_o^{\lambda} \otimes L_d^{\lambda})^{-1} X_t\gamma,
+        \qquad d \sim \mathrm{Bernoulli}(\mathrm{logit}^{-1}(\eta^{\mathrm{sel}})),
+        \qquad y = d \cdot y_{\mathrm{NB}},
+
+    with :math:`L_k^{\lambda} = I_n - \lambda_k W`.  Matches
+    :class:`~neighbayes.models.SARZINBFlowSeparable` and
+    :class:`~neighbayes.models.SARZINBFlowSeparablePanel`.
+
+    Parameters
+    ----------
+    lam_d, lam_o : float
+        Selection destination and origin dependence.
+    gamma : array-like, optional
+        Selection coefficients on the columns of ``X``.  Default: 0.5 on the
+        intercept, −0.5 on log distance, 0.4 on the destination and origin
+        attributes, 0 elsewhere.
+    target_pi : float, optional
+        Shift the selection intercept so the mean activation probability is
+        ``target_pi``.
+    n, T, rho_d, rho_o, seed, **kwargs
+        As for :func:`generate_panel_negbin_flow_data_separable`.
+
+    Returns
+    -------
+    dict
+        The NB flow output with ``y`` zero-inflated (``y_vec`` too when
+        ``T=1``), plus ``d``, ``eta_sel``, ``gamma``, ``lam_d`` and ``lam_o``.
+    """
+    out = generate_panel_negbin_flow_data_separable(
+        n=n, T=T, rho_d=rho_d, rho_o=rho_o, seed=seed, **kwargs
+    )
+    X, names = out["X"], list(out["col_names"])
+    if gamma is None:
+        gamma = np.zeros(X.shape[1])
+        for j, name in enumerate(names):
+            lname = name.lower()
+            if lname == "intercept":
+                gamma[j] = 0.5
+            elif "distance" in lname:
+                gamma[j] = -0.5
+            elif lname.startswith(("dest_", "orig_")):
+                gamma[j] = 0.4
+    gamma = np.asarray(gamma, dtype=float)
+    W = _graph_to_csr(out["G"])
+    nn = W.shape[0]
+    solve_d = spatial_filter_factor(W, lam_d)
+    solve_o = spatial_filter_factor(W, lam_o)
+
+    def filt(v):
+        B = np.asarray(v, dtype=float).reshape(T, nn, nn)
+        return np.stack(
+            [solve_d(np.asarray(solve_o(B[t])).T).T for t in range(T)]
+        ).ravel()
+
+    eta_sel = filt(X @ gamma)
+    if target_pi is not None:
+        # The shift moves the intercept inside the filter, so η moves by
+        # shift·A⁻¹1, not by shift.
+        icpt = [j for j, nm in enumerate(names) if nm.lower() == "intercept"]
+        if not icpt:
+            raise ValueError("target_pi needs an 'intercept' column in X")
+        a0 = filt(X[:, icpt[0]])
+        lo, hi = -50.0, 50.0
+        for _ in range(60):
+            mid = 0.5 * (lo + hi)
+            if np.mean(1.0 / (1.0 + np.exp(-(eta_sel + mid * a0)))) < target_pi:
+                lo = mid
+            else:
+                hi = mid
+        shift = 0.5 * (lo + hi)
+        eta_sel = eta_sel + shift * a0
+        gamma = gamma.copy()
+        gamma[icpt[0]] += shift
+    rng = np.random.default_rng(seed + 7919)
+    d = rng.binomial(1, 1.0 / (1.0 + np.exp(-eta_sel)))
+    out["y"] = (out["y"] * d).astype(np.int64)
+    if T == 1:
+        out["y_vec"] = out["y"]
+    out.update(d=d, eta_sel=eta_sel, gamma=gamma, lam_d=lam_d, lam_o=lam_o)
+    out["params_true"].update(gamma=gamma, lam_d=lam_d, lam_o=lam_o)
+    return out
+
+
+def generate_hurdle_flow_data_separable(
+    n: int | None = None,
+    T: int = 1,
+    rho_d: float = 0.3,
+    rho_o: float = 0.2,
+    lam_d: float = 0.2,
+    lam_o: float = 0.1,
+    gamma: np.ndarray | None = None,
+    target_pi: float | None = None,
+    sel_pair_effect_sd: float = 0.0,
+    sel_time_effect_sd: float = 0.0,
+    seed: int = 42,
+    **kwargs,
+) -> dict:
+    r"""Separable SAR hurdle NB flows, cross-section (``T=1``) or panel.
+
+    The count half's log-mean is that of
+    :func:`generate_panel_negbin_flow_data_separable` (its ``pair_effect_sd``,
+    ``time_effect_sd`` and ``fe_x_corr`` included), truncated at zero; the
+    binary half uses the same flow design ``X``:
+
+    .. math::
+
+        \eta^{\mathrm{b}}_t = (L_o^{\lambda} \otimes L_d^{\lambda})^{-1} X_t\gamma
+        + \tau^{\mathrm{b}}_t + C^{\mathrm{b}},
+        \qquad d \sim \mathrm{Bernoulli}(\mathrm{logit}^{-1}(\eta^{\mathrm{b}})),
+        \qquad y = d \cdot \mathrm{tNB}(\mu, \alpha).
+
+    Matches :class:`~neighbayes.models.SARHurdleNBFlowSeparable` and
+    :class:`~neighbayes.models.SARHurdleNBFlowSeparablePanel`.
+
+    Parameters
+    ----------
+    lam_d, lam_o : float
+        Binary destination and origin dependence.
+    gamma : array-like, optional
+        Binary coefficients on the columns of ``X``; default as
+        :func:`generate_zinb_flow_data_separable`.
+    target_pi : float, optional
+        Shift the binary intercept (inside the filter) so ``mean P(y > 0)`` is
+        ``target_pi``.
+    sel_pair_effect_sd, sel_time_effect_sd : float, default 0.0
+        Standard deviations of the binary pair effects ``C^b`` and period
+        effects ``τ^b`` (``τ^b_0 = 0``).
+    n, T, rho_d, rho_o, seed, **kwargs
+        As for :func:`generate_panel_negbin_flow_data_separable`.
+
+    Returns
+    -------
+    dict
+        The NB flow output with ``y`` replaced by the hurdle counts (``y_vec``
+        too when ``T=1``), plus ``d``, ``eta_bin``, ``gamma``, ``lam_d``,
+        ``lam_o``, ``sel_pair_effect`` and ``sel_time_effect``.
+    """
+    from .hurdle import _intercept_shift, truncated_negative_binomial
+
+    out = generate_panel_negbin_flow_data_separable(
+        n=n, T=T, rho_d=rho_d, rho_o=rho_o, seed=seed, **kwargs
+    )
+    X, names = out["X"], list(out["col_names"])
+    if gamma is None:
+        gamma = np.zeros(X.shape[1])
+        for j, name in enumerate(names):
+            lname = name.lower()
+            if lname == "intercept":
+                gamma[j] = 0.5
+            elif "distance" in lname:
+                gamma[j] = -0.5
+            elif lname.startswith(("dest_", "orig_")):
+                gamma[j] = 0.4
+    gamma = np.asarray(gamma, dtype=float)
+    W = _graph_to_csr(out["G"])
+    nn = W.shape[0]
+    solve_d = spatial_filter_factor(W, lam_d)
+    solve_o = spatial_filter_factor(W, lam_o)
+
+    def filt(v):
+        B = np.asarray(v, dtype=float).reshape(T, nn, nn)
+        return np.stack(
+            [solve_d(np.asarray(solve_o(B[t])).T).T for t in range(T)]
+        ).ravel()
+
+    rng = np.random.default_rng(seed + 7919)
+    sel_pair = sel_pair_effect_sd * rng.standard_normal(nn * nn)
+    sel_time = np.zeros(T)
+    if T > 1:
+        sel_time[1:] = sel_time_effect_sd * rng.standard_normal(T - 1)
+    eta_bin = filt(X @ gamma) + np.tile(sel_pair, T) + np.repeat(sel_time, nn * nn)
+    if target_pi is not None:
+        icpt = [j for j, nm in enumerate(names) if nm.lower() == "intercept"]
+        if not icpt:
+            raise ValueError("target_pi needs an 'intercept' column in X")
+        a0 = filt(X[:, icpt[0]])
+        shift = _intercept_shift(eta_bin, a0, float(target_pi))
+        eta_bin = eta_bin + shift * a0
+        gamma = gamma.copy()
+        gamma[icpt[0]] += shift
+    d = rng.binomial(1, 1.0 / (1.0 + np.exp(-eta_bin)))
+    y = np.zeros(d.size, dtype=np.int64)
+    pos = d == 1
+    alpha = float(out["params_true"]["alpha"])
+    if pos.any():
+        y[pos] = truncated_negative_binomial(rng, out["lambda"][pos], alpha)
+    out["y"] = y
+    if T == 1:
+        out["y_vec"] = y
+    out.update(
+        d=d,
+        eta_bin=eta_bin,
+        gamma=gamma,
+        lam_d=lam_d,
+        lam_o=lam_o,
+        sel_pair_effect=sel_pair,
+        sel_time_effect=sel_time,
+    )
+    out["params_true"].update(
+        gamma=gamma,
+        lam_d=lam_d,
+        lam_o=lam_o,
+        sel_pair_effect=sel_pair,
+        sel_time_effect=sel_time,
+    )
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -1597,11 +1869,15 @@ def generate_poisson_flow_data(
         Target mean of the simulated counts.
     signal : float, default 0.3
         Magnitude of the regression coefficients, which sets the spread of
-        ``eta``.  The default gives ``sd(eta) ~ 1`` and roughly 5-10% zeros —
-        realistic gravity data.  Raising it past ~0.5 produces the very
-        heavy-tailed, mostly-zero designs on which *no* flow sampler in this
-        package recovers (``sd(eta) ~ 3``, 60-70% zeros); those are a bad
-        test bed, not a hard one.
+        ``eta``.  The default gives ``sd(eta) ~ 1`` and roughly 5-10% zeros.
+        Larger values give heavy-tailed designs with many zeros
+        (``signal=0.9``: ``sd(eta) ~ 3``, 40-50% zeros, counts in the
+        hundreds), which the Poisson flow samplers recover.  An earlier note
+        here said they could not; that was the last-arrival augmentation bug
+        fixed on 2026-10-03, which biased large counts.  Sparsity itself is
+        not the obstacle: what limits ρ is the total information, so a
+        low ``mean_count`` on a small ``n`` gives a correct but wide
+        posterior (Gibbs matches NUTS there).
     seed : int, default 42
         Random seed.
     **kwargs

@@ -188,110 +188,60 @@ def _with_shift(logdet_vec_fn, shift: float):
     )
 
 
-def _make_gaussian_gibbs_step(
-    y_jax,
-    X_jax,
-    Wy_jax,
-    WX_jax,
+def _gaussian_data(y, X, Wy, W_sparse, priors, is_sar):
+    """The Gaussian step's ``data``: every data-dependent array and scalar."""
+    import jax.numpy as jnp
+
+    k = X.shape[1]
+    Wy_np = (
+        np.asarray(W_sparse @ np.asarray(y, dtype=np.float64))
+        if Wy is None
+        else np.asarray(Wy, dtype=np.float64)
+    )
+    c = _precompute_gibbs_constants(
+        y=y, X=X, Wy=Wy_np, W_sparse=W_sparse, is_sar=is_sar
+    )
+    c.update(
+        y_jax=jnp.asarray(y, dtype=jnp.float64),
+        X_jax=jnp.asarray(X, dtype=jnp.float64),
+        XtX_jax=jnp.asarray(np.asarray(X).T @ np.asarray(X), dtype=jnp.float64),
+        beta_mu=jnp.broadcast_to(jnp.asarray(priors.beta_mu, dtype=jnp.float64), (k,)),
+        beta_sigma2=jnp.broadcast_to(
+            jnp.asarray(priors.beta_sigma, dtype=jnp.float64) ** 2, (k,)
+        ),
+        sigma2_alpha=jnp.float64(priors.sigma2_alpha),
+        sigma2_beta=jnp.float64(priors.sigma2_beta),
+    )
+    return c
+
+
+def _make_gaussian_step_core(
     n,
     k,
-    logdet_jax,
-    XtX_jax,
-    # Precomputed ρ-independent inner products (closure constants)
-    yty,
-    yTWy,
-    WyTWy,
-    XTy,
-    XTWy,
-    WXTy,
-    WXTWy,
-    XtWX,
-    WXtWX,
-    priors,
+    *,
     model_type: str,
-    logdet_param_fn=None,
+    logdet_param_fn,
     nu: float | None = None,
     n_eff: int | None = None,
     jacobian_shift: float = 0.0,
 ):
-    """Build a JIT-compiled Gaussian Gibbs step with data bound into the closure.
+    """The Gaussian Gibbs step, closing over static settings only.
 
-    ``n_eff`` (default ``n``) is the number of independent observations the
-    σ² draw counts, and ``jacobian_shift`` the coefficient m of the
-    ``-m·log(1 - ρ)`` time-effects Jacobian term; both are for fixed-effects
-    panels (Lee & Yu 2010).
-
-    Creates a ``@eqx.filter_jit``-compiled function that performs one
-    complete 3-block Gibbs sweep (β, σ², ρ/λ) in a single XLA kernel
-    call, eliminating all Python→JAX dispatch overhead.
-
-    The ρ/λ update is Neal (2003) slice sampling with persistent-interval
-    reuse: it explores the full conditional thoroughly and every step
-    accepts (no Metropolis correction).
-
-    Parameters
-    ----------
-    y_jax : jax.numpy.ndarray of shape (n,)
-        Response vector (JAX array).
-    X_jax : jax.numpy.ndarray of shape (n, k)
-        Design matrix (JAX array).
-    Wy_jax : jax.numpy.ndarray of shape (n,) or None
-        W @ y (precomputed, for SAR/SDM).  None for SEM/SDEM.
-    W_dense_jax : jax.numpy.ndarray of shape (n, n) or None
-        Dense W matrix (for SEM/SDEM residual filtering).  None for
-        SAR/SDM.
-    n : int
-        Number of spatial units.
-    k : int
-        Number of regression coefficients.
-    logdet_jax : callable
-        JAX-native function ``(rho) -> jax.numpy.ndarray`` computing
-        log|I - rho*W|.
-    XtX_jax : jax.numpy.ndarray of shape (k, k)
-        Precomputed X^T X.
-    priors : GaussianGibbsPriors
-        Prior hyperparameters.
-    model_type : str
-        One of "sar", "sem", "sdm", "sdem".
-    nu : float or None, default None
-        Student-t degrees of freedom for robust errors.  When set, each sweep
-        first draws the scale-mixture variances ``v`` and weights every
-        cross-product by ``1/v``; ``None`` gives Gaussian errors.
-
-    Returns
-    -------
-    gibbs_step : callable
-        A JIT-compiled function with signature::
-
-            gibbs_step(state, key) -> (new_state, accept)
-
-        where ``state`` is a ``JAXGaussianGibbsState`` and ``key`` is a
-        JAX PRNG key.  ``accept`` is always ``True`` (slice sampling has
-        no rejection step); it is retained so callers can accumulate a
-        (trivially unit) acceptance rate.
+    ``gibbs_step(state, key, data) -> (new_state, accept)`` with ``data`` from
+    :func:`_gaussian_data`, so one compiled program serves every fit of the
+    same structure.  The log-determinant is ``logdet_param_fn(ρ,
+    state.logdet_params)``: its parameters ride in the state, which also lets a
+    warmup refit replace them without a retrace.
     """
     import equinox as eqx
     import jax
     import jax.numpy as jnp
 
-    ensure_x64()
     n_obs = n if n_eff is None else int(n_eff)
-
     is_sar = model_type in ("sar", "sdm")
 
-    # Convert constants to JAX arrays
-    beta_mu_jax = jnp.broadcast_to(jnp.asarray(priors.beta_mu, dtype=jnp.float64), (k,))
-    beta_sigma2_jax = jnp.broadcast_to(
-        jnp.asarray(priors.beta_sigma, dtype=jnp.float64) ** 2, (k,)
-    )
-    sigma2_alpha_jax = jnp.float64(priors.sigma2_alpha)
-    sigma2_beta_jax = jnp.float64(priors.sigma2_beta)
-
-    # Prior precision for beta
-    beta_prior_prec = jnp.diag(1.0 / beta_sigma2_jax)
-
     @eqx.filter_jit
-    def gibbs_step(state, key):
+    def gibbs_step(state, key, data):
         """One partially collapsed Gibbs sweep: σ² → ρ/λ (slice) → β.
 
         Parameters
@@ -309,19 +259,22 @@ def _make_gaussian_gibbs_step(
             Always ``True`` (slice sampling has no rejection step).
         """
         rho = state.rho  # holds λ for SEM/SDEM
+        y_jax, X_jax, XtX_jax = data["y_jax"], data["X_jax"], data["XtX_jax"]
+        Wy_jax, WX_jax = data["Wy_jax"], data["WX_jax"]
+        yty, yTWy, WyTWy = data["yty"], data["yTWy"], data["WyTWy"]
+        XTy, XTWy, WXTy, WXTWy = data["XTy"], data["XTWy"], data["WXTy"], data["WXTWy"]
+        XtWX, WXtWX = data["XtWX"], data["WXtWX"]
+        beta_mu_jax, beta_sigma2_jax = data["beta_mu"], data["beta_sigma2"]
+        beta_prior_prec = jnp.diag(1.0 / beta_sigma2_jax)
+        sigma2_alpha_jax, sigma2_beta_jax = data["sigma2_alpha"], data["sigma2_beta"]
 
         # The interpolant and the ρ support are read from the state, so a
         # warmup refit can swap them between scan phases without a retrace.
-        # With no parameterized evaluator the state carries the prior bounds
-        # and ``logdet_params is None``, and this reduces to the closure form.
         rho_lo = state.rho_lo
         rho_hi = state.rho_hi
-        if logdet_param_fn is None:
-            _logdet_base = logdet_jax
-        else:
 
-            def _logdet_base(param_val):
-                return logdet_param_fn(param_val, state.logdet_params)
+        def _logdet_base(param_val):
+            return logdet_param_fn(param_val, state.logdet_params)
 
         if jacobian_shift:
 
@@ -475,6 +428,103 @@ def _make_gaussian_gibbs_step(
         return new_state, accept
 
     return gibbs_step
+
+
+def _make_gaussian_gibbs_step(
+    y_jax, X_jax, Wy_jax, WX_jax, n, k, logdet_jax, XtX_jax,
+    yty, yTWy, WyTWy, XTy, XTWy, WXTy, WXTWy, XtWX, WXtWX,
+    priors, model_type: str, logdet_param_fn=None, nu: float | None = None,
+    n_eff: int | None = None, jacobian_shift: float = 0.0,
+):  # fmt: skip
+    """A Gaussian Gibbs step with this model's data bound in.
+
+    ``gibbs_step(state, key) -> (new_state, accept)``: the core step
+    (:func:`_make_gaussian_step_core`) with its ``data`` fixed, for
+    single-chain use and tests.  Without ``logdet_param_fn`` it evaluates the
+    closure ``logdet_jax`` and ignores ``state.logdet_params``.
+    """
+    import jax.numpy as jnp
+
+    ensure_x64()
+    data = {
+        "y_jax": y_jax, "X_jax": X_jax, "XtX_jax": XtX_jax,
+        "Wy_jax": Wy_jax, "WX_jax": WX_jax,
+        "yty": yty, "yTWy": yTWy, "WyTWy": WyTWy, "XTy": XTy, "XTWy": XTWy,
+        "WXTy": WXTy, "WXTWy": WXTWy, "XtWX": XtWX, "WXtWX": WXtWX,
+        "beta_mu": jnp.broadcast_to(jnp.asarray(priors.beta_mu, dtype=jnp.float64), (k,)),
+        "beta_sigma2": jnp.broadcast_to(
+            jnp.asarray(priors.beta_sigma, dtype=jnp.float64) ** 2, (k,)
+        ),
+        "sigma2_alpha": jnp.float64(priors.sigma2_alpha),
+        "sigma2_beta": jnp.float64(priors.sigma2_beta),
+    }  # fmt: skip
+    if logdet_param_fn is None:
+
+        def logdet_param_fn(rho, _params):
+            return logdet_jax(rho)
+
+    core = _make_gaussian_step_core(
+        n, k, model_type=model_type, logdet_param_fn=logdet_param_fn, nu=nu,
+        n_eff=n_eff, jacobian_shift=jacobian_shift,
+    )  # fmt: skip
+
+    def gibbs_step(state, key):
+        return core(state, key, data)
+
+    return gibbs_step
+
+
+#: Sweeps per compiled vmapped chunk (fixed, so a refit of any length reuses it).
+_GAUSSIAN_CHUNK = 128
+
+
+def _gaussian_programs(static_key, build_core):
+    """``(core, chunk)`` for one structure: the step and its vmapped chunk program.
+
+    ``chunk(states, keys, n_active, data)`` runs ``_GAUSSIAN_CHUNK`` scan
+    iterations per chain, of which the first ``n_active`` sweep and the rest
+    hold — so warmup, draws and a short last chunk share one compiled program,
+    and the chain's key splits once per active sweep, wherever chunks end.
+    """
+    from .._utils._jax_utils import cached_sweep
+
+    def _build():
+        import jax
+        import jax.numpy as jnp
+
+        core = build_core()
+
+        def _masked_scan(state, key, n_active, data):
+            def body(carry, i):
+                st, kk = carry
+
+                def _run(_):
+                    kk_next, sk = jax.random.split(kk)
+                    st_next, _ = core(st, sk, data)
+                    return (st_next, kk_next), (
+                        st_next.rho,
+                        st_next.beta,
+                        st_next.sigma2,
+                    )
+
+                def _hold(_):
+                    return (st, kk), (st.rho, st.beta, st.sigma2)
+
+                return jax.lax.cond(i < n_active, _run, _hold, None)
+
+            (state, key), traces = jax.lax.scan(
+                body, (state, key), jnp.arange(_GAUSSIAN_CHUNK)
+            )
+            return (state, key, *traces)
+
+        chunk = jax.jit(
+            lambda s, k, n_active, data: jax.vmap(
+                lambda s_, k_: _masked_scan(s_, k_, n_active, data)
+            )(s, k)
+        )
+        return core, chunk
+
+    return cached_sweep(("gaussian", *static_key), _build)
 
 
 # ---------------------------------------------------------------------------
@@ -834,8 +884,16 @@ def run_chains_jax_gibbs_vectorized(
     nu: float | None = None,
     n_eff: int | None = None,
     jacobian_shift: float = 0.0,
+    logdet_kind_params=None,
 ) -> list[dict]:
     """Run multiple JAX Gibbs chains via ``jax.vmap``.
+
+    The step and its vmapped chunk program are compiled once per model
+    structure and reused by later fits (:func:`_gaussian_programs`).  For that,
+    the log-determinant must arrive as parameters: ``logdet_param_fn`` with
+    ``logdet_params`` (the warmup-refit path) or ``logdet_kind_params =
+    (kind, params, T)`` from :func:`neighbayes._logdet._jax.logdet_jax_params`.
+    With only the closure ``logdet_jax`` the program is compiled per fit.
 
     All chains run in parallel on a single device via vectorized
     map.  This avoids Python multiprocessing entirely and is the
@@ -900,44 +958,34 @@ def run_chains_jax_gibbs_vectorized(
     if slice_width is None:
         slice_width = rho_range * 0.1
 
-    # Convert data to JAX arrays
-    y_jax = jnp.asarray(y, dtype=jnp.float64)
-    X_jax = jnp.asarray(X, dtype=jnp.float64)
-    XtX_jax = jnp.asarray(X.T @ X, dtype=jnp.float64)
+    data = _gaussian_data(y, X, Wy, W_sparse, priors, is_sar)
+    if logdet_param_fn is None:
+        if logdet_kind_params is not None:
+            from ..._logdet._jax import logdet_param_evaluator
 
-    if Wy is None:
-        Wy_np = np.asarray(W_sparse @ np.asarray(y, dtype=np.float64))
-    else:
-        Wy_np = np.asarray(Wy, dtype=np.float64)
-    _consts = _precompute_gibbs_constants(
-        y=y, X=X, Wy=Wy_np, W_sparse=W_sparse, is_sar=is_sar
-    )
+            kind, params, T_ld = logdet_kind_params
+            logdet_param_fn = logdet_param_evaluator(kind, int(T_ld))
+            logdet_params = params
+        else:
+            closure = logdet_jax
 
-    # Build the JIT-compiled step function (shared across all chains)
-    gibbs_step = _make_gaussian_gibbs_step(
-        y_jax=y_jax,
-        X_jax=X_jax,
-        Wy_jax=_consts["Wy_jax"],
-        WX_jax=_consts["WX_jax"],
-        n=n,
-        k=k,
-        logdet_jax=logdet_jax,
-        XtX_jax=XtX_jax,
-        yty=_consts["yty"],
-        yTWy=_consts["yTWy"],
-        WyTWy=_consts["WyTWy"],
-        XTy=_consts["XTy"],
-        XTWy=_consts["XTWy"],
-        WXTy=_consts["WXTy"],
-        WXTWy=_consts["WXTWy"],
-        XtWX=_consts["XtWX"],
-        WXtWX=_consts["WXtWX"],
-        priors=priors,
-        model_type=model_type,
-        logdet_param_fn=logdet_param_fn,
-        nu=nu,
-        n_eff=n_eff,
-        jacobian_shift=jacobian_shift,
+            def logdet_param_fn(rho, _params):
+                return closure(rho)
+
+            logdet_params = None
+
+    static_key = (n, k, model_type, logdet_param_fn, nu, n_eff, float(jacobian_shift))
+    _, chunk = _gaussian_programs(
+        static_key,
+        lambda: _make_gaussian_step_core(
+            n,
+            k,
+            model_type=model_type,
+            logdet_param_fn=logdet_param_fn,
+            nu=nu,
+            n_eff=n_eff,
+            jacobian_shift=jacobian_shift,
+        ),  # fmt: skip
     )
 
     # Convert NumPy initial states to JAX states, then batch into a
@@ -979,140 +1027,95 @@ def run_chains_jax_gibbs_vectorized(
             for c in range(chains):
                 pm.start_chain(c)
 
-        # Chunk both phases into ~20 segments so the progress bar
-        # advances smoothly and Python regains control between
-        # segments.  Chunk sizes are Python constants so each kernel
-        # JIT-compiles once and is reused across chunks.
-        warmup_chunk = max(1, tune // 20) if tune > 0 else 1
-        draws_chunk = max(1, draws // 20) if draws > 0 else 1
+        # ── Phase 1: warmup, in fixed-length compiled chunks ──
+        state = init_states
+        chunk_keys = keys
+        # The warmup Jacobian refit happens at exactly tune // 2; ρ before it
+        # is kept (iterations × chains) only when the refit will consume it.
+        refit_at = tune // 2 if (refit_hook is not None and tune > 0) else None
+        warm_rho: list[np.ndarray] = []
+        iter_done = 0
+        while iter_done < tune:
+            stop = refit_at if (refit_at is not None and iter_done < refit_at) else tune
+            n_active = min(_GAUSSIAN_CHUNK, stop - iter_done)
+            state, chunk_keys, rhos_w, _, _ = chunk(state, chunk_keys, n_active, data)
+            jax.block_until_ready(state.rho)
+            if refit_at is not None:
+                warm_rho.append(np.asarray(rhos_w)[:, :n_active].T)
+            iter_done += n_active
+            if pm is not None:
+                for c in range(chains):
+                    pm.update(c, iter_done - 1, tuning=True)
 
-        # ── Phase 1: Warmup via vmap (chunked) ──
-        if tune > 0:
-            warmup_keys = keys
+            # ── Warmup Jacobian refit ──
+            # Rebuild the interpolant on the ρ range the chains found, then
+            # substitute it into the state.  Because the interpolant and the
+            # ρ support are traced state rather than closure constants, and
+            # the new arrays are zero-padded to the same capacity, the
+            # compiled program is reused — no retrace.  Everything after this
+            # point, including the rest of warmup, runs under the refit
+            # interpolant, so the kernel is frozen well before the first
+            # retained draw.
+            if refit_at is not None and iter_done >= refit_at:
+                pooled = np.concatenate(warm_rho, axis=0)  # (iters, chains)
+                # Chains start at ρ = 0; the early transient would stretch
+                # the window back to the initial value, so use the tail.
+                pooled = pooled[len(pooled) // 2 :].ravel()
+                refit = refit_hook(pooled)
+                refit_at = None
+                warm_rho = []
+                if refit is not None:
+                    new_params, lo, hi = refit
+                    import equinox as eqx
 
-            def _warmup_chunk(state, key, n):
-                return _run_chain_jax_gibbs_scanned(gibbs_step, state, key, n)
+                    bcast = jax.tree.map(
+                        lambda a: jnp.broadcast_to(a, (chains, *jnp.shape(a))),
+                        new_params,
+                    )
+                    lo_b = jnp.full((chains,), lo, dtype=jnp.float64)
+                    hi_b = jnp.full((chains,), hi, dtype=jnp.float64)
+                    state = eqx.tree_at(
+                        lambda st: (
+                            st.rho,
+                            st.logdet_params,
+                            st.rho_lo,
+                            st.rho_hi,
+                            st.slice_w,
+                            st.slice_L,
+                            st.slice_R,
+                        ),
+                        state,
+                        (
+                            # A chain may have stepped outside the window in
+                            # the chunk after the draws that defined it.
+                            jnp.clip(state.rho, lo_b, hi_b),
+                            bcast,
+                            lo_b,
+                            hi_b,
+                            # Rescale the slice width and reset the
+                            # persistent interval to the new, much narrower
+                            # support.
+                            jnp.full((chains,), (hi - lo) * 0.1, jnp.float64),
+                            lo_b,
+                            hi_b,
+                        ),
+                    )
 
-            warmup_vmap = jax.jit(
-                lambda s, k: jax.vmap(
-                    lambda s_, k_: _warmup_chunk(s_, k_, warmup_chunk)
-                )(s, k)
-            )
-
-            state = init_states
-            chunk_keys = warmup_keys
-            iter_done = 0
-            # Warmup ρ, kept only when a refit will consume it.
-            refit_at = tune // 2 if refit_hook is not None else None
-            warm_rho: list[np.ndarray] = []
-            while iter_done < tune:
-                step = min(warmup_chunk, tune - iter_done)
-                if step == warmup_chunk:
-                    state, chunk_keys, rhos_w, _, _, _ = warmup_vmap(state, chunk_keys)
-                else:
-                    state, chunk_keys, rhos_w, _, _, _ = jax.vmap(
-                        lambda s_, k_: _warmup_chunk(s_, k_, step)
-                    )(state, chunk_keys)
-                jax.block_until_ready(state.rho)
-                if refit_at is not None:
-                    warm_rho.append(np.asarray(rhos_w))
-                iter_done += step
-                if pm is not None:
-                    for c in range(chains):
-                        pm.update(c, iter_done - 1, tuning=True)
-
-                # ── Warmup Jacobian refit ──
-                # Rebuild the interpolant on the ρ range the chains found, then
-                # substitute it into the state.  Because the interpolant and the
-                # ρ support are traced state rather than closure constants, and
-                # the new arrays are zero-padded to the same capacity, the
-                # compiled step is reused — no retrace.  Everything after this
-                # point, including the rest of warmup, runs under the refit
-                # interpolant, so the kernel is frozen well before the first
-                # retained draw.
-                if refit_at is not None and iter_done >= refit_at:
-                    pooled = np.concatenate(warm_rho, axis=0)  # (iters, chains)
-                    # Chains start at ρ = 0; the early transient would stretch
-                    # the window back to the initial value, so use the tail.
-                    pooled = pooled[len(pooled) // 2 :].ravel()
-                    refit = refit_hook(pooled)
-                    refit_at = None
-                    warm_rho = []
-                    if refit is not None:
-                        new_params, lo, hi = refit
-                        import equinox as eqx
-
-                        bcast = jax.tree.map(
-                            lambda a: jnp.broadcast_to(a, (chains, *jnp.shape(a))),
-                            new_params,
-                        )
-                        lo_b = jnp.full((chains,), lo, dtype=jnp.float64)
-                        hi_b = jnp.full((chains,), hi, dtype=jnp.float64)
-                        state = eqx.tree_at(
-                            lambda st: (
-                                st.rho,
-                                st.logdet_params,
-                                st.rho_lo,
-                                st.rho_hi,
-                                st.slice_w,
-                                st.slice_L,
-                                st.slice_R,
-                            ),
-                            state,
-                            (
-                                # A chain may have stepped outside the window in
-                                # the chunk after the draws that defined it.
-                                jnp.clip(state.rho, lo_b, hi_b),
-                                bcast,
-                                lo_b,
-                                hi_b,
-                                # Rescale the slice width and reset the
-                                # persistent interval to the new, much narrower
-                                # support.
-                                jnp.full((chains,), (hi - lo) * 0.1, jnp.float64),
-                                lo_b,
-                                hi_b,
-                            ),
-                        )
-
-            final_states = state
-        else:
-            final_states = init_states
-
-        # ── Phase 2: Post-warmup draws via vmap (chunked) ──
-        draw_keys = jax.random.split(jax.random.fold_in(master_key, 1), chains)
-
-        def _draws_chunk(state, key, n):
-            return _run_chain_jax_gibbs_scanned(gibbs_step, state, key, n)
-
-        draws_vmap = jax.jit(
-            lambda s, k: jax.vmap(lambda s_, k_: _draws_chunk(s_, k_, draws_chunk))(
-                s, k
-            )
-        )
-
-        state = final_states
-        chunk_keys = draw_keys
+        # ── Phase 2: post-warmup draws, same compiled program ──
+        chunk_keys = jax.random.split(jax.random.fold_in(master_key, 1), chains)
         rho_chunks: list[np.ndarray] = []
         beta_chunks: list[np.ndarray] = []
         sigma2_chunks: list[np.ndarray] = []
-        draw_accept_sum = jnp.zeros(chains, dtype=jnp.float64)
         iter_done = 0
         while iter_done < draws:
-            step = min(draws_chunk, draws - iter_done)
-            if step == draws_chunk:
-                state, chunk_keys, rhos_c, betas_c, sigma2s_c, chunk_rate = draws_vmap(
-                    state, chunk_keys
-                )
-            else:
-                state, chunk_keys, rhos_c, betas_c, sigma2s_c, chunk_rate = jax.vmap(
-                    lambda s_, k_: _draws_chunk(s_, k_, step)
-                )(state, chunk_keys)
-            rho_chunks.append(np.asarray(rhos_c))
-            beta_chunks.append(np.asarray(betas_c))
-            sigma2_chunks.append(np.asarray(sigma2s_c))
-            draw_accept_sum = draw_accept_sum + chunk_rate * jnp.float64(step)
-            iter_done += step
+            n_active = min(_GAUSSIAN_CHUNK, draws - iter_done)
+            state, chunk_keys, rhos_c, betas_c, sigma2s_c = chunk(
+                state, chunk_keys, n_active, data
+            )
+            rho_chunks.append(np.asarray(rhos_c)[:, :n_active])
+            beta_chunks.append(np.asarray(betas_c)[:, :n_active])
+            sigma2_chunks.append(np.asarray(sigma2s_c)[:, :n_active])
+            iter_done += n_active
             if pm is not None:
                 for c in range(chains):
                     pm.update(c, tune + iter_done - 1, tuning=False)
@@ -1120,7 +1123,8 @@ def run_chains_jax_gibbs_vectorized(
         rhos = np.concatenate(rho_chunks, axis=1)
         betas = np.concatenate(beta_chunks, axis=1)
         sigma2s = np.concatenate(sigma2_chunks, axis=1)
-        accept_rates = draw_accept_sum / jnp.float64(draws)
+        # Slice sampling never rejects.
+        accept_rates = np.ones(chains)
 
         if pm is not None:
             pm.refresh()

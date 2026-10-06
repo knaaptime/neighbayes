@@ -517,7 +517,6 @@ def _run_gaussian_gibbs(
     progressbar,
     backend,
     slice_width=None,
-    chain_method=None,
     log_likelihood=False,
 ):
     """Registry runner for Gaussian Gibbs (cross-section and panel FE).
@@ -538,7 +537,6 @@ def _run_gaussian_gibbs(
         progressbar=progressbar,
         gibbs_method=backend,
         slice_width=slice_width,
-        chain_method=chain_method,
         log_likelihood=log_likelihood,
     )
 
@@ -549,7 +547,7 @@ for _structure in ("cross_section", "panel_fe"):
         _structure,
         run=_run_gaussian_gibbs,
         backends={"jax", "numpy"},
-        options={"slice_width", "chain_method"},
+        options={"slice_width"},
         supports_robust=True,
         skips_log_likelihood=True,
     )

@@ -1154,7 +1154,7 @@ def _run_gaussian_re(
 
     Thin adapter over the per-class ``_fit_gibbs`` (SAR/SEM RE own their own
     5-block sampler).  RE Gibbs is NumPy-only — there is no JAX kernel and no
-    ``slice_width``/``chain_method`` options — so ``backend`` is always
+    ``slice_width`` option — so ``backend`` is always
     ``"numpy"`` and no family options are threaded.
     """
     return model._fit_gibbs(
