@@ -998,6 +998,9 @@ class SARFlowSeparable(FlowModel):
     priors on the individual :math:`\rho` components.
     """
 
+    # A = L_o ⊗ L_d: log|A| has the closed form n f(ρ_d) + n f(ρ_o).
+    _separable_filter = True
+
     def __init__(self, y, X, W, **kwargs):
         method = kwargs.pop("logdet_method", None)
         _VALID = {"eigenvalue", "chebyshev", "cheb_cholesky", "aaa", "cheb_stochastic"}
