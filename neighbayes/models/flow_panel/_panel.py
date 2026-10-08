@@ -1756,6 +1756,7 @@ class SARNegBinFlowSeparablePanel(_SeparableCountFlowPanel, SARFlowSeparablePane
         n_jobs: int = -1,
         idata_kwargs: Optional[dict] = None,
         store_group_effects: Optional[bool] = None,
+        cell_mask: Optional[np.ndarray] = None,
         **sample_kwargs,
     ) -> xr.DataTree:
         """Sample the separable NB2 SAR flow panel posterior.
@@ -1775,6 +1776,19 @@ class SARNegBinFlowSeparablePanel(_SeparableCountFlowPanel, SARFlowSeparablePane
         out the pair and period effects, on either backend (see the class
         docstring).
 
+        ``cell_mask`` (Gibbs effects path only) masks cells out of the count
+        likelihood: a bool array of live cells shaped ``(T, n, n)``,
+        ``(T·n·n,)`` or ``(n, n)`` (broadcast over periods).  Masked cells are
+        drawn-then-discarded — their Pólya–Gamma variates keep the random
+        stream mask-invariant — and pairs whose every period is masked stay
+        prior-only and drop out of the learned pair-sd deviance, so masking
+        the intraregional diagonal leaves the posterior of every other cell
+        bit-identical.  The default priors are data-derived, so under a mask
+        they re-derive from the live cells alone (the Gelman intercept
+        centring and the effect levels use ``log mean(y_live)``); explicit
+        ``beta_mu``/``group_effect_mu``/``time_effect_mu`` overrides pass
+        through untouched.  Raises on the pooled or NUTS paths.
+
         ``idata_kwargs={"log_likelihood": True}`` stores the pointwise
         log-likelihood (one value per draw, chain, and flow-period) for
         ``az.loo`` on either sampler; off by default, as in PyMC.
@@ -1793,8 +1807,14 @@ class SARNegBinFlowSeparablePanel(_SeparableCountFlowPanel, SARFlowSeparablePane
                     n_jobs=n_jobs,
                     log_likelihood=log_lik,
                     store_group_effects=store_group_effects,
+                    cell_mask=cell_mask,
                 )
             else:
+                if cell_mask is not None:
+                    raise ValueError(
+                        "cell_mask is supported by the effects Gibbs path; "
+                        "fit with effects=1, 2 or 3"
+                    )
                 idata = self._fit_gibbs(
                     draws=draws,
                     tune=tune,
@@ -1806,6 +1826,8 @@ class SARNegBinFlowSeparablePanel(_SeparableCountFlowPanel, SARFlowSeparablePane
                     log_likelihood=log_lik,
                 )
         elif sampler == "nuts":
+            if cell_mask is not None:
+                raise ValueError("cell_mask is supported only by the Gibbs effects path")
             idata = FlowPanelModel.fit(
                 self,
                 draws=draws,
@@ -1864,6 +1886,7 @@ class SARNegBinFlowSeparablePanel(_SeparableCountFlowPanel, SARFlowSeparablePane
         n_jobs: int,
         log_likelihood: bool,
         store_group_effects: Optional[bool],
+        cell_mask: Optional[np.ndarray] = None,
     ) -> xr.DataTree:
         """Structured sweep with pair and period effects integrated out."""
         from types import SimpleNamespace
@@ -1872,6 +1895,7 @@ class SARNegBinFlowSeparablePanel(_SeparableCountFlowPanel, SARFlowSeparablePane
         from ...samplers.gaussian._chain_runner import run_chains
         from ...samplers.negbin_reduced._flow_structured import classify_flow_design
         from ...samplers.negbin_reduced._flow_structured_fe import (
+            _normalize_cell_mask,
             run_chain_separable_structured_fe,
         )
 
@@ -1879,6 +1903,30 @@ class SARNegBinFlowSeparablePanel(_SeparableCountFlowPanel, SARFlowSeparablePane
         fp = self._count_fe_priors()
         rho_lower = self.priors.get("rho_lower", -0.999)
         rho_upper = self.priors.get("rho_upper", 0.999)
+        cell_mask = _normalize_cell_mask(cell_mask, self._T, self._n)
+        if cell_mask is not None:
+            # Both default priors are data-derived — the Gelman intercept
+            # centring and the effect levels use log mean y — and masked
+            # cells are discarded from the likelihood, so re-derive them
+            # from the live cells.  Rebuilding through the same helpers
+            # keeps every explicit prior override in force.
+            from .._base._shared import gelman_default_beta_prior
+
+            y_live = self._y_int_vec.astype(np.float64)[cell_mask]
+            X_arr = np.asarray(self._X, dtype=np.float64)
+            k = X_arr.shape[1]
+            names = list(self._feature_names) or [f"x{j}" for j in range(k)]
+            g_mu, g_sd = gelman_default_beta_prior(y_live, X_arr, names, link="log")
+            pv = dict(pv)
+            pv["beta_mu"] = np.broadcast_to(
+                np.asarray(self.priors.get("beta_mu", g_mu), dtype=np.float64), (k,)
+            ).copy()
+            pv["beta_sigma"] = np.broadcast_to(
+                np.asarray(self.priors.get("beta_sigma", g_sd), dtype=np.float64), (k,)
+            ).copy()
+            fp = self._effect_priors(
+                float(np.log(max(float(np.mean(y_live)), 1e-3))), self._X, ""
+            )
         priors = SimpleNamespace(
             beta_mu=pv["beta_mu"],
             beta_sigma=pv["beta_sigma"],
@@ -1932,6 +1980,7 @@ class SARNegBinFlowSeparablePanel(_SeparableCountFlowPanel, SARFlowSeparablePane
                 keep_group_draws=keep_groups,
                 jax_seeds=int_seeds,
                 store_log_lik=log_likelihood,
+                cell_mask=cell_mask,
             )
             return self._assemble_count_idata(
                 results, ["rho_d", "rho_o", "rho_w"], keep_groups, log_likelihood
@@ -1960,6 +2009,7 @@ class SARNegBinFlowSeparablePanel(_SeparableCountFlowPanel, SARFlowSeparablePane
                 store_log_lik=log_likelihood,
                 store_group_draws=keep_groups,
                 struct=struct,
+                cell_mask=cell_mask,
             )
 
         seeds = (

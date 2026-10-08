@@ -21,7 +21,7 @@ from ._flow_structured import FlowDesignStructure, classify_flow_design
 
 def _equation_parts(
     W_csc, struct: FlowDesignStructure, beta_mu, beta_sigma, *, rho_bounds,
-    pair_effects=None, period_effects=None, prefix: str = "",
+    pair_effects=None, period_effects=None, prefix: str = "", has_mask: bool = False,
 ):  # fmt: skip
     """Host side of one structured equation: ``(static, data)``.
 
@@ -74,12 +74,14 @@ def _equation_parts(
     data = {prefix + name: value for name, value in raw.items()}
     static = (
         n, T, k, tuple(int(c) for c in cc), tuple(int(c) for c in fc), has_pairs,
-        sd_scale is not None, int(n_tau), lu_solve, prefix,
+        sd_scale is not None, int(n_tau), lu_solve, prefix, has_mask,
     )  # fmt: skip
     return static, data
 
 
-def _equation_fns(n, T, k, cc_t, fc_t, has_pairs, learn_sd, n_tau, lu_solve, prefix):
+def _equation_fns(
+    n, T, k, cc_t, fc_t, has_pairs, learn_sd, n_tau, lu_solve, prefix, has_mask=False
+):
     """One structured equation's kernels for one structure, each taking ``data``."""
     import jax
     import jax.numpy as jnp
@@ -319,9 +321,18 @@ def _equation_fns(n, T, k, cc_t, fc_t, has_pairs, learn_sd, n_tau, lu_solve, pre
                 ),
             }
             if learn_sd:
-                # Centred σ | C, then non-centred σ | C̃ (interweaving).
-                dev2 = jnp.sum((C - m_pair) ** 2)
-                nu, g = 3.0, float(n * n)
+                # Centred σ | C, then non-centred σ | C̃ (interweaving).  Under a
+                # cell mask, pairs whose every period is masked carry no
+                # likelihood and drop out of the deviance (they stay
+                # prior-only, drawn-then-discarded).
+                if has_mask:
+                    pair_live = data["pair_live"]
+                    dev2 = jnp.sum(pair_live * (C - m_pair) ** 2)
+                    g = data["n_live_pairs"]
+                else:
+                    dev2 = jnp.sum((C - m_pair) ** 2)
+                    g = float(n * n)
+                nu = 3.0
 
                 def log_prior(sd):
                     return -0.5 * (nu + 1.0) * jnp.log1p(sd * sd / (nu * sd_scale**2))
@@ -437,6 +448,7 @@ def make_structured_equation(
     pair_effects=None,
     period_effects=None,
     prefix: str = "",
+    has_mask: bool = False,
 ):
     """One separable flow equation for the compiled sweeps.
 
@@ -464,6 +476,7 @@ def make_structured_equation(
     static, data = _equation_parts(
         W_csc, struct, beta_mu, beta_sigma, rho_bounds=rho_bounds,
         pair_effects=pair_effects, period_effects=period_effects, prefix=prefix,
+        has_mask=has_mask,
     )  # fmt: skip
     fns = cached_sweep(("flow_equation", *static), lambda: _equation_fns(*static))
     k = struct.k
@@ -509,8 +522,14 @@ def welford_update(state: dict, C, tuning) -> dict:
     return {"c_count": cnt, "c_mean": c_mean, "c_m2": c_m2}
 
 
-def _fe_sweep(eq_static, has_alpha_fixed, keep_group_draws, store_eta, n_obs):
-    """The structured NB flow FE sweep for one structure, taking ``data``."""
+def _fe_sweep(eq_static, has_alpha_fixed, keep_group_draws, store_eta, n_obs, has_mask):
+    """The structured NB flow FE sweep for one structure, taking ``data``.
+
+    Under a cell mask (``has_mask``) the masked cells are drawn-then-discarded:
+    their Pólya–Gamma variates are drawn (the random stream is
+    mask-invariant), then zeroed, and every α term sums live cells only
+    (``n_obs`` is the live count; ``y_vals``/``y_counts`` tabulate live y).
+    """
     import jax
     import jax.numpy as jnp
     from jax.scipy.special import gammaln
@@ -528,14 +547,25 @@ def _fe_sweep(eq_static, has_alpha_fixed, keep_group_draws, store_eta, n_obs):
         alpha_sigma, alpha_nu = data["alpha_sigma"], data["alpha_nu"]
         a = jnp.exp(log_a)
         log_mu_a = jnp.log(mu + a)
-        ll = (
-            y_counts @ gammaln(y_vals + a)
-            - n_obs * gammaln(a)
-            + y_dot_eta
-            - y_j @ log_mu_a
-            - a * log_mu_a.sum()
-            + n_obs * a * log_a
-        )
+        if has_mask:
+            m = data["mask_f"]
+            ll = (
+                y_counts @ gammaln(y_vals + a)
+                - n_obs * gammaln(a)
+                + y_dot_eta
+                - jnp.sum(m * y_j * log_mu_a)
+                - a * jnp.sum(m * log_mu_a)
+                + n_obs * a * log_a
+            )
+        else:
+            ll = (
+                y_counts @ gammaln(y_vals + a)
+                - n_obs * gammaln(a)
+                + y_dot_eta
+                - y_j @ log_mu_a
+                - a * log_mu_a.sum()
+                + n_obs * a * log_a
+            )
         prior = -0.5 * (alpha_nu + 1.0) * jnp.log1p(a * a / (alpha_nu * alpha_sigma**2))
         return log_a + ll + prior
 
@@ -543,13 +573,27 @@ def _fe_sweep(eq_static, has_alpha_fixed, keep_group_draws, store_eta, n_obs):
         y_j = data["y"]
         alpha = state["alpha"]
         k_pg, k_eq, k_a, k_sd = jax.random.split(key, 4)
+        # Masked cells draw with neutral inputs (h = α) so the stream — and
+        # every live draw — is identical whatever masked y holds.
+        h_in = (
+            jnp.where(data["mask_f"] > 0.5, y_j, 0.0) + alpha
+            if has_mask
+            else y_j + alpha
+        )
         omega = draw_pg(
-            jnp.maximum(y_j + alpha, 1e-3),
+            jnp.maximum(h_in, 1e-3),
             jnp.clip(state["eta"].ravel() - jnp.log(alpha), -30.0, 30.0),
             k_pg,
         )
+        if has_mask:
+            live = data["mask_f"] > 0.5
+            omega = jnp.where(live, omega, 0.0)
+            z_flat = 0.5 * (y_j - alpha) / jnp.where(live, omega, 1.0) + jnp.log(alpha)
+            z_flat = jnp.where(live, z_flat, 0.0)
+        else:
+            z_flat = 0.5 * (y_j - alpha) / omega + jnp.log(alpha)
         Om_all = omega.reshape(T, n, n)
-        Z_all = (0.5 * (y_j - alpha) / omega + jnp.log(alpha)).reshape(T, n, n)
+        Z_all = z_flat.reshape(T, n, n)
         eq_keys = ("beta", "tau", "C", "rho_d", "rho_o", "eta", "slice_widths")
         eq_state = {
             key_: state[key_] for key_ in eq_keys + (("s_pair",) if learn_sd else ())
@@ -558,15 +602,30 @@ def _fe_sweep(eq_static, has_alpha_fixed, keep_group_draws, store_eta, n_obs):
         if learn_sd:
             y3 = y_j.reshape(T, n, n)
             la_ = jnp.log(alpha)
-            new = eq.exact_sd_move(
-                new,
-                lambda e: jnp.sum(y3 * e - (y3 + alpha) * jnp.logaddexp(e, la_)),
-                k_sd,
-                data,
-            )
+            if has_mask:
+                mask3 = data["mask_f"].reshape(T, n, n)
+                new = eq.exact_sd_move(
+                    new,
+                    lambda e: jnp.sum(
+                        mask3 * (y3 * e - (y3 + alpha) * jnp.logaddexp(e, la_))
+                    ),
+                    k_sd,
+                    data,
+                )
+            else:
+                new = eq.exact_sd_move(
+                    new,
+                    lambda e: jnp.sum(y3 * e - (y3 + alpha) * jnp.logaddexp(e, la_)),
+                    k_sd,
+                    data,
+                )
 
         eta_flat = new["eta"].ravel()
-        y_dot_eta, mu = y_j @ eta_flat, jnp.exp(eta_flat)
+        if has_mask:
+            m = data["mask_f"]
+            y_dot_eta, mu = jnp.sum(m * y_j * eta_flat), jnp.exp(eta_flat)
+        else:
+            y_dot_eta, mu = y_j @ eta_flat, jnp.exp(eta_flat)
         if not has_alpha_fixed:
             log_alpha, _ = jax_slice_sample_1d(
                 lambda la: alpha_log_density(la, y_j, y_dot_eta, mu, data),
@@ -630,13 +689,17 @@ def make_structured_fe_sweep(
 
 def _fe_parts(
     y, W_csc, struct, priors, *, pair_effects, period_effects, keep_group_draws,
-    store_eta,
+    store_eta, cell_mask=None,
 ):  # fmt: skip
     """``(cached sweep, initial_eta, data, equation)`` for the FE flow sampler."""
     import jax.numpy as jnp
 
     from .._utils._jax_utils import cached_sweep, padded_value_counts
+    from ._flow_structured_fe import _normalize_cell_mask
 
+    y_np = np.asarray(y, dtype=np.float64)
+    cell_mask = _normalize_cell_mask(cell_mask, struct.T, struct.n)
+    has_mask = cell_mask is not None
     eq = make_structured_equation(
         W_csc,
         struct,
@@ -645,10 +708,11 @@ def _fe_parts(
         rho_bounds=(priors.rho_lower, priors.rho_upper),
         pair_effects=pair_effects,
         period_effects=period_effects,
+        has_mask=has_mask,
     )
     alpha_fixed = getattr(priors, "alpha_fixed", None)
-    y_np = np.asarray(y, dtype=np.float64)
-    y_vals, y_counts = padded_value_counts(y_np)
+    y_live = y_np[cell_mask] if has_mask else y_np
+    y_vals, y_counts = padded_value_counts(y_live)
     # Data-sized arrays and data-dependent scalars enter as arguments.
     data = {
         "y": jnp.asarray(y_np),
@@ -659,9 +723,14 @@ def _fe_parts(
         "alpha_fixed": jnp.float64(alpha_fixed if alpha_fixed is not None else 1.0),
         **eq.data,
     }
+    if has_mask:
+        pair_live = cell_mask.reshape(struct.T, struct.n, struct.n).any(axis=0)
+        data["mask_f"] = jnp.asarray(cell_mask.astype(np.float64))
+        data["pair_live"] = jnp.asarray(pair_live.astype(np.float64))
+        data["n_live_pairs"] = jnp.float64(float(pair_live.sum()))
     static = (
         eq.static, alpha_fixed is not None, bool(keep_group_draws), bool(store_eta),
-        float(y_np.size),
+        float(y_live.size), has_mask,
     )  # fmt: skip
     sweep = cached_sweep(("nb_flow_fe", *static), lambda: _fe_sweep(*static))
     return sweep, eq.initial_eta, data, eq
@@ -685,11 +754,14 @@ def run_chains_jax_flow_structured_fe(
     jax_seeds=None,
     slice_width=0.4,
     store_log_lik=False,
+    cell_mask=None,
 ):
     """Run the structured separable NB flow sampler with fixed effects on JAX.
 
     Returns one dict per chain with the keys of
     :func:`._flow_structured_fe.run_chain_separable_structured_fe`.
+    ``cell_mask`` follows that function's contract (live cells ``True``, drawn-
+    then-discarded elsewhere).
     """
     import jax
     import jax.numpy as jnp
@@ -698,10 +770,12 @@ def run_chains_jax_flow_structured_fe(
     from ..._jax_dispatch import ensure_x64
     from .._utils._jax_utils import run_chains_chunked
     from .._utils._sparsax_lu import set_sparsax_lu_cache_size
+    from ._flow_structured_fe import _normalize_cell_mask
 
     ensure_x64()
     struct = classify_flow_design(X, n, T) if struct is None else struct
     T = struct.T
+    cell_mask = _normalize_cell_mask(cell_mask, T, n)
     chains = len(inits)
     if jax_seeds is None:
         jax_seeds = list(range(chains))
@@ -719,6 +793,7 @@ def run_chains_jax_flow_structured_fe(
         period_effects=period_effects,
         keep_group_draws=keep_group_draws,
         store_eta=store_log_lik,
+        cell_mask=cell_mask,
     )
     y_np = np.asarray(y, dtype=np.float64)
     Y = y_np.reshape(T, n, n)
@@ -728,7 +803,15 @@ def run_chains_jax_flow_structured_fe(
         tau = jnp.full(n_tau, float(mu_tau))
         C0 = np.zeros((n, n))
         if has_pairs:
-            C0 = np.log(Y.mean(axis=0) + 0.5) - np.log(Y.mean() + 0.5) + pair_effects[0]
+            if cell_mask is None:
+                C0 = np.log(Y.mean(axis=0) + 0.5) - np.log(Y.mean() + 0.5) + pair_effects[0]
+            else:
+                # Mask-aware start: no masked count may reach a live cell's η.
+                m3 = cell_mask.reshape(T, n, n)
+                Yl = np.where(m3, Y, 0.0)
+                pair_mean = Yl.sum(axis=0) / np.maximum(m3.sum(axis=0), 1)
+                grand = Yl.sum() / m3.sum()
+                C0 = np.log(pair_mean + 0.5) - np.log(grand + 0.5) + pair_effects[0]
         C0 = jnp.asarray(C0)
         rd, ro = jnp.float64(float(i.rho_d)), jnp.float64(float(i.rho_o))
         st = {

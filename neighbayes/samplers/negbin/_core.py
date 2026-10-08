@@ -920,6 +920,8 @@ def _sample_alpha(
     priors: GibbsPriors,
     *,
     rng: np.random.Generator,
+    cell_mask: np.ndarray | None = None,
+    y_tab: tuple[np.ndarray, np.ndarray] | None = None,
 ) -> float:
     """Block 6: Draw α | y, η — 1-D slice on log(α).
 
@@ -942,6 +944,13 @@ def _sample_alpha(
         Prior hyperparameters (alpha_sigma, alpha_nu).
     rng : numpy.random.Generator
         Random state.
+    cell_mask : ndarray of bool, shape (n,), optional
+        Live cells; masked cells drop out of every term (the tabulated
+        ``Σ gammaln(y+α)`` runs over live counts only).
+    y_tab : (y_vals, y_counts), optional
+        Pre-tabulated ``np.unique(y_live, return_counts=True)`` of the live
+        cells, to hoist the per-call sort out of a Gibbs loop; must align
+        with ``y`` after ``cell_mask`` is applied.
 
     Returns
     -------
@@ -965,7 +974,13 @@ def _sample_alpha(
     from scipy.special import gammaln
 
     y_arr = np.asarray(y, dtype=np.float64)
-    y_vals, y_counts = np.unique(y_arr, return_counts=True)
+    if cell_mask is not None:
+        y_arr = y_arr[cell_mask]
+        eta = eta[cell_mask]
+    if y_tab is None:
+        y_vals, y_counts = np.unique(y_arr, return_counts=True)
+    else:
+        y_vals, y_counts = y_tab
     n_obs = y_arr.size
     y_dot_eta = float(y_arr @ eta)
     mu = np.exp(eta)

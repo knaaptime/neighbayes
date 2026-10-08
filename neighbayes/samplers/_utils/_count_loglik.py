@@ -10,9 +10,15 @@ from __future__ import annotations
 import numpy as np
 
 
-def nb_eta_loglik(y: np.ndarray, eta: np.ndarray, alpha: float) -> float:
-    """``Σ log NB2(y; e^η, α)`` up to terms free of η."""
-    return float(np.sum(y * eta - (y + alpha) * np.logaddexp(eta, np.log(alpha))))
+def nb_eta_loglik(
+    y: np.ndarray, eta: np.ndarray, alpha: float, mask: np.ndarray | None = None
+) -> float:
+    """``Σ log NB2(y; e^η, α)`` up to terms free of η, over the live cells.
+
+    ``mask`` selects the live cells (``True`` = live); ``None`` keeps all.
+    """
+    ll = y * eta - (y + alpha) * np.logaddexp(eta, np.log(alpha))
+    return float(np.sum(ll[mask]) if mask is not None else np.sum(ll))
 
 
 def zinb_count_eta_loglik(

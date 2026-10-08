@@ -306,6 +306,55 @@ def test_log_likelihood_storage():
     assert np.all(np.isfinite(idata.log_likelihood["obs"].values))
 
 
+def _masked_diag_fit(y, backend):
+    """Two-way-FE fit of ``y`` with the intraregional diagonal masked out."""
+    data = _flow(n=5, T=3, seed=7)
+    n = 5
+    eye = np.eye(n, dtype=bool)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        m = SARNegBinFlowSeparablePanel(
+            y=y, X=data["X"], W=data["G"], T=3, col_names=data["col_names"], effects=3
+        )
+        return m.fit(
+            gibbs_backend=backend,
+            cell_mask=~eye,
+            draws=30,
+            tune=20,
+            chains=2,
+            progressbar=False,
+            random_seed=0,
+            n_jobs=1,
+            store_group_effects=False,
+        )
+
+
+def _assert_mask_invariance(backend):
+    """Masked cells are drawn-then-discarded: y ×100 on the diagonal must
+    leave every live-cell posterior trace bit-identical (the diagonal pairs
+    are prior-only under the mask, and no masked count may reach a live η,
+    the α block, the learned-sd deviance, or the Pólya–Gamma stream)."""
+    data = _flow(n=5, T=3, seed=7)
+    n, T = 5, 3
+    y = np.asarray(data["y"], dtype=np.int64).copy()
+    y2 = y.reshape(T, n, n).copy()
+    y2[:, np.eye(n, dtype=bool)] *= 100
+    idatas = [_masked_diag_fit(yy, backend) for yy in (y, y2.reshape(-1))]
+    for var in ("rho_d", "rho_o", "beta", "alpha", "group_sd", "time_effect"):
+        a = idatas[0].posterior[var].values
+        b = idatas[1].posterior[var].values
+        assert np.array_equal(a, b), f"{var} traces differ under masked y x100"
+
+
+def test_cell_mask_invariance_numpy():
+    _assert_mask_invariance("numpy")
+
+
+@pytest.mark.requires_jax
+def test_cell_mask_invariance_jax():
+    _assert_mask_invariance("jax")
+
+
 # ---------------------------------------------------------------------------
 # Slow: recovery and cross-checks
 # ---------------------------------------------------------------------------

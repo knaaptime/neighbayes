@@ -127,6 +127,31 @@ def _gram_block(Oms, Rs, cols_of, prec, prec_tau, D, OmOm_tau):
     return M, v, quad
 
 
+def _normalize_cell_mask(cell_mask, T: int, n: int):
+    """Validate a cell mask and flatten it to ``(T·n·n,)`` bool, or ``None``.
+
+    Accepts a bool array shaped ``(T, n, n)``, ``(T·n·n,)`` or ``(n, n)``
+    (broadcast over periods); ``True`` marks a live cell.  The flat order is
+    C-contiguous time-first, matching the stacked response.
+    """
+    if cell_mask is None:
+        return None
+    m = np.asarray(cell_mask)
+    if m.dtype != bool:
+        m = m.astype(bool)
+    N = T * n * n
+    if m.shape == (T, n, n):
+        return m.reshape(N)
+    if m.shape == (N,):
+        return m
+    if m.shape == (n, n):
+        return np.broadcast_to(m, (T, n, n)).reshape(N).copy()
+    raise ValueError(
+        f"cell_mask must be bool of shape {(T, n, n)}, {(N,)} or {(n, n)}; "
+        f"got {m.shape}"
+    )
+
+
 class StructuredEquation:
     r"""One separable flow equation, sampled from Gaussian working data.
 
@@ -334,8 +359,14 @@ class StructuredEquation:
 
     # --- one Gibbs update ------------------------------------------------
 
-    def update(self, Oms: np.ndarray, z: np.ndarray, rng, tuning: bool) -> None:
-        """Draw ``ρ``, then ``(β, τ)``, then ``C`` given ``(T, n, n)`` working data."""
+    def update(self, Oms: np.ndarray, z: np.ndarray, rng, tuning: bool,
+               pair_live: np.ndarray | None = None) -> None:
+        """Draw ``ρ``, then ``(β, τ)``, then ``C`` given ``(T, n, n)`` working data.
+
+        ``pair_live`` (``(n, n)`` bool) masks pairs out of the learned-sd
+        deviance: pairs whose every period is masked carry no likelihood and
+        stay prior-only, so their deviations must not count against ``σ``.
+        """
         st, n, T = self.struct, self.n, self.T
         k_c, n_tau, t0 = self.k_c, self.n_tau, self.t0
         zc = z - self.m_pair
@@ -462,9 +493,14 @@ class StructuredEquation:
                 )
 
                 # Centred σ | C, then non-centred σ | C̃ (interweaving).
-                dev2 = float(np.sum((self.C - self.m_pair) ** 2))
+                if pair_live is None:
+                    dev2 = float(np.sum((self.C - self.m_pair) ** 2))
+                    n_dev = n * n
+                else:
+                    dev2 = float(np.sum((self.C - self.m_pair)[pair_live] ** 2))
+                    n_dev = int(pair_live.sum())
                 self.s_pair = sample_effect_sd(
-                    self.s_pair, dev2, n * n, self.pair_sd_scale, rng
+                    self.s_pair, dev2, n_dev, self.pair_sd_scale, rng
                 )
                 ct = (self.C - self.m_pair) / self.s_pair
                 OmC = Oms * ct[None]
@@ -500,6 +536,7 @@ def run_chain_separable_structured_fe(
     store_log_lik: bool = False,
     store_group_draws: bool = True,
     struct: Optional[FlowDesignStructure] = None,
+    cell_mask: np.ndarray | None = None,
 ) -> dict[str, np.ndarray]:
     """One chain of the structured separable NB flow sampler with fixed effects.
 
@@ -510,6 +547,14 @@ def run_chain_separable_structured_fe(
     period_effects : (mu, sigma, n_tau) or None
         Normal prior of the period effects, which cover the last ``n_tau``
         periods (``T − 1`` or ``T``); ``None`` omits them.
+    cell_mask : bool array, optional
+        Live cells (``True`` = live) shaped ``(T, n, n)``, ``(T·n·n,)`` or
+        ``(n, n)``; ``None`` keeps every cell.  Masked cells are drawn-then-
+        discarded: their Pólya–Gamma variates are drawn (so the random stream
+        is mask-invariant), then zeroed, and pairs whose every period is
+        masked stay prior-only and drop out of the learned-sd deviance.  The
+        α block tabulates live counts only; with ``store_log_lik`` the stored
+        pointwise values still cover every cell.
 
     Returns
     -------
@@ -521,6 +566,10 @@ def run_chain_separable_structured_fe(
 
     rng = np.random.default_rng() if rng is None else rng
     y = np.asarray(y, dtype=np.float64)
+    cell_mask = _normalize_cell_mask(cell_mask, T, n)
+    y_tab = (
+        np.unique(y[cell_mask], return_counts=True) if cell_mask is not None else None
+    )
     core_priors = ReducedGibbsPriors(
         alpha_sigma=priors.alpha_sigma,
         alpha_nu=priors.alpha_nu,
@@ -529,7 +578,15 @@ def run_chain_separable_structured_fe(
     C_init = None
     if pair_effects is not None:
         Y = y.reshape(T, n, n)
-        C_init = np.log(Y.mean(axis=0) + 0.5) - np.log(Y.mean() + 0.5) + pair_effects[0]
+        if cell_mask is not None:
+            # Mask-aware start: no masked count may reach a live cell's η.
+            m3 = cell_mask.reshape(T, n, n)
+            Yl = np.where(m3, Y, 0.0)
+            pair_mean = Yl.sum(axis=0) / np.maximum(m3.sum(axis=0), 1)
+            grand = Yl.sum() / m3.sum()
+            C_init = np.log(pair_mean + 0.5) - np.log(grand + 0.5) + pair_effects[0]
+        else:
+            C_init = np.log(Y.mean(axis=0) + 0.5) - np.log(Y.mean() + 0.5) + pair_effects[0]
     eq = StructuredEquation(
         X,
         W_csc,
@@ -563,11 +620,23 @@ def run_chain_separable_structured_fe(
     gstore = _GroupStore(n_keep, n * n, store_group_draws) if eq.has_pairs else None
 
     y3 = y.reshape(T, n, n)
+    mask3 = cell_mask.reshape(T, n, n) if cell_mask is not None else None
+    pair_live = mask3.any(axis=0) if mask3 is not None else None
     for it in range(tune + draws):
-        omega = _sample_omega(y, alpha, eq.eta.ravel() - np.log(alpha), rng=rng)
-        z = (0.5 * (y - alpha) / omega + np.log(alpha)).reshape(T, n, n)
-        eq.update(omega.reshape(T, n, n), z, rng, tuning=it < tune)
-        eq.exact_sd_move(lambda e: nb_eta_loglik(y3, e, alpha), rng)
+        # Masked cells draw with neutral inputs (h = α): the C PG sampler's
+        # random consumption is input-dependent, so this keeps the stream —
+        # and therefore every live draw — identical whatever masked y holds.
+        y_pg = np.where(cell_mask, y, 0.0) if cell_mask is not None else y
+        omega = _sample_omega(y_pg, alpha, eq.eta.ravel() - np.log(alpha), rng=rng)
+        if cell_mask is not None:
+            omega = np.where(cell_mask, omega, 0.0)
+            z = 0.5 * (y - alpha) / np.where(cell_mask, omega, 1.0) + np.log(alpha)
+            z = np.where(cell_mask, z, 0.0)
+        else:
+            z = 0.5 * (y - alpha) / omega + np.log(alpha)
+        eq.update(omega.reshape(T, n, n), z.reshape(T, n, n), rng,
+                  tuning=it < tune, pair_live=pair_live)
+        eq.exact_sd_move(lambda e: nb_eta_loglik(y3, e, alpha, mask3), rng)
         st = _StructuralState(
             eta=eq.eta.ravel(),
             beta=eq.beta,
@@ -576,7 +645,8 @@ def run_chain_separable_structured_fe(
             alpha=alpha,
             omega=omega,
         )
-        alpha = _sample_alpha(st, y, core_priors, rng=rng)
+        alpha = _sample_alpha(st, y, core_priors, rng=rng, cell_mask=cell_mask,
+                              y_tab=y_tab)
 
         if it >= tune and (it - tune) % thin == 0:
             j = (it - tune) // thin
