@@ -89,7 +89,7 @@ def _flow_marginal_lm(model, key: str, test_type: str) -> BayesianLMTestResult:
     )
 
 
-def bayesian_lm_flow_dest_test(model) -> BayesianLMTestResult:
+def bayesian_lm_flow_destination_test(model) -> BayesianLMTestResult:
     r"""Bayesian LM test for an omitted destination-side spatial lag.
 
     Tests :math:`H_0\colon \rho_d = 0` against the SARFlow alternative,
@@ -112,23 +112,23 @@ def bayesian_lm_flow_dest_test(model) -> BayesianLMTestResult:
     and :cite:t:`lesage2009IntroductionSpatial`. The Bayesian LM statistic
     is computed per posterior draw following :cite:t:`dogan2021BayesianRobust`.
     """
-    return _flow_marginal_lm(model, "d", "bayesian_lm_flow_dest")
+    return _flow_marginal_lm(model, "d", "bayesian_lm_flow_destination")
 
 
-def bayesian_lm_flow_orig_test(model) -> BayesianLMTestResult:
+def bayesian_lm_flow_origin_test(model) -> BayesianLMTestResult:
     r"""Bayesian LM test for an omitted origin-side spatial lag
-    (:math:`H_0\colon \rho_o = 0`).  See :func:`bayesian_lm_flow_dest_test`
+    (:math:`H_0\colon \rho_o = 0`).  See :func:`bayesian_lm_flow_destination_test`
     for details and references (:cite:p:`lesage2008SpatialEconometric`,
     :cite:p:`dogan2021BayesianRobust`)."""
-    return _flow_marginal_lm(model, "o", "bayesian_lm_flow_orig")
+    return _flow_marginal_lm(model, "o", "bayesian_lm_flow_origin")
 
 
-def bayesian_lm_flow_network_test(model) -> BayesianLMTestResult:
+def bayesian_lm_flow_od_test(model) -> BayesianLMTestResult:
     r"""Bayesian LM test for an omitted network spatial lag
-    (:math:`H_0\colon \rho_w = 0`).  See :func:`bayesian_lm_flow_dest_test`
+    (:math:`H_0\colon \rho_w = 0`).  See :func:`bayesian_lm_flow_destination_test`
     for details and references (:cite:p:`lesage2008SpatialEconometric`,
     :cite:p:`dogan2021BayesianRobust`)."""
-    return _flow_marginal_lm(model, "w", "bayesian_lm_flow_network")
+    return _flow_marginal_lm(model, "w", "bayesian_lm_flow_od")
 
 
 def bayesian_lm_flow_joint_test(model) -> BayesianLMTestResult:
@@ -239,33 +239,35 @@ def _flow_robust_marginal_lm(
     )
 
 
-def bayesian_robust_lm_flow_dest_test(sarflow_model) -> BayesianLMTestResult:
+def bayesian_robust_lm_flow_destination_test(sarflow_model) -> BayesianLMTestResult:
     r"""Robust Bayesian LM test for :math:`\rho_d` adjusting for
     :math:`(\rho_o, \rho_w)` nuisance via the Neyman-orthogonal score
     (:cite:t:`bera1993SpecificationTesting`, :cite:t:`anselin1996SimpleDiagnostic`,
     :cite:t:`dogan2021BayesianRobust`).  Requires a fitted
     :class:`~neighbayes.models.flow.SARFlow`."""
-    return _flow_robust_marginal_lm(sarflow_model, 0, "bayesian_robust_lm_flow_dest")
+    return _flow_robust_marginal_lm(
+        sarflow_model, 0, "bayesian_robust_lm_flow_destination"
+    )
 
 
-def bayesian_robust_lm_flow_orig_test(sarflow_model) -> BayesianLMTestResult:
+def bayesian_robust_lm_flow_origin_test(sarflow_model) -> BayesianLMTestResult:
     r"""Robust Bayesian LM test for :math:`\rho_o` adjusting for
     :math:`(\rho_d, \rho_w)` nuisance.  See
-    :func:`bayesian_robust_lm_flow_dest_test` for details and references
+    :func:`bayesian_robust_lm_flow_destination_test` for details and references
     (:cite:p:`bera1993SpecificationTesting`,
     :cite:p:`anselin1996SimpleDiagnostic`,
     :cite:p:`dogan2021BayesianRobust`)."""
-    return _flow_robust_marginal_lm(sarflow_model, 1, "bayesian_robust_lm_flow_orig")
+    return _flow_robust_marginal_lm(sarflow_model, 1, "bayesian_robust_lm_flow_origin")
 
 
-def bayesian_robust_lm_flow_network_test(sarflow_model) -> BayesianLMTestResult:
+def bayesian_robust_lm_flow_od_test(sarflow_model) -> BayesianLMTestResult:
     r"""Robust Bayesian LM test for :math:`\rho_w` adjusting for
     :math:`(\rho_d, \rho_o)` nuisance.  See
-    :func:`bayesian_robust_lm_flow_dest_test` for details and references
+    :func:`bayesian_robust_lm_flow_destination_test` for details and references
     (:cite:p:`bera1993SpecificationTesting`,
     :cite:p:`anselin1996SimpleDiagnostic`,
     :cite:p:`dogan2021BayesianRobust`)."""
-    return _flow_robust_marginal_lm(sarflow_model, 2, "bayesian_robust_lm_flow_network")
+    return _flow_robust_marginal_lm(sarflow_model, 2, "bayesian_robust_lm_flow_od")
 
 
 # ---------------------------------------------------------------------
@@ -273,7 +275,7 @@ def bayesian_robust_lm_flow_network_test(sarflow_model) -> BayesianLMTestResult:
 # ---------------------------------------------------------------------
 
 
-def bayesian_lm_flow_intra_test(model) -> BayesianLMTestResult:
+def bayesian_lm_flow_intraunit_test(model) -> BayesianLMTestResult:
     r"""Bayesian LM (WX-style) test for the intra block in an OLSFlow null.
 
     Tests :math:`H_0\colon \beta_{\text{intra}} = 0` in the gravity model
@@ -327,7 +329,7 @@ def bayesian_lm_flow_intra_test(model) -> BayesianLMTestResult:
     return _lm_vector(
         G,
         V,
-        test_type="bayesian_lm_flow_intra",
+        test_type="bayesian_lm_flow_intraunit",
         df=k_intra,
         details={"k_intra": k_intra},
         label="V_intra (flow intra LM)",

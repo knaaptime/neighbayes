@@ -19,6 +19,7 @@ import pandas as pd
 import pytensor.tensor as pt
 import scipy.sparse as sp
 
+from ..._backends.sampler_helpers import select_backend
 from ..._lazy_deps import pm, xr
 from ..._logdet import (
     make_flow_separable_logdet,
@@ -67,7 +68,7 @@ class FlowPanelModel(FlowSharedMethods, SpatialPanelModel):
         Flow log-determinant method; ``None`` (default) auto-selects.
         Concrete subclasses override the default with their recommended
         method (see the cross-sectional :class:`~neighbayes.models.flow.FlowModel`).
-    restrict_positive : bool, default True
+    nonnegative_dependence : bool, default True
         If True, use simplex-constrained rho parameters.
     robust : bool, default False
         If True, use Student-t observation errors.
@@ -83,14 +84,14 @@ class FlowPanelModel(FlowSharedMethods, SpatialPanelModel):
         k: Optional[int] = None,
         priors: Optional[dict] = None,
         logdet_method: Optional[str] = None,
-        restrict_positive: bool = True,
+        nonnegative_dependence: bool = True,
         robust: bool = False,
-        symmetric_xo_xd: Optional[bool] = None,
+        shared_od_covariates: Optional[bool] = None,
         effects: int = 0,
     ):
         self.priors = priors or {}
         self.logdet_method = logdet_method
-        self.restrict_positive = restrict_positive
+        self.nonnegative_dependence = nonnegative_dependence
         self.robust = robust
         self.effects = int(effects)
         if self.effects not in (0, 1, 2, 3):
@@ -196,18 +197,18 @@ class FlowPanelModel(FlowSharedMethods, SpatialPanelModel):
 
         # Detect Xo == Xd symmetry on the (undemeaned) raw design.
         if (
-            symmetric_xo_xd is None
+            shared_od_covariates is None
             and self._k_d > 0
             and self._k_d == self._k_o
             and X_arr.shape[1] >= 2 + self._k_d + self._k_o
         ):
             dest_block = X_arr[:, 2 : 2 + self._k_d]
             orig_block = X_arr[:, 2 + self._k_d : 2 + self._k_d + self._k_o]
-            self._symmetric_xo_xd: bool = bool(np.array_equal(dest_block, orig_block))
+            self._shared_od_covariates: bool = bool(np.array_equal(dest_block, orig_block))
         else:
-            self._symmetric_xo_xd = (
-                bool(symmetric_xo_xd)
-                if symmetric_xo_xd is not None
+            self._shared_od_covariates = (
+                bool(shared_od_covariates)
+                if shared_od_covariates is not None
                 else (self._k_d == self._k_o)
             )
 
@@ -368,7 +369,7 @@ class FlowPanelModel(FlowSharedMethods, SpatialPanelModel):
         return full
 
     @abstractmethod
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
         draws: Optional[int] = None,
     ) -> dict[str, np.ndarray]:
@@ -384,7 +385,7 @@ class FlowPanelModel(FlowSharedMethods, SpatialPanelModel):
     # Public diagnostics
     # ------------------------------------------------------------------
 
-    def spatial_effects(
+    def impacts(
         self,
         draws: Optional[int] = None,
         return_posterior_samples: bool = False,
@@ -393,18 +394,18 @@ class FlowPanelModel(FlowSharedMethods, SpatialPanelModel):
     ) -> "pd.DataFrame | tuple[pd.DataFrame, dict[str, np.ndarray]]":
         """Summarize posterior origin/destination/intra/network/total effects.
 
-        See :meth:`neighbayes.models.flow.FlowModel.spatial_effects` for the
+        See :meth:`neighbayes.models.flow.FlowModel.impacts` for the
         ``mode`` semantics (auto / combined / separate destination-origin
         sides per Thomas-Agnan & LeSage 2014, §83.5.2).
         """
-        from ...diagnostics.spatial_effects import _compute_bayesian_pvalue
+        from ...diagnostics.impacts import _compute_bayesian_pvalue
         from ..flow import _EFFECT_KEYS
 
         if self._idata is None:
             raise RuntimeError("Model has not been fit yet.  Call fit() first.")
         if self._k == 0:
             raise RuntimeError(
-                "Cannot compute spatial effects: no `dest_*` columns detected "
+                "Cannot compute impacts: no `dest_*` columns detected "
                 "in the design matrix.  Pass `k=` explicitly when constructing "
                 "the model."
             )
@@ -413,10 +414,10 @@ class FlowPanelModel(FlowSharedMethods, SpatialPanelModel):
                 f"mode must be 'auto', 'combined', or 'separate'; got {mode!r}."
             )
 
-        posterior = self._compute_spatial_effects_posterior(draws=draws)
+        posterior = self._compute_impacts_posterior(draws=draws)
 
         if mode == "auto":
-            effective_mode = "combined" if self._symmetric_xo_xd else "separate"
+            effective_mode = "combined" if self._shared_od_covariates else "separate"
         else:
             effective_mode = mode
 
@@ -677,6 +678,7 @@ class _ResolventFlowPanelMixin:
         random_seed: Optional[int] = None,
         *,
         sampler: str | None = None,
+        backend: str | None = None,
         step_size: float = 5e-4,
         n_probes: int = 48,
         logdet_method: str = "auto",
@@ -693,6 +695,10 @@ class _ResolventFlowPanelMixin:
         sampler : {"gibbs", "nuts", None}, default None
             ``"gibbs"`` (default) uses the resolvent-gradient MALA sampler;
             ``"nuts"`` uses PyMC NUTS via the base class.
+        backend : str, optional
+            The Gibbs sampler runs on NumPy (``"auto"`` or ``"numpy"``); NUTS
+            on ``"pymc"`` (the default), ``"nutpie"``, ``"numpyro"`` or
+            ``"blackjax"``.
         step_size, n_probes, logdet_method, n_quad : float/int/str
             Resolvent sampler parameters (Gibbs path only).
         n_jobs : int, default -1
@@ -704,6 +710,7 @@ class _ResolventFlowPanelMixin:
         """
         if sampler is None:
             sampler = "gibbs"
+        backend = select_backend(sampler, backend, sample_kwargs)
         if sampler == "nuts":
             return FlowPanelModel.fit(
                 self,
@@ -713,13 +720,11 @@ class _ResolventFlowPanelMixin:
                 random_seed=random_seed,
                 progressbar=progressbar,
                 idata_kwargs=idata_kwargs,
+                backend=backend,
                 **sample_kwargs,
             )
-        elif sampler != "gibbs":
-            raise ValueError(
-                f"sampler must be 'gibbs', 'nuts', or None, got {sampler!r}."
-            )
-        # --- Gibbs (resolvent) path ---
+        # --- Gibbs (resolvent) path, on NumPy ---
+        self._resolve_gibbs_backend(backend, jax=False)
         self._pymc_model = None
         self._idata = self._sample_resolvent(
             draws=draws,
@@ -785,7 +790,7 @@ class SARFlowPanelFE(_ResolventFlowPanelMixin, FlowPanelModel):
     logdet_method : str, default "resolvent"
         Log-determinant method.  The default ``"resolvent"`` samples via the
         per-period resolvent-Kronecker gradient sampler (recommended).
-    restrict_positive : bool, default True
+    nonnegative_dependence : bool, default True
         If True, use ``pm.Dirichlet("rho_simplex", a=ones(4))`` to enforce
         :math:`\\rho_d, \\rho_o, \\rho_w \\geq 0` and
         :math:`\\rho_d + \\rho_o + \\rho_w \\leq 1`. If False, three
@@ -795,7 +800,7 @@ class SARFlowPanelFE(_ResolventFlowPanelMixin, FlowPanelModel):
         If True, replace the Normal error with Student-t for robustness
         to heavy-tailed outliers.  The degrees of freedom :math:`\\nu` are
         **fixed** at ``priors["nu"]`` (default 4, LeSage's ``rval``).
-    symmetric_xo_xd : bool, optional
+    shared_od_covariates : bool, optional
         If ``None`` (default), origin and destination design blocks are
         compared and symmetry is auto-detected.
     priors : dict, optional
@@ -804,8 +809,8 @@ class SARFlowPanelFE(_ResolventFlowPanelMixin, FlowPanelModel):
         - ``beta_mu`` : float or array, default Gelman et al. (2008) — Normal prior mean for ``beta`` (``mean(y)`` on the intercept, 0 otherwise).
         - ``beta_sigma`` : float or array, default Gelman et al. (2008) — Normal prior std for ``beta``, scaled to ``sd(y)`` and each column's sd.
         - ``sigma2_alpha``, ``sigma2_beta`` : float, default 2 and ``Var(y)`` — InverseGamma prior on ``sigma**2``.
-        - ``rho_lower`` : float, default -1.0 — Lower bound of Uniform prior on each ρ (only when ``restrict_positive=False``).
-        - ``rho_upper`` : float, default 1.0 — Upper bound of Uniform prior on each ρ (only when ``restrict_positive=False``).
+        - ``rho_lower`` : float, default -1.0 — Lower bound of Uniform prior on each ρ (only when ``nonnegative_dependence=False``).
+        - ``rho_upper`` : float, default 1.0 — Upper bound of Uniform prior on each ρ (only when ``nonnegative_dependence=False``).
         - ``nu`` : float, default 4.0 — Fixed Student-t degrees of freedom (only when ``robust=True``).
     """
 
@@ -823,7 +828,7 @@ class SARFlowPanelFE(_ResolventFlowPanelMixin, FlowPanelModel):
             self._y,
             self._X,
             T=self._T,
-            restrict_positive=self.restrict_positive,
+            nonnegative_dependence=self.nonnegative_dependence,
             fe_dims=self._flow_fe_dims,
             priors=self._flow_gaussian_priors(),
             **kwargs,
@@ -850,7 +855,7 @@ class SARFlowPanelFE(_ResolventFlowPanelMixin, FlowPanelModel):
         y_t = pt.as_tensor_variable(self._y.astype(np.float64))
 
         with pm.Model(coords=self._model_coords()) as model:
-            if self.restrict_positive:
+            if self.nonnegative_dependence:
                 rho_simplex = pm.Dirichlet("rho_simplex", a=np.ones(4))
                 rho_d = pm.Deterministic("rho_d", rho_simplex[0])
                 rho_o = pm.Deterministic("rho_o", rho_simplex[1])
@@ -893,7 +898,7 @@ class SARFlowPanelFE(_ResolventFlowPanelMixin, FlowPanelModel):
         logdet = np.array([ld(*r)[0] for r in zip(*rho)])
         return self._flow_jacobian(logdet, 1 - rho[0] - rho[1] - rho[2], np)
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
         draws: Optional[int] = None,
     ) -> dict[str, np.ndarray]:
@@ -956,7 +961,7 @@ class SARFlowSeparablePanelFE(FlowPanelModel):
         If True, replace the Normal error with Student-t for robustness
         to heavy-tailed outliers.  The degrees of freedom :math:`\\nu` are
         **fixed** at ``priors["nu"]`` (default 4, LeSage's ``rval``).
-    symmetric_xo_xd : bool, optional
+    shared_od_covariates : bool, optional
         If ``None`` (default), origin and destination design blocks are
         compared and symmetry is auto-detected.
     priors : dict, optional
@@ -971,7 +976,7 @@ class SARFlowSeparablePanelFE(FlowPanelModel):
 
     Notes
     -----
-    The ``restrict_positive`` argument inherited from :class:`FlowPanelModel`
+    The ``nonnegative_dependence`` argument inherited from :class:`FlowPanelModel`
     has no effect on this class — separable variants always use Uniform
     priors on the individual :math:`\\rho` components.
     """
@@ -1049,7 +1054,7 @@ class SARFlowSeparablePanelFE(FlowPanelModel):
             self._separable_logdet_numpy_fn(rho_d, rho_o), (1 - rho_d) * (1 - rho_o), np
         )
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
         draws: Optional[int] = None,
     ) -> dict[str, np.ndarray]:
@@ -1120,7 +1125,7 @@ class OLSFlowPanelFE(FlowPanelModel):
         Spatial keys (``rho_*``) are ignored in this aspatial baseline.
     robust : bool, default False
         If True, replace the Normal error with Student-t.
-    symmetric_xo_xd : bool, optional
+    shared_od_covariates : bool, optional
         Whether to constrain origin and destination covariate effects
         to be equal. Forwarded to :class:`FlowPanelModel`.
 
@@ -1133,7 +1138,7 @@ class OLSFlowPanelFE(FlowPanelModel):
     def __init__(self, y, X, W, T, **kwargs):
         # Skip log-determinant precomputation: A = I_N has |A| = 1.
         kwargs.pop("logdet_method", None)
-        kwargs.pop("restrict_positive", None)
+        kwargs.pop("nonnegative_dependence", None)
         super().__init__(y, X, W, T, logdet_method="none", **kwargs)
 
     def _build_pymc_model(self) -> pm.Model:
@@ -1207,14 +1212,14 @@ class OLSFlowPanelFE(FlowPanelModel):
             )
         return out
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
         draws: Optional[int] = None,
     ) -> dict[str, np.ndarray]:
         r"""Closed-form Thomas-Agnan & LeSage (2014, Table 83.1) effects.
 
         Identical to
-        :meth:`neighbayes.models.flow.OLSFlow._compute_spatial_effects_posterior`:
+        :meth:`neighbayes.models.flow.OLSFlow._compute_impacts_posterior`:
         with :math:`A = I_N` the response to any shock equals the shock
         itself, so the per-region averages collapse to closed-form
         expressions in :math:`\beta_d`, :math:`\beta_o`, and
@@ -1403,7 +1408,7 @@ class _UnrestrictedCountFlowPanel(_FlowCountPanelMixin):
             self._T,
             self.priors.get("rho_lower", -0.999),
             self.priors.get("rho_upper", 0.999),
-            self.restrict_positive,
+            self.nonnegative_dependence,
         )
 
     def _build_pymc_count_model(self) -> pm.Model:
@@ -1413,7 +1418,7 @@ class _UnrestrictedCountFlowPanel(_FlowCountPanelMixin):
         N, T = self._N_flow, self._T
         X_t = pt.as_tensor_variable(self._X.astype(np.float64))
         with pm.Model(coords=self._model_coords()) as model:
-            if self.restrict_positive:
+            if self.nonnegative_dependence:
                 rho_simplex = pm.Dirichlet("rho_simplex", a=np.ones(4))
                 rho_d = pm.Deterministic("rho_d", rho_simplex[0])
                 rho_o = pm.Deterministic("rho_o", rho_simplex[1])
@@ -1514,6 +1519,7 @@ class _AspatialCountFlowPanel(_FlowCountPanelMixin):
         self,
         *,
         sampler,
+        backend=None,
         draws,
         tune,
         chains,
@@ -1526,6 +1532,7 @@ class _AspatialCountFlowPanel(_FlowCountPanelMixin):
         **sample_kwargs,
     ) -> xr.DataTree:
         """Gibbs with ρ fixed at 0 (pair effects integrated out), or NUTS."""
+        backend = select_backend(sampler, backend, sample_kwargs)
         if sampler == "nuts":
             return FlowPanelModel.fit(
                 self,
@@ -1535,10 +1542,10 @@ class _AspatialCountFlowPanel(_FlowCountPanelMixin):
                 random_seed=random_seed,
                 progressbar=progressbar,
                 idata_kwargs=idata_kwargs,
+                backend=backend,
                 **sample_kwargs,
             )
-        if sampler != "gibbs":
-            raise ValueError(f"sampler must be 'gibbs' or 'nuts', got {sampler!r}")
+        self._resolve_gibbs_backend(backend, jax=False)
         if sample_kwargs:
             raise TypeError(f"Unexpected keyword arguments: {sorted(sample_kwargs)}")
         from ...samplers.count_panel._filters import NoFilter
@@ -1586,7 +1593,7 @@ class SARNegBinFlowPanelRE(_UnrestrictedCountFlowPanel, SARFlowPanelFE):
         random_seed: Optional[int] = None,
         *,
         sampler: str = "gibbs",
-        gibbs_backend: str = "auto",
+        backend: str | None = None,
         attach_log_abs_det: bool = True,
         progressbar: bool = True,
         n_jobs: int = -1,
@@ -1606,8 +1613,9 @@ class SARNegBinFlowPanelRE(_UnrestrictedCountFlowPanel, SARFlowPanelFE):
         ``log_likelihood``); set it ``False`` to skip the per-draw resolvent cost
         at very large ``N``.
 
-        ``gibbs_backend="auto"`` (default) takes JAX when it is installed and the
-        configuration has a JAX kernel, else NumPy.  The unrestricted JAX kernel
+        ``backend="auto"`` (default) takes JAX when it is installed and the
+        configuration has a JAX kernel, else NumPy; NUTS takes ``"pymc"`` (its
+        default), ``"nutpie"``, ``"numpyro"`` or ``"blackjax"``.  The unrestricted JAX kernel
         covers the cross-section (``T = 1``) without effects; panels and pair or
         period effects run on NumPy.  With pair or period effects
         (``effects != 0``) the sweep also integrates out the pair effects; see
@@ -1618,9 +1626,10 @@ class SARNegBinFlowPanelRE(_UnrestrictedCountFlowPanel, SARFlowPanelFE):
         ``az.loo`` on either sampler; off by default, as in PyMC.
         """
         log_lik = bool((idata_kwargs or {}).get("log_likelihood", False))
+        backend = select_backend(sampler, backend, sample_kwargs)
         if sampler == "gibbs":
             gibbs_backend = self._resolve_gibbs_backend(
-                gibbs_backend, jax=not self._count_effects and self._T == 1
+                backend, jax=not self._count_effects and self._T == 1
             )
             if self._count_effects:
                 pv = self._flow_count_priors()
@@ -1652,7 +1661,7 @@ class SARNegBinFlowPanelRE(_UnrestrictedCountFlowPanel, SARFlowPanelFE):
                     gibbs_backend=gibbs_backend,
                     log_likelihood=log_lik,
                 )
-        elif sampler == "nuts":
+        else:
             idata = FlowPanelModel.fit(
                 self,
                 draws=draws,
@@ -1661,10 +1670,9 @@ class SARNegBinFlowPanelRE(_UnrestrictedCountFlowPanel, SARFlowPanelFE):
                 random_seed=random_seed,
                 progressbar=progressbar,
                 idata_kwargs=idata_kwargs,
+                backend=backend,
                 **sample_kwargs,
             )
-        else:
-            raise ValueError(f"sampler must be 'gibbs' or 'nuts', got {sampler!r}")
         if attach_log_abs_det:
             self._attach_flow_log_abs_det(idata)
         return idata
@@ -1699,7 +1707,7 @@ class SARNegBinFlowPanelRE(_UnrestrictedCountFlowPanel, SARFlowPanelFE):
             log_likelihood=log_likelihood,
         )
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
         draws: Optional[int] = None,
     ) -> dict[str, np.ndarray]:
@@ -1751,7 +1759,7 @@ class SARNegBinFlowSeparablePanelRE(_SeparableCountFlowPanel, SARFlowSeparablePa
         random_seed: Optional[int] = None,
         *,
         sampler: str = "gibbs",
-        gibbs_backend: str = "auto",
+        backend: str | None = None,
         attach_log_abs_det: bool = True,
         progressbar: bool = True,
         n_jobs: int = -1,
@@ -1770,7 +1778,7 @@ class SARNegBinFlowSeparablePanelRE(_SeparableCountFlowPanel, SARFlowSeparablePa
         ``sample_stats["log_abs_det"]`` for diagnostics — not folded into the
         count model's ``log_likelihood``.
 
-        ``gibbs_backend="jax"`` runs the same structured sweep compiled with JAX,
+        ``backend="jax"`` runs the same structured sweep compiled with JAX,
         chains on threads; ``"numpy"`` runs it on the host; ``"auto"`` (default)
         takes JAX when it is installed, else NumPy.  With
         effects (``effects != 0``) the structured sweep also integrates
@@ -1795,8 +1803,9 @@ class SARNegBinFlowSeparablePanelRE(_SeparableCountFlowPanel, SARFlowSeparablePa
         ``az.loo`` on either sampler; off by default, as in PyMC.
         """
         log_lik = bool((idata_kwargs or {}).get("log_likelihood", False))
+        backend = select_backend(sampler, backend, sample_kwargs)
         if sampler == "gibbs":
-            gibbs_backend = self._resolve_gibbs_backend(gibbs_backend, jax=True)
+            gibbs_backend = self._resolve_gibbs_backend(backend, jax=True)
             if self._count_effects:
                 idata = self._fit_gibbs_fe(
                     gibbs_backend=gibbs_backend,
@@ -1826,7 +1835,7 @@ class SARNegBinFlowSeparablePanelRE(_SeparableCountFlowPanel, SARFlowSeparablePa
                     gibbs_backend=gibbs_backend,
                     log_likelihood=log_lik,
                 )
-        elif sampler == "nuts":
+        else:
             if cell_mask is not None:
                 raise ValueError("cell_mask is supported only by the Gibbs effects path")
             idata = FlowPanelModel.fit(
@@ -1837,10 +1846,9 @@ class SARNegBinFlowSeparablePanelRE(_SeparableCountFlowPanel, SARFlowSeparablePa
                 random_seed=random_seed,
                 progressbar=progressbar,
                 idata_kwargs=idata_kwargs,
+                backend=backend,
                 **sample_kwargs,
             )
-        else:
-            raise ValueError(f"sampler must be 'gibbs' or 'nuts', got {sampler!r}")
         if attach_log_abs_det:
             self._attach_flow_log_abs_det(idata)
         return idata
@@ -2032,7 +2040,7 @@ class SARNegBinFlowSeparablePanelRE(_SeparableCountFlowPanel, SARFlowSeparablePa
             results, ["rho_d", "rho_o", "rho_w"], keep_groups, log_likelihood
         )
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
         draws: Optional[int] = None,
     ) -> dict[str, np.ndarray]:
@@ -2084,15 +2092,18 @@ class NegBinFlowPanelRE(_AspatialCountFlowPanel, OLSFlowPanelFE):
         random_seed: Optional[int] = None,
         *,
         sampler: str = "gibbs",
+        backend: str | None = None,
         progressbar: bool = True,
         n_jobs: int = -1,
         idata_kwargs: Optional[dict] = None,
         store_group_effects: Optional[bool] = None,
         **sample_kwargs,
     ) -> xr.DataTree:
-        """Sample the posterior: Gibbs (default, ρ fixed at 0) or ``"nuts"``."""
+        """Sample the posterior: Gibbs (default, ρ fixed at 0, on NumPy) or
+        ``"nuts"`` (``backend`` as in :meth:`SARNegBinFlowPanelRE.fit`)."""
         return self._fit_count_aspatial(
             sampler=sampler,
+            backend=backend,
             draws=draws,
             tune=tune,
             chains=chains,
@@ -2133,11 +2144,11 @@ class SARZINBFlowSeparablePanelRE(
 
     Sampling: ``fit()`` runs the structured ``n × n`` Pólya–Gamma sweep
     (:mod:`neighbayes.samplers.zinb._flow_structured`), on NumPy or
-    ``gibbs_backend="jax"``; ``sampler="nuts"`` fits the same model in PyMC.
+    ``backend="jax"``; ``sampler="nuts"`` fits the same model in PyMC.
 
     Parameters
     ----------
-    y, X, W, T, col_names, k, priors, symmetric_xo_xd
+    y, X, W, T, col_names, k, priors, shared_od_covariates
         As :class:`SARNegBinFlowSeparablePanelRE`.
     Z : array-like or pandas.DataFrame, optional
         Selection design, time-first stacked ``(n²·T, p)``.  Default: ``X``
@@ -2252,7 +2263,7 @@ class SARZINBFlowSeparablePanelRE(
         random_seed: Optional[int] = None,
         *,
         sampler: str = "gibbs",
-        gibbs_backend: str = "auto",
+        backend: str | None = None,
         progressbar: bool = True,
         n_jobs: int = -1,
         idata_kwargs: Optional[dict] = None,
@@ -2261,12 +2272,14 @@ class SARZINBFlowSeparablePanelRE(
     ) -> xr.DataTree:
         """Sample the posterior: structured Gibbs (default) or ``sampler="nuts"``.
 
-        ``gibbs_backend="auto"`` (default) takes JAX when it is installed, else
-        NumPy; ``"numpy"`` or ``"jax"`` pins one.
+        ``backend="auto"`` (default) takes JAX when it is installed, else
+        NumPy; ``"numpy"`` or ``"jax"`` pins one, and NUTS takes ``"pymc"``
+        (its default), ``"nutpie"``, ``"numpyro"`` or ``"blackjax"``.
         ``store_group_effects`` keeps every draw of the pair effects (default:
         when they fit in about 500 MB).  ``idata_kwargs={"log_likelihood":
         True}`` stores the marginal ZINB pointwise log-likelihood.
         """
+        backend = select_backend(sampler, backend, sample_kwargs)
         if sampler == "nuts":
             return FlowPanelModel.fit(
                 self,
@@ -2276,14 +2289,13 @@ class SARZINBFlowSeparablePanelRE(
                 random_seed=random_seed,
                 progressbar=progressbar,
                 idata_kwargs=idata_kwargs,
+                backend=backend,
                 **sample_kwargs,
             )
-        if sampler != "gibbs":
-            raise ValueError(f"sampler must be 'gibbs' or 'nuts', got {sampler!r}")
         if sample_kwargs:
             raise TypeError(f"Unexpected keyword arguments: {sorted(sample_kwargs)}")
         return self._fit_gibbs_zinb(
-            backend=self._resolve_gibbs_backend(gibbs_backend, jax=True),
+            backend=self._resolve_gibbs_backend(backend, jax=True),
             draws=draws,
             tune=tune,
             chains=chains,
@@ -2481,7 +2493,7 @@ class SARZINBFlowSeparablePanelRE(
             eta_cnt = eta_cnt + self._D_tau @ f("time_effect")[g]
         return eta_sel, eta_cnt
 
-    def _compute_spatial_effects_posterior(self, draws: Optional[int] = None) -> dict:
+    def _compute_impacts_posterior(self, draws: Optional[int] = None) -> dict:
         if self._idata is None:
             raise RuntimeError("Model has not been fit yet. Call fit() first.")
         post = self._idata.posterior
@@ -2500,7 +2512,7 @@ class SARZINBFlowSeparablePanelRE(
             draws=draws,
         )
 
-    def spatial_effects(
+    def impacts(
         self,
         equation: str = "count",
         draws: Optional[int] = None,
@@ -2513,7 +2525,7 @@ class SARZINBFlowSeparablePanelRE(
         ``equation="count"`` (default) on the count log-mean through
         ``ρ``; ``"selection"`` on the activation log-odds through ``λ`` and γ,
         available when the selection design is the flow design (``Z=None``).
-        Other arguments as :meth:`FlowPanelModel.spatial_effects`.
+        Other arguments as :meth:`FlowPanelModel.impacts`.
         """
         if equation not in ("count", "selection"):
             raise ValueError(
@@ -2526,7 +2538,7 @@ class SARZINBFlowSeparablePanelRE(
             )
         self._effects_equation = equation
         try:
-            return FlowPanelModel.spatial_effects(
+            return FlowPanelModel.impacts(
                 self,
                 draws=draws,
                 return_posterior_samples=return_posterior_samples,
@@ -2618,7 +2630,7 @@ class SEMFlowPanelFE(_ResolventFlowPanelMixin, _SEMFlowPanelMixin, FlowPanelMode
     logdet_method : str, default "resolvent"
         Log-determinant method.  The default ``"resolvent"`` samples via the
         per-period resolvent-gradient sampler (recommended).
-    restrict_positive : bool, default True
+    nonnegative_dependence : bool, default True
         If True, use ``pm.Dirichlet("lam_simplex", a=ones(4))`` to enforce
         :math:`\\lambda_d, \\lambda_o, \\lambda_w \\geq 0` and
         :math:`\\lambda_d + \\lambda_o + \\lambda_w \\leq 1`. If False,
@@ -2628,7 +2640,7 @@ class SEMFlowPanelFE(_ResolventFlowPanelMixin, _SEMFlowPanelMixin, FlowPanelMode
         If True, replace the Normal error with Student-t for robustness
         to heavy-tailed outliers.  The degrees of freedom :math:`\\nu` are
         **fixed** at ``priors["nu"]`` (default 4, LeSage's ``rval``).
-    symmetric_xo_xd : bool, optional
+    shared_od_covariates : bool, optional
         If ``None`` (default), origin and destination design blocks are
         compared and symmetry is auto-detected.
     priors : dict, optional
@@ -2637,8 +2649,8 @@ class SEMFlowPanelFE(_ResolventFlowPanelMixin, _SEMFlowPanelMixin, FlowPanelMode
         - ``beta_mu`` : float or array, default Gelman et al. (2008) — Normal prior mean for ``beta`` (``mean(y)`` on the intercept, 0 otherwise).
         - ``beta_sigma`` : float or array, default Gelman et al. (2008) — Normal prior std for ``beta``, scaled to ``sd(y)`` and each column's sd.
         - ``sigma2_alpha``, ``sigma2_beta`` : float, default 2 and ``Var(y)`` — InverseGamma prior on ``sigma**2``.
-        - ``lam_lower`` : float, default -1.0 — Lower bound of Uniform prior on each λ (only when ``restrict_positive=False``).
-        - ``lam_upper`` : float, default 1.0 — Upper bound of Uniform prior on each λ (only when ``restrict_positive=False``).
+        - ``lam_lower`` : float, default -1.0 — Lower bound of Uniform prior on each λ (only when ``nonnegative_dependence=False``).
+        - ``lam_upper`` : float, default 1.0 — Upper bound of Uniform prior on each λ (only when ``nonnegative_dependence=False``).
         - ``nu`` : float, default 4.0 — Fixed Student-t degrees of freedom (only when ``robust=True``).
     """
 
@@ -2657,7 +2669,7 @@ class SEMFlowPanelFE(_ResolventFlowPanelMixin, _SEMFlowPanelMixin, FlowPanelMode
             self._y,
             self._X,
             T=self._T,
-            restrict_positive=self.restrict_positive,
+            nonnegative_dependence=self.nonnegative_dependence,
             fe_dims=self._flow_fe_dims,
             priors=self._flow_gaussian_priors(),
             **kwargs,
@@ -2695,7 +2707,7 @@ class SEMFlowPanelFE(_ResolventFlowPanelMixin, _SEMFlowPanelMixin, FlowPanelMode
         u_stacked = u.T.reshape(-1)  # back to time-first
         return Xb + u_stacked
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
         draws: Optional[int] = None,
     ) -> dict[str, np.ndarray]:
@@ -2749,7 +2761,7 @@ class SEMFlowSeparablePanelFE(_SEMFlowPanelMixin, FlowPanelModel):
         If True, replace the Normal error with Student-t for robustness
         to heavy-tailed outliers.  The degrees of freedom :math:`\\nu` are
         **fixed** at ``priors["nu"]`` (default 4, LeSage's ``rval``).
-    symmetric_xo_xd : bool, optional
+    shared_od_covariates : bool, optional
         If ``None`` (default), origin and destination design blocks are
         compared and symmetry is auto-detected.
     priors : dict, optional
@@ -2764,7 +2776,7 @@ class SEMFlowSeparablePanelFE(_SEMFlowPanelMixin, FlowPanelModel):
 
     Notes
     -----
-    The ``restrict_positive`` argument inherited from :class:`FlowPanelModel`
+    The ``nonnegative_dependence`` argument inherited from :class:`FlowPanelModel`
     has no effect on this class — separable variants always use Uniform
     priors on the individual :math:`\\lambda` components.
     """
@@ -2874,7 +2886,7 @@ class SEMFlowSeparablePanelFE(_SEMFlowPanelMixin, FlowPanelModel):
         u = kron_solve_matrix(Lo, Ld, eps, n)
         return Xb + u.T.reshape(-1)
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
         draws: Optional[int] = None,
     ) -> dict[str, np.ndarray]:

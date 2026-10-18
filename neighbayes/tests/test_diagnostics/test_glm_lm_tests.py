@@ -69,7 +69,7 @@ def _negbin_dgp(seed: int, n_side: int, rho: float = 0.0, alpha_true: float = 3.
 @pytest.fixture(scope="module")
 def logit_null_fit():
     y, X, W = _logit_dgp(seed=0, n_side=12)  # n=144
-    m = Logit(y=y, X=X, W=W_to_graph(W), w_vars=["x1", "x2"])
+    m = Logit(y=y, X=X, W=W_to_graph(W), durbin_vars=["x1", "x2"])
     m.fit(draws=300, tune=300, chains=2, progressbar=False, random_seed=11)
     return m
 
@@ -77,7 +77,7 @@ def logit_null_fit():
 @pytest.fixture(scope="module")
 def logit_sar_fit():
     y, X, W = _logit_dgp(seed=1, n_side=15, rho=0.7)
-    m = Logit(y=y, X=X, W=W_to_graph(W), w_vars=["x1", "x2"])
+    m = Logit(y=y, X=X, W=W_to_graph(W), durbin_vars=["x1", "x2"])
     m.fit(draws=400, tune=400, chains=2, progressbar=False, random_seed=12)
     return m
 
@@ -117,7 +117,7 @@ def test_logit_spatial_diagnostics_dispatch(logit_null_fit):
 @pytest.fixture(scope="module")
 def negbin_null_fit():
     y, X, W = _negbin_dgp(seed=2, n_side=12)
-    m = NegBin(y=y, X=X, W=W_to_graph(W), w_vars=["x1", "x2"])
+    m = NegBin(y=y, X=X, W=W_to_graph(W), durbin_vars=["x1", "x2"])
     m.fit(draws=300, tune=300, chains=2, progressbar=False, random_seed=21)
     return m
 
@@ -125,7 +125,7 @@ def negbin_null_fit():
 @pytest.fixture(scope="module")
 def negbin_sar_fit():
     y, X, W = _negbin_dgp(seed=3, n_side=15, rho=0.7)
-    m = NegBin(y=y, X=X, W=W_to_graph(W), w_vars=["x1", "x2"])
+    m = NegBin(y=y, X=X, W=W_to_graph(W), durbin_vars=["x1", "x2"])
     m.fit(draws=400, tune=400, chains=2, progressbar=False, random_seed=22)
     return m
 

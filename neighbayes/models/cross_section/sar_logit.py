@@ -12,7 +12,7 @@ cancels when β is marginalized out, making the ρ conditional linear and
 Krylov-accelerable.  The Pólya–Gamma augmentation yields fully conjugate
 Gibbs updates for β and ρ (via a collapsed slice sampler).
 
-Both backends fit the same model: ``gibbs_backend="jax"`` (the default via
+Both backends fit the same model: ``backend="jax"`` (the default via
 ``"auto"``) runs the chains in parallel threads, one ``jax.jit`` program each;
 ``"numpy"`` uses the CHOLMOD factorization path.  For the SAR logit with
 random effects, pass ``unit_effects="random"``.
@@ -102,12 +102,11 @@ class SARLogit(SpatialModel):
 
     The sampler bypasses PyMC's NUTS entirely. It produces an
     ``xarray.DataTree`` object compatible with all downstream
-    diagnostics (``spatial_diagnostics()``, ``spatial_effects()``,
+    diagnostics (``spatial_diagnostics()``, ``impacts()``,
     ``summary()``).
 
-    The ``fit()`` method does **not** accept ``nuts_sampler`` or
-    ``target_accept`` kwargs — these are NUTS-specific and will raise
-    ``TypeError`` if passed.
+    With the Gibbs sampler, ``fit()`` does **not** accept ``target_accept``,
+    a NUTS-only argument; passing it raises ``TypeError``.
 
     The PG shape parameter is
     always h = 1 (one trial per observation).
@@ -416,7 +415,7 @@ class SARLogit(SpatialModel):
         """
         return self.fitted_probabilities()
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute posterior impacts on the log-odds scale for each draw."""
@@ -436,13 +435,13 @@ class SARLogit(SpatialModel):
 
         return direct_samples, indirect_samples, total_samples
 
-    #: Threshold above which probability-scale spatial effects use the
+    #: Threshold above which probability-scale impacts use the
     #: sparse Hutchinson path instead of the eigendecomposition path.
     #: See :attr:`SARNegBin._COUNT_EFFECTS_EIGEN_MAX_N` for the
     #: cost model — the logit case is identical structurally.
     _PROBABILITY_EFFECTS_EIGEN_MAX_N: int = 2000
 
-    def _compute_probability_scale_spatial_effects_posterior(
+    def _compute_probability_scale_impacts_posterior(
         self,
         method: str = "auto",
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -494,7 +493,7 @@ class SARLogit(SpatialModel):
             method == "auto" and n > self._PROBABILITY_EFFECTS_EIGEN_MAX_N
         )
         if use_sparse:
-            return self._compute_probability_scale_spatial_effects_posterior_sparse(
+            return self._compute_probability_scale_impacts_posterior_sparse(
                 rho_draws=rho_draws,
                 beta_draws=beta_draws,
                 n=n,
@@ -545,7 +544,7 @@ class SARLogit(SpatialModel):
         indirect_samples = total_samples - direct_samples
         return direct_samples, indirect_samples, total_samples
 
-    def _compute_probability_scale_spatial_effects_posterior_sparse(
+    def _compute_probability_scale_impacts_posterior_sparse(
         self,
         rho_draws: np.ndarray,
         beta_draws: np.ndarray,
@@ -554,10 +553,10 @@ class SARLogit(SpatialModel):
         n_draws: int,
         n_effects: int,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        r"""Probability-scale spatial effects via sparse solves + Hutchinson.
+        r"""Probability-scale impacts via sparse solves + Hutchinson.
 
         Direct port of
-        :meth:`SARNegBin._compute_count_scale_spatial_effects_posterior_sparse`
+        :meth:`SARNegBin._compute_count_scale_impacts_posterior_sparse`
         with the count-mean weight :math:`\mu` replaced by the Bernoulli
         variance :math:`p(1-p)`.
         """
@@ -621,7 +620,7 @@ class SARLogit(SpatialModel):
         indirect_samples = total_samples - direct_samples
         return direct_samples, indirect_samples, total_samples
 
-    def spatial_effects(
+    def impacts(
         self,
         return_posterior_samples: bool = False,
         scale: str = "logodds",
@@ -659,18 +658,16 @@ class SARLogit(SpatialModel):
             :math:`n` exceeds :attr:`_PROBABILITY_EFFECTS_EIGEN_MAX_N`
             (default 2000).
         """
-        from ...diagnostics.spatial_effects import _build_effects_dataframe
+        from ...diagnostics.impacts import _build_effects_dataframe
 
         if scale == "logodds":
-            return super().spatial_effects(
-                return_posterior_samples=return_posterior_samples
-            )
+            return super().impacts(return_posterior_samples=return_posterior_samples)
         if scale != "probability":
             raise ValueError("scale must be either 'logodds' or 'probability'.")
 
         self._require_fit()
         direct_samples, indirect_samples, total_samples = (
-            self._compute_probability_scale_spatial_effects_posterior(method=method)
+            self._compute_probability_scale_impacts_posterior(method=method)
         )
 
         k_effects = direct_samples.shape[1]

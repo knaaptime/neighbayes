@@ -76,7 +76,7 @@ class SARNegBin(SpatialModel):
     #: Maximum n for which the JAX dense backend is used automatically.
     _JAX_DENSE_THRESHOLD: int = 10000
 
-    #: Threshold above which count-scale spatial effects use the sparse
+    #: Threshold above which count-scale impacts use the sparse
     #: Hutchinson path instead of the eigendecomposition path.
     _COUNT_EFFECTS_EIGEN_MAX_N: int = 2000
 
@@ -546,10 +546,10 @@ class SARNegBin(SpatialModel):
         return np.exp(eta)
 
     # ------------------------------------------------------------------
-    # Spatial effects (log-mean and count scales)
+    # Impacts (log-mean and count scales)
     # ------------------------------------------------------------------
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute posterior impacts on the log-mean scale for each draw."""
@@ -569,7 +569,7 @@ class SARNegBin(SpatialModel):
 
         return direct_samples, indirect_samples, total_samples
 
-    def _compute_count_scale_spatial_effects_posterior(
+    def _compute_count_scale_impacts_posterior(
         self,
         method: str = "auto",
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -628,7 +628,7 @@ class SARNegBin(SpatialModel):
         if use_sparse:
             # Sparse solves + Hutchinson diagonal estimation; avoids the
             # O(n³) eigendecomposition and O(n²) per-draw matmuls.
-            return self._compute_count_scale_spatial_effects_posterior_sparse(
+            return self._compute_count_scale_impacts_posterior_sparse(
                 rho_draws=rho_draws,
                 beta_draws=beta_draws,
                 n=n,
@@ -737,7 +737,7 @@ class SARNegBin(SpatialModel):
         AinvZ = np.asarray(A_solve(Z), dtype=np.float64)
         return np.mean(Z * AinvZ, axis=1)
 
-    def _compute_count_scale_spatial_effects_posterior_sparse(
+    def _compute_count_scale_impacts_posterior_sparse(
         self,
         rho_draws: np.ndarray,
         beta_draws: np.ndarray,
@@ -746,7 +746,7 @@ class SARNegBin(SpatialModel):
         n_draws: int,
         n_effects: int,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        r"""Count-scale spatial effects via sparse solves + Hutchinson.
+        r"""Count-scale impacts via sparse solves + Hutchinson.
 
         For large W where eigendecomposition is infeasible, this method uses:
 
@@ -844,7 +844,7 @@ class SARNegBin(SpatialModel):
         indirect_samples = total_samples - direct_samples
         return direct_samples, indirect_samples, total_samples
 
-    def spatial_effects(
+    def impacts(
         self,
         return_posterior_samples: bool = False,
         scale: str = "logmean",
@@ -874,18 +874,16 @@ class SARNegBin(SpatialModel):
             when :math:`n` exceeds
             :attr:`_COUNT_EFFECTS_EIGEN_MAX_N` (default 2000).
         """
-        from ...diagnostics.spatial_effects import _build_effects_dataframe
+        from ...diagnostics.impacts import _build_effects_dataframe
 
         if scale == "logmean":
-            return super().spatial_effects(
-                return_posterior_samples=return_posterior_samples
-            )
+            return super().impacts(return_posterior_samples=return_posterior_samples)
         if scale != "count":
             raise ValueError("scale must be either 'logmean' or 'count'.")
 
         self._require_fit()
         direct_samples, indirect_samples, total_samples = (
-            self._compute_count_scale_spatial_effects_posterior(method=method)
+            self._compute_count_scale_impacts_posterior(method=method)
         )
 
         k_effects = direct_samples.shape[1]

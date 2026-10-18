@@ -110,15 +110,15 @@ class NegBin(SpatialModel):
         return model
 
     # ------------------------------------------------------------------
-    # Spatial-effects hooks (not applicable for non-spatial model)
+    # Impacts hooks (not applicable for non-spatial model)
     # ------------------------------------------------------------------
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         raise NotImplementedError(
             "NegBin has no spatial structure and therefore no "
-            "spatial effects. Use Bayesian LM diagnostics to assess whether "
+            "impacts. Use Bayesian LM diagnostics to assess whether "
             "a spatial count model (e.g. SARNegBinRE) is appropriate."
         )
 

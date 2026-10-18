@@ -346,7 +346,7 @@ class TestNegativeBinomialSARFlowGibbs:
         assert "rho_w" in idata.posterior
 
     def test_gibbs_jax_backend_returns_inference_data(self):
-        """gibbs_backend='jax' (sparsax-sparse chain) returns valid InferenceData."""
+        """backend='jax' (sparsax-sparse chain) returns valid InferenceData."""
         import importlib.util
 
         if importlib.util.find_spec("sparsax") is None:
@@ -360,7 +360,7 @@ class TestNegativeBinomialSARFlowGibbs:
             tune=20,
             chains=2,
             sampler="gibbs",
-            gibbs_backend="jax",
+            backend="jax",
             random_seed=42,
             progressbar=False,
             idata_kwargs={"log_likelihood": True},
@@ -386,7 +386,7 @@ class TestNegativeBinomialSARFlowGibbs:
             tune=10,
             chains=1,
             sampler="gibbs",
-            gibbs_backend="jax",
+            backend="jax",
             progressbar=False,
         )
         assert "rho_d" in idata.posterior

@@ -159,7 +159,7 @@ def _refit_on_train(
         W_train = W_train.tocsr()
     else:
         W_train = None
-    # Named columns, so the refit lags the same covariates (``w_vars``).
+    # Named columns, so the refit lags the same covariates (``durbin_vars``).
     X_train = pd.DataFrame(model._X[train_idx, :], columns=model._feature_names)
     new = model.__class__(
         y=model._y[train_idx],
@@ -168,7 +168,7 @@ def _refit_on_train(
         priors=model.priors_obj,
         logdet_method=model.logdet_method,
         robust=model.robust,
-        w_vars=model._wx_feature_names if W_train is not None else None,
+        durbin_vars=model._wx_feature_names if W_train is not None else None,
         logdet_refit=model.logdet_refit,
         logdet_refit_pad_sd=model.logdet_refit_pad_sd,
         logdet_aaa_check=model.logdet_aaa_check,

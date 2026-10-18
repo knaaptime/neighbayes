@@ -42,7 +42,7 @@ BIAS_MESSAGE = (
     "Pólya–Gamma draws on the NumPy backend come from the polyagamma package, "
     "whose sampler is biased for shape h < 8 (mean by up to 1%, variance by up "
     "to 5%); negative-binomial, ZINB and hurdle samplers draw at h = y + α. Use "
-    "gibbs_backend='jax' with pgjax installed, whose sampler is exact."
+    "backend='jax' with pgjax installed, whose sampler is exact."
 )
 
 

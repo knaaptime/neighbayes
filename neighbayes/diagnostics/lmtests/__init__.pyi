@@ -140,28 +140,28 @@ from .flow import (
     _flow_score_info as _flow_score_info,
 )
 from .flow import (
-    bayesian_lm_flow_dest_test as bayesian_lm_flow_dest_test,
+    bayesian_lm_flow_destination_test as bayesian_lm_flow_destination_test,
 )
 from .flow import (
-    bayesian_lm_flow_intra_test as bayesian_lm_flow_intra_test,
+    bayesian_lm_flow_intraunit_test as bayesian_lm_flow_intraunit_test,
 )
 from .flow import (
     bayesian_lm_flow_joint_test as bayesian_lm_flow_joint_test,
 )
 from .flow import (
-    bayesian_lm_flow_network_test as bayesian_lm_flow_network_test,
+    bayesian_lm_flow_od_test as bayesian_lm_flow_od_test,
 )
 from .flow import (
-    bayesian_lm_flow_orig_test as bayesian_lm_flow_orig_test,
+    bayesian_lm_flow_origin_test as bayesian_lm_flow_origin_test,
 )
 from .flow import (
-    bayesian_robust_lm_flow_dest_test as bayesian_robust_lm_flow_dest_test,
+    bayesian_robust_lm_flow_destination_test as bayesian_robust_lm_flow_destination_test,
 )
 from .flow import (
-    bayesian_robust_lm_flow_network_test as bayesian_robust_lm_flow_network_test,
+    bayesian_robust_lm_flow_od_test as bayesian_robust_lm_flow_od_test,
 )
 from .flow import (
-    bayesian_robust_lm_flow_orig_test as bayesian_robust_lm_flow_orig_test,
+    bayesian_robust_lm_flow_origin_test as bayesian_robust_lm_flow_origin_test,
 )
 from .panel import (
     _flow_panel_marginal_lm as _flow_panel_marginal_lm,
@@ -185,19 +185,19 @@ from .panel import (
     bayesian_panel_lm_error_test as bayesian_panel_lm_error_test,
 )
 from .panel import (
-    bayesian_panel_lm_flow_dest_test as bayesian_panel_lm_flow_dest_test,
+    bayesian_panel_lm_flow_destination_test as bayesian_panel_lm_flow_destination_test,
 )
 from .panel import (
-    bayesian_panel_lm_flow_intra_test as bayesian_panel_lm_flow_intra_test,
+    bayesian_panel_lm_flow_intraunit_test as bayesian_panel_lm_flow_intraunit_test,
 )
 from .panel import (
     bayesian_panel_lm_flow_joint_test as bayesian_panel_lm_flow_joint_test,
 )
 from .panel import (
-    bayesian_panel_lm_flow_network_test as bayesian_panel_lm_flow_network_test,
+    bayesian_panel_lm_flow_od_test as bayesian_panel_lm_flow_od_test,
 )
 from .panel import (
-    bayesian_panel_lm_flow_orig_test as bayesian_panel_lm_flow_orig_test,
+    bayesian_panel_lm_flow_origin_test as bayesian_panel_lm_flow_origin_test,
 )
 from .panel import (
     bayesian_panel_lm_lag_sdem_test as bayesian_panel_lm_lag_sdem_test,

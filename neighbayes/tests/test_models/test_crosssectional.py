@@ -112,7 +112,7 @@ BACKENDS = ["numpy", "jax"]
 
 def _backend_kwargs(backend):
     kw = dict(SAMPLE_KWARGS)
-    kw["gibbs_backend"] = backend
+    kw["backend"] = backend
     if backend == "numpy":
         kw["n_jobs"] = 1
     return kw

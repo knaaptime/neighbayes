@@ -468,7 +468,7 @@ class SharedSpatialMethods(metaclass=FacadeMeta):
         """Return indices of non-constant (non-intercept) columns in X.
 
         This is used to exclude the intercept from impact measures, since
-        the intercept has no meaningful spatial effect interpretation.
+        the intercept has no meaningful impact interpretation.
 
         Returns
         -------
@@ -591,7 +591,7 @@ class SharedSpatialMethods(metaclass=FacadeMeta):
         return coords
 
     # ------------------------------------------------------------------
-    # Shared spatial-effects helpers
+    # Shared impacts helpers
     # ------------------------------------------------------------------
     # These centralise the repeated direct/indirect/total effects formulas
     # used by SAR, SEM, SLX/SDEM, and SDM models (cross-section and panel).
@@ -1157,7 +1157,7 @@ class SharedSpatialMethods(metaclass=FacadeMeta):
         eigs = self._logdet_eigs
         return self._logdet_W_operand if eigs is None else eigs
 
-    def spatial_effects(
+    def impacts(
         self, return_posterior_samples: bool = False
     ) -> pd.DataFrame | tuple[pd.DataFrame, dict[str, np.ndarray]]:
         r"""Compute Bayesian inference for direct, indirect, and total impacts.
@@ -1194,11 +1194,11 @@ class SharedSpatialMethods(metaclass=FacadeMeta):
             ``"direct"``, ``"indirect"``, ``"total"``, each mapping
             to a ``(G, k)`` array of posterior draws.
         """
-        from ...diagnostics.spatial_effects import _build_effects_dataframe
+        from ...diagnostics.impacts import _build_effects_dataframe
 
         self._require_fit()
         direct_samples, indirect_samples, total_samples = (
-            self._compute_spatial_effects_posterior()
+            self._compute_impacts_posterior()
         )
 
         # Determine feature names based on the shape of the posterior samples.
@@ -1409,7 +1409,7 @@ class SharedSpatialMethods(metaclass=FacadeMeta):
         return lambda rho: fn(rho) - m * pt.log1p(-rho)
 
     # ------------------------------------------------------------------
-    # Eigendecomposition-backed spatial-effect helpers
+    # Eigendecomposition-backed impact helpers
     # ------------------------------------------------------------------
 
     @cached_property
@@ -1425,7 +1425,7 @@ class SharedSpatialMethods(metaclass=FacadeMeta):
         Eigenvalues are sorted by real part (descending) for numerical
         stability.  Row-standardized W is generally non-symmetric, so V
         and Vinv are complex; taking ``.real`` prematurely drops imaginary
-        parts and produces wrong results for spatial effects.
+        parts and produces wrong results for impacts.
 
         Raises
         ------
@@ -1529,7 +1529,7 @@ class SharedSpatialMethods(metaclass=FacadeMeta):
         """Compute mean row sum of (I - rho*W)^{-1} for each posterior draw.
 
         Always uses the N×N cross-sectional weights matrix (never the
-        (N·T)×(N·T) Kronecker product), because spatial effects are defined
+        (N·T)×(N·T) Kronecker product), because impacts are defined
         in terms of the cross-sectional spatial multiplier.
 
         For row-standardized W this is ``1/(1 - rho)`` on the connected units.
@@ -1567,7 +1567,7 @@ class SharedSpatialMethods(metaclass=FacadeMeta):
         c = self._eig_inv_ones  # complex128, (n,)
         eigs = decomp[0]  # complex128, (n,)
         V_col_sums = decomp[1].sum(axis=0)  # complex128, (n,)
-        from ...diagnostics.spatial_effects import _chunked_eig_means
+        from ...diagnostics.impacts import _chunked_eig_means
 
         return _chunked_eig_means(
             rho_draws,
@@ -1579,7 +1579,7 @@ class SharedSpatialMethods(metaclass=FacadeMeta):
         """Compute mean row sum of (I - rho*W)^{-1} W for each posterior draw.
 
         Always uses the N×N cross-sectional weights matrix (never the
-        (N·T)×(N·T) Kronecker product), because spatial effects are defined
+        (N·T)×(N·T) Kronecker product), because impacts are defined
         in terms of the cross-sectional spatial multiplier.
 
         For row-standardized W this equals ``1/(1 - rho)`` (same as
@@ -1618,7 +1618,7 @@ class SharedSpatialMethods(metaclass=FacadeMeta):
         c = self._eig_inv_ones  # complex128, (n,)
         eigs = decomp[0]  # complex128, (n,)
         V_col_sums = decomp[1].sum(axis=0)  # complex128, (n,)
-        from ...diagnostics.spatial_effects import _chunked_eig_means
+        from ...diagnostics.impacts import _chunked_eig_means
 
         return _chunked_eig_means(
             rho_draws,
@@ -1722,7 +1722,7 @@ class SharedSpatialMethods(metaclass=FacadeMeta):
         --------
         spatial_diagnostics_decision : Model-selection decision based on
             the test results.
-        spatial_effects : Posterior inference for direct/indirect/total
+        impacts : Posterior inference for direct/indirect/total
             impacts.
 
         Examples

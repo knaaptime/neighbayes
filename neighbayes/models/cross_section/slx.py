@@ -73,11 +73,11 @@ class SLX(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     robust : bool, default False
         If True, replace the Normal error with Student-t. See *Robust
         regression* below.
-    w_vars : list of str, optional
+    durbin_vars : list of str, optional
         Names of X columns to spatially lag. By default all
         non-constant columns are lagged. Pass a subset to restrict
         which variables receive a spatial lag, e.g.
-        ``w_vars=["income", "density"]``. SLX requires at least one
+        ``durbin_vars=["income", "density"]``. SLX requires at least one
         WX column; if filtering eliminates all of them a ValueError is
         raised.
 
@@ -112,7 +112,7 @@ class SLX(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     _model_type: str = "slx"
     _likelihood: str = "gaussian"  # NUTS-only (no _gibbs_key)
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute direct, indirect, and total effects for each posterior draw.

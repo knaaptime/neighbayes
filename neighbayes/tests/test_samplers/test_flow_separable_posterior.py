@@ -134,7 +134,7 @@ def test_separable_posterior_matches_exact_reference(data, reference, backend):
         chains=CHAINS,
         random_seed=11,
         progressbar=False,
-        gibbs_backend=backend,
+        backend=backend,
     )
     _assert_matches(idata, reference)
 
@@ -150,6 +150,6 @@ def test_separable_panel_posterior_matches_exact_reference(
         chains=CHAINS,
         random_seed=11,
         progressbar=False,
-        gibbs_backend=backend,
+        backend=backend,
     )
     _assert_matches(idata, panel_reference)

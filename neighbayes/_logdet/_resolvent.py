@@ -18,7 +18,7 @@ One object, three consumers (see the module plan):
 * **gradient-based samplers** (NUTS/MALA on any backend) need ``g(ρ)``;
 * **spatial impacts** need the resolvent trace ``tr(W(I−ρW)⁻¹) = −g(ρ)`` and,
   in mean form, ``mean(λ/(1−ρλ)) = −g(ρ)/n`` — the same quantity
-  :func:`neighbayes.diagnostics.spatial_effects._chunked_eig_means` builds from
+  :func:`neighbayes.diagnostics.impacts._chunked_eig_means` builds from
   dense eigenvalues today, available here at any ``n`` without an
   eigendecomposition;
 * the value log-density adds ``g(ρ)`` as its only extra ρ-term over OLS.

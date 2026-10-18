@@ -1073,15 +1073,15 @@ def _sar_flow_spec() -> TreeNode:
     """
     return TreeNode(
         kind="test",
-        name="Robust-LM-Flow-Dest",
+        name="Robust-LM-Flow-Destination",
         if_true="SARFlow",
         if_false=TreeNode(
             kind="test",
-            name="Robust-LM-Flow-Orig",
+            name="Robust-LM-Flow-Origin",
             if_true="SARFlow",
             if_false=TreeNode(
                 kind="test",
-                name="Robust-LM-Flow-Network",
+                name="Robust-LM-Flow-OD",
                 if_true="SARFlow",
                 if_false="OLSFlow",
             ),
@@ -1103,15 +1103,15 @@ def _panel_sar_flow_spec() -> TreeNode:
     """SARFlowPanelFE decision tree (panel mirror of ``_sar_flow_spec``)."""
     return TreeNode(
         kind="test",
-        name="Panel-Robust-LM-Flow-Dest",
+        name="Panel-Robust-LM-Flow-Destination",
         if_true="SARFlow",
         if_false=TreeNode(
             kind="test",
-            name="Panel-Robust-LM-Flow-Orig",
+            name="Panel-Robust-LM-Flow-Origin",
             if_true="SARFlow",
             if_false=TreeNode(
                 kind="test",
-                name="Panel-Robust-LM-Flow-Network",
+                name="Panel-Robust-LM-Flow-OD",
                 if_true="SARFlow",
                 if_false="OLSFlow",
             ),

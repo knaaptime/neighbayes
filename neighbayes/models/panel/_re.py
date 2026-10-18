@@ -258,7 +258,7 @@ class OLSPanelRE(_RandomEffectsMixin, SpatialPanelModel):
         alpha = self._posterior_mean("alpha")
         return self._X @ beta + alpha[self._unit_idx]
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute posterior samples of direct, indirect, and total effects."""
@@ -518,7 +518,7 @@ class SARPanelRE(_RandomEffectsMixin, SpatialPanelModel):
         alpha = self._posterior_mean("alpha")
         return rho * self._Wy + self._X @ beta + alpha[self._unit_idx]
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute posterior samples of direct, indirect, and total effects."""
@@ -867,7 +867,7 @@ class SEMPanelRE(_RandomEffectsMixin, SpatialPanelModel):
         alpha = self._posterior_mean("alpha")
         return self._X @ beta + alpha[self._unit_idx]
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute posterior samples of direct, indirect, and total effects."""
@@ -969,7 +969,7 @@ class SDEMPanelRE(_RandomEffectsMixin, SpatialPanelModel):
         when ``None`` (default).
     robust : bool, default False
         If True, replace the Normal innovation with Student-t.
-    w_vars : list of str, optional
+    durbin_vars : list of str, optional
         Names of X columns to spatially lag. By default all
         non-constant columns are lagged. At least one column must be
         lagged; if no WX columns remain a :class:`ValueError` is
@@ -996,7 +996,7 @@ class SDEMPanelRE(_RandomEffectsMixin, SpatialPanelModel):
         if not self._wx_column_indices:
             raise ValueError(
                 "SDEMPanelRE requires at least one WX column. Pass "
-                "`w_vars=[...]` to choose which regressors receive a spatial "
+                "`durbin_vars=[...]` to choose which regressors receive a spatial "
                 "lag, or fit an SEMPanelRE model instead."
             )
         self._unit_idx = np.arange(self._N * self._T) % self._N
@@ -1109,7 +1109,7 @@ class SDEMPanelRE(_RandomEffectsMixin, SpatialPanelModel):
         Z = np.hstack([self._X, self._WX])
         return Z @ beta + alpha[self._unit_idx]
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Posterior samples of direct/indirect/total effects (SDEM form)."""

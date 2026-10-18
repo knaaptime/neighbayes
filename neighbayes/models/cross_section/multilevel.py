@@ -36,7 +36,6 @@ from libpysal.graph import Graph
 from ..._lazy_deps import pm, xr
 from ...samplers._registry import register
 from ...samplers.multilevel import (
-    PROCESSES,
     LevelSpec,
     MultilevelGibbsPriors,
     MultilevelStructure,
@@ -47,6 +46,17 @@ from ..base import SpatialModel
 from ..priors import MultilevelPriors
 
 _PARAM = {"lag": "rho", "error": "lam", "none": None}
+
+#: Each process as its dependence ("lag", "error" or "none") and Durbin terms.
+_COMPONENTS = {
+    "SAR": ("lag", False),
+    "SEM": ("error", False),
+    "SDM": ("lag", True),
+    "SDEM": ("error", True),
+    "SLX": ("none", True),
+    None: ("none", False),
+}
+_PROCESS = {v: k for k, v in _COMPONENTS.items()}
 
 
 @dataclass
@@ -66,11 +76,10 @@ class Level:
         Matrix mode in place of ``formula``/``data`` (``y`` at the units only).
     W : libpysal.graph.Graph or scipy.sparse matrix
         The level's graph over **all** its groups, regardless of parent.
-        Optional when ``process="none"`` and ``durbin=False``.
-    process : {"lag", "error", "none"}, default "lag"
-        The level's spatial process.
-    durbin : bool, default False
-        Add the spatial lags of the level's covariates, ``W_ℓ X_ℓ``.
+        Optional when ``process=None``.
+    process : {"SAR", "SEM", "SDM", "SDEM", "SLX", None}, default "SAR"
+        The level's spatial process; the Durbin processes add the spatial
+        lags of the level's covariates, ``W_ℓ X_ℓ``.  ``None`` is aspatial.
     key : str, optional
         The id column shared with the level below: each lower row's value
         names its group here.  Looked up in the level below's data, then in
@@ -95,8 +104,7 @@ class Level:
     y: Any = None
     X: Any = None
     W: Any = None
-    process: str = "lag"
-    durbin: bool = False
+    process: str | None = "SAR"
     key: str | None = None
     groups: Any = None
     name: str | None = None
@@ -259,7 +267,7 @@ class Multilevel(SpatialModel):
     >>> m = Multilevel(
     ...     Level("score ~ frl", data=schools, W=W_schools),
     ...     Level("~ income", data=districts, W=W_districts, key="district"),
-    ...     Level(data=states, W=W_states, key="state", process="error"),
+    ...     Level(data=states, W=W_states, key="state", process="SEM"),
     ... )  # doctest: +SKIP
     """
 
@@ -283,14 +291,13 @@ class Multilevel(SpatialModel):
                 raise TypeError(
                     f"Levels must be Level objects, got {type(lv).__name__}."
                 )
-            if lv.process not in PROCESSES:
+            if lv.process not in _COMPONENTS:
                 raise ValueError(
-                    f"process must be one of {PROCESSES}, got {lv.process!r}."
+                    "process must be 'SAR', 'SEM', 'SDM', 'SDEM', 'SLX' or None, "
+                    f"got {lv.process!r}."
                 )
-            if lv.W is None and (lv.process != "none" or lv.durbin):
-                raise ValueError(
-                    "A level with a lag, an error process or Durbin terms needs W."
-                )
+            if lv.W is None and lv.process is not None:
+                raise ValueError(f"A level with process={lv.process!r} needs W.")
         unit = levels[0]
         super().__init__(
             formula=unit.formula,
@@ -302,7 +309,7 @@ class Multilevel(SpatialModel):
             logdet_method=logdet_method,
         )
         self._y = np.asarray(self._y, dtype=np.float64).reshape(-1)
-        self._jacobian_param = _PARAM[unit.process]
+        self._jacobian_param = _PARAM[_COMPONENTS[unit.process][0]]
         self._resolve_levels(levels)
 
     # ------------------------------------------------------------------
@@ -315,15 +322,16 @@ class Multilevel(SpatialModel):
         names0 = list(self._feature_names)
         X0 = self._X
         durbin0: list[int] = []
-        if unit.durbin:
+        process, durbin = _COMPONENTS[unit.process]
+        if durbin:
             durbin0 = list(self._wx_column_indices)
             X0 = np.hstack([X0, self._WX])
             names0 = names0 + [f"W*{self._feature_names[j]}" for j in durbin0]
         res = [
             _Resolved(
                 name=unit.name or "units",
-                process=unit.process,
-                durbin=unit.durbin,
+                process=process,
+                durbin=durbin,
                 W=self._W_sparse,
                 X=X0,
                 names=names0,
@@ -391,15 +399,16 @@ class Multilevel(SpatialModel):
             X, names = _upper_design(lv, name, frame, J)
             n_cov = X.shape[1]
             durbin_cols: list[int] = []
-            if lv.durbin and n_cov:
+            process, durbin = _COMPONENTS[lv.process]
+            if durbin and n_cov:
                 X = np.hstack([X, np.asarray(W @ X)])
                 durbin_cols = list(range(n_cov))
                 names = names + [f"W*{c}" for c in names[:n_cov]]
             res.append(
                 _Resolved(
                     name=name,
-                    process=lv.process,
-                    durbin=lv.durbin,
+                    process=process,
+                    durbin=durbin,
                     W=W,
                     X=X,
                     names=names,
@@ -443,7 +452,8 @@ class Multilevel(SpatialModel):
     def __repr__(self) -> str:
         parts = []
         for ell, r in enumerate(self._levels):
-            parts.append(f"{ell}:{r.name}(J={len(r.ids)}, {r.process})")
+            process = _PROCESS[(r.process, r.durbin)] or "aspatial"
+            parts.append(f"{ell}:{r.name}(J={len(r.ids)}, {process})")
         return f"Multilevel({', '.join(parts)})"
 
     # ------------------------------------------------------------------
@@ -901,7 +911,7 @@ class Multilevel(SpatialModel):
         rs, rs_w = _mean_rowsums(r.W, coef, lambda c, b: self._filter_solve(ell, c, b))
         return md, md_w, rs, rs_w
 
-    def _compute_spatial_effects_posterior(self):
+    def _compute_impacts_posterior(self):
         """Effects of the units' covariates through the units' filter."""
         return self._effects_at(0, on="units")[1:]
 
@@ -999,7 +1009,7 @@ class Multilevel(SpatialModel):
         total = tot_b[:, None] * B + tot_d[:, None] * Dl
         return names, direct, total - direct, total
 
-    def spatial_effects(
+    def impacts(
         self,
         level: int | str = 0,
         on: str = "units",
@@ -1036,7 +1046,7 @@ class Multilevel(SpatialModel):
         random_seed : int, optional
             For the probes.
         """
-        from ...diagnostics.spatial_effects import _build_effects_dataframe
+        from ...diagnostics.impacts import _build_effects_dataframe
 
         ell = self._level_index(level)
         names, direct, indirect, total = self._effects_at(

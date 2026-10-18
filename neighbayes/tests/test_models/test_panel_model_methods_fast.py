@@ -107,7 +107,7 @@ def test_panel_fe_fitted_values_and_effects_with_mock_posteriors():
 
     for model in [ols, sar, sem, sdm, sdem, slx]:
         fitted = model.fitted_values()
-        effects = model.spatial_effects()
+        effects = model.impacts()
         assert fitted.shape == y.shape
         assert np.all(np.isfinite(fitted))
         assert set(effects.columns) == {
@@ -127,7 +127,7 @@ def test_panel_fe_fitted_values_and_effects_with_mock_posteriors():
         assert np.all(np.isfinite(effects["direct"].values))
 
 
-def test_panel_fe_spatial_effects_accept_numeric_row_standardized_graph_without_transform():
+def test_panel_fe_impacts_accept_numeric_row_standardized_graph_without_transform():
     y, X, _, N, T = _panel_data(seed=65)
     # FE models drop the intercept, so beta has (k-1 + kw) = 2 elements
     beta_2_fe = np.array([0.9, 0.15])
@@ -149,7 +149,7 @@ def test_panel_fe_spatial_effects_accept_numeric_row_standardized_graph_without_
     assert model._is_row_std is True
     assert not any("row-standardized" in str(w.message) for w in caught)
 
-    effects = model.spatial_effects()
+    effects = model.impacts()
     assert np.all(np.isfinite(effects[["direct", "indirect", "total"]].to_numpy()))
 
 

@@ -189,7 +189,7 @@ def compile_count():
 @pytest.mark.parametrize("name", _CASES)
 def test_refit_does_not_recompile(name, compile_count):
     y, build = _cases()[name]
-    kw = dict(chains=2, random_seed=1, progressbar=False, gibbs_backend="jax")
+    kw = dict(chains=2, random_seed=1, progressbar=False, backend="jax")
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         build(y).fit(draws=10, tune=10, **kw)

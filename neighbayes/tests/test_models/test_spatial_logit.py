@@ -102,11 +102,11 @@ class TestBuildPyMCModel:
 class TestFitKwargRejection:
     """fit() should reject NUTS-specific kwargs."""
 
-    def test_rejects_nuts_sampler(self):
+    def test_rejects_a_nuts_backend(self):
         y, X, W = _binary_data()
         model = SARLogit(y=y, X=X, W=W)
-        with pytest.raises(TypeError, match="nuts_sampler"):
-            model.fit(nuts_sampler="numpyro")
+        with pytest.raises(ValueError, match="sampler='gibbs'"):
+            model.fit(backend="numpyro")
 
     def test_rejects_target_accept(self):
         y, X, W = _binary_data()
@@ -141,12 +141,12 @@ class TestFittedProbabilities:
 
 
 # ---------------------------------------------------------------------------
-# spatial_effects test
+# impacts test
 # ---------------------------------------------------------------------------
 
 
 class TestSpatialEffects:
-    """spatial_effects should compute direct/indirect/total impacts."""
+    """impacts should compute direct/indirect/total impacts."""
 
     def test_probability_scale_eigen(self):
         """``scale='probability'`` returns response-scale impacts via eigen path."""
@@ -158,8 +158,8 @@ class TestSpatialEffects:
                 "rho": np.array([0.15, 0.16]),
             }
         )
-        df_logodds = model.spatial_effects(scale="logodds")
-        df_prob = model.spatial_effects(scale="probability", method="eigen")
+        df_logodds = model.impacts(scale="logodds")
+        df_prob = model.impacts(scale="probability", method="eigen")
         # Probability-scale effects are bounded above by log-odds effects in
         # absolute value because the multiplier p*(1-p) ≤ 1/4 < 1.
         means_lo = df_logodds["direct"].to_numpy()
@@ -178,8 +178,8 @@ class TestSpatialEffects:
                 "rho": np.array([0.15, 0.16]),
             }
         )
-        df_eig = model.spatial_effects(scale="probability", method="eigen")
-        df_spr = model.spatial_effects(scale="probability", method="sparse")
+        df_eig = model.impacts(scale="probability", method="eigen")
+        df_spr = model.impacts(scale="probability", method="sparse")
         # Hutchinson with 20 probes is noisy; check sign + order of magnitude.
         e = df_eig["direct"].to_numpy()
         s = df_spr["direct"].to_numpy()
@@ -195,7 +195,7 @@ class TestSpatialEffects:
             }
         )
         with pytest.raises(ValueError, match="logodds.*probability"):
-            model.spatial_effects(scale="bogus")
+            model.impacts(scale="bogus")
 
 
 # ---------------------------------------------------------------------------
@@ -281,11 +281,11 @@ class TestSEMBuildPyMCModel:
 class TestSEMFitKwargRejection:
     """fit() should reject NUTS-specific kwargs."""
 
-    def test_rejects_nuts_sampler(self):
+    def test_rejects_a_nuts_backend(self):
         y, X, W = _binary_data()
         model = SEMLogit(unit_effects="random", y=y, X=X, W=W)
-        with pytest.raises(TypeError, match="nuts_sampler"):
-            model.fit(nuts_sampler="numpyro")
+        with pytest.raises(ValueError, match="sampler='gibbs'"):
+            model.fit(backend="numpyro")
 
     def test_rejects_target_accept(self):
         y, X, W = _binary_data()
@@ -315,7 +315,7 @@ class TestSEMFittedProbabilities:
 
 
 class TestSEMSpatialEffects:
-    """spatial_effects should compute direct/indirect/total impacts."""
+    """impacts should compute direct/indirect/total impacts."""
 
 
 class TestSEMDGPIntegration:
@@ -405,7 +405,7 @@ class TestProgressForwarding:
             random_seed=0,
             n_jobs=1,
             progressbar=True,
-            gibbs_backend="numpy",
+            backend="numpy",
         )
 
         assert seen["progress_manager"] is not None
@@ -456,7 +456,7 @@ class TestProgressForwarding:
             random_seed=0,
             n_jobs=1,
             progressbar=True,
-            gibbs_backend="numpy",
+            backend="numpy",
         )
 
         assert seen["progress_manager"] is not None
@@ -464,7 +464,7 @@ class TestProgressForwarding:
 
 
 # ---------------------------------------------------------------------------
-# JAX vmap (gibbs_backend="jax") path
+# JAX vmap (backend="jax") path
 # ---------------------------------------------------------------------------
 
 
@@ -484,7 +484,7 @@ class TestJaxVectorizedFit:
             random_seed=0,
             n_jobs=1,
             progressbar=False,
-            gibbs_backend="jax",
+            backend="jax",
         )
         rho = idata.posterior["rho"].values
         beta = idata.posterior["beta"].values
@@ -506,7 +506,7 @@ class TestJaxVectorizedFit:
                 random_seed=0,
                 n_jobs=1,
                 progressbar=False,
-                gibbs_backend="jax",
+                backend="jax",
                 return_eta=True,
             )
 
@@ -520,7 +520,7 @@ class TestJaxVectorizedFit:
             random_seed=0,
             n_jobs=1,
             progressbar=False,
-            gibbs_backend="jax",
+            backend="jax",
         )
         lam = idata.posterior["lam"].values
         beta = idata.posterior["beta"].values
@@ -539,6 +539,6 @@ class TestJaxVectorizedFit:
                 random_seed=0,
                 n_jobs=1,
                 progressbar=False,
-                gibbs_backend="jax",
+                backend="jax",
                 return_eta=True,
             )

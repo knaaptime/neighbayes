@@ -40,7 +40,7 @@ __all__ = [
 #
 # Gibbs-only (no NUTS build).  The canonical ``SARLogit`` model.  ``auto``
 # prefers the ``jax`` thread-parallel path (fastest for cross-section models);
-# the NumPy (CHOLMOD) path is available via ``gibbs_backend="numpy"``.
+# the NumPy (CHOLMOD) path is available via ``backend="numpy"``.
 
 
 def _run_binary_reduced_gibbs(

@@ -61,7 +61,7 @@ def test_panel_re_fitted_values_and_effects_run_with_mock_posteriors():
 
     for m in [ols, sar, sem]:
         fitted = m.fitted_values()
-        effects = m.spatial_effects()
+        effects = m.impacts()
         assert fitted.shape == y.shape
         assert np.all(np.isfinite(fitted))
         assert isinstance(effects, pd.DataFrame)
@@ -69,11 +69,11 @@ def test_panel_re_fitted_values_and_effects_run_with_mock_posteriors():
         assert "indirect" in effects.columns
         assert "total" in effects.columns
 
-    sem_eff = sem.spatial_effects()
+    sem_eff = sem.impacts()
     assert np.allclose(sem_eff["indirect"].values, 0.0)
 
 
-@pytest.mark.skip(reason="Spatial effects not yet implemented for panel Tobit models")
+@pytest.mark.skip(reason="Impacts not yet implemented for panel Tobit models")
 def test_panel_tobit_fitted_values_and_effects_run_with_latent_gap_draws():
     y, X, W, N, T = _panel_data(seed=31)
     y = y.copy()
@@ -113,10 +113,10 @@ def test_panel_tobit_fitted_values_and_effects_run_with_latent_gap_draws():
 
     for m in [sar_tobit, sem_tobit]:
         fitted = m.fitted_values()
-        effects = m.spatial_effects()
+        effects = m.impacts()
         assert fitted.shape == y.shape
         assert np.all(np.isfinite(fitted))
         assert np.all(np.isfinite(effects["direct"]))
 
-    sem_eff = sem_tobit.spatial_effects()
+    sem_eff = sem_tobit.impacts()
     assert np.allclose(sem_eff["indirect"], 0.0)

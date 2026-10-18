@@ -190,21 +190,21 @@ SDM_TOBIT_SUITE = DiagnosticSuite(
 FLOW_SUITE = DiagnosticSuite(
     name="Flow",
     tests=_suite(
-        ("bayesian_robust_lm_flow_dest_test", "Robust-LM-Flow-Dest"),
-        ("bayesian_robust_lm_flow_orig_test", "Robust-LM-Flow-Orig"),
-        ("bayesian_robust_lm_flow_network_test", "Robust-LM-Flow-Network"),
-        ("bayesian_lm_flow_intra_test", "LM-Flow-Intra"),
+        ("bayesian_robust_lm_flow_destination_test", "Robust-LM-Flow-Destination"),
+        ("bayesian_robust_lm_flow_origin_test", "Robust-LM-Flow-Origin"),
+        ("bayesian_robust_lm_flow_od_test", "Robust-LM-Flow-OD"),
+        ("bayesian_lm_flow_intraunit_test", "LM-Flow-Intraunit"),
     ),
 )
 
 FLOW_INTRA_SUITE = DiagnosticSuite(
     name="Flow-Intra",
     tests=_suite(
-        ("bayesian_lm_flow_dest_test", "LM-Flow-Dest"),
-        ("bayesian_lm_flow_orig_test", "LM-Flow-Orig"),
-        ("bayesian_lm_flow_network_test", "LM-Flow-Network"),
+        ("bayesian_lm_flow_destination_test", "LM-Flow-Destination"),
+        ("bayesian_lm_flow_origin_test", "LM-Flow-Origin"),
+        ("bayesian_lm_flow_od_test", "LM-Flow-OD"),
         ("bayesian_lm_flow_joint_test", "LM-Flow-Joint"),
-        ("bayesian_lm_flow_intra_test", "LM-Flow-Intra"),
+        ("bayesian_lm_flow_intraunit_test", "LM-Flow-Intraunit"),
     ),
 )
 
@@ -295,11 +295,11 @@ SLX_PANEL_DYNAMIC_SUITE = DiagnosticSuite(
 FLOW_PANEL_SUITE = DiagnosticSuite(
     name="Flow-Panel",
     tests=_suite(
-        ("bayesian_panel_lm_flow_dest_test", "Panel-LM-Flow-Dest"),
-        ("bayesian_panel_lm_flow_orig_test", "Panel-LM-Flow-Orig"),
-        ("bayesian_panel_lm_flow_network_test", "Panel-LM-Flow-Network"),
+        ("bayesian_panel_lm_flow_destination_test", "Panel-LM-Flow-Destination"),
+        ("bayesian_panel_lm_flow_origin_test", "Panel-LM-Flow-Origin"),
+        ("bayesian_panel_lm_flow_od_test", "Panel-LM-Flow-OD"),
         ("bayesian_panel_lm_flow_joint_test", "Panel-LM-Flow-Joint"),
-        ("bayesian_panel_lm_flow_intra_test", "Panel-LM-Flow-Intra"),
+        ("bayesian_panel_lm_flow_intraunit_test", "Panel-LM-Flow-Intraunit"),
     ),
 )
 

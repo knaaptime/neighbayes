@@ -120,10 +120,12 @@ level $L$: schools in districts in states, tracts in counties in states. Each
 level has its own graph $W_\ell$, covariates $X_\ell$, innovation sd
 $\sigma_\ell$ and process, and each level's effect $\theta_\ell$ enters the
 equation of the level below through $\Delta_\ell$, which maps a row to its
-parent. In place of the lag, any level may carry an error process,
+parent. A level's `process` is one of the acronyms used everywhere else. In
+place of the lag (`"SAR"`, the default), any level may carry an error process
+(`"SEM"`),
 $\theta_\ell = X_\ell\beta_\ell + \Delta_\ell\theta_{\ell+1} + v_\ell$ with
-$v_\ell = \lambda_\ell W_\ell v_\ell + \varepsilon_\ell$, or none, and any level
-may add the Durbin terms $W_\ell X_\ell$.
+$v_\ell = \lambda_\ell W_\ell v_\ell + \varepsilon_\ell$, or none (`None`), and
+any level may add the Durbin terms $W_\ell X_\ell$ (`"SDM"`, `"SDEM"`, `"SLX"`).
 
 Every graph spans all groups at its level, whatever their parent: a West Texas
 county neighbours New Mexico counties. Because each level's effect passes
@@ -149,7 +151,7 @@ m = Multilevel(
     Level("~ income + segregation", data=districts, W=W_districts,
           key="district_id"),                                             # level 1
     Level("~ spending", data=states, W=W_states, key="fips",
-          process="error"),                                               # level 2
+          process="SEM"),                                                 # level 2
 )
 idata = m.fit()
 ```
@@ -189,7 +191,7 @@ On a three-level lag model with 16 units per group, the collapsed scheme gave
 7–14× the effective sample size of interweaving for the upper levels' $\rho$
 and $\sigma$, and the most per second.
 
-`gibbs_backend="jax"`, the default when JAX is installed, runs the same sweep
+`backend="jax"`, the default when JAX is installed, runs the same sweep
 compiled, using sparsax's CHOLMOD and LU. When the top level is small (a few
 dozen states, say), its $\rho$ and $\sigma$ are updated through a dense Schur
 complement, which spares the large factorizations. The sweep is compiled once
@@ -203,7 +205,7 @@ non-centred. Gibbs and NUTS agree across lag, error and no-process
 configurations. The units' intercept is heavy-tailed: its spread grows as the top
 level's $\rho$ nears 1, where NUTS diverges.
 
-**Effects.** `spatial_effects(level=ℓ)` reports the effects of level $\ell$'s
+**Impacts.** `impacts(level=ℓ)` reports the impacts of level $\ell$'s
 covariates on the units, through the composed multiplier
 $S_0\Delta_0 S_1 \cdots \Delta_{\ell-1}S_\ell$, where $S_m$ is the identity for a
 level with an error process or none:
@@ -211,7 +213,7 @@ level with an error process or none:
 - *total*: the mean effect of a shift in every group;
 - *indirect*: the difference, which is what reaches a unit from other groups through the filters.
 
-`on="level"` gives the effects on $\theta_\ell$ itself, through $S_\ell$ alone.
+`on="level"` gives the impacts on $\theta_\ell$ itself, through $S_\ell$ alone.
 The own-group trace is exact up to `exact_max` groups and estimated with
 Rademacher probes above.
 
@@ -345,7 +347,7 @@ $$y_i \sim \operatorname{ZINB}(\mu_i, \alpha, \pi_i), \quad \log \boldsymbol{\mu
 
 Zero-inflated negative binomial: a spatial-lag logit selection (is the unit
 active?) and a spatial-lag NB count, both in reduced form. Pólya–Gamma Gibbs
-by default; `sampler="nuts"` fits the same model in PyMC. Corridor
+by default; `sampler="nuts"` fits the same model in PyMC. Activation
 probabilities, zero attribution and fitted means are posterior expectations;
 `posterior_predictive` simulates the zero process too.
 
@@ -372,7 +374,7 @@ over time.
 Both equations are separable flow models,
 $\eta^{\mathrm{sel}} = (L^{\lambda}_o \otimes L^{\lambda}_d)^{-1} Z\gamma$ and
 $\eta^{\mathrm{cnt}} = (L^{\rho}_o \otimes L^{\rho}_d)^{-1} X\beta$, sampled by a
-structured $n \times n$ sweep (NumPy or `gibbs_backend="jax"`) that never forms
+structured $n \times n$ sweep (NumPy or `backend="jax"`) that never forms
 an $n^2 \times n^2$ matrix. The panel adds pair and period effects on the count
 equation; the cross-section is the panel with $T = 1$. Flow counts are usually
 sparse, so the identification caveat above bites hardest here: use the panel
@@ -419,7 +421,7 @@ a ridge, so they are drawn jointly by a slice sampler that moves along it.
   prior gave α at half its true value).
 - Flows (`SARHurdleNegBinFlow(separable=True)`, cross-section or panel): both halves
   are separable flow models, sampled by the structured $n \times n$ sweep
-  (NumPy or `gibbs_backend="jax"`), with pair and period effects in both
+  (NumPy or `backend="jax"`), with pair and period effects in both
   halves.
 
 The halves share no parameters, so the posterior factorizes. Linking them
@@ -635,7 +637,7 @@ random-effects and Tobit models still require NUTS.
 
 ### Execution backends
 
-For any Gibbs sampler, `gibbs_backend` selects the execution path:
+For any Gibbs sampler, `backend` selects the execution path:
 
 | Value | Behaviour |
 |---|---|
@@ -644,6 +646,9 @@ For any Gibbs sampler, `gibbs_backend` selects the execution path:
 | `"numpy"` | pure NumPy/SciPy; chains as separate processes via `joblib`, controlled by `n_jobs` |
 
 Both backends implement the same sampler and target the same posterior.
+With `sampler="nuts"`, `backend` names the NUTS implementation instead:
+`"pymc"` (the default), `"nutpie"`, `"numpyro"` or `"blackjax"`. A backend
+that belongs to the other sampler raises.
 
 A JAX sweep is compiled once per model structure (its dimensions and its
 process, effect and prior options) and reused for the rest of the session. The

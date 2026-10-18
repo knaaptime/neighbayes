@@ -715,7 +715,7 @@ def _initialize_re_gibbs(
     # Random effects variance
     sigma_alpha2_init = max(np.var(alpha_init), 1e-6)
 
-    # Start ρ/λ at 0 (no spatial effect)
+    # Start ρ/λ at 0 (no spatial dependence)
     rho_init = 0.0
 
     return REGibbsState(

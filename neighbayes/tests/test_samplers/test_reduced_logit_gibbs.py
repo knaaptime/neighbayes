@@ -129,8 +129,8 @@ class TestReducedLogitBackendParity:
         graph = W_to_graph(W.toarray())
 
         common = dict(draws=1000, tune=800, chains=4, random_seed=0, progressbar=False)
-        inp = SARLogit(y=y, X=X, W=graph).fit(gibbs_backend="numpy", n_jobs=1, **common)
-        ij = SARLogit(y=y, X=X, W=graph).fit(gibbs_backend="jax", **common)
+        inp = SARLogit(y=y, X=X, W=graph).fit(backend="numpy", n_jobs=1, **common)
+        ij = SARLogit(y=y, X=X, W=graph).fit(backend="jax", **common)
 
         rho_np = float(inp.posterior["rho"].mean())
         rho_jx = float(ij.posterior["rho"].mean())

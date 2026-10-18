@@ -150,7 +150,7 @@ class _SpatialTobitBase(SpatialModel):
             )
         return y_lat
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Posterior samples of direct, indirect, and total effects.
@@ -206,7 +206,7 @@ class _SpatialTobitBase(SpatialModel):
 
         else:
             raise NotImplementedError(
-                f"Spatial effects not implemented for {type(self).__name__}."
+                f"Impacts not implemented for {type(self).__name__}."
             )
 
         return direct_samples, indirect_samples, total_samples
@@ -560,7 +560,7 @@ class SDMTobit(_SpatialTobitBase):
         ``None`` (default).
     robust : bool, default False
         If True, replace the Normal innovation with Student-t.
-    w_vars : list of str, optional
+    durbin_vars : list of str, optional
         Names of X columns to spatially lag. By default all
         non-constant columns are lagged.
 

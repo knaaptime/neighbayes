@@ -78,9 +78,9 @@ class SARHurdleNegBin(HurdleMixin, SpatialModel):
     (``HurdleNegativeBinomial``).
 
     The binary equation is called ``"selection"`` in
-    :meth:`spatial_effects` (alias ``"hurdle"``), with parameters ``gamma`` and
-    ``lam``; :meth:`corridor_probabilities` gives ``P(y > 0)``,
-    :meth:`conditional_mean` ``E[y | y > 0]``.
+    :meth:`impacts` (alias ``"hurdle"``), with parameters ``gamma`` and
+    ``lam``; :meth:`activation_probabilities` gives ``P(y > 0)``,
+    :meth:`positive_mean` ``E[y | y > 0]``.
     """
 
     _dispatch = classmethod(discrete)

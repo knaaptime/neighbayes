@@ -35,6 +35,34 @@ def _has_module(name: str) -> bool:
         return False
 
 
+#: What can execute each sampler, its default first.
+GIBBS_BACKENDS = ("auto", "jax", "numpy")
+NUTS_BACKENDS = ("pymc", "nutpie", "numpyro", "blackjax")
+
+
+def select_backend(sampler: str, backend: str | None, sample_kwargs: dict) -> str:
+    """The executor that ``fit(sampler=..., backend=...)`` names.
+
+    A Gibbs sampler runs on ``"auto"`` (the default: JAX when it is installed
+    and the model has a JAX kernel, else NumPy), ``"jax"`` or ``"numpy"``;
+    NUTS on ``"pymc"`` (the default), ``"nutpie"``, ``"numpyro"`` or
+    ``"blackjax"``.  ``None`` takes the sampler's default.
+    """
+    retired = {"gibbs_backend", "nuts_sampler"} & sample_kwargs.keys()
+    if retired:
+        raise TypeError(f"{min(retired)}= is replaced by backend=.")
+    if sampler not in ("gibbs", "nuts"):
+        raise ValueError(f"sampler must be 'gibbs', 'nuts', or None, got {sampler!r}")
+    valid = GIBBS_BACKENDS if sampler == "gibbs" else NUTS_BACKENDS
+    if backend is None:
+        return valid[0]
+    if backend not in valid:
+        raise ValueError(
+            f"backend for sampler={sampler!r} must be one of {valid}, got {backend!r}."
+        )
+    return backend
+
+
 def jax_available() -> bool:
     """Return ``True`` when optional ``jax`` is importable.
 
@@ -102,7 +130,7 @@ def enforce_c_backend(
         return nuts_sampler
     _warn_once(
         ("c_backend", nuts_sampler, model_name),
-        f"nuts_sampler={nuts_sampler!r} requested but {model_name} uses a custom "
+        f"backend={nuts_sampler!r} requested but {model_name} uses a custom "
         "PyTensor Op without a JAX dispatch; falling back to "
         "PyMC's default NUTS sampler.",
     )

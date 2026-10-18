@@ -53,7 +53,7 @@ def test_as_dense_region_W_rejects_legacy_and_dense_types():
         SEMProbitRE._as_dense_region_W(np.eye(2))
 
 
-def test_matrix_mode_region_parsing_with_ids_and_mobs():
+def test_matrix_mode_group_parsing_with_groups_and_sizes():
     y = np.array([0, 1, 0, 1], dtype=float)
     X = np.column_stack([np.ones(4), np.arange(4, dtype=float)])
     W = W_to_graph(make_line_W(2))
@@ -77,10 +77,10 @@ def test_spatial_probit_constructor_validation_errors():
     with pytest.raises(ValueError, match="Group effects need group_col"):
         SEMProbit(group_effects="random", y=y, X=X, W=W)
 
-    with pytest.raises(ValueError, match="region_ids must have one entry"):
+    with pytest.raises(ValueError, match="groups must have one entry"):
         SEMProbit(group_effects="random", y=y, X=X, W=W, groups=np.array([0, 1, 0]))
 
-    with pytest.raises(ValueError, match=r"sum\(mobs\) must equal"):
+    with pytest.raises(ValueError, match=r"sum\(group_sizes\) must equal"):
         SEMProbit(group_effects="random", y=y, X=X, W=W, group_sizes=[1, 1])
 
     with pytest.raises(ValueError, match="y must be binary"):

@@ -111,7 +111,7 @@ class FlowReducedGibbsCache:
     n_rho_omega_cycles : int
         Number of (ω, ρ, β) Gibbs cycles per sweep.  Default 1.
     positive : bool
-        If True (the model-level ``restrict_positive``), reject any
+        If True (the model-level ``nonnegative_dependence``), reject any
         ``ρ_k < 0`` in the unrestricted ρ conditionals — the Gibbs
         counterpart of the Dirichlet-simplex prior used by the NUTS
         path.  Ignored for the separable variant (which, like its NUTS

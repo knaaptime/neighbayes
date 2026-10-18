@@ -114,7 +114,7 @@ class OLSPanelFE(GaussianLikelihoodMixin, SpatialPanelModel):
     # _fitted_mean_from_posterior inherited from SharedSpatialMethods
     # (X @ beta, no rho, no WX)
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute direct, indirect, and total effects for each posterior draw.
@@ -225,7 +225,7 @@ class SARPanelFE(GaussianLikelihoodMixin, SpatialPanelModel):
         # Delegate to SharedSpatialMethods default (handles intercept_dropped).
         return super()._fitted_mean_from_posterior()
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute direct, indirect, and total effects for each posterior draw.
@@ -337,7 +337,7 @@ class SEMPanelFE(GaussianLikelihoodMixin, SpatialPanelModel):
         """Compute fitted values at posterior mean coefficients."""
         return super()._fitted_mean_from_posterior()
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute direct, indirect, and total effects for each posterior draw.
@@ -415,7 +415,7 @@ class SDMPanelFE(GaussianLikelihoodMixin, SpatialPanelModel):
     robust : bool, default False
         If True, replace the Normal error with Student-t. See
         *Robust regression* below.
-    w_vars : list of str, optional
+    durbin_vars : list of str, optional
         Names of X columns to spatially lag. By default all
         non-constant columns are lagged. Pass a subset to restrict
         which variables receive a spatial lag.
@@ -455,7 +455,7 @@ class SDMPanelFE(GaussianLikelihoodMixin, SpatialPanelModel):
         """
         return super()._fitted_mean_from_posterior()
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute direct, indirect, and total effects for each posterior draw.
@@ -534,7 +534,7 @@ class SDEMPanelFE(GaussianLikelihoodMixin, SpatialPanelModel):
     robust : bool, default False
         If True, replace the Normal innovation with Student-t. See
         *Robust regression* below.
-    w_vars : list of str, optional
+    durbin_vars : list of str, optional
         Names of X columns to spatially lag. By default all
         non-constant columns are lagged.
 
@@ -574,7 +574,7 @@ class SDEMPanelFE(GaussianLikelihoodMixin, SpatialPanelModel):
         """
         return super()._fitted_mean_from_posterior()
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute direct, indirect, and total effects for each posterior draw.
@@ -648,7 +648,7 @@ class SLXPanelFE(GaussianLikelihoodMixin, SpatialPanelModel):
     robust : bool, default False
         If True, replace the Normal error with Student-t. See
         *Robust regression* below.
-    w_vars : list of str, optional
+    durbin_vars : list of str, optional
         Names of X columns to spatially lag. By default all
         non-constant columns are lagged.
 
@@ -677,7 +677,7 @@ class SLXPanelFE(GaussianLikelihoodMixin, SpatialPanelModel):
     # _fitted_mean_from_posterior inherited from SharedSpatialMethods
     # ([X, WX] @ beta, no rho)
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute direct, indirect, and total effects for each posterior draw.

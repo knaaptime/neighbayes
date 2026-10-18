@@ -42,7 +42,7 @@ def run_negbin_flow_gibbs(
     model : FlowModel or FlowPanelModel
         NB flow model instance providing ``_X``, ``_y_int_vec``,
         ``_W_sparse``, ``_Wd``/``_Wo``/``_Ww``, ``_n``, ``priors``, and
-        (unrestricted only) ``restrict_positive``.
+        (unrestricted only) ``nonnegative_dependence``.
     separable : bool
         If True use the separable Kronecker kernel (``rho_w = -rho_d rho_o``,
         box prior); otherwise the unrestricted 3-rho kernel.
@@ -87,7 +87,7 @@ def run_negbin_flow_gibbs(
         T=T,
     )
     if not separable:
-        cache_kwargs["positive"] = model.restrict_positive
+        cache_kwargs["positive"] = model.nonnegative_dependence
     cache = FlowReducedGibbsCache(**cache_kwargs)
 
     # --- Build priors ---
@@ -110,10 +110,10 @@ def run_negbin_flow_gibbs(
             rho_o0 = rng.uniform(-0.1, 0.1)
             rho_w0 = None
         else:
-            rho_lo = 0.0 if model.restrict_positive else -0.1
+            rho_lo = 0.0 if model.nonnegative_dependence else -0.1
             rho_d0 = rng.uniform(rho_lo, 0.1)
             rho_o0 = rng.uniform(rho_lo, 0.1)
-            rho_w0 = rng.uniform(0.0 if model.restrict_positive else -0.05, 0.05)
+            rho_w0 = rng.uniform(0.0 if model.nonnegative_dependence else -0.05, 0.05)
         return FlowReducedGibbsState(
             beta=beta0,
             rho_d=rho_d0,
@@ -175,7 +175,7 @@ def run_negbin_flow_gibbs(
     if gibbs_backend == "jax" and T > 1 and not separable:
         raise NotImplementedError(
             "The unrestricted JAX flow Gibbs kernel is cross-section only; fit "
-            "unrestricted panels with gibbs_backend='numpy'."
+            "unrestricted panels with backend='numpy'."
         )
     if gibbs_backend == "jax":
         from ...samplers._utils._seeds import seed_sequence_to_int, spawn_chain_seeds
@@ -216,7 +216,7 @@ def run_negbin_flow_gibbs(
                 inits=inits,
                 draws=draws,
                 tune=tune,
-                positive=model.restrict_positive,
+                positive=model.nonnegative_dependence,
                 n_cycles=cache.n_rho_omega_cycles,
                 jax_seeds=seeds,
                 progressbar=progressbar,

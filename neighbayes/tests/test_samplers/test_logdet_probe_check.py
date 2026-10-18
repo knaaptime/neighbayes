@@ -52,7 +52,7 @@ def _fit(model_cls, data, backend, **kw):
         chains=2,
         random_seed=11,
         progressbar=False,
-        gibbs_backend=backend,
+        backend=backend,
     )
     name = "rho" if model_cls is SAR else "lam"
     return idata, np.asarray(idata.posterior[name]).ravel()

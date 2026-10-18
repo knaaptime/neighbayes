@@ -1366,7 +1366,7 @@ def fitted_sarflow(_flow_ring_graph):
         data["G"],
         col_names=data["col_names"],
         logdet_method="traces",
-        restrict_positive=False,
+        nonnegative_dependence=False,
     )
     sar.fit(draws=150, tune=150, chains=2, progressbar=False, random_seed=0)
     return sar
@@ -1374,30 +1374,30 @@ def fitted_sarflow(_flow_ring_graph):
 
 class TestFlowLMTests:
     def test_marginal_dest(self, fitted_olsflow):
-        from neighbayes.diagnostics.lmtests import bayesian_lm_flow_dest_test
+        from neighbayes.diagnostics.lmtests import bayesian_lm_flow_destination_test
 
-        r = bayesian_lm_flow_dest_test(fitted_olsflow)
+        r = bayesian_lm_flow_destination_test(fitted_olsflow)
         assert isinstance(r, BayesianLMTestResult)
         assert r.df == 1
-        assert r.test_type == "bayesian_lm_flow_dest"
+        assert r.test_type == "bayesian_lm_flow_destination"
         assert r.lm_samples.ndim == 1
         assert np.all(r.lm_samples >= 0)
         assert 0.0 <= r.bayes_pvalue <= 1.0
 
     def test_marginal_orig(self, fitted_olsflow):
-        from neighbayes.diagnostics.lmtests import bayesian_lm_flow_orig_test
+        from neighbayes.diagnostics.lmtests import bayesian_lm_flow_origin_test
 
-        r = bayesian_lm_flow_orig_test(fitted_olsflow)
+        r = bayesian_lm_flow_origin_test(fitted_olsflow)
         assert r.df == 1
-        assert r.test_type == "bayesian_lm_flow_orig"
+        assert r.test_type == "bayesian_lm_flow_origin"
         assert 0.0 <= r.bayes_pvalue <= 1.0
 
     def test_marginal_network(self, fitted_olsflow):
-        from neighbayes.diagnostics.lmtests import bayesian_lm_flow_network_test
+        from neighbayes.diagnostics.lmtests import bayesian_lm_flow_od_test
 
-        r = bayesian_lm_flow_network_test(fitted_olsflow)
+        r = bayesian_lm_flow_od_test(fitted_olsflow)
         assert r.df == 1
-        assert r.test_type == "bayesian_lm_flow_network"
+        assert r.test_type == "bayesian_lm_flow_od"
         assert 0.0 <= r.bayes_pvalue <= 1.0
 
     def test_joint(self, fitted_olsflow):
@@ -1410,35 +1410,37 @@ class TestFlowLMTests:
         assert 0.0 <= r.bayes_pvalue <= 1.0
 
     def test_intra(self, fitted_olsflow):
-        from neighbayes.diagnostics.lmtests import bayesian_lm_flow_intra_test
+        from neighbayes.diagnostics.lmtests import bayesian_lm_flow_intraunit_test
 
-        r = bayesian_lm_flow_intra_test(fitted_olsflow)
+        r = bayesian_lm_flow_intraunit_test(fitted_olsflow)
         assert r.df >= 1
-        assert r.test_type == "bayesian_lm_flow_intra"
+        assert r.test_type == "bayesian_lm_flow_intraunit"
         assert 0.0 <= r.bayes_pvalue <= 1.0
 
     def test_robust_dest(self, fitted_sarflow):
-        from neighbayes.diagnostics.lmtests import bayesian_robust_lm_flow_dest_test
+        from neighbayes.diagnostics.lmtests import (
+            bayesian_robust_lm_flow_destination_test,
+        )
 
-        r = bayesian_robust_lm_flow_dest_test(fitted_sarflow)
+        r = bayesian_robust_lm_flow_destination_test(fitted_sarflow)
         assert r.df == 1
-        assert r.test_type == "bayesian_robust_lm_flow_dest"
+        assert r.test_type == "bayesian_robust_lm_flow_destination"
         assert 0.0 <= r.bayes_pvalue <= 1.0
 
     def test_robust_orig(self, fitted_sarflow):
-        from neighbayes.diagnostics.lmtests import bayesian_robust_lm_flow_orig_test
+        from neighbayes.diagnostics.lmtests import bayesian_robust_lm_flow_origin_test
 
-        r = bayesian_robust_lm_flow_orig_test(fitted_sarflow)
+        r = bayesian_robust_lm_flow_origin_test(fitted_sarflow)
         assert r.df == 1
-        assert r.test_type == "bayesian_robust_lm_flow_orig"
+        assert r.test_type == "bayesian_robust_lm_flow_origin"
         assert 0.0 <= r.bayes_pvalue <= 1.0
 
     def test_robust_network(self, fitted_sarflow):
-        from neighbayes.diagnostics.lmtests import bayesian_robust_lm_flow_network_test
+        from neighbayes.diagnostics.lmtests import bayesian_robust_lm_flow_od_test
 
-        r = bayesian_robust_lm_flow_network_test(fitted_sarflow)
+        r = bayesian_robust_lm_flow_od_test(fitted_sarflow)
         assert r.df == 1
-        assert r.test_type == "bayesian_robust_lm_flow_network"
+        assert r.test_type == "bayesian_robust_lm_flow_od"
         assert 0.0 <= r.bayes_pvalue <= 1.0
 
 
@@ -1484,24 +1486,26 @@ def fitted_olsflow_panel(_flow_ring_graph):
 
 class TestFlowPanelLMTests:
     def test_marginal_dest(self, fitted_olsflow_panel):
-        from neighbayes.diagnostics.lmtests import bayesian_panel_lm_flow_dest_test
+        from neighbayes.diagnostics.lmtests import (
+            bayesian_panel_lm_flow_destination_test,
+        )
 
-        r = bayesian_panel_lm_flow_dest_test(fitted_olsflow_panel)
+        r = bayesian_panel_lm_flow_destination_test(fitted_olsflow_panel)
         assert r.df == 1
-        assert r.test_type == "bayesian_panel_lm_flow_dest"
+        assert r.test_type == "bayesian_panel_lm_flow_destination"
         assert np.all(r.lm_samples >= 0)
         assert 0.0 <= r.bayes_pvalue <= 1.0
         assert r.details["T"] == 3
 
     def test_marginal_orig_network(self, fitted_olsflow_panel):
         from neighbayes.diagnostics.lmtests import (
-            bayesian_panel_lm_flow_network_test,
-            bayesian_panel_lm_flow_orig_test,
+            bayesian_panel_lm_flow_od_test,
+            bayesian_panel_lm_flow_origin_test,
         )
 
         for fn, tt in (
-            (bayesian_panel_lm_flow_orig_test, "bayesian_panel_lm_flow_orig"),
-            (bayesian_panel_lm_flow_network_test, "bayesian_panel_lm_flow_network"),
+            (bayesian_panel_lm_flow_origin_test, "bayesian_panel_lm_flow_origin"),
+            (bayesian_panel_lm_flow_od_test, "bayesian_panel_lm_flow_od"),
         ):
             r = fn(fitted_olsflow_panel)
             assert r.df == 1
@@ -1517,9 +1521,9 @@ class TestFlowPanelLMTests:
         assert 0.0 <= r.bayes_pvalue <= 1.0
 
     def test_intra(self, fitted_olsflow_panel):
-        from neighbayes.diagnostics.lmtests import bayesian_panel_lm_flow_intra_test
+        from neighbayes.diagnostics.lmtests import bayesian_panel_lm_flow_intraunit_test
 
-        r = bayesian_panel_lm_flow_intra_test(fitted_olsflow_panel)
+        r = bayesian_panel_lm_flow_intraunit_test(fitted_olsflow_panel)
         assert r.df >= 1
-        assert r.test_type == "bayesian_panel_lm_flow_intra"
+        assert r.test_type == "bayesian_panel_lm_flow_intraunit"
         assert 0.0 <= r.bayes_pvalue <= 1.0

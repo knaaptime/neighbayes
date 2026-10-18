@@ -318,7 +318,7 @@ def test_sarlogit_numpy_backend_fit_contract():
     model = SARLogit(y=y, X=X, W=_binary_graph())
     idata = model.fit(
         sampler="gibbs",
-        gibbs_backend="numpy",
+        backend="numpy",
         draws=6,
         tune=6,
         chains=1,
@@ -335,7 +335,7 @@ def test_sarlogit_numpy_backend_fit_contract():
 # Count (Pólya-Gamma NegBin / ZINB) cross-section family
 #
 # Gibbs-registered count models.  ``auto`` resolves to NumPy/CHOLMOD for all
-# of them (the jax_dense path is opt-in via gibbs_backend="jax").  SARNegBin
+# of them (the jax_dense path is opt-in via backend="jax").  SARNegBin
 # also supports NUTS (reduced-form PyMC model with a Deterministic ``mu``).
 # ---------------------------------------------------------------------------
 
@@ -418,7 +418,7 @@ def test_zinb_jax_backend_fit_contract():
     model = SARZINB(y=y, X=X, W=_count_graph())
     idata = model.fit(
         sampler="gibbs",
-        gibbs_backend="jax",
+        backend="jax",
         draws=6,
         tune=6,
         chains=1,

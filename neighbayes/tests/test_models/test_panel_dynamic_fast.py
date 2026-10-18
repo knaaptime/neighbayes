@@ -72,7 +72,7 @@ def test_dynamic_panel_models_fitted_values_and_effects_with_mock_posteriors():
 
     for model in [dlm, sdmr, sdmu]:
         fitted = model.fitted_values()
-        effects = model.spatial_effects()
+        effects = model.impacts()
 
         assert fitted.shape[0] == N * (T - 1)
         assert np.all(np.isfinite(fitted))
@@ -105,7 +105,7 @@ def test_dynamic_dlm_no_wx_branch_uses_feature_names():
         }
     )
 
-    effects = model.spatial_effects()
+    effects = model.impacts()
     assert list(effects.index) == ["x0"]
     assert np.allclose(effects["indirect"].values, 0.0)
 
@@ -136,7 +136,7 @@ def test_dynamic_sar_panel_fitted_values_and_effects():
     )
 
     fitted = model.fitted_values()
-    effects = model.spatial_effects()
+    effects = model.impacts()
 
     assert fitted.shape[0] == N * (T - 1)
     assert np.all(np.isfinite(fitted))
@@ -173,7 +173,7 @@ def test_dynamic_sem_panel_fitted_values_and_effects():
     )
 
     fitted = model.fitted_values()
-    effects = model.spatial_effects()
+    effects = model.impacts()
 
     assert fitted.shape[0] == N * (T - 1)
     assert np.all(np.isfinite(fitted))
@@ -195,7 +195,7 @@ def test_dynamic_sdem_panel_fitted_values_and_effects():
     )
 
     fitted = model.fitted_values()
-    effects = model.spatial_effects()
+    effects = model.impacts()
 
     assert fitted.shape[0] == N * (T - 1)
     assert np.all(np.isfinite(fitted))
@@ -219,7 +219,7 @@ def test_dynamic_slx_panel_fitted_values_and_effects():
     )
 
     fitted = model.fitted_values()
-    effects = model.spatial_effects()
+    effects = model.impacts()
 
     assert fitted.shape[0] == N * (T - 1)
     assert np.all(np.isfinite(fitted))
@@ -350,7 +350,7 @@ def test_dynamic_sdm_models_no_wx_branch_effects_and_names():
     )
 
     for model in [sdmr, sdmu]:
-        eff = model.spatial_effects()
+        eff = model.impacts()
         # SDM models with WX terms report effects for lagged covariates only
         assert len(eff.index) >= 1
         assert np.all(np.isfinite(eff["direct"].values))

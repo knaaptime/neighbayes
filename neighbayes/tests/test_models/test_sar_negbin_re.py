@@ -63,14 +63,14 @@ class TestSARNegBinStructuralBuild:
         with pytest.raises(NotImplementedError, match="robust"):
             SARNegBin(unit_effects="random", y=y, X=X, W=W, robust=True)
 
-    def test_rejects_nuts_kwargs(self):
-        """NUTS-specific kwargs raise TypeError."""
+    def test_rejects_a_nuts_backend(self):
+        """A NUTS backend for the Gibbs sampler raises."""
         W = W_to_graph(make_rook_W(3))
         y = np.ones(9)
         X = np.column_stack([np.ones(9), np.random.randn(9)])
         model = SARNegBin(unit_effects="random", y=y, X=X, W=W)
-        with pytest.raises(TypeError, match="nuts_sampler"):
-            model.fit(draws=10, nuts_sampler="blackjax")
+        with pytest.raises(ValueError, match="sampler='gibbs'"):
+            model.fit(draws=10, backend="blackjax")
 
     def test_rejects_target_accept(self):
         """target_accept kwarg raises TypeError."""
@@ -247,8 +247,8 @@ class TestSARNegBinStructuralRecovery:
             f"slope={beta_mean[1]:.3f} too far from true={BETA_TRUE[1]}"
         )
 
-    def test_spatial_effects(self, sar_nb_data):
-        """spatial_effects() returns a DataFrame with expected columns."""
+    def test_impacts(self, sar_nb_data):
+        """impacts() returns a DataFrame with expected columns."""
         y = sar_nb_data["y"]
         X = sar_nb_data["X"]
         W = sar_nb_data["W_graph"]
@@ -258,7 +258,7 @@ class TestSARNegBinStructuralRecovery:
             draws=200, tune=200, chains=1, random_seed=42, n_jobs=1, progressbar=False
         )
 
-        effects = model.spatial_effects()
+        effects = model.impacts()
         assert "direct" in effects.columns
         assert "indirect" in effects.columns
         assert "total" in effects.columns
@@ -280,7 +280,7 @@ class TestSARNegBinStructuralRecovery:
             n_jobs=1,
             progressbar=False,
             return_eta=True,
-            gibbs_backend="numpy",
+            backend="numpy",
         )
 
         assert "eta" in idata.posterior
@@ -308,7 +308,7 @@ class TestSARNegBinStructuralRecovery:
 
 
 # ---------------------------------------------------------------------------
-# JAX vmap (gibbs_backend="jax") path
+# JAX vmap (backend="jax") path
 # ---------------------------------------------------------------------------
 
 
@@ -332,7 +332,7 @@ class TestSARNegBinStructuralJaxVectorized:
             random_seed=0,
             n_jobs=1,
             progressbar=False,
-            gibbs_backend="jax",
+            backend="jax",
         )
         rho = idata.posterior["rho"].values
         beta = idata.posterior["beta"].values
@@ -358,7 +358,7 @@ class TestSARNegBinStructuralJaxVectorized:
                 random_seed=0,
                 n_jobs=1,
                 progressbar=False,
-                gibbs_backend="jax",
+                backend="jax",
                 return_eta=True,
             )
 
@@ -389,7 +389,7 @@ class TestSARNegBinStructuralJaxDenseRecovery:
             random_seed=42,
             n_jobs=-1,
             progressbar=False,
-            gibbs_backend="numpy",
+            backend="numpy",
         )
 
         alpha_mean = float(idata.posterior["alpha"].mean())

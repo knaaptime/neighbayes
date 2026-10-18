@@ -280,14 +280,7 @@ def sem_probit(cls, kw: dict):
             "The latent SEM probit is not implemented; pass group_col (or groups) "
             "and group_effects='random' for the SEM probit with random group effects."
         )
-    for public, private in (
-        ("group_col", "region_col"),
-        ("groups", "region_ids"),
-        ("group_sizes", "mobs"),
-    ):
-        if public in kw:
-            kw[private] = kw.pop(public)
-    if not {"region_col", "region_ids", "mobs"} & kw.keys():
+    if not {"group_col", "groups", "group_sizes"} & kw.keys():
         raise ValueError(
             "Group effects need group_col (formula mode), or groups or group_sizes "
             "(matrix mode)."

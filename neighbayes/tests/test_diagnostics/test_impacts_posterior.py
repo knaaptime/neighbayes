@@ -1,8 +1,8 @@
-"""Tests for Bayesian spatial effects (impact measures) inference.
+"""Tests for posterior inference on impacts.
 
 Verifies that posterior-draw-level computation of direct, indirect, and total
 effects matches the existing posterior-mean computation, and that the
-DataFrame returned by spatial_effects() is correctly constructed.
+DataFrame returned by impacts() is correctly constructed.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from neighbayes.diagnostics.spatial_effects import (
+from neighbayes.diagnostics.impacts import (
     _build_effects_dataframe,
     _compute_bayesian_pvalue,
     _compute_ci,
@@ -138,7 +138,7 @@ class TestComputeCI:
 
 
 # ------------------------------------------------------------------
-# Tests for SAR spatial effects posterior
+# Tests for SAR impacts posterior
 # ------------------------------------------------------------------
 
 
@@ -164,7 +164,7 @@ class TestSARSpatialEffectsPosterior:
         rho_draws = np.random.uniform(-0.5, 0.5, G)
         _set_posterior_draws(model, beta_draws, rho_draws)
 
-        result = model.spatial_effects()
+        result = model.impacts()
         assert isinstance(result, pd.DataFrame)
         assert np.all(np.isfinite(result[["direct", "indirect", "total"]].to_numpy()))
 
@@ -186,7 +186,7 @@ class TestSARSpatialEffectsPosterior:
 
         # Get posterior effects
         direct_samples, indirect_samples, total_samples = (
-            model._compute_spatial_effects_posterior()
+            model._compute_impacts_posterior()
         )
 
         # Verify shapes (intercept excluded from effects)
@@ -197,8 +197,8 @@ class TestSARSpatialEffectsPosterior:
         # Verify that indirect = total - direct
         np.testing.assert_allclose(indirect_samples, total_samples - direct_samples)
 
-    def test_spatial_effects_result(self):
-        """Test that spatial_effects() returns a DataFrame."""
+    def test_impacts_result(self):
+        """Test that impacts() returns a DataFrame."""
         n = 5
         W = _make_W(n)
         x1 = np.linspace(-1.0, 1.0, n)
@@ -212,7 +212,7 @@ class TestSARSpatialEffectsPosterior:
         rho_draws = np.random.uniform(-0.5, 0.5, G)
         _set_posterior_draws(model, beta_draws, rho_draws)
 
-        result = model.spatial_effects()
+        result = model.impacts()
         assert isinstance(result, pd.DataFrame)
         assert result.attrs["model_type"] == "SAR"
         assert result.attrs["n_draws"] == G
@@ -241,7 +241,7 @@ class TestSARSpatialEffectsPosterior:
         assert np.all(result["indirect_pvalue"].values <= 1)
 
     def test_return_posterior_samples(self):
-        """Test that spatial_effects(return_posterior_samples=True) returns DataFrame and dict."""
+        """Test that impacts(return_posterior_samples=True) returns DataFrame and dict."""
         n = 5
         W = _make_W(n)
         x1 = np.linspace(-1.0, 1.0, n)
@@ -255,7 +255,7 @@ class TestSARSpatialEffectsPosterior:
         rho_draws = np.random.uniform(-0.5, 0.5, G)
         _set_posterior_draws(model, beta_draws, rho_draws)
 
-        df, samples = model.spatial_effects(return_posterior_samples=True)
+        df, samples = model.impacts(return_posterior_samples=True)
         assert isinstance(df, pd.DataFrame)
         assert isinstance(samples, dict)
         assert "direct" in samples
@@ -271,7 +271,7 @@ class TestSARSpatialEffectsPosterior:
 
 
 # ------------------------------------------------------------------
-# Tests for SDM spatial effects posterior
+# Tests for SDM impacts posterior
 # ------------------------------------------------------------------
 
 
@@ -292,7 +292,7 @@ class TestSDMSpatialEffectsPosterior:
         _set_posterior_draws(model, beta_draws, rho_draws)
 
         direct_samples, indirect_samples, total_samples = (
-            model._compute_spatial_effects_posterior()
+            model._compute_impacts_posterior()
         )
 
         # SDM has k_wx = 1 (only x1 is lagged)
@@ -327,7 +327,7 @@ class TestResolventDirectEffects:
 
     def test_mean_diag_matches_eigenvalue_reference(self):
         """tr(S)/n and tr(SW)/n via the resolvent match the eigenvalue form."""
-        from neighbayes.diagnostics.spatial_effects import _chunked_eig_means
+        from neighbayes.diagnostics.impacts import _chunked_eig_means
 
         W = _rook_grid_W(8)  # n=64
         n = W.shape[0]
@@ -349,7 +349,7 @@ class TestResolventDirectEffects:
 
     def test_eigenvalue_identity_is_exact(self):
         """When the method IS eigenvalue, tr(S)/n = 1 − (ρ/n)g holds exactly."""
-        from neighbayes.diagnostics.spatial_effects import _chunked_eig_means
+        from neighbayes.diagnostics.impacts import _chunked_eig_means
 
         W = _rook_grid_W(6)  # n=36 → eigenvalue method
         n = W.shape[0]
@@ -362,7 +362,7 @@ class TestResolventDirectEffects:
             atol=1e-12,
         )
 
-    def test_spatial_effects_uses_no_eigendecomposition(self):
+    def test_impacts_uses_no_eigendecomposition(self):
         """A row-standardized chol-cheb SAR computes impacts without any eig call."""
         W = _rook_grid_W(8)
         n = W.shape[0]
@@ -382,7 +382,7 @@ class TestResolventDirectEffects:
         np.linalg.eig = _boom
         np.linalg.eigvals = _boom
         try:
-            result = model.spatial_effects()
+            result = model.impacts()
         finally:
             np.linalg.eig, np.linalg.eigvals = orig_eig, orig_eigvals
 
@@ -391,7 +391,7 @@ class TestResolventDirectEffects:
 
 
 # ------------------------------------------------------------------
-# Tests for SLX spatial effects posterior
+# Tests for SLX impacts posterior
 # ------------------------------------------------------------------
 
 
@@ -410,7 +410,7 @@ class TestSLXSpatialEffectsPosterior:
         _set_posterior_draws(model, beta_draws)
 
         direct_samples, indirect_samples, total_samples = (
-            model._compute_spatial_effects_posterior()
+            model._compute_impacts_posterior()
         )
 
         assert direct_samples.shape == (G, 1)
@@ -418,7 +418,7 @@ class TestSLXSpatialEffectsPosterior:
 
 
 # ------------------------------------------------------------------
-# Tests for SDEM spatial effects posterior
+# Tests for SDEM impacts posterior
 # ------------------------------------------------------------------
 
 
@@ -437,7 +437,7 @@ class TestSDEMSpatialEffectsPosterior:
         _set_posterior_draws(model, beta_draws)
 
         direct_samples, indirect_samples, total_samples = (
-            model._compute_spatial_effects_posterior()
+            model._compute_impacts_posterior()
         )
 
         assert direct_samples.shape == (G, 1)
@@ -445,7 +445,7 @@ class TestSDEMSpatialEffectsPosterior:
 
 
 # ------------------------------------------------------------------
-# Tests for SEM spatial effects posterior
+# Tests for SEM impacts posterior
 # ------------------------------------------------------------------
 
 
@@ -464,7 +464,7 @@ class TestSEMSpatialEffectsPosterior:
         _set_posterior_draws(model, beta_draws)
 
         direct_samples, indirect_samples, total_samples = (
-            model._compute_spatial_effects_posterior()
+            model._compute_impacts_posterior()
         )
 
         # SEM excludes intercept from effects

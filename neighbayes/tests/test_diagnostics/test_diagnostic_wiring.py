@@ -91,24 +91,24 @@ EXPECTED_REGISTRIES = {
     SEMPanelRE: ["Panel-LM-Lag", "Panel-LM-WX"],
     SDEMPanelRE: ["Panel-LM-Lag-SDEM"],
     OLSFlow: [
-        "LM-Flow-Dest",
-        "LM-Flow-Orig",
-        "LM-Flow-Network",
+        "LM-Flow-Destination",
+        "LM-Flow-Origin",
+        "LM-Flow-OD",
         "LM-Flow-Joint",
-        "LM-Flow-Intra",
+        "LM-Flow-Intraunit",
     ],
     SARFlow: [
-        "Robust-LM-Flow-Dest",
-        "Robust-LM-Flow-Orig",
-        "Robust-LM-Flow-Network",
-        "LM-Flow-Intra",
+        "Robust-LM-Flow-Destination",
+        "Robust-LM-Flow-Origin",
+        "Robust-LM-Flow-OD",
+        "LM-Flow-Intraunit",
     ],
     OLSFlowPanelFE: [
-        "Panel-LM-Flow-Dest",
-        "Panel-LM-Flow-Orig",
-        "Panel-LM-Flow-Network",
+        "Panel-LM-Flow-Destination",
+        "Panel-LM-Flow-Origin",
+        "Panel-LM-Flow-OD",
         "Panel-LM-Flow-Joint",
-        "Panel-LM-Flow-Intra",
+        "Panel-LM-Flow-Intraunit",
     ],
 }
 
@@ -168,7 +168,7 @@ def test_flow_decision_tree_dispatch():
 
     # SARFlow: dest robust sig -> SARFlow
     spec_sar = _dt.get_flow_spec("SARFlow")
-    d3, _ = _dt.evaluate(spec_sar, lambda name: name == "Robust-LM-Flow-Dest")
+    d3, _ = _dt.evaluate(spec_sar, lambda name: name == "Robust-LM-Flow-Destination")
     assert d3 == "SARFlow"
 
     # SARFlow: no robust sig -> OLSFlow

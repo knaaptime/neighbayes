@@ -42,7 +42,7 @@ __all__ = [
 # ---------------------------------------------------------------------------
 #
 # Gibbs-only (no NUTS build).  ``auto`` prefers the ``jax`` path (fastest for
-# cross-section); the CHOLMOD NumPy path is available via gibbs_backend="numpy".
+# cross-section); the CHOLMOD NumPy path is available via backend="numpy".
 
 
 def _run_count_re_gibbs(

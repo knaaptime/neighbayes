@@ -1254,8 +1254,8 @@ def _flow_panel_marginal_lm(model, key: str, test_type: str) -> BayesianLMTestRe
     )
 
 
-def bayesian_panel_lm_flow_dest_test(model) -> BayesianLMTestResult:
-    r"""Panel analogue of :func:`bayesian_lm_flow_dest_test` operating on a
+def bayesian_panel_lm_flow_destination_test(model) -> BayesianLMTestResult:
+    r"""Panel analogue of :func:`bayesian_lm_flow_destination_test` operating on a
     fitted :class:`~neighbayes.models.flow_panel.OLSFlowPanelFE`.
 
     The score is summed over the demeaned panel stack
@@ -1266,34 +1266,34 @@ def bayesian_panel_lm_flow_dest_test(model) -> BayesianLMTestResult:
     follows :cite:t:`elhorst2014SpatialEconometrics` and
     :cite:t:`anselin2008SpatialPanel`. The Bayesian LM statistic is
     computed per posterior draw following :cite:t:`dogan2021BayesianRobust`."""
-    return _flow_panel_marginal_lm(model, "d", "bayesian_panel_lm_flow_dest")
+    return _flow_panel_marginal_lm(model, "d", "bayesian_panel_lm_flow_destination")
 
 
-def bayesian_panel_lm_flow_orig_test(model) -> BayesianLMTestResult:
-    r"""Panel analogue of :func:`bayesian_lm_flow_orig_test`
+def bayesian_panel_lm_flow_origin_test(model) -> BayesianLMTestResult:
+    r"""Panel analogue of :func:`bayesian_lm_flow_origin_test`
     (:math:`H_0\colon \rho_o = 0`). See
-    :func:`bayesian_panel_lm_flow_dest_test` for details and references
+    :func:`bayesian_panel_lm_flow_destination_test` for details and references
     (:cite:p:`lesage2008SpatialEconometric`,
     :cite:p:`elhorst2014SpatialEconometrics`,
     :cite:p:`dogan2021BayesianRobust`)."""
-    return _flow_panel_marginal_lm(model, "o", "bayesian_panel_lm_flow_orig")
+    return _flow_panel_marginal_lm(model, "o", "bayesian_panel_lm_flow_origin")
 
 
-def bayesian_panel_lm_flow_network_test(model) -> BayesianLMTestResult:
-    r"""Panel analogue of :func:`bayesian_lm_flow_network_test`
+def bayesian_panel_lm_flow_od_test(model) -> BayesianLMTestResult:
+    r"""Panel analogue of :func:`bayesian_lm_flow_od_test`
     (:math:`H_0\colon \rho_w = 0`). See
-    :func:`bayesian_panel_lm_flow_dest_test` for details and references
+    :func:`bayesian_panel_lm_flow_destination_test` for details and references
     (:cite:p:`lesage2008SpatialEconometric`,
     :cite:p:`elhorst2014SpatialEconometrics`,
     :cite:p:`dogan2021BayesianRobust`)."""
-    return _flow_panel_marginal_lm(model, "w", "bayesian_panel_lm_flow_network")
+    return _flow_panel_marginal_lm(model, "w", "bayesian_panel_lm_flow_od")
 
 
 def bayesian_panel_lm_flow_joint_test(model) -> BayesianLMTestResult:
     r"""Panel analogue of :func:`bayesian_lm_flow_joint_test` on
     :class:`OLSFlowPanelFE`. The joint score over
     :math:`(\rho_d, \rho_o, \rho_w)` is :math:`\chi^2_3` under :math:`H_0`.
-    See :func:`bayesian_panel_lm_flow_dest_test` for additional details
+    See :func:`bayesian_panel_lm_flow_destination_test` for additional details
     and references (:cite:p:`lesage2008SpatialEconometric`,
     :cite:p:`elhorst2014SpatialEconometrics`,
     :cite:p:`dogan2021BayesianRobust`)."""
@@ -1308,13 +1308,13 @@ def bayesian_panel_lm_flow_joint_test(model) -> BayesianLMTestResult:
     )
 
 
-def bayesian_panel_lm_flow_intra_test(model) -> BayesianLMTestResult:
-    r"""Panel analogue of :func:`bayesian_lm_flow_intra_test` on
+def bayesian_panel_lm_flow_intraunit_test(model) -> BayesianLMTestResult:
+    r"""Panel analogue of :func:`bayesian_lm_flow_intraunit_test` on
     :class:`OLSFlowPanelFE`. Operates on the demeaned panel design.
     Score :math:`g = X_{\text{intra}}^\top e` and information
     :math:`V = X_{\text{intra}}^\top X_{\text{intra}} / \bar\sigma^2`,
     distributed :math:`\chi^2_{k_{\text{intra}}}` under :math:`H_0`.
-    See :func:`bayesian_lm_flow_intra_test` for the cross-sectional
+    See :func:`bayesian_lm_flow_intraunit_test` for the cross-sectional
     construction (:cite:p:`lesage2008SpatialEconometric`,
     :cite:p:`elhorst2014SpatialEconometrics`,
     :cite:p:`dogan2021BayesianRobust`)."""
@@ -1343,7 +1343,7 @@ def bayesian_panel_lm_flow_intra_test(model) -> BayesianLMTestResult:
     return _lm_vector(
         G,
         V,
-        test_type="bayesian_panel_lm_flow_intra",
+        test_type="bayesian_panel_lm_flow_intraunit",
         df=k_intra,
         details={"k_intra": k_intra, "T": int(getattr(model, "_T", 1))},
         label="V_intra (panel flow intra LM)",

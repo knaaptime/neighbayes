@@ -480,7 +480,7 @@ class TestPanelGibbsJAX:
     """JAX JIT path for panel Gibbs."""
 
     def test_sar_panel_fe_jax_produces_idata(self):
-        """SARPanelFE Gibbs with gibbs_backend='jax' returns valid InferenceData."""
+        """SARPanelFE Gibbs with backend='jax' returns valid InferenceData."""
         pytest.importorskip("jax")
         from neighbayes.models.panel._fe import SARPanelFE
 
@@ -504,7 +504,7 @@ class TestPanelGibbsJAX:
             random_seed=42,
             n_jobs=1,
             progressbar=False,
-            gibbs_backend="jax",
+            backend="jax",
         )
         assert "posterior" in idata.children
         assert "rho" in idata.posterior.data_vars
@@ -513,7 +513,7 @@ class TestPanelGibbsJAX:
         assert idata.posterior["beta"].shape[-1] == X.shape[1] - 1
 
     def test_sem_panel_fe_jax_produces_idata(self):
-        """SEMPanelFE Gibbs with gibbs_backend='jax' returns valid InferenceData."""
+        """SEMPanelFE Gibbs with backend='jax' returns valid InferenceData."""
         pytest.importorskip("jax")
         from neighbayes.models.panel._fe import SEMPanelFE
 
@@ -537,7 +537,7 @@ class TestPanelGibbsJAX:
             random_seed=42,
             n_jobs=1,
             progressbar=False,
-            gibbs_backend="jax",
+            backend="jax",
         )
         assert "posterior" in idata.children
         assert "lam" in idata.posterior.data_vars
@@ -570,7 +570,7 @@ class TestPanelGibbsJAX:
             random_seed=42,
             n_jobs=1,
             progressbar=False,
-            gibbs_backend="jax",
+            backend="jax",
         )
         assert idata.posterior["rho"].shape[0] == 2  # 2 chains
 
@@ -599,6 +599,6 @@ class TestPanelGibbsJAX:
             random_seed=42,
             n_jobs=1,
             progressbar=False,
-            gibbs_backend="jax",
+            backend="jax",
         )
         assert idata.posterior["lam"].shape[0] == 2  # 2 chains

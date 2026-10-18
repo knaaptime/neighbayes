@@ -138,7 +138,7 @@ def test_sar_flow_panel_fit_smoke():
         X=X,
         T=T,
         col_names=col_names,
-        restrict_positive=True,
+        nonnegative_dependence=True,
     )
     idata = model.fit(draws=50, tune=50, chains=1, progressbar=False, random_seed=0)
     assert "rho_d" in idata.posterior
@@ -207,7 +207,7 @@ class TestSARFlowPanelRecovery:
             X=out["X"],
             T=PANEL_FLOW_T,
             col_names=out["col_names"],
-            restrict_positive=True,
+            nonnegative_dependence=True,
         )
         idata = model.fit(
             draws=1000,
@@ -557,7 +557,7 @@ class TestFlowPanelSamplerDispatch:
             X=X,
             T=T,
             col_names=col_names,
-            restrict_positive=True,
+            nonnegative_dependence=True,
         )
         idata = m.fit(
             draws=20,
@@ -584,7 +584,7 @@ class TestFlowPanelSamplerDispatch:
             X=X,
             T=T,
             col_names=col_names,
-            restrict_positive=True,
+            nonnegative_dependence=True,
         )
         idata = m.fit(
             draws=10,
@@ -633,7 +633,7 @@ class TestFlowPanelSamplerDispatch:
             X=X,
             T=T,
             col_names=col_names,
-            restrict_positive=True,
+            nonnegative_dependence=True,
         )
         with pytest.raises(ValueError, match="sampler must be"):
             m.fit(

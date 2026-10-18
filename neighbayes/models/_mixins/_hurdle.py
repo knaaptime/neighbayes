@@ -198,7 +198,7 @@ class HurdleMixin(TwoPartMixin):
     # Posterior expectations and prediction
     # ------------------------------------------------------------------
 
-    def conditional_mean(self, draws: Optional[int] = _SUMMARY_DRAWS) -> np.ndarray:
+    def positive_mean(self, draws: Optional[int] = _SUMMARY_DRAWS) -> np.ndarray:
         """Posterior mean of ``E[y | y > 0] = μ / (1 − p₀)`` for every cell."""
         return self._mean_over_draws(lambda es, ec, a: _truncated_mean(ec, a), draws)
 

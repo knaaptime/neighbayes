@@ -68,7 +68,7 @@ def _fit(data, backend, **kw):
         chains=4,
         random_seed=7,
         progressbar=False,
-        gibbs_backend=backend,
+        backend=backend,
     )
     return idata, np.asarray(idata.posterior["rho"]).ravel()
 
@@ -150,7 +150,7 @@ def test_unsupported_method_falls_back_quietly(data, backend, caplog):
             chains=2,
             random_seed=7,
             progressbar=False,
-            gibbs_backend=backend,
+            backend=backend,
         )
     assert "logdet_refit_window" not in idata.attrs
     assert np.isfinite(np.asarray(idata.posterior["rho"]).mean())
@@ -173,7 +173,7 @@ def test_sem_refits_on_lambda(data):
         chains=2,
         random_seed=7,
         progressbar=False,
-        gibbs_backend="numpy",
+        backend="numpy",
     )
     lo, hi = idata.attrs["logdet_refit_window"]
     lam = np.asarray(idata.posterior["lam"]).ravel()

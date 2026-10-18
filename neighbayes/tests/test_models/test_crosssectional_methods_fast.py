@@ -1,7 +1,7 @@
 """Fast method/build tests for cross-sectional spatial models (SLX/SEM/SDEM/SDM).
 
 These tests inject a mock posterior into ``model._idata`` to exercise
-``fitted_values``, ``spatial_effects``, ``_beta_names``, and ``_build_pymc_model``
+``fitted_values``, ``impacts``, ``_beta_names``, and ``_build_pymc_model``
 without running MCMC.
 """
 
@@ -77,7 +77,7 @@ def test_slx_fitted_values_and_effects_with_mock_posterior():
     model._idata = _idata({"beta": np.stack([beta, beta + 1e-3])})
 
     fitted = model.fitted_values()
-    effects = model.spatial_effects()
+    effects = model.impacts()
 
     assert fitted.shape == y.shape
     assert np.all(np.isfinite(fitted))
@@ -128,11 +128,11 @@ def test_sem_sdem_sdm_fitted_values_and_effects_with_mock_posteriors():
 
     for model in [sem, sdem, sdm]:
         fitted = model.fitted_values()
-        effects = model.spatial_effects()
+        effects = model.impacts()
         assert fitted.shape == y.shape
         assert np.all(np.isfinite(fitted))
         assert set(effects.columns) == _EXPECTED_EFFECT_COLUMNS
         assert np.all(np.isfinite(effects["direct"].values))
 
-    sem_eff = sem.spatial_effects()
+    sem_eff = sem.impacts()
     assert np.allclose(sem_eff["indirect"].values, 0.0)

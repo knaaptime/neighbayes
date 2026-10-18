@@ -82,10 +82,8 @@ def test_sar_negbin_fitted_values_and_effects_with_mock_posterior():
     )
 
     fitted = model.fitted_values()
-    effects = model.spatial_effects()
-    count_effects, samples = model.spatial_effects(
-        scale="count", return_posterior_samples=True
-    )
+    effects = model.impacts()
+    count_effects, samples = model.impacts(scale="count", return_posterior_samples=True)
 
     assert fitted.shape == y.shape
     assert np.all(np.isfinite(fitted))
@@ -118,10 +116,10 @@ def test_sar_negbin_count_effects_sparse_matches_eigen():
         }
     )
 
-    df_eigen, samples_eigen = model.spatial_effects(
+    df_eigen, samples_eigen = model.impacts(
         scale="count", return_posterior_samples=True, method="eigen"
     )
-    df_sparse, samples_sparse = model.spatial_effects(
+    df_sparse, samples_sparse = model.impacts(
         scale="count", return_posterior_samples=True, method="sparse"
     )
 
@@ -162,7 +160,7 @@ def test_sar_negbin_count_effects_sparse_batched_matches_columnwise():
         }
     )
 
-    _, samples_batched = model.spatial_effects(
+    _, samples_batched = model.impacts(
         scale="count", return_posterior_samples=True, method="sparse"
     )
 
@@ -201,7 +199,7 @@ def test_sar_negbin_count_effects_sparse_batched_matches_columnwise():
     )
 
 
-def test_sar_negbin_spatial_effects_rejects_unknown_method():
+def test_sar_negbin_impacts_rejects_unknown_method():
     y, X, W = _count_data(seed=103)
     n = X.shape[0]
     model = SARNegBin(y=y, X=X, W=W)
@@ -213,10 +211,10 @@ def test_sar_negbin_spatial_effects_rejects_unknown_method():
         }
     )
     with pytest.raises(ValueError, match="method must be one of"):
-        model.spatial_effects(scale="count", method="bogus")
+        model.impacts(scale="count", method="bogus")
 
 
-def test_sar_negbin_spatial_effects_rejects_unknown_scale():
+def test_sar_negbin_impacts_rejects_unknown_scale():
     y, X, W = _count_data(seed=104)
     n = X.shape[0]
     model = SARNegBin(y=y, X=X, W=W)
@@ -229,7 +227,7 @@ def test_sar_negbin_spatial_effects_rejects_unknown_scale():
     )
 
     with pytest.raises(ValueError, match="scale must be either 'logmean' or 'count'"):
-        model.spatial_effects(scale="response")
+        model.impacts(scale="response")
 
 
 def test_simulate_sar_negbin_output_contract():

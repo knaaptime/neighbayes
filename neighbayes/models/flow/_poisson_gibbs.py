@@ -36,7 +36,7 @@ def run_poisson_flow_gibbs(
     model : FlowModel
         Poisson flow model instance providing ``_X``, ``_y_int_vec``,
         ``_W_sparse``, ``_Wd``/``_Wo``/``_Ww``, ``_n``, ``priors``, and
-        (unrestricted only) ``restrict_positive``.
+        (unrestricted only) ``nonnegative_dependence``.
     separable : bool
         If True use the separable Kronecker kernel (``rho_w = -rho_d rho_o``);
         otherwise the unrestricted 3-ρ kernel.
@@ -73,7 +73,7 @@ def run_poisson_flow_gibbs(
         T=T,
     )
     if not separable:
-        cache_kwargs["positive"] = model.restrict_positive
+        cache_kwargs["positive"] = model.nonnegative_dependence
     cache = FlowReducedGibbsCache(**cache_kwargs)
 
     pv = model._flow_count_priors()
@@ -98,9 +98,9 @@ def run_poisson_flow_gibbs(
                 None,
             )
         else:
-            lo = 0.0 if model.restrict_positive else -0.1
+            lo = 0.0 if model.nonnegative_dependence else -0.1
             rho_d0, rho_o0 = rng.uniform(lo, 0.1), rng.uniform(lo, 0.1)
-            rho_w0 = rng.uniform(0.0 if model.restrict_positive else -0.05, 0.05)
+            rho_w0 = rng.uniform(0.0 if model.nonnegative_dependence else -0.05, 0.05)
         design = build_augmented_index(y)
         s0, om0 = draw_augmentation(y, X @ beta0, design, rng=rng)
         return FlowPoissonGibbsState(

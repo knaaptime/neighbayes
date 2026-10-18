@@ -81,7 +81,7 @@ def bayesian_lm_wx_sem_test(
         raise ValueError(
             "Model has no WX columns. The WX test requires at least one "
             "spatially lagged covariate. Ensure the model was constructed "
-            "with a W matrix and w_vars."
+            "with a W matrix and durbin_vars."
         )
 
     idata = model.inference_data
@@ -315,7 +315,7 @@ def bayesian_lm_wx_test(
         raise ValueError(
             "Model has no WX columns. The WX test requires at least one "
             "spatially lagged covariate. Ensure the model was constructed "
-            "with a W matrix and w_vars."
+            "with a W matrix and durbin_vars."
         )
 
     idata = model.inference_data

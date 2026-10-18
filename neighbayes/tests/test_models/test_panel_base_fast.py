@@ -361,7 +361,7 @@ class TestSpatialPanelModelInit:
         assert model._T == 3
         assert model._panel_index is not None
 
-    def test_w_vars_subsets_lagged_columns(self, W_graph):
+    def test_durbin_vars_subsets_lagged_columns(self, W_graph):
         from neighbayes.models.panel._fe import SDMPanelFE
 
         rng = np.random.default_rng(2)
@@ -390,23 +390,23 @@ class TestSpatialPanelModelInit:
             W=W_graph,
             unit_col="unit",
             time_col="time",
-            w_vars=["x1"],
+            durbin_vars=["x1"],
         )
         assert subset._wx_feature_names == ["x1"]
         assert subset._WX.shape == (12, 1)
 
-    def test_w_vars_unknown_raises(self, W_graph):
+    def test_durbin_vars_unknown_raises(self, W_graph):
         from neighbayes.models.panel._fe import SDMPanelFE
 
         rng = np.random.default_rng(3)
-        with pytest.raises(ValueError, match="w_vars contains names not found"):
+        with pytest.raises(ValueError, match="durbin_vars contains names not found"):
             SDM(
                 y=rng.standard_normal(12),
                 X=rng.standard_normal((12, 2)),
                 W=W_graph,
                 N=4,
                 T=3,
-                w_vars=["nonexistent"],
+                durbin_vars=["nonexistent"],
             )
 
 

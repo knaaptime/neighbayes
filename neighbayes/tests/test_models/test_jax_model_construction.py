@@ -154,7 +154,7 @@ class TestSDEMModelConstruction:
             y=self.y,
             X=self.X,
             W=self.W,
-            w_vars=["x1"],
+            durbin_vars=["x1"],
             logdet_method="eigenvalue",
             robust=robust,
         )
@@ -244,7 +244,7 @@ class TestSDEMPanelFEModelConstruction:
             W=self.W,
             N=self.N,
             T=self.T,
-            w_vars=["x1"],
+            durbin_vars=["x1"],
             logdet_method="eigenvalue",
             robust=robust,
         )
@@ -329,7 +329,7 @@ class TestSDEMPanelREModelConstruction:
             W=self.W,
             N=self.N,
             T=self.T,
-            w_vars=["x1"],
+            durbin_vars=["x1"],
             logdet_method="eigenvalue",
             robust=robust,
         )
@@ -414,7 +414,7 @@ class TestSDEMPanelDynamicModelConstruction:
             W=self.W,
             N=self.N,
             T=self.T,
-            w_vars=["x1"],
+            durbin_vars=["x1"],
             logdet_method="eigenvalue",
             robust=robust,
         )
@@ -512,7 +512,7 @@ class TestFitDispatchesNutsSampler:
             y=self.y,
             X=self.X,
             W=self.W,
-            w_vars=["x1"],
+            durbin_vars=["x1"],
             logdet_method="eigenvalue",
         )
         pm_model = model._build_pymc_model(nuts_sampler="numpyro")

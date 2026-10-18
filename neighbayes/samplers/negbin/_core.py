@@ -932,7 +932,7 @@ def _sample_alpha(
     and p(α) is the Half-Student-t(ν_α, σ_α) prior — the same prior the
     PyMC/NUTS builders place via ``pm.HalfStudentT`` and the same kernel the
     reduced-form JAX sampler uses, so a model's posterior does not depend on
-    ``gibbs_backend``.
+    ``backend``.
 
     Parameters
     ----------

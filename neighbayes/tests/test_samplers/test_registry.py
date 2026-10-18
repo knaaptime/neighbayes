@@ -102,7 +102,7 @@ def test_resolve_backend_explicit_jax_without_jax_raises(fresh_registry):
 
 def test_resolve_backend_invalid_value(fresh_registry):
     entry = fresh_registry.register("g", "cs", run=_dummy_run, backends={"numpy"})
-    with pytest.raises(ValueError, match="gibbs_backend must be one of"):
+    with pytest.raises(ValueError, match="backend for sampler='gibbs' must be one of"):
         R.resolve_backend("factorize", entry, jax_ok=True)
 
 

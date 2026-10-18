@@ -4,8 +4,8 @@ This module provides **post-processing helpers** that convert posterior
 draws of model parameters into posterior distributions of direct,
 indirect, and total impacts.  The actual *computation* of the impact
 matrices :math:`(I-\\rho W)^{-1}(\\beta_{1k} I + \\beta_{2k} W)` lives
-in the model classes (e.g. ``SAR._compute_spatial_effects_posterior``,
-``SDM._compute_spatial_effects_posterior``); this module summarizes
+in the model classes (e.g. ``SAR._compute_impacts_posterior``,
+``SDM._compute_impacts_posterior``); this module summarizes
 those draws with means, credible intervals, and Bayesian p-values.
 This is the fully Bayesian analog of the simulation-based approach in
 :cite:t:`lesage2009IntroductionSpatial` and the asymptotic variance
@@ -138,7 +138,7 @@ def _build_effects_dataframe(
     feature_names: list[str],
     model_type: str,
 ) -> pd.DataFrame:
-    """Build a summary DataFrame from posterior draws of spatial effects.
+    """Build a summary DataFrame from posterior draws of impacts.
 
     Each row corresponds to one covariate.  Columns contain posterior
     means, 95% credible-interval bounds, and Bayesian p-values for

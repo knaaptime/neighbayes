@@ -99,9 +99,8 @@ class SEMLogitRE(SpatialModel):
     ``xarray.DataTree`` object compatible with all downstream
     diagnostics.
 
-    The ``fit()`` method does **not** accept ``nuts_sampler`` or
-    ``target_accept`` kwargs — these are NUTS-specific and will raise
-    ``TypeError`` if passed.
+    With the Gibbs sampler, ``fit()`` does **not** accept ``target_accept``,
+    a NUTS-only argument; passing it raises ``TypeError``.
 
     σ² is fixed at 1, a restriction on the ratio of the propagated variance
     to the logistic noise, not a normalization.  The PG shape parameter is
@@ -311,8 +310,8 @@ class SEMLogitRE(SpatialModel):
         if _use_jax_full:
             if return_eta:
                 raise NotImplementedError(
-                    "return_eta=True is not supported with gibbs_backend='jax'. "
-                    "Use gibbs_backend='numpy' if you need the latent index stored."
+                    "return_eta=True is not supported with backend='jax'. "
+                    "Use backend='numpy' if you need the latent index stored."
                 )
             chain_inits = [
                 self._initialize_from_ols(np.random.default_rng(seed)) for seed in seeds
@@ -451,7 +450,7 @@ class SEMLogitRE(SpatialModel):
         """
         return self.fitted_probabilities()
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute posterior impacts for SEM-logit.

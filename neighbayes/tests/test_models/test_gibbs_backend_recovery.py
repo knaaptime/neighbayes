@@ -120,7 +120,7 @@ def test_sar_logit_backend_recovery(sar_logit_data, backend):
     from neighbayes.models import SARLogit
 
     y, X, W = sar_logit_data
-    idata = SARLogit(y=y, X=X, W=W).fit(gibbs_backend=backend, **_fit_kwargs(backend))
+    idata = SARLogit(y=y, X=X, W=W).fit(backend=backend, **_fit_kwargs(backend))
 
     rho_hat = float(idata.posterior["rho"].mean())
     beta_hat = idata.posterior["beta"].mean(("chain", "draw")).values
@@ -155,7 +155,7 @@ def test_sar_logit_struct_backend_recovery(sar_logit_struct_data, backend):
 
     y, X, W = sar_logit_struct_data
     idata = SARLogit(unit_effects="random", y=y, X=X, W=W).fit(
-        gibbs_backend=backend, **_fit_kwargs(backend)
+        backend=backend, **_fit_kwargs(backend)
     )
 
     rho_hat = float(idata.posterior["rho"].mean())
@@ -191,7 +191,7 @@ def test_sem_logit_backend_recovery(sem_logit_data, backend):
 
     y, X, W = sem_logit_data
     idata = SEMLogit(unit_effects="random", y=y, X=X, W=W).fit(
-        gibbs_backend=backend, **_fit_kwargs(backend)
+        backend=backend, **_fit_kwargs(backend)
     )
 
     lam_hat = float(idata.posterior["lam"].mean())
@@ -228,7 +228,7 @@ def test_sar_negbin_backend_recovery(sar_negbin_data, backend):
     d = sar_negbin_data
     W = W_to_graph(make_rook_W(SIDE_NB))
     idata = SARNegBin(y=d["y"], X=d["X"], W=W).fit(
-        gibbs_backend=backend, **_fit_kwargs(backend)
+        backend=backend, **_fit_kwargs(backend)
     )
 
     rho_hat = float(idata.posterior["rho"].mean())
@@ -276,7 +276,7 @@ def test_sar_negbin_struct_backend_recovery(sar_negbin_struct_data, backend):
     d = sar_negbin_struct_data
     W = W_to_graph(make_rook_W(SIDE_NB))
     idata = SARNegBin(unit_effects="random", y=d["y"], X=d["X"], W=W).fit(
-        gibbs_backend=backend, **_fit_kwargs(backend)
+        backend=backend, **_fit_kwargs(backend)
     )
 
     rho_hat = float(idata.posterior["rho"].mean())
@@ -324,7 +324,7 @@ def test_sar_zinb_backend_recovery(sar_zinb_data, backend):
     d = sar_zinb_data
     W = W_to_graph(make_rook_W(SIDE_NB))
     idata = SARZINB(y=d["y"], X=d["X"], Z=d["Z"], W=W).fit(
-        gibbs_backend=backend, **_fit_kwargs(backend)
+        backend=backend, **_fit_kwargs(backend)
     )
 
     rho_hat = float(idata.posterior["rho"].mean())
@@ -365,7 +365,7 @@ def test_sar_logit_backend_mixing(sar_logit_data, backend):
     from neighbayes.models import SARLogit
 
     y, X, W = sar_logit_data
-    idata = SARLogit(y=y, X=X, W=W).fit(gibbs_backend=backend, **_fit_kwargs(backend))
+    idata = SARLogit(y=y, X=X, W=W).fit(backend=backend, **_fit_kwargs(backend))
 
     summ = az.summary(idata, var_names=["rho"])
     ess = float(summ.loc["rho", "ess_bulk"])
@@ -453,7 +453,7 @@ def test_sar_zinb_backends_agree(sar_zinb_small_data):
     fits = {}
     for backend in BACKENDS:
         idata = SARZINB(y=d["y"], X=d["X"], Z=d["Z"], W=W).fit(
-            gibbs_backend=backend, **_fit_kwargs(backend)
+            backend=backend, **_fit_kwargs(backend)
         )
         fits[backend] = idata.posterior
 
@@ -523,8 +523,7 @@ def test_backends_agree(request, model_name, fixture_name, tols):
         kwargs = dict(y=data["y"], X=data["X"], W=W)
 
     posteriors = {
-        b: cls(**kwargs).fit(gibbs_backend=b, **_fit_kwargs(b)).posterior
-        for b in BACKENDS
+        b: cls(**kwargs).fit(backend=b, **_fit_kwargs(b)).posterior for b in BACKENDS
     }
     _assert_backends_agree(posteriors, tols, model_name)
 
@@ -565,7 +564,7 @@ def test_nb_flow_separable_backends_agree(nb_flow_sep_data):
             tune=TUNE // 2,
             chains=CHAINS,
             random_seed=11,
-            gibbs_backend=backend,
+            backend=backend,
             progressbar=False,
         ).posterior
 
@@ -594,7 +593,7 @@ def test_nb_flow_separable_jax_recovers_and_mixes(nb_flow_sep_data):
         tune=TUNE // 2,
         chains=CHAINS,
         random_seed=11,
-        gibbs_backend="jax",
+        backend="jax",
         progressbar=False,
     )
 

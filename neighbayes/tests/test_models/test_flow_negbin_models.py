@@ -476,11 +476,12 @@ class TestNegBinFlowPanelAspatialRecovery:
 
 
 class TestFlowGibbsBackend:
-    """Flow models default to ``gibbs_backend="auto"``, resolved per configuration."""
+    """Flow models default to the Gibbs ``backend="auto"``, resolved per configuration."""
 
     def test_public_fits_default_to_auto(self):
         import inspect
 
+        from neighbayes._backends import select_backend
         from neighbayes.models.flow_panel._hurdle import (
             SARHurdleNegBinFlowSeparablePanelRE,
         )
@@ -495,8 +496,9 @@ class TestFlowGibbsBackend:
             SARZINBFlowSeparablePanelRE,
             SARHurdleNegBinFlowSeparablePanelRE,
         ):
-            default = inspect.signature(cls.fit).parameters["gibbs_backend"].default
-            assert default == "auto", cls.__name__
+            default = inspect.signature(cls.fit).parameters["backend"].default
+            assert default is None, cls.__name__
+        assert select_backend("gibbs", None, {}) == "auto"
 
     def test_auto_takes_jax_only_where_a_kernel_exists(self):
         pytest.importorskip("jax")
@@ -511,7 +513,7 @@ class TestFlowGibbsBackend:
         data = _small_negbin_flow(seed=4)
         model = NegBinFlow(data["y_vec"], data["X"], data["G"])
         with pytest.raises(ValueError, match="not supported"):
-            model.fit(draws=5, tune=5, chains=1, progressbar=False, gibbs_backend="jax")
+            model.fit(draws=5, tune=5, chains=1, progressbar=False, backend="jax")
 
     def test_unrestricted_panel_auto_runs_numpy(self):
         """The unrestricted JAX kernel is cross-section only, so a panel stays NumPy."""
@@ -526,4 +528,4 @@ class TestFlowGibbsBackend:
             == "numpy"
         )
         with pytest.raises(ValueError, match="not supported"):
-            model.fit(draws=5, tune=5, chains=1, progressbar=False, gibbs_backend="jax")
+            model.fit(draws=5, tune=5, chains=1, progressbar=False, backend="jax")

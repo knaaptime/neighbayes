@@ -191,7 +191,7 @@ class FlowResolventTarget:
         (a conservative row-stochastic stability wall).
     positive : bool
         Additionally reject any ``ρ_k < 0`` (the model-level
-        ``restrict_positive=True`` prior: flat on the positive simplex).
+        ``nonnegative_dependence=True`` prior: flat on the positive simplex).
     """
 
     W: object
@@ -755,7 +755,7 @@ def sample_flow_resolvent(
     progressbar: bool = True,
     n_jobs: int = -1,
     logdet_method: str = "auto",
-    restrict_positive: bool = False,
+    nonnegative_dependence: bool = False,
     fe_dims: dict | None = None,
     priors: dict | None = None,
 ):
@@ -766,7 +766,7 @@ def sample_flow_resolvent(
     handles the panel (stacked over ``T`` periods; log-det scaled by ``T``).
     ``logdet_method`` selects the log-det backend (see :func:`resolve_flow_logdet`;
     ``"auto"`` is exact for undirected ``W``); ``logdet_value_and_grad`` overrides it
-    with any ``(ρ_d, ρ_o, ρ_w) -> (value, grad)`` callable.  With ``restrict_positive`` the flat ρ prior is
+    with any ``(ρ_d, ρ_o, ρ_w) -> (value, grad)`` callable.  With ``nonnegative_dependence`` the flat ρ prior is
     truncated to ``ρ_k ≥ 0`` (the model-level positivity constraint).  The per-draw
     Jacobian ``log|A|`` is attached in ``sample_stats``; with
     ``compute_log_likelihood`` (default) a pointwise ``log_likelihood`` group
@@ -793,7 +793,7 @@ def sample_flow_resolvent(
         n_jobs=n_jobs,
         logdet_method=logdet_method,
         n_quad=n_quad,
-        positive=restrict_positive,
+        positive=nonnegative_dependence,
         fe_dims=fe_dims,
         priors=priors,
     )
@@ -818,7 +818,7 @@ def sample_sem_flow_resolvent(
     progressbar: bool = True,
     n_jobs: int = -1,
     logdet_method: str = "auto",
-    restrict_positive: bool = False,
+    nonnegative_dependence: bool = False,
     fe_dims: dict | None = None,
     priors: dict | None = None,
 ):
@@ -826,7 +826,7 @@ def sample_sem_flow_resolvent(
 
     Same resolvent log-det and sampler as the SAR flow; the data term uses the
     whitened residual ``A(y−Xβ)`` and a GLS ``β`` draw.  ``T>1`` handles the panel.
-    With ``restrict_positive`` the flat λ prior is truncated to ``λ_k ≥ 0``.
+    With ``nonnegative_dependence`` the flat λ prior is truncated to ``λ_k ≥ 0``.
     Packages ``lam_d, lam_o, lam_w, beta, sigma`` with the per-draw Jacobian ``log|A|``
     in ``sample_stats`` and (default) a pointwise ``log_likelihood`` group for LOO/WAIC.
     """
@@ -850,7 +850,7 @@ def sample_sem_flow_resolvent(
         n_jobs=n_jobs,
         logdet_method=logdet_method,
         n_quad=n_quad,
-        positive=restrict_positive,
+        positive=nonnegative_dependence,
         fe_dims=fe_dims,
         priors=priors,
     )

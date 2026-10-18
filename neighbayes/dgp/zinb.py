@@ -42,7 +42,7 @@ def simulate_sar_zinb(
 
     Two-equation model:
 
-    **Selection** (corridor activity — SAR-logit):
+    **Selection** (unit activity — SAR-logit):
 
     .. math::
 
@@ -106,7 +106,7 @@ def simulate_sar_zinb(
         Neighbor rule used when W is built from ``gdf``.
     target_pi : float, optional
         If given, an intercept shift is solved so that the marginal
-        corridor activation probability ``mean(pi) == target_pi``.
+        activation probability ``mean(pi) == target_pi``.
         The shift is added to ``gamma[0]`` (inside the filter, so the
         reported ``gamma`` generates ``eta_sel``).
     err_hetero : bool, default False
@@ -195,7 +195,7 @@ def simulate_sar_zinb(
         gamma = gamma.copy()
         gamma[0] = gamma[0] + c
 
-    # Binary corridor activity
+    # Binary unit activity
     pi = 1.0 / (1.0 + np.exp(-eta_sel))
     d = rng.binomial(1, pi).astype(np.float64)
 

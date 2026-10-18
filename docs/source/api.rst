@@ -226,18 +226,18 @@ Flow Bayesian LM Tests
 .. autosummary::
    :toctree: generated/
 
-   bayesian_lm_flow_dest_test
-   bayesian_lm_flow_orig_test
-   bayesian_lm_flow_network_test
-   bayesian_lm_flow_intra_test
+   bayesian_lm_flow_destination_test
+   bayesian_lm_flow_origin_test
+   bayesian_lm_flow_od_test
+   bayesian_lm_flow_intraunit_test
    bayesian_lm_flow_joint_test
-   bayesian_robust_lm_flow_dest_test
-   bayesian_robust_lm_flow_orig_test
-   bayesian_robust_lm_flow_network_test
-   bayesian_panel_lm_flow_dest_test
-   bayesian_panel_lm_flow_orig_test
-   bayesian_panel_lm_flow_network_test
-   bayesian_panel_lm_flow_intra_test
+   bayesian_robust_lm_flow_destination_test
+   bayesian_robust_lm_flow_origin_test
+   bayesian_robust_lm_flow_od_test
+   bayesian_panel_lm_flow_destination_test
+   bayesian_panel_lm_flow_origin_test
+   bayesian_panel_lm_flow_od_test
+   bayesian_panel_lm_flow_intraunit_test
    bayesian_panel_lm_flow_joint_test
 
 

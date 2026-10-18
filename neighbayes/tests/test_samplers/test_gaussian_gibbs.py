@@ -865,7 +865,7 @@ class TestRobustGibbsVsNUTS:
         kw = dict(draws=3000, tune=1000, chains=4, random_seed=3, progressbar=False)
         nuts = Model(y=y, X=X, W=W, robust=True).fit(sampler="nuts", **kw)
         gibbs = Model(y=y, X=X, W=W, robust=True).fit(
-            sampler="gibbs", gibbs_backend=backend, **kw
+            sampler="gibbs", backend=backend, **kw
         )
         # The NUTS run is the reference, so check it before blaming Gibbs.
         rhat = az.rhat(nuts, var_names=[param, "sigma", "beta"])
@@ -918,9 +918,7 @@ class TestGibbsJointVsNUTS:
 
         kw = dict(draws=3000, tune=1000, chains=4, random_seed=7, progressbar=False)
         nuts = _stats(Model(y=y, X=X, W=W).fit(sampler="nuts", **kw))
-        gibbs = _stats(
-            Model(y=y, X=X, W=W).fit(sampler="gibbs", gibbs_backend=backend, **kw)
-        )
+        gibbs = _stats(Model(y=y, X=X, W=W).fit(sampler="gibbs", backend=backend, **kw))
         np.testing.assert_allclose(gibbs[:2], nuts[:2], atol=0.08)
         np.testing.assert_allclose(gibbs[2], nuts[2], atol=0.02)
         np.testing.assert_allclose(gibbs[3], nuts[3], rtol=0.15)
@@ -1009,7 +1007,7 @@ class TestJAXGaussianGibbs:
             random_seed=42,
             n_jobs=1,
             progressbar=False,
-            gibbs_backend="jax",
+            backend="jax",
         )
         assert "posterior" in idata.children
         assert "rho" in idata.posterior.data_vars
@@ -1030,7 +1028,7 @@ class TestJAXGaussianGibbs:
             random_seed=42,
             n_jobs=1,
             progressbar=False,
-            gibbs_backend="jax",
+            backend="jax",
         )
         assert "lam" in idata.posterior.data_vars
 
@@ -1048,7 +1046,7 @@ class TestJAXGaussianGibbs:
             random_seed=42,
             n_jobs=1,
             progressbar=False,
-            gibbs_backend="jax",
+            backend="jax",
         )
         assert "rho" in idata.posterior.data_vars
         assert idata.posterior["beta"].shape[-1] == 3  # intercept + x + W*x
@@ -1067,7 +1065,7 @@ class TestJAXGaussianGibbs:
             random_seed=42,
             n_jobs=1,
             progressbar=False,
-            gibbs_backend="jax",
+            backend="jax",
         )
         assert "lam" in idata.posterior.data_vars
 
@@ -1086,7 +1084,7 @@ class TestJAXGaussianGibbs:
             random_seed=42,
             n_jobs=1,
             progressbar=False,
-            gibbs_backend="jax",
+            backend="jax",
             idata_kwargs={"log_likelihood": True},
         )
         loo = az.loo(idata)
@@ -1107,7 +1105,7 @@ class TestJAXGaussianGibbs:
             random_seed=42,
             n_jobs=1,
             progressbar=False,
-            gibbs_backend="jax",
+            backend="jax",
         )
         assert "rho" in idata.posterior.data_vars
 
@@ -1133,7 +1131,7 @@ class TestEdgeCases:
         model = Model(y=y, X=X, W=W_to_graph(W_dense), robust=True)
         idata = model.fit(
             sampler="gibbs",
-            gibbs_backend=backend,
+            backend=backend,
             draws=30,
             tune=20,
             chains=2,
@@ -1211,14 +1209,16 @@ class TestEdgeCases:
         with pytest.raises(ValueError, match="sampler"):
             model.fit(sampler="invalid")
 
-    def test_invalid_gibbs_backend_raises(self):
-        """An invalid gibbs_backend value raises (strict; no silent fallback)."""
+    def test_invalid_backend_raises(self):
+        """An invalid Gibbs backend raises (strict; no silent fallback)."""
         from neighbayes.models.cross_section.sar import SAR
 
         y, X, W_dense, n = _make_sar_data()
         W = W_to_graph(W_dense)
         model = SAR(y=y, X=X, W=W)
-        with pytest.raises(ValueError, match="gibbs_backend must be one of"):
+        with pytest.raises(
+            ValueError, match="backend for sampler='gibbs' must be one of"
+        ):
             model.fit(
                 sampler="gibbs",
                 draws=10,
@@ -1227,7 +1227,7 @@ class TestEdgeCases:
                 random_seed=42,
                 n_jobs=1,
                 progressbar=False,
-                gibbs_backend="invalid",
+                backend="invalid",
             )
 
     def test_removed_gibbs_method_kwarg_rejected(self):
@@ -1374,7 +1374,7 @@ class TestInformativeOutput:
                 random_seed=42,
                 n_jobs=1,
                 progressbar=False,
-                gibbs_backend="jax",
+                backend="jax",
             )
         assert "JAX Gibbs sampling" in caplog.text
         assert "slice" in caplog.text
@@ -1455,7 +1455,7 @@ class TestChainParallelism:
             chains=2,
             random_seed=42,
             progressbar=False,
-            gibbs_backend="jax",
+            backend="jax",
         )
         assert "posterior" in idata.children
         assert idata.posterior["beta"].shape[0] == 2  # 2 chains

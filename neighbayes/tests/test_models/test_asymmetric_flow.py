@@ -324,7 +324,7 @@ class TestModelAsymmetric:
         assert model._k == 2  # backward compat alias
 
     def test_effects_asymmetric_shape(self):
-        """Spatial effects have correct shapes when k_d ≠ k_o."""
+        """Impacts have correct shapes when k_d ≠ k_o."""
         from neighbayes.dgp import simulate_sar_flow
         from neighbayes.models.flow._flow import OLSFlow
 
@@ -346,14 +346,14 @@ class TestModelAsymmetric:
         )
         model.fit(draws=30, tune=30, chains=1, progressbar=False, random_seed=0)
 
-        posterior = model._compute_spatial_effects_posterior()
+        posterior = model._compute_impacts_posterior()
         # dest effects: k_d=2, orig effects: k_o=1, combined: k_d+k_o=3
         assert posterior["dest_total"].shape[1] == 2
         assert posterior["orig_total"].shape[1] == 1
         assert posterior["total"].shape[1] == 3  # concatenated when k_d != k_o
 
     def test_effects_symmetric_shape(self):
-        """Spatial effects have correct shapes when k_d == k_o (symmetric)."""
+        """Impacts have correct shapes when k_d == k_o (symmetric)."""
         from neighbayes.dgp import simulate_sar_flow
         from neighbayes.models.flow._flow import OLSFlow
 
@@ -375,7 +375,7 @@ class TestModelAsymmetric:
         )
         model.fit(draws=30, tune=30, chains=1, progressbar=False, random_seed=0)
 
-        posterior = model._compute_spatial_effects_posterior()
+        posterior = model._compute_impacts_posterior()
         # dest effects: k_d=1, orig effects: k_o=1, combined: k_d=1 (summed)
         assert posterior["dest_total"].shape[1] == 1
         assert posterior["orig_total"].shape[1] == 1

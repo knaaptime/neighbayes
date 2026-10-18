@@ -15,7 +15,7 @@ import pytest
 import scipy.sparse as sp
 from libpysal.graph import Graph
 
-from neighbayes.diagnostics.spatial_effects import _chunked_eig_means
+from neighbayes.diagnostics.impacts import _chunked_eig_means
 from neighbayes.models.cross_section.sar_logit import SARLogit
 from neighbayes.models.cross_section.sar_negbin import SARNegBin
 from neighbayes.models.cross_section.sar_negbin_re import SARNegBinRE
@@ -128,7 +128,7 @@ def test_linear_scale_impacts_use_no_eigendecomposition(model_cls, y_kind, _desi
     np.linalg.eig = _boom
     np.linalg.eigvals = _boom
     try:
-        result = model.spatial_effects()
+        result = model.impacts()
     finally:
         np.linalg.eig, np.linalg.eigvals = orig_eig, orig_eigvals
 

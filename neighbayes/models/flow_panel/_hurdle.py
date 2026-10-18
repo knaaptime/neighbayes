@@ -26,6 +26,7 @@ import pandas as pd
 import pytensor.tensor as pt
 import scipy.sparse as sp
 
+from ..._backends.sampler_helpers import select_backend
 from ..._lazy_deps import pm, xr
 from ..._ops import kron_solve_matrix
 from ...graph import _weights_to_csr
@@ -64,11 +65,11 @@ class SARHurdleNegBinFlowSeparablePanelRE(
 
     Sampling: ``fit()`` runs the structured ``n × n`` Pólya–Gamma sweep
     (:mod:`neighbayes.samplers.hurdle._flow_structured`), on NumPy or
-    ``gibbs_backend="jax"``; ``sampler="nuts"`` fits the same model in PyMC.
+    ``backend="jax"``; ``sampler="nuts"`` fits the same model in PyMC.
 
     Parameters
     ----------
-    y, X, W, T, col_names, k, priors, symmetric_xo_xd
+    y, X, W, T, col_names, k, priors, shared_od_covariates
         As :class:`SARNegBinFlowSeparablePanelRE`.
     Z : array-like or pandas.DataFrame, optional
         Binary design, time-first stacked ``(n²·T, p)``.  Default: ``X`` (then
@@ -188,7 +189,7 @@ class SARHurdleNegBinFlowSeparablePanelRE(
         random_seed: Optional[int] = None,
         *,
         sampler: str = "gibbs",
-        gibbs_backend: str = "auto",
+        backend: str | None = None,
         progressbar: bool = True,
         n_jobs: int = -1,
         idata_kwargs: Optional[dict] = None,
@@ -197,12 +198,14 @@ class SARHurdleNegBinFlowSeparablePanelRE(
     ) -> xr.DataTree:
         """Sample the posterior: structured Gibbs (default) or ``sampler="nuts"``.
 
-        ``gibbs_backend="auto"`` (default) takes JAX when it is installed, else
-        NumPy; ``"numpy"`` or ``"jax"`` pins one.
+        ``backend="auto"`` (default) takes JAX when it is installed, else
+        NumPy; ``"numpy"`` or ``"jax"`` pins one, and NUTS takes ``"pymc"``
+        (its default), ``"nutpie"``, ``"numpyro"`` or ``"blackjax"``.
         ``store_group_effects`` keeps every draw of both halves' pair effects
         (default: when they fit in about 500 MB).  ``idata_kwargs=
         {"log_likelihood": True}`` stores the pointwise hurdle log-likelihood.
         """
+        backend = select_backend(sampler, backend, sample_kwargs)
         if sampler == "nuts":
             return FlowPanelModel.fit(
                 self,
@@ -212,14 +215,13 @@ class SARHurdleNegBinFlowSeparablePanelRE(
                 random_seed=random_seed,
                 progressbar=progressbar,
                 idata_kwargs=idata_kwargs,
+                backend=backend,
                 **sample_kwargs,
             )
-        if sampler != "gibbs":
-            raise ValueError(f"sampler must be 'gibbs' or 'nuts', got {sampler!r}")
         if sample_kwargs:
             raise TypeError(f"Unexpected keyword arguments: {sorted(sample_kwargs)}")
         return self._fit_gibbs_hurdle(
-            backend=self._resolve_gibbs_backend(gibbs_backend, jax=True),
+            backend=self._resolve_gibbs_backend(backend, jax=True),
             draws=draws,
             tune=tune,
             chains=chains,
@@ -392,7 +394,7 @@ class SARHurdleNegBinFlowSeparablePanelRE(
         full[:, self._sel_keep] = gamma
         return full
 
-    def _compute_spatial_effects_posterior(self, draws: Optional[int] = None) -> dict:
+    def _compute_impacts_posterior(self, draws: Optional[int] = None) -> dict:
         if self._idata is None:
             raise RuntimeError("Model has not been fit yet. Call fit() first.")
         post = self._idata.posterior
@@ -410,7 +412,7 @@ class SARHurdleNegBinFlowSeparablePanelRE(
             draws=draws,
         )
 
-    def spatial_effects(
+    def impacts(
         self,
         equation: str = "count",
         draws: Optional[int] = None,
@@ -424,7 +426,7 @@ class SARHurdleNegBinFlowSeparablePanelRE(
         ``ρ``; ``"selection"`` (alias ``"hurdle"``) on the log-odds of any flow
         through ``λ`` and γ, available when the binary design is the flow
         design (``Z=None``).  Other arguments as
-        :meth:`FlowPanelModel.spatial_effects`.
+        :meth:`FlowPanelModel.impacts`.
         """
         if equation == "hurdle":
             equation = "selection"
@@ -439,7 +441,7 @@ class SARHurdleNegBinFlowSeparablePanelRE(
             )
         self._effects_equation = equation
         try:
-            return FlowPanelModel.spatial_effects(
+            return FlowPanelModel.impacts(
                 self,
                 draws=draws,
                 return_posterior_samples=return_posterior_samples,

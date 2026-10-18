@@ -73,7 +73,7 @@ def test_panel_re_fitted_values_and_effects_with_mock_posteriors():
 
     for model in [ols, sar, sem]:
         fitted = model.fitted_values()
-        effects = model.spatial_effects()
+        effects = model.impacts()
 
         assert fitted.shape == y.shape
         assert np.all(np.isfinite(fitted))
@@ -115,7 +115,7 @@ def test_sdem_panel_re_builds_and_computes_effects():
     )
 
     fitted = sdem.fitted_values()
-    effects = sdem.spatial_effects()
+    effects = sdem.impacts()
     assert fitted.shape == y.shape
     assert np.all(np.isfinite(fitted))
     assert np.all(np.isfinite(effects["direct"].values))

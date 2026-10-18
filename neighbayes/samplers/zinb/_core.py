@@ -166,7 +166,7 @@ def _sample_z(
 
     For y_i > 0: z_i = 1 (only count process generates positives).
     For y_i = 0:
-      π_i = expit(η^sel_i)     (corridor activation probability)
+      π_i = expit(η^sel_i)     (activation probability)
       p_nb_zero = (α/(exp(η^cnt_i)+α))^α  (NB probability of zero)
       P(z=1 | y=0) = π_i · p_nb_zero / (π_i · p_nb_zero + (1 - π_i))
 
@@ -436,8 +436,8 @@ def run_zinb_chain(
 
     for i in range(total_iters):
         # ── SELECTION EQUATION (reduced-form SAR-logit, 3 blocks) ──────
-        # CRITICAL: The selection equation models the *latent* corridor
-        # activity z, NOT the observed d = 1(y > 0).  Using d conflates
+        # CRITICAL: The selection equation models the *latent* activity
+        # z, NOT the observed d = 1(y > 0).  Using d conflates
         # structural zeros with NB sampling zeros, biasing γ and λ.
         #
         # Reduced form: η^sel = (I − λW_sel)⁻¹ Zγ (deterministic, no latent
@@ -647,7 +647,7 @@ def run_zinb_chain(
                         y, state.eta_sel, eta_cnt, state.alpha
                     )
 
-                # Posterior mean corridor activation probability
+                # Posterior mean activation probability
                 pi_mean_samples[idx] = float(np.mean(_expit(state.eta_sel)))
 
         if progress_manager is not None:

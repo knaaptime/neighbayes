@@ -51,7 +51,7 @@ class GibbsEntry:
         ``{"jax", "numpy"}``.  ``"auto"`` resolves against this set; every
         family supports ``"numpy"`` (JAX is the optional accelerated path).
     auto_backend
-        Which backend ``gibbs_backend="auto"`` prefers.  ``"jax"`` (default)
+        Which backend ``backend="auto"`` prefers.  ``"jax"`` (default)
         selects JAX when installed and supported, else NumPy — the JAX Gibbs
         path uses the sparse sparsax solve (it never densifies ``W``; a dense
         fallback runs only when sparsax is unavailable or on GPU).  ``"numpy"``
@@ -138,12 +138,12 @@ def resolve(likelihood: str, structure: str) -> GibbsEntry | None:
 
 
 def resolve_backend(requested: str, entry: GibbsEntry, *, jax_ok: bool) -> str:
-    """Map ``gibbs_backend`` ∈ {auto, jax, numpy} to a concrete supported backend.
+    """Map a Gibbs ``backend`` ∈ {auto, jax, numpy} to a concrete supported one.
 
     Parameters
     ----------
     requested
-        The user's ``gibbs_backend`` value.
+        The user's ``backend`` value.
     entry
         The resolved registry entry (its ``backends`` bound the choice).
     jax_ok
@@ -183,7 +183,8 @@ def resolve_backend_for(
     valid = {"auto", "jax", "numpy"}
     if requested not in valid:
         raise ValueError(
-            f"gibbs_backend must be one of {sorted(valid)}, got {requested!r}"
+            f"backend for sampler='gibbs' must be one of {sorted(valid)}, "
+            f"got {requested!r}"
         )
     if requested == "auto":
         # Prefer the declared auto backend; only escalate to JAX when it is
@@ -193,13 +194,11 @@ def resolve_backend_for(
         return "numpy" if "numpy" in backends else next(iter(backends))
     if requested not in backends:
         raise ValueError(
-            f"gibbs_backend={requested!r} is not supported for this model "
+            f"backend={requested!r} is not supported for this model "
             f"(supported: {sorted(backends)})"
         )
     if requested == "jax" and not jax_ok:
-        raise ImportError(
-            "gibbs_backend='jax' requires JAX. Install with: pip install jax"
-        )
+        raise ImportError("backend='jax' requires JAX. Install with: pip install jax")
     return _jax_backend() if requested == "jax" else requested
 
 

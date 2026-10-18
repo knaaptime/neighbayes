@@ -61,12 +61,11 @@ class SARNegBinRE(SpatialModel):
 
     The sampler bypasses PyMC's NUTS entirely. It produces an
     ``xarray.DataTree`` object compatible with all downstream
-    diagnostics (``spatial_diagnostics()``, ``spatial_effects()``,
+    diagnostics (``spatial_diagnostics()``, ``impacts()``,
     ``summary()``).
 
-    The ``fit()`` method does **not** accept ``nuts_sampler`` or
-    ``target_accept`` kwargs — these are NUTS-specific and will raise
-    ``TypeError`` if passed.
+    With the Gibbs sampler, ``fit()`` does **not** accept ``target_accept``,
+    a NUTS-only argument; passing it raises ``TypeError``.
 
     α (NB dispersion) mixing can be slower than ρ or β. Monitor ESS
     for α specifically and use longer runs if needed.
@@ -346,8 +345,8 @@ class SARNegBinRE(SpatialModel):
         if _use_jax_full:
             if return_eta:
                 raise NotImplementedError(
-                    "return_eta=True is not supported with gibbs_backend='jax'. "
-                    "Use gibbs_backend='numpy' if you need the latent index stored."
+                    "return_eta=True is not supported with backend='jax'. "
+                    "Use backend='numpy' if you need the latent index stored."
                 )
             chain_inits = [
                 self._initialize_from_glm(np.random.default_rng(seed)) for seed in seeds
@@ -499,7 +498,7 @@ class SARNegBinRE(SpatialModel):
         )
         return np.exp(A_rho_inv)
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute posterior impacts on the log-mean scale for each draw."""

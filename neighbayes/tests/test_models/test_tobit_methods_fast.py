@@ -63,12 +63,12 @@ def test_sar_sem_tobit_fitted_values_and_effects_run_with_mock_posteriors():
 
     for m in [sar, sem]:
         fitted = m.fitted_values()
-        effects = m.spatial_effects()
+        effects = m.impacts()
         assert fitted.shape == y.shape
         assert np.all(np.isfinite(fitted))
         assert np.all(np.isfinite(effects["direct"].values))
 
-    sem_eff = sem.spatial_effects()
+    sem_eff = sem.impacts()
     assert np.allclose(sem_eff["indirect"].values, 0.0)
 
 
@@ -94,7 +94,7 @@ def test_sdm_tobit_fitted_values_and_effects_run_with_mock_posterior():
     )
 
     fitted = sdm.fitted_values()
-    effects = sdm.spatial_effects()
+    effects = sdm.impacts()
 
     assert fitted.shape == y.shape
     assert np.all(np.isfinite(fitted))

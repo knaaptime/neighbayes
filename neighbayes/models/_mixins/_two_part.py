@@ -22,7 +22,7 @@ import numpy as np
 #: Draws averaged by the posterior summaries unless the caller asks otherwise.
 _SUMMARY_DRAWS = 200
 
-#: Accepted names of the binary equation in :meth:`TwoPartMixin.spatial_effects`.
+#: Accepted names of the binary equation in :meth:`TwoPartMixin.impacts`.
 _BINARY_NAMES = ("selection", "hurdle")
 
 
@@ -106,7 +106,7 @@ class TwoPartMixin:
     # Impacts
     # ------------------------------------------------------------------
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self, equation: str = "count"
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Posterior impacts per draw for the count or the binary equation."""
@@ -137,7 +137,7 @@ class TwoPartMixin:
             else:
                 # 1'S1 is a column-weighted bilinear form, not a trace, so the
                 # non-row-standardized total keeps the eigen decomposition.
-                from ...diagnostics.spatial_effects import _chunked_eig_means
+                from ...diagnostics.impacts import _chunked_eig_means
 
                 n = self._W_sel_sparse.shape[0]
                 W_dense = self._W_sel_sparse.toarray().astype(np.float64)
@@ -155,7 +155,7 @@ class TwoPartMixin:
             )
         return direct, total - direct, total
 
-    def spatial_effects(
+    def impacts(
         self,
         equation: str = "count",
         return_posterior_samples: bool = False,
@@ -172,12 +172,10 @@ class TwoPartMixin:
         return_posterior_samples : bool, default False
             Also return the per-draw impacts.
         """
-        from ...diagnostics.spatial_effects import _build_effects_dataframe
+        from ...diagnostics.impacts import _build_effects_dataframe
 
         self._require_fit()
-        direct, indirect, total = self._compute_spatial_effects_posterior(
-            equation=equation
-        )
+        direct, indirect, total = self._compute_impacts_posterior(equation=equation)
         k = direct.shape[1]
         if equation in _BINARY_NAMES:
             names = self._sel_nonintercept_feature_names
@@ -203,7 +201,7 @@ class TwoPartMixin:
     # Posterior expectations
     # ------------------------------------------------------------------
 
-    def corridor_probabilities(
+    def activation_probabilities(
         self, draws: Optional[int] = _SUMMARY_DRAWS
     ) -> np.ndarray:
         """Posterior mean of each binary probability ``π = logit⁻¹(η_sel)``.

@@ -11,7 +11,7 @@ import pandas as pd
 import scipy.sparse as sp
 from libpysal.graph import Graph
 
-from .._backends.sampler_helpers import jax_available
+from .._backends.sampler_helpers import jax_available, select_backend
 from .._lazy_deps import pm, xr
 from .._logdet import (
     resolve_logdet_bounds,
@@ -81,12 +81,12 @@ class SpatialModel(SharedSpatialMethods, ABC):
         degrees of freedom :math:`\\nu`, set via ``priors={"nu": value}``
         (default 4, LeSage's ``rval``).  Fixing :math:`\\nu` is what keeps
         the NUTS and Gibbs paths targeting the same posterior.
-    w_vars : list of str, optional
+    durbin_vars : list of str, optional
         Names of X columns to spatially lag. Only relevant for models that
         include ``WX`` terms (SLX, SDM, SDEM and their panel/Tobit variants).
         By default all non-constant columns are lagged. Pass a subset to
         restrict which variables receive a spatial lag, e.g.
-        ``w_vars=["income", "density"]``.
+        ``durbin_vars=["income", "density"]``.
 
     Attributes
     ----------
@@ -134,7 +134,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
         priors: Optional[Union[dict, Any]] = None,
         logdet_method: str | None = None,
         robust: bool = False,
-        w_vars: Optional[list] = None,
+        durbin_vars: Optional[list] = None,
         logdet_refit: bool = True,
         logdet_refit_pad_sd: float = 10.0,
         logdet_aaa_check: bool = True,
@@ -189,17 +189,17 @@ class SpatialModel(SharedSpatialMethods, ABC):
             self._wx_column_indices = self._spatial_lag_column_indices(
                 self._X, self._feature_names
             )
-            if w_vars is not None:
-                unknown = [v for v in w_vars if v not in self._feature_names]
+            if durbin_vars is not None:
+                unknown = [v for v in durbin_vars if v not in self._feature_names]
                 if unknown:
                     raise ValueError(
-                        f"w_vars contains names not found in X columns: {unknown}. "
+                        f"durbin_vars contains names not found in X columns: {unknown}. "
                         f"Available: {self._feature_names}"
                     )
                 self._wx_column_indices = [
                     i
                     for i in self._wx_column_indices
-                    if self._feature_names[i] in w_vars
+                    if self._feature_names[i] in durbin_vars
                 ]
             self._wx_feature_names = [
                 self._feature_names[i] for i in self._wx_column_indices
@@ -223,8 +223,8 @@ class SpatialModel(SharedSpatialMethods, ABC):
             self._wx_feature_names: list[str] = []
             self._Wy = np.zeros(len(self._y), dtype=np.float64)
             self._WX = np.empty((self._X.shape[0], 0), dtype=np.float64)
-            if w_vars is not None:
-                raise ValueError("w_vars requires a spatial weights matrix W.")
+            if durbin_vars is not None:
+                raise ValueError("durbin_vars requires a spatial weights matrix W.")
 
     @cached_property
     def _W_dense(self) -> np.ndarray:
@@ -269,7 +269,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
         random_seed: Optional[int] = None,
         progressbar: bool = True,
         sampler: str | None = None,
-        gibbs_backend: str = "auto",
+        backend: str | None = None,
         thin: int = 1,
         n_jobs: int = -1,
         idata_kwargs: dict[str, Any] | None = None,
@@ -295,9 +295,11 @@ class SpatialModel(SharedSpatialMethods, ABC):
         sampler : {"gibbs", "nuts", None}, default None
             Sampling method.  ``None`` auto-selects Gibbs when this model has
             one, else NUTS.
-        gibbs_backend : {"auto", "jax", "numpy"}, default "auto"
-            Execution backend for the Gibbs sampler.  ``"auto"`` uses JAX when
-            installed and supported by the family, else NumPy.  Ignored for NUTS.
+        backend : str, optional
+            What executes the sampler.  For Gibbs, ``"auto"`` (the default),
+            ``"jax"`` or ``"numpy"``; ``"auto"`` takes JAX when it is installed
+            and supported by the family, else NumPy.  For NUTS, ``"pymc"`` (the
+            default), ``"nutpie"``, ``"numpyro"`` or ``"blackjax"``.
         thin : int, default 1
             Keep every ``thin``-th post-warmup Gibbs draw (Gibbs only).
         n_jobs : int, default -1
@@ -310,8 +312,8 @@ class SpatialModel(SharedSpatialMethods, ABC):
             at n = 250,000 with 4 × 2,000 draws).  For NUTS the dict is also
             passed to ``pm.sample``.
         **sample_kwargs
-            For NUTS, forwarded to ``pm.sample`` (``nuts_sampler=...``); for
-            Gibbs, the family's declared options (an unsupported key raises).
+            For NUTS, forwarded to ``pm.sample``; for Gibbs, the family's
+            declared options (an unsupported key raises).
 
         Returns
         -------
@@ -328,6 +330,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
         entry = resolve(*gibbs_key) if gibbs_key is not None else None
         if sampler is None:
             sampler = "gibbs" if entry is not None else "nuts"
+        backend = select_backend(sampler, backend, sample_kwargs)
 
         if sampler == "gibbs":
             if entry is None:
@@ -346,7 +349,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
                     "the Gibbs sampler (sampler='gibbs'). Remove it, or use "
                     "sampler='nuts'."
                 )
-            backend = resolve_backend(gibbs_backend, entry, jax_ok=jax_available())
+            backend = resolve_backend(backend, entry, jax_ok=jax_available())
             family_opts = pop_options(sample_kwargs, entry)
             self._idata = run_entry(
                 entry,
@@ -365,12 +368,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
             self._idata = self._postprocess_idata(self._idata)
             return self._idata
 
-        if sampler != "nuts":
-            raise ValueError(
-                f"sampler must be 'gibbs', 'nuts', or None, got {sampler!r}"
-            )
-
-        nuts_sampler = sample_kwargs.pop("nuts_sampler", "pymc")
+        nuts_sampler = backend
         compute_log_likelihood = bool((idata_kwargs or {}).get("log_likelihood", False))
         _, compute_log_likelihood = self._fit_nuts(
             draws=draws,
@@ -445,7 +443,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
         progressbar : bool, default True
             Show per-chain progress bars.
         gibbs_method : str, default "numpy"
-            Execution backend (the resolved ``gibbs_backend``): ``"numpy"``
+            Execution backend (the resolved ``backend``): ``"numpy"``
             for Python-loop Gibbs or ``"jax"`` for full-JIT Gibbs; both
             slice-sample ρ/λ.
         slice_width : float or None, default None
@@ -579,7 +577,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
         return self._pymc_model
 
     @abstractmethod
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute direct, indirect, and total effects for each posterior draw.

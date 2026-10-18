@@ -172,12 +172,12 @@ class TestSARHurdleNB:
             idata.posterior.data_vars
         )
         assert idata["log_likelihood"]["obs"].shape[-1] == d["y"].size
-        assert m.corridor_probabilities(draws=5).shape == d["y"].shape
-        assert np.all(m.conditional_mean(draws=5) >= 1.0)
+        assert m.activation_probabilities(draws=5).shape == d["y"].shape
+        assert np.all(m.positive_mean(draws=5) >= 1.0)
         pp = m.posterior_predictive(n_draws=4, random_seed=0)
         assert pp.shape == (4, d["y"].size) and pp.min() >= 0
         for eq in ("count", "selection", "hurdle"):
-            assert len(m.spatial_effects(eq)) == 1
+            assert len(m.impacts(eq)) == 1
 
     @pytest.mark.parametrize("sampler", ["gibbs", "nuts"])
     def test_alpha_fixed(self, sampler):
@@ -246,7 +246,7 @@ def test_hurdle_panel_registry_and_storage():
     idata = m.fit(store_group_effects=False, **QUICK)
     assert "group_effect" not in idata.posterior.data_vars
     assert {"group_effect_summary", "sel_group_effect_summary"} <= set(idata.children)
-    assert m.corridor_probabilities(draws=3).shape == (100,)
+    assert m.activation_probabilities(draws=3).shape == (100,)
 
 
 def test_hurdle_panel_absorbs_and_warns():
@@ -288,7 +288,7 @@ def test_hurdle_panel_learned_sds_and_mundlak():
     for sampler in ("gibbs", "nuts"):
         post = m.fit(sampler=sampler, **QUICK).posterior
         assert {"group_sd", "sel_group_sd"} <= set(post.data_vars)
-    assert len(m.spatial_effects("selection")) == 1  # the mean is not an effect
+    assert len(m.impacts("selection")) == 1  # the mean is not an effect
 
 
 # ---------------------------------------------------------------------------
@@ -445,13 +445,13 @@ def test_flow_hurdle_cross_section(backend):
     m = SARHurdleNegBinFlow(
         d["y_vec"], d["X"], d["G"], separable=True, col_names=d["col_names"]
     )
-    kw = {"sampler": "nuts"} if backend == "nuts" else {"gibbs_backend": backend}
+    kw = {"sampler": "nuts"} if backend == "nuts" else {"backend": backend}
     idata = m.fit(idata_kwargs={"log_likelihood": True}, **kw, **QUICK)
     names = set(idata.posterior.data_vars)
     assert {"lam_d", "lam_o", "rho_d", "rho_o", "beta", "gamma", "alpha"} <= names
     assert idata["log_likelihood"]["obs"].shape[-1] == d["y_vec"].size
-    assert m.spatial_effects("hurdle", draws=5).shape[0] > 0
-    assert m.conditional_mean(draws=3).shape == (36,)
+    assert m.impacts("hurdle", draws=5).shape[0] > 0
+    assert m.positive_mean(draws=3).shape == (36,)
 
 
 @pytest.mark.parametrize("effects", [0, 1, 2, 3])
@@ -473,7 +473,7 @@ def test_flow_hurdle_panel(effects, backend):
             col_names=d["col_names"],
             **effects_kwargs(effects, "pair_effects", "random"),
         )
-        kw = {"sampler": "nuts"} if backend == "nuts" else {"gibbs_backend": backend}
+        kw = {"sampler": "nuts"} if backend == "nuts" else {"backend": backend}
         post = m.fit(**kw, **QUICK).posterior
     names = set(post.data_vars)
     for pre in ("", "sel_"):
@@ -495,7 +495,7 @@ def test_flow_hurdle_alpha_fixed_and_summaries(backend):
         m = SARHurdleNegBinFlow(
             d["y"], d["X"], d["G"], separable=True, pair_effects="random", T=3, col_names=d["col_names"], priors={"alpha_fixed": 4.0},
         )  # fmt: skip
-        idata = m.fit(gibbs_backend=backend, store_group_effects=False, **QUICK)
+        idata = m.fit(backend=backend, store_group_effects=False, **QUICK)
     assert np.all(idata.posterior["alpha"].values == 4.0)
     assert {"group_effect_summary", "sel_group_effect_summary"} <= set(idata.children)
 
@@ -525,7 +525,7 @@ def test_flow_hurdle_guards():
     )
     m.fit(**QUICK)
     with pytest.raises(NotImplementedError, match="flow design"):
-        m.spatial_effects("selection")
+        m.impacts("selection")
 
 
 @pytest.mark.slow
@@ -636,8 +636,8 @@ def test_flow_hurdle_jax_matches_numpy():
             col_names=d["col_names"],
         )
     fit = dict(draws=3000, tune=1000, chains=4, progressbar=False)
-    a = m.fit(gibbs_backend="numpy", random_seed=1, n_jobs=4, **fit).posterior
-    b = m.fit(gibbs_backend="jax", random_seed=2, **fit).posterior
+    a = m.fit(backend="numpy", random_seed=1, n_jobs=4, **fit).posterior
+    b = m.fit(backend="jax", random_seed=2, **fit).posterior
     for var in ("rho_d", "rho_o", "lam_d", "lam_o", "beta", "gamma", "alpha",
                 "time_effect", "sel_time_effect", "group_sd", "sel_group_sd"):  # fmt: skip
         _agree_mc(b, a, var)
@@ -676,7 +676,7 @@ def test_flow_hurdle_panel_recovers_sparse_flows():
         )
     post = m.fit(
         draws=3000, tune=1000, chains=4, progressbar=False, random_seed=1,
-        gibbs_backend="jax",
+        backend="jax",
     ).posterior  # fmt: skip
     truth = {"lam_d": 0.3, "lam_o": 0.2, "rho_d": 0.3, "rho_o": 0.2, "alpha": 3.0}
     for var, value in truth.items():

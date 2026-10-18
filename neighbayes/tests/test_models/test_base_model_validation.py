@@ -1,7 +1,7 @@
 """Fast unit tests for neighbayes.models.base input validation and decision tree.
 
 Tests _parse_W error paths, SpatialModel.__init__ formula mode,
-w_vars validation, and spatial_diagnostics_decision branches
+durbin_vars validation, and spatial_diagnostics_decision branches
 without running MCMC.
 """
 
@@ -227,16 +227,16 @@ class TestSpatialModelInit:
         with pytest.raises(ValueError, match="Provide either"):
             OLS(W=W_graph)
 
-    def test_w_vars_unknown_raises(self, W_graph):
+    def test_durbin_vars_unknown_raises(self, W_graph):
         from neighbayes.models.cross_section.slx import SLX
 
         rng = np.random.default_rng(0)
-        with pytest.raises(ValueError, match="w_vars contains names not found"):
+        with pytest.raises(ValueError, match="durbin_vars contains names not found"):
             SLX(
                 y=rng.standard_normal(4),
                 X=rng.standard_normal((4, 2)),
                 W=W_graph,
-                w_vars=["nonexistent"],
+                durbin_vars=["nonexistent"],
             )
 
 

@@ -34,7 +34,7 @@ import numpy as np
 import pytensor.tensor as pt
 from pytensor import sparse as pts
 
-from ..._backends.sampler_helpers import use_jax_likelihood
+from ..._backends.sampler_helpers import select_backend, use_jax_likelihood
 from ..._lazy_deps import pm
 from ..._logdet import get_cached_logdet_fn
 from .._base._shared import (
@@ -87,7 +87,7 @@ class _DynamicPanelMixin:
         mu, sd = gelman_default_beta_prior(self._y_dyn, design, names)
         return self.priors.get("beta_mu", mu), self.priors.get("beta_sigma", sd)
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute posterior samples of direct, indirect, and total effects."""
@@ -366,6 +366,8 @@ class _DynamicPanelMixin:
         target_accept: float = 0.9,
         random_seed: int | None = None,
         idata_kwargs: dict | None = None,
+        sampler: str | None = None,
+        backend: str | None = None,
         **sample_kwargs,
     ):
         """Shared NUTS fit for spatial dynamic panels.
@@ -376,9 +378,13 @@ class _DynamicPanelMixin:
         requested, the Jacobian-corrected log-likelihood is reconstructed
         post-sampling via :meth:`_reconstruct_dynamic_log_likelihood`.
         """
+        if sampler not in (None, "nuts"):
+            raise NotImplementedError(
+                f"{type(self).__name__} has no Gibbs sampler; use sampler='nuts'."
+            )
+        nuts_sampler = select_backend("nuts", backend, sample_kwargs)
         idata_kwargs = idata_kwargs or {}
         compute_log_likelihood = bool(idata_kwargs.get("log_likelihood", False))
-        nuts_sampler = sample_kwargs.pop("nuts_sampler", "pymc")
         progressbar = sample_kwargs.pop("progressbar", True)
 
         _, compute_log_likelihood = self._fit_nuts(
@@ -474,7 +480,7 @@ class OLSPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
     robust : bool, default False
         If True, replace the Normal error with Student-t. See
         *Robust regression* below.
-    w_vars : list of str, optional
+    durbin_vars : list of str, optional
         Names of X columns to spatially lag. By default all
         non-constant columns are lagged.
 
@@ -601,6 +607,8 @@ class SDMPanelDynamicRestricted(_DynamicPanelMixin, SpatialPanelModel):
         target_accept: float = 0.9,
         random_seed: int | None = None,
         idata_kwargs: dict | None = None,
+        sampler: str | None = None,
+        backend: str | None = None,
         **sample_kwargs,
     ):
         """Sample posterior and attach Jacobian-corrected log-likelihood."""
@@ -612,6 +620,8 @@ class SDMPanelDynamicRestricted(_DynamicPanelMixin, SpatialPanelModel):
             target_accept=target_accept,
             random_seed=random_seed,
             idata_kwargs=idata_kwargs,
+            sampler=sampler,
+            backend=backend,
             **sample_kwargs,
         )
 
@@ -698,7 +708,7 @@ class SDMPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
         ``None`` (default).
     robust : bool, default False
         If True, replace the Normal error with Student-t.
-    w_vars : list of str, optional
+    durbin_vars : list of str, optional
         Names of X columns to spatially lag. By default all
         non-constant columns are lagged.
 
@@ -765,6 +775,8 @@ class SDMPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
         target_accept: float = 0.9,
         random_seed: int | None = None,
         idata_kwargs: dict | None = None,
+        sampler: str | None = None,
+        backend: str | None = None,
         **sample_kwargs,
     ):
         """Sample posterior and attach Jacobian-corrected log-likelihood."""
@@ -776,6 +788,8 @@ class SDMPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
             target_accept=target_accept,
             random_seed=random_seed,
             idata_kwargs=idata_kwargs,
+            sampler=sampler,
+            backend=backend,
             **sample_kwargs,
         )
 
@@ -913,6 +927,8 @@ class SARPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
         target_accept: float = 0.9,
         random_seed: int | None = None,
         idata_kwargs: dict | None = None,
+        sampler: str | None = None,
+        backend: str | None = None,
         **sample_kwargs,
     ):
         """Sample posterior and attach Jacobian-corrected log-likelihood."""
@@ -924,6 +940,8 @@ class SARPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
             target_accept=target_accept,
             random_seed=random_seed,
             idata_kwargs=idata_kwargs,
+            sampler=sampler,
+            backend=backend,
             **sample_kwargs,
         )
 
@@ -1114,6 +1132,8 @@ class SEMPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
         target_accept: float = 0.9,
         random_seed: int | None = None,
         idata_kwargs: dict | None = None,
+        sampler: str | None = None,
+        backend: str | None = None,
         **sample_kwargs,
     ):
         """Sample posterior and attach pointwise log-likelihood for IC metrics."""
@@ -1125,6 +1145,8 @@ class SEMPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
             target_accept=target_accept,
             random_seed=random_seed,
             idata_kwargs=idata_kwargs,
+            sampler=sampler,
+            backend=backend,
             **sample_kwargs,
         )
 
@@ -1201,7 +1223,7 @@ class SDEMPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
         when ``None`` (default).
     robust : bool, default False
         If True, replace the Normal innovation with Student-t.
-    w_vars : list of str, optional
+    durbin_vars : list of str, optional
         Names of X columns to spatially lag. By default all
         non-constant columns are lagged.
 
@@ -1326,6 +1348,8 @@ class SDEMPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
         target_accept: float = 0.9,
         random_seed: int | None = None,
         idata_kwargs: dict | None = None,
+        sampler: str | None = None,
+        backend: str | None = None,
         **sample_kwargs,
     ):
         """Sample posterior and attach pointwise log-likelihood for IC metrics."""
@@ -1337,6 +1361,8 @@ class SDEMPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
             target_accept=target_accept,
             random_seed=random_seed,
             idata_kwargs=idata_kwargs,
+            sampler=sampler,
+            backend=backend,
             **sample_kwargs,
         )
 
@@ -1408,7 +1434,7 @@ class SLXPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
         Accepted for API consistency; unused (no spatial Jacobian).
     robust : bool, default False
         If True, replace the Normal error with Student-t.
-    w_vars : list of str, optional
+    durbin_vars : list of str, optional
         Names of X columns to spatially lag. By default all
         non-constant columns are lagged.
 

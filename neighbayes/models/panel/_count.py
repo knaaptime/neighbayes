@@ -251,7 +251,7 @@ class _CountPanelBase(CountPanelFEMixin, SpatialPanelModel):
             eta = eta + self._D_tau @ self._posterior_mean("time_effect")
         return np.exp(eta)
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Impacts on the log-mean scale for each draw."""

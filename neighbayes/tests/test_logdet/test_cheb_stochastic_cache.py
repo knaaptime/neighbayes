@@ -65,7 +65,7 @@ def test_a_fit_builds_one_precompute(W, backend, count_precomputes):
         chains=2,
         random_seed=1,
         progressbar=False,
-        gibbs_backend=backend,
+        backend=backend,
     )
     assert len(count_precomputes) == 1
 

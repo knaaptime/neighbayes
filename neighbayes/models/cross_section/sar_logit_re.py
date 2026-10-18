@@ -314,8 +314,8 @@ class SARLogitRE(SpatialModel):
         if _use_jax_full:
             if return_eta:
                 raise NotImplementedError(
-                    "return_eta=True is not supported with gibbs_backend='jax'. "
-                    "Use gibbs_backend='numpy' if you need the latent index "
+                    "return_eta=True is not supported with backend='jax'. "
+                    "Use backend='numpy' if you need the latent index "
                     "stored."
                 )
             chain_inits = [
@@ -446,7 +446,7 @@ class SARLogitRE(SpatialModel):
         """For the logit model, the fitted mean is the fitted probability."""
         return self.fitted_probabilities()
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute posterior impacts on the log-odds scale for each draw."""

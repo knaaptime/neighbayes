@@ -26,7 +26,7 @@ def _filter(W: sp.csr_matrix, coef: float, rhs: np.ndarray) -> np.ndarray:
 def simulate_multilevel(
     n_side: int = 24,
     blocks: Sequence[int] = (4, 2),
-    processes: Sequence[str] = ("lag", "lag", "lag"),
+    processes: Sequence[str | None] = ("SAR", "SAR", "SAR"),
     rhos: Sequence[float] = (0.4, 0.5, 0.4),
     betas: Sequence[Sequence[float]] | None = None,
     sigmas: Sequence[float] = (1.0, 0.5, 0.5),
@@ -47,8 +47,8 @@ def simulate_multilevel(
         \theta_\ell = S_\ell(X_\ell\beta_\ell + \Delta_\ell\theta_{\ell+1}
                       + \sigma_\ell\varepsilon_\ell)
 
-    for a lag (:math:`S_\ell = (I-\rho_\ell W_\ell)^{-1}`); an error process
-    filters only the innovation, and ``"none"`` filters nothing.
+    for a SAR level (:math:`S_\ell = (I-\rho_\ell W_\ell)^{-1}`); a SEM level
+    filters only the innovation, and an aspatial level (``None``) nothing.
     :math:`y = \theta_0`.
 
     Parameters
@@ -57,10 +57,11 @@ def simulate_multilevel(
         Side of the unit grid; must be divisible by ``prod(blocks)``.
     blocks : sequence of int, default (4, 2)
         Block side of each upper level, in groups of the level below.
-    processes : sequence of {"lag", "error", "none"}
-        One per level, the units first.
+    processes : sequence of {"SAR", "SEM", None}
+        One per level, the units first, as :class:`~neighbayes.models.Level`
+        takes them.  The simulator draws no Durbin terms.
     rhos : sequence of float
-        The autoregressive parameter of each level (ignored for ``"none"``).
+        The autoregressive parameter of each level (ignored for ``None``).
     betas : sequence of sequences, optional
         Coefficients per level.  The units' include the intercept first;
         upper levels have none.  Default: ``[1, 1, -1]`` at the units and
@@ -94,6 +95,11 @@ def simulate_multilevel(
     L = len(blocks)
     if not (len(processes) == len(rhos) == len(sigmas) == L + 1):
         raise ValueError("processes, rhos and sigmas need one entry per level.")
+    bad = [p for p in processes if p not in ("SAR", "SEM", None)]
+    if bad:
+        raise NotImplementedError(
+            f"simulate_multilevel draws SAR, SEM or aspatial levels; got {bad}."
+        )
     if n_side % int(np.prod(blocks)):
         raise ValueError("n_side must be divisible by the product of blocks.")
     if betas is None:
@@ -131,9 +137,9 @@ def simulate_multilevel(
             sd = _hetero_scale(designs[0], sigmas[0])
         eps = sd * rng.standard_normal(J)
         proc = processes[ell]
-        if proc == "lag":
+        if proc == "SAR":
             thetas[ell] = _filter(W, rhos[ell], mean + eps)
-        elif proc == "error":
+        elif proc == "SEM":
             thetas[ell] = mean + _filter(W, rhos[ell], eps)
         else:
             thetas[ell] = mean + eps

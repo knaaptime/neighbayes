@@ -362,7 +362,7 @@ class TestSARFlowFitSmoke:
             self.X,
             self.G,
             col_names=self.col_names,
-            restrict_positive=True,
+            nonnegative_dependence=True,
         )
         idata = model.fit(draws=50, tune=50, chains=1, progressbar=False, random_seed=0)
         posterior = idata.posterior
@@ -393,7 +393,7 @@ class TestSARFlowFitSmoke:
             self.X,
             self.G,
             col_names=self.col_names,
-            restrict_positive=True,
+            nonnegative_dependence=True,
         )
         idata = model.fit(draws=50, tune=50, chains=1, progressbar=False, random_seed=0)
         rho_d = idata.posterior["rho_d"].values.ravel()
@@ -446,7 +446,7 @@ class TestEffectsAccountingIdentity:
         )
         # Use minimal posterior (mock-style: just run prior predictive)
         model.fit(draws=20, tune=20, chains=1, progressbar=False, random_seed=0)
-        effects = model._compute_spatial_effects_posterior(draws=5)
+        effects = model._compute_impacts_posterior(draws=5)
 
         total = effects["total"]
         check = (
@@ -696,7 +696,7 @@ class TestSARFlowRecovery:
             out["X"],
             G,
             col_names=out["col_names"],
-            restrict_positive=True,
+            nonnegative_dependence=True,
         )
         idata = model.fit(**SAMPLE_KWARGS)
         return idata
@@ -821,7 +821,7 @@ class TestKronSolveUtilities:
 
 
 # ---------------------------------------------------------------------------
-# Public spatial_effects + posterior_predictive (Phase 3.3)
+# Public impacts + posterior_predictive (Phase 3.3)
 # ---------------------------------------------------------------------------
 
 
@@ -852,16 +852,16 @@ class TestFlowSpatialEffectsAndPPC:
         model.fit(draws=40, tune=40, chains=1, progressbar=False, random_seed=0)
         return model
 
-    def test_spatial_effects_returns_dataframe(self, fitted):
-        df = fitted.spatial_effects()
+    def test_impacts_returns_dataframe(self, fitted):
+        df = fitted.impacts()
         assert df.index.names == ["predictor", "side", "effect"]
         assert {"mean", "ci_lower", "ci_upper", "bayes_pvalue"} <= set(df.columns)
         # Five effect labels per predictor.
         effects = set(df.index.get_level_values("effect"))
         assert effects == {"origin", "destination", "intra", "network", "total"}
 
-    def test_spatial_effects_return_samples(self, fitted):
-        df, samples = fitted.spatial_effects(return_posterior_samples=True)
+    def test_impacts_return_samples(self, fitted):
+        df, samples = fitted.impacts(return_posterior_samples=True)
         for key in ["origin", "destination", "intra", "network", "total"]:
             arr = samples[key]
             assert arr.ndim == 2
@@ -879,7 +879,7 @@ class TestFlowSpatialEffectsAndPPC:
 
 
 # ---------------------------------------------------------------------------
-# LeSage-decomposition correctness tests for the new spatial_effects math
+# LeSage-decomposition correctness tests for the new impacts math
 # ---------------------------------------------------------------------------
 
 
@@ -929,7 +929,7 @@ def _ring_W(n, row_standardize=True):
 
 
 class TestFlowEffectsLeSageDecomposition:
-    """Verify spatial_effects matches the LeSage (2008) calc_effects.m reference."""
+    """Verify impacts matches the LeSage (2008) calc_effects.m reference."""
 
     @pytest.mark.parametrize("row_standardize", [True, False])
     @pytest.mark.parametrize(
@@ -984,7 +984,7 @@ class TestFlowEffectsLeSageDecomposition:
         np.testing.assert_allclose(res["total"], s)
 
     def test_calc_effects_reference_match(self):
-        """End-to-end: spatial_effects matches a hand-rolled LeSage solve at one draw."""
+        """End-to-end: impacts matches a hand-rolled LeSage solve at one draw."""
         import scipy.sparse as sp_local
 
         from neighbayes.dgp import simulate_sar_flow
@@ -1009,7 +1009,7 @@ class TestFlowEffectsLeSageDecomposition:
         )
         model.fit(draws=20, tune=20, chains=1, progressbar=False, random_seed=0)
 
-        _, samples = model.spatial_effects(return_posterior_samples=True)
+        _, samples = model.impacts(return_posterior_samples=True)
         post = model.inference_data.posterior
         rho_d = float(post["rho_d"].values.reshape(-1)[0])
         rho_o = float(post["rho_o"].values.reshape(-1)[0])
@@ -1084,14 +1084,14 @@ class TestFlowPanelSpatialEffectsAndPPC:
         model.fit(draws=30, tune=30, chains=1, progressbar=False, random_seed=0)
         return model
 
-    def test_panel_spatial_effects_dataframe(self, fitted_panel):
-        df = fitted_panel.spatial_effects()
+    def test_panel_impacts_dataframe(self, fitted_panel):
+        df = fitted_panel.impacts()
         assert df.index.names == ["predictor", "side", "effect"]
         effects = set(df.index.get_level_values("effect"))
         assert effects == {"origin", "destination", "intra", "network", "total"}
 
     def test_panel_total_identity(self, fitted_panel):
-        df, samples = fitted_panel.spatial_effects(return_posterior_samples=True)
+        df, samples = fitted_panel.impacts(return_posterior_samples=True)
         s = (
             samples["origin"]
             + samples["destination"]
@@ -1190,9 +1190,9 @@ class TestFlowEffectsAsymmetricAndIntra:
             G,
             col_names=design.feature_names,
         )
-        assert model._symmetric_xo_xd is False
+        assert model._shared_od_covariates is False
         model.fit(draws=20, tune=20, chains=1, progressbar=False, random_seed=0)
-        df = model.spatial_effects()  # auto -> separate
+        df = model.impacts()  # auto -> separate
         sides = set(df.index.get_level_values("side"))
         assert sides == {"dest", "orig"}
 
@@ -1219,8 +1219,8 @@ class TestFlowEffectsAsymmetricAndIntra:
             col_names=data["col_names"],
         )
         model.fit(draws=20, tune=20, chains=1, progressbar=False, random_seed=0)
-        df_combined = model.spatial_effects(mode="combined")
-        df_separate = model.spatial_effects(mode="separate")
+        df_combined = model.impacts(mode="combined")
+        df_separate = model.impacts(mode="separate")
 
         for eff in ("origin", "destination", "intra", "network", "total"):
             cmean = df_combined.xs(eff, level="effect")["mean"].iloc[0]
@@ -1254,7 +1254,7 @@ class TestOLSFlowEffects:
             np.log(data["y_vec"]), data["X"], data["G"], col_names=data["col_names"]
         )
         model.fit(draws=40, tune=40, chains=1, progressbar=False, random_seed=0)
-        df = model.spatial_effects(mode="combined")
+        df = model.impacts(mode="combined")
 
         # NE = 0 exactly (closed form).
         assert np.isclose(df.xs("network", level="effect")["mean"].iloc[0], 0.0)
@@ -1335,7 +1335,7 @@ class TestFlowLogLikelihood:
             self.gauss["X"],
             self.G,
             col_names=self.gauss["col_names"],
-            restrict_positive=True,
+            nonnegative_dependence=True,
         )
         idata = m.fit(
             draws=30,
@@ -1397,7 +1397,7 @@ class TestFlowLogLikelihood:
             self.gauss["X"],
             self.G,
             col_names=self.gauss["col_names"],
-            restrict_positive=True,
+            nonnegative_dependence=True,
         )
         m_sep = SARFlow(
             self.gauss["y_vec"],

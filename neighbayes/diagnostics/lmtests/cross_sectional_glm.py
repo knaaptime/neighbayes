@@ -191,7 +191,7 @@ def bayesian_glm_lm_wx_test(model) -> BayesianLMTestResult:
     if k_wx == 0:
         raise ValueError(
             "Model has no WX columns. The WX test requires at least one "
-            "spatially lagged covariate (set ``w_vars`` at construction)."
+            "spatially lagged covariate (set ``durbin_vars`` at construction)."
         )
 
     idata = model.inference_data

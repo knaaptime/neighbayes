@@ -154,7 +154,7 @@ class SARZINB(ZINBMixin, SpatialModel):
     reduced-form SAR-NB blocks (ω^cnt, β, ρ, α); ``sampler="nuts"`` fits the
     same model and priors in PyMC (``ZeroInflatedNegativeBinomial``).
 
-    ``corridor_probabilities``, ``zero_attribution`` and the fitted means are
+    ``activation_probabilities``, ``zero_attribution`` and the fitted means are
     posterior expectations averaged over draws; ``posterior_predictive``
     simulates ``d ~ Bern(π)``, ``y = d · NB``.
     """

@@ -90,7 +90,7 @@ class OLS(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     _model_type: str = "ols"
     _likelihood: str = "gaussian"  # NUTS-only (no _gibbs_key)
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Not applicable — OLS has no spatial lag structure.
@@ -101,7 +101,7 @@ class OLS(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
             Always raised; use Bayesian LM diagnostics instead.
         """
         raise NotImplementedError(
-            "OLS has no spatial lag structure and therefore no spatial effects. "
+            "OLS has no spatial lag structure and therefore no impacts. "
             "Use Bayesian LM diagnostics to assess which spatial model "
             "is appropriate, then refit with SAR, SEM, SLX, SDM, or SDEM."
         )

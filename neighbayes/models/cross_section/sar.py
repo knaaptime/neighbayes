@@ -112,7 +112,7 @@ class SAR(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     robust : bool, default False
         If True, replace the Normal error with Student-t for robustness
         to heavy-tailed outliers. See *Robust regression* below.
-    w_vars : list of str, optional
+    durbin_vars : list of str, optional
         Accepted for API consistency with SLX/SDM/SDEM but unused
         (SAR has no ``WX`` term). If supplied without effect on this
         model.
@@ -121,7 +121,7 @@ class SAR(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     -----
     Direct, indirect and total effects of :math:`X` on :math:`y` are
     derived from the spatial multiplier :math:`(I - \\rho W)^{-1}` and
-    are reported by :meth:`spatial_effects`.
+    are reported by :meth:`impacts`.
 
     **Robust regression**
 
@@ -149,7 +149,7 @@ class SAR(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     _likelihood: str = "gaussian"
     _gibbs_key: tuple[str, str] | None = ("gaussian", "cross_section")
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute direct, indirect, and total effects for each posterior draw.

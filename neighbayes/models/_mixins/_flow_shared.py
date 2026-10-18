@@ -35,6 +35,7 @@ from ..._backends.sampler_helpers import (
     jax_available,
     prepare_compile_kwargs,
     prepare_idata_kwargs,
+    select_backend,
 )
 from ..._lazy_deps import pm, xr
 
@@ -54,7 +55,7 @@ class FlowSharedMethods:
     _separable_filter: bool = False
 
     def _resolve_gibbs_backend(self, requested: str, *, jax: bool) -> str:
-        """``gibbs_backend`` resolved for this flow configuration.
+        """The Gibbs ``backend`` resolved for this flow configuration.
 
         ``jax`` says whether the configuration has a JAX Gibbs kernel.
         ``"auto"`` takes it when JAX is installed and NumPy otherwise; an
@@ -101,7 +102,7 @@ class FlowSharedMethods:
     def _flow_effect_moments(self):
         """W-only moments for the exact LeSage effects breakdown.
 
-        Built on first use, only when spatial effects are computed; see
+        Built on first use, only when impacts are computed; see
         :class:`~neighbayes.models.flow._flow._FlowEffectMoments`.
         """
         from ..flow._flow import _FlowEffectMoments
@@ -160,6 +161,8 @@ class FlowSharedMethods:
         store_lambda: bool = False,
         idata_kwargs: Optional[dict] = None,
         progressbar: bool = True,
+        sampler: str | None = None,
+        backend: str | None = None,
         **sample_kwargs,
     ) -> "xr.DataTree":
         """Draw samples from the posterior via PyMC NUTS.
@@ -187,6 +190,10 @@ class FlowSharedMethods:
             default, as in PyMC: it holds one value per draw, chain, and flow.
         progressbar : bool, default True
             Show progress bar during sampling.
+        sampler : {"nuts", None}, default None
+            The only sampler here is NUTS.
+        backend : {"pymc", "nutpie", "numpyro", "blackjax"}, optional
+            What executes NUTS; ``"pymc"`` by default.
         **sample_kwargs
             Additional keyword arguments forwarded to ``pm.sample``.
             Pass ``target_accept=0.95`` to adjust the NUTS acceptance rate.
@@ -197,7 +204,11 @@ class FlowSharedMethods:
         """
         idata_kwargs = dict(idata_kwargs) if idata_kwargs else {}
         compute_log_likelihood = bool(idata_kwargs.get("log_likelihood", False))
-        nuts_sampler = sample_kwargs.pop("nuts_sampler", "pymc")
+        if sampler not in (None, "nuts"):
+            raise NotImplementedError(
+                f"{type(self).__name__} has no Gibbs sampler; use sampler='nuts'."
+            )
+        nuts_sampler = select_backend("nuts", backend, sample_kwargs)
         target_accept = sample_kwargs.pop("target_accept", 0.9)
         nuts_sampler = enforce_c_backend(
             nuts_sampler,

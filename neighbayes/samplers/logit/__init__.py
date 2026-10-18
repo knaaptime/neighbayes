@@ -41,7 +41,7 @@ __all__ = [
 # (Bernoulli) models; the SAR-vs-SEM distinction is handled by MRO dispatch of
 # ``_fit_gibbs`` (each model owns its Pólya-Gamma orchestration).  ``auto``
 # prefers the ``jax`` path (fastest for cross-section); the CHOLMOD NumPy path
-# is available via ``gibbs_backend="numpy"``.  The reduced-form ``SARLogit``
+# is available via ``backend="numpy"``.  The reduced-form ``SARLogit``
 # (key ``"binary"``) is registered separately in ``logit_reduced``.
 
 

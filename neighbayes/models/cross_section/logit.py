@@ -91,14 +91,14 @@ class Logit(SpatialModel):
         return model
 
     # ------------------------------------------------------------------
-    # Spatial-effects hooks (not applicable for non-spatial model)
+    # Impacts hooks (not applicable for non-spatial model)
     # ------------------------------------------------------------------
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         raise NotImplementedError(
-            "Logit has no spatial structure and therefore no spatial effects. "
+            "Logit has no spatial structure and therefore no impacts. "
             "Use Bayesian LM diagnostics to assess whether a spatial binary "
             "model (e.g. SARLogit) is appropriate."
         )

@@ -1,4 +1,4 @@
-"""Formula-level checks for spatial_effects against explicit matrix calculations.
+"""Formula-level checks for impacts against explicit matrix calculations.
 
 These tests avoid MCMC by injecting posterior means directly into model
 InferenceData objects. They verify that impacts match legacy-style formulas.
@@ -26,7 +26,7 @@ def _build_inputs(n: int = 5) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     return y, X, W
 
 
-def test_sar_spatial_effects_match_matrix_formula() -> None:
+def test_sar_impacts_match_matrix_formula() -> None:
     y, X, W = _build_inputs()
     model = SAR(y=y, X=X, W=W_to_graph(W))
 
@@ -34,7 +34,7 @@ def test_sar_spatial_effects_match_matrix_formula() -> None:
     rho = 0.35
     _set_posterior_means(model, beta=beta, rho=rho)
 
-    effects = model.spatial_effects()
+    effects = model.impacts()
 
     S = np.linalg.inv(np.eye(W.shape[0]) - rho * W)
     # Intercept excluded from effects, so use only non-intercept beta
@@ -47,7 +47,7 @@ def test_sar_spatial_effects_match_matrix_formula() -> None:
     assert np.allclose(effects["indirect"].values, expected_indirect)
 
 
-def test_sdm_spatial_effects_match_matrix_formula() -> None:
+def test_sdm_impacts_match_matrix_formula() -> None:
     y, X, W = _build_inputs()
     model = SDM(y=y, X=X, W=W_to_graph(W))
 
@@ -56,7 +56,7 @@ def test_sdm_spatial_effects_match_matrix_formula() -> None:
     rho = 0.3
     _set_posterior_means(model, beta=beta, rho=rho)
 
-    effects = model.spatial_effects()
+    effects = model.impacts()
 
     n = W.shape[0]
     M = np.linalg.inv(np.eye(n) - rho * W)
@@ -73,7 +73,7 @@ def test_sdm_spatial_effects_match_matrix_formula() -> None:
     assert np.allclose(effects["indirect"].values, expected_indirect)
 
 
-def test_slx_spatial_effects_match_matrix_formula() -> None:
+def test_slx_impacts_match_matrix_formula() -> None:
     y, X, W = _build_inputs()
     model = SLX(y=y, X=X, W=W_to_graph(W))
 
@@ -81,7 +81,7 @@ def test_slx_spatial_effects_match_matrix_formula() -> None:
     beta = np.array([0.5, 1.1, -0.2])
     _set_posterior_means(model, beta=beta)
 
-    effects = model.spatial_effects()
+    effects = model.impacts()
 
     beta1_x1 = beta[1]
     beta2_x1 = beta[2]
@@ -96,7 +96,7 @@ def test_slx_spatial_effects_match_matrix_formula() -> None:
     assert np.allclose(effects["indirect"].values, expected_indirect)
 
 
-def test_sdem_spatial_effects_match_matrix_formula() -> None:
+def test_sdem_impacts_match_matrix_formula() -> None:
     y, X, W = _build_inputs()
     model = SDEM(y=y, X=X, W=W_to_graph(W))
 
@@ -104,7 +104,7 @@ def test_sdem_spatial_effects_match_matrix_formula() -> None:
     beta = np.array([0.3, -1.0, 0.4])
     _set_posterior_means(model, beta=beta)
 
-    effects = model.spatial_effects()
+    effects = model.impacts()
 
     beta1_x1 = beta[1]
     beta2_x1 = beta[2]

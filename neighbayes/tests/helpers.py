@@ -410,8 +410,8 @@ def make_spatial_probit_data(
         Binary outcomes, shape ``(nobs,)``.
     X : np.ndarray
         Covariates including intercept, shape ``(nobs, k)``.
-    region_ids : np.ndarray
-        Region code for each observation, shape ``(nobs,)``.
+    groups : np.ndarray
+        Group code for each observation, shape ``(nobs,)``.
     """
     out = dgp.simulate_sem_probit(
         W=_as_sparse(W),
@@ -422,7 +422,7 @@ def make_spatial_probit_data(
         group_size=n_per_region,
         group_effects="random",
     )
-    return out["y"], out["X"], out["region_ids"]
+    return out["y"], out["X"], out["groups"]
 
 
 # ---------------------------------------------------------------------------

@@ -22,7 +22,11 @@ import pandas as pd
 import pytensor.tensor as pt
 from libpysal.graph import Graph
 
-from ..._backends.sampler_helpers import prepare_compile_kwargs, prepare_idata_kwargs
+from ..._backends.sampler_helpers import (
+    prepare_compile_kwargs,
+    prepare_idata_kwargs,
+    select_backend,
+)
 from ..._lazy_deps import pm, xr
 from .._base._shared import SharedSpatialMethods
 from .._design import FacadeMeta, sem_probit
@@ -57,7 +61,7 @@ class SEMProbitRE(SharedSpatialMethods):
     ----------
     formula : str, optional
         Formula for the binary response model, e.g. ``"y ~ x1 + x2"``.
-        Requires ``data`` and ``region_col``.
+        Requires ``data`` and ``group_col``.
     data : pandas.DataFrame, optional
         Data source used with ``formula`` mode.
     y : array-like, optional
@@ -65,19 +69,19 @@ class SEMProbitRE(SharedSpatialMethods):
     X : array-like or pandas.DataFrame, optional
         Covariate matrix, required in matrix mode.
     W : libpysal.graph.Graph or scipy.sparse matrix
-        Region-level ``m x m`` spatial weights matrix. Accepts a
+        Group-level ``m x m`` spatial weights matrix. Accepts a
         :class:`libpysal.graph.Graph` (the modern libpysal graph API) or any
         :class:`scipy.sparse` matrix.  The legacy :class:`libpysal.weights.W`
         object is **not** accepted directly; pass ``w.sparse`` or convert with
         ``libpysal.graph.Graph.from_W(w)``.
         W should be row-standardized; a :class:`UserWarning` is raised if not.
-    region_col : str, optional
-        Region identifier column in ``data`` (formula mode).
-    region_ids : array-like, optional
-        Region identifier per observation (matrix mode).
-    mobs : array-like, optional
-        Region observation counts ``(m,)`` in sorted region order
-        (matrix mode alternative to ``region_ids``).
+    group_col : str, optional
+        Group identifier column in ``data`` (formula mode).
+    groups : array-like, optional
+        Group identifier per observation (matrix mode).
+    group_sizes : array-like, optional
+        Observation counts per group ``(m,)``, in sorted group order, for
+        data sorted by group (matrix mode alternative to ``groups``).
     priors : dict, optional
         Override default priors. Supported keys:
 
@@ -88,7 +92,7 @@ class SEMProbitRE(SharedSpatialMethods):
         - ``beta_mu``, ``beta_sigma`` (float or array, default Gelman et al.
           2008): Normal prior on :math:`\\beta`, on the probit scale (intercept at ``Φ⁻¹(mean(y))``, scale ``2.5 / 1.6``; slopes ``(2.5 / 1.6) / sd(x_j)``).
         - ``sigma_a_sigma`` (float, default 2.0): HalfNormal scale
-          for the regional random-effect std :math:`\\sigma_a`.
+          for the group effects' std :math:`\\sigma_a`.
 
     robust : bool, default False
         Not supported. The probit link uses a Normal CDF; a Student-t
@@ -116,9 +120,9 @@ class SEMProbitRE(SharedSpatialMethods):
         y: Optional[Union[np.ndarray, pd.Series]] = None,
         X: Optional[Union[np.ndarray, pd.DataFrame]] = None,
         W: Optional[Union[Graph, np.ndarray]] = None,
-        region_col: Optional[str] = None,
-        region_ids: Optional[Union[np.ndarray, pd.Series]] = None,
-        mobs: Optional[Union[np.ndarray, list[int]]] = None,
+        group_col: Optional[str] = None,
+        groups: Optional[Union[np.ndarray, pd.Series]] = None,
+        group_sizes: Optional[Union[np.ndarray, list[int]]] = None,
         priors: Optional[dict] = None,
         robust: bool = False,
     ):
@@ -134,7 +138,7 @@ class SEMProbitRE(SharedSpatialMethods):
 
         self._W_dense = self._as_dense_region_W(W)
         self._m = self._W_dense.shape[0]
-        # The weights matrix is region-level (m x m), not observation-level;
+        # The weights matrix is group-level (m x m), not observation-level;
         # inherited observation-level W machinery (spatial_diagnostics, ...)
         # is not applicable and _require_W raises cleanly.
         self._W_sparse = None
@@ -142,10 +146,10 @@ class SEMProbitRE(SharedSpatialMethods):
         if formula is not None:
             if data is None:
                 raise ValueError("data is required when using formula mode.")
-            if region_col is None:
-                raise ValueError("region_col is required when using formula mode.")
+            if group_col is None:
+                raise ValueError("group_col is required when using formula mode.")
             self._y, self._X, self._feature_names = self._parse_formula(formula, data)
-            region_series = data[region_col]
+            region_series = data[group_col]
             # pd.factorize returns (codes, uniques)
             codes, uniques = pd.factorize(region_series, sort=False)
             self._region_codes = codes.astype(int)
@@ -154,12 +158,13 @@ class SEMProbitRE(SharedSpatialMethods):
             self._y, self._X, self._feature_names = self._parse_matrices(y, X)
             self._region_codes, self._region_names = self._parse_regions(
                 nobs=self._X.shape[0],
-                region_ids=region_ids,
-                mobs=mobs,
+                groups=groups,
+                group_sizes=group_sizes,
             )
         else:
             raise ValueError(
-                "Provide either (formula, data, region_col) or (y, X, region_ids/mobs)."
+                "Provide either (formula, data, group_col) or "
+                "(y, X, groups or group_sizes)."
             )
 
         # Shared parsers keep y as passed; flatten possible (n, 1) columns.
@@ -173,7 +178,7 @@ class SEMProbitRE(SharedSpatialMethods):
 
         if len(np.unique(self._region_codes)) != self._m:
             raise ValueError(
-                f"Number of observed regions ({len(np.unique(self._region_codes))}) "
+                f"Number of observed groups ({len(np.unique(self._region_codes))}) "
                 f"must match W dimension ({self._m})."
             )
 
@@ -199,32 +204,34 @@ class SEMProbitRE(SharedSpatialMethods):
                 f"got {type(W).__name__}."
             )
         if W_csr.ndim != 2 or W_csr.shape[0] != W_csr.shape[1]:
-            raise ValueError("W must be a square region-level matrix.")
+            raise ValueError("W must be a square group-level matrix.")
         _check_row_standardization(W_csr, stacklevel=3)
         return W_csr.toarray()
 
     @staticmethod
     def _parse_regions(
         nobs: int,
-        region_ids: Optional[Union[np.ndarray, pd.Series]],
-        mobs: Optional[Union[np.ndarray, list[int]]],
+        groups: Optional[Union[np.ndarray, pd.Series]],
+        group_sizes: Optional[Union[np.ndarray, list[int]]],
     ) -> tuple[np.ndarray, list[str]]:
-        if region_ids is not None:
-            ids = np.asarray(region_ids)
+        if groups is not None:
+            ids = np.asarray(groups)
             if ids.shape[0] != nobs:
-                raise ValueError("region_ids must have one entry per observation.")
+                raise ValueError("groups must have one entry per observation.")
             codes, uniques = pd.factorize(ids, sort=False)
             return codes.astype(int), [str(v) for v in uniques.tolist()]
 
-        if mobs is not None:
-            counts = np.asarray(mobs, dtype=int).reshape(-1)
+        if group_sizes is not None:
+            counts = np.asarray(group_sizes, dtype=int).reshape(-1)
             if counts.sum() != nobs:
-                raise ValueError("sum(mobs) must equal number of observations.")
+                raise ValueError(
+                    "sum(group_sizes) must equal the number of observations."
+                )
             codes = np.repeat(np.arange(len(counts), dtype=int), counts)
             names = [f"region_{i}" for i in range(len(counts))]
             return codes, names
 
-        raise ValueError("Provide either region_ids or mobs in matrix mode.")
+        raise ValueError("Provide either groups or group_sizes in matrix mode.")
 
     def _model_coords(self) -> dict[str, list[str]]:
         coords = super()._model_coords()
@@ -278,10 +285,17 @@ class SEMProbitRE(SharedSpatialMethods):
         chains: int = 4,
         random_seed: Optional[int] = None,
         progressbar: bool = True,
+        sampler: str | None = None,
+        backend: str | None = None,
         **sample_kwargs,
     ) -> xr.DataTree:
-        """Draw samples from the posterior."""
-        nuts_sampler = sample_kwargs.pop("nuts_sampler", "pymc")
+        """Draw samples from the posterior with NUTS (``backend`` as in
+        :meth:`~neighbayes.models.base.SpatialModel.fit`)."""
+        if sampler not in (None, "nuts"):
+            raise NotImplementedError(
+                "SEMProbit has no Gibbs sampler; use sampler='nuts'."
+            )
+        nuts_sampler = select_backend("nuts", backend, sample_kwargs)
         target_accept = sample_kwargs.pop("target_accept", 0.9)
         model = self._build_pymc_model()
         self._pymc_model = model
@@ -340,7 +354,7 @@ class SEMProbitRE(SharedSpatialMethods):
         p = self._idata.posterior["p"].mean(("chain", "draw")).to_numpy()
         return np.asarray(p, dtype=float)
 
-    def spatial_effects(
+    def impacts(
         self,
         return_posterior_samples: bool = False,
     ) -> Union[pd.DataFrame, tuple[pd.DataFrame, dict[str, np.ndarray]]]:

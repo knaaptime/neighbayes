@@ -133,8 +133,8 @@ def test_spatial_kfold_accepts_duck_typed_splitter(sar_grid):
     assert np.isfinite(res.se) and res.se >= 0.0
 
 
-def test_spatial_kfold_refit_keeps_w_vars():
-    """The per-fold refit lags the same covariates as the model (``w_vars``)."""
+def test_spatial_kfold_refit_keeps_durbin_vars():
+    """The per-fold refit lags the same covariates as the model (``durbin_vars``)."""
     from sklearn.model_selection import PredefinedSplit
 
     from neighbayes.models import SDM
@@ -149,6 +149,6 @@ def test_spatial_kfold_refit_keeps_w_vars():
         geometry_type="polygon",
     )
     W = Graph.build_contiguity(gdf, rook=True).transform("r")
-    model = SDM(formula="y ~ X_1 + X_2", data=gdf, W=W, w_vars=["X_1"])
+    model = SDM(formula="y ~ X_1 + X_2", data=gdf, W=W, durbin_vars=["X_1"])
     res = spatial_kfold(model, PredefinedSplit(np.arange(len(gdf)) % 2), **FIT_KW)
     assert np.isfinite(res.elpd)

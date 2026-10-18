@@ -51,7 +51,7 @@ def _flow_panel():
 def test_sar_negbin(backend):
     d, W = _cross_section()
     m = SARNegBin(y=d["y"], X=d["X"], W=W, priors={"alpha_fixed": A})
-    assert _held(m.fit(gibbs_backend=backend, n_jobs=1, **SHORT))
+    assert _held(m.fit(backend=backend, n_jobs=1, **SHORT))
 
 
 @pytest.mark.parametrize(
@@ -62,7 +62,7 @@ def test_sar_negbin_re(backend):
     m = SARNegBin(
         unit_effects="random", y=d["y"], X=d["X"], W=W, priors={"alpha_fixed": A}
     )
-    assert _held(m.fit(gibbs_backend=backend, n_jobs=1, **SHORT))
+    assert _held(m.fit(backend=backend, n_jobs=1, **SHORT))
 
 
 @pytest.mark.parametrize(
@@ -80,7 +80,7 @@ def test_flow_cross_section(cls, backend):
     m = cls(
         d["y_vec"], d["X"], d["G"], col_names=d["col_names"], priors={"alpha_fixed": A}
     )
-    kw = {} if cls is NegBinFlow else {"gibbs_backend": backend}
+    kw = {} if cls is NegBinFlow else {"backend": backend}
     assert _held(m.fit(sampler="gibbs", n_jobs=1, **kw, **SHORT))
 
 
@@ -111,7 +111,7 @@ def test_flow_panels(cls, effects, backend):
             effects=effects,
             priors={"alpha_fixed": A},
         )
-        kw = {} if cls is NegBinFlowPanelRE else {"gibbs_backend": backend}
+        kw = {} if cls is NegBinFlowPanelRE else {"backend": backend}
         idata = (
             m.fit(n_jobs=1, attach_log_abs_det=False, **kw, **SHORT)
             if kw

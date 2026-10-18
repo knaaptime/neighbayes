@@ -58,7 +58,7 @@ __all__ = [
 # SARNegBin also supports NUTS (``sampler="nuts"`` builds a reduced-form PyMC
 # model); the base dispatcher routes that path.  ``auto`` prefers the ``jax``
 # path (fastest for cross-section); the CHOLMOD NumPy path is available via
-# gibbs_backend="numpy".
+# backend="numpy".
 
 
 def _run_count_reduced_gibbs(

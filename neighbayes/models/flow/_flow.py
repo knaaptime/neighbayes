@@ -22,7 +22,7 @@ Two variants are provided:
 
 * :class:`SARFlow` — three free ρ parameters with a Dirichlet stability
   constraint (default) or a quadratic-wall potential when competitive effects
-  are needed (``restrict_positive=False``).
+  are needed (``nonnegative_dependence=False``).
 * :class:`SARFlowSeparable` — constrained :math:`\\rho_w = -\\rho_d \\rho_o`,
   enabling exact eigenvalue-based log-determinant.
 """
@@ -38,6 +38,7 @@ import pandas as pd
 import pytensor.tensor as pt
 import scipy.sparse as sp
 
+from ..._backends.sampler_helpers import select_backend
 from ..._lazy_deps import pm, xr
 from ..._logdet import (
     make_flow_separable_logdet,
@@ -293,19 +294,19 @@ class FlowModel(FlowSharedMethods, SpatialModel):
         ``"chebyshev"``, ``"cheb_cholesky"``, ``"aaa"``,
         ``"cheb_stochastic"``) via the exact Kronecker factorization, and
         aspatial classes skip the log-determinant entirely.
-    restrict_positive : bool, default True
+    nonnegative_dependence : bool, default True
         If True, use a ``pm.Dirichlet`` prior that restricts :math:`\\rho_d,
         \\rho_o, \\rho_w \\geq 0` with :math:`\\rho_d + \\rho_o + \\rho_w \\leq 1`.
         This is NUTS-safe and appropriate for most flow applications.
         If False, use three independent ``pm.Uniform(-1, 1)`` priors with a
         differentiable quadratic-wall stability potential.
-    symmetric_xo_xd : bool, optional
+    shared_od_covariates : bool, optional
         If ``None`` (default), the destination and origin design blocks are
         compared and symmetry is auto-detected.  Set explicitly to override
         the heuristic — for example, when using
         :func:`~neighbayes.graph.flow_design_matrix_with_orig` with distinct
         attributes for the origin and destination sides.  Controls the default
-        behavior of :meth:`spatial_effects` when ``mode="auto"``.
+        behavior of :meth:`impacts` when ``mode="auto"``.
     """
 
     def __init__(
@@ -317,12 +318,12 @@ class FlowModel(FlowSharedMethods, SpatialModel):
         k: Optional[int] = None,
         priors: Optional[dict] = None,
         logdet_method: Optional[str] = None,
-        restrict_positive: bool = True,
-        symmetric_xo_xd: Optional[bool] = None,
+        nonnegative_dependence: bool = True,
+        shared_od_covariates: Optional[bool] = None,
     ):
         self.priors = priors or {}
         self.logdet_method = logdet_method
-        self.restrict_positive = restrict_positive
+        self.nonnegative_dependence = nonnegative_dependence
         self.robust = False
         self._is_row_std = True  # W is assumed row-standardized
         self._idata: Optional[xr.DataTree] = None
@@ -412,21 +413,23 @@ class FlowModel(FlowSharedMethods, SpatialModel):
         # Detect whether the destination and origin design blocks are
         # identical (the symmetric Xo = Xd case).  When asymmetric the
         # Thomas-Agnan & LeSage (2014, §83.5.2) shortcut of summing dest and
-        # orig effects is not appropriate, and `spatial_effects(mode="auto")`
+        # orig effects is not appropriate, and `impacts(mode="auto")`
         # falls back to reporting both sides separately.
         if (
-            symmetric_xo_xd is None
+            shared_od_covariates is None
             and self._k_d > 0
             and self._k_d == self._k_o
             and X_arr.shape[1] >= 2 + self._k_d + self._k_o
         ):
             dest_block = X_arr[:, 2 : 2 + self._k_d]
             orig_block = X_arr[:, 2 + self._k_d : 2 + self._k_d + self._k_o]
-            self._symmetric_xo_xd: bool = bool(np.array_equal(dest_block, orig_block))
+            self._shared_od_covariates: bool = bool(
+                np.array_equal(dest_block, orig_block)
+            )
         else:
-            self._symmetric_xo_xd = (
-                bool(symmetric_xo_xd)
-                if symmetric_xo_xd is not None
+            self._shared_od_covariates = (
+                bool(shared_od_covariates)
+                if shared_od_covariates is not None
                 else (self._k_d == self._k_o)
             )
 
@@ -493,10 +496,10 @@ class FlowModel(FlowSharedMethods, SpatialModel):
         """Construct and return the PyMC model.  Implemented by subclasses."""
 
     @abstractmethod
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self, draws: Optional[int] = None
     ) -> dict[str, np.ndarray]:
-        """Compute posterior spatial effects.  Implemented by subclasses."""
+        """Compute posterior impacts.  Implemented by subclasses."""
 
     # ------------------------------------------------------------------
     # Public API (fit, spatial_diagnostics_decision, etc.) inherited from
@@ -521,7 +524,7 @@ class FlowModel(FlowSharedMethods, SpatialModel):
     # Public diagnostics
     # ------------------------------------------------------------------
 
-    def spatial_effects(
+    def impacts(
         self,
         draws: Optional[int] = None,
         return_posterior_samples: bool = False,
@@ -530,7 +533,7 @@ class FlowModel(FlowSharedMethods, SpatialModel):
     ) -> "pd.DataFrame | tuple[pd.DataFrame, dict[str, np.ndarray]]":
         """Summarize posterior origin/destination/intra/network/total effects.
 
-        Wraps :meth:`_compute_spatial_effects_posterior` to produce a tidy
+        Wraps :meth:`_compute_impacts_posterior` to produce a tidy
         DataFrame indexed by predictor with posterior means, credible-interval
         bounds, and Bayesian p-values for each effect type (origin,
         destination, intra, network, total).  Following Thomas-Agnan & LeSage
@@ -549,7 +552,7 @@ class FlowModel(FlowSharedMethods, SpatialModel):
             Controls whether destination- and origin-side effects are summed
             or reported separately.  ``"auto"`` collapses to combined when
             the destination and origin design blocks are identical
-            (``self._symmetric_xo_xd``) and reports both sides otherwise.
+            (``self._shared_od_covariates``) and reports both sides otherwise.
             ``"combined"`` always sums; ``"separate"`` always reports both.
 
         Returns
@@ -558,13 +561,13 @@ class FlowModel(FlowSharedMethods, SpatialModel):
             Long-format summary indexed by ``(predictor, side, effect)`` where
             ``side`` is one of ``"combined"``, ``"dest"``, ``"orig"``.
         """
-        from ...diagnostics.spatial_effects import _compute_bayesian_pvalue
+        from ...diagnostics.impacts import _compute_bayesian_pvalue
 
         if self._idata is None:
             raise RuntimeError("Model has not been fit yet.  Call fit() first.")
         if self._k == 0:
             raise RuntimeError(
-                "Cannot compute spatial effects: no `dest_*` columns detected "
+                "Cannot compute impacts: no `dest_*` columns detected "
                 "in the design matrix.  Pass `k=` explicitly when constructing "
                 "the model."
             )
@@ -573,10 +576,10 @@ class FlowModel(FlowSharedMethods, SpatialModel):
                 f"mode must be 'auto', 'combined', or 'separate'; got {mode!r}."
             )
 
-        posterior = self._compute_spatial_effects_posterior(draws=draws)
+        posterior = self._compute_impacts_posterior(draws=draws)
 
         if mode == "auto":
-            effective_mode = "combined" if self._symmetric_xo_xd else "separate"
+            effective_mode = "combined" if self._shared_od_covariates else "separate"
         else:
             effective_mode = mode
 
@@ -762,7 +765,7 @@ class SARFlow(FlowModel):
     logdet_method : str, default "resolvent"
         Log-determinant method.  The default ``"resolvent"`` samples via the
         resolvent-Kronecker gradient sampler (recommended).
-    restrict_positive : bool, default True
+    nonnegative_dependence : bool, default True
         If True, use ``pm.Dirichlet("rho_simplex", a=ones(4))`` to enforce
         :math:`\\rho_d, \\rho_o, \\rho_w \\geq 0` and
         :math:`\\rho_d + \\rho_o + \\rho_w \\leq 1`. NUTS-safe via the
@@ -770,7 +773,7 @@ class SARFlow(FlowModel):
         (negative) spillovers are not expected. If False, three
         independent ``pm.Uniform(rho_lower, rho_upper)`` priors are used
         together with a differentiable quadratic-wall stability potential.
-    symmetric_xo_xd : bool, optional
+    shared_od_covariates : bool, optional
         If ``None`` (default), origin and destination design blocks are
         compared and symmetry is auto-detected. Set explicitly to override
         the heuristic.
@@ -780,8 +783,8 @@ class SARFlow(FlowModel):
         - ``beta_mu`` : float or array, default Gelman et al. (2008) — Normal prior mean for ``beta`` (``mean(y)`` on the intercept, 0 otherwise).
         - ``beta_sigma`` : float or array, default Gelman et al. (2008) — Normal prior std for ``beta``, scaled to ``sd(y)`` and each column's sd.
         - ``sigma2_alpha``, ``sigma2_beta`` : float, default 2 and ``Var(y)`` — InverseGamma prior on ``sigma**2``.
-        - ``rho_lower`` : float, default -1.0 — Lower bound of Uniform prior on each ρ (only when ``restrict_positive=False``).
-        - ``rho_upper`` : float, default 1.0 — Upper bound of Uniform prior on each ρ (only when ``restrict_positive=False``).
+        - ``rho_lower`` : float, default -1.0 — Lower bound of Uniform prior on each ρ (only when ``nonnegative_dependence=False``).
+        - ``rho_upper`` : float, default 1.0 — Upper bound of Uniform prior on each ρ (only when ``nonnegative_dependence=False``).
 
     Notes
     -----
@@ -853,7 +856,7 @@ class SARFlow(FlowModel):
             n_quad=n_quad,
             progressbar=progressbar,
             n_jobs=n_jobs,
-            restrict_positive=self.restrict_positive,
+            nonnegative_dependence=self.nonnegative_dependence,
             priors=self._flow_gaussian_priors(),
             compute_log_likelihood=bool(
                 (idata_kwargs or {}).get("log_likelihood", False)
@@ -870,7 +873,7 @@ class SARFlow(FlowModel):
             "the legacy 'traces' Jacobian was removed. Use SARFlow.fit()."
         )
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self, draws: Optional[int] = None
     ) -> dict[str, np.ndarray]:
         """Compute posterior origin / destination / intra / network / total effects.
@@ -981,7 +984,7 @@ class SARFlowSeparable(FlowModel):
         Method for the :math:`n \\times n` log-determinant used via the exact
         Kronecker factorization.  ``None`` (default) auto-selects
         (``"aaa"`` for directed/non-symmetric ``W``).
-    symmetric_xo_xd : bool, optional
+    shared_od_covariates : bool, optional
         If ``None`` (default), origin and destination design blocks are
         compared and symmetry is auto-detected. Set explicitly to override
         the heuristic.
@@ -996,7 +999,7 @@ class SARFlowSeparable(FlowModel):
 
     Notes
     -----
-    The ``restrict_positive`` argument inherited from :class:`FlowModel`
+    The ``nonnegative_dependence`` argument inherited from :class:`FlowModel`
     has no effect on this class — separable variants always use Uniform
     priors on the individual :math:`\rho` components.
     """
@@ -1065,13 +1068,13 @@ class SARFlowSeparable(FlowModel):
             )
         return self._separable_logdet_numpy_fn(rho_d, rho_o)
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self, draws: Optional[int] = None
     ) -> dict[str, np.ndarray]:
         """Compute posterior effects using Kronecker-factored solve.
 
         Implements the LeSage (2008) effects decomposition (see
-        :meth:`SARFlow._compute_spatial_effects_posterior`) but exploits
+        :meth:`SARFlow._compute_impacts_posterior`) but exploits
         :math:`A = L_o \\otimes L_d` to replace the
         :math:`N\\times N` sparse factorization with two :math:`n\\times n`
         sparse solves per predictor via
@@ -1085,7 +1088,7 @@ class SARFlowSeparable(FlowModel):
         Returns
         -------
         dict[str, np.ndarray]
-            Same keys and shapes as :meth:`SARFlow._compute_spatial_effects_posterior`.
+            Same keys and shapes as :meth:`SARFlow._compute_impacts_posterior`.
         """
         if self._idata is None:
             raise RuntimeError("Model has not been fit yet.  Call fit() first.")
@@ -1235,7 +1238,7 @@ class OLSFlow(FlowModel):
         - ``sigma2_alpha``, ``sigma2_beta`` : float, default 2 and ``Var(y)`` — InverseGamma prior on ``sigma**2``.
 
         Spatial keys (``rho_*``) are ignored.
-    symmetric_xo_xd : bool, optional
+    shared_od_covariates : bool, optional
         If ``None`` (default), origin/destination design symmetry is
         auto-detected. Set explicitly to override.
 
@@ -1250,7 +1253,7 @@ class OLSFlow(FlowModel):
     def __init__(self, y, X, W, **kwargs):
         # Skip log-determinant precomputation: A = I_N has |A| = 1.
         kwargs.pop("logdet_method", None)
-        kwargs.pop("restrict_positive", None)
+        kwargs.pop("nonnegative_dependence", None)
         super().__init__(y, X, W, logdet_method="none", **kwargs)
 
     def _build_pymc_model(self) -> pm.Model:
@@ -1311,7 +1314,7 @@ class OLSFlow(FlowModel):
             out[g] = self._simulate_y_rep(0.0, 0.0, 0.0, beta_draws[g], sigma_g, rng)
         return out
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self, draws: Optional[int] = None
     ) -> dict[str, np.ndarray]:
         r"""Closed-form Thomas-Agnan & LeSage (2014, Table 83.1) effects.
@@ -1360,7 +1363,7 @@ class _NegBinFlowMixin:
     to the Gaussian :class:`FlowModel.fit` NUTS path.
     """
 
-    #: Whether this model has a JAX Gibbs kernel (see ``gibbs_backend``).
+    #: Whether this model has a JAX Gibbs kernel (see ``backend``).
     _gibbs_jax = True
 
     def fit(
@@ -1370,7 +1373,7 @@ class _NegBinFlowMixin:
         chains: int = 4,
         random_seed: Optional[int] = None,
         sampler: str = "gibbs",
-        gibbs_backend: str = "auto",
+        backend: str | None = None,
         store_lambda: bool = False,
         idata_kwargs: Optional[dict] = None,
         progressbar: bool = True,
@@ -1394,13 +1397,14 @@ class _NegBinFlowMixin:
             Sampling method: ``"gibbs"`` (default) for the reduced-form
             Pólya–Gamma Gibbs sampler, or ``"nuts"`` for PyMC NUTS on the
             exact count likelihood (much slower).
-        gibbs_backend : {"auto", "jax", "numpy"}, default "auto"
-            Execution backend for the Gibbs sampler (only used when
-            ``sampler="gibbs"``).  ``"jax"`` compiles the sweep with JAX and
+        backend : str, optional
+            What executes the sampler.  For Gibbs, ``"auto"`` (the default),
+            ``"jax"`` or ``"numpy"``: ``"jax"`` compiles the sweep with JAX and
             sparsax sparse LU solves, chains on threads; ``"numpy"`` uses the
-            host CHOLMOD/KLU path.  ``"auto"`` takes JAX when it is installed
+            host CHOLMOD/KLU path; ``"auto"`` takes JAX when it is installed
             and the model has a JAX kernel (the aspatial ``NegBinFlow`` does
-            not), else NumPy.
+            not), else NumPy.  For NUTS, ``"pymc"`` (the default),
+            ``"nutpie"``, ``"numpyro"`` or ``"blackjax"``.
         store_lambda : bool, default False
             If True, include the high-dimensional fitted mean ``lambda`` in the
             stored posterior (NUTS only).
@@ -1426,10 +1430,9 @@ class _NegBinFlowMixin:
         -------
         xarray.DataTree
         """
+        backend = select_backend(sampler, backend, sample_kwargs)
         if sampler == "gibbs":
-            gibbs_backend = self._resolve_gibbs_backend(
-                gibbs_backend, jax=self._gibbs_jax
-            )
+            gibbs_backend = self._resolve_gibbs_backend(backend, jax=self._gibbs_jax)
             idata = self._fit_gibbs(
                 draws=draws,
                 tune=tune,
@@ -1441,7 +1444,7 @@ class _NegBinFlowMixin:
                 sample_kwargs=sample_kwargs,
                 log_likelihood=bool((idata_kwargs or {}).get("log_likelihood", False)),
             )
-        elif sampler == "nuts":
+        else:
             # Call FlowModel.fit explicitly: SARFlow's own ``fit`` is the
             # Gaussian resolvent sampler, which must never see count data.
             idata = FlowModel.fit(
@@ -1453,10 +1456,9 @@ class _NegBinFlowMixin:
                 store_lambda=store_lambda,
                 idata_kwargs=idata_kwargs,
                 progressbar=progressbar,
+                backend=backend,
                 **sample_kwargs,
             )
-        else:
-            raise ValueError(f"sampler must be 'nuts' or 'gibbs', got {sampler!r}")
         if attach_log_abs_det:
             self._attach_flow_log_abs_det(idata)
         return idata
@@ -1508,7 +1510,7 @@ class SARNegBinFlow(_NegBinFlowMixin, SARFlow):
         X_t = pt.as_tensor_variable(self._X.astype(np.float64))
 
         with pm.Model(coords=self._model_coords()) as model:
-            if self.restrict_positive:
+            if self.nonnegative_dependence:
                 rho_simplex = pm.Dirichlet("rho_simplex", a=np.ones(4))
                 rho_d = pm.Deterministic("rho_d", rho_simplex[0])
                 rho_o = pm.Deterministic("rho_o", rho_simplex[1])
@@ -2024,6 +2026,7 @@ class _PoissonFlowMixin:
         chains: int = 4,
         random_seed: Optional[int] = None,
         sampler: str = "gibbs",
+        backend: str | None = None,
         progressbar: bool = True,
         n_jobs: int = -1,
         idata_kwargs: Optional[dict] = None,
@@ -2039,6 +2042,8 @@ class _PoissonFlowMixin:
             Seed for reproducibility.
         sampler : {"gibbs"}, default "gibbs"
             Only the auxiliary-mixture Gibbs sampler is implemented.
+        backend : {"auto", "numpy"}, optional
+            The sampler runs on NumPy only.
         progressbar : bool, default True
             Show a progress bar.
         n_jobs : int, default -1
@@ -2054,6 +2059,9 @@ class _PoissonFlowMixin:
                 f"got {sampler!r}.  There is no NUTS path for the "
                 "auxiliary-mixture Poisson flow models yet."
             )
+        self._resolve_gibbs_backend(
+            select_backend(sampler, backend, sample_kwargs), jax=False
+        )
         if sample_kwargs:
             raise TypeError(f"Unexpected keyword arguments: {sorted(sample_kwargs)}")
         idata = self._fit_gibbs(
@@ -2320,13 +2328,13 @@ class SEMFlow(FlowModel):
     logdet_method : str, default "resolvent"
         Log-determinant method.  The default ``"resolvent"`` samples via the
         resolvent-gradient sampler (recommended).
-    restrict_positive : bool, default True
+    nonnegative_dependence : bool, default True
         If True, use ``pm.Dirichlet("lam_simplex", a=ones(4))`` to enforce
         :math:`\\lambda_d, \\lambda_o, \\lambda_w \\geq 0` and
         :math:`\\lambda_d + \\lambda_o + \\lambda_w \\leq 1`. If False,
         three independent ``pm.Uniform(lam_lower, lam_upper)`` priors are
         used with a differentiable quadratic-wall stability potential.
-    symmetric_xo_xd : bool, optional
+    shared_od_covariates : bool, optional
         If ``None`` (default), origin and destination design blocks are
         compared and symmetry is auto-detected.
     priors : dict, optional
@@ -2335,8 +2343,8 @@ class SEMFlow(FlowModel):
         - ``beta_mu`` : float or array, default Gelman et al. (2008) — Normal prior mean for ``beta`` (``mean(y)`` on the intercept, 0 otherwise).
         - ``beta_sigma`` : float or array, default Gelman et al. (2008) — Normal prior std for ``beta``, scaled to ``sd(y)`` and each column's sd.
         - ``sigma2_alpha``, ``sigma2_beta`` : float, default 2 and ``Var(y)`` — InverseGamma prior on ``sigma**2``.
-        - ``lam_lower`` : float, default -1.0 — Lower bound of Uniform prior on each λ (only when ``restrict_positive=False``).
-        - ``lam_upper`` : float, default 1.0 — Upper bound of Uniform prior on each λ (only when ``restrict_positive=False``).
+        - ``lam_lower`` : float, default -1.0 — Lower bound of Uniform prior on each λ (only when ``nonnegative_dependence=False``).
+        - ``lam_upper`` : float, default 1.0 — Upper bound of Uniform prior on each λ (only when ``nonnegative_dependence=False``).
 
     Notes
     -----
@@ -2421,7 +2429,7 @@ class SEMFlow(FlowModel):
             n_quad=n_quad,
             progressbar=progressbar,
             n_jobs=n_jobs,
-            restrict_positive=self.restrict_positive,
+            nonnegative_dependence=self.nonnegative_dependence,
             priors=self._flow_gaussian_priors(),
             compute_log_likelihood=bool(
                 (idata_kwargs or {}).get("log_likelihood", False)
@@ -2456,7 +2464,7 @@ class SEMFlow(FlowModel):
         u = self._solve_A(lam_d, lam_o, lam_w, eps)
         return Xb + u
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self, draws: Optional[int] = None
     ) -> dict[str, np.ndarray]:
         r"""Closed-form Thomas-Agnan & LeSage (2014, Table 83.1) effects.
@@ -2520,7 +2528,7 @@ class SEMFlowSeparable(SEMFlow):
         ``None`` auto-selects (``aaa`` for directed W, ``cheb_cholesky`` for
         symmetric, ``eigenvalue`` for small n).
         Method for the Kronecker-factored log-determinant.
-    symmetric_xo_xd : bool, optional
+    shared_od_covariates : bool, optional
         If ``None`` (default), origin and destination design blocks are
         compared and symmetry is auto-detected.
     priors : dict, optional
@@ -2534,7 +2542,7 @@ class SEMFlowSeparable(SEMFlow):
 
     Notes
     -----
-    The ``restrict_positive`` argument inherited from :class:`FlowModel`
+    The ``nonnegative_dependence`` argument inherited from :class:`FlowModel`
     has no effect on this class — separable variants always use Uniform
     priors on the individual :math:`\\lambda` components.
     """

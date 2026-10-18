@@ -168,7 +168,8 @@ def _simulate_sar_probit(
     Returns
     -------
     dict
-        Keys: ``y``, ``X``, ``region_ids``, ``W_sparse``, ``W_graph``,
+        Keys: ``y``, ``X``, ``groups`` (each observation's group, as
+        :class:`~neighbayes.models.SEMProbit` takes it), ``W_sparse``, ``W_graph``,
         ``params_true``.
     """
     rng = ensure_rng(rng, seed)
@@ -205,7 +206,7 @@ def _simulate_sar_probit(
     return {
         "y": y,
         "X": X,
-        "region_ids": region_ids,
+        "groups": region_ids,
         "W_sparse": W_sparse,
         "W_graph": Wg,
         "params_true": {

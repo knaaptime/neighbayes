@@ -114,11 +114,11 @@ class SDM(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     robust : bool, default False
         If True, replace the Normal error with Student-t. See *Robust
         regression* below.
-    w_vars : list of str, optional
+    durbin_vars : list of str, optional
         Names of X columns to spatially lag. By default all
         non-constant columns are lagged. Pass a subset to restrict
         which variables receive a spatial lag, e.g.
-        ``w_vars=["income", "density"]``. SDM requires at least one
+        ``durbin_vars=["income", "density"]``. SDM requires at least one
         WX column; if filtering eliminates all of them a ValueError is
         raised.
 
@@ -127,7 +127,7 @@ class SDM(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     Direct, indirect and total effects of :math:`X` on :math:`y`
     incorporate both the local and lagged-X blocks via the spatial
     multiplier :math:`(I - \\rho W)^{-1}` and are reported by
-    :meth:`spatial_effects`.
+    :meth:`impacts`.
 
     **Robust regression**
 
@@ -155,7 +155,7 @@ class SDM(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     _likelihood: str = "gaussian"
     _gibbs_key: tuple[str, str] | None = ("gaussian", "cross_section")
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute direct, indirect, and total effects for each posterior draw.

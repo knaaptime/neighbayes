@@ -807,7 +807,7 @@ class TestJaxLogLikelihoodCapture:
             chains=1,
             random_seed=0,
             progressbar=False,
-            nuts_sampler="numpyro",
+            backend="numpyro",
             idata_kwargs={"log_likelihood": True},
         )
         _assert_valid_log_likelihood(idata, n, "SEM[numpyro]")
@@ -823,7 +823,7 @@ class TestJaxLogLikelihoodCapture:
             chains=1,
             random_seed=0,
             progressbar=False,
-            nuts_sampler="numpyro",
+            backend="numpyro",
             idata_kwargs={"log_likelihood": True},
         )
         _assert_valid_log_likelihood(idata, n, "SDEM[numpyro]")
@@ -847,7 +847,7 @@ class TestJaxLogLikelihoodCapture:
             random_seed=0,
             progressbar=False,
             sampler="nuts",
-            nuts_sampler="numpyro",
+            backend="numpyro",
             idata_kwargs={"log_likelihood": True},
         )
         _assert_valid_log_likelihood(idata, n, "SEMPanelFE[numpyro]")
@@ -871,7 +871,7 @@ class TestJaxLogLikelihoodCapture:
             random_seed=0,
             progressbar=False,
             sampler="nuts",
-            nuts_sampler="numpyro",
+            backend="numpyro",
             idata_kwargs={"log_likelihood": True},
         )
         _assert_valid_log_likelihood(idata, n, "SDEMPanelFE[numpyro]")
@@ -889,7 +889,7 @@ class TestJaxLogLikelihoodCapture:
             random_seed=0,
             progressbar=False,
             sampler="nuts",
-            nuts_sampler="numpyro",
+            backend="numpyro",
             idata_kwargs={"log_likelihood": True},
         )
         _assert_valid_log_likelihood(idata, n, "SEMPanelRE[numpyro]")
@@ -913,7 +913,7 @@ class TestJaxLogLikelihoodCapture:
             chains=1,
             random_seed=0,
             progressbar=False,
-            nuts_sampler="numpyro",
+            backend="numpyro",
             idata_kwargs={"log_likelihood": True},
         )
         _assert_valid_log_likelihood(idata, n, "SEMTobitPanel[numpyro]")

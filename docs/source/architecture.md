@@ -22,7 +22,7 @@ implementation detail to be chosen silently on a user's behalf.
 
 **Automatic choices are overridable.** The library picks a log-determinant method, a
 sampler, a sparse backend, and a set of priors for you. Every one of them can be
-replaced by an explicit argument — `logdet_method=`, `sampler=`, `gibbs_backend=`,
+replaced by an explicit argument — `logdet_method=`, `sampler=`, `backend=`,
 `priors=` — and the resolved log-determinant method is recorded on the model as
 `_resolved_logdet_method`. Nothing is chosen in a way you cannot see or change.
 
@@ -237,7 +237,7 @@ identical data — the check the package's own validation notebooks run.
 There is one model code path. Acceleration is selected at run time and degrades to a
 working default rather than an error:
 
-- **JAX** is optional. `gibbs_backend="auto"` uses it when it is installed and the
+- **JAX** is optional. `backend="auto"` uses it when it is installed and the
   family prefers it, NumPy otherwise. Requesting `"jax"` explicitly without JAX
   installed raises, because a silent downgrade of an explicit request would be
   misleading.
@@ -278,7 +278,7 @@ resolved through a registry of test suites. `spatial_diagnostics_decision()` wal
 results through a decision tree and reports both the favoured model and the path it took
 to reach it, so the recommendation can be audited rather than taken on faith.
 
-`spatial_effects()` decomposes a change in $X$ through the spatial multiplier
+`impacts()` decomposes a change in $X$ through the spatial multiplier
 $(I - \rho W)^{-1}$ into direct, indirect, and total effects, computed from the posterior
 draws. These are distributions, not delta-method approximations — which is much of the
 argument for estimating these models in a Bayesian framework in the first place.

@@ -158,7 +158,7 @@ class TestBiasWarning:
 
         if not pg._installed_release_is_biased():
             pytest.skip("installed polyagamma is newer than the biased releases")
-        with pytest.warns(RuntimeWarning, match="gibbs_backend='jax'"):
+        with pytest.warns(RuntimeWarning, match="backend='jax'"):
             sample_polyagamma(np.full(4, 2.5), np.zeros(4), rng=rng)
         import warnings
 
@@ -216,10 +216,10 @@ def test_numpy_count_fit_warns(parallel_jobs):
 
     if not pg._installed_release_is_biased():
         pytest.skip("installed polyagamma is newer than the biased releases")
-    with pytest.warns(RuntimeWarning, match="gibbs_backend='jax'"):
+    with pytest.warns(RuntimeWarning, match="backend='jax'"):
         _nb_model().fit(
             draws=5, tune=5, chains=2, n_jobs=parallel_jobs, progressbar=False,
-            gibbs_backend="numpy", random_seed=1,
+            backend="numpy", random_seed=1,
         )  # fmt: skip
 
 
@@ -243,7 +243,7 @@ def test_jax_fits_do_not_warn():
         with warnings.catch_warnings(record=True) as caught:
             warnings.simplefilter("always")
             model.fit(
-                draws=5, tune=5, chains=1, progressbar=False, gibbs_backend="jax",
+                draws=5, tune=5, chains=1, progressbar=False, backend="jax",
                 random_seed=1,
             )  # fmt: skip
         assert not [w for w in caught if "Pólya–Gamma" in str(w.message)], type(

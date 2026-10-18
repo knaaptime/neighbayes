@@ -62,7 +62,7 @@ def _fit(data, backend, method="chol_aaa", **kw):
         chains=2,
         random_seed=7,
         progressbar=False,
-        gibbs_backend=backend,
+        backend=backend,
     )
 
 

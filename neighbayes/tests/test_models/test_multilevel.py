@@ -12,13 +12,24 @@ from neighbayes import dgp
 from neighbayes.models import Level, Multilevel
 from neighbayes.samplers.multilevel import MultilevelStructure, log_marginal
 
+# The simulator draws no Durbin terms; a model may still add them.
+_DATA_PROCESS = {
+    "SAR": "SAR",
+    "SDM": "SAR",
+    "SEM": "SEM",
+    "SDEM": "SEM",
+    "SLX": None,
+    None: None,
+}
+
 
 def _data(n_side=8, blocks=(2, 2), processes=None, seed=0, **kw):
     L = len(blocks)
+    processes = processes or ("SAR",) * (L + 1)
     return dgp.simulate_multilevel(
         n_side=n_side,
         blocks=blocks,
-        processes=processes or ("lag",) * (L + 1),
+        processes=tuple(_DATA_PROCESS[p] for p in processes),
         rhos=kw.pop("rhos", (0.4, 0.5, 0.4)[: L + 1]),
         sigmas=kw.pop("sigmas", (1.0, 0.6, 0.6)[: L + 1]),
         seed=seed,
@@ -26,15 +37,10 @@ def _data(n_side=8, blocks=(2, 2), processes=None, seed=0, **kw):
     )
 
 
-def _model(d, processes=None, durbin=None, **kw):
+def _model(d, processes=None, **kw):
     f = d["frames"]
-    processes = processes or ("lag",) * len(f)
-    durbin = durbin or (False,) * len(f)
-    levels = [
-        Level(
-            "y ~ x1 + x2", data=f[0], W=d["W"], process=processes[0], durbin=durbin[0]
-        )
-    ]
+    processes = processes or ("SAR",) * len(f)
+    levels = [Level("y ~ x1 + x2", data=f[0], W=d["W"], process=processes[0])]
     for ell in range(1, len(f)):
         levels.append(
             Level(
@@ -43,7 +49,6 @@ def _model(d, processes=None, durbin=None, **kw):
                 W=d["levels"][ell - 1]["W"],
                 key=f"g{ell}",
                 process=processes[ell],
-                durbin=durbin[ell],
             )
         )
     return Multilevel(*levels, **kw)
@@ -97,17 +102,17 @@ def _dense_log_marginal(m, rho, sig2):
 
 
 @pytest.mark.parametrize(
-    "processes, durbin",
+    "processes",
     [
-        (("lag", "lag", "lag"), (False, False, False)),
-        (("error", "lag", "error"), (False, False, False)),
-        (("lag", "error", "none"), (False, True, False)),
-        (("none", "lag", "lag"), (True, False, True)),
+        ("SAR", "SAR", "SAR"),
+        ("SEM", "SAR", "SEM"),
+        ("SAR", "SDEM", None),
+        ("SLX", "SAR", "SDM"),
     ],
 )
-def test_collapsed_marginal_matches_dense_reduced_form(processes, durbin):
+def test_collapsed_marginal_matches_dense_reduced_form(processes):
     d = _data(n_side=8, blocks=(2, 2), seed=3)
-    m = _model(d, processes, durbin)
+    m = _model(d, processes)
     st = MultilevelStructure(m._y, m._level_specs())
     rng = np.random.default_rng(0)
     vals = []
@@ -122,7 +127,7 @@ def test_collapsed_marginal_matches_dense_reduced_form(processes, durbin):
 
 def test_precision_matches_its_residual_definition():
     d = _data(n_side=8, blocks=(2, 2), seed=4)
-    m = _model(d, ("error", "lag", "error"))
+    m = _model(d, ("SEM", "SAR", "SEM"))
     st = MultilevelStructure(m._y, m._level_specs())
     rho, sig2 = np.array([0.3, -0.4, 0.6]), np.array([0.7, 0.5, 1.3])
     P = st.precision(rho, sig2).toarray()
@@ -222,12 +227,35 @@ def test_linking_errors():
         Multilevel(Level("y ~ x1", data=u, W=d["W"]))
 
 
-def test_level_without_graph_when_process_is_none():
+def test_level_takes_the_process_acronyms():
+    d = _data(n_side=8, blocks=(2,), seed=2)
+    u, l1 = d["frames"]
+    unit = Level("y ~ x1", data=u, W=d["W"])
+    with pytest.raises(ValueError, match="'SAR', 'SEM', 'SDM', 'SDEM', 'SLX' or None"):
+        Multilevel(unit, Level("~ z1", data=l1, key="g1", process="lag"))
+    with pytest.raises(TypeError, match="durbin"):
+        Level("~ z1", data=l1, key="g1", durbin=True)
+    m = Multilevel(
+        unit, Level("~ z1", data=l1, W=d["levels"][0]["W"], key="g1", process="SDM")
+    )
+    assert repr(m) == "Multilevel(0:units(J=64, SAR), 1:g1(J=16, SDM))"
+    assert m._levels[1].durbin and m._levels[1].process == "lag"
+    with pytest.raises(NotImplementedError, match="SAR, SEM or aspatial"):
+        dgp.simulate_multilevel(
+            n_side=8,
+            blocks=(2,),
+            processes=("SAR", "SDM"),
+            rhos=(0.4, 0.5),
+            sigmas=(1.0, 0.6),
+        )
+
+
+def test_level_without_graph_when_aspatial():
     d = _data(n_side=8, blocks=(2,), seed=2)
     u, l1 = d["frames"]
     m = Multilevel(
         Level("y ~ x1", data=u, W=d["W"]),
-        Level("~ z1", data=l1, key="g1", process="none"),
+        Level("~ z1", data=l1, key="g1", process=None),
     )
     idata = m.fit(
         draws=30, tune=20, chains=1, progressbar=False, n_jobs=1, random_seed=0
@@ -246,10 +274,10 @@ def test_level_without_graph_when_process_is_none():
 )
 def test_parametrizations_run_and_name_by_level(parametrization, backend):
     d = _data(n_side=8, blocks=(2, 2), seed=5)
-    m = _model(d, ("lag", "error", "lag"), (False, True, False))
+    m = _model(d, ("SAR", "SDEM", "SAR"))
     idata = m.fit(
         draws=40, tune=20, chains=2, progressbar=False, n_jobs=1, random_seed=1,
-        parametrization=parametrization, gibbs_backend=backend,
+        parametrization=parametrization, backend=backend,
     )  # fmt: skip
     post = idata.posterior
     for v in ("rho_0", "beta_0", "sigma_0", "lam_1", "beta_1", "sigma_1",
@@ -277,7 +305,7 @@ def test_jax_compiles_once_per_structure(monkeypatch):
     monkeypatch.setattr(
         U, "_compile_chunk", lambda *a, **k: calls.append(1) or real(*a, **k)
     )
-    kw = dict(chains=2, progressbar=False, gibbs_backend="jax", store_theta=False)
+    kw = dict(chains=2, progressbar=False, backend="jax", store_theta=False)
     m = _model(_data(n_side=8, blocks=(2, 2), seed=12))
     m.fit(draws=30, tune=10, random_seed=0, **kw)
     m.fit(draws=30, tune=10, random_seed=1, **kw)
@@ -290,7 +318,7 @@ def test_jax_compiles_once_per_structure(monkeypatch):
 
 def test_jax_chunking_does_not_change_draws():
     m = _model(_data(n_side=8, blocks=(2,), seed=14))
-    kw = dict(chains=1, progressbar=False, gibbs_backend="jax", random_seed=5, tune=20)
+    kw = dict(chains=1, progressbar=False, backend="jax", random_seed=5, tune=20)
     short = m.fit(draws=50, **kw).posterior["rho_1"].values
     long = m.fit(draws=300, **kw).posterior["rho_1"].values
     np.testing.assert_array_equal(short[0], long[0, :50])
@@ -307,7 +335,7 @@ def test_jax_fit_builds_float64_params_when_x64_starts_off():
     was = jax.config.jax_enable_x64
     jax.config.update("jax_enable_x64", False)
     try:
-        m.fit(draws=5, tune=5, chains=1, progressbar=False, gibbs_backend="jax")
+        m.fit(draws=5, tune=5, chains=1, progressbar=False, backend="jax")
         assert jax.config.jax_enable_x64
     finally:
         jax.config.update("jax_enable_x64", was or True)
@@ -353,7 +381,7 @@ def fitted_lag3():
 
 def test_unit_effects_totals_follow_the_multiplier(fitted_lag3):
     m = fitted_lag3
-    _, s = m.spatial_effects(level=0, return_posterior_samples=True)
+    _, s = m.impacts(level=0, return_posterior_samples=True)
     rho0 = m._draws("rho_0")
     beta = m._draws("beta_0")[:, 1:]
     np.testing.assert_allclose(s["total"], beta / (1.0 - rho0[:, None]), rtol=1e-8)
@@ -361,13 +389,13 @@ def test_unit_effects_totals_follow_the_multiplier(fitted_lag3):
 
 def test_composed_totals_multiply_the_filters(fitted_lag3):
     m = fitted_lag3
-    _, s = m.spatial_effects(level=2, return_posterior_samples=True)
+    _, s = m.impacts(level=2, return_posterior_samples=True)
     mult = np.prod([1.0 / (1.0 - m._draws(f"rho_{ell}")) for ell in range(3)], axis=0)
     np.testing.assert_allclose(
         s["total"][:, 0], m._draws("beta_2")[:, 0] * mult, rtol=1e-8
     )
     # within the level: β / (1 − ρ_2)
-    _, w = m.spatial_effects(level="g2", on="level", return_posterior_samples=True)
+    _, w = m.impacts(level="g2", on="level", return_posterior_samples=True)
     np.testing.assert_allclose(
         w["total"][:, 0],
         m._draws("beta_2")[:, 0] / (1.0 - m._draws("rho_2")),
@@ -377,8 +405,8 @@ def test_composed_totals_multiply_the_filters(fitted_lag3):
 
 def test_probe_trace_estimates_the_exact_one(fitted_lag3):
     m = fitted_lag3
-    _, exact = m.spatial_effects(level=1, return_posterior_samples=True, max_draws=20)
-    _, probe = m.spatial_effects(
+    _, exact = m.impacts(level=1, return_posterior_samples=True, max_draws=20)
+    _, probe = m.impacts(
         level=1, return_posterior_samples=True, max_draws=20, exact_max=0,
         n_probes=4000, random_seed=0,
     )  # fmt: skip
@@ -397,9 +425,7 @@ def test_fitted_and_predictive_shapes(fitted_lag3):
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(
-    "processes", [("lag", "lag", "error"), ("error", "none", "lag")]
-)
+@pytest.mark.parametrize("processes", [("SAR", "SAR", "SEM"), ("SEM", None, "SAR")])
 def test_pymc_model_builds_with_the_gibbs_names(processes):
     m = _model(_data(n_side=8, blocks=(2, 2), seed=8), processes)
     model = m._build_pymc_model()
@@ -421,18 +447,18 @@ def _flat(post, var):
 
 @pytest.mark.slow
 @pytest.mark.parametrize(
-    "processes, durbin",
+    "processes",
     [
-        (("lag", "lag", "lag"), (False, False, False)),
-        (("lag", "error", "none"), (False, False, False)),
-        (("error", "lag"), (False, False)),
-        (("none", "lag"), (False, True)),
+        ("SAR", "SAR", "SAR"),
+        ("SAR", "SEM", None),
+        ("SEM", "SAR"),
+        (None, "SDM"),
     ],
 )
-def test_gibbs_matches_nuts(processes, durbin):
+def test_gibbs_matches_nuts(processes):
     L = len(processes) - 1
     d = _data(n_side=16, blocks=(2, 2)[:L], processes=processes, seed=11)
-    m = _model(d, processes, durbin)
+    m = _model(d, processes)
     names = m._param_names()
     nuts = m.fit(
         sampler="nuts", draws=2500, tune=2500, chains=4, target_accept=0.95,
@@ -461,22 +487,22 @@ def test_gibbs_matches_nuts(processes, durbin):
 
 @pytest.mark.slow
 @pytest.mark.parametrize(
-    "processes, durbin",
+    "processes",
     [
-        (("lag", "lag", "lag"), (False, False, False)),
-        (("error", "error", "none"), (False, True, False)),
+        ("SAR", "SAR", "SAR"),
+        ("SEM", "SDEM", None),
     ],
 )
-def test_jax_matches_numpy(processes, durbin):
+def test_jax_matches_numpy(processes):
     """The two backends sample one posterior (means within Monte Carlo error)."""
     import arviz as az
 
     d = _data(n_side=16, blocks=(2, 2), processes=processes, seed=11)
-    m = _model(d, processes, durbin)
+    m = _model(d, processes)
     kw = dict(draws=4000, tune=1000, chains=4, progressbar=False, store_theta=False)
-    ref = m.fit(gibbs_backend="numpy", random_seed=1, **kw)
+    ref = m.fit(backend="numpy", random_seed=1, **kw)
     for par in ("collapsed", "interweave"):
-        got = m.fit(gibbs_backend="jax", parametrization=par, random_seed=2, **kw)
+        got = m.fit(backend="jax", parametrization=par, random_seed=2, **kw)
         for v in m._param_names():
             a, b = _flat(got.posterior, v), _flat(ref.posterior, v)
             se = np.hypot(

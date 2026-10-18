@@ -621,7 +621,7 @@ def _initialize_gaussian_gibbs(
     beta_ols = cho_solve(XtX_cho, X.T @ y)
     resid = y - X @ beta_ols
     sigma2_ols = np.dot(resid, resid) / len(y)
-    # Start ρ/λ at 0 (no spatial effect)
+    # Start ρ/λ at 0 (no spatial dependence)
     rho_init = 0.0
 
     return GaussianGibbsState(

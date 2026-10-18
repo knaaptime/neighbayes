@@ -106,7 +106,7 @@ def test_reduced_fitted_values_and_effects_with_mock_posterior():
     assert np.all(np.isfinite(fitted))
     assert np.all(fitted > 0)
 
-    effects = model.spatial_effects()
+    effects = model.impacts()
     assert "direct" in effects.columns
     assert np.all(np.isfinite(effects["direct"].values))
 

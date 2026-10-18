@@ -164,7 +164,7 @@ class TestConstruction:
             warnings.simplefilter("ignore")
             m = _flow_model(SARNegBinFlowPanelRE, data, 3, effects=1)
         with pytest.raises(ValueError, match="not supported"):
-            m.fit(gibbs_backend="jax", **QUICK)
+            m.fit(backend="jax", **QUICK)
 
 
 # ---------------------------------------------------------------------------
@@ -199,7 +199,7 @@ def test_flow_fit_api(cls, effects):
     assert np.all(np.isfinite(post["beta"].values))
     pp = m.posterior_predictive(n_draws=2, random_seed=0)
     assert pp.shape == (2, data["y"].size)
-    assert m.spatial_effects().shape[0] > 0
+    assert m.impacts().shape[0] > 0
 
 
 @pytest.mark.parametrize("cls", PANEL_CLASSES)
@@ -216,7 +216,7 @@ def test_panel_fit_api(cls, effects):
     assert ("rho" in post) == (cls is SARNegBinPanelRE)
     assert "alpha" in post
     assert m.posterior_predictive(n_draws=2, random_seed=0).shape == (2, 75)
-    assert m.spatial_effects().shape[0] == 1
+    assert m.impacts().shape[0] == 1
     assert np.all(np.isfinite(m._fitted_mean_from_posterior()))
 
 
@@ -283,7 +283,7 @@ def test_separable_fixed_effects_jax_backend(effects, store):
         warnings.simplefilter("ignore")
         m = _flow_model(SARNegBinFlowSeparablePanelRE, data, 3, effects=effects)
         idata = m.fit(
-            gibbs_backend="jax",
+            backend="jax",
             store_group_effects=store,
             idata_kwargs={"log_likelihood": True},
             draws=20,
@@ -331,7 +331,7 @@ def _masked_diag_fit(y, backend):
             col_names=data["col_names"],
         )
         return m.fit(
-            gibbs_backend=backend,
+            backend=backend,
             cell_mask=~eye,
             draws=30,
             tune=20,
@@ -474,8 +474,8 @@ def test_separable_fixed_effects_jax_matches_numpy():
     fit = dict(
         draws=2000, tune=600, chains=2, progressbar=False, attach_log_abs_det=False
     )
-    a = m.fit(gibbs_backend="numpy", random_seed=1, n_jobs=1, **fit)
-    b = m.fit(gibbs_backend="jax", random_seed=2, **fit)
+    a = m.fit(backend="numpy", random_seed=1, n_jobs=1, **fit)
+    b = m.fit(backend="jax", random_seed=2, **fit)
     for var in ("rho_d", "rho_o", "beta", "time_effect", "alpha"):
         x, y = a.posterior[var].values, b.posterior[var].values
         sd = x.reshape(-1, *x.shape[2:]).std(0)

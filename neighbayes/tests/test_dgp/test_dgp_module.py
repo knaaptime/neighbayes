@@ -159,7 +159,7 @@ def test_nonlinear_generators_run_with_sparse_W() -> None:
         assert out["censored_mask"].shape == out["y"].shape
 
     assert out_probit["y"].shape[0] == out_probit["X"].shape[0]
-    assert out_probit["region_ids"].shape[0] == out_probit["y"].shape[0]
+    assert out_probit["groups"].shape[0] == out_probit["y"].shape[0]
 
 
 def test_gdf_input_path_for_representative_generators() -> None:
@@ -185,7 +185,7 @@ def test_gdf_input_path_for_representative_generators() -> None:
     assert isinstance(out_panel, tuple)
     _, panel_long = out_panel
     assert panel_long["y"].shape[0] == 27
-    assert out_probit["region_ids"].max() == 8
+    assert out_probit["groups"].max() == 8
 
 
 def test_cross_sectional_create_gdf_reuses_input_geometry() -> None:

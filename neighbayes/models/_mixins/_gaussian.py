@@ -205,7 +205,7 @@ class GaussianLikelihoodMixin:
                 alt = "OLS"
             raise ValueError(
                 f"{model_name} requires at least one WX column. "
-                f"Pass `w_vars=[...]` to choose which regressors receive "
+                f"Pass `durbin_vars=[...]` to choose which regressors receive "
                 f"a spatial lag, or fit an {alt} model instead."
             )
 

@@ -109,13 +109,11 @@ class _PanelTobitBase(SpatialPanelModel):
             )
         return y_lat
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute direct, indirect, and total effects for each posterior draw."""
-        raise NotImplementedError(
-            "Spatial effects not yet implemented for panel Tobit models."
-        )
+        raise NotImplementedError("Impacts not yet implemented for panel Tobit models.")
 
 
 class SARTobitPanel(_PanelTobitBase):

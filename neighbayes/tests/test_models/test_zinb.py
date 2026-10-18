@@ -144,9 +144,7 @@ class TestFixes:
         rng = np.random.default_rng(5)
         d = dgp.simulate_sar_zinb(n_side=15, seed=5, alpha=400.0, rng=rng)
         m = SARZINB(y=d["y"], X=d["X"], Z=d["Z"], W=d["W_graph"])
-        idata = m.fit(
-            draws=600, tune=600, chains=2, progressbar=False, gibbs_backend="jax"
-        )
+        idata = m.fit(draws=600, tune=600, chains=2, progressbar=False, backend="jax")
         assert float(idata.posterior["alpha"].max()) > 60.0
 
 
@@ -159,8 +157,8 @@ class TestSARZINB:
     @pytest.mark.parametrize(
         "kw",
         [
-            dict(gibbs_backend="numpy", n_jobs=1),
-            pytest.param(dict(gibbs_backend="jax"), marks=pytest.mark.requires_jax),
+            dict(backend="numpy", n_jobs=1),
+            pytest.param(dict(backend="jax"), marks=pytest.mark.requires_jax),
             dict(sampler="nuts"),
         ],
     )
@@ -192,17 +190,17 @@ class TestSARZINB:
     def test_posterior_summaries(self):
         d = _xs()
         m = SARZINB(y=d["y"], X=d["X"], Z=d["Z"], W=d["W_graph"])
-        m.fit(gibbs_backend="numpy", n_jobs=1, **QUICK)
+        m.fit(backend="numpy", n_jobs=1, **QUICK)
         n = d["y"].size
         pp = m.posterior_predictive(n_draws=4, random_seed=0)
         assert pp.shape == (4, n) and np.all(pp >= 0)
-        pi = m.corridor_probabilities(draws=5)
+        pi = m.activation_probabilities(draws=5)
         assert pi.shape == (n,) and np.all((pi > 0) & (pi < 1))
         za = m.zero_attribution(draws=5)
         n0 = int(np.sum(d["y"] == 0))
         assert za["structural_prob"].shape == (n0,)
         np.testing.assert_allclose(za["structural_prob"] + za["sampling_prob"], 1.0)
-        assert m.spatial_effects(equation="selection").shape[0] == 1
+        assert m.impacts(equation="selection").shape[0] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -225,8 +223,8 @@ def test_zinb_panel_api(cls, effects, sampler):
     assert ("lam" in post) == (cls is SARZINBPanelRE)
     assert post["gamma"].shape[-1] == 2
     assert m.posterior_predictive(n_draws=2, random_seed=0).shape == (2, 75)
-    assert m.spatial_effects().shape[0] == 1
-    assert m.spatial_effects(equation="selection").shape[0] == 1
+    assert m.impacts().shape[0] == 1
+    assert m.impacts(equation="selection").shape[0] == 1
 
 
 def test_zinb_panel_registry_and_storage():
@@ -272,14 +270,14 @@ def test_flow_zinb_cross_section(backend):
     kw = (
         dict(QUICK, sampler="nuts")
         if backend == "nuts"
-        else dict(QUICK, gibbs_backend=backend, n_jobs=1)
+        else dict(QUICK, backend=backend, n_jobs=1)
     )
     post = m.fit(**kw).posterior
     assert {"lam_d", "lam_o", "lam_w", "rho_d", "rho_o", "gamma"} <= set(post.data_vars)
     assert np.allclose(post["alpha"].values, A)
     assert m.posterior_predictive(n_draws=2, random_seed=0).shape == (2, 16)
-    assert m.spatial_effects().shape[0] > 0
-    assert m.spatial_effects(equation="selection").shape[0] > 0
+    assert m.impacts().shape[0] > 0
+    assert m.impacts(equation="selection").shape[0] > 0
 
 
 @pytest.mark.parametrize("effects", [0, 1, 2, 3])
@@ -287,7 +285,13 @@ def test_flow_zinb_cross_section(backend):
     "backend", ["numpy", pytest.param("jax", marks=pytest.mark.requires_jax)]
 )
 def test_flow_zinb_panel(effects, backend):
-    d = _flow(T=3, pair_effects="random", pair_effect_sd=0.4, time_effects=True, time_effect_sd=0.3)
+    d = _flow(
+        T=3,
+        pair_effects="random",
+        pair_effect_sd=0.4,
+        time_effects=True,
+        time_effect_sd=0.3,
+    )
     X = np.column_stack([d["X"], np.random.default_rng(0).normal(size=d["X"].shape[0])])
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -300,7 +304,7 @@ def test_flow_zinb_panel(effects, backend):
             col_names=list(d["col_names"]) + ["z"],
             **effects_kwargs(effects, "pair_effects", "random"),
         )
-        post = m.fit(gibbs_backend=backend, n_jobs=1, **QUICK).posterior
+        post = m.fit(backend=backend, n_jobs=1, **QUICK).posterior
     assert ("group_effect" in post) == (effects in (1, 3))
     assert ("group_sd" in post) == (effects in (1, 3))
     assert ("time_effect" in post) == (effects in (2, 3))
@@ -317,7 +321,7 @@ def test_flow_zinb_guards():
     m = _flow_model(SARZINBFlowSeparable, d, Z=Z)
     m.fit(n_jobs=1, **QUICK)
     with pytest.raises(NotImplementedError, match="Z=None"):
-        m.spatial_effects(equation="selection")
+        m.impacts(equation="selection")
 
 
 # ---------------------------------------------------------------------------
@@ -336,7 +340,7 @@ def test_sarzinb_gibbs_matches_nuts(backend, alpha_fixed):
     m = SARZINB(y=d["y"], X=d["X"], Z=d["Z"], W=d["W_graph"], priors=priors)
     g = m.fit(
         draws=3000, tune=1000, chains=4, progressbar=False, random_seed=1,
-        gibbs_backend=backend, n_jobs=4,
+        backend=backend, n_jobs=4,
     ).posterior  # fmt: skip
     n = m.fit(
         sampler="nuts", draws=1500, tune=1500, chains=4, progressbar=False,
@@ -442,7 +446,7 @@ def test_flow_zinb_panel_pair_effects_identify_selection():
         )
     post = m.fit(
         draws=3000, tune=1000, chains=4, progressbar=False, random_seed=1,
-        gibbs_backend="jax",
+        backend="jax",
     ).posterior  # fmt: skip
     truth = {"lam_d": 0.3, "lam_o": 0.2, "alpha": 3.0}
     for var, value in truth.items():
@@ -472,8 +476,8 @@ def test_flow_zinb_jax_matches_numpy():
         col_names=d["col_names"],
     )
     fit = dict(draws=3000, tune=1000, chains=4, progressbar=False)
-    a = m.fit(gibbs_backend="numpy", random_seed=1, n_jobs=4, **fit).posterior
-    b = m.fit(gibbs_backend="jax", random_seed=2, **fit).posterior
+    a = m.fit(backend="numpy", random_seed=1, n_jobs=4, **fit).posterior
+    b = m.fit(backend="jax", random_seed=2, **fit).posterior
     # Against Monte Carlo error: the selection half still mixes slowest.
     for var in ("rho_d", "rho_o", "beta", "time_effect", "alpha", "group_sd",
                 "lam_d", "lam_o", "gamma"):  # fmt: skip
