@@ -123,7 +123,7 @@ def _d_symmetrize(W: sp.csr_matrix) -> sp.csc_matrix:
     ValueError
         If no symmetrizing diagonal exists (directed graph, or weights
         inconsistent with ``W = D⁻¹A`` for symmetric ``A``).  Pass
-        ``logdet_method="aaa"`` for such matrices.
+        ``logdet_decomp="lu"`` for such matrices.
     """
     n = W.shape[0]
     W = sp.csr_matrix(W)
@@ -144,18 +144,18 @@ def _d_symmetrize(W: sp.csr_matrix) -> sp.csc_matrix:
     import os
 
     if os.environ.get("NEIGHBAYES_NUMBA_SYMMETRIZE", "") == "1":
-        from ._slq import _numba_available
+        from ._symmetrize import _numba_available
 
         if _numba_available:
-            from ._slq import _d_symmetrize_numba
+            from ._symmetrize import _d_symmetrize_numba
 
             W_sym = _d_symmetrize_numba(W)
             if W_sym is None:
                 raise ValueError(
-                    "cheb_cholesky requires a D-symmetrizable W (row-"
+                    "logdet_decomp='chol' requires a D-symmetrizable W (row-"
                     "standardized undirected graph); no valid symmetrizing "
-                    'diagonal was found. Use logdet_method="aaa" for '
-                    "directed or non-symmetrizable W."
+                    "diagonal was found. Use logdet_decomp='lu' for a directed "
+                    "or non-symmetrizable W."
                 )
             sym_diff = (W_sym - W_sym.T).tocoo()
             sym_err = float(np.abs(sym_diff.data).max()) if sym_diff.nnz else 0.0
@@ -163,19 +163,19 @@ def _d_symmetrize(W: sp.csr_matrix) -> sp.csc_matrix:
                 raise ValueError(
                     f"D-symmetrization failed (max asymmetry {sym_err:.2e}); "
                     "W is not of the form D^-1 A with symmetric A. Use "
-                    'logdet_method="aaa" for this weights matrix.'
+                    "logdet_decomp='lu' for this weights matrix."
                 )
             return W_sym
 
     # Pure-NumPy path (default).
-    from ._slq import _recover_symmetrizing_diagonal
+    from ._symmetrize import _recover_symmetrizing_diagonal
 
     D = _recover_symmetrizing_diagonal(W)
     if D is None or not np.all(np.isfinite(D)) or np.any(D <= 0):
         raise ValueError(
-            "cheb_cholesky requires a D-symmetrizable W (row-standardized "
+            "logdet_decomp='chol' requires a D-symmetrizable W (row-standardized "
             "undirected graph); no valid symmetrizing diagonal was found. "
-            'Use logdet_method="aaa" for directed or non-symmetrizable W.'
+            "Use logdet_decomp='lu' for a directed or non-symmetrizable W."
         )
 
     D_sqrt = np.sqrt(D)
@@ -194,7 +194,7 @@ def _d_symmetrize(W: sp.csr_matrix) -> sp.csc_matrix:
         raise ValueError(
             f"D-symmetrization failed (max asymmetry {sym_err:.2e}); W is "
             "not of the form D^-1 A with symmetric A. Use "
-            'logdet_method="aaa" for this weights matrix.'
+            "logdet_decomp='lu' for this weights matrix."
         )
     return W_sym
 
@@ -375,7 +375,7 @@ class CholChebContext(_ChebContextBase):
     ------
     ValueError
         If ``W`` admits no symmetrizing diagonal (directed graph); use
-        ``logdet_method="aaa"`` for those.
+        ``logdet_decomp="lu"`` for those.
     """
 
     __slots__ = ("W_sym", "_eye", "_factor", "n")

@@ -66,8 +66,22 @@ class SARHurdleNegBin(HurdleMixin, SpatialModel):
         ``rho_lower_zero``/``rho_upper_zero``,
         ``alpha_sigma``/``alpha_nu`` and ``alpha_fixed``.  See
         :class:`~neighbayes.models.priors.SARHurdlePriors`.
-    logdet_method : str, optional
-        Accepted for API symmetry; neither part has a Jacobian.
+    logdet_method : {"exact", "cheb", "aaa", "spline", "stochastic"}, optional
+        How ``log|I - rho*W|`` is approximated over rho: evaluated exactly at
+        every rho, interpolated (Chebyshev, AAA rational, or cubic spline)
+        through exact values, or expanded stochastically with no
+        factorization.  ``None`` (default) selects from the size and symmetry
+        of ``W``: ``"exact"`` for ``n <= 500``; ``"aaa"`` up to
+        ``n = 60000`` (``NEIGHBAYES_LOGDET_FACTOR_MAX_N``) unless the
+        factorization's fill-in would dominate; ``"stochastic"`` beyond.
+    logdet_decomp : {"auto", "eig", "chol", "lu"}, default "auto"
+        What supplies the exact values: a dense eigendecomposition, a sparse
+        Cholesky (undirected ``W``; scikit-sparse CHOLMOD) or a sparse LU.
+        ``"auto"`` takes the first of ``"eig"`` (``n <= 500``,
+        ``NEIGHBAYES_LOGDET_EIGEN_MAX_N``), ``"chol"`` (undirected ``W``) and
+        ``"lu"`` that the method is implemented on.  Ignored by
+        ``"stochastic"``.  A pair with no implementation (``"spline"`` on
+        ``"chol"``, ``"exact"`` on ``"lu"``) raises.
 
     Notes
     -----

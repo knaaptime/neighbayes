@@ -85,9 +85,22 @@ class SARLogit(SpatialModel):
         - ``beta_mu``, ``beta_sigma`` (float or array, default Gelman et al.
           2008): Normal prior on :math:`\\beta`, on the logit scale (intercept at ``logit(mean(y))``, scale 2.5; slopes ``2.5 / sd(x_j)``).
 
-    logdet_method : str, optional
-        How to compute :math:`\\log|I - \\rho W|`. ``None`` (default)
-        auto-selects based on ``n``.
+    logdet_method : {"exact", "cheb", "aaa", "spline", "stochastic"}, optional
+        How ``log|I - rho*W|`` is approximated over rho: evaluated exactly at
+        every rho, interpolated (Chebyshev, AAA rational, or cubic spline)
+        through exact values, or expanded stochastically with no
+        factorization.  ``None`` (default) selects from the size and symmetry
+        of ``W``: ``"exact"`` for ``n <= 500``; ``"aaa"`` up to
+        ``n = 60000`` (``NEIGHBAYES_LOGDET_FACTOR_MAX_N``) unless the
+        factorization's fill-in would dominate; ``"stochastic"`` beyond.
+    logdet_decomp : {"auto", "eig", "chol", "lu"}, default "auto"
+        What supplies the exact values: a dense eigendecomposition, a sparse
+        Cholesky (undirected ``W``; scikit-sparse CHOLMOD) or a sparse LU.
+        ``"auto"`` takes the first of ``"eig"`` (``n <= 500``,
+        ``NEIGHBAYES_LOGDET_EIGEN_MAX_N``), ``"chol"`` (undirected ``W``) and
+        ``"lu"`` that the method is implemented on.  Ignored by
+        ``"stochastic"``.  A pair with no implementation (``"spline"`` on
+        ``"chol"``, ``"exact"`` on ``"lu"``) raises.
     robust : bool, default False
         Not supported. Raises ``NotImplementedError`` if True.
 

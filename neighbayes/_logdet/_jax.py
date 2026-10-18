@@ -3,14 +3,11 @@
 Mirrors the PyTensor symbolic functions but uses ``jax.numpy`` so the
 returned callables are compatible with ``jax.jit`` and ``jax.grad``.
 
-Supports ``"eigenvalue"``, ``"chebyshev"``, ``"cheb_stochastic"``,
-``"cheb_cholesky"``, ``"aaa"``, and ``"slq"``.  The stochastic Chebyshev
+Supports the internal keys ``"eigenvalue"``, ``"chebyshev"``,
+``"cheb_stochastic"``, ``"cheb_cholesky"``, ``"lu_cheb"``, ``"aaa"``,
+``"chol_aaa"``, ``"grid_spline"`` and ``"cholmod"``.  The stochastic Chebyshev
 method precomputes moments in numpy and evaluates via JAX-native Clenshaw.
-SLQ consumes the numpy :func:`slq_logdet_precompute` quadrature rules
-(sparse batched D-symmetrized Lanczos, canonical ``n·v₁²`` weights; complex
-bilinear ``γ`` for the directed-``W`` Arnoldi fallback) and evaluates the
-ρ-dependent quadrature in JAX — differentiable and JIT-compatible, with no
-dense ``W`` materialization.  ``cheb_cholesky`` precomputes Chebyshev
+``cheb_cholesky`` precomputes Chebyshev
 coefficients via sparse Cholesky in numpy and evaluates via JAX-native
 Clenshaw.  ``aaa`` precomputes support points and barycentric weights via
 sparse LU in numpy and evaluates via JAX-native barycentric formula.
@@ -25,7 +22,7 @@ import scipy.sparse as sp
 
 from ._chebyshev import chebyshev
 from ._config import resolve_logdet_method
-from ._slq import slq_logdet_precompute
+from ._exact_chol import _PD_MARGIN
 
 
 def jax_logdet_chebyshev_traced(rho, coeffs, rmin, rmax):
@@ -180,8 +177,8 @@ def logdet_jax_params(W, method: str, rho_min: float, rho_max: float, eigs=None)
 
     ``kind`` is ``"eig"`` (eigenvalues, exact), ``"cheb"`` (Chebyshev
     coefficients and interval) or ``"aaa"`` (barycentric nodes, values and
-    weights).  Methods with no array form (``grid_spline``, ``cholmod``,
-    ``slq``) return ``("closure", fn)``: a sweep using one compiles per fit.
+    weights).  Methods with no array form (``grid_spline``, ``cholmod``)
+    return ``("closure", fn)``: a sweep using one compiles per fit.
     Evaluate with :func:`eval_logdet_params`.  Requires JAX's float64 mode.
     """
     import jax.numpy as jnp
@@ -279,8 +276,9 @@ def make_logdet_jax_fn(
 ):
     """Return a JAX-native ``(rho) -> log|I - ρW|`` callable.
 
-    Supports ``"eigenvalue"``, ``"chebyshev"``, ``"cheb_stochastic"``,
-    ``"cheb_cholesky"``, ``"aaa"``, ``"cholmod"``, and ``"slq"``.
+    Supports the internal keys ``"eigenvalue"``, ``"chebyshev"``,
+    ``"cheb_stochastic"``, ``"cheb_cholesky"``, ``"lu_cheb"``, ``"aaa"``,
+    ``"chol_aaa"``, ``"grid_spline"`` and ``"cholmod"``.
     ``"cholmod"`` uses ``sparsax`` for exact sparse CHOLMOD logdet
     (requires the ``sparsax`` package; CPU-only).
     """
@@ -351,60 +349,6 @@ def make_logdet_jax_fn(
             return val if T == 1 else T * val
 
         return _jax_cheb_stochastic
-
-    if method == "slq":
-        if eigs is not None:
-            raise ValueError(
-                "SLQ requires the weight matrix W, not a 1-D eigenvalue array."
-            )
-        # Consume the numpy sparse SLQ rules: batched D-symmetrized Lanczos
-        # (real nodes θ and real n·v₁² weights) for undirected W, or Arnoldi
-        # (complex Ritz values θ and complex bilinear weights γ) for directed
-        # W.  Evaluate the ρ-dependent quadrature in JAX via the complex log;
-        # the Lanczos case is the zero-imaginary special case of the same
-        # formula.  No dense W is materialized — the precompute is matvec-only.
-        pre = slq_logdet_precompute(W_sparse)
-        nodes = np.asarray(pre.nodes)
-        weights = np.asarray(pre.weights)
-        n_probes = pre.n_probes
-
-        # The exact-moment control variate is part of the value the numpy
-        # evaluator returns, so it has to be carried into the traced graph too;
-        # otherwise the JAX and numpy paths compute different functions.
-        cv = (
-            np.zeros(0)
-            if pre.cv_coeffs is None
-            else np.asarray(pre.cv_coeffs, dtype=np.float64)
-        )
-
-        nodes_real = np.ascontiguousarray(nodes.real.astype(np.float64))
-        nodes_imag = np.ascontiguousarray(nodes.imag.astype(np.float64))
-        w_real = np.ascontiguousarray(weights.real.astype(np.float64))
-        w_imag = np.ascontiguousarray(weights.imag.astype(np.float64))
-
-        def _jax_slq(rho):
-            import jax.numpy as jnp
-
-            nr = jnp.asarray(nodes_real)
-            ni = jnp.asarray(nodes_imag)
-            wr = jnp.asarray(w_real)
-            wi = jnp.asarray(w_imag)
-            # 1 - ρθ = (1 - ρ·Re θ) + i(-ρ·Im θ)
-            # log(1 - ρθ) = 0.5·log|1-ρθ|² + i·atan2(Im, Re)
-            re = 1.0 - rho * nr
-            im = -rho * ni
-            log_re = 0.5 * jnp.log(jnp.maximum(re**2 + im**2, 1e-300))
-            log_im = jnp.arctan2(im, re)
-            # Re(Σ γ·log(1-ρθ)) = Σ [Re(γ)·log_re - Im(γ)·log_im]; the second
-            # term vanishes for real (Lanczos) weights but keeps the cross term
-            # that a magnitude-only log would drop for the complex Arnoldi case.
-            val = jnp.sum(wr * log_re - wi * log_im) / n_probes
-            if cv.size:
-                j = jnp.arange(1, cv.size + 1, dtype=jnp.float64)
-                val = val + jnp.sum(rho**j / j * jnp.asarray(cv))
-            return val if T == 1 else T * val
-
-        return _jax_slq
 
     if method in ("cheb_cholesky", "lu_cheb"):
         from ._factories import _cheb_precompute_for
@@ -495,13 +439,13 @@ def make_logdet_jax_fn(
         # is symmetric with the same eigenvalues, so I−ρW_sym is SPD
         # for |ρ| < 1 and sparsax.logdet applies directly.
         # If W is not D-symmetrizable (directed graph), this raises
-        # ValueError — use logdet_method="aaa" for such matrices.
+        # ValueError — use logdet_decomp="lu" with an interpolating method.
         from .._jax_dispatch import _sparsax_available
 
         if not _sparsax_available():
             raise ImportError(
-                "logdet method 'cholmod' requires the 'sparsax' package. "
-                "Install it with: pip install sparsax"
+                "logdet_method='exact' on logdet_decomp='chol' needs the "
+                "'sparsax' package on the JAX path: pip install sparsax"
             )
 
         from ._chol_cheb import _d_symmetrize
@@ -566,19 +510,21 @@ def make_logdet_jax_fn(
             W_vals = jnp.asarray(_W_sym_vals, dtype=jnp.float64)
             diag_idx = jnp.asarray(_diag_idx_direct, dtype=jnp.int32)
 
+            # I − ρW_sym is SPD only for |ρ| < 1 (λ ∈ [−1, 1]); outside that the
+            # factorization fails, so factor at ρ = 0 there and report −inf, the
+            # boundary limit, as the eigenvalue form does.
+            inside = jnp.abs(rho) < 1.0 - _PD_MARGIN
+            safe = jnp.where(inside, rho, 0.0)
+
             # Ax = I − ρW_sym at pattern positions
-            Ax = -rho * W_vals
+            Ax = -safe * W_vals
             diag_vals = jnp.zeros(_nnz_direct, dtype=jnp.float64)
             diag_vals = diag_vals.at[diag_idx].set(1.0)
             Ax = Ax + diag_vals
 
-            val = sparsax.logdet(Ai, Aj, Ax, _n_static)
+            val = jnp.where(inside, sparsax.logdet(Ai, Aj, Ax, _n_static), -jnp.inf)
             return val if T == 1 else T * val
 
         return _jax_cholmod
 
-    raise ValueError(
-        f"Method '{method}' has no JAX implementation. "
-        "Use 'eigenvalue', 'chebyshev', 'cheb_stochastic', "
-        "'cheb_cholesky', 'aaa', 'chol_aaa', 'cholmod', or 'slq'."
-    )
+    raise ValueError(f"Log-determinant key {method!r} has no JAX implementation.")

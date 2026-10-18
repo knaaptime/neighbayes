@@ -26,7 +26,7 @@ def _toy_inputs(n: int = 25, seed: int = 0):
 
 def test_sar_logdet_bounds_default():
     y, X, W = _toy_inputs()
-    m = SAR(y=y, X=X, W=W, logdet_method="eigenvalue")
+    m = SAR(y=y, X=X, W=W, logdet_method="exact", logdet_decomp="eig")
     b = m._logdet_bounds
     assert isinstance(b, LogdetBounds)
     assert b.method == "eigenvalue"
@@ -36,7 +36,7 @@ def test_sar_logdet_bounds_default():
 
 def test_sem_logdet_bounds_default():
     y, X, W = _toy_inputs()
-    m = SEM(y=y, X=X, W=W, logdet_method="eigenvalue")
+    m = SEM(y=y, X=X, W=W, logdet_method="exact", logdet_decomp="eig")
     b = m._logdet_bounds
     assert isinstance(b, LogdetBounds)
     assert b.rho_min == -1.0
@@ -49,7 +49,8 @@ def test_sar_logdet_bounds_from_priors():
         y=y,
         X=X,
         W=W,
-        logdet_method="eigenvalue",
+        logdet_method="exact",
+        logdet_decomp="eig",
         priors={"rho_lower": -0.5, "rho_upper": 0.8},
     )
     b = m._logdet_bounds
@@ -67,7 +68,7 @@ def test_eigenvalue_guard_large_n():
     hard_limit = _eigen_hard_max_n()
     n = hard_limit + 50  # above the hard guard
     y, X, W = _toy_inputs(n=n)
-    m = SAR(y=y, X=X, W=W, logdet_method="eigenvalue")
+    m = SAR(y=y, X=X, W=W, logdet_method="exact", logdet_decomp="eig")
     # Accessing _W_eigs should raise, not silently densify.
     with pytest.raises(ValueError, match="NEIGHBAYES_LOGDET_EIGEN_HARD_MAX_N"):
         _ = m._W_eigs

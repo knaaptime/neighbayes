@@ -23,7 +23,7 @@ import pytest
 import scipy.sparse as sp
 from scipy.sparse.csgraph import connected_components
 
-from neighbayes._logdet._slq import _recover_symmetrizing_diagonal
+from neighbayes._logdet._symmetrize import _recover_symmetrizing_diagonal
 
 
 def _reference_bfs(W: sp.csr_matrix) -> np.ndarray | None:

@@ -129,7 +129,7 @@ rather than a function. Three design decisions shape it.
 **Precompute once, evaluate many times.** Every method splits into a `*_precompute`
 step that does the expensive linear algebra and an `*_eval` step that answers a single
 $\rho$. The sampler pays the setup once per model and then evaluates in microseconds.
-This is what makes exact interpolation competitive: `cheb_cholesky` factorises at a
+This is what makes exact interpolation competitive: `cheb` on `chol` factorises at a
 handful of Chebyshev nodes and then costs ~1.3 μs per $\rho$ via Clenshaw recurrence;
 `aaa` factorises on an adaptive coarse grid, selects ~7 support points, and costs ~5 μs.
 Both are accurate to near machine precision, and both need far fewer factorisations than
@@ -167,14 +167,16 @@ Built callables are cached by a signature of $W$ and the resolved bounds
 (`get_cached_logdet_fn`), so refitting a model, or fitting several models on the same
 graph, reuses the setup.
 
-**Auto-selection from the shape of the problem.** `resolve_logdet_method` picks from the
-size and symmetry of $W$: exact eigendecomposition below $n=500$; `cheb_cholesky` for
-symmetric $W$ (undirected graphs) up to $n=20{,}000$; `aaa` for non-symmetric $W$ (KNN,
-travel time, migration flows) in the same range; a stochastic method above it, where
-factorisation fill-in stops being affordable. The symmetry test uses
-`Graph.asymmetry(intrinsic=False)` for libpysal graphs and never densifies a sparse
-matrix to check. Both cutoffs are environment variables, and `logdet_method=` overrides
-the choice outright.
+**Auto-selection from the shape of the problem.** A model names its log-determinant
+by `logdet_method` (the approximation over ρ) and `logdet_decomp` (what supplies exact
+values), and `logdet_key` resolves the pair to one internal key that the factories
+and samplers dispatch on. Left to auto, `resolve_logdet_method` picks from the size
+and symmetry of $W$: `exact` on `eig` below $n=500$; `aaa` on `chol` for undirected $W$
+and on `lu` for directed $W$ (KNN, travel time, migration flows) up to $n=60{,}000$; and
+`stochastic` above it, where factorisation fill-in stops being affordable. The
+symmetry test uses `Graph.asymmetry(intrinsic=False)` for libpysal graphs and never
+densifies a sparse matrix to check. Both cutoffs are environment variables, and the two
+arguments override the choice outright.
 
 ## Sampler dispatch
 
@@ -296,8 +298,8 @@ without touching model code:
   - effect
 * - `NEIGHBAYES_LOGDET_EIGEN_MAX_N`
   - largest `n` auto-routed to exact eigendecomposition (default 500)
-* - `NEIGHBAYES_LOGDET_CHEB_MAX_N`
-  - largest `n` auto-routed to an exact interpolating method (default 60000)
+* - `NEIGHBAYES_LOGDET_FACTOR_MAX_N`
+  - largest `n` auto-routed to a factorization (default 60000)
 * - `NEIGHBAYES_SPARSE_BACKEND`
   - force a sparse solver instead of auto-detecting
 * - `NEIGHBAYES_SPARSE_STRICT`

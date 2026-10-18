@@ -13,41 +13,6 @@ import scipy.sparse as sp
 from neighbayes.models import SARFlow
 from neighbayes.tests.helpers import SAMPLE_KWARGS
 
-# ---------------------------------------------------------------------------
-# logdet flow helper functions
-# ---------------------------------------------------------------------------
-
-
-class TestBarryPaceTraces:
-    def test_shape(self):
-        from neighbayes._logdet._chebyshev import _barry_pace_traces
-
-        n = 10
-        W = sp.random(n, n, density=0.3, format="csr", random_state=0, dtype=np.float64)
-        # Row-normalize
-        row_sums = np.asarray(W.sum(axis=1)).ravel()
-        row_sums[row_sums == 0] = 1
-        W = sp.diags(1.0 / row_sums) @ W
-        rng = np.random.default_rng(0)
-        out = _barry_pace_traces(W, order=5, iter=10, rng=rng)
-        assert out.shape == (5, 10)
-
-    def test_exact_tr_W_override(self):
-        """tr(W) = 0 for zero-diagonal W must be set in row 0."""
-        from neighbayes._logdet._chebyshev import _barry_pace_traces
-
-        n = 8
-        W = sp.random(n, n, density=0.4, format="csr", random_state=1, dtype=np.float64)
-        W.setdiag(0)
-        W.eliminate_zeros()
-        row_sums = np.asarray(W.sum(axis=1)).ravel()
-        row_sums[row_sums == 0] = 1
-        W = sp.diags(1.0 / row_sums) @ W
-        rng = np.random.default_rng(2)
-        out = _barry_pace_traces(W, order=4, iter=20, rng=rng)
-        # All rows 0 should be the exact tr(W) = 0
-        np.testing.assert_allclose(out[0, :], 0.0, atol=1e-12)
-
 
 class TestFlowModelConstruction:
     def setup_method(self):
@@ -598,7 +563,7 @@ ABS_TOL_SIGMA = 0.35
 class TestSARFlowSeparableLogdetMethods:
     """SARFlowSeparable fits without error for each logdet method."""
 
-    @pytest.fixture(params=["eigenvalue", "chebyshev"], scope="class")
+    @pytest.fixture(params=[("exact", "eig"), ("cheb", "eig")], scope="class")
     def fitted_model(self, request):
         from neighbayes.dgp import simulate_sar_flow
         from neighbayes.models.flow import SARFlowSeparable
@@ -620,7 +585,8 @@ class TestSARFlowSeparableLogdetMethods:
             G,
             separable=True,
             col_names=out["col_names"],
-            logdet_method=request.param,
+            logdet_method=request.param[0],
+            logdet_decomp=request.param[1],
         )
         idata = model.fit(**{**SAMPLE_KWARGS, "draws": 50, "tune": 50, "chains": 1})
         return idata, request.param
@@ -665,7 +631,7 @@ class TestSARFlowSeparableLogdetMethods:
                 G,
                 separable=True,
                 col_names=out["col_names"],
-                logdet_method="traces",
+                logdet_method="trace_series",
             )
 
 

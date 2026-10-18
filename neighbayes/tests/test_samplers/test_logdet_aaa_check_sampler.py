@@ -53,9 +53,11 @@ def high():
     return _data(0.95)
 
 
-def _fit(data, backend, method="chol_aaa", **kw):
+def _fit(data, backend, method="aaa", decomp="chol", **kw):
     y, X, W = data
-    model = SAR(y=y, X=X, W=W, priors=PRIORS, logdet_method=method, **kw)
+    model = SAR(
+        y=y, X=X, W=W, priors=PRIORS, logdet_method=method, logdet_decomp=decomp, **kw
+    )
     return model.fit(
         draws=600,
         tune=600,
@@ -91,7 +93,7 @@ class TestAAANodeCheck:
         import arviz as az
 
         aaa = _fit(high, backend)
-        exact = _fit(high, backend, method="eigenvalue")
+        exact = _fit(high, backend, method="exact", decomp="eig")
         ra, re = _rho(aaa), _rho(exact)
         ess_a = float(az.ess(aaa, var_names=["rho"])["rho"])
         ess_e = float(az.ess(exact, var_names=["rho"])["rho"])
@@ -99,13 +101,13 @@ class TestAAANodeCheck:
         assert abs(ra.mean() - re.mean()) < 4.0 * mcse
 
     def test_off_records_nothing(self, mid, backend):
-        idata = _fit(mid, backend, logdet_aaa_check=False)
+        idata = _fit(mid, backend, logdet_adapt=False)
         assert "logdet_aaa_nodes" not in idata.attrs
         assert np.isfinite(_rho(idata).mean())
 
 
 def test_non_aaa_methods_are_untouched(mid):
-    idata = _fit(mid, "numpy", method="cheb_cholesky")
+    idata = _fit(mid, "numpy", method="cheb", decomp="chol")
     assert "logdet_aaa_nodes" not in idata.attrs
 
 
@@ -126,7 +128,16 @@ def test_panel_fe_runs_refit_and_check():
             for t in range(T)
         ]
     )
-    model = SAR(unit_effects="fixed", y=y, X=X, W=W, N=N, T=T, logdet_method="chol_aaa")
+    model = SAR(
+        unit_effects="fixed",
+        y=y,
+        X=X,
+        W=W,
+        N=N,
+        T=T,
+        logdet_method="aaa",
+        logdet_decomp="chol",
+    )
     idata = model.fit(
         sampler="gibbs",
         draws=300,

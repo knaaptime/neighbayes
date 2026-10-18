@@ -54,6 +54,26 @@ class FlowSharedMethods:
     # log-determinant (see :meth:`_attach_flow_log_abs_det`).
     _separable_filter: bool = False
 
+    def _flow_logdet_choice(self, backend: str | None, sample_kwargs: dict) -> str:
+        """The unrestricted flow log-determinant the resolvent sampler runs.
+
+        ``"kron_traces"`` for the exact trace series (``logdet_method=
+        "trace_series"``, or ``None`` with an undirected ``W``), else the
+        resolvent estimator on ``"jax"`` or ``"numpy"`` (``backend``; ``"auto"``
+        takes JAX when it is installed).
+        """
+        from ..._logdet._config import _is_symmetric_W
+
+        backend = select_backend("gibbs", backend, sample_kwargs)
+        method = self.logdet_method
+        if method is None:
+            method = "trace_series" if _is_symmetric_W(self._W_sparse) else "resolvent"
+        if method == "trace_series":
+            return "kron_traces"
+        if backend == "auto":
+            return "jax" if jax_available() else "numpy"
+        return backend
+
     def _resolve_gibbs_backend(self, requested: str, *, jax: bool) -> str:
         """The Gibbs ``backend`` resolved for this flow configuration.
 

@@ -11,7 +11,7 @@ Env vars
 
 The other runtime knobs — ``NEIGHBAYES_SPARSE_BACKEND``,
 ``NEIGHBAYES_SPARSE_STRICT``, ``NEIGHBAYES_KRON_DENSE_MAX``,
-``NEIGHBAYES_LOGDET_EIGEN_MAX_N``, ``NEIGHBAYES_LOGDET_CHEB_MAX_N`` — are
+``NEIGHBAYES_LOGDET_EIGEN_MAX_N``, ``NEIGHBAYES_LOGDET_FACTOR_MAX_N`` — are
 read **at call time** by their consumers
 (:mod:`neighbayes._ops._backend`, :mod:`neighbayes._logdet._config`) with
 ``functools.lru_cache``, so tests can override them via

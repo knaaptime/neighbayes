@@ -41,6 +41,7 @@ import scipy.sparse as sp
 from ..._backends.sampler_helpers import select_backend
 from ..._lazy_deps import pm, xr
 from ..._logdet import (
+    FLOW_LOGDET_METHODS,
     make_flow_separable_logdet,
     make_flow_separable_logdet_numpy,
 )
@@ -286,14 +287,11 @@ class FlowModel(FlowSharedMethods, SpatialModel):
     priors : dict, optional
         Override default priors.  Supported keys vary by subclass.
     logdet_method : str, optional
-        How to compute :math:`\\log|I_N - \\rho_d W_d - \\rho_o W_o - \\rho_w W_w|`.
-        ``None`` (default) auto-selects.  Concrete subclasses override the
-        default with their recommended method: the unrestricted SAR/SEM flow
-        classes use the resolvent-gradient sampler (``"resolvent"``), the
-        separable classes accept any single-``W`` method (``"eigenvalue"``,
-        ``"chebyshev"``, ``"cheb_cholesky"``, ``"aaa"``,
-        ``"cheb_stochastic"``) via the exact Kronecker factorization, and
-        aspatial classes skip the log-determinant entirely.
+        The flow log-determinant; ``None`` (default) auto-selects.  The
+        unrestricted classes take ``"trace_series"`` or ``"resolvent"``; the
+        separable classes factor it into ``n x n`` terms and take the
+        single-``W`` methods with ``logdet_decomp``; the aspatial classes have
+        none.
     nonnegative_dependence : bool, default True
         If True, use a ``pm.Dirichlet`` prior that restricts :math:`\\rho_d,
         \\rho_o, \\rho_w \\geq 0` with :math:`\\rho_d + \\rho_o + \\rho_w \\leq 1`.
@@ -309,6 +307,10 @@ class FlowModel(FlowSharedMethods, SpatialModel):
         behavior of :meth:`impacts` when ``mode="auto"``.
     """
 
+    #: Whether the class samples the unrestricted three-ρ flow, whose
+    #: log-determinant is the trace series or the resolvent estimator.
+    _unrestricted_logdet = False
+
     def __init__(
         self,
         y: Union[np.ndarray, pd.Series],
@@ -320,9 +322,11 @@ class FlowModel(FlowSharedMethods, SpatialModel):
         logdet_method: Optional[str] = None,
         nonnegative_dependence: bool = True,
         shared_od_covariates: Optional[bool] = None,
+        logdet_decomp: str = "auto",
     ):
         self.priors = priors or {}
         self.logdet_method = logdet_method
+        self.logdet_decomp = logdet_decomp
         self.nonnegative_dependence = nonnegative_dependence
         self.robust = False
         self._is_row_std = True  # W is assumed row-standardized
@@ -441,30 +445,31 @@ class FlowModel(FlowSharedMethods, SpatialModel):
         self._W_eigs: Optional[np.ndarray] = None
         self._separable_logdet_fn = None
         self._separable_logdet_numpy_fn = None
-        _SEPARABLE_METHODS = {
-            "eigenvalue",
-            "chebyshev",
-            "cheb_cholesky",
-            "aaa",
-            "cheb_stochastic",
-        }
-        if logdet_method is None or logdet_method in _SEPARABLE_METHODS:
-            from ..._logdet._config import resolve_logdet_method
+        if self._unrestricted_logdet:
+            if self.logdet_method not in (None, "none", *FLOW_LOGDET_METHODS):
+                raise ValueError(
+                    f"{type(self).__name__} takes logdet_method 'trace_series', "
+                    f"'resolvent' or None, got {self.logdet_method!r}."
+                )
+        elif self.logdet_method != "none":
+            from ..._logdet._config import logdet_key, resolve_logdet_method
 
+            key = logdet_key(
+                self.logdet_method, self.logdet_decomp, n=self._n, W=self._W_sparse
+            )
             self._separable_logdet_fn = make_flow_separable_logdet(
                 self._W_sparse,
                 self._n,
-                method=logdet_method,
+                method=key,
             )
             self._separable_logdet_numpy_fn = make_flow_separable_logdet_numpy(
                 self._W_sparse,
                 self._n,
-                method=logdet_method,
+                method=key,
             )
-            # Populate ``_W_eigs`` only when the resolved method is eigenvalue
+            # Populate ``_W_eigs`` only when the resolved key is eigenvalue
             # (auto-selection may resolve None to eigenvalue for small n).
-            resolved = resolve_logdet_method(logdet_method, n=self._n, W=self._W_sparse)
-            if resolved == "eigenvalue":
+            if resolve_logdet_method(key, n=self._n, W=self._W_sparse) == "eigenvalue":
                 self._W_eigs = np.linalg.eigvals(
                     self._W_sparse.toarray().astype(np.float64)
                 ).real
@@ -762,9 +767,14 @@ class SARFlow(FlowModel):
         Number of regional attribute columns (destination/origin variable
         pairs). Inferred from ``dest_*``/``orig_*`` column names when the
         standard LeSage layout is used.
-    logdet_method : str, default "resolvent"
-        Log-determinant method.  The default ``"resolvent"`` samples via the
-        resolvent-Kronecker gradient sampler (recommended).
+    logdet_method : {"trace_series", "resolvent"}, optional
+        The unrestricted flow log-determinant
+        :math:`\\log|I_N - \\rho_d W_d - \\rho_o W_o - \\rho_w W_w|`.
+        ``"trace_series"`` is exact, from trace moments of the ``n x n`` ``W``
+        with no ``N x N`` work; ``"resolvent"`` is the stochastic resolvent
+        estimator, whose accuracy improves with the flow sample size ``N``, run
+        on ``fit(backend=...)``.  ``None`` (default) takes ``"trace_series"``
+        for an undirected ``W`` and ``"resolvent"`` for a directed one.
     nonnegative_dependence : bool, default True
         If True, use ``pm.Dirichlet("rho_simplex", a=ones(4))`` to enforce
         :math:`\\rho_d, \\rho_o, \\rho_w \\geq 0` and
@@ -791,18 +801,13 @@ class SARFlow(FlowModel):
     The unrestricted flow log-determinant is sampled with the scalable
     resolvent-Kronecker gradient (see
     :mod:`neighbayes.samplers.gaussian._flow_resolvent`), whose accuracy improves
-    with the flow sample size ``N``.  The legacy ``"traces"`` value method — which
-    amplifies stochastic-moment noise for large directed ``W`` — is retired but
-    remains reachable via ``logdet_method="traces"`` (PyMC/NUTS path).
+    with the flow sample size ``N``, or with the exact trace series for an
+    undirected ``W`` (``logdet_method``).
     """
 
     _dispatch = classmethod(flow)
 
-    def __init__(self, y, X, W, **kwargs):
-        # Default to the resolvent-gradient sampler; "traces" stays as an
-        # explicit (deprecated) opt-in routed through the legacy PyMC path.
-        kwargs.setdefault("logdet_method", "resolvent")
-        super().__init__(y, X, W, **kwargs)
+    _unrestricted_logdet = True
 
     def fit(
         self,
@@ -813,7 +818,7 @@ class SARFlow(FlowModel):
         *,
         step_size: float = 5e-4,
         n_probes: int = 48,
-        logdet_method: str = "auto",
+        backend: str | None = None,
         n_quad: int = 8,
         progressbar: bool = True,
         n_jobs: int = -1,
@@ -828,11 +833,10 @@ class SARFlow(FlowModel):
 
         Parameters
         ----------
-        logdet_method : {"auto", "kron_traces", "jax", "numpy"}, default "auto"
-            Flow log-determinant backend.  ``"auto"`` is exact (trace moments of
-            ``W``, no ``N × N`` work) for undirected ``W`` and the stochastic
-            resolvent estimator for directed ``W``; see
-            :func:`~neighbayes.samplers.gaussian._flow_resolvent.resolve_flow_logdet`.
+        backend : {"auto", "jax", "numpy"}, optional
+            What runs the resolvent estimator of the log-determinant (the
+            model's ``logdet_method``): ``"auto"`` (default) takes JAX when it
+            is installed, else NumPy.  The exact trace series runs on NumPy.
         idata_kwargs : dict, optional
             ``{"log_likelihood": True}`` stores the pointwise log-likelihood
             (one value per draw, chain, and flow) for ``az.loo``.
@@ -852,7 +856,7 @@ class SARFlow(FlowModel):
             n_probes=n_probes,
             coord_names=list(self._feature_names) or None,
             random_seed=random_seed,
-            logdet_method=logdet_method,
+            logdet_method=self._flow_logdet_choice(backend, sample_kwargs),
             n_quad=n_quad,
             progressbar=progressbar,
             n_jobs=n_jobs,
@@ -980,10 +984,22 @@ class SARFlowSeparable(FlowModel):
         Number of regional attribute columns (destination/origin variable
         pairs). Inferred from ``dest_*``/``orig_*`` column names when the
         standard LeSage layout is used.
-    logdet_method : {"eigenvalue", "chebyshev", "cheb_cholesky", "aaa", "cheb_stochastic"} or None, default None
-        Method for the :math:`n \\times n` log-determinant used via the exact
-        Kronecker factorization.  ``None`` (default) auto-selects
-        (``"aaa"`` for directed/non-symmetric ``W``).
+    logdet_method : {"exact", "cheb", "aaa", "spline", "stochastic"}, optional
+        How ``log|I - rho*W|`` is approximated over rho: evaluated exactly at
+        every rho, interpolated (Chebyshev, AAA rational, or cubic spline)
+        through exact values, or expanded stochastically with no
+        factorization.  ``None`` (default) selects from the size and symmetry
+        of ``W``: ``"exact"`` for ``n <= 500``; ``"aaa"`` up to
+        ``n = 60000`` (``NEIGHBAYES_LOGDET_FACTOR_MAX_N``) unless the
+        factorization's fill-in would dominate; ``"stochastic"`` beyond.
+    logdet_decomp : {"auto", "eig", "chol", "lu"}, default "auto"
+        What supplies the exact values: a dense eigendecomposition, a sparse
+        Cholesky (undirected ``W``; scikit-sparse CHOLMOD) or a sparse LU.
+        ``"auto"`` takes the first of ``"eig"`` (``n <= 500``,
+        ``NEIGHBAYES_LOGDET_EIGEN_MAX_N``), ``"chol"`` (undirected ``W``) and
+        ``"lu"`` that the method is implemented on.  Ignored by
+        ``"stochastic"``.  A pair with no implementation (``"spline"`` on
+        ``"chol"``, ``"exact"`` on ``"lu"``) raises.
     shared_od_covariates : bool, optional
         If ``None`` (default), origin and destination design blocks are
         compared and symmetry is auto-detected. Set explicitly to override
@@ -1008,14 +1024,6 @@ class SARFlowSeparable(FlowModel):
     _separable_filter = True
 
     def __init__(self, y, X, W, **kwargs):
-        method = kwargs.pop("logdet_method", None)
-        _VALID = {"eigenvalue", "chebyshev", "cheb_cholesky", "aaa", "cheb_stochastic"}
-        if method is not None and method not in _VALID:
-            raise ValueError(
-                f"SARFlowSeparable logdet_method must be None (auto) or one of "
-                f"{sorted(_VALID)}; got {method!r}."
-            )
-        kwargs["logdet_method"] = method
         super().__init__(y, X, W, **kwargs)
 
     def _build_pymc_model(self) -> pm.Model:
@@ -2325,9 +2333,14 @@ class SEMFlow(FlowModel):
         Number of regional attribute columns (destination/origin variable
         pairs). Inferred from ``dest_*``/``orig_*`` column names when the
         standard LeSage layout is used.
-    logdet_method : str, default "resolvent"
-        Log-determinant method.  The default ``"resolvent"`` samples via the
-        resolvent-gradient sampler (recommended).
+    logdet_method : {"trace_series", "resolvent"}, optional
+        The unrestricted flow log-determinant
+        :math:`\\log|I_N - \\rho_d W_d - \\rho_o W_o - \\rho_w W_w|`.
+        ``"trace_series"`` is exact, from trace moments of the ``n x n`` ``W``
+        with no ``N x N`` work; ``"resolvent"`` is the stochastic resolvent
+        estimator, whose accuracy improves with the flow sample size ``N``, run
+        on ``fit(backend=...)``.  ``None`` (default) takes ``"trace_series"``
+        for an undirected ``W`` and ``"resolvent"`` for a directed one.
     nonnegative_dependence : bool, default True
         If True, use ``pm.Dirichlet("lam_simplex", a=ones(4))`` to enforce
         :math:`\\lambda_d, \\lambda_o, \\lambda_w \\geq 0` and
@@ -2359,10 +2372,9 @@ class SEMFlow(FlowModel):
 
     _dispatch = classmethod(flow)
 
+    _unrestricted_logdet = True
+
     def __init__(self, y, X, W, **kwargs):
-        # Default to the resolvent-gradient SEM sampler (separable subclasses pass
-        # their own separable logdet_method and route to the PyMC path).
-        kwargs.setdefault("logdet_method", "resolvent")
         super().__init__(y, X, W, **kwargs)
         # Precompute lags of the design matrix (constant — no parameter dependence).
         self._Wd_X, self._Wo_X, self._Ww_X = flow_lags(self._W_sparse, self._X)
@@ -2376,7 +2388,7 @@ class SEMFlow(FlowModel):
         *,
         step_size: float = 5e-4,
         n_probes: int = 48,
-        logdet_method: str = "auto",
+        backend: str | None = None,
         n_quad: int = 8,
         progressbar: bool = True,
         n_jobs: int = -1,
@@ -2386,22 +2398,21 @@ class SEMFlow(FlowModel):
         """Sample the SEM-flow posterior.
 
         Uses the resolvent-Kronecker gradient sampler (MALA-on-λ within GLS Gibbs
-        for ``β, σ²``) by default; the separable subclass (which sets a separable
-        ``logdet_method``) routes to the PyMC/NUTS path instead.
+        for ``β, σ²``); the separable subclass routes to the PyMC/NUTS path
+        instead, where ``backend`` names the NUTS implementation.
 
         Parameters
         ----------
-        logdet_method : {"auto", "kron_traces", "jax", "numpy"}, default "auto"
-            Flow log-determinant backend.  ``"auto"`` is exact (trace moments of
-            ``W``, no ``N × N`` work) for undirected ``W`` and the stochastic
-            resolvent estimator for directed ``W``; see
-            :func:`~neighbayes.samplers.gaussian._flow_resolvent.resolve_flow_logdet`.
+        backend : {"auto", "jax", "numpy"}, optional
+            What runs the resolvent estimator of the log-determinant (the
+            model's ``logdet_method``): ``"auto"`` (default) takes JAX when it
+            is installed, else NumPy.  The exact trace series runs on NumPy.
         idata_kwargs : dict, optional
             ``{"log_likelihood": True}`` stores the pointwise log-likelihood
             (one value per draw, chain, and flow) for ``az.loo``.
             Off by default, as in PyMC.
         """
-        if self.logdet_method != "resolvent":
+        if not self._unrestricted_logdet:
             return super().fit(
                 draws=draws,
                 tune=tune,
@@ -2409,6 +2420,7 @@ class SEMFlow(FlowModel):
                 random_seed=random_seed,
                 progressbar=progressbar,
                 idata_kwargs=idata_kwargs,
+                backend=backend,
                 **sample_kwargs,
             )
         from ...samplers.gaussian._flow_resolvent import sample_sem_flow_resolvent
@@ -2425,7 +2437,7 @@ class SEMFlow(FlowModel):
             n_probes=n_probes,
             coord_names=list(self._feature_names) or None,
             random_seed=random_seed,
-            logdet_method=logdet_method,
+            logdet_method=self._flow_logdet_choice(backend, sample_kwargs),
             n_quad=n_quad,
             progressbar=progressbar,
             n_jobs=n_jobs,
@@ -2524,10 +2536,22 @@ class SEMFlowSeparable(SEMFlow):
         Number of regional attribute columns. Inferred from
         ``dest_*``/``orig_*`` column names when the standard LeSage
         layout is used.
-    logdet_method : {"eigenvalue", "chebyshev", "cheb_cholesky", "aaa", "cheb_stochastic"} or None, default None
-        ``None`` auto-selects (``aaa`` for directed W, ``cheb_cholesky`` for
-        symmetric, ``eigenvalue`` for small n).
-        Method for the Kronecker-factored log-determinant.
+    logdet_method : {"exact", "cheb", "aaa", "spline", "stochastic"}, optional
+        How ``log|I - rho*W|`` is approximated over rho: evaluated exactly at
+        every rho, interpolated (Chebyshev, AAA rational, or cubic spline)
+        through exact values, or expanded stochastically with no
+        factorization.  ``None`` (default) selects from the size and symmetry
+        of ``W``: ``"exact"`` for ``n <= 500``; ``"aaa"`` up to
+        ``n = 60000`` (``NEIGHBAYES_LOGDET_FACTOR_MAX_N``) unless the
+        factorization's fill-in would dominate; ``"stochastic"`` beyond.
+    logdet_decomp : {"auto", "eig", "chol", "lu"}, default "auto"
+        What supplies the exact values: a dense eigendecomposition, a sparse
+        Cholesky (undirected ``W``; scikit-sparse CHOLMOD) or a sparse LU.
+        ``"auto"`` takes the first of ``"eig"`` (``n <= 500``,
+        ``NEIGHBAYES_LOGDET_EIGEN_MAX_N``), ``"chol"`` (undirected ``W``) and
+        ``"lu"`` that the method is implemented on.  Ignored by
+        ``"stochastic"``.  A pair with no implementation (``"spline"`` on
+        ``"chol"``, ``"exact"`` on ``"lu"``) raises.
     shared_od_covariates : bool, optional
         If ``None`` (default), origin and destination design blocks are
         compared and symmetry is auto-detected.
@@ -2547,15 +2571,9 @@ class SEMFlowSeparable(SEMFlow):
     priors on the individual :math:`\\lambda` components.
     """
 
+    _unrestricted_logdet = False
+
     def __init__(self, y, X, W, **kwargs):
-        method = kwargs.pop("logdet_method", None)
-        _VALID = {"eigenvalue", "chebyshev", "cheb_cholesky", "aaa", "cheb_stochastic"}
-        if method is not None and method not in _VALID:
-            raise ValueError(
-                f"SEMFlowSeparable logdet_method must be None (auto) or one of "
-                f"{sorted(_VALID)}; got {method!r}."
-            )
-        kwargs["logdet_method"] = method
         super().__init__(y, X, W, **kwargs)
 
     def _build_pymc_model(self) -> pm.Model:

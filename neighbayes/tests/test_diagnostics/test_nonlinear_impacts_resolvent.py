@@ -64,7 +64,7 @@ def test_direct_effect_trace_matches_eigen_reference(model_cls, y_kind, _design)
         if y_kind == "binary"
         else rng.poisson(2.0, size=n).astype(float)
     )
-    model = model_cls(y=y, X=X, W=_graph(W), logdet_method="cheb_cholesky")
+    model = model_cls(y=y, X=X, W=_graph(W), logdet_method="cheb", logdet_decomp="chol")
     rho = rng.uniform(0.05, 0.9, size=1500)
 
     md_res = model._batch_mean_diag(rho)
@@ -76,7 +76,7 @@ def test_zinb_selection_direct_effect_same_W(_design):
     """ZINB with shared weights reuses the count-equation resolvent helper."""
     W, n, X, rng = _design
     y = rng.poisson(2.0, size=n).astype(float)
-    model = SARZINB(y=y, X=X, W=_graph(W), logdet_method="cheb_cholesky")
+    model = SARZINB(y=y, X=X, W=_graph(W), logdet_method="cheb", logdet_decomp="chol")
     assert model._same_W is True
 
     lam = rng.uniform(0.05, 0.9, size=1500)
@@ -91,7 +91,12 @@ def test_zinb_selection_direct_effect_distinct_W(_design):
     y = rng.poisson(2.0, size=n).astype(float)
     W_zero = _rook_W(8)  # same structure, distinct object → _same_W False
     model = SARZINB(
-        y=y, X=X, W=_graph(W), W_zero=_graph(W_zero), logdet_method="cheb_cholesky"
+        y=y,
+        X=X,
+        W=_graph(W),
+        W_zero=_graph(W_zero),
+        logdet_method="cheb",
+        logdet_decomp="chol",
     )
     assert model._same_W is False
 
@@ -113,7 +118,7 @@ def test_linear_scale_impacts_use_no_eigendecomposition(model_cls, y_kind, _desi
         if y_kind == "binary"
         else rng.poisson(2.0, size=n).astype(float)
     )
-    model = model_cls(y=y, X=X, W=_graph(W), logdet_method="cheb_cholesky")
+    model = model_cls(y=y, X=X, W=_graph(W), logdet_method="cheb", logdet_decomp="chol")
 
     G = 200
     beta_draws = rng.standard_normal((1, G, X.shape[1]))

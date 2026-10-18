@@ -26,7 +26,6 @@ import scipy.sparse as sp
 
 from ..._lazy_deps import xr
 from ..._logdet._probe_check import WarmupProbes
-from ..._logdet._refit import DEFAULT_PAD_SD
 from ..._logdet._warmup import WarmupJacobian
 
 _log = logging.getLogger(__name__)
@@ -87,10 +86,7 @@ class GibbsEstimation:
         W_eigs: np.ndarray | None = None,
         logdet_method: str | None = None,
         T: int = 1,
-        logdet_refit: bool = False,
-        logdet_refit_pad_sd: float = DEFAULT_PAD_SD,
-        logdet_aaa_check: bool = False,
-        logdet_probe_check: bool = False,
+        logdet_adapt: bool = False,
         nu: float | None = None,
         jacobian_T: int | None = None,
         jacobian_shift: float = 0.0,
@@ -108,10 +104,7 @@ class GibbsEstimation:
         self.W_eigs = W_eigs
         self.logdet_method = logdet_method
         self.T = int(T)
-        self.logdet_refit = bool(logdet_refit)
-        self.logdet_refit_pad_sd = float(logdet_refit_pad_sd)
-        self.logdet_aaa_check = bool(logdet_aaa_check)
-        self.logdet_probe_check = bool(logdet_probe_check)
+        self.logdet_adapt = bool(logdet_adapt)
         self.nu = None if nu is None else float(nu)
         self.warmup_jacobian = None
         self.n, self.k = X.shape
@@ -500,27 +493,24 @@ class GibbsEstimation:
         Construction is lazy, with no factorization until evaluators are built, so
         this is cheap to call unconditionally.
         """
-        if self.W_sparse is None:
+        if self.W_sparse is None or not self.logdet_adapt:
             return None
-        if self.logdet_probe_check:
-            from ..._logdet._config import resolve_logdet_method
+        from ..._logdet._config import resolve_logdet_method
 
-            n_units = self.W_sparse.shape[0] // self.T
-            W = self.W_sparse[:n_units, :n_units] if self.T > 1 else self.W_sparse
-            if resolve_logdet_method(self.logdet_method, n=n_units, W=W) == (
-                "cheb_stochastic"
-            ):
-                wp = WarmupProbes.for_sampler(
-                    self.W_sparse,
-                    T=self.T,
-                    jacobian_T=self.jacobian_T,
-                    rho_min=self.priors.rho_lower,
-                    rho_max=self.priors.rho_upper,
-                )
-                self.warmup_jacobian = wp
-                return wp
-        if not (self.logdet_refit or self.logdet_aaa_check):
-            return None
+        n_units = self.W_sparse.shape[0] // self.T
+        W = self.W_sparse[:n_units, :n_units] if self.T > 1 else self.W_sparse
+        if resolve_logdet_method(self.logdet_method, n=n_units, W=W) == (
+            "cheb_stochastic"
+        ):
+            wp = WarmupProbes.for_sampler(
+                self.W_sparse,
+                T=self.T,
+                jacobian_T=self.jacobian_T,
+                rho_min=self.priors.rho_lower,
+                rho_max=self.priors.rho_upper,
+            )
+            self.warmup_jacobian = wp
+            return wp
         wj = WarmupJacobian.for_sampler(
             self.W_sparse,
             self.logdet_method,
@@ -528,9 +518,6 @@ class GibbsEstimation:
             jacobian_T=self.jacobian_T,
             rho_min=self.priors.rho_lower,
             rho_max=self.priors.rho_upper,
-            refit=self.logdet_refit,
-            refit_pad_sd=self.logdet_refit_pad_sd,
-            aaa_check=self.logdet_aaa_check,
         )
         if not wj.active:
             return None
@@ -818,10 +805,7 @@ class GaussianSARGibbs(GibbsEstimation):
         W_eigs: np.ndarray | None = None,
         logdet_method: str | None = None,
         T: int = 1,
-        logdet_refit: bool = False,
-        logdet_refit_pad_sd: float = DEFAULT_PAD_SD,
-        logdet_aaa_check: bool = False,
-        logdet_probe_check: bool = False,
+        logdet_adapt: bool = False,
         nu: float | None = None,
         jacobian_T: int | None = None,
         jacobian_shift: float = 0.0,
@@ -840,10 +824,7 @@ class GaussianSARGibbs(GibbsEstimation):
             W_eigs=W_eigs,
             logdet_method=logdet_method,
             T=T,
-            logdet_refit=logdet_refit,
-            logdet_refit_pad_sd=logdet_refit_pad_sd,
-            logdet_aaa_check=logdet_aaa_check,
-            logdet_probe_check=logdet_probe_check,
+            logdet_adapt=logdet_adapt,
             nu=nu,
             jacobian_T=jacobian_T,
             jacobian_shift=jacobian_shift,
@@ -899,10 +880,7 @@ class GaussianSEMGibbs(GibbsEstimation):
         W_eigs: np.ndarray | None = None,
         logdet_method: str | None = None,
         T: int = 1,
-        logdet_refit: bool = False,
-        logdet_refit_pad_sd: float = DEFAULT_PAD_SD,
-        logdet_aaa_check: bool = False,
-        logdet_probe_check: bool = False,
+        logdet_adapt: bool = False,
         nu: float | None = None,
         jacobian_T: int | None = None,
         jacobian_shift: float = 0.0,
@@ -921,10 +899,7 @@ class GaussianSEMGibbs(GibbsEstimation):
             W_eigs=W_eigs,
             logdet_method=logdet_method,
             T=T,
-            logdet_refit=logdet_refit,
-            logdet_refit_pad_sd=logdet_refit_pad_sd,
-            logdet_aaa_check=logdet_aaa_check,
-            logdet_probe_check=logdet_probe_check,
+            logdet_adapt=logdet_adapt,
             nu=nu,
             jacobian_T=jacobian_T,
             jacobian_shift=jacobian_shift,

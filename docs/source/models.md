@@ -730,56 +730,63 @@ For the unrestricted model (`SARNegBinFlow`), each ρ parameter (ρ_d, ρ_o, ρ_
 
 ## Log-Determinant Methods
 
-The spatial Jacobian $\log|I - \rho W|$ is evaluated at every MCMC draw, and is
-the term that makes large problems expensive. `logdet_method` is set on the
-**model** constructor, not on `fit()`, and both samplers honour it. Leaving it
-at `None` auto-selects by size, by whether $W$ is symmetric, and by how much
-fill-in a sparse factorization would incur.
+The log-determinant $\log|I - \rho W|$ is evaluated at every MCMC draw, and is
+the term that makes large problems expensive. Two arguments of the **model**
+constructor (not of `fit()`) choose how it is computed, and both samplers
+honour them:
 
-### Auto-selection
+- `logdet_method` is the approximation over ρ: `"exact"` evaluates it at every
+  ρ; `"cheb"`, `"aaa"` and `"spline"` interpolate exact values (Chebyshev, AAA
+  rational, cubic spline); `"stochastic"` is a stochastic Chebyshev expansion
+  (Han et al. 2015) that needs no factorization.
+- `logdet_decomp` is what supplies the exact values: `"eig"` (a dense
+  eigendecomposition), `"chol"` (sparse Cholesky through scikit-sparse's
+  CHOLMOD, for an undirected $W$) or `"lu"` (sparse LU by KLU or UMFPACK,
+  routed by the sparsity pattern, for any $W$).
+  `"auto"` takes the first of `"eig"` ($n \le 500$), `"chol"` (an undirected
+  $W$) and `"lu"` that the method is implemented on, so `"aaa"` at small $n$
+  takes `"chol"` and `"spline"` always takes `"lu"`. `"stochastic"` ignores it.
+
+| `logdet_method` | `"eig"` | `"chol"` | `"lu"` |
+|---|---|---|---|
+| `"exact"` | ✅ the reference at small $n$ | ✅ one factorization per ρ | — |
+| `"cheb"` | ✅ | ✅ | ✅ |
+| `"aaa"` | — | ✅ | ✅ |
+| `"spline"` | — | — | ✅ |
+
+Every pair except `"stochastic"` is exact up to its interpolation error; a pair
+marked — raises. Leaving both at their defaults auto-selects by size, by whether
+$W$ is undirected, and by how much fill-in a sparse factorization would incur:
 
 | $n$ | $W$ | Chosen | Why |
 |---|---|---|---|
-| ≤ 500 | any | `eigenvalue` | one $O(n^3)$ eigendecomposition, then $O(n)$ per ρ — exact and cheap at this size |
-| ≤ 60000 | symmetric | `chol_aaa` | sparse Cholesky at adaptively-chosen AAA support points; exact, root-exponential convergence |
-| ≤ 60000 | non-symmetric | `aaa` | the same rational scheme over sparse LU (KLU), for directed graphs — k-nearest-neighbour, travel time, migration |
-| > 60000 | any | `cheb_stochastic` | stochastic Chebyshev expansion; no factorization, at the cost of stochastic error |
+| ≤ 500 | any | `exact` on `eig` | one $O(n^3)$ eigendecomposition, then $O(n)$ per ρ — exact and cheap at this size |
+| ≤ 60000 | undirected | `aaa` on `chol` | sparse Cholesky at adaptively chosen AAA support points; root-exponential convergence |
+| ≤ 60000 | directed | `aaa` on `lu` | the same rational scheme over sparse LU (KLU or UMFPACK) — k-nearest-neighbour, travel time, migration |
+| > 60000 | any | `stochastic` | no factorization, at the cost of stochastic error |
 
 **Fill-in guard.** Size alone does not predict factorization cost — a dense or
 hub-dominated graph blows up under Cholesky regardless of $n$. Before
-committing to an exact path the selector estimates
+committing to a factorization the selector estimates
 $\mathrm{nnz}(W^2)/\mathrm{nnz}(W)$ in $O(\mathrm{nnz})$; if that exceeds 20 it
-warns and falls back to `cheb_stochastic`. A KNN-50 graph or a fully dense $W$
+warns and falls back to `stochastic`. A KNN-50 graph or a fully dense $W$
 at moderate $n$ takes that branch.
 
-### The full set
+**Adaptation.** With `logdet_adapt=True` (the default) the Gibbs sampler fits
+the log-determinant to where the chains are halfway through warmup: an
+interpolant is refit on that ρ range (recorded in
+`idata.attrs["logdet_refit_window"]`), AAA adds factorizations near a
+singularity, and `stochastic` grows its probe pool until the bias it leaves is
+small against the posterior sd.
 
-| Method | Exact | Notes |
-|---|---|---|
-| `eigenvalue` | ✅ | full eigendecomposition; the reference answer at small $n$ |
-| `chol_aaa` | ✅ | CHOLMOD factorizations at AAA support points; auto choice for symmetric $W$ |
-| `aaa` | ✅ | AAA rational approximation over sparse LU; handles non-symmetric $W$ |
-| `cheb_cholesky` | ✅ | sparse Cholesky at Chebyshev nodes |
-| `lu_cheb` | ✅ | sparse LU at Chebyshev nodes |
-| `chebyshev` | ✅ | deterministic Chebyshev from exact eigenvalues |
-| `cholmod` | ✅ | JAX-native sparse CHOLMOD; requires `sparsax` |
-| `grid_spline` | ≈ | spline interpolation over a precomputed ρ grid |
-| `cheb_stochastic` | ✗ | stochastic Chebyshev (Han et al. 2015); auto choice above the cutoff |
-| `slq` | ✗ | Stochastic Lanczos Quadrature, D-symmetrised |
-| `traces` | ✗ | truncated trace series; legacy, retained for the flow NUTS path |
-
-Flow models take an additional value, `"resolvent"`, which is their default for
-the unrestricted three-ρ case: it samples via the resolvent-Kronecker gradient
-rather than evaluating a scalar log-determinant.
+**Flows.** The unrestricted three-ρ flow models take `"trace_series"` (exact,
+from trace moments of the $n \times n$ $W$) or `"resolvent"` (a stochastic
+resolvent estimator whose accuracy improves with the flow sample size, run on
+`fit(backend=...)`); `None` takes the trace series for an undirected $W$ and
+the resolvent for a directed one. The separable flows factor the
+log-determinant into $n \times n$ terms and take the single-$W$ methods above.
 
 Cutoffs are configurable through the environment:
 `NEIGHBAYES_LOGDET_EIGEN_MAX_N` (default 500),
-`NEIGHBAYES_LOGDET_CHEB_MAX_N` (default 60000), and
+`NEIGHBAYES_LOGDET_FACTOR_MAX_N` (default 60000), and
 `NEIGHBAYES_LOGDET_MAX_FILLIN_RATIO` (default 20).
-
-The constructor reports the valid names on a bad value, so the list above can
-be checked against any installation:
-
-```python
-SAR(y=y, X=X, W=W, logdet_method="?")   # ValueError lists every valid option
-```

@@ -14,6 +14,7 @@ from libpysal.graph import Graph
 from .._backends.sampler_helpers import jax_available, select_backend
 from .._lazy_deps import pm, xr
 from .._logdet import (
+    logdet_key,
     resolve_logdet_bounds,
 )
 from ._base._shared import (
@@ -52,28 +53,22 @@ class SpatialModel(SharedSpatialMethods, ABC):
     priors : dict, optional
         Override default priors. Keys depend on the model subclass; see
         each model's docstring for supported keys.
-    logdet_method : str, optional
-        How to compute ``log|I - rho*W|``.  ``None`` (default) auto-selects
-        from the size and symmetry of ``W``:
-
-        - ``"eigenvalue"`` for ``n <= 500``: exact; one ``O(n^3)``
-          eigendecomposition, then ``O(n)`` per evaluation.
-        - ``"cheb_cholesky"`` for symmetric ``W`` (undirected graph) with
-          ``n <= 20000``: exact; sparse Cholesky at Chebyshev nodes with
-          symbolic reuse, then ~1.3 us per rho via Clenshaw recurrence.
-        - ``"aaa"`` for non-symmetric ``W`` (directed graph: KNN, travel
-          time, flows) with ``n <= 20000``: exact; sparse LU on an adaptive
-          coarse grid with AAA rational interpolation, ~5 us per rho.
-        - ``"cheb_stochastic"`` for larger ``n``, where factorization
-          fill-in gets expensive: stochastic Chebyshev expansion (Han et
-          al. 2015), with probe information computed once and reused.
-
-        Both cutoffs are settable via the ``NEIGHBAYES_LOGDET_EIGEN_MAX_N``
-        and ``NEIGHBAYES_LOGDET_CHEB_MAX_N`` environment variables.
-        ``"chebyshev"`` (Barry-Pace Hutchinson stochastic traces) and
-        ``"slq"`` (stochastic Lanczos quadrature) are available as explicit
-        opt-ins; both inject stochastic error into the log-density.  The
-        resolved choice is recorded on ``_resolved_logdet_method``.
+    logdet_method : {"exact", "cheb", "aaa", "spline", "stochastic"}, optional
+        How ``log|I - rho*W|`` is approximated over rho: evaluated exactly at
+        every rho, interpolated (Chebyshev, AAA rational, or cubic spline)
+        through exact values, or expanded stochastically with no
+        factorization.  ``None`` (default) selects from the size and symmetry
+        of ``W``: ``"exact"`` for ``n <= 500``; ``"aaa"`` up to
+        ``n = 60000`` (``NEIGHBAYES_LOGDET_FACTOR_MAX_N``) unless the
+        factorization's fill-in would dominate; ``"stochastic"`` beyond.
+    logdet_decomp : {"auto", "eig", "chol", "lu"}, default "auto"
+        What supplies the exact values: a dense eigendecomposition, a sparse
+        Cholesky (undirected ``W``; scikit-sparse CHOLMOD) or a sparse LU.
+        ``"auto"`` takes the first of ``"eig"`` (``n <= 500``,
+        ``NEIGHBAYES_LOGDET_EIGEN_MAX_N``), ``"chol"`` (undirected ``W``) and
+        ``"lu"`` that the method is implemented on.  Ignored by
+        ``"stochastic"``.  A pair with no implementation (``"spline"`` on
+        ``"chol"``, ``"exact"`` on ``"lu"``) raises.
     robust : bool, default False
         If True, use a Student-t error distribution instead of Normal,
         yielding a model that is robust to heavy-tailed outliers. When
@@ -87,7 +82,20 @@ class SpatialModel(SharedSpatialMethods, ABC):
         By default all non-constant columns are lagged. Pass a subset to
         restrict which variables receive a spatial lag, e.g.
         ``durbin_vars=["income", "density"]``.
-
+    logdet_adapt : bool, default True
+        Halfway through warmup, let the Gibbs sampler fit the log-determinant
+        to where the chains have found the posterior rather than to the prior
+        interval.  An interpolant on Cholesky or LU values (``"cheb"``,
+        ``"aaa"``) is refit on that range, padded by ten warmup standard
+        deviations; the window becomes the sampler's support, is recorded in
+        ``idata.attrs["logdet_refit_window"]``, and a warning is raised if the
+        retained draws reach an edge it introduced.  ``"aaa"`` also adds exact
+        factorizations when the posterior lies near a singularity
+        (``idata.attrs["logdet_aaa_nodes"]``).  ``"stochastic"`` grows its
+        Hutchinson probes, from 50 to at most 200, until the bias they leave
+        in the posterior mean of the spatial parameter is expected to stay
+        under 0.0225 posterior sd (``idata.attrs["logdet_probes"]``).
+        ``False`` keeps the fit on the prior interval.
     Attributes
     ----------
     _spatial_params : tuple[str, ...]
@@ -135,10 +143,8 @@ class SpatialModel(SharedSpatialMethods, ABC):
         logdet_method: str | None = None,
         robust: bool = False,
         durbin_vars: Optional[list] = None,
-        logdet_refit: bool = True,
-        logdet_refit_pad_sd: float = 10.0,
-        logdet_aaa_check: bool = True,
-        logdet_probe_check: bool = True,
+        logdet_decomp: str = "auto",
+        logdet_adapt: bool = True,
     ):
         # Resolve typed priors (dataclass) and dict view.
         from .priors import BasePriors, priors_as_dict, resolve_priors
@@ -147,11 +153,9 @@ class SpatialModel(SharedSpatialMethods, ABC):
         self.priors_obj = resolve_priors(priors, _priors_cls)
         self.priors = priors_as_dict(self.priors_obj)
         self.logdet_method = logdet_method
+        self.logdet_decomp = logdet_decomp
+        self.logdet_adapt = bool(logdet_adapt)
         self.robust = robust
-        self.logdet_refit = bool(logdet_refit)
-        self.logdet_refit_pad_sd = float(logdet_refit_pad_sd)
-        self.logdet_aaa_check = bool(logdet_aaa_check)
-        self.logdet_probe_check = bool(logdet_probe_check)
 
         self._idata: Optional[xr.DataTree] = None
         self._pymc_model: Optional[pm.Model] = None
@@ -180,7 +184,12 @@ class SpatialModel(SharedSpatialMethods, ABC):
             # interval is approximately (-1, 1), so no eigenvalues are needed
             # to resolve the bounds either.
             self._logdet_bounds = resolve_logdet_bounds(
-                self.logdet_method,
+                logdet_key(
+                    self.logdet_method,
+                    self.logdet_decomp,
+                    n=len(self._y),
+                    W=self._W_sparse,
+                ),
                 n=len(self._y),
                 priors=self.priors,
                 W=self._W_sparse,
@@ -505,9 +514,9 @@ class SpatialModel(SharedSpatialMethods, ABC):
         sampler_builds_logdet = sampler_builds_evaluators(
             self._logdet_bounds.method,
             self._W_sparse is not None,
-            self.logdet_refit,
-            self.logdet_aaa_check,
-            self.logdet_probe_check,
+            self.logdet_adapt,
+            self.logdet_adapt,
+            self.logdet_adapt,
         )
         gibbs_kwargs: dict[str, Any] = dict(
             y=self._y,
@@ -524,10 +533,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
             model_type=self._model_type,
             W_eigs=self._logdet_eigs,
             logdet_method=self._logdet_bounds.method,
-            logdet_refit=self.logdet_refit,
-            logdet_refit_pad_sd=self.logdet_refit_pad_sd,
-            logdet_aaa_check=self.logdet_aaa_check,
-            logdet_probe_check=self.logdet_probe_check,
+            logdet_adapt=self.logdet_adapt,
         )
         # SAR/SDM need Wy; SEM/SDEM do not
         if self._jacobian_param == "rho":

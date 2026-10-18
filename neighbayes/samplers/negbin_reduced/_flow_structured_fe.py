@@ -359,8 +359,14 @@ class StructuredEquation:
 
     # --- one Gibbs update ------------------------------------------------
 
-    def update(self, Oms: np.ndarray, z: np.ndarray, rng, tuning: bool,
-               pair_live: np.ndarray | None = None) -> None:
+    def update(
+        self,
+        Oms: np.ndarray,
+        z: np.ndarray,
+        rng,
+        tuning: bool,
+        pair_live: np.ndarray | None = None,
+    ) -> None:
         """Draw ``ρ``, then ``(β, τ)``, then ``C`` given ``(T, n, n)`` working data.
 
         ``pair_live`` (``(n, n)`` bool) masks pairs out of the learned-sd
@@ -586,7 +592,9 @@ def run_chain_separable_structured_fe(
             grand = Yl.sum() / m3.sum()
             C_init = np.log(pair_mean + 0.5) - np.log(grand + 0.5) + pair_effects[0]
         else:
-            C_init = np.log(Y.mean(axis=0) + 0.5) - np.log(Y.mean() + 0.5) + pair_effects[0]
+            C_init = (
+                np.log(Y.mean(axis=0) + 0.5) - np.log(Y.mean() + 0.5) + pair_effects[0]
+            )
     eq = StructuredEquation(
         X,
         W_csc,
@@ -634,8 +642,13 @@ def run_chain_separable_structured_fe(
             z = np.where(cell_mask, z, 0.0)
         else:
             z = 0.5 * (y - alpha) / omega + np.log(alpha)
-        eq.update(omega.reshape(T, n, n), z.reshape(T, n, n), rng,
-                  tuning=it < tune, pair_live=pair_live)
+        eq.update(
+            omega.reshape(T, n, n),
+            z.reshape(T, n, n),
+            rng,
+            tuning=it < tune,
+            pair_live=pair_live,
+        )
         eq.exact_sd_move(lambda e: nb_eta_loglik(y3, e, alpha, mask3), rng)
         st = _StructuralState(
             eta=eq.eta.ravel(),
@@ -645,8 +658,9 @@ def run_chain_separable_structured_fe(
             alpha=alpha,
             omega=omega,
         )
-        alpha = _sample_alpha(st, y, core_priors, rng=rng, cell_mask=cell_mask,
-                              y_tab=y_tab)
+        alpha = _sample_alpha(
+            st, y, core_priors, rng=rng, cell_mask=cell_mask, y_tab=y_tab
+        )
 
         if it >= tune and (it - tune) % thin == 0:
             j = (it - tune) // thin

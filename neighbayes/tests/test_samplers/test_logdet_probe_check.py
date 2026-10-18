@@ -64,13 +64,15 @@ class TestProbeCheckFit:
     def test_agrees_with_the_exact_logdet(self, data, backend, model_cls):
         import arviz as az
 
-        exact_idata, exact = _fit(model_cls, data, backend, logdet_method="eigenvalue")
+        exact_idata, exact = _fit(
+            model_cls, data, backend, logdet_method="exact", logdet_decomp="eig"
+        )
         idata, draws = _fit(
             model_cls,
             data,
             backend,
-            logdet_method="cheb_stochastic",
-            logdet_probe_check=True,
+            logdet_method="stochastic",
+            logdet_adapt=True,
         )
         name = "rho" if model_cls is SAR else "lam"
         ess_e = float(az.ess(exact_idata, var_names=[name])[name])
@@ -84,8 +86,8 @@ class TestProbeCheckFit:
             model_cls,
             data,
             backend,
-            logdet_method="cheb_stochastic",
-            logdet_probe_check=True,
+            logdet_method="stochastic",
+            logdet_adapt=True,
         )
         a = idata.attrs
         assert a["logdet_probes"] >= DEFAULT_PROBE_MIN
@@ -96,22 +98,25 @@ class TestProbeCheckFit:
 
 @pytest.mark.parametrize("backend", BACKENDS)
 def test_on_by_default(data, backend):
-    idata, _ = _fit(SAR, data, backend, logdet_method="cheb_stochastic")
+    idata, _ = _fit(SAR, data, backend, logdet_method="stochastic")
     assert idata.attrs["logdet_probes"] >= DEFAULT_PROBE_MIN
 
 
 @pytest.mark.parametrize("backend", BACKENDS)
 def test_off_records_nothing(data, backend):
-    idata, _ = _fit(
-        SAR, data, backend, logdet_method="cheb_stochastic", logdet_probe_check=False
-    )
+    idata, _ = _fit(SAR, data, backend, logdet_method="stochastic", logdet_adapt=False)
     assert "logdet_probes" not in idata.attrs
 
 
 @pytest.mark.parametrize("backend", BACKENDS)
 def test_other_methods_ignore_the_flag(data, backend):
     idata, _ = _fit(
-        SAR, data, backend, logdet_method="cheb_cholesky", logdet_probe_check=True
+        SAR,
+        data,
+        backend,
+        logdet_method="cheb",
+        logdet_decomp="chol",
+        logdet_adapt=True,
     )
     assert "logdet_probes" not in idata.attrs
 

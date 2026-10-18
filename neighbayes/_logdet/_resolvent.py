@@ -5,8 +5,8 @@ Every entry point returns the **logdet gradient**
     g(ρ) = d/dρ log|I − ρW| = −tr(W (I − ρW)⁻¹)                       (Jacobi)
 
 as a closed form of a representation that some existing precompute already
-produces (eigenvalues, Chebyshev coefficients, AAA support points/weights, or
-SLQ quadrature rules).  Because each formula is the *analytic derivative of the
+produces (eigenvalues, Chebyshev coefficients, or AAA support points and
+weights).  Because each formula is the *analytic derivative of the
 corresponding value surrogate*, it agrees with ``jax.grad`` / ``pytensor.grad``
 of that surrogate to machine precision — the numpy path in
 :func:`neighbayes._logdet.make_logdet_grad_numpy_fn` and the autodiff paths
@@ -38,7 +38,6 @@ __all__ = [
     "logdet_grad_eigenvalue",
     "logdet_grad_chebyshev",
     "logdet_grad_aaa",
-    "logdet_grad_slq",
     "clenshaw_deriv_x",
 ]
 
@@ -83,8 +82,8 @@ def logdet_grad_chebyshev(rho, coeffs, rmin=-1.0, rmax=1.0, *, xp=np):
     """``g(ρ)`` for a Chebyshev-in-ρ logdet surrogate ``Σ_j coeffs[j] T_j(x(ρ))``.
 
     ``x(ρ) = (2ρ − rmax − rmin)/(rmax − rmin)`` so ``dx/dρ = 2/(rmax − rmin)``.
-    Serves the ``chebyshev``, ``cheb_cholesky``, ``cheb_stochastic``, and
-    ``slq→chebyshev`` methods (all share this coefficient representation).
+    Serves the ``chebyshev``, ``cheb_cholesky``, ``lu_cheb`` and
+    ``cheb_stochastic`` keys (all share this coefficient representation).
     """
     x = (2.0 * rho - rmax - rmin) / (rmax - rmin)
     dxdrho = 2.0 / (rmax - rmin)
@@ -110,27 +109,3 @@ def logdet_grad_aaa(rho, support_points, support_values, weights, *, xp=np):
     dn = -xp.sum(inv2 * f)
     dd = -xp.sum(inv2)
     return (dn * d_val - n_val * dd) / d_val**2
-
-
-def logdet_grad_slq(rho, nodes, weights, n_probes, *, cv_coeffs=None, xp=np):
-    """``g(ρ) = −(1/P) Re(Σ wᵢθᵢ/(1 − ρθᵢ))`` — the SLQ resolvent-trace estimate.
-
-    The analytic derivative of the frozen-probe SLQ surrogate
-    ``(1/P) Σ wᵢ log(1 − ρθᵢ)``.  Real (Lanczos) and complex (Arnoldi) rules are
-    handled by the same expression; ``real`` keeps the Arnoldi cross term.
-
-    ``cv_coeffs`` carries the exact-moment control variate of
-    :func:`~._slq._slq_cv_coeffs`.  It must be differentiated with the value it
-    corrects, or the gradient stops being the derivative of the function the
-    evaluator returns: the correction ``Σⱼ (ρʲ/j)·cⱼ`` contributes
-    ``Σⱼ ρ^{j-1}·cⱼ``.
-    """
-    theta = xp.asarray(nodes)
-    w = xp.asarray(weights)
-    res = w * theta / (1.0 - rho * theta)
-    grad = -xp.real(xp.sum(res)) / n_probes
-    if cv_coeffs is not None and len(cv_coeffs) > 0:
-        c = xp.asarray(cv_coeffs)
-        j = xp.arange(1, len(cv_coeffs) + 1)
-        grad = grad + xp.sum(rho ** (j - 1) * c)
-    return grad

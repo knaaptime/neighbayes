@@ -61,7 +61,8 @@ _log = logging.getLogger(__name__)
 #: probe noise rather than by the interval, so narrowing it buys nothing.
 REFITTABLE_METHODS = frozenset({"cheb_cholesky", "lu_cheb", "aaa", "chol_aaa"})
 
-#: Default padding, in warmup posterior standard deviations.
+#: Padding of the refit window, in warmup posterior standard deviations.  At ten
+#: the truncated tail is ~1e-23 under normality, for a node or two at most.
 DEFAULT_PAD_SD = 10.0
 
 #: Default absolute error target for the refit.  Tight on purpose: on a narrow
@@ -269,8 +270,8 @@ def boundary_warning(
         "Post-warmup draws of the spatial parameter reached the "
         + " and ".join(hits)
         + " of the warmup-refit window, so the reported posterior is truncated "
-        "there. Increase `logdet_refit_pad_sd`, lengthen warmup, or disable the "
-        "refit with `logdet_refit=False`."
+        "there. Lengthen warmup, or keep the fit on the prior interval with "
+        "`logdet_adapt=False`."
     )
 
 

@@ -291,53 +291,36 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
     priors : dict, optional
         Override default priors. Supported keys depend on the subclass;
         each subclass docstring lists its keys with defaults.
-    logdet_method : str, optional
-        How to compute :math:`\\log|I - \\rho W|`. ``None`` (default)
-        auto-selects from the size and symmetry of the cross-sectional
-        ``N x N`` weights: ``"eigenvalue"`` for ``N <= 500``; for
-        ``N <= 20000`` the exact interpolating methods ``"cheb_cholesky"``
-        (symmetric ``W``) or ``"aaa"`` (non-symmetric ``W``); and
-        ``"cheb_stochastic"`` above that.  Stochastic opt-ins
-        (``"chebyshev"``, ``"slq"``) and the environment variables
-        controlling the cutoffs are documented on the cross-sectional
-        ``SpatialModel`` base class.
-    logdet_refit : bool, default True
-        Rebuild the log-determinant interpolant halfway through warmup, on
-        the range the chains have found rather than the interval implied by
-        the prior.  A warmup posterior is typically one to two orders of
-        magnitude narrower than the prior, which needs far fewer interpolation
-        nodes and drives the approximation error over the posterior's support
-        down to the factorization's roundoff floor.  Applies to
-        ``"cheb_cholesky"``, ``"lu_cheb"``, ``"aaa"`` and ``"chol_aaa"``;
-        ignored otherwise.
-
-        The interpolant is only valid on its interval, so the refit window
-        becomes the sampler's support.  The window is padded by
-        ``logdet_refit_pad_sd`` warmup standard deviations, recorded in
-        ``idata.attrs["logdet_refit_window"]``, and a warning is raised if
-        the retained draws ever reach an edge the refit introduced.
-    logdet_refit_pad_sd : float, default 10.0
-        Padding for the refit window, in warmup posterior standard
-        deviations.  At the default the truncated tail is ~1e-23 under
-        normality, and the padding costs a node or two at most.
-    logdet_aaa_check : bool, default True
-        For the AAA methods (``"aaa"``, ``"chol_aaa"``), set the number of
-        exact factorizations from where the posterior lies.  Warmup starts on a
-        14-node fit; halfway through, nodes are added only if the warmup
-        posterior lies closer to a singularity of the Jacobian than four times
-        the distance at which the fit's poles resolve it.  The count used is
-        recorded in ``idata.attrs["logdet_aaa_nodes"]``.  Off, or on a path
-        without a warmup midpoint, the count is fixed by the prior interval:
-        14 nodes within ``|ρ| ≤ 0.9``, 18 otherwise.
-    logdet_probe_check : bool, default True
-        For ``"cheb_stochastic"``, set the number of Hutchinson probes from
-        where the posterior lies.  Warmup starts on 50 probes; halfway through,
-        the probes' own spread prices the bias they leave in the posterior mean
-        of the spatial parameter, and the pool grows, to at most 200, until
-        that bias is expected to stay under 0.0225 posterior sd.  The count
-        used is recorded in ``idata.attrs["logdet_probes"]``, with a warning
-        if the cap is reached first.  Probes cost setup time only; the cost of
-        each draw does not depend on how many there are.
+    logdet_method : {"exact", "cheb", "aaa", "spline", "stochastic"}, optional
+        How ``log|I - rho*W|`` is approximated over rho: evaluated exactly at
+        every rho, interpolated (Chebyshev, AAA rational, or cubic spline)
+        through exact values, or expanded stochastically with no
+        factorization.  ``None`` (default) selects from the size and symmetry
+        of the cross-sectional ``N x N`` ``W``: ``"exact"`` for ``n <= 500``; ``"aaa"`` up to
+        ``n = 60000`` (``NEIGHBAYES_LOGDET_FACTOR_MAX_N``) unless the
+        factorization's fill-in would dominate; ``"stochastic"`` beyond.
+    logdet_decomp : {"auto", "eig", "chol", "lu"}, default "auto"
+        What supplies the exact values: a dense eigendecomposition, a sparse
+        Cholesky (undirected ``W``; scikit-sparse CHOLMOD) or a sparse LU.
+        ``"auto"`` takes the first of ``"eig"`` (``n <= 500``,
+        ``NEIGHBAYES_LOGDET_EIGEN_MAX_N``), ``"chol"`` (undirected ``W``) and
+        ``"lu"`` that the method is implemented on.  Ignored by
+        ``"stochastic"``.  A pair with no implementation (``"spline"`` on
+        ``"chol"``, ``"exact"`` on ``"lu"``) raises.
+    logdet_adapt : bool, default True
+        Halfway through warmup, let the Gibbs sampler fit the log-determinant
+        to where the chains have found the posterior rather than to the prior
+        interval.  An interpolant on Cholesky or LU values (``"cheb"``,
+        ``"aaa"``) is refit on that range, padded by ten warmup standard
+        deviations; the window becomes the sampler's support, is recorded in
+        ``idata.attrs["logdet_refit_window"]``, and a warning is raised if the
+        retained draws reach an edge it introduced.  ``"aaa"`` also adds exact
+        factorizations when the posterior lies near a singularity
+        (``idata.attrs["logdet_aaa_nodes"]``).  ``"stochastic"`` grows its
+        Hutchinson probes, from 50 to at most 200, until the bias they leave
+        in the posterior mean of the spatial parameter is expected to stay
+        under 0.0225 posterior sd (``idata.attrs["logdet_probes"]``).
+        ``False`` keeps the fit on the prior interval.
     robust : bool, default False
         If True, replace the Normal error with Student-t for robustness
         to heavy-tailed outliers.  The degrees of freedom :math:`\\nu` are
@@ -392,10 +375,8 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         logdet_method: str | None = None,
         robust: bool = False,
         durbin_vars: Optional[list] = None,
-        logdet_refit: bool = True,
-        logdet_refit_pad_sd: float = 10.0,
-        logdet_aaa_check: bool = True,
-        logdet_probe_check: bool = True,
+        logdet_decomp: str = "auto",
+        logdet_adapt: bool = True,
     ):
         if W is None:
             raise ValueError("W is required.")
@@ -407,10 +388,8 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         self.priors_obj = resolve_priors(priors, _priors_cls)
         self.priors = priors_as_dict(self.priors_obj)
         self.logdet_method = logdet_method
-        self.logdet_refit = bool(logdet_refit)
-        self.logdet_refit_pad_sd = float(logdet_refit_pad_sd)
-        self.logdet_aaa_check = bool(logdet_aaa_check)
-        self.logdet_probe_check = bool(logdet_probe_check)
+        self.logdet_decomp = logdet_decomp
+        self.logdet_adapt = bool(logdet_adapt)
         self.model = _resolve_effects(effects)
         self.effects = _EFFECTS_NAMES[self.model]
         self.robust = robust
@@ -496,10 +475,15 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         # For row-standardized W the spectral stability interval is
         # always approximately (-1, 1), so no eigenvalue computation
         # is needed here.
-        from .._logdet import resolve_logdet_bounds
+        from .._logdet import logdet_key, resolve_logdet_bounds
 
         self._logdet_bounds = resolve_logdet_bounds(
-            self.logdet_method,
+            logdet_key(
+                self.logdet_method,
+                self.logdet_decomp,
+                n=self._W_sparse.shape[0],
+                W=self._W_sparse,
+            ),
             n=self._W_sparse.shape[0],
             priors=self.priors,
             W=self._W_sparse,
@@ -984,9 +968,9 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         sampler_builds_logdet = sampler_builds_evaluators(
             method,
             self._W_sparse_NT is not None,
-            self.logdet_refit,
-            self.logdet_aaa_check,
-            self.logdet_probe_check,
+            self.logdet_adapt,
+            self.logdet_adapt,
+            self.logdet_adapt,
         )
 
         gibbs_kwargs: dict[str, Any] = dict(
@@ -1007,10 +991,7 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
             jacobian_T=self._jacobian_T,
             jacobian_shift=self._jacobian_shift,
             n_eff=self._n_effective,
-            logdet_refit=self.logdet_refit,
-            logdet_refit_pad_sd=self.logdet_refit_pad_sd,
-            logdet_aaa_check=self.logdet_aaa_check,
-            logdet_probe_check=self.logdet_probe_check,
+            logdet_adapt=self.logdet_adapt,
         )
         # SAR/SDM need Wy; SEM/SDEM do not.
         if self._jacobian_param == "rho":

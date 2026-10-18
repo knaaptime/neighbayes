@@ -167,12 +167,10 @@ def _refit_on_train(
         W=W_train,
         priors=model.priors_obj,
         logdet_method=model.logdet_method,
+        logdet_decomp=model.logdet_decomp,
+        logdet_adapt=model.logdet_adapt,
         robust=model.robust,
         durbin_vars=model._wx_feature_names if W_train is not None else None,
-        logdet_refit=model.logdet_refit,
-        logdet_refit_pad_sd=model.logdet_refit_pad_sd,
-        logdet_aaa_check=model.logdet_aaa_check,
-        logdet_probe_check=model.logdet_probe_check,
     )
     new.fit(**fit_kwargs)
     return new

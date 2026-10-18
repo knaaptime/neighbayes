@@ -79,7 +79,7 @@ import numpy as np
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 
-from ._slq import _recover_symmetrizing_diagonal
+from ._symmetrize import _recover_symmetrizing_diagonal
 
 #: Default number of exact low-order moments.  ``d = 4`` needs a single
 #: sparse-sparse product (``W²``) and captures most of the available variance

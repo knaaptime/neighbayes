@@ -143,7 +143,9 @@ class TestCrossSectionalLogLikelihood:
         _assert_valid_log_likelihood(idata, self.n, "SLX")
 
     def test_sar_log_likelihood(self):
-        model = SAR(y=self.y, X=self.X, W=self.W, logdet_method="eigenvalue")
+        model = SAR(
+            y=self.y, X=self.X, W=self.W, logdet_method="exact", logdet_decomp="eig"
+        )
         idata = model.fit(
             draws=10,
             tune=5,
@@ -155,7 +157,9 @@ class TestCrossSectionalLogLikelihood:
         _assert_valid_log_likelihood(idata, self.n, "SAR")
 
     def test_sem_log_likelihood(self):
-        model = SEM(y=self.y, X=self.X, W=self.W, logdet_method="eigenvalue")
+        model = SEM(
+            y=self.y, X=self.X, W=self.W, logdet_method="exact", logdet_decomp="eig"
+        )
         idata = model.fit(
             draws=10,
             tune=5,
@@ -167,7 +171,9 @@ class TestCrossSectionalLogLikelihood:
         _assert_valid_log_likelihood(idata, self.n, "SEM")
 
     def test_sdm_log_likelihood(self):
-        model = SDM(y=self.y, X=self.X, W=self.W, logdet_method="eigenvalue")
+        model = SDM(
+            y=self.y, X=self.X, W=self.W, logdet_method="exact", logdet_decomp="eig"
+        )
         idata = model.fit(
             draws=10,
             tune=5,
@@ -179,7 +185,9 @@ class TestCrossSectionalLogLikelihood:
         _assert_valid_log_likelihood(idata, self.n, "SDM")
 
     def test_sdem_log_likelihood(self):
-        model = SDEM(y=self.y, X=self.X, W=self.W, logdet_method="eigenvalue")
+        model = SDEM(
+            y=self.y, X=self.X, W=self.W, logdet_method="exact", logdet_decomp="eig"
+        )
         idata = model.fit(
             draws=10,
             tune=5,
@@ -204,7 +212,9 @@ class TestTobitLogLikelihood:
         self.y, self.X, self.W, self.W_dense, self.n = _tobit_data()
 
     def test_sar_tobit_log_likelihood(self):
-        model = SARTobit(y=self.y, X=self.X, W=self.W, logdet_method="eigenvalue")
+        model = SARTobit(
+            y=self.y, X=self.X, W=self.W, logdet_method="exact", logdet_decomp="eig"
+        )
         idata = model.fit(
             draws=10,
             tune=5,
@@ -216,7 +226,9 @@ class TestTobitLogLikelihood:
         _assert_valid_log_likelihood(idata, self.n, "SARTobit")
 
     def test_sem_tobit_log_likelihood(self):
-        model = SEMTobit(y=self.y, X=self.X, W=self.W, logdet_method="eigenvalue")
+        model = SEMTobit(
+            y=self.y, X=self.X, W=self.W, logdet_method="exact", logdet_decomp="eig"
+        )
         idata = model.fit(
             draws=10,
             tune=5,
@@ -228,7 +240,9 @@ class TestTobitLogLikelihood:
         _assert_valid_log_likelihood(idata, self.n, "SEMTobit")
 
     def test_sdm_tobit_log_likelihood(self):
-        model = SDMTobit(y=self.y, X=self.X, W=self.W, logdet_method="eigenvalue")
+        model = SDMTobit(
+            y=self.y, X=self.X, W=self.W, logdet_method="exact", logdet_decomp="eig"
+        )
         idata = model.fit(
             draws=10,
             tune=5,
@@ -274,7 +288,8 @@ class TestPanelFELogLikelihood:
             W=self.W,
             N=self.N,
             T=self.T,
-            logdet_method="eigenvalue",
+            logdet_method="exact",
+            logdet_decomp="eig",
         )
         idata = model.fit(
             draws=10,
@@ -294,7 +309,8 @@ class TestPanelFELogLikelihood:
             W=self.W,
             N=self.N,
             T=self.T,
-            logdet_method="eigenvalue",
+            logdet_method="exact",
+            logdet_decomp="eig",
         )
         idata = model.fit(
             draws=10,
@@ -314,7 +330,8 @@ class TestPanelFELogLikelihood:
             W=self.W,
             N=self.N,
             T=self.T,
-            logdet_method="eigenvalue",
+            logdet_method="exact",
+            logdet_decomp="eig",
         )
         idata = model.fit(
             draws=10,
@@ -334,7 +351,8 @@ class TestPanelFELogLikelihood:
             W=self.W,
             N=self.N,
             T=self.T,
-            logdet_method="eigenvalue",
+            logdet_method="exact",
+            logdet_decomp="eig",
         )
         idata = model.fit(
             draws=10,
@@ -381,7 +399,8 @@ class TestPanelRELogLikelihood:
             W=self.W,
             N=self.N,
             T=self.T,
-            logdet_method="eigenvalue",
+            logdet_method="exact",
+            logdet_decomp="eig",
         )
         idata = model.fit(
             draws=10,
@@ -401,7 +420,8 @@ class TestPanelRELogLikelihood:
             W=self.W,
             N=self.N,
             T=self.T,
-            logdet_method="eigenvalue",
+            logdet_method="exact",
+            logdet_decomp="eig",
         )
         idata = model.fit(
             draws=10,
@@ -433,7 +453,8 @@ class TestPanelTobitLogLikelihood:
             W=self.W,
             N=self.N,
             T=self.T,
-            logdet_method="eigenvalue",
+            logdet_method="exact",
+            logdet_decomp="eig",
         )
         idata = model.fit(
             draws=10,
@@ -452,7 +473,8 @@ class TestPanelTobitLogLikelihood:
             W=self.W,
             N=self.N,
             T=self.T,
-            logdet_method="eigenvalue",
+            logdet_method="exact",
+            logdet_decomp="eig",
         )
         idata = model.fit(
             draws=10,
@@ -481,7 +503,7 @@ class TestLogLikelihoodStructureFast:
     def test_sar_fit_adds_log_likelihood(self, monkeypatch):
         """SAR fit() should add log_likelihood with Jacobian correction."""
         y, X, W, W_dense, n = _cross_section_data()
-        model = SAR(y=y, X=X, W=W, logdet_method="eigenvalue")
+        model = SAR(y=y, X=X, W=W, logdet_method="exact", logdet_decomp="eig")
 
         posterior = {
             "rho": np.array([[0.3, 0.31]]),
@@ -509,7 +531,7 @@ class TestLogLikelihoodStructureFast:
     def test_sem_fit_adds_log_likelihood(self, monkeypatch):
         """SEM fit() should add log_likelihood computed from Potential."""
         y, X, W, W_dense, n = _cross_section_data()
-        model = SEM(y=y, X=X, W=W, logdet_method="eigenvalue")
+        model = SEM(y=y, X=X, W=W, logdet_method="exact", logdet_decomp="eig")
 
         posterior = {
             "lam": np.array([[0.3, 0.31]]),
@@ -537,7 +559,7 @@ class TestLogLikelihoodStructureFast:
     def test_sdm_fit_adds_log_likelihood(self, monkeypatch):
         """SDM fit() should add log_likelihood with Jacobian correction."""
         y, X, W, W_dense, n = _cross_section_data()
-        model = SDM(y=y, X=X, W=W, logdet_method="eigenvalue")
+        model = SDM(y=y, X=X, W=W, logdet_method="exact", logdet_decomp="eig")
 
         posterior = {
             "rho": np.array([[0.3, 0.31]]),
@@ -565,7 +587,7 @@ class TestLogLikelihoodStructureFast:
     def test_sdem_fit_adds_log_likelihood(self, monkeypatch):
         """SDEM fit() should add log_likelihood computed from Potential."""
         y, X, W, W_dense, n = _cross_section_data()
-        model = SDEM(y=y, X=X, W=W, logdet_method="eigenvalue")
+        model = SDEM(y=y, X=X, W=W, logdet_method="exact", logdet_decomp="eig")
 
         posterior = {
             "lam": np.array([[0.3, 0.31]]),
@@ -593,7 +615,7 @@ class TestLogLikelihoodStructureFast:
     def test_sem_panel_fe_fit_adds_log_likelihood(self, monkeypatch):
         """SEMPanelFE fit() should add log_likelihood computed from Potential."""
         y, X, W, W_dense, N, T, n = _panel_data()
-        model = SEM(y=y, X=X, W=W, N=N, T=T, logdet_method="eigenvalue")
+        model = SEM(y=y, X=X, W=W, N=N, T=T, logdet_method="exact", logdet_decomp="eig")
 
         posterior = {
             "lam": np.array([[0.1, 0.11]]),
@@ -621,7 +643,9 @@ class TestLogLikelihoodStructureFast:
     def test_sdem_panel_fe_fit_adds_log_likelihood(self, monkeypatch):
         """SDEMPanelFE fit() should add log_likelihood computed from Potential."""
         y, X, W, W_dense, N, T, n = _panel_data()
-        model = SDEM(y=y, X=X, W=W, N=N, T=T, logdet_method="eigenvalue")
+        model = SDEM(
+            y=y, X=X, W=W, N=N, T=T, logdet_method="exact", logdet_decomp="eig"
+        )
 
         posterior = {
             "lam": np.array([[0.1, 0.11]]),
@@ -649,7 +673,7 @@ class TestLogLikelihoodStructureFast:
     def test_sar_panel_fe_fit_adds_log_likelihood(self, monkeypatch):
         """SARPanelFE fit() should add Jacobian-corrected log_likelihood."""
         y, X, W, W_dense, N, T, n = _panel_data()
-        model = SAR(y=y, X=X, W=W, N=N, T=T, logdet_method="eigenvalue")
+        model = SAR(y=y, X=X, W=W, N=N, T=T, logdet_method="exact", logdet_decomp="eig")
 
         # SARPanelFE uses pm.Normal("obs") which auto-captures, so we need
         # a fake idata with log_likelihood already present (simulating PyMC auto-capture)
@@ -684,7 +708,7 @@ class TestLogLikelihoodStructureFast:
     def test_sdm_panel_fe_fit_adds_log_likelihood(self, monkeypatch):
         """SDMPanelFE fit() should add Jacobian-corrected log_likelihood."""
         y, X, W, W_dense, N, T, n = _panel_data()
-        model = SDM(y=y, X=X, W=W, N=N, T=T, logdet_method="eigenvalue")
+        model = SDM(y=y, X=X, W=W, N=N, T=T, logdet_method="exact", logdet_decomp="eig")
 
         n_obs = n
         posterior = {
@@ -728,7 +752,9 @@ class TestArviZCompatibility:
 
     def test_sar_loo(self):
         """SAR log_likelihood should work with az.loo()."""
-        model = SAR(y=self.y, X=self.X, W=self.W, logdet_method="eigenvalue")
+        model = SAR(
+            y=self.y, X=self.X, W=self.W, logdet_method="exact", logdet_decomp="eig"
+        )
         idata = model.fit(
             draws=50,
             tune=25,
@@ -742,7 +768,9 @@ class TestArviZCompatibility:
 
     def test_sem_loo(self):
         """SEM log_likelihood should work with az.loo()."""
-        model = SEM(y=self.y, X=self.X, W=self.W, logdet_method="eigenvalue")
+        model = SEM(
+            y=self.y, X=self.X, W=self.W, logdet_method="exact", logdet_decomp="eig"
+        )
         idata = model.fit(
             draws=50,
             tune=25,
@@ -759,7 +787,13 @@ class TestArviZCompatibility:
         models = {}
         for cls, name in [(OLS, "OLS"), (SAR, "SAR"), (SEM, "SEM")]:
             model = (
-                cls(y=self.y, X=self.X, W=self.W, logdet_method="eigenvalue")
+                cls(
+                    y=self.y,
+                    X=self.X,
+                    W=self.W,
+                    logdet_method="exact",
+                    logdet_decomp="eig",
+                )
                 if cls != OLS
                 else cls(y=self.y, X=self.X, W=self.W)
             )
@@ -799,7 +833,7 @@ class TestJaxLogLikelihoodCapture:
     def test_sem_jax(self):
         pytest.importorskip("numpyro")
         y, X, W, _, n = _cross_section_data()
-        model = SEM(y=y, X=X, W=W, logdet_method="eigenvalue")
+        model = SEM(y=y, X=X, W=W, logdet_method="exact", logdet_decomp="eig")
         idata = model.fit(
             sampler="nuts",
             draws=20,
@@ -815,7 +849,7 @@ class TestJaxLogLikelihoodCapture:
     def test_sdem_jax(self):
         pytest.importorskip("numpyro")
         y, X, W, _, n = _cross_section_data()
-        model = SDEM(y=y, X=X, W=W, logdet_method="eigenvalue")
+        model = SDEM(y=y, X=X, W=W, logdet_method="exact", logdet_decomp="eig")
         idata = model.fit(
             sampler="nuts",
             draws=20,
@@ -838,7 +872,8 @@ class TestJaxLogLikelihoodCapture:
             W=W,
             N=N,
             T=T,
-            logdet_method="eigenvalue",
+            logdet_method="exact",
+            logdet_decomp="eig",
         )
         idata = model.fit(
             draws=20,
@@ -862,7 +897,8 @@ class TestJaxLogLikelihoodCapture:
             W=W,
             N=N,
             T=T,
-            logdet_method="eigenvalue",
+            logdet_method="exact",
+            logdet_decomp="eig",
         )
         idata = model.fit(
             draws=20,
@@ -880,7 +916,14 @@ class TestJaxLogLikelihoodCapture:
         pytest.importorskip("numpyro")
         y, X, W, _, N, T, n = _panel_data()
         model = SEM(
-            unit_effects="random", y=y, X=X, W=W, N=N, T=T, logdet_method="eigenvalue"
+            unit_effects="random",
+            y=y,
+            X=X,
+            W=W,
+            N=N,
+            T=T,
+            logdet_method="exact",
+            logdet_decomp="eig",
         )
         idata = model.fit(
             draws=20,
@@ -905,7 +948,8 @@ class TestJaxLogLikelihoodCapture:
             W=W,
             N=N,
             T=T,
-            logdet_method="eigenvalue",
+            logdet_method="exact",
+            logdet_decomp="eig",
         )
         idata = model.fit(
             draws=20,

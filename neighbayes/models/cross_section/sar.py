@@ -64,51 +64,36 @@ class SAR(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
         - ``nu`` (float, default 4.0): Fixed Student-t degrees of
           freedom (only used when ``robust=True``).
 
-    logdet_method : str, optional
-        How to compute :math:`\\log|I - \\rho W|`. ``None`` (default)
-        auto-selects by size: ``"eigenvalue"`` for ``n <= 500``; for
-        ``500 < n <= 60000``, ``"cheb_cholesky"`` (exact, sparse Cholesky
-        at Chebyshev nodes) when ``W`` is symmetric else ``"aaa"`` (AAA
-        rational approximation); ``"cheb_stochastic"`` for ``n > 60000``.
-        Explicit opt-ins: ``"chebyshev"`` (Barry-Pace) and ``"slq"``
-        (stochastic Lanczos quadrature).
-    logdet_refit : bool, default True
-        Rebuild the log-determinant interpolant halfway through warmup, on
-        the range the chains have found rather than the interval implied by
-        the prior.  A warmup posterior is typically one to two orders of
-        magnitude narrower than the prior, which needs far fewer interpolation
-        nodes and drives the approximation error over the posterior's support
-        down to the factorization's roundoff floor.  Applies to
-        ``"cheb_cholesky"``, ``"lu_cheb"``, ``"aaa"`` and ``"chol_aaa"``;
-        ignored otherwise.
-
-        The interpolant is only valid on its interval, so the refit window
-        becomes the sampler's support.  The window is padded by
-        ``logdet_refit_pad_sd`` warmup standard deviations, recorded in
-        ``idata.attrs["logdet_refit_window"]``, and a warning is raised if
-        the retained draws ever reach an edge the refit introduced.
-    logdet_refit_pad_sd : float, default 10.0
-        Padding for the refit window, in warmup posterior standard
-        deviations.  At the default the truncated tail is ~1e-23 under
-        normality, and the padding costs a node or two at most.
-    logdet_aaa_check : bool, default True
-        For the AAA methods (``"aaa"``, ``"chol_aaa"``), set the number of
-        exact factorizations from where the posterior lies.  Warmup starts on a
-        14-node fit; halfway through, nodes are added only if the warmup
-        posterior lies closer to a singularity of the Jacobian than four times
-        the distance at which the fit's poles resolve it.  The count used is
-        recorded in ``idata.attrs["logdet_aaa_nodes"]``.  Off, or on a path
-        without a warmup midpoint, the count is fixed by the prior interval:
-        14 nodes within ``|ρ| ≤ 0.9``, 18 otherwise.
-    logdet_probe_check : bool, default True
-        For ``"cheb_stochastic"``, set the number of Hutchinson probes from
-        where the posterior lies.  Warmup starts on 50 probes; halfway through,
-        the probes' own spread prices the bias they leave in the posterior mean
-        of the spatial parameter, and the pool grows, to at most 200, until
-        that bias is expected to stay under 0.0225 posterior sd.  The count
-        used is recorded in ``idata.attrs["logdet_probes"]``, with a warning
-        if the cap is reached first.  Probes cost setup time only; the cost of
-        each draw does not depend on how many there are.
+    logdet_method : {"exact", "cheb", "aaa", "spline", "stochastic"}, optional
+        How ``log|I - rho*W|`` is approximated over rho: evaluated exactly at
+        every rho, interpolated (Chebyshev, AAA rational, or cubic spline)
+        through exact values, or expanded stochastically with no
+        factorization.  ``None`` (default) selects from the size and symmetry
+        of ``W``: ``"exact"`` for ``n <= 500``; ``"aaa"`` up to
+        ``n = 60000`` (``NEIGHBAYES_LOGDET_FACTOR_MAX_N``) unless the
+        factorization's fill-in would dominate; ``"stochastic"`` beyond.
+    logdet_decomp : {"auto", "eig", "chol", "lu"}, default "auto"
+        What supplies the exact values: a dense eigendecomposition, a sparse
+        Cholesky (undirected ``W``; scikit-sparse CHOLMOD) or a sparse LU.
+        ``"auto"`` takes the first of ``"eig"`` (``n <= 500``,
+        ``NEIGHBAYES_LOGDET_EIGEN_MAX_N``), ``"chol"`` (undirected ``W``) and
+        ``"lu"`` that the method is implemented on.  Ignored by
+        ``"stochastic"``.  A pair with no implementation (``"spline"`` on
+        ``"chol"``, ``"exact"`` on ``"lu"``) raises.
+    logdet_adapt : bool, default True
+        Halfway through warmup, let the Gibbs sampler fit the log-determinant
+        to where the chains have found the posterior rather than to the prior
+        interval.  An interpolant on Cholesky or LU values (``"cheb"``,
+        ``"aaa"``) is refit on that range, padded by ten warmup standard
+        deviations; the window becomes the sampler's support, is recorded in
+        ``idata.attrs["logdet_refit_window"]``, and a warning is raised if the
+        retained draws reach an edge it introduced.  ``"aaa"`` also adds exact
+        factorizations when the posterior lies near a singularity
+        (``idata.attrs["logdet_aaa_nodes"]``).  ``"stochastic"`` grows its
+        Hutchinson probes, from 50 to at most 200, until the bias they leave
+        in the posterior mean of the spatial parameter is expected to stay
+        under 0.0225 posterior sd (``idata.attrs["logdet_probes"]``).
+        ``False`` keeps the fit on the prior interval.
     robust : bool, default False
         If True, replace the Normal error with Student-t for robustness
         to heavy-tailed outliers. See *Robust regression* below.

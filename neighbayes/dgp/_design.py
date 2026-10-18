@@ -70,7 +70,9 @@ def simulator(route):
                 )
             for key, instead in _RETIRED.items():
                 if key in kwargs:
-                    raise TypeError(f"{fn.__name__}(): {key}= is replaced by {instead}.")
+                    raise TypeError(
+                        f"{fn.__name__}(): {key}= is replaced by {instead}."
+                    )
             kwargs.update(zip(positional, args))
             design = {k: kwargs.pop(k) for k in list(kwargs) if k in route.accepts}
             extra = {k for k in kwargs if k in _DESIGN} - set(sig.parameters)
@@ -187,7 +189,13 @@ _GAUSSIAN = {
 
 
 @accepts(
-    "T", "N", "unit_effects", "time_effects", "dynamic", "unit_effect_sd", "time_effect_sd"
+    "T",
+    "N",
+    "unit_effects",
+    "time_effects",
+    "dynamic",
+    "unit_effect_sd",
+    "time_effect_sd",
 )
 def gaussian(fn, design, kw):
     """OLS, SLX, SAR, SEM, SDM, SDEM: panels with effects or the time lag."""
@@ -212,7 +220,9 @@ def gaussian(fn, design, kw):
         target = _private("panel_dynamic", f"_simulate_{proc}_panel_dynamic{suffix}")
     else:
         target = _private("panel_fe", f"_simulate_{proc}_panel_fe")
-    kw["sigma_alpha"] = _scale(design, "unit_effect_sd", unit is not None, "unit_effects")
+    kw["sigma_alpha"] = _scale(
+        design, "unit_effect_sd", unit is not None, "unit_effects"
+    )
     kw["time_effect_sd"] = _scale(design, "time_effect_sd", time, "time_effects")
     return target, _with_N(target, kw)
 
@@ -285,7 +295,9 @@ def count(fn, design, kw):
             _scale(design, "unit_effect_sd", False, "unit_effects")
         return fn, kw
     target = _private(*_COUNT[name])
-    kw["unit_effect_sd"] = _scale(design, "unit_effect_sd", unit is not None, "unit_effects")
+    kw["unit_effect_sd"] = _scale(
+        design, "unit_effect_sd", unit is not None, "unit_effects"
+    )
     kw["time_effect_sd"] = _scale(design, "time_effect_sd", time, "time_effects")
     return target, _with_N(target, kw)
 
@@ -340,11 +352,16 @@ _FLOW = {
         {(False, False): None, (True, False): "_simulate_sar_poisson_flow_separable"},
     ),
     "simulate_sar_zinb_flow": ("random", {(True, False): None, (True, True): None}),
-    "simulate_sar_hurdle_negbin_flow": ("random", {(True, False): None, (True, True): None}),
+    "simulate_sar_hurdle_negbin_flow": (
+        "random",
+        {(True, False): None, (True, True): None},
+    ),
 }
 
 
-@accepts("T", "separable", "pair_effects", "time_effects", "pair_effect_sd", "time_effect_sd")
+@accepts(
+    "T", "separable", "pair_effects", "time_effects", "pair_effect_sd", "time_effect_sd"
+)
 def flow(fn, design, kw):
     """Flow simulators: the separable restriction, flow panels, and pair effects."""
     name = fn.__name__
@@ -394,13 +411,19 @@ def aspatial(spatial, zeros, *, panel_only=False, xs_random=True):
                     f"{stub.__name__}() has no spatial dependence; got {sorted(clash)}."
                 )
             if kwargs.get("separable"):
-                raise ValueError(f"{stub.__name__}() has no spatial dependence to restrict.")
+                raise ValueError(
+                    f"{stub.__name__}() has no spatial dependence to restrict."
+                )
             cross_section = kwargs.get("T") in (None, 1)
             if panel_only and cross_section:
                 raise NotImplementedError(
                     f"{stub.__name__}() is implemented for panels only (pass T)."
                 )
-            if not xs_random and cross_section and kwargs.get("unit_effects") is not None:
+            if (
+                not xs_random
+                and cross_section
+                and kwargs.get("unit_effects") is not None
+            ):
                 raise NotImplementedError(
                     f"{stub.__name__}() takes unit effects only in a panel (pass T)."
                 )

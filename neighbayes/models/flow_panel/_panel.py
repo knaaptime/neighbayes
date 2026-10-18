@@ -22,6 +22,7 @@ import scipy.sparse as sp
 from ..._backends.sampler_helpers import select_backend
 from ..._lazy_deps import pm, xr
 from ..._logdet import (
+    FLOW_LOGDET_METHODS,
     make_flow_separable_logdet,
     make_flow_separable_logdet_numpy,
 )
@@ -65,14 +66,20 @@ class FlowPanelModel(FlowSharedMethods, SpatialPanelModel):
     priors : dict, optional
         Prior overrides.
     logdet_method : str, optional
-        Flow log-determinant method; ``None`` (default) auto-selects.
-        Concrete subclasses override the default with their recommended
-        method (see the cross-sectional :class:`~neighbayes.models.flow.FlowModel`).
+        The flow log-determinant; ``None`` (default) auto-selects.  The
+        unrestricted classes take ``"trace_series"`` or ``"resolvent"``; the
+        separable classes factor it into ``n x n`` terms and take the
+        single-``W`` methods with ``logdet_decomp``; the aspatial classes have
+        none.
     nonnegative_dependence : bool, default True
         If True, use simplex-constrained rho parameters.
     robust : bool, default False
         If True, use Student-t observation errors.
     """
+
+    #: Whether the class samples the unrestricted three-ρ flow, whose
+    #: log-determinant is the trace series or the resolvent estimator.
+    _unrestricted_logdet = False
 
     def __init__(
         self,
@@ -88,9 +95,11 @@ class FlowPanelModel(FlowSharedMethods, SpatialPanelModel):
         robust: bool = False,
         shared_od_covariates: Optional[bool] = None,
         effects: int = 0,
+        logdet_decomp: str = "auto",
     ):
         self.priors = priors or {}
         self.logdet_method = logdet_method
+        self.logdet_decomp = logdet_decomp
         self.nonnegative_dependence = nonnegative_dependence
         self.robust = robust
         self.effects = int(effects)
@@ -204,7 +213,9 @@ class FlowPanelModel(FlowSharedMethods, SpatialPanelModel):
         ):
             dest_block = X_arr[:, 2 : 2 + self._k_d]
             orig_block = X_arr[:, 2 + self._k_d : 2 + self._k_d + self._k_o]
-            self._shared_od_covariates: bool = bool(np.array_equal(dest_block, orig_block))
+            self._shared_od_covariates: bool = bool(
+                np.array_equal(dest_block, orig_block)
+            )
         else:
             self._shared_od_covariates = (
                 bool(shared_od_covariates)
@@ -267,32 +278,31 @@ class FlowPanelModel(FlowSharedMethods, SpatialPanelModel):
         self._W_eigs: Optional[np.ndarray] = None
         self._separable_logdet_fn = None
         self._separable_logdet_numpy_fn = None
-        _SEPARABLE_METHODS = {
-            "eigenvalue",
-            "chebyshev",
-            "cheb_cholesky",
-            "aaa",
-            "cheb_stochastic",
-        }
-        if self.logdet_method is None or self.logdet_method in _SEPARABLE_METHODS:
-            from ..._logdet._config import resolve_logdet_method
+        if self._unrestricted_logdet:
+            if self.logdet_method not in (None, "none", *FLOW_LOGDET_METHODS):
+                raise ValueError(
+                    f"{type(self).__name__} takes logdet_method 'trace_series', "
+                    f"'resolvent' or None, got {self.logdet_method!r}."
+                )
+        elif self.logdet_method != "none":
+            from ..._logdet._config import logdet_key, resolve_logdet_method
 
+            key = logdet_key(
+                self.logdet_method, self.logdet_decomp, n=self._n, W=self._W_sparse
+            )
             self._separable_logdet_fn = make_flow_separable_logdet(
                 self._W_sparse,
                 self._n,
-                method=self.logdet_method,
+                method=key,
             )
             self._separable_logdet_numpy_fn = make_flow_separable_logdet_numpy(
                 self._W_sparse,
                 self._n,
-                method=self.logdet_method,
+                method=key,
             )
-            # Populate ``_W_eigs`` only when the resolved method is eigenvalue
+            # Populate ``_W_eigs`` only when the resolved key is eigenvalue
             # (auto-selection may resolve None to eigenvalue for small n).
-            resolved = resolve_logdet_method(
-                self.logdet_method, n=self._n, W=self._W_sparse
-            )
-            if resolved == "eigenvalue":
+            if resolve_logdet_method(key, n=self._n, W=self._W_sparse) == "eigenvalue":
                 self._W_eigs = np.linalg.eigvals(
                     self._W_sparse.toarray().astype(np.float64)
                 ).real
@@ -681,7 +691,6 @@ class _ResolventFlowPanelMixin:
         backend: str | None = None,
         step_size: float = 5e-4,
         n_probes: int = 48,
-        logdet_method: str = "auto",
         n_quad: int = 8,
         progressbar: bool = True,
         n_jobs: int = -1,
@@ -696,10 +705,13 @@ class _ResolventFlowPanelMixin:
             ``"gibbs"`` (default) uses the resolvent-gradient MALA sampler;
             ``"nuts"`` uses PyMC NUTS via the base class.
         backend : str, optional
-            The Gibbs sampler runs on NumPy (``"auto"`` or ``"numpy"``); NUTS
-            on ``"pymc"`` (the default), ``"nutpie"``, ``"numpyro"`` or
+            For Gibbs, what runs the resolvent estimator of the
+            log-determinant (the model's ``logdet_method``): ``"auto"``
+            (default; JAX when it is installed, else NumPy), ``"jax"`` or
+            ``"numpy"``; the exact trace series runs on NumPy.  For NUTS,
+            ``"pymc"`` (the default), ``"nutpie"``, ``"numpyro"`` or
             ``"blackjax"``.
-        step_size, n_probes, logdet_method, n_quad : float/int/str
+        step_size, n_probes, n_quad : float/int
             Resolvent sampler parameters (Gibbs path only).
         n_jobs : int, default -1
             Parallel workers for the Gibbs path (``-1`` = all CPUs).
@@ -723,8 +735,7 @@ class _ResolventFlowPanelMixin:
                 backend=backend,
                 **sample_kwargs,
             )
-        # --- Gibbs (resolvent) path, on NumPy ---
-        self._resolve_gibbs_backend(backend, jax=False)
+        # --- Gibbs (resolvent) path ---
         self._pymc_model = None
         self._idata = self._sample_resolvent(
             draws=draws,
@@ -732,7 +743,7 @@ class _ResolventFlowPanelMixin:
             chains=chains,
             step_size=step_size,
             n_probes=n_probes,
-            logdet_method=logdet_method,
+            logdet_method=self._flow_logdet_choice(backend, sample_kwargs),
             n_quad=n_quad,
             coord_names=list(getattr(self, "_feature_names", []) or []) or None,
             random_seed=random_seed,
@@ -787,9 +798,14 @@ class SARFlowPanelFE(_ResolventFlowPanelMixin, FlowPanelModel):
     model : int, default 0
         Fixed-effects transform: ``0`` pooled, ``1`` pair FE, ``2`` time
         FE, ``3`` two-way FE.
-    logdet_method : str, default "resolvent"
-        Log-determinant method.  The default ``"resolvent"`` samples via the
-        per-period resolvent-Kronecker gradient sampler (recommended).
+    logdet_method : {"trace_series", "resolvent"}, optional
+        The unrestricted flow log-determinant
+        :math:`\\log|I_N - \\rho_d W_d - \\rho_o W_o - \\rho_w W_w|`.
+        ``"trace_series"`` is exact, from trace moments of the ``n x n`` ``W``
+        with no ``N x N`` work; ``"resolvent"`` is the stochastic resolvent
+        estimator, whose accuracy improves with the flow sample size ``N``, run
+        on ``fit(backend=...)``.  ``None`` (default) takes ``"trace_series"``
+        for an undirected ``W`` and ``"resolvent"`` for a directed one.
     nonnegative_dependence : bool, default True
         If True, use ``pm.Dirichlet("rho_simplex", a=ones(4))`` to enforce
         :math:`\\rho_d, \\rho_o, \\rho_w \\geq 0` and
@@ -814,11 +830,7 @@ class SARFlowPanelFE(_ResolventFlowPanelMixin, FlowPanelModel):
         - ``nu`` : float, default 4.0 — Fixed Student-t degrees of freedom (only when ``robust=True``).
     """
 
-    def __init__(self, *args, **kwargs):
-        # Default to the resolvent-gradient panel sampler (subclasses that need the
-        # PyMC path — e.g. the NB count panel — set a different logdet_method).
-        kwargs.setdefault("logdet_method", "resolvent")
-        super().__init__(*args, **kwargs)
+    _unrestricted_logdet = True
 
     def _sample_resolvent(self, **kwargs) -> xr.DataTree:
         from ...samplers.gaussian._flow_resolvent import sample_flow_resolvent
@@ -953,10 +965,22 @@ class SARFlowSeparablePanelFE(FlowPanelModel):
     model : int, default 0
         Fixed-effects transform: ``0`` pooled, ``1`` pair FE, ``2`` time
         FE, ``3`` two-way FE.
-    logdet_method : {"eigenvalue", "chebyshev", "cheb_cholesky", "aaa", "cheb_stochastic"} or None, default None
-        ``None`` auto-selects (``aaa`` for directed W, ``cheb_cholesky`` for
-        symmetric, ``eigenvalue`` for small n).
-        Method for the Kronecker-factored log-determinant.
+    logdet_method : {"exact", "cheb", "aaa", "spline", "stochastic"}, optional
+        How ``log|I - rho*W|`` is approximated over rho: evaluated exactly at
+        every rho, interpolated (Chebyshev, AAA rational, or cubic spline)
+        through exact values, or expanded stochastically with no
+        factorization.  ``None`` (default) selects from the size and symmetry
+        of ``W``: ``"exact"`` for ``n <= 500``; ``"aaa"`` up to
+        ``n = 60000`` (``NEIGHBAYES_LOGDET_FACTOR_MAX_N``) unless the
+        factorization's fill-in would dominate; ``"stochastic"`` beyond.
+    logdet_decomp : {"auto", "eig", "chol", "lu"}, default "auto"
+        What supplies the exact values: a dense eigendecomposition, a sparse
+        Cholesky (undirected ``W``; scikit-sparse CHOLMOD) or a sparse LU.
+        ``"auto"`` takes the first of ``"eig"`` (``n <= 500``,
+        ``NEIGHBAYES_LOGDET_EIGEN_MAX_N``), ``"chol"`` (undirected ``W``) and
+        ``"lu"`` that the method is implemented on.  Ignored by
+        ``"stochastic"``.  A pair with no implementation (``"spline"`` on
+        ``"chol"``, ``"exact"`` on ``"lu"``) raises.
     robust : bool, default False
         If True, replace the Normal error with Student-t for robustness
         to heavy-tailed outliers.  The degrees of freedom :math:`\\nu` are
@@ -985,14 +1009,6 @@ class SARFlowSeparablePanelFE(FlowPanelModel):
     _separable_filter = True
 
     def __init__(self, y, X, W, **kwargs):
-        method = kwargs.pop("logdet_method", None)
-        _VALID = {"eigenvalue", "chebyshev", "cheb_cholesky", "aaa", "cheb_stochastic"}
-        if method is not None and method not in _VALID:
-            raise ValueError(
-                f"SARFlowSeparablePanelFE logdet_method must be None (auto) or one of "
-                f"{sorted(_VALID)}; got {method!r}."
-            )
-        kwargs["logdet_method"] = method
         super().__init__(y, X, W, **kwargs)
 
     def _build_pymc_model(self) -> pm.Model:
@@ -1742,14 +1758,6 @@ class SARNegBinFlowSeparablePanelRE(_SeparableCountFlowPanel, SARFlowSeparablePa
         effects = _pop_effects(kwargs)
         mundlak = pop_mundlak(kwargs)
         y_arr = require_counts(y, "SARNegBinFlowSeparablePanelRE")
-        method = kwargs.pop("logdet_method", None)
-        _VALID = {"eigenvalue", "chebyshev", "cheb_cholesky", "aaa", "cheb_stochastic"}
-        if method is not None and method not in _VALID:
-            raise ValueError(
-                f"SARNegBinFlowSeparablePanelRE logdet_method must be None (auto) or one of "
-                f"{sorted(_VALID)}; got {method!r}."
-            )
-        kwargs["logdet_method"] = method
         super().__init__(y_arr.astype(np.float64), X, W, effects=0, **kwargs)
         self._finish_count_init(y_arr, effects, mundlak)
 
@@ -1839,7 +1847,9 @@ class SARNegBinFlowSeparablePanelRE(_SeparableCountFlowPanel, SARFlowSeparablePa
                 )
         else:
             if cell_mask is not None:
-                raise ValueError("cell_mask is supported only by the Gibbs effects path")
+                raise ValueError(
+                    "cell_mask is supported only by the Gibbs effects path"
+                )
             idata = FlowPanelModel.fit(
                 self,
                 draws=draws,
@@ -2171,14 +2181,6 @@ class SARZINBFlowSeparablePanelRE(
         effects = _pop_effects(kwargs)
         mundlak = pop_mundlak(kwargs)
         y_arr = require_counts(y, type(self).__name__)
-        method = kwargs.pop("logdet_method", None)
-        _VALID = {"eigenvalue", "chebyshev", "cheb_cholesky", "aaa", "cheb_stochastic"}
-        if method is not None and method not in _VALID:
-            raise ValueError(
-                f"logdet_method must be None (auto) or one of {sorted(_VALID)}; "
-                f"got {method!r}."
-            )
-        kwargs["logdet_method"] = method
         super().__init__(y_arr.astype(np.float64), X, W, effects=0, **kwargs)
         # Selection design, before the count effects drop absorbed X columns.
         self._sel_is_X = X_zero is None
@@ -2436,7 +2438,10 @@ class SARZINBFlowSeparablePanelRE(
                 "beta", mu=pr.beta_mu, sigma=pr.beta_sigma, dims="coefficient"
             )
             gamma = pm.Normal(
-                "beta_zero", mu=pr.gamma_mu, sigma=pr.gamma_sigma, dims="coefficient_zero"
+                "beta_zero",
+                mu=pr.gamma_mu,
+                sigma=pr.gamma_sigma,
+                dims="coefficient_zero",
             )
             Xb = pt.reshape(pt.dot(X_t, beta), (T, N)).T
             Zg = pt.reshape(pt.dot(Z_t, gamma), (T, N)).T
@@ -2630,9 +2635,14 @@ class SEMFlowPanelFE(_ResolventFlowPanelMixin, _SEMFlowPanelMixin, FlowPanelMode
     model : int, default 0
         Fixed-effects transform: ``0`` pooled, ``1`` pair FE, ``2`` time
         FE, ``3`` two-way FE.
-    logdet_method : str, default "resolvent"
-        Log-determinant method.  The default ``"resolvent"`` samples via the
-        per-period resolvent-gradient sampler (recommended).
+    logdet_method : {"trace_series", "resolvent"}, optional
+        The unrestricted flow log-determinant
+        :math:`\\log|I_N - \\rho_d W_d - \\rho_o W_o - \\rho_w W_w|`.
+        ``"trace_series"`` is exact, from trace moments of the ``n x n`` ``W``
+        with no ``N x N`` work; ``"resolvent"`` is the stochastic resolvent
+        estimator, whose accuracy improves with the flow sample size ``N``, run
+        on ``fit(backend=...)``.  ``None`` (default) takes ``"trace_series"``
+        for an undirected ``W`` and ``"resolvent"`` for a directed one.
     nonnegative_dependence : bool, default True
         If True, use ``pm.Dirichlet("lam_simplex", a=ones(4))`` to enforce
         :math:`\\lambda_d, \\lambda_o, \\lambda_w \\geq 0` and
@@ -2657,10 +2667,9 @@ class SEMFlowPanelFE(_ResolventFlowPanelMixin, _SEMFlowPanelMixin, FlowPanelMode
         - ``nu`` : float, default 4.0 — Fixed Student-t degrees of freedom (only when ``robust=True``).
     """
 
+    _unrestricted_logdet = True
+
     def __init__(self, y, X, W, T, **kwargs):
-        # Default to the resolvent-gradient SEM panel sampler (parallel to the
-        # cross-sectional SEMFlow); the separable subclass sets its own method.
-        kwargs.setdefault("logdet_method", "resolvent")
         super().__init__(y, X, W, T, **kwargs)
         self._init_sem_lags()
 
@@ -2756,10 +2765,22 @@ class SEMFlowSeparablePanelFE(_SEMFlowPanelMixin, FlowPanelModel):
     model : int, default 0
         Fixed-effects transform: ``0`` pooled, ``1`` pair FE, ``2`` time
         FE, ``3`` two-way FE.
-    logdet_method : {"eigenvalue", "chebyshev", "cheb_cholesky", "aaa", "cheb_stochastic"} or None, default None
-        ``None`` auto-selects (``aaa`` for directed W, ``cheb_cholesky`` for
-        symmetric, ``eigenvalue`` for small n).
-        Method for the Kronecker-factored log-determinant.
+    logdet_method : {"exact", "cheb", "aaa", "spline", "stochastic"}, optional
+        How ``log|I - rho*W|`` is approximated over rho: evaluated exactly at
+        every rho, interpolated (Chebyshev, AAA rational, or cubic spline)
+        through exact values, or expanded stochastically with no
+        factorization.  ``None`` (default) selects from the size and symmetry
+        of ``W``: ``"exact"`` for ``n <= 500``; ``"aaa"`` up to
+        ``n = 60000`` (``NEIGHBAYES_LOGDET_FACTOR_MAX_N``) unless the
+        factorization's fill-in would dominate; ``"stochastic"`` beyond.
+    logdet_decomp : {"auto", "eig", "chol", "lu"}, default "auto"
+        What supplies the exact values: a dense eigendecomposition, a sparse
+        Cholesky (undirected ``W``; scikit-sparse CHOLMOD) or a sparse LU.
+        ``"auto"`` takes the first of ``"eig"`` (``n <= 500``,
+        ``NEIGHBAYES_LOGDET_EIGEN_MAX_N``), ``"chol"`` (undirected ``W``) and
+        ``"lu"`` that the method is implemented on.  Ignored by
+        ``"stochastic"``.  A pair with no implementation (``"spline"`` on
+        ``"chol"``, ``"exact"`` on ``"lu"``) raises.
     robust : bool, default False
         If True, replace the Normal error with Student-t for robustness
         to heavy-tailed outliers.  The degrees of freedom :math:`\\nu` are
@@ -2785,14 +2806,6 @@ class SEMFlowSeparablePanelFE(_SEMFlowPanelMixin, FlowPanelModel):
     """
 
     def __init__(self, y, X, W, T, **kwargs):
-        method = kwargs.pop("logdet_method", None)
-        _VALID = {"eigenvalue", "chebyshev", "cheb_cholesky", "aaa", "cheb_stochastic"}
-        if method is not None and method not in _VALID:
-            raise ValueError(
-                f"SEMFlowSeparablePanelFE logdet_method must be None (auto) or one of "
-                f"{sorted(_VALID)}; got {method!r}."
-            )
-        kwargs["logdet_method"] = method
         super().__init__(y, X, W, T, **kwargs)
         self._init_sem_lags()
 

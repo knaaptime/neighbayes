@@ -115,7 +115,8 @@ class TestSEMModelConstruction:
             y=self.y,
             X=self.X,
             W=self.W,
-            logdet_method="eigenvalue",
+            logdet_method="exact",
+            logdet_decomp="eig",
             robust=robust,
         )
 
@@ -155,7 +156,8 @@ class TestSDEMModelConstruction:
             X=self.X,
             W=self.W,
             durbin_vars=["x1"],
-            logdet_method="eigenvalue",
+            logdet_method="exact",
+            logdet_decomp="eig",
             robust=robust,
         )
 
@@ -202,7 +204,8 @@ class TestSEMPanelFEModelConstruction:
             W=self.W,
             N=self.N,
             T=self.T,
-            logdet_method="eigenvalue",
+            logdet_method="exact",
+            logdet_decomp="eig",
             robust=robust,
         )
 
@@ -245,7 +248,8 @@ class TestSDEMPanelFEModelConstruction:
             N=self.N,
             T=self.T,
             durbin_vars=["x1"],
-            logdet_method="eigenvalue",
+            logdet_method="exact",
+            logdet_decomp="eig",
             robust=robust,
         )
 
@@ -287,7 +291,8 @@ class TestSEMPanelREModelConstruction:
             W=self.W,
             N=self.N,
             T=self.T,
-            logdet_method="eigenvalue",
+            logdet_method="exact",
+            logdet_decomp="eig",
             robust=robust,
         )
 
@@ -330,7 +335,8 @@ class TestSDEMPanelREModelConstruction:
             N=self.N,
             T=self.T,
             durbin_vars=["x1"],
-            logdet_method="eigenvalue",
+            logdet_method="exact",
+            logdet_decomp="eig",
             robust=robust,
         )
 
@@ -372,7 +378,8 @@ class TestSEMPanelDynamicModelConstruction:
             W=self.W,
             N=self.N,
             T=self.T,
-            logdet_method="eigenvalue",
+            logdet_method="exact",
+            logdet_decomp="eig",
             robust=robust,
         )
 
@@ -415,7 +422,8 @@ class TestSDEMPanelDynamicModelConstruction:
             N=self.N,
             T=self.T,
             durbin_vars=["x1"],
-            logdet_method="eigenvalue",
+            logdet_method="exact",
+            logdet_decomp="eig",
             robust=robust,
         )
 
@@ -458,7 +466,8 @@ class TestSEMPanelTobitModelConstruction:
             W=self.W,
             N=self.N,
             T=self.T,
-            logdet_method="eigenvalue",
+            logdet_method="exact",
+            logdet_decomp="eig",
             robust=robust,
         )
 
@@ -499,7 +508,9 @@ class TestFitDispatchesNutsSampler:
         """SEM.fit() should pass nuts_sampler to _build_pymc_model()."""
         from neighbayes.models.cross_section.sem import SEM
 
-        model = SEM(y=self.y, X=self.X, W=self.W, logdet_method="eigenvalue")
+        model = SEM(
+            y=self.y, X=self.X, W=self.W, logdet_method="exact", logdet_decomp="eig"
+        )
         # Just build the model — don't sample
         pm_model = model._build_pymc_model(nuts_sampler="numpyro")
         _assert_has_obs_rv(pm_model, "SEM[numpyro]")
@@ -513,7 +524,8 @@ class TestFitDispatchesNutsSampler:
             X=self.X,
             W=self.W,
             durbin_vars=["x1"],
-            logdet_method="eigenvalue",
+            logdet_method="exact",
+            logdet_decomp="eig",
         )
         pm_model = model._build_pymc_model(nuts_sampler="numpyro")
         _assert_has_obs_rv(pm_model, "SDEM[numpyro]")

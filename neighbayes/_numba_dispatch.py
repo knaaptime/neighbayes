@@ -1,12 +1,13 @@
-"""Numba dispatch registrations for selected custom Ops in :mod:`neighbayes._ops`.
+"""Numba dispatch registrations for selected custom Ops.
 
 Targets the cross-sectional SAR sparse solve family
-(:class:`~neighbayes._ops.SparseSARSolveOp`, :class:`~neighbayes._ops._SparseSARVJPOp`)
-and the Kronecker-factored NB flow Ops
+(:class:`~neighbayes._ops.SparseSARSolveOp`, :class:`~neighbayes._ops._SparseSARVJPOp`),
+the Kronecker-factored NB flow Ops
 (:class:`~neighbayes._ops.KroneckerFlowSolveOp`,
 :class:`~neighbayes._ops._KroneckerFlowVJPOp`,
 :class:`~neighbayes._ops.KroneckerFlowSolveMatrixOp`,
-:class:`~neighbayes._ops._KroneckerFlowVJPMatrixOp`).
+:class:`~neighbayes._ops._KroneckerFlowVJPMatrixOp`) and the exact-Cholesky
+log-determinant Ops of :mod:`neighbayes._logdet._exact_chol`.
 
 When a dense ``W`` view is available (small ``n``), the cross-sectional SAR
 and the *vector* Kronecker Ops use pure Numba nopython kernels based on
@@ -302,4 +303,43 @@ def register_numba_dispatch() -> bool:
     # PyTensor warning per Op, which is acceptable for a path that already
     # bottlenecks on a sparse SuperLU factorization per gradient evaluation.
 
+    return True
+
+
+@lru_cache(maxsize=1)
+def register_logdet_numba_dispatch() -> bool:
+    """Register Numba dispatches for the exact-Cholesky log-determinant Ops.
+
+    Called from :mod:`neighbayes._logdet._exact_chol` once its Ops exist: that
+    module imports :mod:`neighbayes._ops`, so registering from there avoids the
+    cycle.  Each Op factors with CHOLMOD, which Numba cannot lower; the
+    ``numba.objmode`` wrapper only silences PyTensor's object-mode warning.
+    """
+    if not _numba_available():
+        return False
+
+    import numba
+    import numpy as np
+    from pytensor.link.numba.dispatch.basic import numba_funcify
+
+    from ._logdet._exact_chol import ExactCholLogdetGradOp, ExactCholLogdetOp
+
+    _SCALAR = numba.types.Array(numba.types.float64, 0, "C")
+
+    def _scalar_funcify(op, **kwargs):
+        def _py(rho):
+            outputs = [[None]]
+            op.perform(None, [np.asarray(rho)], outputs)
+            return outputs[0][0]
+
+        @numba.njit
+        def exact_chol(rho):
+            with numba.objmode(ret=_SCALAR):
+                ret = _py(rho)
+            return ret
+
+        return exact_chol
+
+    numba_funcify.register(ExactCholLogdetOp)(_scalar_funcify)
+    numba_funcify.register(ExactCholLogdetGradOp)(_scalar_funcify)
     return True

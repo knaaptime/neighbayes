@@ -92,8 +92,11 @@ def test_unsupported_method_is_inactive(W):
     assert not wj.active and not wj.adapts(1000)
 
 
-def test_record_writes_attrs_and_warns_at_a_truncated_edge(W):
-    wj = WarmupJacobian(W, "chol_aaa", refit_pad_sd=0.05)
+def test_record_writes_attrs_and_warns_at_a_truncated_edge(W, monkeypatch):
+    from neighbayes._logdet import _refit
+
+    monkeypatch.setattr(_refit, "DEFAULT_PAD_SD", 0.05)
+    wj = WarmupJacobian(W, "chol_aaa")
     wj.initial(tune=100)
     wj.adapt(_draws(0.5))
     idata = _Idata()

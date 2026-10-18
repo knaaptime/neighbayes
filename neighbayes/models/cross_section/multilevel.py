@@ -243,8 +243,23 @@ class Multilevel(SpatialModel):
         is its index ℓ in the notation and in the posterior names.
     priors : dict or MultilevelPriors, optional
         See :class:`~neighbayes.models.priors.MultilevelPriors`.
-    logdet_method : str, optional
-        Log-determinant method at the units; upper levels choose their own.
+    logdet_method : {"exact", "cheb", "aaa", "spline", "stochastic"}, optional
+        The log-determinant at the units; upper levels choose their own.
+        How ``log|I - rho*W|`` is approximated over rho: evaluated exactly at
+        every rho, interpolated (Chebyshev, AAA rational, or cubic spline)
+        through exact values, or expanded stochastically with no
+        factorization.  ``None`` (default) selects from the size and symmetry
+        of ``W``: ``"exact"`` for ``n <= 500``; ``"aaa"`` up to
+        ``n = 60000`` (``NEIGHBAYES_LOGDET_FACTOR_MAX_N``) unless the
+        factorization's fill-in would dominate; ``"stochastic"`` beyond.
+    logdet_decomp : {"auto", "eig", "chol", "lu"}, default "auto"
+        What supplies the exact values: a dense eigendecomposition, a sparse
+        Cholesky (undirected ``W``; scikit-sparse CHOLMOD) or a sparse LU.
+        ``"auto"`` takes the first of ``"eig"`` (``n <= 500``,
+        ``NEIGHBAYES_LOGDET_EIGEN_MAX_N``), ``"chol"`` (undirected ``W``) and
+        ``"lu"`` that the method is implemented on.  Ignored by
+        ``"stochastic"``.  A pair with no implementation (``"spline"`` on
+        ``"chol"``, ``"exact"`` on ``"lu"``) raises.
 
     Notes
     -----
@@ -281,6 +296,7 @@ class Multilevel(SpatialModel):
         *levels: Level,
         priors: dict | MultilevelPriors | None = None,
         logdet_method: str | None = None,
+        logdet_decomp: str = "auto",
     ):
         if len(levels) < 2:
             raise ValueError(
@@ -307,6 +323,7 @@ class Multilevel(SpatialModel):
             W=unit.W,
             priors=priors,
             logdet_method=logdet_method,
+            logdet_decomp=logdet_decomp,
         )
         self._y = np.asarray(self._y, dtype=np.float64).reshape(-1)
         self._jacobian_param = _PARAM[_COMPONENTS[unit.process][0]]

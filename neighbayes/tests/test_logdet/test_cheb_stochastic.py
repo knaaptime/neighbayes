@@ -23,7 +23,7 @@ from neighbayes._logdet._cheb_stochastic import (
 
 def _d_sym(W):
     """D-symmetrized W_sym = D^{1/2} W D^{-1/2} (same spectrum, symmetric)."""
-    from neighbayes._logdet._slq import _recover_symmetrizing_diagonal
+    from neighbayes._logdet._symmetrize import _recover_symmetrizing_diagonal
 
     s = np.sqrt(_recover_symmetrizing_diagonal(W))
     return sp.csr_matrix(sp.diags(s) @ W @ sp.diags(1.0 / s))
@@ -234,13 +234,8 @@ class TestAccuracy:
         rel_err = abs(est - exact) / abs(exact)
         assert rel_err < 0.05, f"rel_err={rel_err:.4e}"
 
-    def test_better_than_barry_pace_at_rho_095(self, small_W, small_eigs):
-        """At ρ=0.95 and large n, stochastic Chebyshev should be more accurate than Barry-Pace-MC.
-
-        Note: Barry-Pace uses exact eigenvalues for n≤500, so this test only
-        works with a large enough W to trigger the MC path.  We test the
-        stochastic moments directly against exact instead.
-        """
+    def test_accurate_at_rho_095(self, small_W, small_eigs):
+        """At ρ = 0.95 the stochastic Chebyshev value stays within 5% of exact."""
         rho = 0.95
         exact = np.sum(np.log(np.abs(1.0 - rho * small_eigs)))
 

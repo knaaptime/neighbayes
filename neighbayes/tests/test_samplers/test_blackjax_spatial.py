@@ -90,7 +90,9 @@ class TestRecovery:
             chains=2,
             seed=0,
         )
-        m = SAR(y=y, X=X, W=Wd, priors=_PRIORS, logdet_method="eigenvalue")
+        m = SAR(
+            y=y, X=X, W=Wd, priors=_PRIORS, logdet_method="exact", logdet_decomp="eig"
+        )
         idata = m.fit(
             sampler="gibbs", draws=3000, tune=1000, chains=2, progressbar=False
         )

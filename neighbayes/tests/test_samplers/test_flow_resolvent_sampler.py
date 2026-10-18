@@ -444,7 +444,9 @@ def test_separable_count_flow_log_abs_det_uses_closed_form(monkeypatch):
 
     W, _, X = _directed_flow_data(n=12, seed=4)
     y = np.random.default_rng(4).poisson(3.0, size=X.shape[0])
-    model = SARNegBinFlow(y, X, W, separable=True, logdet_method="eigenvalue")
+    model = SARNegBinFlow(
+        y, X, W, separable=True, logdet_method="exact", logdet_decomp="eig"
+    )
 
     def _no_resolvent(*args, **kwargs):
         raise AssertionError("separable class reached the resolvent route")
@@ -454,9 +456,7 @@ def test_separable_count_flow_log_abs_det_uses_closed_form(monkeypatch):
     nchain, ndraw = 2, 3
     rd = np.array([[0.3, 0.1, -0.2], [0.25, 0.0, 0.4]])
     ro = np.array([[0.2, -0.3, 0.15], [0.05, 0.35, -0.1]])
-    idata = az.from_dict(
-        {"posterior": {"rho_d": rd, "rho_o": ro, "rho_w": -rd * ro}}
-    )
+    idata = az.from_dict({"posterior": {"rho_d": rd, "rho_o": ro, "rho_w": -rd * ro}})
     model._attach_flow_log_abs_det(idata)
     lad = idata.sample_stats["log_abs_det"].values
     assert lad.shape == (nchain, ndraw)

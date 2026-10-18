@@ -59,7 +59,7 @@ def test_a_fit_builds_one_precompute(W, backend, count_precomputes):
     X = np.column_stack([np.ones(n), rng.normal(size=n)])
     A = (sp.eye(n, format="csc") - 0.5 * sp.csc_matrix(W)).tocsc()
     y = spsolve(A, X @ np.array([1.0, 2.0]) + rng.normal(size=n))
-    SAR(y=y, X=X, W=W, logdet_method="cheb_stochastic", logdet_probe_check=False).fit(
+    SAR(y=y, X=X, W=W, logdet_method="stochastic", logdet_adapt=False).fit(
         draws=50,
         tune=50,
         chains=2,

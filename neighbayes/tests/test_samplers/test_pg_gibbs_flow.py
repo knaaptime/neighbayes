@@ -253,7 +253,8 @@ class TestNegativeBinomialSARFlowSeparableGibbs:
             data["X"],
             data["G"],
             separable=True,
-            logdet_method="eigenvalue",
+            logdet_method="exact",
+            logdet_decomp="eig",
         )
         idata = model.fit(
             draws=20,
@@ -279,7 +280,8 @@ class TestNegativeBinomialSARFlowSeparableGibbs:
             data["X"],
             data["G"],
             separable=True,
-            logdet_method="eigenvalue",
+            logdet_method="exact",
+            logdet_decomp="eig",
         )
         idata = model.fit(
             draws=30,
@@ -304,7 +306,8 @@ class TestNegativeBinomialSARFlowSeparableGibbs:
             data["X"],
             data["G"],
             separable=True,
-            logdet_method="eigenvalue",
+            logdet_method="exact",
+            logdet_decomp="eig",
         )
         draws, chains = 30, 2
         idata = model.fit(

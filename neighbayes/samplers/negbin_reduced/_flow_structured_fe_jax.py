@@ -804,7 +804,11 @@ def run_chains_jax_flow_structured_fe(
         C0 = np.zeros((n, n))
         if has_pairs:
             if cell_mask is None:
-                C0 = np.log(Y.mean(axis=0) + 0.5) - np.log(Y.mean() + 0.5) + pair_effects[0]
+                C0 = (
+                    np.log(Y.mean(axis=0) + 0.5)
+                    - np.log(Y.mean() + 0.5)
+                    + pair_effects[0]
+                )
             else:
                 # Mask-aware start: no masked count may reach a live cell's η.
                 m3 = cell_mask.reshape(T, n, n)

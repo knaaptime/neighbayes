@@ -1096,7 +1096,7 @@ class TestJAXGaussianGibbs:
 
         y, X, W_dense, n = _make_sar_data()
         W = W_to_graph(W_dense)
-        model = SAR(y=y, X=X, W=W, logdet_method="chebyshev")
+        model = SAR(y=y, X=X, W=W, logdet_method="cheb", logdet_decomp="eig")
         idata = model.fit(
             sampler="gibbs",
             draws=50,

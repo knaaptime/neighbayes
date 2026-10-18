@@ -336,7 +336,9 @@ class TestResolventDirectEffects:
         rho = np.random.default_rng(0).uniform(0.05, 0.9, size=2000)
 
         # Force the surrogate (not eigenvalue) logdet method.
-        model = SAR(y=y, X=X, W=_W_to_graph(W), logdet_method="cheb_cholesky")
+        model = SAR(
+            y=y, X=X, W=_W_to_graph(W), logdet_method="cheb", logdet_decomp="chol"
+        )
         eigs = model._W_eigs  # reference eigendecomposition
 
         md_res = model._batch_mean_diag(rho)
@@ -354,7 +356,13 @@ class TestResolventDirectEffects:
         W = _rook_grid_W(6)  # n=36 → eigenvalue method
         n = W.shape[0]
         X = np.column_stack([np.ones(n), np.linspace(-1, 1, n)])
-        model = SAR(y=np.zeros(n), X=X, W=_W_to_graph(W), logdet_method="eigenvalue")
+        model = SAR(
+            y=np.zeros(n),
+            X=X,
+            W=_W_to_graph(W),
+            logdet_method="exact",
+            logdet_decomp="eig",
+        )
         rho = np.linspace(-0.9, 0.9, 50)
         np.testing.assert_allclose(
             model._batch_mean_diag(rho),
@@ -367,7 +375,13 @@ class TestResolventDirectEffects:
         W = _rook_grid_W(8)
         n = W.shape[0]
         X = np.column_stack([np.ones(n), np.linspace(-1, 1, n)])
-        model = SAR(y=np.zeros(n), X=X, W=_W_to_graph(W), logdet_method="cheb_cholesky")
+        model = SAR(
+            y=np.zeros(n),
+            X=X,
+            W=_W_to_graph(W),
+            logdet_method="cheb",
+            logdet_decomp="chol",
+        )
         G = 200
         beta_draws = np.random.default_rng(1).standard_normal((G, 2))
         rho_draws = np.random.default_rng(2).uniform(0.0, 0.9, G)

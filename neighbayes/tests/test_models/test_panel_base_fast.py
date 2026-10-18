@@ -265,7 +265,8 @@ class TestSpatialPanelModelInit:
             W=W_graph,
             N=4,
             T=3,
-            logdet_method="chebyshev",
+            logdet_method="cheb",
+            logdet_decomp="eig",
         )
         assert "_W_eigs" not in model.__dict__
 
@@ -285,7 +286,8 @@ class TestSpatialPanelModelInit:
             W=W_graph,
             N=4,
             T=3,
-            logdet_method="eigenvalue",
+            logdet_method="exact",
+            logdet_decomp="eig",
         )
         assert "_W_eigs" not in model.__dict__
 

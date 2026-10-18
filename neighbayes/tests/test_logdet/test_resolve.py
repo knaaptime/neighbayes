@@ -10,7 +10,6 @@ from neighbayes._logdet import (
 
 CANONICAL_METHODS = {
     "eigenvalue",
-    "slq",
     "chebyshev",
     "cheb_stochastic",
     "cheb_cholesky",
@@ -18,7 +17,6 @@ CANONICAL_METHODS = {
     "aaa",
     "chol_aaa",
     "grid_spline",
-    "traces",
     "cholmod",
 }
 
@@ -33,9 +31,7 @@ def test_valid_logdet_methods_constant():
 
 def test_enum_str_equality():
     assert LogDetMethod.EIGENVALUE == "eigenvalue"
-    assert LogDetMethod.SLQ == "slq"
     assert LogDetMethod.CHEBYSHEV == "chebyshev"
-    assert LogDetMethod.TRACES == "traces"
 
 
 @pytest.mark.parametrize("name", sorted(CANONICAL_METHODS))

@@ -130,7 +130,7 @@ class TestBoundaryWarning:
         draws = 0.6 + 0.01 * rng.standard_normal(2000)
         msg = boundary_warning(draws, self._win(0.4, 0.62))
         assert msg is not None and "upper edge" in msg
-        assert "logdet_refit_pad_sd" in msg  # tells the user what to change
+        assert "logdet_adapt" in msg  # tells the user what to change
 
     def test_silent_at_an_edge_that_is_the_prior_bound(self):
         """The prior always truncated there; the refit changed nothing."""
@@ -149,7 +149,7 @@ class TestRefitter:
         for method in ("cheb_cholesky", "aaa"):
             assert LogdetRefitter(W, method).supported
             assert method in REFITTABLE_METHODS
-        for method in ("eigenvalue", "cheb_stochastic", "slq", "chebyshev", "traces"):
+        for method in ("eigenvalue", "cheb_stochastic", "chebyshev", "cholmod"):
             assert not LogdetRefitter(W, method).supported
 
     def test_construction_does_no_work(self, W):

@@ -199,7 +199,7 @@ class _DSymCholSolver:
         Row-standardized weights, known to be D-symmetrizable.
     d : ndarray, shape (n,)
         Symmetrizing diagonal from
-        :func:`neighbayes._logdet._slq._recover_symmetrizing_diagonal`.
+        :func:`neighbayes._logdet._symmetrize._recover_symmetrizing_diagonal`.
     n : int
         Matrix dimension.
     """
@@ -331,13 +331,13 @@ def _symmetrizing_diagonal(W_csc: sp.csc_matrix) -> np.ndarray | None:
     """Return a positive ``D`` with ``D^{1/2}WD^{-1/2}`` symmetric, else ``None``.
 
     Thin guard around
-    :func:`neighbayes._logdet._slq._recover_symmetrizing_diagonal`: that
+    :func:`neighbayes._logdet._symmetrize._recover_symmetrizing_diagonal`: that
     routine returns ``None`` for directed graphs and can return a
     sign-inconsistent ``D`` for weights that are not of the form ``D⁻¹A``, so
     we additionally require ``D > 0`` and verify the resulting similarity is
     symmetric before trusting it.
     """
-    from ..._logdet._slq import _recover_symmetrizing_diagonal
+    from ..._logdet._symmetrize import _recover_symmetrizing_diagonal
 
     d = _recover_symmetrizing_diagonal(sp.csr_matrix(W_csc))
     if d is None or not np.all(np.isfinite(d)) or np.any(d <= 0.0):

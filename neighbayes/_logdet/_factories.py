@@ -7,8 +7,8 @@ Three backends:
 * **NumPy vectorized** (``make_logdet_numpy_vec_fn``) — ``(rho_arr) -> np.ndarray``.
 * **JAX** (``make_logdet_jax_fn`` in ``_jax.py``) — JIT-compatible.
 
-All accept ``method="eigenvalue"`` or ``method="chebyshev"`` (or ``None``
-for auto-select).  ``T`` multiplies the result for panel models.
+All take an internal key (see :func:`~._config.logdet_key`) or ``None`` to
+auto-select.  ``T`` multiplies the result for panel models.
 """
 
 from __future__ import annotations
@@ -31,11 +31,8 @@ from ._config import (
     _LOGDET_FN_CACHE_MAXSIZE,
     resolve_logdet_method,
 )
+from ._exact_chol import ExactCholLogdet, exact_chol_logdet_fn
 from ._pytensor import logdet_chebyshev, logdet_eigenvalue
-from ._slq import (
-    slq_logdet_precompute,
-    slq_to_chebyshev_coeffs,
-)
 
 # ---------------------------------------------------------------------------
 # Stochastic-Chebyshev coefficient helper
@@ -217,15 +214,9 @@ def make_logdet_numpy_fn(
 
         return _grid_spline_numpy
 
-    if method == "slq":
-        # SLQ precompute → Chebyshev coefficients → Clenshaw evaluation
-        pre = slq_logdet_precompute(W_sparse)
-        cheb = slq_to_chebyshev_coeffs(
-            pre, W=W_sparse, order=20, rho_min=rho_min, rho_max=rho_max
-        )
-        coeffs = cheb["coeffs"]
-        rmin_cb, rmax_cb = cheb["rmin"], cheb["rmax"]
-        return lambda r: _clenshaw_scalar(coeffs, r, rmin_cb, rmax_cb, T)
+    if method == "cholmod":
+        ev = ExactCholLogdet(W_sparse)
+        return lambda r: T * float(ev.value(r)[0])
 
     raise ValueError(f"Unsupported logdet method: {method!r}")
 
@@ -251,9 +242,9 @@ def make_logdet_grad_numpy_fn(
     samplers (nutpie-custom, MALA, pseudo-marginal).  The negated value,
     ``−g(ρ)``, is the resolvent trace used by spatial impacts.
 
-    Every branch mirrors :func:`make_logdet_numpy_fn`'s representation choice
-    (in particular ``slq`` shares the Chebyshev-converted coefficients its value
-    form uses) so ``grad == d(value)/dρ`` holds exactly for each method.
+    Every branch mirrors :func:`make_logdet_numpy_fn`'s representation choice,
+    so ``grad == d(value)/dρ`` holds exactly for each method; ``cholmod``, which
+    evaluates exactly, takes the central difference of its exact values.
     """
     from ._resolvent import (
         logdet_grad_aaa,
@@ -323,17 +314,9 @@ def make_logdet_grad_numpy_fn(
             float(deriv(min(max(float(r), pre.rho_min), pre.rho_max)))
         )
 
-    if method == "slq":
-        # Match make_logdet_numpy_fn: its slq value form is the Chebyshev-
-        # converted series, so the consistent gradient differentiates that.
-        pre = slq_logdet_precompute(W_sparse)
-        cheb = slq_to_chebyshev_coeffs(
-            pre, W=W_sparse, order=20, rho_min=rho_min, rho_max=rho_max
-        )
-        coeffs, rmin_cb, rmax_cb = cheb["coeffs"], cheb["rmin"], cheb["rmax"]
-        return lambda r: _scale(
-            logdet_grad_chebyshev(float(r), coeffs, rmin_cb, rmax_cb)
-        )
+    if method == "cholmod":
+        ev = ExactCholLogdet(W_sparse)
+        return lambda r: _scale(ev.grad(r)[0])
 
     raise ValueError(f"Unsupported logdet method: {method!r}")
 
@@ -379,9 +362,9 @@ def make_logdet_grad_numpy_vec_fn(
 
         return _vec_eig_grad
 
-    # Chebyshev-family (chebyshev / cheb_cholesky / cheb_stochastic / slq) share
+    # Chebyshev-family (chebyshev / cheb_cholesky / lu_cheb / cheb_stochastic) share
     # the Clenshaw-derivative, which vectorizes naturally over ρ arrays.
-    if method in ("chebyshev", "cheb_stochastic", "cheb_cholesky", "lu_cheb", "slq"):
+    if method in ("chebyshev", "cheb_stochastic", "cheb_cholesky", "lu_cheb"):
         if method == "chebyshev":
             out = chebyshev(W_sparse, order=20, rmin=rho_min, rmax=rho_max, eigs=eigs)
             coeffs, rmin_cb, rmax_cb = out["coeffs"], out["rmin"], out["rmax"]
@@ -389,17 +372,11 @@ def make_logdet_grad_numpy_vec_fn(
             coeffs, rmin_cb, rmax_cb = _cheb_stochastic_coeffs(
                 W_sparse, rho_min, rho_max
             )
-        elif method in ("cheb_cholesky", "lu_cheb"):
+        else:
             pre = _cheb_precompute_for(method)(
                 W_sparse, order=None, rho_min=rho_min, rho_max=rho_max
             )
             coeffs, rmin_cb, rmax_cb = pre.coeffs, pre.rho_min, pre.rho_max
-        else:  # slq
-            pre = slq_logdet_precompute(W_sparse)
-            cheb = slq_to_chebyshev_coeffs(
-                pre, W=W_sparse, order=20, rho_min=rho_min, rho_max=rho_max
-            )
-            coeffs, rmin_cb, rmax_cb = cheb["coeffs"], cheb["rmin"], cheb["rmax"]
 
         def _vec_cheb_grad(rho_arr):
             rho_arr = np.asarray(rho_arr, dtype=np.float64)
@@ -463,6 +440,10 @@ def make_logdet_grad_numpy_vec_fn(
             return _scale(np.asarray(deriv(r), dtype=np.float64))
 
         return _vec_grid_spline_grad
+
+    if method == "cholmod":
+        ev = ExactCholLogdet(W_sparse)
+        return lambda rho_arr: _scale(ev.grad(rho_arr))
 
     raise ValueError(f"Unsupported logdet method: {method!r}")
 
@@ -557,15 +538,9 @@ def make_logdet_numpy_vec_fn(
 
         return _vec_grid_spline
 
-    if method == "slq":
-        # SLQ precompute → Chebyshev coefficients → vectorized Clenshaw
-        pre = slq_logdet_precompute(W_sparse)
-        cheb = slq_to_chebyshev_coeffs(
-            pre, W=W_sparse, order=20, rho_min=rho_min, rho_max=rho_max
-        )
-        coeffs = cheb["coeffs"].astype(np.float64)
-        rmin_cb, rmax_cb = float(cheb["rmin"]), float(cheb["rmax"])
-        return lambda rho_arr: _clenshaw_vec(coeffs, rho_arr, rmin_cb, rmax_cb, T)
+    if method == "cholmod":
+        ev = ExactCholLogdet(W_sparse)
+        return lambda rho_arr: ev.value(rho_arr) if T == 1 else T * ev.value(rho_arr)
 
     raise ValueError(f"Unsupported logdet method: {method!r}")
 
@@ -660,20 +635,8 @@ def make_logdet_fn(
                 return val if T == 1 else T * val
 
             return _chol_aaa_sparse
-        if method == "slq":
-            # SLQ precompute → Chebyshev coefficients → differentiable Clenshaw
-            pre = slq_logdet_precompute(W_sparse)
-            cheb = slq_to_chebyshev_coeffs(
-                pre, W=W_sparse, order=20, rho_min=rho_min, rho_max=rho_max
-            )
-            coeffs_np = cheb["coeffs"]
-            rmin_cb, rmax_cb = cheb["rmin"], cheb["rmax"]
-
-            def _slq_sparse(rho):
-                val = logdet_chebyshev(rho, coeffs_np, rmin=rmin_cb, rmax=rmax_cb)
-                return val if T == 1 else T * val
-
-            return _slq_sparse
+        if method == "cholmod":
+            return exact_chol_logdet_fn(ExactCholLogdet(W_sparse), T)
         if method == "chebyshev":
             out = chebyshev(W_sparse, order=20, rmin=rho_min, rmax=rho_max)
             coeffs_np = out["coeffs"]
@@ -780,25 +743,13 @@ def make_logdet_fn(
             return val if T == 1 else T * val
 
         return _chol_aaa_dense
-    if method == "slq":
-        # SLQ precompute → Chebyshev coefficients → differentiable Clenshaw
-        pre = slq_logdet_precompute(W_dense)
-        cheb = slq_to_chebyshev_coeffs(
-            pre, W=sp.csr_matrix(W_dense), order=20, rho_min=rho_min, rho_max=rho_max
-        )
-        coeffs_np = cheb["coeffs"]
-        rmin_cb, rmax_cb = cheb["rmin"], cheb["rmax"]
-
-        def _slq_dense(rho):
-            val = logdet_chebyshev(rho, coeffs_np, rmin=rmin_cb, rmax=rmax_cb)
-            return val if T == 1 else T * val
-
-        return _slq_dense
     if method == "eigenvalue":
         eigs = np.linalg.eigvals(W_dense)
         if T == 1:
             return lambda rho: logdet_eigenvalue(rho, eigs)
         return lambda rho: T * logdet_eigenvalue(rho, eigs)
+    if method == "cholmod":
+        return exact_chol_logdet_fn(ExactCholLogdet(sp.csr_matrix(W_dense)), T)
     if method == "chebyshev":
         out = chebyshev(W_dense, order=20, rmin=rho_min, rmax=rho_max)
         coeffs_np = out["coeffs"]
@@ -866,7 +817,7 @@ def get_cached_logdet_fn(
     resolved_method = resolve_logdet_method(method, n=n_w, W=W)
 
     # NOTE: the key carries no rng/seed component by design — the stochastic
-    # precomputes (SLQ, cheb_stochastic) default to a fixed rng(0), so the
+    # precompute (cheb_stochastic) defaults to a fixed rng(0), so the
     # cached callable is deterministic for a given (W, method, bounds, T).
     key = (
         _logdet_w_signature(W),

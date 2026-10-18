@@ -95,14 +95,6 @@ class SARHurdleNegBinFlowSeparablePanelRE(
             raise ValueError(
                 f"{type(self).__name__} needs at least one positive count."
             )
-        method = kwargs.pop("logdet_method", None)
-        _VALID = {"eigenvalue", "chebyshev", "cheb_cholesky", "aaa", "cheb_stochastic"}
-        if method is not None and method not in _VALID:
-            raise ValueError(
-                f"logdet_method must be None (auto) or one of {sorted(_VALID)}; "
-                f"got {method!r}."
-            )
-        kwargs["logdet_method"] = method
         super().__init__(y_arr.astype(np.float64), X, W, effects=0, **kwargs)
         # Binary design, before the effects drop absorbed columns.
         self._sel_is_X = X_zero is None

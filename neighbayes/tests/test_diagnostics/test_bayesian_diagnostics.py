@@ -1365,7 +1365,6 @@ def fitted_sarflow(_flow_ring_graph):
         data["X"],
         data["G"],
         col_names=data["col_names"],
-        logdet_method="traces",
         nonnegative_dependence=False,
     )
     sar.fit(draws=150, tune=150, chains=2, progressbar=False, random_seed=0)

@@ -1,27 +1,31 @@
-"""Log-determinant configuration: method enum, resolution, and bounds.
+"""Log-determinant configuration: method names, resolution, and bounds.
 
-Five methods are supported:
+A model names its log-determinant with two arguments.  ``logdet_method`` is the
+approximation over ρ:
 
-* ``"eigenvalue"`` — exact O(n) per-call after one-time O(n³) eigendecomposition.
-* ``"slq"`` — stochastic Lanczos quadrature; D-symmetrized batched Lanczos
-  with Gauss quadrature trace estimation → Chebyshev coefficients.
-* ``"chebyshev"`` — Barry-Pace Monte Carlo traces → Chebyshev approximation; O(m) per call.
-* ``"cheb_stochastic"`` — stochastic Chebyshev expansion (Han et al. 2015);
-  operator-valued Chebyshev polynomials with geometric convergence via
-  Bernstein ellipse.  Same matvec cost as ``chebyshev`` but better accuracy at high |ρ|.
-* ``"grid_spline"`` — incumbent baseline: exact sparse-LU log-determinants on
-  an equispaced grid of 100 rho values, then cubic-spline interpolation.
-* ``"traces"`` — multinomial trace expansion for unrestricted 3-parameter
-  flow models (the only option when the system matrix doesn't factor).
+* ``"exact"`` — evaluated directly at every ρ;
+* ``"cheb"`` — Chebyshev interpolation of exact values at Chebyshev nodes;
+* ``"aaa"`` — AAA rational interpolation of exact values at adaptive points;
+* ``"spline"`` — cubic spline through exact values on a grid;
+* ``"stochastic"`` — stochastic Chebyshev expansion (Han et al. 2015), no
+  factorization;
+* ``"trace_series"``, ``"resolvent"`` — the unrestricted flow models' exact
+  trace series and stochastic resolvent estimator.
 
-When ``logdet_method`` is ``None`` the method is auto-selected:
-``"eigenvalue"`` for n ≤ ``NEIGHBAYES_LOGDET_EIGEN_MAX_N`` (default 500),
-``"chol_aaa"`` for n ≤ ``NEIGHBAYES_LOGDET_CHEB_MAX_N`` (default 60000)
-when ``W`` is symmetric (undirected graph), ``"aaa"`` when ``W`` is
-non-symmetric (directed graph), otherwise ``"cheb_stochastic"``
-(geometric convergence, same cost as Barry-Pace).
-``"cheb_cholesky"`` (Chebyshev interpolation via Cholesky) and
-``"slq"`` and ``"chebyshev"`` are available as explicit opt-ins.
+``logdet_decomp`` names what supplies the exact values: ``"eig"`` (dense
+eigendecomposition), ``"chol"`` (sparse Cholesky, for undirected ``W``) or
+``"lu"`` (sparse LU).  ``"auto"`` takes the first of ``eig`` (n ≤
+``NEIGHBAYES_LOGDET_EIGEN_MAX_N``, default 500), ``chol`` (an undirected,
+D-symmetrizable ``W``) and ``lu`` that the method is implemented on.  The
+stochastic and flow methods use no decomposition.
+
+With both left to auto the method is selected from the problem: ``exact`` on
+``eig`` for n ≤ 500; ``aaa`` on ``chol`` (undirected ``W``) or ``lu``
+(directed) for n ≤ ``NEIGHBAYES_LOGDET_FACTOR_MAX_N`` (default 60000) unless
+factorization fill-in would dominate; ``stochastic`` otherwise.
+
+Internally each pair resolves to one key (:func:`logdet_key`), on which the
+factories and samplers dispatch.
 """
 
 from __future__ import annotations
@@ -46,10 +50,9 @@ _LOGDET_FN_CACHE: OrderedDict[tuple, Any] = OrderedDict()
 
 
 class LogDetMethod(str, Enum):
-    """Canonical log-determinant computation methods."""
+    """Internal log-determinant keys (see :func:`logdet_key` for the public names)."""
 
     EIGENVALUE = "eigenvalue"
-    SLQ = "slq"
     CHEBYSHEV = "chebyshev"
     CHEB_STOCHASTIC = "cheb_stochastic"
     CHEB_CHOLESKY = "cheb_cholesky"
@@ -57,7 +60,6 @@ class LogDetMethod(str, Enum):
     AAA = "aaa"
     CHOL_AAA = "chol_aaa"
     GRID_SPLINE = "grid_spline"
-    TRACES = "traces"
     CHOLMOD = "cholmod"  # JAX-native sparse CHOLMOD logdet (requires sparsax)
 
 
@@ -65,7 +67,6 @@ VALID_LOGDET_METHODS: frozenset[str] = frozenset(m.value for m in LogDetMethod)
 
 LogDetMethodName = Literal[
     "eigenvalue",
-    "slq",
     "chebyshev",
     "cheb_stochastic",
     "cheb_cholesky",
@@ -73,9 +74,102 @@ LogDetMethodName = Literal[
     "aaa",
     "chol_aaa",
     "grid_spline",
-    "traces",
     "cholmod",
 ]
+
+#: The public names: the approximation over ρ, and what supplies its exact values.
+LOGDET_METHODS = (
+    "exact",
+    "cheb",
+    "aaa",
+    "spline",
+    "stochastic",
+    "trace_series",
+    "resolvent",
+)
+LOGDET_DECOMPS = ("auto", "eig", "chol", "lu")
+
+#: ``(logdet_method, logdet_decomp)`` → internal key.
+_KEYS = {
+    ("exact", "eig"): "eigenvalue",
+    ("exact", "chol"): "cholmod",
+    ("cheb", "eig"): "chebyshev",
+    ("cheb", "chol"): "cheb_cholesky",
+    ("cheb", "lu"): "lu_cheb",
+    ("aaa", "chol"): "chol_aaa",
+    ("aaa", "lu"): "aaa",
+    ("spline", "lu"): "grid_spline",
+}
+#: Methods that use no decomposition (``logdet_decomp`` is ignored).
+_UNDECOMPOSED = {"stochastic": "cheb_stochastic"}
+#: The unrestricted flow models' own methods.
+FLOW_LOGDET_METHODS = ("trace_series", "resolvent")
+_PUBLIC = {key: pair for pair, key in _KEYS.items()} | {
+    key: (method, None) for method, key in _UNDECOMPOSED.items()
+}
+
+
+def logdet_key(
+    method: str | None, decomp: str = "auto", *, n: int, W=None
+) -> str | None:
+    """The internal key for ``logdet_method`` × ``logdet_decomp``.
+
+    ``None`` when both are left to auto (the key is then selected from the
+    problem by :func:`resolve_logdet_method`).  A method given with
+    ``decomp="auto"`` takes the first decomposition it is implemented on among
+    ``eig`` (only for ``n ≤ NEIGHBAYES_LOGDET_EIGEN_MAX_N``), ``chol`` (only
+    for an undirected ``W``) and ``lu``; a decomposition given with
+    ``method=None`` takes ``exact`` on ``eig`` and ``aaa`` otherwise.
+
+    Raises
+    ------
+    ValueError
+        For an unknown name, or a flow-only method.
+    NotImplementedError
+        For a pair with no implementation (e.g. ``spline`` on ``chol``).
+    """
+    if decomp not in LOGDET_DECOMPS:
+        raise ValueError(
+            f"logdet_decomp must be one of {LOGDET_DECOMPS}, got {decomp!r}."
+        )
+    if method is None:
+        if decomp == "auto":
+            return None
+        method = "exact" if decomp == "eig" else "aaa"
+    if method not in LOGDET_METHODS:
+        raise ValueError(
+            f"logdet_method must be one of {LOGDET_METHODS} or None, got {method!r}."
+        )
+    if method in FLOW_LOGDET_METHODS:
+        raise ValueError(
+            f"logdet_method={method!r} is for the unrestricted flow models only."
+        )
+    if method in _UNDECOMPOSED:
+        return _UNDECOMPOSED[method]
+    if decomp == "auto":
+        usable = {"eig": n <= _eigen_cutoff(), "chol": _is_symmetric_W(W), "lu": True}
+        found = [d for d in ("eig", "chol", "lu") if usable[d] and (method, d) in _KEYS]
+        if not found:
+            raise NotImplementedError(
+                f"logdet_method={method!r} has no decomposition for this W: eig is "
+                f"past NEIGHBAYES_LOGDET_EIGEN_MAX_N, chol needs an undirected W, "
+                f"and {method} on lu is not implemented."
+            )
+        decomp = found[0]
+    key = _KEYS.get((method, decomp))
+    if key is None:
+        pairs = ", ".join(f"{m}/{d}" for m, d in _KEYS)
+        raise NotImplementedError(
+            f"logdet_method={method!r} on logdet_decomp={decomp!r} is not "
+            f"implemented; implemented pairs: {pairs}."
+        )
+    return key
+
+
+def logdet_label(key: str) -> str:
+    """The public spelling of an internal key, for messages (``"aaa on chol"``)."""
+    method, decomp = _PUBLIC.get(key, (key, None))
+    return method if decomp is None else f"{method} on {decomp}"
 
 
 # ---------------------------------------------------------------------------
@@ -224,11 +318,11 @@ def _auto_logdet_method(n: int, W=None) -> str:
     symmetrizing-diagonal recovery roughly halved Cholesky setup: at n = 60,000
     the exact path now costs ~850ms more than the stochastic one for six orders
     of magnitude less error, which is negligible against any chain that runs for
-    seconds.  Raise it further via ``NEIGHBAYES_LOGDET_CHEB_MAX_N`` if Cholesky
+    seconds.  Raise it further via ``NEIGHBAYES_LOGDET_FACTOR_MAX_N`` if Cholesky
     fill-in on your graph stays affordable past that.
     """
     eigen_cutoff = _eigen_cutoff()
-    cheb_cutoff_raw = os.getenv("NEIGHBAYES_LOGDET_CHEB_MAX_N", "60000")
+    cheb_cutoff_raw = os.getenv("NEIGHBAYES_LOGDET_FACTOR_MAX_N", "60000")
     try:
         cheb_cutoff = max(eigen_cutoff + 1, int(cheb_cutoff_raw))
     except ValueError:
@@ -252,8 +346,9 @@ def _auto_logdet_method(n: int, W=None) -> str:
                     f"Estimated fill-in ratio nnz(W²)/nnz(W) ≈ {ratio:.0f}× "
                     f"exceeds max_fillin_ratio={max_ratio:.0f}×. "
                     f"Sparse factorization fill-in would dominate setup cost; "
-                    f"auto-selecting cheb_stochastic instead of {fallback}. "
-                    f"Set logdet_method explicitly to override.",
+                    f"auto-selecting the stochastic method instead of "
+                    f"{logdet_label(fallback)}. Set logdet_method explicitly to "
+                    f"override.",
                     stacklevel=3,
                 )
                 return "cheb_stochastic"
@@ -285,7 +380,7 @@ def _eigen_cutoff() -> int:
         return 500
 
 
-#: Hard limit for explicit ``logdet_method="eigenvalue"`` on large W.
+#: Hard limit for an explicit ``logdet_decomp="eig"`` on large W.
 #: The auto-select cutoff (:func:`_eigen_cutoff`, default 500) is a performance
 #: guideline — slightly exceeding it is fine.  This hard guard prevents
 #: genuinely dangerous O(n²) memory allocations (e.g. a dense 20k×20k matrix
@@ -298,7 +393,7 @@ def _eigen_hard_max_n() -> int:
 
     The auto-select cutoff (``NEIGHBAYES_LOGDET_EIGEN_MAX_N``, default 500) is
     a performance guideline — tests and users may legitimately force
-    ``logdet_method="eigenvalue"`` on moderately larger W.  This hard guard
+    ``logdet_decomp="eig"`` on moderately larger W.  This hard guard
     only fires when the allocation would be genuinely dangerous (O(n²) memory
     in the multi-GB range).  Read from ``NEIGHBAYES_LOGDET_EIGEN_HARD_MAX_N``
     (default 5000; a 5000×5000 dense matrix is ~200 MB).

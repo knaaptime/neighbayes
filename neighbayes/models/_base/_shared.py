@@ -1070,8 +1070,8 @@ class SharedSpatialMethods(metaclass=FacadeMeta):
             If ``n`` exceeds ``NEIGHBAYES_LOGDET_EIGEN_MAX_N`` (default 500).
             The eigenvalue logdet method densifies ``W`` and runs an O(n³)
             eigendecomposition, which is prohibitively expensive for large
-            graphs.  Use ``logdet_method="cheb_cholesky"`` (symmetric ``W``)
-            or ``logdet_method="aaa"`` (non-symmetric ``W``) instead.
+            graphs.  Use ``logdet_decomp="chol"`` (undirected ``W``) or
+            ``"lu"`` (directed ``W``) instead.
         """
         if self._W_sparse is None:
             return None
@@ -1083,9 +1083,8 @@ class SharedSpatialMethods(metaclass=FacadeMeta):
                 f"Eigenvalue logdet/effect computation requires densifying W "
                 f"(n={n} > NEIGHBAYES_LOGDET_EIGEN_HARD_MAX_N={_eigen_hard_max_n()}). "
                 f"This is O(n³) and O(n²) memory. Use "
-                f'logdet_method="cheb_cholesky" (symmetric W) or '
-                f'logdet_method="aaa" (non-symmetric W) instead, or raise '
-                f"NEIGHBAYES_LOGDET_EIGEN_HARD_MAX_N."
+                f'logdet_decomp="chol" (undirected W) or "lu" (directed W) '
+                f"instead, or raise NEIGHBAYES_LOGDET_EIGEN_HARD_MAX_N."
             )
         return np.linalg.eigvals(self._W_sparse.toarray().astype(np.float64))
 
@@ -1443,9 +1442,8 @@ class SharedSpatialMethods(metaclass=FacadeMeta):
                 f"Eigenvalue logdet/effect computation requires densifying W "
                 f"(n={n} > NEIGHBAYES_LOGDET_EIGEN_HARD_MAX_N={_eigen_hard_max_n()}). "
                 f"This is O(n³) and O(n²) memory. Use "
-                f'logdet_method="cheb_cholesky" (symmetric W) or '
-                f'logdet_method="aaa" (non-symmetric W) instead, or raise '
-                f"NEIGHBAYES_LOGDET_EIGEN_HARD_MAX_N."
+                f'logdet_decomp="chol" (undirected W) or "lu" (directed W) '
+                f"instead, or raise NEIGHBAYES_LOGDET_EIGEN_HARD_MAX_N."
             )
         W_dense = np.asarray(self._W_sparse.toarray(), dtype=np.float64)
         eigs, V = np.linalg.eig(W_dense)
