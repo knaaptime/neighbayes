@@ -215,7 +215,7 @@ def _simulate_sar_hurdle_negbin_panel_re(
 
     .. math::
 
-        \eta_{z,t} = (I - \rho_z W_z)^{-1} X_{z,t}\beta_z + c_z + \tau_{z,t},
+        \eta_{z,t} = (I - \rho_z W_z)^{-1} (X_{z,t}\beta_z + c_z) + \tau_{z,t},
 
     with a fresh ``X_{z,t}`` (intercept plus standard-normal columns) each
     period, ``d_{it} ~ Bernoulli(logit⁻¹(η_{z,it}))`` and ``y = d · tNB``.
@@ -276,7 +276,7 @@ def _simulate_sar_hurdle_negbin_panel_re(
             [np.ones(N), rng.standard_normal((N, len(beta_zero) - 1))]
         )
         Z_list.append(Z_t)
-        eta_list.append(solve(Z_t @ beta_zero) + sel_unit + sel_time[t])
+        eta_list.append(solve(Z_t @ beta_zero + sel_unit) + sel_time[t])
     X_zero = np.vstack(Z_list)
     eta_bin = np.concatenate(eta_list)
     d = rng.binomial(1, 1.0 / (1.0 + np.exp(-eta_bin)))

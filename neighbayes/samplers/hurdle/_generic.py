@@ -5,16 +5,17 @@ origin–destination pairs:
 
 .. math::
 
-    \eta^{\mathrm{b}} &= (I_T \otimes A_b(\lambda))^{-1} Z\gamma
-        + D_\tau\tau_b + D_g c_b, \qquad
+    \eta^{\mathrm{b}} &= (I_T \otimes A_b(\lambda))^{-1} (Z\gamma + D_g c_b)
+        + D_\tau\tau_b, \qquad
     P(y > 0) = \mathrm{logit}^{-1}(\eta^{\mathrm{b}}), \\
-    \eta^{\mathrm{c}} &= (I_T \otimes A_c(\rho))^{-1} X\beta
-        + D_\tau\tau_c + D_g c_c, \qquad
+    \eta^{\mathrm{c}} &= (I_T \otimes A_c(\rho))^{-1} (X\beta + D_g c_c)
+        + D_\tau\tau_c, \qquad
     y \mid y > 0 \sim \mathrm{NB2}(e^{\eta^{\mathrm{c}}}, \alpha)
     \text{ truncated at } 0 .
 
 Either filter is one of :mod:`neighbayes.samplers.count_panel._filters`
-(``NoFilter`` for an aspatial half); each half is a
+(``NoFilter`` for an aspatial half), and each half's random effects enter
+inside its own filter; each half is a
 :class:`~neighbayes.samplers._utils._glm_equation.MaterializedEquation`.  The
 halves share no parameters, so the likelihood factorizes and each is sampled
 as its own model:
@@ -248,9 +249,9 @@ def run_chain(
                 if learned["group_sd"]:
                     out["group_sd"][j] = count.group_sd
                 if store_b is not None:
-                    store_b.add(j, binary.c)
+                    store_b.add(j, binary.effects())
                 if store_c is not None:
-                    store_c.add(j, count.c)
+                    store_c.add(j, count.effects())
                 if store_log_lik:
                     out["log_lik"][j] = hurdle_loglik_pointwise(
                         y, binary.eta, count.eta, alpha

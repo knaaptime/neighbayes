@@ -936,6 +936,7 @@ def _simulate_sar_negbin_flow_panel_re(
     pair_effect_sd: float = 0.0,
     time_effect_sd: float = 0.0,
     fe_x_corr: float = 0.0,
+    effects_inside: bool = True,
 ) -> dict:
     r"""Generate panel NB2 flow counts from a spatial autoregressive DGP.
 
@@ -992,9 +993,10 @@ def _simulate_sar_negbin_flow_panel_re(
         Accepted for API parity with other DGP functions; not used
         (pass *G* directly instead).
     pair_effect_sd : float, default 0.0
-        Standard deviation of origin-destination pair effects ``c_od`` added
-        to the log-mean outside the filter, :math:`\eta_t = A^{-1}X_t\beta
-        + c + \tau_t`.  Zero (the default) gives the pooled DGP.
+        Standard deviation of the random origin-destination pair effects
+        ``c_od``, which enter inside the filter with the covariates,
+        :math:`\eta_t = A^{-1}(X_t\beta + c) + \tau_t`.  Zero (the default)
+        gives the DGP without effects.
     time_effect_sd : float, default 0.0
         Standard deviation of the period effects ``τ_t`` (``τ_0 = 0``).
     fe_x_corr : float, default 0.0
@@ -1003,6 +1005,9 @@ def _simulate_sar_negbin_flow_panel_re(
         unit-level component of this weight, and ``c_od`` loads on the
         persistent components of origin ``o`` and destination ``d``.  Makes a
         pooled fit biased, so fixed-effects recovery tests have power.
+    effects_inside : bool, default True
+        Pass the pair effects through the filter; ``False`` adds them after it,
+        as the separable flow panels still model them.
 
     Returns
     -------
@@ -1094,8 +1099,11 @@ def _simulate_sar_negbin_flow_panel_re(
 
         Xbeta = design.combined @ beta_full  # (N,)
 
-        # Solve A eta = Xbeta  (reduced form: no sigma, no noise)
-        eta_t = solve_A(Xbeta) + pair_effect + time_effect[t]
+        # Solve A eta = Xbeta + c  (reduced form: no sigma, no noise)
+        if effects_inside:
+            eta_t = solve_A(Xbeta + pair_effect) + time_effect[t]
+        else:
+            eta_t = solve_A(Xbeta) + pair_effect + time_effect[t]
         lambda_t = np.exp(eta_t)
         p_nb = alpha / (alpha + lambda_t)
         y_t = rng.negative_binomial(alpha, p_nb).astype(np.int64)
@@ -1256,7 +1264,11 @@ def _simulate_sar_negbin_flow_separable_panel_re(
     rho_o: float = 0.2,
     **kwargs,
 ) -> dict:
-    """Panel NB2 flow DGP with separability constraint ``rho_w=-rho_d*rho_o``."""
+    """Panel NB2 flow DGP with separability constraint ``rho_w=-rho_d*rho_o``.
+
+    The pair effects are added after the filter, as the separable flow panels
+    still model them.
+    """
     rho_w = -rho_d * rho_o
     return _simulate_sar_negbin_flow_panel_re(
         n=n,
@@ -1265,6 +1277,7 @@ def _simulate_sar_negbin_flow_separable_panel_re(
         rho_d=rho_d,
         rho_o=rho_o,
         rho_w=rho_w,
+        effects_inside=False,
         **kwargs,
     )
 

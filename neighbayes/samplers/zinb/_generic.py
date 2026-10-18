@@ -7,14 +7,15 @@ origin–destination pairs:
 
     \eta^{\mathrm{sel}} &= (I_T \otimes A_s(\lambda))^{-1} Z\gamma, \qquad
     z \sim \mathrm{Bernoulli}(\mathrm{logit}^{-1}(\eta^{\mathrm{sel}})), \\
-    \eta^{\mathrm{cnt}} &= (I_T \otimes A_c(\rho))^{-1} X\beta + D_\tau\tau + D_g c,
+    \eta^{\mathrm{cnt}} &= (I_T \otimes A_c(\rho))^{-1} (X\beta + D_g c) + D_\tau\tau,
     \qquad y \mid z = 1 \sim \mathrm{NB2}(e^{\eta^{\mathrm{cnt}}}, \alpha),
     \quad y \mid z = 0 = 0.
 
 Structural zeros are per period.  Either filter is one of
 :mod:`neighbayes.samplers.count_panel._filters` (``NoFilter`` for an aspatial
-equation); group effects ``c`` and period effects ``τ`` enter the count
-equation only, exactly as in :mod:`neighbayes.samplers.count_panel`.
+equation); random group effects ``c`` (inside the filter) and period effects
+``τ`` enter the count equation only, exactly as in
+:mod:`neighbayes.samplers.count_panel`.
 
 **Sweep** (partially collapsed Gibbs):
 
@@ -212,7 +213,7 @@ def run_chain(
                 for name in filt_cnt.names:
                     out[name][j] = cnt.params[name]
                 if gstore is not None:
-                    gstore.add(j, cnt.c)
+                    gstore.add(j, cnt.effects())
                 if store_log_lik:
                     out["log_lik"][j] = _zinb_loglik_pointwise(
                         y, sel.eta, cnt.eta, alpha

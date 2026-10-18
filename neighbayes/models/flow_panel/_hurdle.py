@@ -328,8 +328,10 @@ class SARHurdleNegBinFlowSeparablePanelRE(
                 sigma=pr.gamma_sigma,
                 dims="coefficient_zero",
             )
-            Xb = pt.reshape(pt.dot(X_t, beta), (T, N)).T
-            Zg = pt.reshape(pt.dot(Z_t, gamma), (T, N)).T
+            inner_c, outer_c = self._pymc_fe_terms()
+            inner_b, outer_b = self._pymc_fe_terms(True, self._sel_fe_priors())
+            Xb = pt.reshape(pt.dot(X_t, beta) + inner_c, (T, N)).T
+            Zg = pt.reshape(pt.dot(Z_t, gamma) + inner_b, (T, N)).T
             eta_c = pt.reshape(
                 KroneckerFlowSolveMatrixOp(self._W_sparse, n)(rho_d, rho_o, Xb).T,
                 (N * T,),
@@ -338,8 +340,8 @@ class SARHurdleNegBinFlowSeparablePanelRE(
                 KroneckerFlowSolveMatrixOp(self._W_zero_sparse, n)(lam_d, lam_o, Zg).T,
                 (N * T,),
             )
-            eta_c = eta_c + self._pymc_fe_offset()
-            eta_b = eta_b + self._pymc_fe_offset(True, self._sel_fe_priors())
+            eta_c = eta_c + outer_c
+            eta_b = eta_b + outer_b
             alpha = nb_alpha_rv(pr.alpha_fixed, pr.alpha_nu, pr.alpha_sigma)
             pm.HurdleNegativeBinomial(
                 "obs",
@@ -364,19 +366,21 @@ class SARHurdleNegBinFlowSeparablePanelRE(
     def _part_etas(self, g: int) -> tuple[np.ndarray, np.ndarray]:
         """``(η_b, η_c)`` at draw ``g`` (pair-effect posterior means if summarized)."""
         f = self._flat_draw
+        inner_b, outer_b = self._effects_at(g, True)
+        inner_c, outer_c = self._effects_at(g, False)
         eta_b = self._kron_eta(
             self._W_zero_sparse,
             float(f("rho_d_zero")[g]),
             float(f("rho_o_zero")[g]),
-            self._Z @ f("beta_zero")[g],
+            self._Z @ f("beta_zero")[g] + inner_b,
         )
         eta_c = self._kron_eta(
             self._W_sparse,
             float(f("rho_d")[g]),
             float(f("rho_o")[g]),
-            self._X @ f("beta")[g],
+            self._X @ f("beta")[g] + inner_c,
         )
-        return eta_b + self._effects_at(g, True), eta_c + self._effects_at(g, False)
+        return eta_b + outer_b, eta_c + outer_c
 
     def _gamma_layout(self, posterior) -> np.ndarray:
         """Posterior ``beta_zero`` in the full flow-design layout (absorbed columns NaN)."""

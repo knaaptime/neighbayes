@@ -308,9 +308,9 @@ def sar_zinb_data():
     return dgp.simulate_sar_zinb(
         W=_as_sparse(W),
         rho=RHO_ZINB,
-        lam=LAM_ZINB,
+        rho_zero=LAM_ZINB,
         beta=BETA_ZINB,
-        gamma=GAMMA_ZINB,
+        beta_zero=GAMMA_ZINB,
         alpha=ALPHA_ZINB,
         rng=rng,
     )
@@ -323,14 +323,14 @@ def test_sar_zinb_backend_recovery(sar_zinb_data, backend):
 
     d = sar_zinb_data
     W = W_to_graph(make_rook_W(SIDE_NB))
-    idata = SARZINB(y=d["y"], X=d["X"], Z=d["Z"], W=W).fit(
+    idata = SARZINB(y=d["y"], X=d["X"], X_zero=d["X_zero"], W=W).fit(
         backend=backend, **_fit_kwargs(backend)
     )
 
     rho_hat = float(idata.posterior["rho"].mean())
-    lam_hat = float(idata.posterior["lam"].mean())
+    lam_hat = float(idata.posterior["rho_zero"].mean())
     beta_hat = idata.posterior["beta"].mean(("chain", "draw")).values
-    gamma_hat = idata.posterior["gamma"].mean(("chain", "draw")).values
+    gamma_hat = idata.posterior["beta_zero"].mean(("chain", "draw")).values
     alpha_hat = float(idata.posterior["alpha"].mean())
 
     assert abs(rho_hat - RHO_ZINB) < TOL_SPATIAL_ZINB, (
@@ -429,9 +429,9 @@ def sar_zinb_small_data():
     return dgp.simulate_sar_zinb(
         n_side=18,
         rho=RHO_ZINB,
-        lam=LAM_ZINB,
+        rho_zero=LAM_ZINB,
         beta=BETA_ZINB,
-        gamma=GAMMA_ZINB,
+        beta_zero=GAMMA_ZINB,
         alpha=ALPHA_ZINB,
         seed=3,
     )
@@ -452,7 +452,7 @@ def test_sar_zinb_backends_agree(sar_zinb_small_data):
 
     fits = {}
     for backend in BACKENDS:
-        idata = SARZINB(y=d["y"], X=d["X"], Z=d["Z"], W=W).fit(
+        idata = SARZINB(y=d["y"], X=d["X"], X_zero=d["X_zero"], W=W).fit(
             backend=backend, **_fit_kwargs(backend)
         )
         fits[backend] = idata.posterior
@@ -463,10 +463,10 @@ def test_sar_zinb_backends_agree(sar_zinb_small_data):
 
     for name, tol in (
         ("rho", 0.08),
-        ("lam", 0.08),
+        ("rho_zero", 0.08),
         ("alpha", 0.25),
         ("beta", 0.10),
-        ("gamma", 0.08),
+        ("beta_zero", 0.08),
     ):
         a, b = _mean(fits["numpy"], name), _mean(fits["jax"], name)
         assert np.allclose(a, b, atol=tol), (
@@ -487,22 +487,28 @@ def _assert_backends_agree(posteriors, tols, label):
         )
 
 
-# (model name, fixture, builder, tolerances)
+# (model name, unit effects, fixture, tolerances)
 _AGREEMENT_CASES = [
-    ("SARLogit", "sar_logit_data", {"rho": 0.05, "beta": 0.05}),
-    ("SARLogitRE", "sar_logit_struct_data", {"rho": 0.05, "beta": 0.05}),
-    ("SEMLogitRE", "sem_logit_data", {"lam": 0.06, "beta": 0.05}),
-    ("SARNegBin", "sar_negbin_data", {"rho": 0.05, "beta": 0.05, "alpha": 0.15}),
+    ("SARLogit", None, "sar_logit_data", {"rho": 0.05, "beta": 0.05}),
+    ("SARLogit", "random", "sar_logit_struct_data", {"rho": 0.05, "beta": 0.05}),
+    ("SEMLogit", "random", "sem_logit_data", {"lam": 0.06, "beta": 0.05}),
     (
-        "SARNegBinRE",
+        "SARNegBin",
+        None,
+        "sar_negbin_data",
+        {"rho": 0.05, "beta": 0.05, "alpha": 0.15},
+    ),
+    (
+        "SARNegBin",
+        "random",
         "sar_negbin_struct_data",
         {"rho": 0.05, "beta": 0.05, "alpha": 0.15},
     ),
 ]
 
 
-@pytest.mark.parametrize("model_name,fixture_name,tols", _AGREEMENT_CASES)
-def test_backends_agree(request, model_name, fixture_name, tols):
+@pytest.mark.parametrize("model_name,unit_effects,fixture_name,tols", _AGREEMENT_CASES)
+def test_backends_agree(request, model_name, unit_effects, fixture_name, tols):
     """Every dual-backend family must sample the *same* posterior.
 
     The recovery tests above compare each backend to truth, at tolerances
@@ -522,6 +528,8 @@ def test_backends_agree(request, model_name, fixture_name, tols):
         W = W_to_graph(make_rook_W(SIDE_NB))
         kwargs = dict(y=data["y"], X=data["X"], W=W)
 
+    if unit_effects is not None:
+        kwargs["unit_effects"] = unit_effects
     posteriors = {
         b: cls(**kwargs).fit(backend=b, **_fit_kwargs(b)).posterior for b in BACKENDS
     }

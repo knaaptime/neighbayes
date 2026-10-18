@@ -3,6 +3,15 @@
 Each filter knows its ρ names, their box bounds, the admissible region, and how
 to solve the per-period system for a time-first stacked ``(N·T, k)`` right-hand
 side (``N`` groups per period).  One factorization of ``A`` covers all periods.
+
+A filter whose group effects enter inside it also gives the per-period ``A`` at
+ρ (:meth:`effect_operator`), ``AᵀA`` with its log-determinant when the solve's
+factorization already holds it (:meth:`effect_gram`), and a sparsity pattern
+covering ``AᵀA`` at every ρ (:meth:`effect_pattern`); see
+:class:`~neighbayes.samplers._utils._group_effects.SARGroupProjector`.  The
+others return ``None``: with ``A = I`` inside and outside coincide, and the
+separable flow filter keeps its effects outside until the structured flow
+kernels carry them inside.
 """
 
 from __future__ import annotations
@@ -36,8 +45,21 @@ class NoFilter:
     def solve(self, rho: dict, X: np.ndarray) -> np.ndarray:
         return X
 
+    def effect_operator(self, rho: dict) -> None:
+        return None
+
     def init(self, rng: np.random.Generator) -> dict:
         return {}
+
+
+def _gram_pattern(*Ws: sp.spmatrix) -> sp.csc_matrix:
+    """A matrix with the pattern of ``AᵀA`` for every ``A = I − Σ ρ_k W_k``.
+
+    Built from ``I + Σ |W_k|`` so that no entry cancels for want of a sign.
+    """
+    n = Ws[0].shape[0]
+    B = sp.eye(n, format="csc") + sum(abs(sp.csc_matrix(W)) for W in Ws)
+    return (B.T @ B).tocsc()
 
 
 class SARFilter:
@@ -53,6 +75,7 @@ class SARFilter:
         self.T = int(T)
         self._bounds = (float(lower), float(upper))
         self._solver = _FilterSolver(self.W_csc)
+        self._gram_parts = None
 
     def admissible(self, rho: dict) -> bool:
         lo, hi = self._bounds
@@ -64,6 +87,27 @@ class SARFilter:
     def solve(self, rho: dict, X: np.ndarray) -> np.ndarray:
         U = self._solver.at(float(rho["rho"])).solve(_stack(X, self.N, self.T))
         return _unstack(np.asarray(U).reshape(self.N, -1), self.N, self.T)
+
+    def effect_operator(self, rho: dict) -> sp.csc_matrix:
+        """``A = I − ρW``, which the group effects pass through."""
+        return (sp.eye(self.N, format="csc") - float(rho["rho"]) * self.W_csc).tocsc()
+
+    def effect_gram(self, rho: dict):
+        """``(AᵀA, log|AᵀA|)`` at ρ, the log-determinant ``2 log|A|`` from the
+        factorization :meth:`solve` holds (refactored only for a new ρ)."""
+        r = float(rho["rho"])
+        if self._gram_parts is None:
+            self._gram_parts = (
+                sp.eye(self.N, format="csc"),
+                (self.W_csc + self.W_csc.T).tocsc(),
+                (self.W_csc.T @ self.W_csc).tocsc(),
+            )
+        eye, W_sym, WtW = self._gram_parts
+        gram = (eye - r * W_sym + r * r * WtW).tocsc()
+        return gram, 2.0 * self._solver.at(r).logdet()
+
+    def effect_pattern(self) -> sp.csc_matrix:
+        return _gram_pattern(self.W_csc)
 
     def init(self, rng: np.random.Generator) -> dict:
         return {"rho": float(rng.uniform(-0.1, 0.1))}
@@ -93,6 +137,11 @@ class FlowSeparableFilter:
         return _solve_A_separable(
             rho["rho_d"], rho["rho_o"], X, self.W_csc, self.n, T=self.T
         )
+
+    def effect_operator(self, rho: dict) -> None:
+        # Effects stay outside this filter until the structured separable
+        # kernels, which share its model, carry them inside.
+        return None
 
     def init(self, rng: np.random.Generator) -> dict:
         return {k: float(rng.uniform(-0.1, 0.1)) for k in self.names}
@@ -145,6 +194,23 @@ class FlowUnrestrictedFilter:
             rho["rho_d"], rho["rho_o"], rho["rho_w"], self.Wd, self.Wo, self.Ww, self.Nf
         )
         return _solve_A_unrestricted(A, X, T=self.T)
+
+    def effect_operator(self, rho: dict) -> sp.csc_matrix:
+        """``A = I − ρ_d W_d − ρ_o W_o − ρ_w W_w``, which the pair effects pass through."""
+        from ..negbin_reduced._flow import _assemble_A_unrestricted
+
+        return _assemble_A_unrestricted(
+            rho["rho_d"], rho["rho_o"], rho["rho_w"], self.Wd, self.Wo, self.Ww, self.Nf
+        ).tocsc()
+
+    def effect_gram(self, rho: dict):
+        """``(AᵀA, None)``: no factorization of ``A`` is kept to read
+        ``log|AᵀA|`` from, so the projector factors ``AᵀA`` itself."""
+        A = self.effect_operator(rho)
+        return (A.T @ A).tocsc(), None
+
+    def effect_pattern(self) -> sp.csc_matrix:
+        return _gram_pattern(self.Wd, self.Wo, self.Ww)
 
     def init(self, rng: np.random.Generator) -> dict:
         lo = 0.0 if self.positive else -0.1

@@ -182,20 +182,25 @@ class HurdleMixin(TwoPartMixin):
             out.append(j)
         return out
 
-    def _effects_at(self, g: int, zero: bool) -> np.ndarray:
-        """``D_g c + D_τ τ`` of one part at draw ``g`` (summary mean if not stored)."""
+    def _effects_at(self, g: int, zero: bool) -> tuple[np.ndarray, np.ndarray]:
+        """One part's effects at draw ``g``, ``(inner, outer)`` (summary mean if
+        not stored): ``D_g c`` before the filter when the effects enter inside
+        it, and ``D_τ τ`` (with ``D_g c`` otherwise) after it."""
         post = self._idata.posterior
-        out = np.zeros(self._n_groups * self._T_count)
+        inner = np.zeros(self._n_groups * self._T_count)
+        outer = np.zeros_like(inner)
         if self._fe_groups:
             name = self._effect_name(zero=zero)
             if name in post.data_vars:
                 c = self._flat_draw(name)[g]
             else:
                 c = self._idata[self._effect_name("_summary", zero)]["mean"].values
-            out += np.asarray(c)[self._row_group]
+            (inner if self._effects_inside else outer)[:] += np.asarray(c)[
+                self._row_group
+            ]
         if self._fe_periods:
-            out += self._D_tau @ self._flat_draw(self._time_name(zero=zero))[g]
-        return out
+            outer += self._D_tau @ self._flat_draw(self._time_name(zero=zero))[g]
+        return inner, outer
 
     # ------------------------------------------------------------------
     # Posterior expectations and prediction

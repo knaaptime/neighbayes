@@ -5,15 +5,20 @@ The within transform that gives the Gaussian panels their fixed effects
 raw counts and carry the effects as parameters:
 
 * **Unit effects** ``c`` (one per spatial unit; pair effects, one per
-  origin–destination pair, in a flow panel) sit outside the spatial filter.  ``(I_T ⊗ A⁻¹)`` commutes
-  with the group dummies ``1_T ⊗ I``, so effects inside the filter are the same
-  model with ``c = A⁻¹μ``.  They are **partially pooled**: ``c_g ~ N(μ, σ²)``
-  with the sd σ learned (half-t(3, ``unit_effect_sd_scale``) prior), so a
-  unit seen in few periods is shrunk toward the common mean in proportion to
-  how little its data say.  The samplers integrate ``c`` out of every ρ update,
-  draw it jointly with β, then draw σ (see
-  :mod:`~neighbayes.samplers._utils._group_effects`); it is stored as a unit
-  (pair) index, never as columns of ``X``.
+  origin–destination pair, in a flow panel) are random effects and enter
+  inside the spatial filter, with the covariates: ``η_t = A⁻¹(X_tβ + c) + τ_t``.
+  Persistent unobservables propagate as the covariates do (the space–time
+  steady state).  They are **partially pooled**: ``c_g ~ N(μ, σ²)`` with the
+  sd σ learned (half-t(3, ``unit_effect_sd_scale``) prior), so a unit seen in
+  few periods is shrunk toward the common mean in proportion to how little its
+  data say.  Inside the filter the propagated effects ``A⁻¹c`` have the prior
+  ``N(μA⁻¹1, σ²(AᵀA)⁻¹)``, so this is not the model with independent effects
+  added after the filter, which it equals only for unpooled effects.  The
+  samplers integrate the effects out of every ρ update, draw them jointly with
+  β, then draw σ (see :mod:`~neighbayes.samplers._utils._group_effects`); they
+  are stored as a unit (pair) index, never as columns of ``X``.  The separable
+  flow panels still add their pair effects after the filter
+  (:attr:`CountPanelFEMixin._effects_inside`).
 * **Period effects** ``τ``, also outside the filter, join the coefficient
   block under a fixed prior (there are too few to learn their sd): ``T − 1`` of
   them (first period the baseline) beside unit effects, all ``T`` without
@@ -143,6 +148,9 @@ class CountPanelFEMixin:
     """
 
     _count_spatial: bool = True
+    #: Whether the unit (pair) effects enter inside the filter.  False only for
+    #: the separable flow panels, whose structured kernels still add them after.
+    _effects_inside: bool = True
     # Count likelihoods carry no Jacobian; the Lee & Yu adjustments are Gaussian.
     _lee_yu: bool = False
     #: What the effects index: units here, pairs in the flow panels.
@@ -497,18 +505,22 @@ class CountPanelFEMixin:
     # PyMC terms and posterior helpers
     # ------------------------------------------------------------------
 
-    def _pymc_fe_offset(self, zero: bool = False, fe_priors: Optional[dict] = None):
-        """Inside a ``pm.Model``: the effects' part of the log-mean, or 0.
+    def _pymc_fe_terms(self, zero: bool = False, fe_priors: Optional[dict] = None):
+        """Inside a ``pm.Model``: the effects' parts of the log-mean, ``(inner, outer)``.
 
-        ``zero`` and ``fe_priors`` (keys as :meth:`_count_fe_priors`) name and
-        price a second set of effects (the hurdle's zero part, ``*_zero``).
+        ``inner`` joins the covariates before the filter — the unit (pair)
+        effects, when they enter inside it (:attr:`_effects_inside`); ``outer``
+        is added after it — the period effects, and the unit effects otherwise.
+        Either is 0 when absent.  ``zero`` and ``fe_priors`` (keys as
+        :meth:`_count_fe_priors`) name and price a second set of effects (the
+        hurdle's zero part, ``*_zero``).
         """
         import pytensor.tensor as pt
 
         from ..._lazy_deps import pm
 
         fp = self._count_fe_priors() if fe_priors is None else fe_priors
-        offset = 0.0
+        inner = outer = 0.0
         if self._fe_groups:
             # Pooled effects, non-centred: c = μ + σ·z keeps NUTS off the funnel.
             index = self._effect_index
@@ -519,7 +531,10 @@ class CountPanelFEMixin:
             c = pm.Deterministic(
                 self._effect_name(zero=zero), fp["effect_mu"] + sd * raw, dims=index
             )
-            offset = offset + c[self._row_group]
+            if self._effects_inside:
+                inner = c[self._row_group]
+            else:
+                outer = c[self._row_group]
         if self._fe_periods:
             tau = pm.Normal(
                 self._time_name(zero=zero),
@@ -527,15 +542,16 @@ class CountPanelFEMixin:
                 sigma=fp["time_effect_sigma"],
                 dims="time",
             )
-            offset = offset + pt.dot(pt.as_tensor_variable(self._D_tau), tau)
-        return offset
+            outer = outer + pt.dot(pt.as_tensor_variable(self._D_tau), tau)
+        return inner, outer
 
-    def _fe_offset_draws(self, n_draws: int) -> Optional[np.ndarray]:
-        """Per-draw ``D_g c + D_τ τ``, shape ``(n_draws, N·T)``, or ``None``."""
-        if not (self._fe_groups or self._fe_periods):
-            return None
+    def _fe_draws(self, n_draws: int):
+        """Per-draw ``(inner, outer)`` effect parts, as :meth:`_pymc_fe_terms`.
+
+        Each is an ``(n_draws, N·T)`` array, or ``None`` when absent.
+        """
         post = self._idata.posterior
-        out = np.zeros((n_draws, self._n_groups * self._T_count))
+        inner = outer = None
         if self._fe_groups:
             name = self._effect_name()
             if name not in post.data_vars:
@@ -545,11 +561,16 @@ class CountPanelFEMixin:
                     "store_effects=True."
                 )
             c = post[name].values.reshape(-1, self._n_groups)[:n_draws]
-            out += c[:, self._row_group]
+            rows = c[:, self._row_group]
+            if self._effects_inside:
+                inner = rows
+            else:
+                outer = rows
         if self._fe_periods:
             tau = post["time_effect"].values.reshape(-1, self._n_tau)[:n_draws]
-            out += tau @ self._D_tau.T
-        return out
+            shift = tau @ self._D_tau.T
+            outer = shift if outer is None else outer + shift
+        return inner, outer
 
     def _count_draw(self, rng, eta: np.ndarray, alpha: Optional[float]) -> np.ndarray:
         lam = np.exp(np.clip(eta, -50.0, 50.0))

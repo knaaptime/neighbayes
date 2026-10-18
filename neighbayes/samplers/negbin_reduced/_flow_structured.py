@@ -175,6 +175,10 @@ class _FilterSolver:
     def solve(self, rhs: np.ndarray) -> np.ndarray:
         return np.asarray(self._solver.solve(np.asarray(rhs, dtype=np.float64)))
 
+    def logdet(self) -> float:
+        """``log|det(I − ρW)|`` from the current factorization."""
+        return float(self._solver.logdet())
+
 
 # ---------------------------------------------------------------------------
 # Per-period algebra

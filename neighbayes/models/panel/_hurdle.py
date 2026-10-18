@@ -2,15 +2,16 @@ r"""Hurdle NB2 panels with unit and period effects in both parts.
 
 .. math::
 
-    \eta_{z,t} &= (I - \rho_z W_z)^{-1} X_{z,t}\beta_z
-        + c_z + \tau_{z,t}, \qquad
+    \eta_{z,t} &= (I - \rho_z W_z)^{-1} (X_{z,t}\beta_z + c_z)
+        + \tau_{z,t}, \qquad
     P(y_{it} > 0) = \mathrm{logit}^{-1}(\eta_{z,it}), \\
-    \eta^{\mathrm{c}}_t &= (I - \rho W)^{-1} X_t\beta + c + \tau_t, \qquad
+    \eta^{\mathrm{c}}_t &= (I - \rho W)^{-1} (X_t\beta + c) + \tau_t, \qquad
     y_{it} \mid y_{it} > 0 \sim \mathrm{NB2}(e^{\eta^{\mathrm{c}}_{it}}, \alpha)
     \text{ truncated at } 0,
 
 stacked time-first over ``T`` periods of ``N`` units.  ``effects`` sets unit
-and period effects on **both** parts.  In the zero part a unit effect absorbs
+and period effects on **both** parts; each part's random unit effects enter
+inside its own filter.  In the zero part a unit effect absorbs
 each unit's baseline chance of a positive count, so ``β_z`` is identified from
 within-unit switches between zero and positive periods (units that never
 switch carry no information on ``β_z`` and their effects are bounded by the
@@ -288,8 +289,10 @@ class _HurdlePanelBase(HurdleMixin, CountPanelFEMixin, SpatialPanelModel):
             gamma = pm.Normal(
                 "beta_zero", mu=gamma_mu, sigma=gamma_sigma, dims="coefficient_zero"
             )
-            eta_c = pt.dot(X_t, beta)
-            eta_b = pt.dot(Z_t, gamma)
+            inner_c, outer_c = self._pymc_fe_terms()
+            inner_b, outer_b = self._pymc_fe_terms(True, self._sel_fe_priors())
+            eta_c = pt.dot(X_t, beta) + inner_c
+            eta_b = pt.dot(Z_t, gamma) + inner_b
             if self._count_spatial:
                 from ..._ops import SparseSARSolveOp
 
@@ -300,8 +303,8 @@ class _HurdlePanelBase(HurdleMixin, CountPanelFEMixin, SpatialPanelModel):
                     sp.kron(sp.eye(self._T, format="csr"), self._W_zero_sparse)
                 )
                 eta_b = SparseSARSolveOp(W_zero_NT)(lam, eta_b)
-            eta_c = eta_c + self._pymc_fe_offset()
-            eta_b = eta_b + self._pymc_fe_offset(True, self._sel_fe_priors())
+            eta_c = eta_c + outer_c
+            eta_b = eta_b + outer_b
             alpha = nb_alpha_rv(a_fixed, a_nu, a_sigma)
             pm.HurdleNegativeBinomial(
                 "obs",
@@ -328,8 +331,10 @@ class _HurdlePanelBase(HurdleMixin, CountPanelFEMixin, SpatialPanelModel):
         With the unit effects stored only as a summary
         (``store_effects=False``), their posterior mean stands in.
         """
-        eta_b = self._Z @ self._flat_draw("beta_zero")[g]
-        eta_c = self._X @ self._flat_draw("beta")[g]
+        inner_b, outer_b = self._effects_at(g, True)
+        inner_c, outer_c = self._effects_at(g, False)
+        eta_b = self._Z @ self._flat_draw("beta_zero")[g] + inner_b
+        eta_c = self._X @ self._flat_draw("beta")[g] + inner_c
         if self._count_spatial:
             eta_b = self._solve_periods(
                 self._W_zero_sparse, float(self._flat_draw("rho_zero")[g]), eta_b
@@ -337,7 +342,7 @@ class _HurdlePanelBase(HurdleMixin, CountPanelFEMixin, SpatialPanelModel):
             eta_c = self._solve_periods(
                 self._W_sparse, float(self._flat_draw("rho")[g]), eta_c
             )
-        return eta_b + self._effects_at(g, True), eta_c + self._effects_at(g, False)
+        return eta_b + outer_b, eta_c + outer_c
 
 
 class SARHurdleNegBinPanelRE(_HurdlePanelBase):
@@ -346,9 +351,9 @@ class SARHurdleNegBinPanelRE(_HurdlePanelBase):
 
     .. math::
 
-        \eta_{z,t} = (I - \rho_z W_z)^{-1} X_{z,t}\beta_z
-        + c_z + \tau_{z,t},
-        \quad \eta^{\mathrm{c}}_t = (I - \rho W)^{-1} X_t\beta + c + \tau_t
+        \eta_{z,t} = (I - \rho_z W_z)^{-1} (X_{z,t}\beta_z + c_z)
+        + \tau_{z,t},
+        \quad \eta^{\mathrm{c}}_t = (I - \rho W)^{-1} (X_t\beta + c) + \tau_t
     """
         + _PARAMS_DOC
     )

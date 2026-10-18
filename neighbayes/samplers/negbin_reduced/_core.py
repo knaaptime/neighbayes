@@ -168,6 +168,10 @@ class _CholmodNormalEqSolver:
         # CHOLMOD solve: A^T A x = A^T b
         return self._cholmod.solve(Atb)
 
+    def logdet(self) -> float:
+        """``log|det(I − ρW)|``, half that of the factored ``AᵀA``."""
+        return 0.5 * self._cholmod.logdet()
+
 
 class _DSymCholSolver:
     r"""Solve :math:`(I-\rho W)x = b` by Cholesky on the D-symmetrized twin.

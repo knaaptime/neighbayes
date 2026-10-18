@@ -2,17 +2,22 @@ r"""One reduced-form equation with a materialized filtered design.
 
 .. math::
 
-    \eta = (I_T \otimes A(\rho))^{-1} X\theta_x + D_\tau\tau + D_g c,
+    \eta = (I_T \otimes A(\rho))^{-1} (X\theta_x + D_g c) + D_\tau\tau,
+    \qquad c \sim N(\mu, \sigma^2 I),
 
 ``θ = (θ_x, τ)``, for any filter of
 :mod:`neighbayes.samplers.count_panel._filters` (``NoFilter`` for an aspatial
-equation).  :meth:`MaterializedEquation.update` takes one sweep's Gaussian
+equation).  The random effects ``c`` enter inside the filter, with the
+covariates; the working model carries them as ``c̃ = A⁻¹c`` (one solve of the
+ones column gives its prior mean ``μA⁻¹1``) and reports ``c`` itself.  A filter
+that keeps them outside (``effect_operator`` returns ``None``) adds ``c``
+after it.  :meth:`MaterializedEquation.update` takes one sweep's Gaussian
 working data ``(z, ω)`` on a subset of the rows — Pólya–Gamma for a logit or an
 NB count — and draws each filter parameter with ``θ`` and the group effects
-``c`` integrated out, then ``(θ, c)`` jointly; ``η`` is then recomputed on
-every row.  Rows outside the subset do not enter the likelihood (a ZINB count
-on its active rows, a hurdle count on its positive rows); a group with no
-working rows draws its effect from the prior.
+integrated out, then ``(θ, c̃)`` jointly; ``η`` is then recomputed on every
+row.  Rows outside the subset do not enter the likelihood (a ZINB count on its
+active rows, a hurdle count on its positive rows); a group with no working
+rows draws its effect from the prior.
 
 The two-part samplers compose two of these, as the structured flow sweeps
 compose two :class:`~neighbayes.samplers.negbin_reduced._flow_structured_fe.StructuredEquation`.
@@ -27,6 +32,7 @@ import numpy as np
 from ._group_effects import (
     GroupEffects,
     GroupProjector,
+    SARGroupProjector,
     collapsed_log_density,
     draw_collapsed,
 )
@@ -83,7 +89,7 @@ def init_from_counts(y, X, fe, rows: np.ndarray, rng, jitter: float = 0.1):
 
 
 class MaterializedEquation:
-    """One equation ``η = (I_T ⊗ A)⁻¹Xθ_x + D_τ τ + D_g c`` with ``U`` materialized.
+    """One equation ``η = (I_T ⊗ A)⁻¹(Xθ_x + D_g c) + D_τ τ`` with ``U`` materialized.
 
     Parameters
     ----------
@@ -96,7 +102,7 @@ class MaterializedEquation:
     fe : CountPanelFE or None
         Group effects and period dummies; ``None`` for neither.
     theta, c : ndarray
-        Starting ``θ`` and group effects.
+        Starting ``θ`` and group effects on the working scale (``A⁻¹c``).
     params : dict, optional
         Starting filter parameters; drawn by ``filt.init`` when omitted.
     rng : numpy.random.Generator
@@ -130,7 +136,11 @@ class MaterializedEquation:
         self.widths = {name: SliceWidthState() for name in filt.names}
         groups = self.fe.groups
         self._g_idx = groups.row_group if groups is not None else None
-        self.U = self.design(self.params)
+        self._inside = (
+            groups is not None and filt.effect_operator(self.params) is not None
+        )
+        self._factors = None
+        self.U, self._a1 = self._filtered(self.params)
         self.eta = self._eta_of(self.U)
 
     @property
@@ -139,20 +149,65 @@ class MaterializedEquation:
 
     def design(self, params: dict) -> np.ndarray:
         """``[(I_T ⊗ A)⁻¹X, D_τ]`` at ``params``."""
-        U = self.filt.solve(params, self.X)
-        return U if self.fe.D_tau is None else np.hstack([U, self.fe.D_tau])
+        return self._filtered(params)[0]
+
+    def _filtered(self, params: dict):
+        """``(U, a1)``: the design at ``params`` and, with the effects inside
+        the filter, ``(I_T ⊗ A)⁻¹1`` (else ``None``), from one solve."""
+        k = self.k
+        if self._inside:
+            sol = self.filt.solve(
+                params, np.hstack([self.X, np.ones((self.X.shape[0], 1))])
+            )
+            U, a1 = sol[:, :k], sol[:, k]
+        else:
+            U, a1 = self.filt.solve(params, self.X), None
+        if self.fe.D_tau is not None:
+            U = np.hstack([U, self.fe.D_tau])
+        return U, a1
 
     def _eta_of(self, U: np.ndarray) -> np.ndarray:
         e = U @ self.theta
         return e if self.c is None else e + self.c[self._g_idx]
 
-    def _projector(self, rows, omega):
+    def _prior_mean(self, a1):
+        """The prior mean of the working effects: ``μA⁻¹1``, or ``μ`` outside."""
+        groups = self.fe.groups
+        if not self._inside:
+            return groups.mu
+        return groups.mu * a1[: groups.n_groups]
+
+    def _projector(self, rows, omega, params=None, a1=None):
         groups = self.fe.groups
         if groups is None:
             return None
         g = groups.row_group if rows is None else groups.row_group[rows]
         spec = GroupEffects(g, groups.n_groups, groups.mu, groups.sigma)
-        return GroupProjector(spec, omega)
+        if not self._inside:
+            return GroupProjector(spec, omega)
+        gram = self.filt.effect_gram(params)
+        if self._factors is None:
+            from ._spatial_normal import CholmodFactor
+
+            pattern = self.filt.effect_pattern()
+            # A second factor for AᵀA only when the filter cannot supply its
+            # log-determinant from the factorization behind its solve.
+            n = 1 if gram[1] is not None else 2
+            self._factors = [CholmodFactor(pattern) for _ in range(n)]
+        return SARGroupProjector(
+            spec,
+            omega,
+            self.filt.effect_operator(params),
+            self._prior_mean(a1),
+            gram,
+            self._factors,
+        )
+
+    def effects(self) -> Optional[np.ndarray]:
+        """The group effects ``c`` (``A c̃``, from the working ``c̃``), or ``None``."""
+        if self.c is None or not self._inside:
+            return self.c
+        return self.filt.effect_operator(self.params) @ self.c
 
     def exact_sd_move(self, loglik, rng) -> None:
         """Non-centred sd step on the exact likelihood (see
@@ -170,14 +225,15 @@ class MaterializedEquation:
         if groups is None or groups.sigma_scale is None or self.c is None:
             return
         g = groups.row_group
-        ct = (self.c - groups.mu) / groups.sigma
+        mean = self._prior_mean(self._a1)
+        ct = (self.c - mean) / groups.sigma
         a = ct[g]
-        rest = self.eta - self.c[g] + groups.mu
+        rest = self.eta - (self.c - mean)[g]
         sd = exact_noncentered_sd(
             groups.sigma, groups.sigma_scale, lambda s: loglik(rest + s * a), rng
         )
         self.fe = replace(self.fe, groups=replace(groups, sigma=sd))
-        self.c = groups.mu + sd * ct
+        self.c = mean + sd * ct
         self.eta = rest + sd * a
 
     def level_direction(self):
@@ -218,18 +274,21 @@ class MaterializedEquation:
             v = np.ones(self.eta.size)
         elif self.c is not None:
             groups = self.fe.groups
+            G = groups.n_groups
+            # Shifting the effects c by t moves the working c̃ = A⁻¹c by tA⁻¹1.
+            v = self._a1.copy() if self._inside else np.ones(self.eta.size)
+            step = v[:G]
+            A = self.filt.effect_operator(self.params) if self._inside else None
+            mean = self._prior_mean(self._a1)
 
             def log_prior(t):
-                return (
-                    -0.5
-                    * float(np.sum((self.c + t - groups.mu) ** 2))
-                    / groups.sigma**2
-                )
+                dev = self.c + t * step - mean
+                if A is not None:
+                    dev = A @ dev
+                return -0.5 * float(np.sum(dev**2)) / groups.sigma**2
 
             def shift(t):
-                self.c = self.c + t
-
-            v = np.ones(self.eta.size)
+                self.c = self.c + t * step
         else:
             return None
 
@@ -252,23 +311,31 @@ class MaterializedEquation:
         ``rows`` is a boolean mask or index array (``None`` for every row);
         ``z`` and ``omega`` are given on those rows only.
         """
-        proj = self._projector(rows, omega)
         take = (lambda U: U) if rows is None else (lambda U: U[rows])
-        slice_filter_params(
-            self.filt,
-            self.params,
-            lambda cand: collapsed_log_density(
-                take(self.design(cand)), z, omega, self.mu0, self.prec0, proj
-            ),
-            self.widths,
-            rng,
-            tuning,
-        )
-        U = self.design(self.params)
+        if self._inside:
+            # The effects' prior moves with the filter: a projector per candidate.
+            def density(cand):
+                U, a1 = self._filtered(cand)
+                proj = self._projector(rows, omega, cand, a1)
+                return collapsed_log_density(
+                    take(U), z, omega, self.mu0, self.prec0, proj
+                )
+        else:
+            proj = self._projector(rows, omega)
+
+            def density(cand):
+                return collapsed_log_density(
+                    take(self.design(cand)), z, omega, self.mu0, self.prec0, proj
+                )
+
+        slice_filter_params(self.filt, self.params, density, self.widths, rng, tuning)
+        U, a1 = self._filtered(self.params)
+        proj = self._projector(rows, omega, self.params, a1)
         theta, c_new = draw_collapsed(
             take(U), z, omega, self.mu0, self.prec0, proj, rng
         )
         self.theta = theta
+        self._a1 = a1
         if c_new is not None:
             self.c = c_new
             groups = self.fe.groups
@@ -279,7 +346,14 @@ class MaterializedEquation:
 
                 g = groups.row_group if rows is None else groups.row_group[rows]
                 new_groups, self.c = interweave_group_sd(
-                    groups, self.c, z - take(U) @ theta, omega, g, rng
+                    groups,
+                    self.c,
+                    z - take(U) @ theta,
+                    omega,
+                    g,
+                    rng,
+                    mean=self._prior_mean(a1),
+                    A=proj.A if self._inside else None,
                 )
                 self.fe = replace(self.fe, groups=new_groups)
         self.U = U

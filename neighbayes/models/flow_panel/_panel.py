@@ -1303,10 +1303,13 @@ _COUNT_FE_DOC = """
     ``effects`` selects ``0`` pooled, ``1`` pair effects, ``2`` period effects
     or ``3`` both.  The within transform of the Gaussian panels does not carry to
     a log link, so the effects are parameters: pair effects (one per
-    origin–destination pair) sit outside the spatial filter — ``A⁻¹`` commutes
-    with the pair dummies, so this is the inside-filter model reparameterized —
-    and are integrated out of every ρ update and drawn jointly with β, held as a
-    pair index rather than ``n²`` dummy columns.
+    origin–destination pair), integrated out of every ρ update and drawn
+    jointly with β, held as a pair index rather than ``n²`` dummy columns.  In
+    the unrestricted panel they enter inside the spatial filter, with the
+    covariates, ``η_t = A⁻¹(X_tβ + C) + τ_t``: random effects propagate as ``X``
+    does.  The separable panel still adds them after the filter,
+    ``η_t = A⁻¹X_tβ + C + τ_t``; under pooling that is a different prior, not a
+    reparameterization (inside, ``A⁻¹C`` has covariance ``σ²(AᵀA)⁻¹``).
 
     Pair effects are **partially pooled**: ``C_ij ~ N(μ, σ²)`` with σ learned
     (half-t(3, ``pair_effect_sd_scale``) prior, default scale 1).  A pair seen
@@ -1362,8 +1365,8 @@ class _FlowCountPanelMixin(CountPanelFEMixin):
         # observed counts is already the complete pointwise likelihood.
         return None
 
-    def _eta_reduced(self, rho: dict, beta: np.ndarray) -> np.ndarray:
-        """``(I_T ⊗ A(ρ))⁻¹ Xβ`` for one draw, time-first stacked."""
+    def _eta_reduced(self, rho: dict, beta: np.ndarray, inner=None) -> np.ndarray:
+        """``(I_T ⊗ A(ρ))⁻¹ (Xβ + inner)`` for one draw, time-first stacked."""
         raise NotImplementedError
 
     def _rho_draws(self) -> dict:
@@ -1392,15 +1395,17 @@ class _FlowCountPanelMixin(CountPanelFEMixin):
             total = min(int(n_draws), total)
         rho = self._rho_draws()
         alpha = post["alpha"].values.reshape(-1) if "alpha" in post.data_vars else None
-        offsets = self._fe_offset_draws(total)
+        inner, outer = self._fe_draws(total)
         rng = np.random.default_rng(random_seed)
         out = np.empty((total, self._N_flow * self._T), dtype=np.float64)
         for g in range(total):
             eta = self._eta_reduced(
-                {k: float(v[g]) for k, v in rho.items()}, beta_draws[g]
+                {k: float(v[g]) for k, v in rho.items()},
+                beta_draws[g],
+                None if inner is None else inner[g],
             )
-            if offsets is not None:
-                eta = eta + offsets[g]
+            if outer is not None:
+                eta = eta + outer[g]
             out[g] = self._count_draw(
                 rng, eta, None if alpha is None else float(alpha[g])
             )
@@ -1410,9 +1415,10 @@ class _FlowCountPanelMixin(CountPanelFEMixin):
 class _UnrestrictedCountFlowPanel(_FlowCountPanelMixin):
     """3-ρ filter pieces of the unrestricted NB flow panel."""
 
-    def _eta_reduced(self, rho: dict, beta: np.ndarray) -> np.ndarray:
+    def _eta_reduced(self, rho: dict, beta: np.ndarray, inner=None) -> np.ndarray:
         N, T = self._N_flow, self._T
-        Xb = (self._X @ beta).reshape(T, N).T
+        Xb = self._X @ beta if inner is None else self._X @ beta + inner
+        Xb = Xb.reshape(T, N).T
         return self._solve_A(rho["rho_d"], rho["rho_o"], rho["rho_w"], Xb).T.reshape(-1)
 
     def _unrestricted_filter(self):
@@ -1452,10 +1458,11 @@ class _UnrestrictedCountFlowPanel(_FlowCountPanelMixin):
             beta = pm.Normal(
                 "beta", mu=pv["beta_mu"], sigma=pv["beta_sigma"], dims="coefficient"
             )
-            Xb_mat = pt.reshape(pt.dot(X_t, beta), (T, N)).T
+            inner, outer = self._pymc_fe_terms()
+            Xb_mat = pt.reshape(pt.dot(X_t, beta) + inner, (T, N)).T
             solve_op = SparseFlowSolveMatrixOp(self._Wd, self._Wo, self._Ww)
             eta = pt.reshape(solve_op(rho_d, rho_o, rho_w, Xb_mat).T, (N * T,))
-            eta = eta + self._pymc_fe_offset()
+            eta = eta + outer
             lam = pm.Deterministic("lambda", pt.exp(eta))
             alpha = nb_alpha_rv(pv["alpha_fixed"], pv["alpha_nu"], pv["alpha_sigma"])
             pm.NegativeBinomial("obs", mu=lam, alpha=alpha, observed=self._y_int_vec)
@@ -1466,12 +1473,17 @@ class _UnrestrictedCountFlowPanel(_FlowCountPanelMixin):
 class _SeparableCountFlowPanel(_FlowCountPanelMixin):
     """Kronecker-filter pieces of the separable NB flow panel."""
 
-    def _eta_reduced(self, rho: dict, beta: np.ndarray) -> np.ndarray:
+    # The structured separable kernels still add the pair effects after the
+    # filter; they move inside with those kernels.
+    _effects_inside = False
+
+    def _eta_reduced(self, rho: dict, beta: np.ndarray, inner=None) -> np.ndarray:
         n, N, T = self._n, self._N_flow, self._T
         I_n = sp.eye(n, format="csr", dtype=np.float64)
         Ld = (I_n - rho["rho_d"] * self._W_sparse).tocsr()
         Lo = (I_n - rho["rho_o"] * self._W_sparse).tocsr()
-        Xb = (self._X @ beta).reshape(T, N).T
+        Xb = self._X @ beta if inner is None else self._X @ beta + inner
+        Xb = Xb.reshape(T, N).T
         return kron_solve_matrix(Lo, Ld, Xb, n).T.reshape(-1)
 
     def _separable_filter(self):
@@ -1499,10 +1511,11 @@ class _SeparableCountFlowPanel(_FlowCountPanelMixin):
             beta = pm.Normal(
                 "beta", mu=pv["beta_mu"], sigma=pv["beta_sigma"], dims="coefficient"
             )
-            Xb_mat = pt.reshape(pt.dot(X_t, beta), (T, N)).T
+            inner, outer = self._pymc_fe_terms()
+            Xb_mat = pt.reshape(pt.dot(X_t, beta) + inner, (T, N)).T
             solve_op = KroneckerFlowSolveMatrixOp(self._W_sparse, n)
             eta = pt.reshape(solve_op(rho_d, rho_o, Xb_mat).T, (N * T,))
-            eta = eta + self._pymc_fe_offset()
+            eta = eta + outer
             lam = pm.Deterministic("lambda", pt.exp(eta))
             alpha = nb_alpha_rv(pv["alpha_fixed"], pv["alpha_nu"], pv["alpha_sigma"])
             pm.NegativeBinomial("obs", mu=lam, alpha=alpha, observed=self._y_int_vec)
@@ -1517,8 +1530,8 @@ class _AspatialCountFlowPanel(_FlowCountPanelMixin):
 
     _count_spatial = False
 
-    def _eta_reduced(self, rho: dict, beta: np.ndarray) -> np.ndarray:
-        return self._X @ beta
+    def _eta_reduced(self, rho: dict, beta: np.ndarray, inner=None) -> np.ndarray:
+        return self._X @ beta if inner is None else self._X @ beta + inner
 
     def _build_pymc_count_model(self) -> pm.Model:
         pv = self._flow_count_priors()
@@ -1527,7 +1540,8 @@ class _AspatialCountFlowPanel(_FlowCountPanelMixin):
             beta = pm.Normal(
                 "beta", mu=pv["beta_mu"], sigma=pv["beta_sigma"], dims="coefficient"
             )
-            eta = pt.dot(X_t, beta) + self._pymc_fe_offset()
+            inner, outer = self._pymc_fe_terms()
+            eta = pt.dot(X_t, beta) + inner + outer
             lam = pm.Deterministic("lambda", pt.exp(eta))
             alpha = nb_alpha_rv(pv["alpha_fixed"], pv["alpha_nu"], pv["alpha_sigma"])
             pm.NegativeBinomial("obs", mu=lam, alpha=alpha, observed=self._y_int_vec)
@@ -2443,7 +2457,8 @@ class SARZINBFlowSeparablePanelRE(
                 sigma=pr.gamma_sigma,
                 dims="coefficient_zero",
             )
-            Xb = pt.reshape(pt.dot(X_t, beta), (T, N)).T
+            inner, outer = self._pymc_fe_terms()
+            Xb = pt.reshape(pt.dot(X_t, beta) + inner, (T, N)).T
             Zg = pt.reshape(pt.dot(Z_t, gamma), (T, N)).T
             eta_cnt = pt.reshape(
                 KroneckerFlowSolveMatrixOp(self._W_sparse, n)(rho_d, rho_o, Xb).T,
@@ -2453,7 +2468,7 @@ class SARZINBFlowSeparablePanelRE(
                 KroneckerFlowSolveMatrixOp(self._W_zero_sparse, n)(lam_d, lam_o, Zg).T,
                 (N * T,),
             )
-            eta_cnt = eta_cnt + self._pymc_fe_offset()
+            eta_cnt = eta_cnt + outer
             alpha = nb_alpha_rv(pr.alpha_fixed, pr.alpha_nu, pr.alpha_sigma)
             pm.ZeroInflatedNegativeBinomial(
                 "obs",
@@ -2478,6 +2493,15 @@ class SARZINBFlowSeparablePanelRE(
     def _part_etas(self, g: int) -> tuple[np.ndarray, np.ndarray]:
         """``(η_sel, η_cnt)`` at draw ``g`` (pair-effect posterior mean if summarized)."""
         f = self._flat_draw
+        post = self._idata.posterior
+        inner = outer = 0.0
+        if self._fe_groups:
+            if self._effect_name() in post.data_vars:
+                c = f(self._effect_name())[g]
+            else:
+                c = self._idata[self._effect_name("_summary")]["mean"].values
+            rows = np.asarray(c)[self._row_group]
+            inner, outer = (rows, 0.0) if self._effects_inside else (0.0, rows)
         eta_sel = self._kron_eta(
             self._W_zero_sparse,
             float(f("rho_d_zero")[g]),
@@ -2488,15 +2512,9 @@ class SARZINBFlowSeparablePanelRE(
             self._W_sparse,
             float(f("rho_d")[g]),
             float(f("rho_o")[g]),
-            self._X @ f("beta")[g],
+            self._X @ f("beta")[g] + inner,
         )
-        post = self._idata.posterior
-        if self._fe_groups:
-            if self._effect_name() in post.data_vars:
-                c = f(self._effect_name())[g]
-            else:
-                c = self._idata[self._effect_name("_summary")]["mean"].values
-            eta_cnt = eta_cnt + np.asarray(c)[self._row_group]
+        eta_cnt = eta_cnt + outer
         if self._fe_periods:
             eta_cnt = eta_cnt + self._D_tau @ f("time_effect")[g]
         return eta_sel, eta_cnt

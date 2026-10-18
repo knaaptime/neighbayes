@@ -293,18 +293,23 @@ $$y_{it} = \max(c, y_{it}^*), \quad y_t^* = X_t\beta + u_t, \quad u_t = \lambda 
 
 ### Panel count models (`SARNegBin`, `NegBin`)
 
-$$y_{it} \sim \operatorname{NegBin}(\mu_{it}, \alpha), \quad \log \boldsymbol{\mu}_t = (I - \rho W)^{-1} X_t\beta + c + \tau_t$$
+$$y_{it} \sim \operatorname{NegBin}(\mu_{it}, \alpha), \quad \log \boldsymbol{\mu}_t = (I - \rho W)^{-1} (X_t\beta + c) + \tau_t$$
 
 Unit effects $c$ come from `unit_effects="random"` and period effects $\tau_t$
 from `time_effects=True`. The Gaussian panels' within transform does not carry
 to a log link, so the effects are parameters, held as a unit index rather than
-dummy columns. Unit effects sit outside the spatial filter. Unpooled, that
-would be the inside-filter model reparameterized, since
-$(I_T \otimes A^{-1})$ commutes with the unit dummies; under the partial
-pooling below it is not, because inside the filter the pooled effects would
-carry the SAR covariance $\sigma^2 (A'A)^{-1}$ in place of independence. The Gibbs sampler integrates the unit
-effects out of every $\rho$ update by an ω-weighted analogue of the within
-transform, recomputed each sweep from the Pólya–Gamma weights.
+dummy columns. The unit effects enter inside the spatial filter, with the
+covariates, as random effects do in every spatial equation of the package:
+persistent unobservables propagate as $X$ does. Under the partial pooling below
+this is a different model from independent effects added after the filter, not
+a reparameterization of it: the propagated effects $(I - \rho W)^{-1} c$ carry
+the SAR covariance $\sigma^2 (A'A)^{-1}$, so the effects themselves inform
+$\rho$. The two coincide only for unpooled effects. The Gibbs sampler
+integrates the unit effects out of every $\rho$ update by an ω-weighted
+analogue of the within transform, recomputed each sweep from the Pólya–Gamma
+weights; its effect block has the sparse precision
+$\operatorname{diag}(w) + A'A/\sigma^2$, factored by CHOLMOD at each
+candidate $\rho$.
 
 The unit effects are **partially pooled**: $c_i \sim N(\mu, \sigma^2)$ with
 $\sigma$ learned (a half-$t_3$ prior with scale `unit_effect_sd_scale`,
@@ -538,10 +543,13 @@ $$y = X\beta + u, \quad u = \lambda_d W_d u + \lambda_o W_o u - \lambda_d \lambd
 Stack the flow models above across $T$ periods in time-first order; any flow class is a panel when `T` is given, with `pair_effects` and `time_effects`. The NB
 panels take pair and period effects as parameters, the pair effects partially
 pooled,
-$\log \boldsymbol{\mu}_t = A(\boldsymbol{\rho})^{-1} X_t\beta + c + \tau_t$,
+$\log \boldsymbol{\mu}_t = A(\boldsymbol{\rho})^{-1} (X_t\beta + c) + \tau_t$,
 with one effect per origin-destination pair held as an index, never as $n^2$
-dummy columns; see the panel count models above. The separable NB panel keeps
-its structured $n \times n$ sweep with effects.
+dummy columns; see the panel count models above. The separable panels (NB,
+ZINB, hurdle) keep their structured $n \times n$ sweep, and for now still add
+the pair effects after the filter, $A^{-1} X_t\beta + c + \tau_t$: inside it
+their effect block is $n^2 \times n^2$ and needs an iterative solve, which is
+not yet in place.
 
 ### OLSFlow panel
 

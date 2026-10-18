@@ -1,30 +1,35 @@
-r"""Reduced-form NB2 Gibbs for count panels with group and period fixed effects.
+r"""Reduced-form NB2 Gibbs for count panels with random group effects and period effects.
 
 Model, stacked time-first over ``T`` periods of ``N`` groups (spatial units or
 origin–destination pairs):
 
 .. math::
 
-    \eta = (I_T \otimes A(\rho))^{-1} X\beta + D_\tau \tau + D_g c,
-    \qquad y \sim \mathrm{NB2}(e^\eta, \alpha).
+    \eta = (I_T \otimes A(\rho))^{-1} (X\beta + D_g c) + D_\tau \tau,
+    \qquad c \sim N(\mu, \sigma^2 I), \qquad y \sim \mathrm{NB2}(e^\eta, \alpha).
 
-Group effects sit outside the filter.  ``A⁻¹`` commutes with the group dummies
-``D_g = 1_T ⊗ I_N`` (``(I_T⊗A⁻¹)D_g = D_g A⁻¹``), so effects inside the filter
-are the same model reparameterized as ``c = A⁻¹μ``; outside, the reduced form
-never needs ``A⁻¹D_g`` and the prior on ``c`` is free of ρ.  Period effects
-``τ`` join the coefficient block ``θ = (β, τ)``.
+The group effects enter inside the filter, with the covariates, as persistent
+unobservables propagate in the space–time steady state.  ``A⁻¹`` commutes
+with the group dummies ``D_g = 1_T ⊗ I_N``, so the working model carries
+``c̃ = A⁻¹c``, under the prior ``N(μA⁻¹1, σ²(AᵀA)⁻¹)``.  That is a different
+model from independent effects outside the filter: the two coincide only for
+unpooled effects.  Period effects ``τ``, outside the filter, join the
+coefficient block ``θ = (β, τ)``.  (The separable flow filter keeps its
+effects outside for now; see :mod:`._filters`.)
 
-**Sweep** (partially collapsed Gibbs):
+**Sweep** (partially collapsed Gibbs), one
+:class:`~neighbayes.samplers._utils._glm_equation.MaterializedEquation`:
 
 1. Pólya–Gamma ``ω ~ PG(y + α, η − log α)``, leaving a Gaussian working model
-   ``z = Uθ + D_g c + e``.
-2. Each ρ by slice sampling with ``θ`` and ``c`` integrated out — ``c``
+   ``z = Uθ + D_g c̃ + e``.
+2. Each ρ by slice sampling with ``θ`` and ``c̃`` integrated out — ``c̃``
    through the ω-weighted within transform of
-   :mod:`~neighbayes.samplers._utils._group_effects`.
-3. ``(θ, c) | ρ`` jointly: ``θ`` from the Schur Gram, then ``c | θ``; then
-   the effects' sd when it is learned (``GroupEffects.sigma_scale``), which
-   makes the group effects partially pooled — centred ``σ | c`` then
-   non-centred ``σ | c̃`` (interweaving, so σ mixes at small T).
+   :mod:`~neighbayes.samplers._utils._group_effects`, whose prior precision
+   ``AᵀA/σ²`` moves with ρ.
+3. ``(θ, c̃) | ρ`` jointly: ``θ`` from the Schur Gram, then ``c̃ | θ``; then
+   the effects' sd — centred ``σ | c`` then non-centred ``σ | c/σ``
+   (interweaving, so σ mixes at small T), the latter again on the exact NB
+   likelihood.
 4. ``α`` by slice sampling on ``log α``, unless ``alpha_fixed`` holds it.
 
 ``filter`` is one of :mod:`._filters`; :class:`~._filters.NoFilter` gives the
@@ -35,25 +40,13 @@ has its own structured kernel.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from typing import Optional
 
 import numpy as np
 
 from .._utils._count_loglik import nb_eta_loglik
-from .._utils._group_effects import (
-    GroupEffects,
-    GroupProjector,
-    collapsed_log_density,
-    draw_collapsed,
-    exact_noncentered_sd,
-    interweave_group_sd,
-)
-from .._utils._slice import (
-    SliceWidthState,
-    slice_sample_1d_adaptive,
-    update_slice_width,
-)
+from .._utils._group_effects import GroupEffects
 
 
 @dataclass
@@ -78,7 +71,8 @@ class CountPanelFE:
     Parameters
     ----------
     groups : GroupEffects or None
-        Group effects (one per unit or pair), integrated out each sweep.
+        Random group effects (one per unit or pair), inside the filter;
+        integrated out of each ρ update.
     D_tau : ndarray, shape (N·T, n_tau), or None
         Period dummies, outside the filter.
     """
@@ -126,23 +120,6 @@ class _GroupStore:
         return {"group_effect_mean": self.mean, "group_effect_sd": np.sqrt(var)}
 
 
-def init_theta(y, X, fe: CountPanelFE, rng, jitter: float = 0.1):
-    """Least-squares start on ``log(y + ½)``; group effects from the residual."""
-    target = np.log(np.asarray(y, dtype=np.float64) + 0.5)
-    Z = X if fe.D_tau is None else np.hstack([X, fe.D_tau])
-    theta = np.linalg.lstsq(Z, target, rcond=None)[0] if Z.shape[1] else np.zeros(0)
-    theta = theta + rng.normal(0.0, jitter, size=theta.size)
-    c = None
-    if fe.groups is not None:
-        g = fe.groups.row_group
-        resid = target - Z @ theta
-        cnt = np.bincount(g, minlength=fe.groups.n_groups)
-        c = np.bincount(g, weights=resid, minlength=fe.groups.n_groups) / np.maximum(
-            cnt, 1
-        )
-    return theta, c
-
-
 def run_chain(
     y: np.ndarray,
     X: np.ndarray,
@@ -181,6 +158,7 @@ def run_chain(
         ``beta``, ``time_effect``, each ρ, ``alpha``, the group effects and
         ``log_lik``.
     """
+    from .._utils._glm_equation import MaterializedEquation, init_from_counts
     from ..negbin._core import GibbsState as _AlphaState
     from ..negbin._core import _nb_loglik_pointwise, _sample_alpha
     from ..negbin_reduced._core import ReducedGibbsPriors, _sample_omega
@@ -200,19 +178,12 @@ def run_chain(
         alpha_fixed=priors.alpha_fixed,
     )
 
-    def full_design(rho):
-        U = filt.solve(rho, X)
-        return U if fe.D_tau is None else np.hstack([U, fe.D_tau])
-
     rho = filt.init(rng)
-    theta, c = init_theta(y, X, fe, rng)
+    theta, c = init_from_counts(y, X, fe, np.ones(y.size, bool), rng)
+    eq = MaterializedEquation(
+        X, filt, mu0, prec0, fe, theta=theta, c=c, params=rho, rng=rng
+    )
     alpha = 1.0 if priors.alpha_fixed is None else float(priors.alpha_fixed)
-    width = {name: SliceWidthState() for name in filt.names}
-    g_idx = fe.groups.row_group if fe.groups is not None else None
-
-    def eta_of(U, th, cc):
-        e = U @ th
-        return e if cc is None else e + cc[g_idx]
 
     n_keep = draws // thin if thin > 0 else draws
     out: dict[str, np.ndarray] = {
@@ -232,86 +203,39 @@ def run_chain(
         else None
     )
 
-    U = full_design(rho)
-    eta = eta_of(U, theta, c)
-
     for it in range(tune + draws):
+        tuning = it < tune
         # --- 1. ω and the Gaussian working response ---
-        omega = _sample_omega(y, alpha, eta - np.log(alpha), rng=rng)
+        omega = _sample_omega(y, alpha, eq.eta - np.log(alpha), rng=rng)
         z = 0.5 * (y - alpha) / omega + np.log(alpha)
-        proj = GroupProjector(fe.groups, omega) if fe.groups is not None else None
 
-        # --- 2. each ρ with θ and c integrated out ---
-        for name in filt.names:
-            lo, hi = filt.bounds(name)
-
-            def log_density(v, _name=name):
-                cand = dict(rho)
-                cand[_name] = float(v)
-                if not filt.admissible(cand):
-                    return -np.inf
-                try:
-                    Uc = full_design(cand)
-                except (RuntimeError, ValueError, np.linalg.LinAlgError):
-                    return -np.inf
-                return collapsed_log_density(Uc, z, omega, mu0, prec0, proj)
-
-            new, _, sl, sr = slice_sample_1d_adaptive(
-                log_density,
-                rho[name],
-                lower=lo,
-                upper=hi,
-                width_state=width[name],
-                rng=rng,
-            )
-            if it < tune:
-                update_slice_width(width[name], sl, sr)
-            rho[name] = float(new)
-
-        # --- 3. (θ, c) | ρ jointly ---
-        U = full_design(rho)
-        theta, c_new = draw_collapsed(U, z, omega, mu0, prec0, proj, rng)
-        if c_new is not None:
-            c = c_new
-            if learn_sd:
-                groups, c = interweave_group_sd(
-                    fe.groups, c, z - U @ theta, omega, g_idx, rng
-                )
-                # Non-centred again on the exact NB likelihood (no PG layer).
-                ct = (c - groups.mu) / groups.sigma
-                rest, a = U @ theta + groups.mu, ct[g_idx]
-                sd = exact_noncentered_sd(
-                    groups.sigma,
-                    groups.sigma_scale,
-                    lambda s: nb_eta_loglik(y, rest + s * a, alpha),
-                    rng,
-                )
-                c = groups.mu + sd * ct
-                fe = replace(fe, groups=replace(groups, sigma=sd))
-        eta = eta_of(U, theta, c)
+        # --- 2–3. each ρ, then (θ, c̃) and the effects' sd ---
+        eq.update(None, z, omega, rng, tuning)
+        # Non-centred again on the exact NB likelihood (no PG layer).
+        eq.exact_sd_move(lambda e: nb_eta_loglik(y, e, alpha), rng)
 
         # --- 4. dispersion (held when alpha_fixed) ---
         st = _AlphaState(
-            eta=eta, beta=theta, sigma2=1.0, rho=0.0, alpha=alpha, omega=omega
+            eta=eq.eta, beta=eq.theta, sigma2=1.0, rho=0.0, alpha=alpha, omega=omega
         )
         alpha = _sample_alpha(st, y, alpha_priors, rng=rng)
 
-        if it >= tune and (it - tune) % thin == 0:
+        if not tuning and (it - tune) % thin == 0:
             j = (it - tune) // thin
             if j < n_keep:
-                out["beta"][j] = theta[:k]
-                out["time_effect"][j] = theta[k:]
+                out["beta"][j] = eq.theta[:k]
+                out["time_effect"][j] = eq.theta[k:]
                 out["alpha"][j] = alpha
                 for name in filt.names:
-                    out[name][j] = rho[name]
+                    out[name][j] = eq.params[name]
                 if learn_sd:
-                    out["group_sd"][j] = fe.groups.sigma
+                    out["group_sd"][j] = eq.group_sd
                 if gstore is not None:
-                    gstore.add(j, c)
+                    gstore.add(j, eq.effects())
                 if store_log_lik:
-                    out["log_lik"][j] = _nb_loglik_pointwise(y, eta, alpha)
+                    out["log_lik"][j] = _nb_loglik_pointwise(y, eq.eta, alpha)
         if progress_manager is not None:
-            progress_manager.update(chain_id, it, tuning=it < tune)
+            progress_manager.update(chain_id, it, tuning=tuning)
 
     if gstore is not None:
         out.update(gstore.result())

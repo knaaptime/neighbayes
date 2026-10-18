@@ -1,9 +1,12 @@
-r"""NB2 count panel DGP with unit and period effects.
+r"""NB2 count panel DGP with random unit effects and period effects.
 
 .. math::
 
-    \eta_t = (I - \rho W)^{-1} X_t \beta + c + \tau_t \mathbf 1, \qquad
+    \eta_t = (I - \rho W)^{-1} (X_t \beta + c) + \tau_t \mathbf 1, \qquad
     y_{it} \sim \mathrm{NB2}(e^{\eta_{it}}, \alpha),
+
+with the unit effects ``c`` inside the filter, as random effects enter a
+spatial equation,
 
 stacked time-first, matching :class:`~neighbayes.models.SARNegBinPanelRE`
 (``rho = 0`` gives :class:`~neighbayes.models.NegBinPanelRE`).
@@ -67,7 +70,7 @@ def _simulate_panel_count(
     for t in range(T):
         Z = fe_x_corr * u[:, :k] + keep * rng.standard_normal((N, k))
         X_t = np.column_stack([np.ones(N), Z])
-        eta = solve(X_t @ beta) + unit_effect + time_effect[t]
+        eta = solve(X_t @ beta + unit_effect) + time_effect[t]
         mu = np.exp(np.clip(eta, -30.0, 30.0))
         y_t = rng.negative_binomial(alpha, alpha / (alpha + mu))
         y_list.append(y_t.astype(np.int64))
@@ -123,8 +126,8 @@ def _simulate_sar_negbin_panel_re(
     alpha : float, default 2.0
         NB2 dispersion.
     unit_effect_sd, time_effect_sd : float, default 0.0
-        Standard deviations of the unit effects ``c_i`` and the period
-        effects ``τ_t`` (``τ_0 = 0``), both outside the filter.
+        Standard deviations of the unit effects ``c_i``, inside the filter,
+        and the period effects ``τ_t`` (``τ_0 = 0``), outside it.
     fe_x_corr : float, default 0.0
         Correlation, in ``[0, 1)``, between the unit effects and the persistent
         part of the first regressor.

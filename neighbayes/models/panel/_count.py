@@ -1,8 +1,9 @@
-r"""NB2 count panels with pooled unit effects and period effects.
+r"""NB2 count panels with random unit effects and period effects.
 
 .. math::
 
-    \eta_t = (I_N - \rho W)^{-1} X_t \beta + c + \tau_t \mathbf 1,
+    \eta_t = (I_N - \rho W)^{-1} (X_t \beta + c) + \tau_t \mathbf 1,
+    \qquad c \sim N(\mu, \sigma^2 I),
     \qquad y_{it} \sim \mathrm{NB2}(e^{\eta_{it}}, \alpha),
 
 stacked time-first over ``T`` periods of ``N`` units.  The spatial filter acts
@@ -12,7 +13,8 @@ on the log-mean only — ``y`` is not transformed, so there is no
 
 * :class:`SARNegBinPanelRE` — spatial lag on the log-mean, sampled by
   reduced-form Pólya–Gamma Gibbs with β, the period effects and the unit
-  effects integrated out of every ρ update.
+  effects integrated out of every ρ update.  The unit effects enter inside the
+  filter, with the covariates, so they propagate as ``X`` does.
 * :class:`NegBinPanelRE` — the aspatial baseline.
 
 Both default to Gibbs, as the Gaussian panels do; ``sampler="nuts"`` runs the
@@ -195,14 +197,15 @@ class _CountPanelBase(CountPanelFEMixin, SpatialPanelModel):
         X_t = pt.as_tensor_variable(self._X.astype(np.float64))
         with pm.Model(coords=self._model_coords()) as model:
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            eta = pt.dot(X_t, beta)
+            inner, outer = self._pymc_fe_terms()
+            eta = pt.dot(X_t, beta) + inner
             if self._count_spatial:
                 from ..._ops import SparseSARSolveOp
 
                 b = self._logdet_bounds
                 rho = pm.Uniform("rho", lower=b.rho_min, upper=b.rho_max)
                 eta = SparseSARSolveOp(self._W_sparse_NT)(rho, eta)
-            eta = eta + self._pymc_fe_offset()
+            eta = eta + outer
             alpha = nb_alpha_rv(
                 nb_alpha_fixed(self.priors),
                 float(self.priors.get("alpha_nu", 3.0)),
@@ -217,9 +220,13 @@ class _CountPanelBase(CountPanelFEMixin, SpatialPanelModel):
     # Posterior summaries
     # ------------------------------------------------------------------
 
-    def _eta_reduced(self, rho: Optional[float], beta: np.ndarray) -> np.ndarray:
-        """``(I_T ⊗ (I − ρW))⁻¹ Xβ`` for one draw, time-first stacked."""
+    def _eta_reduced(
+        self, rho: Optional[float], beta: np.ndarray, inner=None
+    ) -> np.ndarray:
+        """``(I_T ⊗ (I − ρW))⁻¹ (Xβ + inner)`` for one draw, time-first stacked."""
         Xb = self._X @ beta
+        if inner is not None:
+            Xb = Xb + inner
         if not self._count_spatial:
             return Xb
         N, T = self._N, self._T
@@ -239,13 +246,17 @@ class _CountPanelBase(CountPanelFEMixin, SpatialPanelModel):
         total = beta.shape[0] if n_draws is None else min(int(n_draws), beta.shape[0])
         rho = post["rho"].values.reshape(-1) if self._count_spatial else None
         alpha = post["alpha"].values.reshape(-1)
-        offsets = self._fe_offset_draws(total)
+        inner, outer = self._fe_draws(total)
         rng = np.random.default_rng(random_seed)
         out = np.empty((total, self._N * self._T))
         for g in range(total):
-            eta = self._eta_reduced(None if rho is None else float(rho[g]), beta[g])
-            if offsets is not None:
-                eta = eta + offsets[g]
+            eta = self._eta_reduced(
+                None if rho is None else float(rho[g]),
+                beta[g],
+                None if inner is None else inner[g],
+            )
+            if outer is not None:
+                eta = eta + outer[g]
             out[g] = self._count_draw(rng, eta, float(alpha[g]))
         return out
 
@@ -254,13 +265,14 @@ class _CountPanelBase(CountPanelFEMixin, SpatialPanelModel):
         self._require_fit()
         post = self._idata.posterior
         rho = float(self._posterior_mean("rho")) if self._count_spatial else None
-        eta = self._eta_reduced(rho, self._posterior_mean("beta"))
+        inner = None
         if self._fe_groups:
             if self._effect_name() in post.data_vars:
                 c = self._posterior_mean(self._effect_name())
             else:
                 c = self._idata[self._effect_name("_summary")]["mean"].values
-            eta = eta + np.asarray(c)[self._row_group]
+            inner = np.asarray(c)[self._row_group]
+        eta = self._eta_reduced(rho, self._posterior_mean("beta"), inner)
         if self._fe_periods:
             eta = eta + self._D_tau @ self._posterior_mean("time_effect")
         return np.exp(eta)
@@ -317,12 +329,13 @@ register(
 
 class SARNegBinPanelRE(_CountPanelBase):
     __doc__ = (
-        r"""Spatial-lag NB2 count panel with pooled unit effects and period effects.
+        r"""Spatial-lag NB2 count panel with random unit effects and period effects.
 
     .. math::
 
         y_{it} \sim \mathrm{NB2}(e^{\eta_{it}}, \alpha), \quad
-        \eta_t = (I - \rho W)^{-1} X_t \beta + c + \tau_t
+        \eta_t = (I - \rho W)^{-1} (X_t \beta + c) + \tau_t, \quad
+        c \sim N(\mu, \sigma^2 I)
 
     Sampled by reduced-form Pólya–Gamma Gibbs (``sampler="nuts"`` for PyMC).
     """
@@ -333,7 +346,7 @@ class SARNegBinPanelRE(_CountPanelBase):
 
 class NegBinPanelRE(_CountPanelBase):
     __doc__ = (
-        r"""Aspatial NB2 count panel with pooled unit effects and period effects.
+        r"""Aspatial NB2 count panel with random unit effects and period effects.
 
     Pólya–Gamma Gibbs with the unit effects integrated out (NUTS cannot carry
     one parameter per unit at scale); ``sampler="nuts"`` for PyMC.

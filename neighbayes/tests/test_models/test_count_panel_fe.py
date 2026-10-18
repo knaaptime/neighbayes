@@ -482,6 +482,106 @@ def test_separable_fixed_effects_jax_matches_numpy():
         assert np.all(np.abs(x.mean((0, 1)) - y.mean((0, 1))) < 0.25 * sd), var
 
 
+# ---------------------------------------------------------------------------
+# Random effects enter inside the filter
+# ---------------------------------------------------------------------------
+
+
+def _filter_solve(W, rho, b, T):
+    """``(I_T ⊗ (I − ρW))⁻¹ b`` for a time-first stacked ``b``."""
+    import scipy.sparse as sp
+
+    N = W.shape[0]
+    A = (sp.eye(N, format="csc") - rho * sp.csc_matrix(W)).tocsc()
+    return sp.linalg.splu(A).solve(np.ascontiguousarray(b.reshape(T, N).T)).T.ravel()
+
+
+def test_place_dgp_draws_unit_effects_inside_the_filter():
+    N, T = 25, 3
+    d = simulate_sar_negbin(N=N, T=T, n_side=5, rho=0.5, unit_effects="random", unit_effect_sd=0.7, time_effects=True, seed=1)  # fmt: skip
+    pt_ = d["params_true"]
+    inner = d["X"] @ pt_["beta"] + np.tile(pt_["unit_effect"], T)
+    eta = _filter_solve(d["W_sparse"], pt_["rho"], inner, T)
+    eta += np.repeat(pt_["time_effect"], N)
+    np.testing.assert_allclose(np.log(d["mu"]), eta, atol=1e-10)
+
+
+def test_flow_dgp_draws_pair_effects_inside_the_unrestricted_filter():
+    from neighbayes.dgp.flows import _flow_system, _simulate_sar_negbin_flow_panel_re
+
+    T = 3
+    kw = dict(n=4, T=T, seed=0, pair_effect_sd=0.5, time_effect_sd=0.3)
+
+    def unexplained(d):
+        """What ``A(log λ_t − τ_t) − c`` leaves outside the span of ``X``:
+        nothing when the pair effects pass through the filter."""
+        A = _flow_system(d["G"], d["rho_d"], d["rho_o"], d["rho_w"])
+        N = d["pair_effect"].size
+        eta = np.log(d["lambda"]).reshape(T, N) - d["time_effect"][:, None]
+        lhs = np.concatenate([A.matvec(e) - d["pair_effect"] for e in eta])
+        coef = np.linalg.lstsq(d["X"], lhs, rcond=None)[0]
+        return np.abs(lhs - d["X"] @ coef).max()
+
+    assert unexplained(_simulate_sar_negbin_flow_panel_re(**kw)) < 1e-10
+    # The check has power: effects added after the filter fail it.
+    outside = _simulate_sar_negbin_flow_panel_re(effects_inside=False, **kw)
+    assert unexplained(outside) > 1e-3
+
+
+def test_effects_placement_per_class():
+    assert SARNegBinPanelRE._effects_inside and SARNegBinFlowPanelRE._effects_inside
+    # The structured separable kernels still add their pair effects after the filter.
+    assert not SARNegBinFlowSeparablePanelRE._effects_inside
+
+
+def test_fitted_mean_puts_unit_effects_inside_the_filter():
+    N, T = 25, 3
+    d = simulate_sar_negbin(N=N, T=T, n_side=5, rho=0.4, unit_effects="random", unit_effect_sd=0.7, time_effects=True, seed=2)  # fmt: skip
+    m = _place(SARNegBinPanelRE, d, N, T, effects=3)
+    m.fit(**QUICK)
+    mean = lambda v: m._idata.posterior[v].mean(("chain", "draw")).values  # noqa: E731
+    inner = m._X @ mean("beta") + mean("unit_effect")[m._row_group]
+    eta = _filter_solve(d["W_sparse"], float(mean("rho")), inner, T)
+    eta += m._D_tau @ mean("time_effect")
+    np.testing.assert_allclose(m._fitted_mean_from_posterior(), np.exp(eta), rtol=1e-10)
+
+
+@pytest.mark.slow
+def test_spatial_unit_effects_gibbs_matches_nuts():
+    """Effects inside the filter: Gibbs (collapsed SAR effect block) vs PyMC."""
+    d = simulate_sar_negbin(N=64, T=4, n_side=8, rho=0.5, alpha=3.0, seed=43, unit_effects="random", unit_effect_sd=0.6, time_effects=True, time_effect_sd=0.3)  # fmt: skip
+    gibbs = _place(SARNegBinPanelRE, d, 64, 4, effects=3).fit(
+        sampler="gibbs", draws=2000, tune=500, chains=2, progressbar=False,
+        random_seed=1, n_jobs=1,
+    )  # fmt: skip
+    nuts = _place(SARNegBinPanelRE, d, 64, 4, effects=3).fit(
+        sampler="nuts", draws=1000, tune=1000, chains=2, progressbar=False,
+        random_seed=1,
+    )  # fmt: skip
+    for var in ("rho", "alpha", "unit_effect_sd", "beta", "time_effect", "unit_effect"):
+        a, b = gibbs.posterior[var].values, nuts.posterior[var].values
+        a, b = a.reshape(-1, *a.shape[2:]), b.reshape(-1, *b.shape[2:])
+        assert np.all(np.abs(a.mean(0) - b.mean(0)) < 0.2 * b.std(0)), var
+        np.testing.assert_allclose(a.std(0), b.std(0), rtol=0.2)
+
+
+@pytest.mark.slow
+def test_unrestricted_flow_pair_effects_gibbs_matches_nuts():
+    data = _flow(n=5, T=4, seed=3, rho_d=0.3, rho_o=0.2, rho_w=0.05, alpha=3.0, pair_effects="random", pair_effect_sd=0.5, time_effects=True, time_effect_sd=0.3)  # fmt: skip
+    gibbs = _flow_model(SARNegBinFlowPanelRE, data, 4, effects=3).fit(
+        sampler="gibbs", draws=2000, tune=500, chains=2, progressbar=False,
+        random_seed=1, n_jobs=1,
+    )  # fmt: skip
+    nuts = _flow_model(SARNegBinFlowPanelRE, data, 4, effects=3).fit(
+        sampler="nuts", draws=1000, tune=1000, chains=2, progressbar=False,
+        random_seed=1, target_accept=0.9,
+    )  # fmt: skip
+    for var in ("rho_d", "rho_o", "rho_w", "alpha", "pair_effect_sd", "beta"):
+        a, b = gibbs.posterior[var].values, nuts.posterior[var].values
+        a, b = a.reshape(-1, *a.shape[2:]), b.reshape(-1, *b.shape[2:])
+        assert np.all(np.abs(a.mean(0) - b.mean(0)) < 0.25 * b.std(0)), var
+
+
 @pytest.mark.slow
 @pytest.mark.parametrize("alpha_fixed", [None, 30.0])
 def test_unit_effects_gibbs_matches_nuts(alpha_fixed):

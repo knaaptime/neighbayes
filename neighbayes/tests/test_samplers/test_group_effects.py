@@ -271,3 +271,93 @@ def test_masked_cells_drop_out_of_structured_moments():
     np.testing.assert_allclose(M, M_ref, atol=1e-10)
     np.testing.assert_allclose(v, v_ref, atol=1e-10)
     np.testing.assert_allclose(quad, quad_ref, atol=1e-10)
+
+
+# ---------------------------------------------------------------------------
+# Effects inside the filter
+# ---------------------------------------------------------------------------
+
+
+def _sar_problem(seed=1, side=5, T=3, k=2, mu=0.4, sigma=0.7):
+    import scipy.sparse as sp
+
+    from neighbayes.samplers._utils._spatial_normal import CholmodFactor
+    from neighbayes.samplers.count_panel._filters import SARFilter
+
+    path = sp.diags([np.ones(side - 1)] * 2, [-1, 1])
+    eye = sp.eye(side)
+    A0 = sp.csr_matrix(sp.kron(path, eye) + sp.kron(eye, path))
+    W = sp.csr_matrix(sp.diags(1 / np.asarray(A0.sum(1)).ravel()) @ A0)
+    G = W.shape[0]
+    rng = np.random.default_rng(seed)
+    g = np.tile(np.arange(G), T)
+    spec = GroupEffects(g, G, mu, sigma)
+    omega = rng.uniform(0.3, 2.0, g.size)
+    X = rng.standard_normal((g.size, k))
+    z = rng.standard_normal(g.size)
+    D = np.zeros((g.size, G))
+    D[np.arange(g.size), g] = 1.0
+    filt = SARFilter(W, T, -0.99, 0.99)
+    pattern = filt.effect_pattern()
+    factors = [CholmodFactor(pattern), CholmodFactor(pattern)]
+    return rng, spec, omega, X, z, D, W.toarray(), filt, factors
+
+
+def _sar_projector(spec, omega, filt, factors, rho, n_rows):
+    from neighbayes.samplers._utils._group_effects import SARGroupProjector
+
+    G = spec.n_groups
+    a1 = filt.solve({"rho": rho}, np.ones((n_rows, 1)))[:, 0]
+    A = filt.effect_operator({"rho": rho})
+    gram, gram_logdet = filt.effect_gram({"rho": rho})
+    # Both routes to log|AᵀA|: the filter's factorization, and a factor of AᵀA.
+    via_factor = SARGroupProjector(
+        spec, omega, A, spec.mu * a1[:G], (gram, None), factors
+    ).rho_logdet()
+    proj = SARGroupProjector(
+        spec, omega, A, spec.mu * a1[:G], (gram, gram_logdet), factors
+    )
+    np.testing.assert_allclose(proj.rho_logdet(), via_factor, rtol=1e-10)
+    return proj
+
+
+def test_inside_effects_density_matches_dense_marginal_up_to_constant():
+    """With c ~ N(μ, σ²I) inside A⁻¹, the collapsed density tracks the exact
+    marginal across ρ, the effects' ρ-dependent prior included."""
+    from neighbayes.samplers._utils._group_effects import collapsed_log_density
+
+    rng, spec, omega, X, z, D, Wd, filt, factors = _sar_problem()
+    G, T, k = spec.n_groups, z.size // spec.n_groups, X.shape[1]
+    mu_b, prec_b = rng.normal(size=k), np.full(k, 0.5)
+    gaps = []
+    for rho in (-0.6, -0.1, 0.3, 0.7, 0.9):
+        Ai = np.linalg.inv(np.eye(G) - rho * Wd)
+        U = np.kron(np.eye(T), Ai) @ X
+        cov = (
+            np.diag(1 / omega)
+            + U @ np.diag(1 / prec_b) @ U.T
+            + spec.sigma**2 * D @ Ai @ Ai.T @ D.T
+        )
+        mean = U @ mu_b + D @ (spec.mu * Ai @ np.ones(G))
+        exact = multivariate_normal(mean, cov).logpdf(z)
+        proj = _sar_projector(spec, omega, filt, factors, rho, z.size)
+        ours = collapsed_log_density(
+            filt.solve({"rho": rho}, X), z, omega, mu_b, prec_b, proj
+        )
+        gaps.append(exact - ours)
+    np.testing.assert_allclose(gaps, gaps[0], atol=1e-8)
+
+
+def test_inside_effects_conditional_mean_and_cov():
+    rng, spec, omega, X, z, D, Wd, filt, factors = _sar_problem(seed=2)
+    G, rho = spec.n_groups, 0.5
+    A = np.eye(G) - rho * Wd
+    P = D.T @ np.diag(omega) @ D + A.T @ A / spec.sigma**2
+    m_tilde = spec.mu * np.linalg.solve(A, np.ones(G))
+    resid = rng.standard_normal(z.size)
+    mean = np.linalg.solve(P, D.T @ (omega * resid) + A.T @ A @ m_tilde / spec.sigma**2)
+    proj = _sar_projector(spec, omega, filt, factors, rho, z.size)
+    np.testing.assert_allclose(proj.mean(resid), mean, atol=1e-10)
+    draws = np.array([proj.draw(resid, rng) for _ in range(20000)])
+    cov = np.linalg.inv(P)
+    np.testing.assert_allclose(np.cov(draws.T), cov, atol=0.05 * np.abs(cov).max())

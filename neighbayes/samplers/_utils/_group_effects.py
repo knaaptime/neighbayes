@@ -25,10 +25,19 @@ group sums are ``np.bincount`` over a row→group index, so groups may have
 any sizes.
 
 Quantities passed to :meth:`GroupProjector.gram`, :meth:`~GroupProjector.cross`
-and :meth:`~GroupProjector.quad` are *centered*: subtract ``spec.mu`` from the
-working response first, so the group block has prior mean zero.
-:meth:`~GroupProjector.draw` takes the raw residual ``z − Uβ`` and returns
-``c`` on its own scale.
+and :meth:`~GroupProjector.quad` are *centered*: subtract the projector's
+``row_mean`` from the working response first, so the group block has prior
+mean zero.  :meth:`~GroupProjector.draw` takes the raw residual ``z − Uβ`` and
+returns ``c`` on its own scale.
+
+**Effects inside the filter.**  A random effect enters a spatial equation
+inside the multiplier, with the covariates: ``η = (I_T ⊗ A)⁻¹(Xβ + D c)``,
+``c ~ N(μ, σ²I)``.  Since ``(I_T ⊗ A⁻¹)D = D A⁻¹``, the working model carries
+``c̃ = A⁻¹c``, whose prior ``N(μA⁻¹1, σ²(AᵀA)⁻¹)`` depends on ρ.  That is a
+different prior from independent effects outside the filter, not a
+reparameterization of it.  :class:`SARGroupProjector` integrates ``c̃`` out
+under it, with ``P = diag(w) + AᵀA/σ²`` in place of the diagonal ``d`` and
+CHOLMOD for ``P⁻¹``.
 """
 
 from __future__ import annotations
@@ -36,6 +45,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+import scipy.sparse as sp
 
 
 @dataclass(frozen=True)
@@ -168,35 +178,51 @@ def exact_noncentered_sd(sigma: float, scale: float, loglik_at, rng) -> float:
     return _slice_log_sd(log_density, sigma, s, 0.3, rng)
 
 
-def interweave_group_sd(groups, c, resid, omega, row_group, rng):
+def interweave_group_sd(groups, c, resid, omega, row_group, rng, *, mean=None, A=None):
     """Both halves of the sd update for row-indexed group effects.
 
     ``resid`` is the working response less the non-group predictor, on the
     rows of ``row_group`` (with weights ``omega``).  Returns ``(groups, c)``:
     the centred draw ``σ | c``, then the non-centred ``σ | c̃`` with ``c``
     rescaled to match.
+
+    With the effects inside the filter, ``c`` is the working model's ``A⁻¹c``,
+    ``mean`` its prior mean ``μA⁻¹1`` and ``A`` the filter: the centred half
+    reads the deviation ``A(c − mean)`` of the effects themselves, and the
+    non-centred half holds ``A(c − mean)/σ`` fixed, which scales ``c − mean``
+    with σ exactly as outside.
     """
     from dataclasses import replace
 
     if groups.sigma_scale is None:
         return groups, c
-    groups = draw_group_sd(groups, c, rng)
-    ct = (np.asarray(c) - groups.mu) / groups.sigma
+    mean = groups.mu if mean is None else mean
+    groups = draw_group_sd(groups, c, rng, mean=mean, A=A)
+    ct = (np.asarray(c) - mean) / groups.sigma
     a = ct[row_group]
-    r = np.asarray(resid) - groups.mu
+    r = np.asarray(resid) - (mean[row_group] if np.ndim(mean) else mean)
     P = float(np.dot(omega, a * a))
     h = float(np.dot(omega, a * r))
     sigma = noncentered_effect_sd(groups.sigma, P, h, groups.sigma_scale, rng)
-    return replace(groups, sigma=sigma), groups.mu + sigma * ct
+    return replace(groups, sigma=sigma), mean + sigma * ct
 
 
-def draw_group_sd(groups: GroupEffects, c: np.ndarray, rng) -> GroupEffects:
-    """``groups`` with its sd redrawn given the effects ``c`` (unchanged if fixed)."""
+def draw_group_sd(
+    groups: GroupEffects, c: np.ndarray, rng, *, mean=None, A=None
+) -> GroupEffects:
+    """``groups`` with its sd redrawn given the effects ``c`` (unchanged if fixed).
+
+    ``mean`` and ``A`` as in :func:`interweave_group_sd`, for effects inside
+    the filter.
+    """
     from dataclasses import replace
 
     if groups.sigma_scale is None:
         return groups
-    dev2 = float(np.sum((np.asarray(c) - groups.mu) ** 2))
+    dev = np.asarray(c) - (groups.mu if mean is None else mean)
+    if A is not None:
+        dev = A @ dev
+    dev2 = float(np.sum(dev**2))
     sigma = sample_effect_sd(
         groups.sigma, dev2, groups.n_groups, groups.sigma_scale, rng
     )
@@ -253,9 +279,18 @@ class GroupProjector:
         s = self.sums(r)
         return float(np.dot(r, self.omega * r) - np.dot(s, s / self.d))
 
+    @property
+    def row_mean(self) -> float:
+        """Prior mean of the group block on every working row."""
+        return self.spec.mu
+
     def logdet(self) -> float:
         """``Σ_g log d_g``; constant in ρ and β given ω."""
         return float(np.sum(np.log(self.d)))
+
+    def rho_logdet(self) -> float:
+        """The part of ``log|P| − log|Q₀|`` that varies with the filter: none."""
+        return 0.0
 
     def mean(self, resid: np.ndarray) -> np.ndarray:
         """Posterior mean of ``c`` given the raw residual ``resid = z − Uβ``."""
@@ -267,6 +302,89 @@ class GroupProjector:
         return self.mean(resid) + rng.standard_normal(self.spec.n_groups) / np.sqrt(
             self.d
         )
+
+
+class SARGroupProjector(GroupProjector):
+    r"""The ω-weighted within transform with the effects inside the filter.
+
+    The group block is ``c̃ = A⁻¹c`` with ``c ~ N(μ, σ²I)``, so its prior is
+    ``N(m̃, Q₀⁻¹)`` with ``m̃ = μA⁻¹1`` and ``Q₀ = AᵀA/σ²``.  Its posterior
+    precision ``P = diag(w) + Q₀`` replaces the diagonal ``d``:
+
+    .. math::
+
+        \langle x, y \rangle_{\tilde\Omega}
+        = \sum_r \omega_r x_r y_r - S(x)^\top P^{-1} S(y),
+
+    and integrating ``c̃`` out leaves ``−½(log|P| − log|Q₀|)``, which varies
+    with ρ (:meth:`rho_logdet`).  Built for one ρ: a candidate ρ needs its own.
+
+    Parameters
+    ----------
+    spec : GroupEffects
+    omega : ndarray, shape (n_rows,)
+    A : sparse matrix, shape (n_groups, n_groups)
+        The filter at this ρ.
+    m_tilde : ndarray, shape (n_groups,)
+        ``μA⁻¹1``, the prior mean of ``c̃``.
+    gram : tuple
+        ``(AᵀA, log|AᵀA|)``; the log-determinant may be ``None``, and is
+        then read from a factorization of ``AᵀA``.
+    factors : sequence of CholmodFactor
+        Factors on the pattern of ``AᵀA``: the first for ``P``, the second
+        (needed only without ``log|AᵀA|``) for ``AᵀA``.  Shared across ρ, so a
+        projector is spent once another is built.
+    """
+
+    def __init__(self, spec, omega, A, m_tilde, gram, factors):
+        super().__init__(spec, omega)
+        self.A = sp.csc_matrix(A)
+        self.m_tilde = np.asarray(m_tilde, dtype=np.float64)
+        AtA, gram_logdet = gram
+        self._Q0 = AtA / spec.sigma**2
+        self._fP = factors[0]
+        self._fP.factorize((self._Q0 + sp.diags(self.w)).tocsc())
+        if gram_logdet is None:
+            factors[1].factorize(AtA)
+            gram_logdet = factors[1].logdet()
+        self._rho_logdet = (
+            self._fP.logdet() - gram_logdet + 2.0 * spec.n_groups * np.log(spec.sigma)
+        )
+
+    @property
+    def row_mean(self) -> np.ndarray:
+        return self.m_tilde[self._g]
+
+    def gram(self, U: np.ndarray, S_U: np.ndarray | None = None) -> np.ndarray:
+        S_U = self.sums(U) if S_U is None else S_U
+        return U.T @ (self.omega[:, None] * U) - S_U.T @ self._fP.solve(S_U)
+
+    def cross(
+        self, U: np.ndarray, r: np.ndarray, S_U: np.ndarray | None = None
+    ) -> np.ndarray:
+        S_U = self.sums(U) if S_U is None else S_U
+        return U.T @ (self.omega * r) - S_U.T @ self._fP.solve(self.sums(r))
+
+    def quad(self, r: np.ndarray) -> float:
+        s = self.sums(r)
+        return float(np.dot(r, self.omega * r) - np.dot(s, self._fP.solve(s)))
+
+    def logdet(self) -> float:
+        """``log|P|``."""
+        return float(self._fP.logdet())
+
+    def rho_logdet(self) -> float:
+        """``log|P| − log|Q₀|``, the effects' share of the collapsed density."""
+        return float(self._rho_logdet)
+
+    def mean(self, resid: np.ndarray) -> np.ndarray:
+        """Posterior mean of ``c̃`` given the raw residual ``resid = z − Uβ``."""
+        m = self.m_tilde
+        return m + self._fP.solve(self.sums(resid) - self.w * m)
+
+    def draw(self, resid: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+        """Draw ``c̃ | β, ω`` given the raw residual ``resid = z − Uβ``."""
+        return self._fP.sample(self.sums(resid) + self._Q0 @ self.m_tilde, rng=rng)
 
 
 # ---------------------------------------------------------------------------
@@ -293,12 +411,14 @@ def collapsed_log_density(
 ) -> float:
     r"""``log p(z | U, ω)`` with ``θ ~ N(μ₀, diag(prec₀)⁻¹)`` and ``c`` integrated out.
 
-    Up to terms constant in ``U`` (the sampler's ρ enters only through
-    ``U = A(ρ)⁻¹X``): ``−½ log|M| − ½ (rᵀΩ̃r − vᵀM⁻¹v)`` with
-    ``r = z − m − Uμ₀``, ``M = diag(prec₀) + UᵀΩ̃U`` and ``v = UᵀΩ̃r``.
-    Returns ``−inf`` when ``M`` is not positive definite.
+    Up to terms constant in ρ: ``−½ log|M| − ½ (rᵀΩ̃r − vᵀM⁻¹v)`` with
+    ``r = z − m − Uμ₀``, ``M = diag(prec₀) + UᵀΩ̃U`` and ``v = UᵀΩ̃r``, less
+    ``½ proj.rho_logdet()`` — nothing for effects outside the filter, whose
+    prior is free of ρ, but ``½(log|P| − log|Q₀|)`` for effects inside it
+    (:class:`SARGroupProjector`).  Returns ``−inf`` when ``M`` is not positive
+    definite.
     """
-    m = proj.spec.mu if proj is not None else 0.0
+    m = proj.row_mean if proj is not None else 0.0
     r = z - m - U @ mu0
     M, v, quad = _weighted_moments(U, r, omega, proj)
     M[np.diag_indices_from(M)] += prec0
@@ -308,6 +428,8 @@ def collapsed_log_density(
         return -np.inf
     w = np.linalg.solve(L, v) if v.size else v
     val = -float(np.sum(np.log(np.diag(L)))) - 0.5 * (quad - float(w @ w))
+    if proj is not None:
+        val -= 0.5 * proj.rho_logdet()
     return val if np.isfinite(val) else -np.inf
 
 
@@ -324,7 +446,7 @@ def draw_collapsed(
 
     Returns ``(θ, c)``, with ``c = None`` when there are no group effects.
     """
-    m = proj.spec.mu if proj is not None else 0.0
+    m = proj.row_mean if proj is not None else 0.0
     G, h, _ = _weighted_moments(U, z - m, omega, proj)
     G[np.diag_indices_from(G)] += prec0
     h = h + prec0 * mu0

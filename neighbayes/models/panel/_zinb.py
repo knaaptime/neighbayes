@@ -4,14 +4,15 @@ r"""Zero-inflated NB2 panels with count-equation effects.
 
     \eta_{z,t} &= (I - \rho_z W_z)^{-1} X_{z,t} \beta_z, \qquad
     z_{it} \sim \mathrm{Bernoulli}(\mathrm{logit}^{-1}(\eta_{z,it})), \\
-    \eta^{\mathrm{cnt}}_t &= (I - \rho W)^{-1} X_t \beta + c + \tau_t, \qquad
+    \eta^{\mathrm{cnt}}_t &= (I - \rho W)^{-1} (X_t \beta + c) + \tau_t, \qquad
     y_{it} \mid z_{it} = 1 \sim \mathrm{NB2}(e^{\eta^{\mathrm{cnt}}_{it}}, \alpha),
     \quad y_{it} \mid z_{it} = 0 = 0,
 
 stacked time-first over ``T`` periods of ``N`` units.  Structural zeros are per
 period; ``X_zero`` may vary over time (add period dummies to it for period
-effects in the zero part).  ``effects`` sets unit (pooled) and period effects
-on the **count** part only, as in :class:`~neighbayes.models.SARNegBinPanelRE`;
+effects in the zero part).  ``effects`` sets random unit effects (inside the
+count filter) and period effects on the **count** part only, as in
+:class:`~neighbayes.models.SARNegBinPanelRE`;
 the zero part has none (a unit effect there would compete with the zero
 process for the same information).  ``ρ_z``, ``β_z`` are the posterior's
 ``rho_zero``, ``beta_zero``.
@@ -287,7 +288,8 @@ class _ZINBPanelBase(ZINBMixin, CountPanelFEMixin, SpatialPanelModel):
             gamma = pm.Normal(
                 "beta_zero", mu=gamma_mu, sigma=gamma_sigma, dims="coefficient_zero"
             )
-            eta_cnt = pt.dot(X_t, beta)
+            inner, outer = self._pymc_fe_terms()
+            eta_cnt = pt.dot(X_t, beta) + inner
             eta_sel = pt.dot(Z_t, gamma)
             if self._count_spatial:
                 from ..._ops import SparseSARSolveOp
@@ -299,7 +301,7 @@ class _ZINBPanelBase(ZINBMixin, CountPanelFEMixin, SpatialPanelModel):
                     sp.kron(sp.eye(self._T, format="csr"), self._W_zero_sparse)
                 )
                 eta_sel = SparseSARSolveOp(W_zero_NT)(lam, eta_sel)
-            eta_cnt = eta_cnt + self._pymc_fe_offset()
+            eta_cnt = eta_cnt + outer
             alpha = nb_alpha_rv(
                 nb_alpha_fixed(self.priors),
                 float(self.priors.get("alpha_nu", 3.0)),
@@ -335,6 +337,13 @@ class _ZINBPanelBase(ZINBMixin, CountPanelFEMixin, SpatialPanelModel):
         beta = self._flat_draw("beta")[g]
         eta_sel = self._Z @ gamma
         eta_cnt = self._X @ beta
+        if self._fe_groups:
+            # The unit effects enter inside the count filter.
+            if self._effect_name() in post.data_vars:
+                c = self._flat_draw(self._effect_name())[g]
+            else:
+                c = self._idata[self._effect_name("_summary")]["mean"].values
+            eta_cnt = eta_cnt + np.asarray(c)[self._row_group]
         if self._count_spatial:
             eta_sel = self._solve_periods(
                 self._W_zero_sparse, float(self._flat_draw("rho_zero")[g]), eta_sel
@@ -342,12 +351,6 @@ class _ZINBPanelBase(ZINBMixin, CountPanelFEMixin, SpatialPanelModel):
             eta_cnt = self._solve_periods(
                 self._W_sparse, float(self._flat_draw("rho")[g]), eta_cnt
             )
-        if self._fe_groups:
-            if self._effect_name() in post.data_vars:
-                c = self._flat_draw(self._effect_name())[g]
-            else:
-                c = self._idata[self._effect_name("_summary")]["mean"].values
-            eta_cnt = eta_cnt + np.asarray(c)[self._row_group]
         if self._fe_periods:
             eta_cnt = eta_cnt + self._D_tau @ self._flat_draw("time_effect")[g]
         return eta_sel, eta_cnt
@@ -398,7 +401,7 @@ class SARZINBPanelRE(_ZINBPanelBase):
     .. math::
 
         \eta_{z,t} = (I - \rho_z W_z)^{-1} X_{z,t}\beta_z,
-        \quad \eta^{\mathrm{cnt}}_t = (I - \rho W)^{-1} X_t\beta + c + \tau_t
+        \quad \eta^{\mathrm{cnt}}_t = (I - \rho W)^{-1} (X_t\beta + c) + \tau_t
     """
         + _PARAMS_DOC
     )

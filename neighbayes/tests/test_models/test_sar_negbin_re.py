@@ -153,7 +153,7 @@ class TestSARNegBinStructuralRecovery:
         assert "observed_data" in idata
         assert "rho" in idata.posterior
         assert "beta" in idata.posterior
-        assert "sigma" in idata.posterior
+        assert "unit_effect_sd" in idata.posterior
         assert "alpha" in idata.posterior
 
     def test_posterior_shapes(self, sar_nb_data):
@@ -176,7 +176,7 @@ class TestSARNegBinStructuralRecovery:
 
         assert idata.posterior["rho"].shape == (n_chains, n_draws)
         assert idata.posterior["beta"].shape == (n_chains, n_draws, X.shape[1])
-        assert idata.posterior["sigma"].shape == (n_chains, n_draws)
+        assert idata.posterior["unit_effect_sd"].shape == (n_chains, n_draws)
         assert idata.posterior["alpha"].shape == (n_chains, n_draws)
 
     def test_rho_recovery(self, sar_nb_data):
@@ -336,7 +336,7 @@ class TestSARNegBinStructuralJaxVectorized:
         )
         rho = idata.posterior["rho"].values
         beta = idata.posterior["beta"].values
-        sigma = idata.posterior["sigma"].values
+        sigma = idata.posterior["unit_effect_sd"].values
         alpha = idata.posterior["alpha"].values
         assert rho.shape == (2, 40)
         assert beta.shape == (2, 40, X.shape[1])
