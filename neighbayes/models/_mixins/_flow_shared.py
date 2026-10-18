@@ -96,7 +96,7 @@ class FlowSharedMethods:
 
     @property
     def _Ww(self) -> sp.csr_matrix:
-        return self._flow_kron_weights["network"]
+        return self._flow_kron_weights["od"]
 
     @cached_property
     def _flow_effect_moments(self):

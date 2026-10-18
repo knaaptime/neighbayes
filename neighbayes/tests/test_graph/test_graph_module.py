@@ -52,7 +52,7 @@ class TestValidateGraph:
 
 
 # ---------------------------------------------------------------------------
-# destination_weights / origin_weights / network_weights
+# destination_weights / origin_weights / od_weights
 # ---------------------------------------------------------------------------
 
 
@@ -76,10 +76,10 @@ class TestWeightMatrixShapes:
 
     @pytest.mark.parametrize("n", [4, 7])
     def test_network_shape(self, n):
-        from neighbayes.graph import network_weights
+        from neighbayes.graph import od_weights
 
         G = _make_ring_graph(n)
-        Ww = network_weights(G)
+        Ww = od_weights(G)
         assert Ww.shape == (n * n, n * n)
 
     def test_destination_block_diagonal(self):
@@ -98,12 +98,12 @@ class TestWeightMatrixShapes:
             np.testing.assert_allclose(block, W_arr, atol=1e-12)
 
     def test_network_equals_kron_W_W(self):
-        from neighbayes.graph import _graph_to_csr, network_weights
+        from neighbayes.graph import _graph_to_csr, od_weights
 
         n = 4
         G = _make_ring_graph(n)
         W = _graph_to_csr(G)
-        Ww = network_weights(G).toarray()
+        Ww = od_weights(G).toarray()
         expected = sp.kron(W, W, format="csr").toarray()
         np.testing.assert_allclose(Ww, expected, atol=1e-12)
 
@@ -113,7 +113,7 @@ class TestWeightMatrixKronecker:
         """W_w = W_d @ W_o / (row normalization) for row-stochastic W."""
         from neighbayes.graph import (
             destination_weights,
-            network_weights,
+            od_weights,
             origin_weights,
         )
 
@@ -121,7 +121,7 @@ class TestWeightMatrixKronecker:
         G = _make_ring_graph(n)
         Wd = destination_weights(G)
         Wo = origin_weights(G)
-        Ww = network_weights(G)
+        Ww = od_weights(G)
         # For row-stochastic W: (I ⊗ W)(W ⊗ I) = W ⊗ W
         product = Wd @ Wo
         np.testing.assert_allclose(Ww.toarray(), product.toarray(), atol=1e-12)
@@ -152,13 +152,13 @@ class TestFlowWeightMatrices:
 
         G = _make_ring_graph(5)
         wms = flow_weight_matrices(G)
-        assert set(wms.keys()) == {"destination", "origin", "network"}
+        assert set(wms.keys()) == {"destination", "origin", "od"}
 
     def test_consistency_with_individual_functions(self):
         from neighbayes.graph import (
             destination_weights,
             flow_weight_matrices,
-            network_weights,
+            od_weights,
             origin_weights,
         )
 
@@ -172,7 +172,7 @@ class TestFlowWeightMatrices:
             wms["origin"].toarray(), origin_weights(G).toarray(), atol=1e-12
         )
         np.testing.assert_allclose(
-            wms["network"].toarray(), network_weights(G).toarray(), atol=1e-12
+            wms["od"].toarray(), od_weights(G).toarray(), atol=1e-12
         )
 
 

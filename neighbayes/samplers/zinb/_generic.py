@@ -61,8 +61,8 @@ class ZINBPriors:
 
 
 def sel_name(name: str) -> str:
-    """The selection-equation name of a filter parameter (``rho_d`` → ``lam_d``)."""
-    return name.replace("rho", "lam", 1)
+    """The zero-part name of a filter parameter (``rho_d`` → ``rho_d_zero``)."""
+    return name + "_zero"
 
 
 def run_chain(
@@ -154,7 +154,7 @@ def run_chain(
 
     n_keep = draws // thin if thin > 0 else draws
     out: dict[str, np.ndarray] = {
-        "gamma": np.empty((n_keep, p)),
+        "beta_zero": np.empty((n_keep, p)),
         "beta": np.empty((n_keep, k)),
         "time_effect": np.empty((n_keep, n_tau)),
         "alpha": np.empty(n_keep),
@@ -203,7 +203,7 @@ def run_chain(
         if not tuning and (it - tune) % thin == 0:
             j = (it - tune) // thin
             if j < n_keep:
-                out["gamma"][j] = sel.theta
+                out["beta_zero"][j] = sel.theta
                 out["beta"][j] = cnt.theta[:k]
                 out["time_effect"][j] = cnt.theta[k:]
                 out["alpha"][j] = alpha

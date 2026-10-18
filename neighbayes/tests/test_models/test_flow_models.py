@@ -452,7 +452,7 @@ class TestEffectsAccountingIdentity:
         check = (
             effects["origin"]
             + effects["destination"]
-            + effects["intra"]
+            + effects["intraunit"]
             + effects["network"]
         )
         np.testing.assert_allclose(total, check, atol=1e-8)
@@ -858,11 +858,11 @@ class TestFlowSpatialEffectsAndPPC:
         assert {"mean", "ci_lower", "ci_upper", "bayes_pvalue"} <= set(df.columns)
         # Five effect labels per predictor.
         effects = set(df.index.get_level_values("effect"))
-        assert effects == {"origin", "destination", "intra", "network", "total"}
+        assert effects == {"origin", "destination", "intraunit", "network", "total"}
 
     def test_impacts_return_samples(self, fitted):
         df, samples = fitted.impacts(return_posterior_samples=True)
-        for key in ["origin", "destination", "intra", "network", "total"]:
+        for key in ["origin", "destination", "intraunit", "network", "total"]:
             arr = samples[key]
             assert arr.ndim == 2
             assert arr.shape[1] == fitted._k
@@ -960,7 +960,7 @@ class TestFlowEffectsLeSageDecomposition:
         for p in range(2):
             bd, bo = beta_d[0, p], beta_o[0, p]
             assert np.isclose(res["total"][0, p], bd + bo)
-            assert np.isclose(res["intra"][0, p], (bd + bo) / n)
+            assert np.isclose(res["intraunit"][0, p], (bd + bo) / n)
             assert np.isclose(res["origin"][0, p], (n - 1) / n * bo)
             assert np.isclose(res["destination"][0, p], (n - 1) / n * bd)
             assert np.isclose(res["network"][0, p], 0.0)
@@ -980,7 +980,7 @@ class TestFlowEffectsLeSageDecomposition:
         res = _compute_flow_effects(
             sums, rng.standard_normal((2, 2)), rng.standard_normal((2, 2))
         )
-        s = res["origin"] + res["destination"] + res["intra"] + res["network"]
+        s = res["origin"] + res["destination"] + res["intraunit"] + res["network"]
         np.testing.assert_allclose(res["total"], s)
 
     def test_calc_effects_reference_match(self):
@@ -1044,7 +1044,7 @@ class TestFlowEffectsLeSageDecomposition:
             ref_network = ref_total - ref_origin - ref_dest - ref_intra
 
             assert np.isclose(samples["total"][0, p], ref_total)
-            assert np.isclose(samples["intra"][0, p], ref_intra)
+            assert np.isclose(samples["intraunit"][0, p], ref_intra)
             assert np.isclose(samples["origin"][0, p], ref_origin)
             assert np.isclose(samples["destination"][0, p], ref_dest)
             assert np.isclose(samples["network"][0, p], ref_network)
@@ -1088,14 +1088,14 @@ class TestFlowPanelSpatialEffectsAndPPC:
         df = fitted_panel.impacts()
         assert df.index.names == ["predictor", "side", "effect"]
         effects = set(df.index.get_level_values("effect"))
-        assert effects == {"origin", "destination", "intra", "network", "total"}
+        assert effects == {"origin", "destination", "intraunit", "network", "total"}
 
     def test_panel_total_identity(self, fitted_panel):
         df, samples = fitted_panel.impacts(return_posterior_samples=True)
         s = (
             samples["origin"]
             + samples["destination"]
-            + samples["intra"]
+            + samples["intraunit"]
             + samples["network"]
         )
         np.testing.assert_allclose(samples["total"], s, atol=1e-10)
@@ -1132,7 +1132,9 @@ class TestFlowEffectsAsymmetricAndIntra:
         res_with = _compute_flow_effects(sums, beta_d, beta_o, beta_intra)
         res_without = _compute_flow_effects(sums, beta_d, beta_o, None)
         # Intra increases by β_intra/n (single perturbed region averaged).
-        assert np.isclose(res_with["intra"][0, 0] - res_without["intra"][0, 0], 2.0 / n)
+        assert np.isclose(
+            res_with["intraunit"][0, 0] - res_without["intraunit"][0, 0], 2.0 / n
+        )
         # Total increases by β_intra/n as well.
         assert np.isclose(res_with["total"][0, 0] - res_without["total"][0, 0], 2.0 / n)
         # Network unchanged (intra is part of the "owner" region's column).
@@ -1222,7 +1224,7 @@ class TestFlowEffectsAsymmetricAndIntra:
         df_combined = model.impacts(mode="combined")
         df_separate = model.impacts(mode="separate")
 
-        for eff in ("origin", "destination", "intra", "network", "total"):
+        for eff in ("origin", "destination", "intraunit", "network", "total"):
             cmean = df_combined.xs(eff, level="effect")["mean"].iloc[0]
             d = df_separate.xs(("dest", eff), level=("side", "effect"))["mean"].iloc[0]
             o = df_separate.xs(("orig", eff), level=("side", "effect"))["mean"].iloc[0]
@@ -1262,7 +1264,7 @@ class TestOLSFlowEffects:
         te = df.xs("total", level="effect")["mean"].iloc[0]
         assert np.isclose(te, 1.0 + 0.5, atol=0.2)
         # IE = (TE + β_intra)/n with β_intra ≈ 0 in the DGP.
-        ie = df.xs("intra", level="effect")["mean"].iloc[0]
+        ie = df.xs("intraunit", level="effect")["mean"].iloc[0]
         assert np.isclose(ie, te / n, atol=0.1)
 
     def test_olsflow_posterior_predictive_shape(self):

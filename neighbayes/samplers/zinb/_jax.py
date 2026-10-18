@@ -3,7 +3,7 @@ r"""JAX reduced-form Zero-Inflated SAR Negative-Binomial Pólya-Gamma Gibbs.
 Composes the two reduced-form jax samplers already built:
 
 * **selection** — reduced-form SAR-**logit** on the *latent* activation ``z``
-  (``η_sel = (I − λ W_sel)⁻¹ Z γ``), reusing ``logit_reduced``'s Krylov-only
+  (``η_sel = (I − λ W_zero)⁻¹ Z γ``), reusing ``logit_reduced``'s Krylov-only
   ρ-slice density; the working response is ``κ_sel = z − ½`` and ``z`` is redrawn
   every sweep;
 * **count** — reduced-form SAR-**NB** on the counts (``η_cnt = (I − ρ W_cnt)⁻¹ X β``),
@@ -69,13 +69,13 @@ def _make_zinb_gibbs_step(
         w_lam, w_rho = slice_widths
         y_jax, Z_jax, X_jax = data["y"], data["Z"], data["X"]
         V0g, mu0g, V0b, mu0b = data["V0g"], data["mu0g"], data["V0b"], data["mu0b"]
-        lam_lo, lam_hi = data["lam_lower"], data["lam_upper"]
+        lam_lo, lam_hi = data["rho_lower_zero"], data["rho_upper_zero"]
         rho_lo, rho_hi = data["rho_lower"], data["rho_upper"]
         a_sigma, a_nu, dmax = data["alpha_sigma"], data["alpha_nu"], data["krylov_dmax"]
         _solve_sel, _matvec_Wsel = _bind_sparse_solvers(lu_sel, data["sel"])
         _solve_cnt, _matvec_Wcnt = _bind_sparse_solvers(lu_cnt, data["cnt"])
-        gamma = state["gamma"]
-        lam = state["lam"]
+        gamma = state["beta_zero"]
+        lam = state["rho_zero"]
         beta = state["beta"]
         rho = state["rho"]
         alpha = state["alpha"]
@@ -115,7 +115,7 @@ def _make_zinb_gibbs_step(
             w=w_lam,
             return_steps=True,
         )
-        # Z̃ = (I−λ_new W_sel)⁻¹Z: Krylov basis inside the safe radius, direct
+        # Z̃ = (I−λ_new W_zero)⁻¹Z: Krylov basis inside the safe radius, direct
         # sparsax solve outside it (the slice can now land there).
         _dlam = lam_new - lam
         Ztilde = jax.lax.cond(
@@ -221,8 +221,8 @@ def _make_zinb_gibbs_step(
             alpha = data["alpha_fixed"]
 
         new_state = {
-            "gamma": gamma,
-            "lam": lam,
+            "beta_zero": gamma,
+            "rho_zero": lam,
             "beta": beta,
             "rho": rho,
             "alpha": alpha,
@@ -253,8 +253,8 @@ def _zinb_data(y, Z, X, sel_arrays, cnt_arrays, priors, krylov_dmax):
         "mu0g": mu0g,
         "V0b": V0b,
         "mu0b": mu0b,
-        "lam_lower": jnp.float64(priors.lam_lower),
-        "lam_upper": jnp.float64(priors.lam_upper),
+        "rho_lower_zero": jnp.float64(priors.lam_lower),
+        "rho_upper_zero": jnp.float64(priors.lam_upper),
         "rho_lower": jnp.float64(priors.rho_lower),
         "rho_upper": jnp.float64(priors.rho_upper),
         "alpha_sigma": jnp.float64(priors.alpha_sigma),
@@ -271,7 +271,7 @@ def run_chains_jax_zinb(
     d,
     Z,
     X,
-    W_sel_sparse,
+    W_zero_sparse,
     W_cnt_sparse,
     priors,
     inits,
@@ -311,21 +311,21 @@ def run_chains_jax_zinb(
     chains = len(inits)
     n, k = X.shape
     p = Z.shape[1]
-    lu_sel, sel_arrays = _sparse_solve_parts(_build_sparse_ctx(W_sel_sparse, n))
+    lu_sel, sel_arrays = _sparse_solve_parts(_build_sparse_ctx(W_zero_sparse, n))
     lu_cnt, cnt_arrays = _sparse_solve_parts(_build_sparse_ctx(W_cnt_sparse, n))
     data = _zinb_data(y, Z, X, sel_arrays, cnt_arrays, priors, krylov_dmax)
 
     from .._utils._sparsax_lu import set_sparsax_lu_cache_size
 
-    # two patterns (W_sel, W_cnt) x chains x a few distinct rho/lam per sweep
+    # two patterns (W_zero, W_cnt) x chains x a few distinct rho/lam per sweep
     set_sparsax_lu_cache_size(max(64, 12 * chains))
 
     if jax_seeds is None:
         jax_seeds = list(range(chains))
 
     state0 = {
-        "gamma": jnp.asarray(np.stack([i.gamma for i in inits]), dtype=jnp.float64),
-        "lam": jnp.asarray([float(i.lam) for i in inits], dtype=jnp.float64),
+        "beta_zero": jnp.asarray(np.stack([i.gamma for i in inits]), dtype=jnp.float64),
+        "rho_zero": jnp.asarray([float(i.lam) for i in inits], dtype=jnp.float64),
         "beta": jnp.asarray(np.stack([i.beta for i in inits]), dtype=jnp.float64),
         "rho": jnp.asarray([float(i.rho) for i in inits], dtype=jnp.float64),
         "alpha": jnp.asarray([float(i.alpha) for i in inits], dtype=jnp.float64),
@@ -429,8 +429,8 @@ def run_chains_jax_zinb(
             pi_mean = np.asarray(pi_all[c, sl])
         results.append(
             {
-                "lam": lam_all[c, sl],
-                "gamma": gamma_all[c, sl],
+                "rho_zero": lam_all[c, sl],
+                "beta_zero": gamma_all[c, sl],
                 "rho": rho_all[c, sl],
                 "beta": beta_all[c, sl],
                 "alpha": alpha_all[c, sl],

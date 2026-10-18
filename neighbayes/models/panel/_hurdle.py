@@ -1,24 +1,25 @@
-r"""Hurdle NB2 panels with unit and period effects in both halves.
+r"""Hurdle NB2 panels with unit and period effects in both parts.
 
 .. math::
 
-    \eta^{\mathrm{b}}_t &= (I - \lambda W_{\mathrm{sel}})^{-1} Z_t\gamma
-        + c^{\mathrm{b}} + \tau^{\mathrm{b}}_t, \qquad
-    P(y_{it} > 0) = \mathrm{logit}^{-1}(\eta^{\mathrm{b}}_{it}), \\
+    \eta_{z,t} &= (I - \rho_z W_z)^{-1} X_{z,t}\beta_z
+        + c_z + \tau_{z,t}, \qquad
+    P(y_{it} > 0) = \mathrm{logit}^{-1}(\eta_{z,it}), \\
     \eta^{\mathrm{c}}_t &= (I - \rho W)^{-1} X_t\beta + c + \tau_t, \qquad
     y_{it} \mid y_{it} > 0 \sim \mathrm{NB2}(e^{\eta^{\mathrm{c}}_{it}}, \alpha)
     \text{ truncated at } 0,
 
 stacked time-first over ``T`` periods of ``N`` units.  ``effects`` sets unit
-and period effects on **both** halves.  In the binary half a unit effect
-absorbs each unit's baseline chance of a positive count, so γ is identified
-from within-unit switches between zero and positive periods (units that never
-switch carry no information on γ and their effects are bounded by the prior);
-in the count half it absorbs each unit's usual volume.  The halves share no
-parameters (linking them through correlated unit effects is a planned
-extension), so the posterior factorizes.
+and period effects on **both** parts.  In the zero part a unit effect absorbs
+each unit's baseline chance of a positive count, so ``β_z`` is identified from
+within-unit switches between zero and positive periods (units that never
+switch carry no information on ``β_z`` and their effects are bounded by the
+prior); in the count part it absorbs each unit's usual volume.  The parts
+share no parameters (linking them through correlated unit effects is a planned
+extension), so the posterior factorizes.  ``ρ_z``, ``β_z`` are the posterior's
+``rho_zero``, ``beta_zero``.
 
-* :class:`SARHurdleNegBinPanelRE` — spatial lag in both halves.
+* :class:`SARHurdleNegBinPanelRE` — spatial lag in both parts.
 * :class:`HurdleNegBinPanelRE` — the aspatial baseline.
 
 Both default to the Pólya–Gamma Gibbs sampler of
@@ -57,24 +58,24 @@ _PARAMS_DOC = """
         Stacked counts of shape ``(N*T,)``, time-first (matrix mode).
     X : array-like or pandas.DataFrame, optional
         Stacked count design (matrix mode).
-    Z : array-like or pandas.DataFrame, optional
-        Stacked binary design, time-first. Default: ``X``.
-    sel_formula : str, optional
-        Binary right-hand side, e.g. ``"~ z1 + z2"`` (formula mode).
+    X_zero : array-like or pandas.DataFrame, optional
+        Stacked zero-part design, time-first. Default: ``X``.
+    formula_zero : str, optional
+        Zero-part right-hand side, e.g. ``"~ z1 + z2"`` (formula mode).
     W : libpysal.graph.Graph or scipy.sparse matrix
-        ``N × N`` count-half weights, row-standardized.
-    W_sel : libpysal.graph.Graph or scipy.sparse matrix, optional
-        ``N × N`` binary-half weights. Default: ``W``.
+        ``N × N`` count-part weights, row-standardized.
+    W_zero : libpysal.graph.Graph or scipy.sparse matrix, optional
+        ``N × N`` zero-part weights. Default: ``W``.
     unit_col, time_col : str, optional
         Unit and period columns (formula mode).
     N, T : int, optional
         Units and periods (matrix mode).
     effects : int or str, default 0
-        Effects in both halves: ``0``/``"pooled"``, ``1``/``"unit"``,
+        Effects in both parts: ``0``/``"pooled"``, ``1``/``"unit"``,
         ``2``/``"time"``, ``3``/``"two_way"``.
     priors : dict, optional
         See :class:`~neighbayes.models.priors.PanelHurdlePriors` (β, ρ, α incl.
-        ``alpha_fixed``, the count effects; γ, λ bounds, the binary effects).
+        ``alpha_fixed``, the count effects; the zero part's ``*_zero``).
 """
 
 
@@ -89,9 +90,9 @@ class _HurdlePanelBase(HurdleMixin, CountPanelFEMixin, SpatialPanelModel):
     def __init__(
         self,
         *args,
-        Z=None,
-        sel_formula: Optional[str] = None,
-        W_sel=None,
+        X_zero=None,
+        formula_zero: Optional[str] = None,
+        W_zero=None,
         effects: Any = 0,
         mundlak: bool = False,
         **kwargs,
@@ -115,21 +116,21 @@ class _HurdlePanelBase(HurdleMixin, CountPanelFEMixin, SpatialPanelModel):
 
         # Binary design, before the effects drop absorbed columns.
         data = kwargs.get("data")
-        if sel_formula is not None and data is not None:
+        if formula_zero is not None and data is not None:
             data = data.sort_values(
                 [kwargs["time_col"], kwargs["unit_col"]]
             ).reset_index(drop=True)
         self._Z, self._sel_feature_names = _selection_design(
-            Z, sel_formula, data, N * T
+            X_zero, formula_zero, data, N * T
         )
         if self._Z is None:
             self._Z = np.asarray(self._X, dtype=np.float64).copy()
             self._sel_feature_names = list(self._feature_names)
-        if W_sel is not None:
-            self._W_sel_sparse, self._is_sel_row_std = _parse_W(W_sel, N)
+        if W_zero is not None:
+            self._W_zero_sparse, self._is_sel_row_std = _parse_W(W_zero, N)
             self._same_W = False
         else:
-            self._W_sel_sparse = self._W_sparse
+            self._W_zero_sparse = self._W_sparse
             self._is_sel_row_std = self._is_row_std
             self._same_W = True
 
@@ -152,17 +153,19 @@ class _HurdlePanelBase(HurdleMixin, CountPanelFEMixin, SpatialPanelModel):
     def _model_coords(self, extra: Optional[dict] = None) -> dict:
         coords = super()._model_coords(extra)
         coords.update(self._fe_coords())
-        coords["sel_coefficient"] = list(self._sel_feature_names)
+        coords["coefficient_zero"] = list(self._sel_feature_names)
         return coords
 
     # ------------------------------------------------------------------
     # Priors and filters
     # ------------------------------------------------------------------
 
-    def _bounds(self, prefix: str) -> tuple[float, float]:
+    def _bounds(self, zero: bool = False) -> tuple[float, float]:
+        """ρ's prior bounds in the count part, or in the zero part (``*_zero`` keys)."""
         b = self._logdet_bounds
-        lo = float(self.priors.get(f"{prefix}_lower", b.rho_min))
-        hi = float(self.priors.get(f"{prefix}_upper", b.rho_max))
+        z = "_zero" if zero else ""
+        lo = float(self.priors.get(f"rho_lower{z}", b.rho_min))
+        hi = float(self.priors.get(f"rho_upper{z}", b.rho_max))
         return max(lo, b.rho_min), min(hi, b.rho_max)
 
     def _filters(self):
@@ -171,8 +174,8 @@ class _HurdlePanelBase(HurdleMixin, CountPanelFEMixin, SpatialPanelModel):
         if not self._count_spatial:
             return NoFilter(), NoFilter()
         return (
-            SARFilter(self._W_sparse, self._T, *self._bounds("rho")),
-            SARFilter(self._W_sel_sparse, self._T, *self._bounds("lam")),
+            SARFilter(self._W_sparse, self._T, *self._bounds()),
+            SARFilter(self._W_zero_sparse, self._T, *self._bounds(zero=True)),
         )
 
     # ------------------------------------------------------------------
@@ -188,7 +191,7 @@ class _HurdlePanelBase(HurdleMixin, CountPanelFEMixin, SpatialPanelModel):
         thin: int = 1,
         n_jobs: int = -1,
         progressbar: bool = True,
-        store_group_effects: Optional[bool] = None,
+        store_effects: Optional[bool] = None,
         log_likelihood: bool = False,
     ) -> xr.DataTree:
         """Sample via the generic hurdle kernel (registry ``("hurdle", "panel")``)."""
@@ -220,7 +223,7 @@ class _HurdlePanelBase(HurdleMixin, CountPanelFEMixin, SpatialPanelModel):
             alpha_fixed=a_fixed,
         )
         keep_groups = self._store_group_draws(
-            store_group_effects, chains, draws // max(thin, 1)
+            store_effects, chains, draws // max(thin, 1)
         )
         y = self._y.astype(np.float64)
         X = np.asarray(self._X, dtype=np.float64)
@@ -267,7 +270,7 @@ class _HurdlePanelBase(HurdleMixin, CountPanelFEMixin, SpatialPanelModel):
             scalars,
             keep_groups,
             log_likelihood,
-            extra={"gamma": ("sel_coefficient", self._sel_feature_names)},
+            extra={"beta_zero": ("coefficient_zero", self._sel_feature_names)},
             sel_effects=True,
         )
 
@@ -283,22 +286,22 @@ class _HurdlePanelBase(HurdleMixin, CountPanelFEMixin, SpatialPanelModel):
         with pm.Model(coords=self._model_coords()) as model:
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
             gamma = pm.Normal(
-                "gamma", mu=gamma_mu, sigma=gamma_sigma, dims="sel_coefficient"
+                "beta_zero", mu=gamma_mu, sigma=gamma_sigma, dims="coefficient_zero"
             )
             eta_c = pt.dot(X_t, beta)
             eta_b = pt.dot(Z_t, gamma)
             if self._count_spatial:
                 from ..._ops import SparseSARSolveOp
 
-                rho = pm.Uniform("rho", *self._bounds("rho"))
-                lam = pm.Uniform("lam", *self._bounds("lam"))
+                rho = pm.Uniform("rho", *self._bounds())
+                lam = pm.Uniform("rho_zero", *self._bounds(zero=True))
                 eta_c = SparseSARSolveOp(self._W_sparse_NT)(rho, eta_c)
-                W_sel_NT = sp.csr_matrix(
-                    sp.kron(sp.eye(self._T, format="csr"), self._W_sel_sparse)
+                W_zero_NT = sp.csr_matrix(
+                    sp.kron(sp.eye(self._T, format="csr"), self._W_zero_sparse)
                 )
-                eta_b = SparseSARSolveOp(W_sel_NT)(lam, eta_b)
+                eta_b = SparseSARSolveOp(W_zero_NT)(lam, eta_b)
             eta_c = eta_c + self._pymc_fe_offset()
-            eta_b = eta_b + self._pymc_fe_offset("sel_", self._sel_fe_priors())
+            eta_b = eta_b + self._pymc_fe_offset(True, self._sel_fe_priors())
             alpha = nb_alpha_rv(a_fixed, a_nu, a_sigma)
             pm.HurdleNegativeBinomial(
                 "obs",
@@ -323,28 +326,28 @@ class _HurdlePanelBase(HurdleMixin, CountPanelFEMixin, SpatialPanelModel):
         """``(η_b, η_c)`` at draw ``g``.
 
         With the unit effects stored only as a summary
-        (``store_group_effects=False``), their posterior mean stands in.
+        (``store_effects=False``), their posterior mean stands in.
         """
-        eta_b = self._Z @ self._flat_draw("gamma")[g]
+        eta_b = self._Z @ self._flat_draw("beta_zero")[g]
         eta_c = self._X @ self._flat_draw("beta")[g]
         if self._count_spatial:
             eta_b = self._solve_periods(
-                self._W_sel_sparse, float(self._flat_draw("lam")[g]), eta_b
+                self._W_zero_sparse, float(self._flat_draw("rho_zero")[g]), eta_b
             )
             eta_c = self._solve_periods(
                 self._W_sparse, float(self._flat_draw("rho")[g]), eta_c
             )
-        return eta_b + self._effects_at(g, "sel_"), eta_c + self._effects_at(g, "")
+        return eta_b + self._effects_at(g, True), eta_c + self._effects_at(g, False)
 
 
 class SARHurdleNegBinPanelRE(_HurdlePanelBase):
     __doc__ = (
-        r"""Reduced-form SAR hurdle NB panel: spatial lag in both halves.
+        r"""Reduced-form SAR hurdle NB panel: spatial lag in both parts.
 
     .. math::
 
-        \eta^{\mathrm{b}}_t = (I - \lambda W_{\mathrm{sel}})^{-1} Z_t\gamma
-        + c^{\mathrm{b}} + \tau^{\mathrm{b}}_t,
+        \eta_{z,t} = (I - \rho_z W_z)^{-1} X_{z,t}\beta_z
+        + c_z + \tau_{z,t},
         \quad \eta^{\mathrm{c}}_t = (I - \rho W)^{-1} X_t\beta + c + \tau_t
     """
         + _PARAMS_DOC
@@ -353,7 +356,7 @@ class SARHurdleNegBinPanelRE(_HurdlePanelBase):
 
 
 class HurdleNegBinPanelRE(_HurdlePanelBase):
-    __doc__ = r"""Aspatial hurdle NB panel with effects in both halves.""" + _PARAMS_DOC
+    __doc__ = r"""Aspatial hurdle NB panel with effects in both parts.""" + _PARAMS_DOC
     _count_spatial = False
 
 

@@ -202,12 +202,12 @@ def test_gaussian_panel_fe_fit_contract(name, ctor, data_fn, expected, sampler):
 # The 5-block RE Gibbs sampler does not emit the deterministic ``sigma2`` that
 # the NUTS build derives, so the contract is pinned *per sampler*.  NUTS
 # samples the effects non-centered by default (``alpha = sigma_alpha *
-# alpha_z``) and keeps the free variable ``alpha_z``: bridge sampling reads
+# unit_effect_raw``) and keeps the free variable ``unit_effect_raw``: bridge sampling reads
 # every free variable's draws from the posterior.
 # ---------------------------------------------------------------------------
 
-_RE_BASE = {"alpha", "beta", "sigma", "sigma_alpha"}
-_RE_NUTS = _RE_BASE | {"sigma2", "alpha_z"}
+_RE_BASE = {"unit_effect", "beta", "sigma", "unit_effect_sd"}
+_RE_NUTS = _RE_BASE | {"sigma2", "unit_effect_raw"}
 
 # name -> (ctor, data_fn, {sampler: expected_varnames})
 GAUSSIAN_PANEL_RE: dict[str, tuple] = {
@@ -366,12 +366,12 @@ COUNT_XS: dict[str, tuple] = {
     "SARNegBinRE": (
         SARNegBinRE,
         False,
-        {"gibbs": {"beta", "rho", "alpha", "sigma"}},
+        {"gibbs": {"beta", "rho", "alpha", "unit_effect_sd"}},
     ),
     "SARZINB": (
         SARZINB,
         True,
-        {"gibbs": {"beta", "rho", "alpha", "gamma", "lam"}},
+        {"gibbs": {"beta", "rho", "alpha", "beta_zero", "rho_zero"}},
     ),
 }
 
@@ -428,7 +428,9 @@ def test_zinb_jax_backend_fit_contract():
         idata_kwargs=_LL,
     )
     varnames = set(idata.posterior.data_vars)
-    assert varnames == {"beta", "rho", "alpha", "gamma", "lam"}, sorted(varnames)
+    assert varnames == {"beta", "rho", "alpha", "beta_zero", "rho_zero"}, sorted(
+        varnames
+    )
     assert "log_likelihood" in idata.children
 
 

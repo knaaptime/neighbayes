@@ -33,7 +33,7 @@ def run_chain_zinb_flow_structured(
     X: np.ndarray,
     Z: np.ndarray,
     W_csc,
-    W_sel_csc,
+    W_zero_csc,
     n: int,
     T: int,
     priors,
@@ -97,7 +97,7 @@ def run_chain_zinb_flow_structured(
 
     sel = StructuredEquation(
         Z,
-        W_sel_csc,
+        W_zero_csc,
         n,
         T,
         priors.gamma_mu,
@@ -127,9 +127,17 @@ def run_chain_zinb_flow_structured(
     n_keep = draws // thin if thin > 0 else draws
     out = {
         name: np.empty(n_keep)
-        for name in ("lam_d", "lam_o", "lam_w", "rho_d", "rho_o", "rho_w", "alpha")
+        for name in (
+            "rho_d_zero",
+            "rho_o_zero",
+            "rho_w_zero",
+            "rho_d",
+            "rho_o",
+            "rho_w",
+            "alpha",
+        )
     }
-    out["gamma"] = np.empty((n_keep, sel.k))
+    out["beta_zero"] = np.empty((n_keep, sel.k))
     out["beta"] = np.empty((n_keep, cnt.k))
     out["time_effect"] = np.empty((n_keep, cnt.n_tau))
     out["log_lik"] = np.empty((n_keep, y.size)) if store_log_lik else None
@@ -176,13 +184,13 @@ def run_chain_zinb_flow_structured(
             j = (it - tune) // thin
             if j < n_keep:
                 for eq, a, b, w in (
-                    (sel, "lam_d", "lam_o", "lam_w"),
+                    (sel, "rho_d_zero", "rho_o_zero", "rho_w_zero"),
                     (cnt, "rho_d", "rho_o", "rho_w"),
                 ):
                     out[a][j] = eq.rho["rho_d"]
                     out[b][j] = eq.rho["rho_o"]
                     out[w][j] = -eq.rho["rho_d"] * eq.rho["rho_o"]
-                out["gamma"][j] = sel.beta
+                out["beta_zero"][j] = sel.beta
                 out["beta"][j] = cnt.beta
                 out["time_effect"][j] = cnt.tau
                 out["alpha"][j] = alpha

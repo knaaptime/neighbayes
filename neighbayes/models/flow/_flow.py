@@ -51,7 +51,7 @@ from .._design import flow
 from .._mixins._flow_shared import FlowSharedMethods
 from ..base import SpatialModel
 
-_EFFECT_KEYS = ("origin", "destination", "intra", "network", "total")
+_EFFECT_KEYS = ("origin", "destination", "intraunit", "network", "total")
 
 
 class _FlowEffectMoments:
@@ -234,7 +234,7 @@ def _compute_flow_effects(
     for side, arr in (("dest", dest), ("orig", orig)):
         total, intra, origin, destination = (arr[..., i] for i in range(4))
         out[f"{side}_total"] = total
-        out[f"{side}_intra"] = intra
+        out[f"{side}_intraunit"] = intra
         out[f"{side}_origin"] = origin
         out[f"{side}_destination"] = destination
         out[f"{side}_network"] = total - origin - destination - intra
@@ -898,7 +898,7 @@ class SARFlow(FlowModel):
         Returns
         -------
         dict[str, np.ndarray]
-            Keys: ``"origin"``, ``"destination"``, ``"intra"``, ``"network"``,
+            Keys: ``"origin"``, ``"destination"``, ``"intraunit"``, ``"network"``,
             ``"total"``.  Each value has shape ``(draws, k)``.
         """
         if self._idata is None:
@@ -1173,13 +1173,13 @@ def _compute_ols_flow_effects(
     out: dict[str, np.ndarray] = {}
     out["dest_total"] = bd + bi / n
     out["dest_destination"] = bd * (n - 1) / n
-    out["dest_intra"] = (bd + bi) / n
+    out["dest_intraunit"] = (bd + bi) / n
     out["dest_origin"] = zeros_d.copy()
     out["dest_network"] = zeros_d.copy()
 
     out["orig_total"] = bo
     out["orig_origin"] = bo * (n - 1) / n
-    out["orig_intra"] = bo / n
+    out["orig_intraunit"] = bo / n
     out["orig_destination"] = zeros_o.copy()
     out["orig_network"] = zeros_o.copy()
 

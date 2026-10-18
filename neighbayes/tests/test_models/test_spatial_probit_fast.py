@@ -30,10 +30,10 @@ def _idata_for_model(m: SEMProbitRE) -> xr.DataTree:
         "beta": np.array(
             [[[0.2] * m._X.shape[1], [0.21] * m._X.shape[1]]], dtype=float
         ),
-        "a": np.array([[[0.1] * r, [0.11] * r]], dtype=float),
+        "group_effect": np.array([[[0.1] * r, [0.11] * r]], dtype=float),
         "p": np.array([[[0.6] * n, [0.61] * n]], dtype=float),
-        "rho": np.array([[0.1, 0.11]], dtype=float),
-        "sigma_a": np.array([[0.9, 0.91]], dtype=float),
+        "lam": np.array([[0.1, 0.11]], dtype=float),
+        "group_effect_sd": np.array([[0.9, 0.91]], dtype=float),
     }
     return az.from_dict({"posterior": posterior})
 
@@ -66,7 +66,7 @@ def test_matrix_mode_group_parsing_with_groups_and_sizes():
 
     m_mobs = SEMProbit(group_effects="random", y=y, X=X, W=W, group_sizes=[2, 2])
     assert m_mobs._region_codes.tolist() == [0, 0, 1, 1]
-    assert m_mobs._region_names == ["region_0", "region_1"]
+    assert m_mobs._region_names == ["group_0", "group_1"]
 
 
 def test_spatial_probit_constructor_validation_errors():
@@ -157,12 +157,12 @@ def test_post_fit_accessors_and_rename_helper_and_pymc_property(monkeypatch):
 
     # monkeypatch summary to avoid depending on ArviZ summary internals
     def _fake_summary(_idata, var_names=None, **_kwargs):
-        idx = ["beta[Intercept]", "a[a]", "rho"]
+        idx = ["beta[Intercept]", "group_effect[a]", "lam"]
         return pd.DataFrame({"mean": [0.2, 0.1, 0.1]}, index=idx)
 
     monkeypatch.setattr(az, "summary", _fake_summary)
-    smry = model.summary(var_names=["beta", "a", "rho"])
-    assert list(smry.index) == ["Intercept", "a:a", "rho"]
+    smry = model.summary(var_names=["beta", "group_effect", "lam"])
+    assert list(smry.index) == ["Intercept", "group_effect:a", "lam"]
 
     a_mean = model.random_effects_mean()
     p_hat = model.fitted_probabilities()

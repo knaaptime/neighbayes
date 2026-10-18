@@ -134,7 +134,7 @@ class ZINBGibbsState:
 class ZINBGibbsCache(NamedTuple):
     """Precomputed data that doesn't change across sweeps."""
 
-    # Selection equation cache (reduced-form SAR-logit; ReducedGibbsCache on W_sel)
+    # Selection equation cache (reduced-form SAR-logit; ReducedGibbsCache on W_zero)
     sel_cache: ReducedGibbsCache
     # Count equation cache (reduced-form SAR-NB; ReducedGibbsCache on W_cnt)
     cnt_cache: ReducedGibbsCache
@@ -144,7 +144,7 @@ class ZINBGibbsCache(NamedTuple):
     Z: np.ndarray  # (n, p) selection covariates
     X: np.ndarray  # (n, k) count covariates
     # Weights
-    W_sel_sparse: sp.csr_matrix
+    W_zero_sparse: sp.csr_matrix
     W_cnt_sparse: sp.csr_matrix
     same_W: bool
 
@@ -282,7 +282,7 @@ def run_zinb_chain(
     d: np.ndarray,
     Z: np.ndarray,
     X: np.ndarray,
-    W_sel_sparse: sp.csr_matrix,
+    W_zero_sparse: sp.csr_matrix,
     W_cnt_sparse: sp.csr_matrix,
     priors: ZINBGibbsPriors,
     cache: ZINBGibbsCache,
@@ -310,7 +310,7 @@ def run_zinb_chain(
         Selection covariate matrix.
     X : ndarray of shape (n, k)
         Count covariate matrix.
-    W_sel_sparse : csr_matrix of shape (n, n)
+    W_zero_sparse : csr_matrix of shape (n, n)
         Spatial weights for the selection equation.
     W_cnt_sparse : csr_matrix of shape (n, n)
         Spatial weights for the count equation.
@@ -440,7 +440,7 @@ def run_zinb_chain(
         # z, NOT the observed d = 1(y > 0).  Using d conflates
         # structural zeros with NB sampling zeros, biasing γ and λ.
         #
-        # Reduced form: η^sel = (I − λW_sel)⁻¹ Zγ (deterministic, no latent
+        # Reduced form: η^sel = (I − λW_zero)⁻¹ Zγ (deterministic, no latent
         # field).  Mirrors the JAX backend and the reduced-NB count blocks:
         # ω^sel = PG(1, η^sel); λ is a β-marginalized slice (Jacobian cancels);
         # γ is conjugate given Z̃ = A_λ^{-1} Z.
@@ -654,8 +654,8 @@ def run_zinb_chain(
             progress_manager.update(chain_id, i, tuning=i < tune)
 
     return {
-        "lam": lam_samples,
-        "gamma": gamma_samples,
+        "rho_zero": lam_samples,
+        "beta_zero": gamma_samples,
         "rho": rho_samples,
         "beta": beta_samples,
         "alpha": alpha_samples,

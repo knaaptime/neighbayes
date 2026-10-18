@@ -55,7 +55,7 @@ def _re_prior_values(model, Z: np.ndarray) -> dict:
 
     ``Z`` is the design ``beta`` multiplies (``[X, WX]`` for SDEM); the
     ``beta`` default is the data-scaled Gelman et al. (2008) prior on it.
-    ``sigma_alpha_scale`` defaults to ``sd(y)``, so the half-t prior on
+    ``unit_effect_sd_scale`` defaults to ``sd(y)``, so the half-t prior on
     :math:`\\sigma_\\alpha` means the same thing whatever units ``y`` is in.
     """
     names = list(model._model_coords()["coefficient"])
@@ -66,28 +66,30 @@ def _re_prior_values(model, Z: np.ndarray) -> dict:
         "beta_sigma": p.get("beta_sigma", beta_sigma),
         "sigma2_alpha": float(p.get("sigma2_alpha", 2.0)),
         "sigma2_beta": float(p.get("sigma2_beta", np.var(model._y))),
-        "sigma_alpha_nu": float(p.get("sigma_alpha_nu", 1.0)),
-        "sigma_alpha_scale": float(p.get("sigma_alpha_scale", np.std(model._y))),
+        "unit_effect_sd_nu": float(p.get("unit_effect_sd_nu", 1.0)),
+        "unit_effect_sd_scale": float(p.get("unit_effect_sd_scale", np.std(model._y))),
     }
 
 
 def _random_effects(pv: dict, centered: bool):
-    """``sigma_alpha`` and the unit effects ``alpha``, inside a model context.
+    """``unit_effect_sd`` and the unit effects ``unit_effect``, inside a model context.
 
     The half-t prior is ``HalfCauchy`` when ``nu == 1``.  Non-centered,
-    ``alpha`` is a ``Deterministic`` of the standardized ``alpha_z``, so the
-    posterior carries ``alpha`` under either parameterization.
+    ``unit_effect`` is a ``Deterministic`` of the standardized ``unit_effect_raw``,
+    so the posterior carries ``unit_effect`` under either parameterization.
     """
-    nu, scale = pv["sigma_alpha_nu"], pv["sigma_alpha_scale"]
+    nu, scale = pv["unit_effect_sd_nu"], pv["unit_effect_sd_scale"]
     if nu == 1.0:
-        sigma_alpha = pm.HalfCauchy("sigma_alpha", beta=scale)
+        sigma_alpha = pm.HalfCauchy("unit_effect_sd", beta=scale)
     else:
-        sigma_alpha = pm.HalfStudentT("sigma_alpha", nu=nu, sigma=scale)
+        sigma_alpha = pm.HalfStudentT("unit_effect_sd", nu=nu, sigma=scale)
     if centered:
-        alpha = pm.Normal("alpha", mu=0.0, sigma=sigma_alpha, dims="unit")
+        alpha = pm.Normal("unit_effect", mu=0.0, sigma=sigma_alpha, dims="unit")
     else:
-        alpha_z = pm.Normal("alpha_z", mu=0.0, sigma=1.0, dims="unit")
-        alpha = pm.Deterministic("alpha", sigma_alpha * alpha_z, dims="unit")
+        unit_effect_raw = pm.Normal("unit_effect_raw", mu=0.0, sigma=1.0, dims="unit")
+        alpha = pm.Deterministic(
+            "unit_effect", sigma_alpha * unit_effect_raw, dims="unit"
+        )
     return sigma_alpha, alpha
 
 
@@ -102,8 +104,8 @@ def _re_gibbs_priors(pv: dict, rho_lower: float, rho_upper: float):
         rho_upper=rho_upper,
         sigma2_alpha=pv["sigma2_alpha"],
         sigma2_beta=pv["sigma2_beta"],
-        sigma_alpha_nu=pv["sigma_alpha_nu"],
-        sigma_alpha_scale=pv["sigma_alpha_scale"],
+        unit_effect_sd_nu=pv["unit_effect_sd_nu"],
+        unit_effect_sd_scale=pv["unit_effect_sd_scale"],
     )
 
 
@@ -161,9 +163,9 @@ class OLSPanelRE(_RandomEffectsMixin, SpatialPanelModel):
         - ``sigma2_alpha`` (float, default 2.0): InverseGamma prior alpha for sigma2
         - ``sigma2_beta`` (float, default var(y)): InverseGamma prior beta for sigma2
           for :math:`\\sigma`.
-        - ``sigma_alpha_nu`` (float, default 1.0): degrees of freedom of the
+        - ``unit_effect_sd_nu`` (float, default 1.0): degrees of freedom of the
           half-t prior on :math:`\\sigma_\\alpha`; 1 is the half-Cauchy.
-        - ``sigma_alpha_scale`` (float, default sd(y)): scale of that prior.
+        - ``unit_effect_sd_scale`` (float, default sd(y)): scale of that prior.
           See :class:`~neighbayes.models.priors.PanelREMixinPriors`.
         - ``nu`` (float, default 4.0): Fixed Student-t degrees of
           freedom (only used when ``robust=True``).
@@ -255,7 +257,7 @@ class OLSPanelRE(_RandomEffectsMixin, SpatialPanelModel):
         np.ndarray
         """
         beta = self._posterior_mean("beta")
-        alpha = self._posterior_mean("alpha")
+        alpha = self._posterior_mean("unit_effect")
         return self._X @ beta + alpha[self._unit_idx]
 
     def _compute_impacts_posterior(
@@ -336,9 +338,9 @@ class SARPanelRE(_RandomEffectsMixin, SpatialPanelModel):
         - ``sigma2_alpha`` (float, default 2.0): InverseGamma prior alpha for sigma2
         - ``sigma2_beta`` (float, default var(y)): InverseGamma prior beta for sigma2
           for :math:`\\sigma`.
-        - ``sigma_alpha_nu`` (float, default 1.0): degrees of freedom of the
+        - ``unit_effect_sd_nu`` (float, default 1.0): degrees of freedom of the
           half-t prior on :math:`\\sigma_\\alpha`; 1 is the half-Cauchy.
-        - ``sigma_alpha_scale`` (float, default sd(y)): scale of that prior.
+        - ``unit_effect_sd_scale`` (float, default sd(y)): scale of that prior.
           See :class:`~neighbayes.models.priors.PanelREMixinPriors`.
         - ``nu`` (float, default 4.0): Fixed Student-t degrees of
           freedom (only used when ``robust=True``).
@@ -515,7 +517,7 @@ class SARPanelRE(_RandomEffectsMixin, SpatialPanelModel):
         """
         rho = float(self._posterior_mean("rho"))
         beta = self._posterior_mean("beta")
-        alpha = self._posterior_mean("alpha")
+        alpha = self._posterior_mean("unit_effect")
         return rho * self._Wy + self._X @ beta + alpha[self._unit_idx]
 
     def _compute_impacts_posterior(
@@ -600,9 +602,9 @@ class SEMPanelRE(_RandomEffectsMixin, SpatialPanelModel):
         - ``sigma2_alpha`` (float, default 2.0): InverseGamma prior alpha for sigma2
         - ``sigma2_beta`` (float, default var(y)): InverseGamma prior beta for sigma2
           for :math:`\\sigma`.
-        - ``sigma_alpha_nu`` (float, default 1.0): degrees of freedom of the
+        - ``unit_effect_sd_nu`` (float, default 1.0): degrees of freedom of the
           half-t prior on :math:`\\sigma_\\alpha`; 1 is the half-Cauchy.
-        - ``sigma_alpha_scale`` (float, default sd(y)): scale of that prior.
+        - ``unit_effect_sd_scale`` (float, default sd(y)): scale of that prior.
           See :class:`~neighbayes.models.priors.PanelREMixinPriors`.
         - ``nu`` (float, default 4.0): Fixed Student-t degrees of
           freedom (only used when ``robust=True``).
@@ -864,7 +866,7 @@ class SEMPanelRE(_RandomEffectsMixin, SpatialPanelModel):
         np.ndarray
         """
         beta = self._posterior_mean("beta")
-        alpha = self._posterior_mean("alpha")
+        alpha = self._posterior_mean("unit_effect")
         return self._X @ beta + alpha[self._unit_idx]
 
     def _compute_impacts_posterior(
@@ -949,9 +951,9 @@ class SDEMPanelRE(_RandomEffectsMixin, SpatialPanelModel):
         - ``sigma2_alpha`` (float, default 2.0): InverseGamma prior alpha for sigma2
         - ``sigma2_beta`` (float, default var(y)): InverseGamma prior beta for sigma2
           for :math:`\\sigma`.
-        - ``sigma_alpha_nu`` (float, default 1.0): degrees of freedom of the
+        - ``unit_effect_sd_nu`` (float, default 1.0): degrees of freedom of the
           half-t prior on :math:`\\sigma_\\alpha`; 1 is the half-Cauchy.
-        - ``sigma_alpha_scale`` (float, default sd(y)): scale of that prior.
+        - ``unit_effect_sd_scale`` (float, default sd(y)): scale of that prior.
           See :class:`~neighbayes.models.priors.PanelREMixinPriors`.
         - ``nu`` (float, default 4.0): Fixed Student-t degrees of
           freedom (only used when ``robust=True``).
@@ -1105,7 +1107,7 @@ class SDEMPanelRE(_RandomEffectsMixin, SpatialPanelModel):
 
     def _fitted_mean_from_posterior(self) -> np.ndarray:
         beta = self._posterior_mean("beta")
-        alpha = self._posterior_mean("alpha")
+        alpha = self._posterior_mean("unit_effect")
         Z = np.hstack([self._X, self._WX])
         return Z @ beta + alpha[self._unit_idx]
 

@@ -1,30 +1,30 @@
 r"""Zero-inflated SAR Negative Binomial (ZINB-SAR) model.
 
-Composes a reduced-form SAR-logit selection equation with a
-reduced-form SAR-NB count equation via a zero-allocation block:
+Composes a reduced-form SAR logit zero part with a reduced-form SAR NB count
+part via a zero-allocation block:
 
 .. math::
 
-    d_i \mid \eta_i^{\mathrm{sel}} &\sim \mathrm{Bernoulli}(\mathrm{logit}^{-1}(\eta_i^{\mathrm{sel}})) \\
-    \eta^{\mathrm{sel}} &= (I - \lambda W_{\mathrm{sel}})^{-1} Z\gamma \\
+    d_i \mid \eta_{z,i} &\sim \mathrm{Bernoulli}(\mathrm{logit}^{-1}(\eta_{z,i})) \\
+    \eta_z &= (I - \rho_z W_z)^{-1} X_z\beta_z \\
     y_i \mid d_i, \eta_i^{\mathrm{cnt}}, \alpha &\sim \begin{cases}
         0 & \text{if } d_i = 0 \\
         \mathrm{NegBin}(\exp(\eta_i^{\mathrm{cnt}}), \alpha) & \text{if } d_i = 1
     \end{cases} \\
     \eta^{\mathrm{cnt}} &= (I - \rho W_{\mathrm{cnt}})^{-1} X\beta
 
-Both equations are reduced-form: the spatial lag enters each linear
-predictor as a deterministic mean-propagator (no random effects), so
-the ``|I − λW|`` / ``|I − ρW|`` Jacobians cancel under marginalization.
-The Pólya–Gamma
-augmentation yields fully conjugate Gibbs updates for all blocks except
-ρ, λ, and α, which use 1-D adaptive slice sampling.  The NumPy and JAX
-backends fit the same model block-for-block.
+Both parts are reduced-form SARs: the spatial lag enters each linear predictor
+as a deterministic mean propagator (no random effects), so the
+``|I − ρ_z W_z|`` / ``|I − ρW|`` Jacobians cancel under marginalization.  The
+Pólya–Gamma augmentation yields fully conjugate Gibbs updates for all blocks
+except ρ, ρ_z and α, which use 1-D adaptive slice sampling.  The NumPy and JAX
+backends fit the same model block-for-block.  ``ρ_z``, ``β_z`` are the
+posterior's ``rho_zero``, ``beta_zero``.
 
 Use this model when:
 - The response is a non-negative integer count with excess zeros.
-- You need spatial autocorrelation in both the selection (binary)
-  and count (intensity) processes.
+- You need spatial autocorrelation in both the zero part (activation) and the
+  count part (intensity).
 - The two processes may operate on different spatial scales
   (different W matrices).
 
@@ -67,16 +67,16 @@ from ..base import SpatialModel
 from ..priors import SARZINBPriors
 
 
-def _selection_design(Z, sel_formula, data, n: int):
+def _selection_design(Z, formula_zero, data, n: int):
     """The selection design and its column names, or ``(None, None)`` for ``Z = X``."""
-    if Z is not None and sel_formula is not None:
-        raise ValueError("Pass Z or sel_formula, not both.")
-    if sel_formula is not None:
+    if Z is not None and formula_zero is not None:
+        raise ValueError("Pass Z or formula_zero, not both.")
+    if formula_zero is not None:
         if data is None:
-            raise ValueError("sel_formula needs data (formula mode).")
+            raise ValueError("formula_zero needs data (formula mode).")
         from formulaic import model_matrix
 
-        rhs = sel_formula.split("~", 1)[-1].strip()
+        rhs = formula_zero.split("~", 1)[-1].strip()
         mm = model_matrix(rhs, data)
         names, Z_arr = list(mm.columns), np.asarray(mm, dtype=np.float64)
     elif Z is not None:
@@ -110,25 +110,26 @@ class SARZINB(ZINBMixin, SpatialModel):
     X : array-like, optional
         Count covariate matrix of shape ``(n, k)``. Required in matrix
         mode.
-    Z : array-like or pandas.DataFrame, optional
-        Selection covariate matrix of shape ``(n, p)``; a DataFrame's column
-        names label γ. If ``None`` (and no ``sel_formula``), defaults to ``X``
-        (same covariates for both equations).
-    sel_formula : str, optional
-        Right-hand side for the **selection** equation, e.g. ``"~ z1 + z2"``,
-        evaluated on ``data`` (formula mode). Alternative to ``Z``.
+    X_zero : array-like or pandas.DataFrame, optional
+        Zero-part covariate matrix of shape ``(n, p)``; a DataFrame's column
+        names label ``beta_zero``. If ``None`` (and no ``formula_zero``),
+        defaults to ``X`` (the same covariates in both parts).
+    formula_zero : str, optional
+        Right-hand side for the **zero** part, e.g. ``"~ z1 + z2"``,
+        evaluated on ``data`` (formula mode). Alternative to ``X_zero``.
     W : libpysal.graph.Graph or scipy.sparse matrix
-        Spatial weights for the **count** equation, shape ``(n, n)``.
-    W_sel : libpysal.graph.Graph or scipy.sparse matrix, optional
-        Spatial weights for the **selection** equation. If ``None``,
-        uses ``W`` (same weights for both equations).
+        Spatial weights for the **count** part, shape ``(n, n)``.
+    W_zero : libpysal.graph.Graph or scipy.sparse matrix, optional
+        Spatial weights for the **zero** part. If ``None``, uses ``W`` (the
+        same weights in both parts).
     priors : dict, optional
         Override default priors. Supported keys:
 
-        - ``gamma_mu``, ``gamma_sigma`` (float or array, default Gelman et al.
-          2008 on the logit scale, centred at even odds): Normal prior on γ.
-        - ``lam_lower`` (float, default -0.999): Lower bound for λ.
-        - ``lam_upper`` (float, default 0.999): Upper bound for λ.
+        - ``beta_mu_zero``, ``beta_sigma_zero`` (float or array, default
+          Gelman et al. 2008 on the logit scale, centred at even odds): Normal
+          prior on ``beta_zero``.
+        - ``rho_lower_zero``, ``rho_upper_zero`` (float, default -0.999 and
+          0.999): bounds for ``rho_zero``.
         - ``beta_mu``, ``beta_sigma`` (float or array, default Gelman et al.
           2008 on the log scale): Normal prior on β, intercept at
           ``log(mean(y))`` with scale 2.5 and slopes ``2.5 / sd(x_j)``.
@@ -138,7 +139,7 @@ class SARZINB(ZINBMixin, SpatialModel):
           Half-Student-t(ν, σ) prior on the NB dispersion α.
         - ``alpha_fixed`` (float, optional): hold α at this value instead;
           a large value (10-20 times the typical mean count) makes the count
-          equation essentially Poisson on the same exact sampler.
+          part essentially Poisson on the same exact sampler.
 
         See :class:`~neighbayes.models.priors.SARZINBPriors`.
 
@@ -150,7 +151,7 @@ class SARZINB(ZINBMixin, SpatialModel):
     Notes
     -----
     ``fit()`` defaults to a 9-block Gibbs sampler that composes the SAR-logit
-    blocks (ω^sel, η^sel, γ, λ), the zero-allocation block (z), and the
+    blocks of the zero part (ω_z, η_z, β_z, ρ_z), the zero-allocation block (z), and the
     reduced-form SAR-NB blocks (ω^cnt, β, ρ, α); ``sampler="nuts"`` fits the
     same model and priors in PyMC (``ZeroInflatedNegativeBinomial``).
 
@@ -161,7 +162,7 @@ class SARZINB(ZINBMixin, SpatialModel):
 
     _dispatch = classmethod(discrete)
 
-    _spatial_params: tuple[str, ...] = ("rho", "lam")
+    _spatial_params: tuple[str, ...] = ("rho", "rho_zero")
     _lag_terms: tuple[str, ...] = ()
     _jacobian_param: str | None = "rho"  # count equation Jacobian
     _gibbs_class: str | None = None
@@ -176,10 +177,10 @@ class SARZINB(ZINBMixin, SpatialModel):
         data=None,
         y=None,
         X=None,
-        Z=None,
+        X_zero=None,
         W=None,
-        sel_formula=None,
-        W_sel=None,
+        formula_zero=None,
+        W_zero=None,
         priors=None,
         logdet_method=None,
         robust=False,
@@ -215,18 +216,18 @@ class SARZINB(ZINBMixin, SpatialModel):
 
         # Selection covariates Z
         self._Z, self._sel_feature_names = _selection_design(
-            Z, sel_formula, data, len(self._y)
+            X_zero, formula_zero, data, len(self._y)
         )
         if self._Z is None:
             self._Z = self._X.copy()
             self._sel_feature_names = list(self._feature_names)
 
-        # Selection weights W_sel
-        if W_sel is not None:
-            self._W_sel_sparse, self._is_sel_row_std = _parse_W(W_sel, len(self._y))
+        # Selection weights W_zero
+        if W_zero is not None:
+            self._W_zero_sparse, self._is_sel_row_std = _parse_W(W_zero, len(self._y))
             self._same_W = False
         else:
-            self._W_sel_sparse = self._W_sparse
+            self._W_zero_sparse = self._W_sparse
             self._is_sel_row_std = self._is_row_std
             self._same_W = True
 
@@ -247,7 +248,7 @@ class SARZINB(ZINBMixin, SpatialModel):
         X = self._X
         Z = self._Z
         W_cnt_csc = self._W_sparse.tocsc()
-        W_sel_csc = self._W_sel_sparse.tocsc()
+        W_zero_csc = self._W_zero_sparse.tocsc()
         k = X.shape[1]
         p = Z.shape[1]
 
@@ -259,7 +260,7 @@ class SARZINB(ZINBMixin, SpatialModel):
             profile_loglik_rho_grid,
         )
 
-        _best_lam, _best_gamma, _best_ll_sel = profile_loglik_rho_grid(d, Z, W_sel_csc)
+        _best_lam, _best_gamma, _best_ll_sel = profile_loglik_rho_grid(d, Z, W_zero_csc)
 
         lam_init = float(
             np.clip(
@@ -271,7 +272,7 @@ class SARZINB(ZINBMixin, SpatialModel):
         gamma_init = _best_gamma + 0.1 * rng.standard_normal(p)
 
         # η^sel from the selection profile
-        _sel_solver = CachedSparseSolver([W_sel_csc], n)
+        _sel_solver = CachedSparseSolver([W_zero_csc], n)
         eta_sel_init = _sel_solver.solve([-lam_init], Z @ gamma_init)
 
         # ω^sel: PG(1, η^sel)
@@ -373,13 +374,13 @@ class SARZINB(ZINBMixin, SpatialModel):
         p = self._Z.shape[1]
         return ZINBGibbsPriors(
             gamma_mu=np.broadcast_to(
-                np.asarray(self.priors.get("gamma_mu", g_mu), dtype=float), (p,)
+                np.asarray(self.priors.get("beta_mu_zero", g_mu), dtype=float), (p,)
             ).copy(),
             gamma_sigma=np.broadcast_to(
-                np.asarray(self.priors.get("gamma_sigma", g_sd), dtype=float), (p,)
+                np.asarray(self.priors.get("beta_sigma_zero", g_sd), dtype=float), (p,)
             ).copy(),
-            lam_lower=float(self.priors.get("lam_lower", rho_lower)),
-            lam_upper=float(self.priors.get("lam_upper", rho_upper)),
+            lam_lower=float(self.priors.get("rho_lower_zero", rho_lower)),
+            lam_upper=float(self.priors.get("rho_upper_zero", rho_upper)),
             beta_mu=beta_mu,
             beta_sigma=beta_sigma,
             rho_lower=float(self.priors.get("rho_lower", rho_lower)),
@@ -418,8 +419,8 @@ class SARZINB(ZINBMixin, SpatialModel):
         progressbar : bool
             Show per-chain progress bars.
         backend : {"numpy", "jax"}
-            Execution backend — both fit the *same* reduced-form ZINB (reduced
-            SAR-logit selection + reduced SAR-NB count).  ``"jax"`` (the default
+            Execution backend — both fit the *same* reduced-form ZINB (a
+            reduced SAR logit zero part and a reduced SAR NB count part).  ``"jax"`` (the default
             via ``"auto"``) runs the chains in parallel threads with
             sparsax-KLU solves and on-device Pólya-Gamma; ``"numpy"`` uses the
             CHOLMOD 9-block Gibbs.
@@ -429,17 +430,16 @@ class SARZINB(ZINBMixin, SpatialModel):
         Returns
         -------
         xarray.DataTree
-            Posterior draws of ``lam``, ``gamma``, ``rho``, ``beta``,
+            Posterior draws of ``rho_zero``, ``beta_zero``, ``rho``, ``beta``,
             ``alpha`` and pointwise ``log_likelihood``.
         """
         n, k = self._X.shape
-        self._Z.shape[1]
 
         if n < 900:
             warnings.warn(
                 f"Zero-inflated NB models require large samples for "
                 f"reliable spatial parameter recovery. With n={n}, "
-                f"posterior estimates of ρ, λ, and α may be severely "
+                f"posterior estimates of rho, rho_zero and alpha may be severely "
                 f"attenuated. n ≥ 900 is recommended.",
                 UserWarning,
                 stacklevel=2,
@@ -466,7 +466,7 @@ class SARZINB(ZINBMixin, SpatialModel):
                 d=self._d,
                 Z=self._Z,
                 X=self._X,
-                W_sel_sparse=self._W_sel_sparse.tocsr(),
+                W_zero_sparse=self._W_zero_sparse.tocsr(),
                 W_cnt_sparse=self._W_sparse.tocsr(),
                 priors=priors,
                 inits=chain_inits,
@@ -479,8 +479,8 @@ class SARZINB(ZINBMixin, SpatialModel):
             )
 
             stacked = {
-                "lam": np.stack([c["lam"] for c in chain_results], axis=0),
-                "gamma": np.stack([c["gamma"] for c in chain_results], axis=0),
+                "rho_zero": np.stack([c["rho_zero"] for c in chain_results], axis=0),
+                "beta_zero": np.stack([c["beta_zero"] for c in chain_results], axis=0),
                 "rho": np.stack([c["rho"] for c in chain_results], axis=0),
                 "beta": np.stack([c["beta"] for c in chain_results], axis=0),
                 "alpha": np.stack([c["alpha"] for c in chain_results], axis=0),
@@ -496,12 +496,12 @@ class SARZINB(ZINBMixin, SpatialModel):
                 log_likelihood={"obs": log_lik} if log_likelihood else None,
                 observed_data={"obs": self._y_int},
                 coords={
-                    "sel_coefficient": list(self._sel_feature_names),
+                    "coefficient_zero": list(self._sel_feature_names),
                     "coefficient": list(self._feature_names),
                     "obs_id": list(range(n)),
                 },
                 dims={
-                    "gamma": ["sel_coefficient"],
+                    "beta_zero": ["coefficient_zero"],
                     "beta": ["coefficient"],
                     "obs": ["obs_id"],
                 },
@@ -521,22 +521,22 @@ class SARZINB(ZINBMixin, SpatialModel):
         W_cnt_sym, W_cnt_tW, cnt_pattern = _make_cholmod_pattern(W_cnt_csc, n)
         cnt_cholmod_pattern = cnt_pattern
 
-        # --- Selection equation cache (reduced-form SAR-logit on W_sel) ---
+        # --- Selection equation cache (reduced-form SAR-logit on W_zero) ---
         # Same ReducedGibbsCache shape as the count; the λ slice uses the
         # direct-CG path (basis=None), so krylov_degree is unused here.  For
-        # W_sel eigen bounds reuse the count's when the weights match, else use
+        # W_zero eigen bounds reuse the count's when the weights match, else use
         # the row-standardized default [−1, 1] (safe for the CG SPD check).
-        W_sel_csr = self._W_sel_sparse.tocsr()
-        W_sel_csc = self._W_sel_sparse.tocsc()
-        W_sel_sym, W_sel_tW, sel_pattern = _make_cholmod_pattern(W_sel_csc, n)
+        W_zero_csr = self._W_zero_sparse.tocsr()
+        W_zero_csc = self._W_zero_sparse.tocsc()
+        W_zero_sym, W_zero_tW, sel_pattern = _make_cholmod_pattern(W_zero_csc, n)
         if self._same_W:
-            W_sel_eig_max, W_sel_eig_min = W_eig_max, W_eig_min
+            W_zero_eig_max, W_zero_eig_min = W_eig_max, W_eig_min
         else:
-            W_sel_eig_max, W_sel_eig_min = 1.0, -1.0
+            W_zero_eig_max, W_zero_eig_min = 1.0, -1.0
 
         sel_cache = ReducedGibbsCache(
-            W_sparse=W_sel_csr,
-            W_csc=W_sel_csc,
+            W_sparse=W_zero_csr,
+            W_csc=W_zero_csc,
             rho_lower=priors.lam_lower,
             rho_upper=priors.lam_upper,
             rho_adaptive_width=True,
@@ -544,10 +544,10 @@ class SARZINB(ZINBMixin, SpatialModel):
             krylov_degree=0,
             krylov_dmax=0.15,
             cholmod_pattern=sel_pattern,
-            W_sym=W_sel_sym,
-            WtW=W_sel_tW,
-            W_eig_max=W_sel_eig_max,
-            W_eig_min=W_sel_eig_min,
+            W_sym=W_zero_sym,
+            WtW=W_zero_tW,
+            W_eig_max=W_zero_eig_max,
+            W_eig_min=W_zero_eig_min,
             n_rho_omega_cycles=1,
         )
 
@@ -576,7 +576,7 @@ class SARZINB(ZINBMixin, SpatialModel):
             d=self._d,
             Z=self._Z,
             X=self._X,
-            W_sel_sparse=W_sel_csr,
+            W_zero_sparse=W_zero_csr,
             W_cnt_sparse=W_cnt_csr,
             same_W=self._same_W,
         )
@@ -596,7 +596,7 @@ class SARZINB(ZINBMixin, SpatialModel):
                 d=self._d,
                 Z=self._Z,
                 X=self._X,
-                W_sel_sparse=W_sel_csr,
+                W_zero_sparse=W_zero_csr,
                 W_cnt_sparse=W_cnt_csr,
                 priors=priors,
                 cache=zinb_cache,
@@ -625,8 +625,8 @@ class SARZINB(ZINBMixin, SpatialModel):
 
         # Stack chains
         stacked = {
-            "lam": np.stack([c["lam"] for c in chain_results], axis=0),
-            "gamma": np.stack([c["gamma"] for c in chain_results], axis=0),
+            "rho_zero": np.stack([c["rho_zero"] for c in chain_results], axis=0),
+            "beta_zero": np.stack([c["beta_zero"] for c in chain_results], axis=0),
             "rho": np.stack([c["rho"] for c in chain_results], axis=0),
             "beta": np.stack([c["beta"] for c in chain_results], axis=0),
             "alpha": np.stack([c["alpha"] for c in chain_results], axis=0),
@@ -642,12 +642,12 @@ class SARZINB(ZINBMixin, SpatialModel):
             log_likelihood={"obs": log_lik} if log_likelihood else None,
             observed_data={"obs": self._y_int},
             coords={
-                "sel_coefficient": list(self._sel_feature_names),
+                "coefficient_zero": list(self._sel_feature_names),
                 "coefficient": list(self._feature_names),
                 "obs_id": list(range(n)),
             },
             dims={
-                "gamma": ["sel_coefficient"],
+                "beta_zero": ["coefficient_zero"],
                 "beta": ["coefficient"],
                 "obs": ["obs_id"],
             },
@@ -660,7 +660,7 @@ class SARZINB(ZINBMixin, SpatialModel):
         r"""Reduced-form ZINB for NUTS: the same model and priors as the Gibbs path.
 
         ``y ~ ZINB(ψ = π, μ = exp(η_cnt), α)`` with
-        ``η_sel = (I − λW_sel)⁻¹Zγ`` and ``η_cnt = (I − ρW)⁻¹Xβ``; PyMC's ``ψ`` is
+        ``η_z = (I − ρ_z W_z)⁻¹X_zβ_z`` and ``η_cnt = (I − ρW)⁻¹Xβ``; PyMC's ``ψ`` is
         the probability of the NB component, i.e. the activation probability π.
         No ``log|I − ρW|`` terms: neither ``y`` nor ``d`` is transformed.
         """
@@ -671,16 +671,19 @@ class SARZINB(ZINBMixin, SpatialModel):
 
         pv = self._zinb_priors()
         with pm.Model(coords=self._model_coords(self._zinb_coords())) as model:
-            lam = pm.Uniform("lam", lower=pv.lam_lower, upper=pv.lam_upper)
+            lam = pm.Uniform("rho_zero", lower=pv.lam_lower, upper=pv.lam_upper)
             gamma = pm.Normal(
-                "gamma", mu=pv.gamma_mu, sigma=pv.gamma_sigma, dims="sel_coefficient"
+                "beta_zero",
+                mu=pv.gamma_mu,
+                sigma=pv.gamma_sigma,
+                dims="coefficient_zero",
             )
             rho = pm.Uniform("rho", lower=pv.rho_lower, upper=pv.rho_upper)
             beta = pm.Normal(
                 "beta", mu=pv.beta_mu, sigma=pv.beta_sigma, dims="coefficient"
             )
             alpha = nb_alpha_rv(pv.alpha_fixed, pv.alpha_nu, pv.alpha_sigma)
-            eta_sel = SparseSARSolveOp(self._W_sel_sparse)(
+            eta_sel = SparseSARSolveOp(self._W_zero_sparse)(
                 lam, pt.dot(pt.as_tensor_variable(self._Z), gamma)
             )
             eta_cnt = SparseSARSolveOp(self._W_sparse)(
@@ -696,17 +699,17 @@ class SARZINB(ZINBMixin, SpatialModel):
         return model
 
     def _zinb_coords(self) -> dict:
-        return {"sel_coefficient": list(self._sel_feature_names)}
+        return {"coefficient_zero": list(self._sel_feature_names)}
 
     def _part_etas(self, g: int) -> tuple[np.ndarray, np.ndarray]:
         """``(η_sel, η_cnt)`` at posterior draw ``g``."""
         n = self._X.shape[0]
-        lam = float(self._flat_draw("lam")[g])
+        lam = float(self._flat_draw("rho_zero")[g])
         rho = float(self._flat_draw("rho")[g])
-        gamma = self._flat_draw("gamma")[g]
+        gamma = self._flat_draw("beta_zero")[g]
         beta = self._flat_draw("beta")[g]
         eye = sp.eye(n, format="csc", dtype=np.float64)
-        eta_sel = sp.linalg.splu((eye - lam * self._W_sel_sparse).tocsc()).solve(
+        eta_sel = sp.linalg.splu((eye - lam * self._W_zero_sparse).tocsc()).solve(
             self._Z @ gamma
         )
         eta_cnt = sp.linalg.splu((eye - rho * self._W_sparse).tocsc()).solve(

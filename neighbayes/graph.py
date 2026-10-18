@@ -1,6 +1,6 @@
 """Kronecker-product spatial weight utilities for flow (O-D) models.
 
-Provides helpers to build destination, origin, and network weight matrices
+Provides helpers to build destination, origin, and origin–destination weight matrices
 from a single n×n :class:`libpysal.graph.Graph` using Kronecker products,
 following :cite:t:`lesage2008SpatialEconometric`.
 
@@ -167,8 +167,8 @@ def origin_weights(G: Graph) -> sp.csr_matrix:
     return sp.kron(W, sp.eye(n, format="csr"), format="csr")
 
 
-def network_weights(G: Graph) -> sp.csr_matrix:
-    """Build the N×N network weight matrix :math:`W_w = W \\otimes W`.
+def od_weights(G: Graph) -> sp.csr_matrix:
+    """Build the N×N origin–destination weight matrix :math:`W_w = W \\otimes W`.
 
     Captures joint origin-destination neighborhood structure: a non-zero
     entry at :math:`(i \\cdot n + j,\\; k \\cdot n + l)` indicates that
@@ -182,7 +182,7 @@ def network_weights(G: Graph) -> sp.csr_matrix:
     Returns
     -------
     scipy.sparse.csr_matrix
-        :math:`N \\times N` network weight matrix (:math:`N = n^2`).
+        :math:`N \\times N` origin–destination weight matrix (:math:`N = n^2`).
     """
     W = _weights_to_csr(G)
     return sp.kron(W, W, format="csr")
@@ -199,7 +199,7 @@ def flow_weight_matrices(G: Graph) -> dict[str, sp.csr_matrix]:
     Returns
     -------
     dict[str, scipy.sparse.csr_matrix]
-        Dictionary with keys ``"destination"``, ``"origin"``, ``"network"``.
+        Dictionary with keys ``"destination"``, ``"origin"``, ``"od"``.
     """
     W = _weights_to_csr(G)
     n = W.shape[0]
@@ -207,7 +207,7 @@ def flow_weight_matrices(G: Graph) -> dict[str, sp.csr_matrix]:
     return {
         "destination": sp.kron(eye, W, format="csr"),
         "origin": sp.kron(W, eye, format="csr"),
-        "network": sp.kron(W, W, format="csr"),
+        "od": sp.kron(W, W, format="csr"),
     }
 
 

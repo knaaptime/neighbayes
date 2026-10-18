@@ -210,10 +210,10 @@ def _simulate_sar_probit(
         "W_sparse": W_sparse,
         "W_graph": Wg,
         "params_true": {
-            "rho": rho,
+            "lam": rho,
             "beta": beta,
-            "sigma_a": sigma_a,
-            "n_per_region": n_per_region,
+            "group_effect_sd": sigma_a,
+            "group_size": n_per_region,
         },
     }
 
@@ -412,7 +412,7 @@ def simulate_sem_probit(
     W=None,
     gdf=None,
     n_side: int | None = None,
-    rho: float = 0.35,
+    lam: float = 0.35,
     beta: np.ndarray | None = None,
     group_effect_sd: float = 0.8,
     group_size: int = 25,
@@ -425,15 +425,15 @@ def simulate_sem_probit(
 
     Draws from :class:`~neighbayes.models.SEMProbit`; pass
     ``group_effects="random"``.  Observations nest in groups of ``group_size``,
-    and the groups' effects follow a SAR process with parameter ``rho`` on the
-    group-level weights, with scale ``group_effect_sd`` (LeSage and Pace 2009,
-    §10.6).
+    and the groups' effects follow an autoregressive process with parameter
+    ``lam`` on the group-level weights, with scale ``group_effect_sd`` (LeSage
+    and Pace 2009, §10.6).
     """
     return _simulate_sar_probit(
         W=W,
         gdf=gdf,
         n_side=n_side,
-        rho=rho,
+        rho=lam,
         beta=beta,
         sigma_a=group_effect_sd,
         n_per_region=group_size,

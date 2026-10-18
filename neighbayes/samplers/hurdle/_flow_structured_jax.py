@@ -31,7 +31,7 @@ def make_hurdle_flow_sweep(
     X,
     Z,
     W_csc,
-    W_sel_csc,
+    W_zero_csc,
     n: int,
     T: int,
     priors,
@@ -55,7 +55,7 @@ def make_hurdle_flow_sweep(
     from .._utils._jax_utils import cached_sweep
 
     binary = make_structured_equation(
-        W_sel_csc,
+        W_zero_csc,
         classify_flow_design(Z, n, T),
         priors.gamma_mu,
         priors.gamma_sigma,
@@ -319,7 +319,7 @@ def run_chains_jax_hurdle_flow_structured(
     X,
     Z,
     W_csc,
-    W_sel_csc,
+    W_zero_csc,
     n: int,
     T: int,
     priors,
@@ -352,7 +352,7 @@ def run_chains_jax_hurdle_flow_structured(
     chains = len(jax_seeds)
     set_sparsax_lu_cache_size(max(32, 16 * chains))
     sweep, binary, count, data = make_hurdle_flow_sweep(
-        y, X, Z, W_csc, W_sel_csc, n, T, priors,
+        y, X, Z, W_csc, W_zero_csc, n, T, priors,
         pair_effects=pair_effects, period_effects=period_effects,
         sel_pair_effects=sel_pair_effects, sel_period_effects=sel_period_effects,
         keep_group_draws=keep_group_draws, store_eta=store_log_lik,
@@ -445,10 +445,10 @@ def run_chains_jax_hurdle_flow_structured(
     results = []
     for c in range(chains):
         out = {
-            "lam_d": ld[c],
-            "lam_o": lo[c],
-            "lam_w": -ld[c] * lo[c],
-            "gamma": gam[c],
+            "rho_d_zero": ld[c],
+            "rho_o_zero": lo[c],
+            "rho_w_zero": -ld[c] * lo[c],
+            "beta_zero": gam[c],
             "sel_time_effect": stau[c],
             "rho_d": rd[c],
             "rho_o": ro[c],

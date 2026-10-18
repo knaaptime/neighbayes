@@ -14,7 +14,7 @@ factor into three orthogonal axes:
 * ``beta`` defaults are data-scaled (omitted) for every family, resolved on
   the link scale (identity, log, logit or probit) at fit time.
 * the noise block differs: Gaussian/NB/Tobit carry ``sigma2_alpha``;
-  SEMProbitRE carries ``sigma_a_sigma``; Logit carries neither.
+  SEMProbitRE carries ``group_effect_sd_sigma``; Logit carries neither.
 """
 
 from __future__ import annotations
@@ -88,9 +88,9 @@ EXPECTED: dict[str, dict[str, float]] = {
         "rho_upper": 1.0,
     },
     "SARProbitPriors": {
-        "rho_lower": -0.95,
-        "rho_upper": 0.95,
-        "sigma_a_sigma": 2.0,
+        "lam_lower": -0.95,
+        "lam_upper": 0.95,
+        "group_effect_sd_sigma": 2.0,
     },
     "SARLogitPriors": {
         "rho_lower": -0.999,
@@ -130,26 +130,26 @@ EXPECTED: dict[str, dict[str, float]] = {
     "PanelOLSREPriors": {
         "nu": NU,
         "sigma2_alpha": 2.0,
-        "sigma_alpha_nu": 1.0,
+        "unit_effect_sd_nu": 1.0,
     },
     "PanelSARREPriors": {
         "nu": NU,
         "sigma2_alpha": 2.0,
-        "sigma_alpha_nu": 1.0,
+        "unit_effect_sd_nu": 1.0,
         "rho_lower": -1.0,
         "rho_upper": 1.0,
     },
     "PanelSEMREPriors": {
         "nu": NU,
         "sigma2_alpha": 2.0,
-        "sigma_alpha_nu": 1.0,
+        "unit_effect_sd_nu": 1.0,
         "lam_lower": -1.0,
         "lam_upper": 1.0,
     },
     "PanelSDEMREPriors": {
         "nu": NU,
         "sigma2_alpha": 2.0,
-        "sigma_alpha_nu": 1.0,
+        "unit_effect_sd_nu": 1.0,
         "lam_lower": -1.0,
         "lam_upper": 1.0,
     },

@@ -37,7 +37,7 @@ def test_panel_re_fitted_values_and_effects_run_with_mock_posteriors():
     ols._idata = _idata(
         {
             "beta": np.stack([beta, beta + 1e-3]),
-            "alpha": np.stack([alpha, alpha + 1e-3]),
+            "unit_effect": np.stack([alpha, alpha + 1e-3]),
         }
     )
 
@@ -45,7 +45,7 @@ def test_panel_re_fitted_values_and_effects_run_with_mock_posteriors():
     sar._idata = _idata(
         {
             "beta": np.stack([beta, beta + 1e-3]),
-            "alpha": np.stack([alpha, alpha + 1e-3]),
+            "unit_effect": np.stack([alpha, alpha + 1e-3]),
             "rho": np.array([0.2, 0.201]),
         }
     )
@@ -54,7 +54,7 @@ def test_panel_re_fitted_values_and_effects_run_with_mock_posteriors():
     sem._idata = _idata(
         {
             "beta": np.stack([beta, beta + 1e-3]),
-            "alpha": np.stack([alpha, alpha + 1e-3]),
+            "unit_effect": np.stack([alpha, alpha + 1e-3]),
             "lam": np.array([0.1, 0.101]),
         }
     )

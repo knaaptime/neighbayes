@@ -257,7 +257,7 @@ class REGibbsEstimation:
 
         # Stack chain results
         posterior_samples = {}
-        for key in [spatial_param, "sigma", "sigma_alpha"]:
+        for key in [spatial_param, "sigma", "unit_effect_sd"]:
             arrays = [c[key] for c in chain_results]
             posterior_samples[key] = np.stack(arrays, axis=0)  # (chains, n_keep)
 
@@ -267,8 +267,8 @@ class REGibbsEstimation:
         )  # (chains, n_keep, k)
 
         # alpha has shape (n_keep, N) per chain
-        posterior_samples["alpha"] = np.stack(
-            [c["alpha"] for c in chain_results], axis=0
+        posterior_samples["unit_effect"] = np.stack(
+            [c["unit_effect"] for c in chain_results], axis=0
         )  # (chains, n_keep, N)
 
         # Feature names for coords
@@ -278,7 +278,7 @@ class REGibbsEstimation:
         }
         dims = {
             "beta": ["coefficient"],
-            "alpha": ["unit"],
+            "unit_effect": ["unit"],
         }
 
         # Log-likelihood, shape (chains, n_keep, n), only when requested.

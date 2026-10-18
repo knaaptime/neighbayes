@@ -50,9 +50,9 @@ def test_spatialprobit_recovery_and_fitted_probs(rng):
     model = SEMProbit(group_effects="random", y=y, X=X, W=W_graph, groups=region_ids)
     idata = model.fit(**SAMPLE_KWARGS)
 
-    rho_hat = float(idata.posterior["rho"].mean())
+    rho_hat = float(idata.posterior["lam"].mean())
     assert abs(rho_hat - RHO_TRUE) < ABS_TOL_RHO, (
-        f"SEMProbitRE rho: expected ≈{RHO_TRUE}, got {rho_hat:.3f}"
+        f"SEMProbit lam: expected ≈{RHO_TRUE}, got {rho_hat:.3f}"
     )
 
     beta_hat = idata.posterior["beta"].mean(("chain", "draw")).values
@@ -61,7 +61,7 @@ def test_spatialprobit_recovery_and_fitted_probs(rng):
             f"SEMProbitRE beta[{j}]: expected ≈{btrue}, got {bhat:.3f}"
         )
 
-    sa_hat = float(idata.posterior["sigma_a"].mean())
+    sa_hat = float(idata.posterior["group_effect_sd"].mean())
     assert abs(sa_hat - SIGMA_A_TRUE) < ABS_TOL_SIGMA_A, (
         f"SEMProbitRE sigma_a: expected ≈{SIGMA_A_TRUE}, got {sa_hat:.3f}"
     )

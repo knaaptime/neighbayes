@@ -180,22 +180,22 @@ class SARZINBPriors(NegBinPriors):
 
     Attributes
     ----------
-    gamma_mu, gamma_sigma
-        Normal prior on the selection coefficients γ; default Gelman et al.
+    beta_mu_zero, beta_sigma_zero
+        Normal prior on the zero part's coefficients; default Gelman et al.
         (2008) on the logit scale, centred at even odds.
-    rho_lower, rho_upper, lam_lower, lam_upper
-        Uniform bounds on the count (ρ) and selection (λ) spatial parameters;
-        default the stability bounds of the weights.
+    rho_lower, rho_upper, rho_lower_zero, rho_upper_zero
+        Uniform bounds on the count and zero parts' ρ; default the stability
+        bounds of the weights.
     alpha_sigma, alpha_nu, alpha_fixed
         The NB dispersion, as :class:`NegBinPriors`.
     """
 
-    gamma_mu: float | Any = None
-    gamma_sigma: float | Any = None
+    beta_mu_zero: float | Any = None
+    beta_sigma_zero: float | Any = None
     rho_lower: float | None = None
     rho_upper: float | None = None
-    lam_lower: float | None = None
-    lam_upper: float | None = None
+    rho_lower_zero: float | None = None
+    rho_upper_zero: float | None = None
 
 
 @dataclass(frozen=True)
@@ -207,23 +207,23 @@ class SARHurdlePriors(NegBinPriors):
     beta_mu, beta_sigma
         Normal prior on the count coefficients β; default Gelman et al. (2008)
         on the log scale, the intercept centred at ``log mean(y | y > 0)``.
-    gamma_mu, gamma_sigma
-        Normal prior on the binary coefficients γ; default Gelman et al.
+    beta_mu_zero, beta_sigma_zero
+        Normal prior on the zero part's coefficients; default Gelman et al.
         (2008) on the logit scale, the intercept centred at
         ``logit(mean(y > 0))``.
-    rho_lower, rho_upper, lam_lower, lam_upper
-        Uniform bounds on the count (ρ) and binary (λ) spatial parameters;
-        default the stability bounds of the weights.
+    rho_lower, rho_upper, rho_lower_zero, rho_upper_zero
+        Uniform bounds on the count and zero parts' ρ; default the stability
+        bounds of the weights.
     alpha_sigma, alpha_nu, alpha_fixed
         The NB dispersion of the truncated count, as :class:`NegBinPriors`.
     """
 
-    gamma_mu: float | Any = None
-    gamma_sigma: float | Any = None
+    beta_mu_zero: float | Any = None
+    beta_sigma_zero: float | Any = None
     rho_lower: float | None = None
     rho_upper: float | None = None
-    lam_lower: float | None = None
-    lam_upper: float | None = None
+    rho_lower_zero: float | None = None
+    rho_upper_zero: float | None = None
 
 
 @dataclass(frozen=True)
@@ -298,18 +298,18 @@ class SDMTobitPriors(SDMPriors):
 
 @dataclass(frozen=True)
 class SARProbitPriors:
-    """Priors for :class:`neighbayes.models.SEMProbitRE`.
+    """Priors for :class:`neighbayes.models.SEMProbit`.
 
     Differs from :class:`SARPriors`: there is no ``sigma`` parameter (the
-    probit link absorbs the noise scale) and the regional random-effect
-    variance ``sigma_a`` has its own half-normal scale.
+    probit link absorbs the noise scale) and the group effects' sd
+    ``group_effect_sd`` has its own half-normal scale.
     """
 
-    rho_lower: float = -0.95
-    rho_upper: float = 0.95
+    lam_lower: float = -0.95
+    lam_upper: float = 0.95
     beta_mu: float | Any = None  # Gelman et al. (2008), link scale
     beta_sigma: float | Any = None
-    sigma_a_sigma: float = 2.0
+    group_effect_sd_sigma: float = 2.0
 
 
 @dataclass(frozen=True)
@@ -469,8 +469,8 @@ class PanelSARPriors(PanelBasePriors):
 
 
 @dataclass(frozen=True)
-class PanelCountPriors(PanelSARPriors):
-    """Priors for the count panels (:class:`neighbayes.models.SARNegBinPanelRE` & co).
+class _PanelCountBasePriors(PanelSARPriors):
+    """The count panels' shared priors: the NB dispersion and the period effects.
 
     Attributes
     ----------
@@ -478,15 +478,9 @@ class PanelCountPriors(PanelSARPriors):
         Half-Student-t prior on the NB2 dispersion.
     alpha_fixed
         Hold the dispersion at this value instead (see :class:`NegBinPriors`).
-    group_effect_mu
-        Mean of the unit (pair) effects: 0 when the design keeps an intercept
-        (it carries the level), else ``log(mean(y))``.
-    group_effect_sd_scale
-        Scale of the half-Student-t(3) prior on the effects' sd, which is
-        learned (the effects are partially pooled).  Default 1.
     time_effect_mu, time_effect_sigma
         Normal prior on each period effect; the mean defaults to zero beside
-        unit effects (a shift from the baseline period) and to
+        unit (pair) effects (a shift from the baseline period) and to
         ``log(mean(y))`` without them (each period's level).
 
     The ``sigma2_*`` and ``nu`` fields inherited from the Gaussian panels are
@@ -496,67 +490,108 @@ class PanelCountPriors(PanelSARPriors):
     alpha_sigma: float = 2.5
     alpha_nu: float = 3.0
     alpha_fixed: float | None = None
-    group_effect_mu: float | None = None
-    group_effect_sd_scale: float = 1.0
     time_effect_mu: float | None = None
     time_effect_sigma: float = 2.5
 
 
 @dataclass(frozen=True)
-class PanelZINBPriors(PanelCountPriors):
-    """Priors for the ZINB panels (:class:`neighbayes.models.SARZINBPanelRE` & co).
+class PanelCountPriors(_PanelCountBasePriors):
+    """Priors for the count panels (:class:`neighbayes.models.SARNegBin` & co).
 
-    The count-equation priors of :class:`PanelCountPriors` (β, ρ, α, the unit
-    and period effects), plus the selection equation's:
+    The dispersion and period-effect priors of :class:`_PanelCountBasePriors`,
+    plus the unit effects':
 
     Attributes
     ----------
-    gamma_mu, gamma_sigma
-        Normal prior on γ; default Gelman et al. (2008) on the logit scale,
-        centred at even odds.
-    lam_lower, lam_upper
-        Uniform bounds on the selection λ; default the count equation's.
+    unit_effect_mu
+        Mean of the unit effects: 0 when the design keeps an intercept (it
+        carries the level), else ``log(mean(y))``.
+    unit_effect_sd_scale
+        Scale of the half-Student-t(3) prior on the effects' sd, which is
+        learned (the effects are partially pooled).  Default 1.
     """
 
-    gamma_mu: float | Any = None
-    gamma_sigma: float | Any = None
-    lam_lower: float | None = None
-    lam_upper: float | None = None
+    unit_effect_mu: float | None = None
+    unit_effect_sd_scale: float = 1.0
+
+
+@dataclass(frozen=True)
+class PanelZINBPriors(PanelCountPriors):
+    """Priors for the ZINB panels (:class:`neighbayes.models.SARZINB` & co).
+
+    The count part's priors of :class:`PanelCountPriors` (β, ρ, α, the unit
+    and period effects), plus the zero part's, named as the count part's with
+    a ``_zero`` suffix:
+
+    Attributes
+    ----------
+    beta_mu_zero, beta_sigma_zero
+        Normal prior on the zero part's coefficients; default Gelman et al.
+        (2008) on the logit scale, centred at even odds.
+    rho_lower_zero, rho_upper_zero
+        Uniform bounds on the zero part's ρ; default the count part's.
+    """
+
+    beta_mu_zero: float | Any = None
+    beta_sigma_zero: float | Any = None
+    rho_lower_zero: float | None = None
+    rho_upper_zero: float | None = None
 
 
 @dataclass(frozen=True)
 class PanelHurdlePriors(PanelCountPriors):
-    """Priors for the hurdle panels (:class:`neighbayes.models.SARHurdleNegBinPanelRE` & co).
+    """Priors for the hurdle panels (:class:`neighbayes.models.SARHurdleNegBin` & co).
 
-    The count half takes the priors of :class:`PanelCountPriors` (β, ρ, α,
+    The count part takes the priors of :class:`PanelCountPriors` (β, ρ, α,
     the unit and period effects), centred on the positive counts: the
-    intercept defaults to ``log mean(y | y > 0)``.
-    The binary half adds:
+    intercept defaults to ``log mean(y | y > 0)``.  The zero part's are named
+    as the count part's with a ``_zero`` suffix:
 
     Attributes
     ----------
-    gamma_mu, gamma_sigma
-        Normal prior on γ; default Gelman et al. (2008) on the logit scale,
-        the intercept centred at ``logit(mean(y > 0))``.
-    lam_lower, lam_upper
-        Uniform bounds on the binary λ; default the count half's.
-    sel_group_effect_mu, sel_group_effect_sd_scale
-        Mean of the binary unit effects (0 when the binary design keeps an
+    beta_mu_zero, beta_sigma_zero
+        Normal prior on the zero part's coefficients; default Gelman et al.
+        (2008) on the logit scale, the intercept centred at
+        ``logit(mean(y > 0))``.
+    rho_lower_zero, rho_upper_zero
+        Uniform bounds on the zero part's ρ; default the count part's.
+    unit_effect_mu_zero, unit_effect_sd_scale_zero
+        Mean of the zero part's unit effects (0 when its design keeps an
         intercept, else ``logit(mean(y > 0))``) and the scale of the half-t(3)
         prior on their learned sd (default 1).
-    sel_time_effect_mu, sel_time_effect_sigma
-        Normal prior on each binary period effect: mean zero beside unit
-        effects, ``logit(mean(y > 0))`` without them.
+    time_effect_mu_zero, time_effect_sigma_zero
+        Normal prior on each of the zero part's period effects: mean zero
+        beside unit effects, ``logit(mean(y > 0))`` without them.
     """
 
-    gamma_mu: float | Any = None
-    gamma_sigma: float | Any = None
-    lam_lower: float | None = None
-    lam_upper: float | None = None
-    sel_group_effect_mu: float | None = None
-    sel_group_effect_sd_scale: float = 1.0
-    sel_time_effect_mu: float | None = None
-    sel_time_effect_sigma: float = 2.5
+    beta_mu_zero: float | Any = None
+    beta_sigma_zero: float | Any = None
+    rho_lower_zero: float | None = None
+    rho_upper_zero: float | None = None
+    unit_effect_mu_zero: float | None = None
+    unit_effect_sd_scale_zero: float = 1.0
+    time_effect_mu_zero: float | None = None
+    time_effect_sigma_zero: float = 2.5
+
+
+@dataclass(frozen=True)
+class FlowPanelHurdlePriors(_PanelCountBasePriors):
+    """Priors for the hurdle flow panels (:class:`neighbayes.models.SARHurdleNegBinFlow`).
+
+    As :class:`PanelHurdlePriors`, with pair effects in place of unit effects:
+    ``pair_effect_mu``, ``pair_effect_sd_scale`` and their ``_zero`` twins.
+    """
+
+    pair_effect_mu: float | None = None
+    pair_effect_sd_scale: float = 1.0
+    beta_mu_zero: float | Any = None
+    beta_sigma_zero: float | Any = None
+    rho_lower_zero: float | None = None
+    rho_upper_zero: float | None = None
+    pair_effect_mu_zero: float | None = None
+    pair_effect_sd_scale_zero: float = 1.0
+    time_effect_mu_zero: float | None = None
+    time_effect_sigma_zero: float = 2.5
 
 
 @dataclass(frozen=True)
@@ -586,14 +621,14 @@ class PanelREMixinPriors:
 
     Attributes
     ----------
-    sigma_alpha_nu, sigma_alpha_scale
+    unit_effect_sd_nu, unit_effect_sd_scale
         Half-t prior on the random-effect scale,
         :math:`\sigma_\alpha \sim \text{half-}t_\nu(0, A)`.  The default
         ``nu = 1`` is the half-Cauchy of Gelman (2006) and Polson & Scott
         (2012), the weakly informative choice for a hierarchical variance;
         the inverse gamma, conjugate or near-improper, pulls
         :math:`\sigma_\alpha` toward zero and over-shrinks the unit effects
-        when units are few or weakly identified.  ``sigma_alpha_scale``
+        when units are few or weakly identified.  ``unit_effect_sd_scale``
         (``A``) defaults to ``sd(y)`` at construction, so the prior is
         scale-aware like the Gelman et al. (2008) default for
         :math:`\beta`.  NUTS and Gibbs use the same prior; the Gibbs
@@ -601,8 +636,8 @@ class PanelREMixinPriors:
         scale mixture of Huang & Wand (2013).
     """
 
-    sigma_alpha_nu: float = 1.0
-    sigma_alpha_scale: float | None = None
+    unit_effect_sd_nu: float = 1.0
+    unit_effect_sd_scale: float | None = None
 
 
 @dataclass(frozen=True)
@@ -868,15 +903,15 @@ class REGibbsPriors(GibbsBasePriors):
 
     * ``sigma2_alpha``, ``sigma2_beta``: σ² ~ Inv-Γ(sigma2_alpha,
       sigma2_beta), the models' default ``Inv-Γ(2, Var(y))``.
-    * ``sigma_alpha_nu``, ``sigma_alpha_scale``: σ_α ~ half-t_ν(0, A),
+    * ``unit_effect_sd_nu``, ``unit_effect_sd_scale``: σ_α ~ half-t_ν(0, A),
       half-Cauchy by default (see :class:`PanelREMixinPriors`), sampled
       through the Huang & Wand (2013) inverse-gamma mixture.
     """
 
     sigma2_alpha: float = 2.0
     sigma2_beta: float = 1.0
-    sigma_alpha_nu: float = 1.0
-    sigma_alpha_scale: float = 1.0
+    unit_effect_sd_nu: float = 1.0
+    unit_effect_sd_scale: float = 1.0
 
 
 __all__ = [

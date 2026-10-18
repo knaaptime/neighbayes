@@ -8,7 +8,7 @@ Implements a Bayesian binary-response model analogous to legacy ``semip_g``:
 where regional effects follow
 
 .. math::
-    a = \\rho W a + u,\\quad u \\sim \\mathcal{N}(0, \\sigma_a^2 I).
+    a = \\lambda W a + u,\\quad u \\sim \\mathcal{N}(0, \\sigma_a^2 I).
 
 The probit link is used directly via ``P(y=1) = Phi(X\\beta + \\Delta a)``.
 """
@@ -51,10 +51,10 @@ class SEMProbitRE(SharedSpatialMethods):
 
     .. math::
 
-        a = \\rho W a + u,\\quad u \\sim \\mathcal{N}(0, \\sigma_a^2 I_m),
+        a = \\lambda W a + u,\\quad u \\sim \\mathcal{N}(0, \\sigma_a^2 I_m),
 
-    so that :math:`a \\sim \\mathcal{N}(0, \\sigma_a^2 (I_m - \\rho W)^{-1}
-    (I_m - \\rho W)^{-T})`. The marginal choice probability is
+    so that :math:`a \\sim \\mathcal{N}(0, \\sigma_a^2 (I_m - \\lambda W)^{-1}
+    (I_m - \\lambda W)^{-T})`. The marginal choice probability is
     :math:`P(y_i = 1 \\mid \\beta, a) = \\Phi(x_i'\\beta + a_{r(i)})`.
 
     Parameters
@@ -85,13 +85,13 @@ class SEMProbitRE(SharedSpatialMethods):
     priors : dict, optional
         Override default priors. Supported keys:
 
-        - ``rho_lower`` (float, default -0.95): Lower bound of the
-          Uniform prior on :math:`\\rho`.
-        - ``rho_upper`` (float, default 0.95): Upper bound of the
-          Uniform prior on :math:`\\rho`.
+        - ``lam_lower`` (float, default -0.95): Lower bound of the
+          Uniform prior on :math:`\\lambda` (``lam``).
+        - ``lam_upper`` (float, default 0.95): Upper bound of the
+          Uniform prior on :math:`\\lambda`.
         - ``beta_mu``, ``beta_sigma`` (float or array, default Gelman et al.
           2008): Normal prior on :math:`\\beta`, on the probit scale (intercept at ``Φ⁻¹(mean(y))``, scale ``2.5 / 1.6``; slopes ``(2.5 / 1.6) / sd(x_j)``).
-        - ``sigma_a_sigma`` (float, default 2.0): HalfNormal scale
+        - ``group_effect_sd_sigma`` (float, default 2.0): HalfNormal scale
           for the group effects' std :math:`\\sigma_a`.
 
     robust : bool, default False
@@ -228,14 +228,14 @@ class SEMProbitRE(SharedSpatialMethods):
                     "sum(group_sizes) must equal the number of observations."
                 )
             codes = np.repeat(np.arange(len(counts), dtype=int), counts)
-            names = [f"region_{i}" for i in range(len(counts))]
+            names = [f"group_{i}" for i in range(len(counts))]
             return codes, names
 
         raise ValueError("Provide either groups or group_sizes in matrix mode.")
 
     def _model_coords(self) -> dict[str, list[str]]:
         coords = super()._model_coords()
-        coords["region"] = list(self._region_names)
+        coords["group"] = list(self._region_names)
         return coords
 
     def _build_pymc_model(self) -> pm.Model:
@@ -243,10 +243,10 @@ class SEMProbitRE(SharedSpatialMethods):
         if k == 0:
             raise ValueError("X must contain at least one predictor.")
 
-        rho_lower = self.priors.get("rho_lower", -0.95)
-        rho_upper = self.priors.get("rho_upper", 0.95)
+        rho_lower = self.priors.get("lam_lower", -0.95)
+        rho_upper = self.priors.get("lam_upper", 0.95)
         beta_mu, beta_sigma = self._resolved_beta_prior(link="probit")
-        sigma_a_sigma = self.priors.get("sigma_a_sigma", 2.0)
+        sigma_a_sigma = self.priors.get("group_effect_sd_sigma", 2.0)
 
         if self.robust:
             raise NotImplementedError(
@@ -261,15 +261,15 @@ class SEMProbitRE(SharedSpatialMethods):
         I_pt = pt.eye(self._m)
 
         with pm.Model(coords=self._model_coords()) as model:
-            rho = pm.Uniform("rho", lower=rho_lower, upper=rho_upper)
+            rho = pm.Uniform("lam", lower=rho_lower, upper=rho_upper)
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            sigma_a = pm.HalfNormal("sigma_a", sigma=sigma_a_sigma)
+            sigma_a = pm.HalfNormal("group_effect_sd", sigma=sigma_a_sigma)
 
-            a_raw = pm.Normal("a_raw", mu=0.0, sigma=1.0, dims="region")
+            a_raw = pm.Normal("group_effect_raw", mu=0.0, sigma=1.0, dims="group")
             a = pm.Deterministic(
-                "a",
+                "group_effect",
                 pt.linalg.solve(I_pt - rho * W_pt, sigma_a * a_raw),
-                dims="region",
+                dims="group",
             )
 
             eta = pt.dot(self._X, beta) + a[self._region_codes]
@@ -331,22 +331,23 @@ class SEMProbitRE(SharedSpatialMethods):
 
     @staticmethod
     def _rename_summary_index(summary_df: pd.DataFrame) -> pd.DataFrame:
-        # Shared version strips beta[...]; additionally relabel the regional
-        # effects a[...] -> a:...
+        # Shared version strips beta[...]; additionally relabel the group
+        # effects group_effect[...] -> group_effect:...
         out = SharedSpatialMethods._rename_summary_index(summary_df)
+        pre = "group_effect["
         out.index = [
-            f"a:{label[2:-1]}"
-            if label.startswith("a[") and label.endswith("]")
+            f"group_effect:{label[len(pre) : -1]}"
+            if label.startswith(pre) and label.endswith("]")
             else label
             for label in out.index.astype(str)
         ]
         return out
 
     def random_effects_mean(self) -> pd.Series:
-        """Return posterior mean regional effects."""
+        """Return the posterior mean group effects."""
         self._require_fit()
-        amean = self._idata.posterior["a"].mean(("chain", "draw")).to_numpy()
-        return pd.Series(amean, index=self._region_names, name="a_mean")
+        amean = self._idata.posterior["group_effect"].mean(("chain", "draw")).to_numpy()
+        return pd.Series(amean, index=self._region_names, name="group_effect_mean")
 
     def fitted_probabilities(self) -> np.ndarray:
         """Return posterior mean fitted probabilities for observed data."""
@@ -365,7 +366,7 @@ class SEMProbitRE(SharedSpatialMethods):
         .. math::
 
             z_i = x_i'\beta + a_{r(i)} + \varepsilon_i,
-            \quad a = \rho W a + u,
+            \quad a = \lambda W a + u,
 
         the marginal effect of covariate :math:`k` on the choice
         probability is
@@ -406,7 +407,7 @@ class SEMProbitRE(SharedSpatialMethods):
         self._require_fit()
         post = self._idata.posterior
         beta_draws = post["beta"].stack(samples=("chain", "draw")).values.T
-        a_draws = post["a"].stack(samples=("chain", "draw")).values.T
+        a_draws = post["group_effect"].stack(samples=("chain", "draw")).values.T
         n_draws = beta_draws.shape[0]
 
         # Identify non-intercept columns
@@ -491,7 +492,7 @@ class SEMProbit(metaclass=FacadeMeta):
     .. math::
 
         y_{ik} = 1[z_{ik} > 0], \quad z = X\beta + \Delta\theta + \varepsilon,
-        \quad \theta = \rho W \theta + u, \quad u \sim N(0, \sigma_u^2 I).
+        \quad \theta = \lambda W \theta + u, \quad u \sim N(0, \sigma_u^2 I).
 
     The latent SEM probit, whose error process carries the probit disturbance
     itself, is not implemented, so the group effects are required.

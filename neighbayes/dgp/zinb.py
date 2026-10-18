@@ -23,13 +23,13 @@ def simulate_sar_zinb(
     W=None,
     gdf=None,
     rho: float = 0.5,
-    lam: float = 0.3,
+    rho_zero: float = 0.3,
     beta: np.ndarray | None = None,
-    gamma: np.ndarray | None = None,
+    beta_zero: np.ndarray | None = None,
     alpha: float = 2.0,
-    Z: np.ndarray | None = None,
+    X_zero: np.ndarray | None = None,
     X: np.ndarray | None = None,
-    W_sel=None,
+    W_zero=None,
     rng: np.random.Generator | None = None,
     seed: int | None = None,
     contiguity: str = "queen",
@@ -40,20 +40,20 @@ def simulate_sar_zinb(
 ) -> dict:
     r"""Simulate data from a zero-inflated SAR-NB DGP.
 
-    Two-equation model:
+    Two-part model:
 
-    **Selection** (unit activity — SAR-logit):
+    **Zero part** (unit activity — reduced-form SAR logit):
 
     .. math::
 
-        d_i \sim \text{Bernoulli}(\text{logit}^{-1}(\eta^{\text{sel}}_i)),
-        \quad \eta^{\text{sel}} = (I - \lambda W_{\text{sel}})^{-1} Z\gamma,
+        d_i \sim \text{Bernoulli}(\text{logit}^{-1}(\eta_{z,i})),
+        \quad \eta_z = (I - \rho_z W_z)^{-1} X_z\beta_z,
 
-    the reduced-form selection :class:`~neighbayes.models.SARZINB` fits.  (Until
+    the reduced-form zero part :class:`~neighbayes.models.SARZINB` fits.  (Until
     2026-10-03 a latent ``ν ~ N(0, I)`` was added inside the filter, a random
-    effect the model does not have, which attenuated the γ estimates.)
+    effect the model does not have, which attenuated the ``β_z`` estimates.)
 
-    **Count** (flow volume — reduced-form SAR-NB):
+    **Count part** (volume — reduced-form SAR-NB):
 
     .. math::
 
@@ -73,31 +73,31 @@ def simulate_sar_zinb(
         Side length of the square rook grid used when neither ``W`` nor
         ``gdf`` is supplied (``n_side**2`` observations).
     W : Graph or scipy.sparse matrix, optional
-        Spatial weights for the count equation. Also used for the
-        selection equation when ``W_sel`` is not provided.
+        Spatial weights for the count part. Also used for the zero part
+        when ``W_zero`` is not provided.
     gdf : GeoDataFrame, optional
         Geodataframe used to construct weights.
     rho : float, default 0.5
-        Spatial autoregressive parameter for the count equation.
-    lam : float, default 0.3
-        Spatial autoregressive parameter for the selection equation.
+        Spatial autoregressive parameter for the count part.
+    rho_zero : float, default 0.3
+        Spatial autoregressive parameter for the zero part.
     beta : ndarray, optional
-        Count equation coefficients (including intercept). Defaults to
+        Count-part coefficients (including intercept). Defaults to
         ``[1.0, 0.6]``.
-    gamma : ndarray, optional
-        Selection equation coefficients (including intercept). Defaults
-        to ``[0.3, 1.0]``.
+    beta_zero : ndarray, optional
+        Zero-part coefficients (including intercept). Defaults to
+        ``[0.3, 1.0]``.
     alpha : float, default 2.0
         NB2 dispersion parameter. Must be strictly positive.
-    Z : ndarray, optional
-        Selection covariate matrix of shape ``(nobs, p)``. If not
-        provided, a random design matrix is generated from ``gamma``.
+    X_zero : ndarray, optional
+        Zero-part covariate matrix of shape ``(nobs, p)``. If not provided,
+        a random design matrix is generated from ``beta_zero``.
     X : ndarray, optional
         Count covariate matrix of shape ``(nobs, k)``. If not provided,
         a random design matrix is generated from ``beta``.
-    W_sel : Graph or scipy.sparse matrix, optional
-        Spatial weights for the selection equation. If ``None``, uses
-        ``W`` (same weights for both equations).
+    W_zero : Graph or scipy.sparse matrix, optional
+        Spatial weights for the zero part. If ``None``, uses ``W`` (the same
+        weights in both parts).
     rng : numpy.random.Generator, optional
         Random number generator.
     seed : int, optional
@@ -107,8 +107,8 @@ def simulate_sar_zinb(
     target_pi : float, optional
         If given, an intercept shift is solved so that the marginal
         activation probability ``mean(pi) == target_pi``.
-        The shift is added to ``gamma[0]`` (inside the filter, so the
-        reported ``gamma`` generates ``eta_sel``).
+        The shift is added to ``beta_zero[0]`` (inside the filter, so the
+        reported ``beta_zero`` generates ``eta_zero``).
     err_hetero : bool, default False
         Not implemented for ZINB models. If True, a warning is issued
         and the parameter is ignored (homoskedastic errors are used).
@@ -120,8 +120,8 @@ def simulate_sar_zinb(
     Returns
     -------
     dict
-        Keys: ``y``, ``d``, ``X``, ``Z``, ``eta_cnt``, ``eta_sel``,
-        ``W_sparse``, ``W_graph``, ``W_sel_sparse``, ``W_sel_graph``,
+        Keys: ``y``, ``d``, ``X``, ``X_zero``, ``eta_cnt``, ``eta_zero``,
+        ``W_sparse``, ``W_graph``, ``W_zero_sparse``, ``W_zero_graph``,
         ``params_true``.
     """
     if alpha <= 0:
@@ -139,20 +139,20 @@ def simulate_sar_zinb(
     nobs = Ws.shape[0]
 
     # Resolve selection weights
-    if W_sel is not None:
-        W_sel_s, W_sel_g = resolve_weights(
-            W=W_sel, gdf=gdf, n_side=n_side, contiguity=contiguity
+    if W_zero is not None:
+        W_zero_s, W_zero_g = resolve_weights(
+            W=W_zero, gdf=gdf, n_side=n_side, contiguity=contiguity
         )
     else:
-        W_sel_s, W_sel_g = Ws, Wg
+        W_zero_s, W_zero_g = Ws, Wg
 
     if beta is None:
         beta = np.array([1.0, 0.6], dtype=float)
     beta = np.asarray(beta, dtype=float)
 
-    if gamma is None:
-        gamma = np.array([0.3, 1.0], dtype=float)
-    gamma = np.asarray(gamma, dtype=float)
+    if beta_zero is None:
+        beta_zero = np.array([0.3, 1.0], dtype=float)
+    beta_zero = np.asarray(beta_zero, dtype=float)
 
     # Generate design matrices if not provided
     if X is None:
@@ -160,25 +160,27 @@ def simulate_sar_zinb(
     else:
         X = np.asarray(X, dtype=np.float64)
 
-    if Z is None:
-        Z = make_design_matrix(rng, nobs, k=max(len(gamma) - 1, 0), add_intercept=True)
+    if X_zero is None:
+        X_zero = make_design_matrix(
+            rng, nobs, k=max(len(beta_zero) - 1, 0), add_intercept=True
+        )
     else:
-        Z = np.asarray(Z, dtype=np.float64)
+        X_zero = np.asarray(X_zero, dtype=np.float64)
 
     _check_rho_stability(rho, name="rho")
-    _check_rho_stability(lam, name="lam")
+    _check_rho_stability(rho_zero, name="rho_zero")
 
     # --- Selection equation: SAR-logit ---
-    # Reduced form, as the model: eta_sel = (I - lam * W_sel)^{-1} Z gamma.
-    solve_sel = spatial_filter_factor(W_sel_s, lam)
-    eta_sel = solve_sel(Z @ gamma)
+    # Reduced form, as the model: eta_sel = (I - lam * W_zero)^{-1} Z gamma.
+    solve_sel = spatial_filter_factor(W_zero_s, rho_zero)
+    eta_sel = solve_sel(X_zero @ beta_zero)
 
     # Apply target_pi shift if requested.  The shift moves gamma[0] inside the
-    # filter, so eta_sel moves by c·(I − λW_sel)⁻¹Z[:, 0], not by c.
+    # filter, so eta_sel moves by c·(I − λW_zero)⁻¹Z[:, 0], not by c.
     if target_pi is not None:
         if not 0.0 < float(target_pi) < 1.0:
             raise ValueError(f"target_pi must lie in (0, 1); got {target_pi!r}")
-        a0 = np.asarray(solve_sel(Z[:, 0]), dtype=float)
+        a0 = np.asarray(solve_sel(X_zero[:, 0]), dtype=float)
 
         def _mean_pi(c: float) -> float:
             return float(np.mean(1.0 / (1.0 + np.exp(-(eta_sel + c * a0)))))
@@ -192,8 +194,8 @@ def simulate_sar_zinb(
                 hi = mid
         c = 0.5 * (lo + hi)
         eta_sel = eta_sel + c * a0
-        gamma = gamma.copy()
-        gamma[0] = gamma[0] + c
+        beta_zero = beta_zero.copy()
+        beta_zero[0] = beta_zero[0] + c
 
     # Binary unit activity
     pi = 1.0 / (1.0 + np.exp(-eta_sel))
@@ -213,9 +215,9 @@ def simulate_sar_zinb(
 
     params_true = {
         "rho": rho,
-        "lam": lam,
+        "rho_zero": rho_zero,
         "beta": beta,
-        "gamma": gamma,
+        "beta_zero": beta_zero,
         "alpha": alpha,
     }
 
@@ -223,13 +225,13 @@ def simulate_sar_zinb(
         "y": y,
         "d": d,
         "X": X,
-        "Z": Z,
+        "X_zero": X_zero,
         "eta_cnt": eta_cnt,
-        "eta_sel": eta_sel,
+        "eta_zero": eta_sel,
         "W_sparse": Ws,
         "W_graph": Wg,
-        "W_sel_sparse": W_sel_s,
-        "W_sel_graph": W_sel_g,
+        "W_zero_sparse": W_zero_s,
+        "W_zero_graph": W_zero_g,
         "params_true": params_true,
     }
     return _attach_optional_gdf(
@@ -240,9 +242,9 @@ def simulate_sar_zinb(
     )
 
 
-@aspatial(simulate_sar_zinb, {"rho": 0.0, "lam": 0.0}, panel_only=True)
+@aspatial(simulate_sar_zinb, {"rho": 0.0, "rho_zero": 0.0}, panel_only=True)
 def simulate_zinb():
-    """Simulate an aspatial ZINB panel: :func:`simulate_sar_zinb` with ``rho = lam = 0``.
+    """Simulate an aspatial ZINB panel: :func:`simulate_sar_zinb` with ``rho = rho_zero = 0``.
 
     Panels only, as for :class:`~neighbayes.models.ZINB`: pass ``T`` and ``N``.
     """

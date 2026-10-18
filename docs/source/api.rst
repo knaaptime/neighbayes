@@ -144,6 +144,7 @@ Default NUTS Priors
    PanelZINBPriors
    SARZINBPriors
    PanelHurdlePriors
+   FlowPanelHurdlePriors
    SARHurdlePriors
    MultilevelPriors
    PanelSEMTobitPriors
@@ -408,6 +409,6 @@ Graph Utilities
    flow_weight_matrices
    destination_weights
    origin_weights
-   network_weights
+   od_weights
 
 

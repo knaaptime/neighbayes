@@ -152,9 +152,9 @@ def _simulate_sar_zinb_panel_re(
     N: int,
     T: int,
     rho: float = 0.4,
-    lam: float = 0.3,
+    rho_zero: float = 0.3,
     beta: np.ndarray | None = None,
-    gamma: np.ndarray | None = None,
+    beta_zero: np.ndarray | None = None,
     alpha: float = 2.0,
     unit_effect_sd: float = 0.0,
     time_effect_sd: float = 0.0,
@@ -163,34 +163,34 @@ def _simulate_sar_zinb_panel_re(
     rng: np.random.Generator | None = None,
     seed: int | None = None,
     W=None,
-    W_sel=None,
+    W_zero=None,
     gdf=None,
     n_side: int | None = None,
     contiguity: str = "queen",
 ) -> dict:
     r"""Simulate a zero-inflated SAR-NB panel with per-period structural zeros.
 
-    The count equation is :func:`_simulate_sar_negbin_panel_re` (including its
-    unit- and period-effect knobs); the selection equation is
+    The count part is :func:`_simulate_sar_negbin_panel_re` (including its
+    unit- and period-effect knobs); the zero part is
 
     .. math::
 
-        \eta^{\mathrm{sel}}_t = (I - \lambda W_{\mathrm{sel}})^{-1} Z_t\gamma,
-        \qquad d_{it} \sim \mathrm{Bernoulli}(\mathrm{logit}^{-1}(\eta^{\mathrm{sel}}_{it})),
+        \eta_{z,t} = (I - \rho_z W_z)^{-1} X_{z,t}\beta_z,
+        \qquad d_{it} \sim \mathrm{Bernoulli}(\mathrm{logit}^{-1}(\eta_{z,it})),
 
-    with a fresh selection design ``Z_t`` (intercept plus standard-normal
+    with a fresh zero-part design ``X_{z,t}`` (intercept plus standard-normal
     columns) each period, and ``y = d · y_NB``.  Matches
-    :class:`~neighbayes.models.SARZINBPanelRE` (``rho = lam = 0`` gives
-    :class:`~neighbayes.models.ZINBPanelRE`).
+    :class:`~neighbayes.models.SARZINB` panels (``rho = rho_zero = 0`` gives
+    the aspatial :class:`~neighbayes.models.ZINB`).
 
     Parameters
     ----------
-    lam : float, default 0.3
-        Selection spatial parameter.
-    gamma : array-like, optional
-        Selection coefficients including the intercept; default ``[0.5, 1.0]``.
-    W_sel : Graph or scipy.sparse matrix, optional
-        Selection weights; default the count weights.
+    rho_zero : float, default 0.3
+        Zero-part spatial parameter.
+    beta_zero : array-like, optional
+        Zero-part coefficients including the intercept; default ``[0.5, 1.0]``.
+    W_zero : Graph or scipy.sparse matrix, optional
+        Zero-part weights; default the count weights.
     N, T, rho, beta, alpha, unit_effect_sd, time_effect_sd, fe_x_corr, \
     err_hetero, rng, seed, W, gdf, n_side, contiguity
         As for :func:`_simulate_sar_negbin_panel_re`.
@@ -199,31 +199,33 @@ def _simulate_sar_zinb_panel_re(
     -------
     dict
         As :func:`_simulate_sar_negbin_panel_re`, with ``y`` zero-inflated, plus
-        ``Z``, ``d`` (the activity indicators), ``eta_sel`` and ``W_sel_sparse``;
-        ``params_true`` gains ``lam`` and ``gamma``.
+        ``X_zero``, ``d`` (the activity indicators), ``eta_zero`` and
+        ``W_zero_sparse``; ``params_true`` gains ``rho_zero`` and ``beta_zero``.
     """
     rng = ensure_rng(rng, seed)
     out = _simulate_panel_count(
         N, T, rho, beta, alpha, unit_effect_sd, time_effect_sd,
         fe_x_corr, err_hetero, rng, None, W, gdf, n_side, contiguity,
     )  # fmt: skip
-    gamma = np.asarray([0.5, 1.0] if gamma is None else gamma, dtype=float)
-    if W_sel is not None:
+    beta_zero = np.asarray([0.5, 1.0] if beta_zero is None else beta_zero, dtype=float)
+    if W_zero is not None:
         Ws_sel, _ = resolve_weights(
-            W=W_sel, gdf=gdf, n_side=n_side, contiguity=contiguity
+            W=W_zero, gdf=gdf, n_side=n_side, contiguity=contiguity
         )
     else:
         Ws_sel = out["W_sparse"]
-    solve = spatial_filter_factor(Ws_sel, lam)
+    solve = spatial_filter_factor(Ws_sel, rho_zero)
     Z_list, eta_list = [], []
     for _ in range(T):
-        Z_t = np.column_stack([np.ones(N), rng.standard_normal((N, len(gamma) - 1))])
+        Z_t = np.column_stack(
+            [np.ones(N), rng.standard_normal((N, len(beta_zero) - 1))]
+        )
         Z_list.append(Z_t)
-        eta_list.append(solve(Z_t @ gamma))
-    Z = np.vstack(Z_list)
+        eta_list.append(solve(Z_t @ beta_zero))
+    X_zero = np.vstack(Z_list)
     eta_sel = np.concatenate(eta_list)
     d = rng.binomial(1, 1.0 / (1.0 + np.exp(-eta_sel)))
     out["y"] = (out["y"] * d).astype(np.int64)
-    out.update(Z=Z, d=d, eta_sel=eta_sel, W_sel_sparse=Ws_sel)
-    out["params_true"].update(lam=lam, gamma=gamma)
+    out.update(X_zero=X_zero, d=d, eta_zero=eta_sel, W_zero_sparse=Ws_sel)
+    out["params_true"].update(rho_zero=rho_zero, beta_zero=beta_zero)
     return out

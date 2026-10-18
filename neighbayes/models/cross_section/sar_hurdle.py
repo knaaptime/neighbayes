@@ -2,19 +2,20 @@ r"""Reduced-form SAR hurdle negative binomial (cross-section).
 
 .. math::
 
-    P(y_i > 0) &= \mathrm{logit}^{-1}(\eta^{\mathrm{b}}_i), \qquad
-    \eta^{\mathrm{b}} = (I - \lambda W_{\mathrm{sel}})^{-1} Z\gamma, \\
+    P(y_i > 0) &= \mathrm{logit}^{-1}(\eta_{z,i}), \qquad
+    \eta_z = (I - \rho_z W_z)^{-1} X_z\beta_z, \\
     y_i \mid y_i > 0 &\sim \mathrm{NB2}(e^{\eta^{\mathrm{c}}_i}, \alpha)
     \text{ truncated at } 0, \qquad
     \eta^{\mathrm{c}} = (I - \rho W)^{-1} X\beta .
 
 A hurdle separates *whether* a count is positive from *how large* it is when
-it is.  Unlike a zero-inflated model it has no latent allocation: the binary
-half is a reduced-form spatial logit on the observed ``d = 1(y > 0)`` and the
-count half a zero-truncated reduced-form spatial NB on the positive counts, so
-both halves are identified from observed data even when the counts are sparse.
-Both halves are mean-propagating (the spatial lag acts on the linear predictor,
-with no latent noise field), so no Jacobian enters either.
+it is.  Unlike a zero-inflated model it has no latent allocation: the zero
+part is a reduced-form spatial logit on the observed ``d = 1(y > 0)`` and the
+count part a zero-truncated reduced-form spatial NB on the positive counts, so
+both parts are identified from observed data even when the counts are sparse.
+Both parts are reduced-form SARs (the spatial lag acts on the linear
+predictor, with no latent disturbance), so no Jacobian enters either.
+``ρ_z``, ``β_z`` are the posterior's ``rho_zero``, ``beta_zero``.
 """
 
 from __future__ import annotations
@@ -41,51 +42,51 @@ class SARHurdleNegBin(HurdleMixin, SpatialModel):
     Parameters
     ----------
     formula : str, optional
-        Count-half formula, e.g. ``"y ~ x1 + x2"``. Requires ``data``.
+        Count-part formula, e.g. ``"y ~ x1 + x2"``. Requires ``data``.
     data : pandas.DataFrame or geopandas.GeoDataFrame, optional
         Data source for formula mode.
     y : array-like, optional
         Non-negative integer counts of shape ``(n,)`` (matrix mode).
     X : array-like, optional
-        Count-half design of shape ``(n, k)`` (matrix mode).
-    Z : array-like or pandas.DataFrame, optional
-        Binary-half design of shape ``(n, p)``; a DataFrame's column names
-        label γ.  Default: ``X``.
-    sel_formula : str, optional
-        Binary-half right-hand side, e.g. ``"~ z1 + z2"`` (formula mode).
+        Count-part design of shape ``(n, k)`` (matrix mode).
+    X_zero : array-like or pandas.DataFrame, optional
+        Zero-part design of shape ``(n, p)``; a DataFrame's column names
+        label ``beta_zero``.  Default: ``X``.
+    formula_zero : str, optional
+        Zero-part right-hand side, e.g. ``"~ z1 + z2"`` (formula mode).
     W : libpysal.graph.Graph or scipy.sparse matrix
-        Count-half weights, ``n × n``.
-    W_sel : libpysal.graph.Graph or scipy.sparse matrix, optional
-        Binary-half weights. Default: ``W``.
+        Count-part weights, ``n × n``.
+    W_zero : libpysal.graph.Graph or scipy.sparse matrix, optional
+        Zero-part weights. Default: ``W``.
     priors : dict, optional
         ``beta_mu``/``beta_sigma`` (default Gelman et al. 2008 on the log
-        scale, the intercept at ``log mean(y | y > 0)``), ``gamma_mu``/
-        ``gamma_sigma`` (logit scale, the intercept at ``logit(mean(y > 0))``),
-        ``rho_lower``/``rho_upper``, ``lam_lower``/``lam_upper``,
+        scale, the intercept at ``log mean(y | y > 0)``), ``beta_mu_zero``/
+        ``beta_sigma_zero`` (logit scale, the intercept at
+        ``logit(mean(y > 0))``), ``rho_lower``/``rho_upper``,
+        ``rho_lower_zero``/``rho_upper_zero``,
         ``alpha_sigma``/``alpha_nu`` and ``alpha_fixed``.  See
         :class:`~neighbayes.models.priors.SARHurdlePriors`.
     logdet_method : str, optional
-        Accepted for API symmetry; neither half has a Jacobian.
+        Accepted for API symmetry; neither part has a Jacobian.
 
     Notes
     -----
     ``fit()`` runs the Gibbs sampler of :mod:`neighbayes.samplers.hurdle._generic`:
-    a Pólya–Gamma logit for the binary half; for the count half a Pólya–Gamma
+    a Pólya–Gamma logit for the zero part; for the count part a Pólya–Gamma
     NB with the truncation augmented exactly (geometric counts of the zeros it
     hid), plus a joint slice on the count level and ``log α``, which otherwise
     trade off along a ridge when the positive counts are mostly ones.
     ``sampler="nuts"`` fits the same model and priors in PyMC
     (``HurdleNegativeBinomial``).
 
-    The binary equation is called ``"selection"`` in
-    :meth:`impacts` (alias ``"hurdle"``), with parameters ``gamma`` and
-    ``lam``; :meth:`activation_probabilities` gives ``P(y > 0)``,
-    :meth:`positive_mean` ``E[y | y > 0]``.
+    The zero part is ``impacts(equation="zero")``, with parameters
+    ``beta_zero`` and ``rho_zero``; :meth:`activation_probabilities` gives
+    ``P(y > 0)``, :meth:`positive_mean` ``E[y | y > 0]``.
     """
 
     _dispatch = classmethod(discrete)
 
-    _spatial_params: tuple[str, ...] = ("rho", "lam")
+    _spatial_params: tuple[str, ...] = ("rho", "rho_zero")
     _lag_terms: tuple[str, ...] = ()
     _jacobian_param: str | None = None
     _gibbs_class: str | None = None
@@ -100,10 +101,10 @@ class SARHurdleNegBin(HurdleMixin, SpatialModel):
         data=None,
         y=None,
         X=None,
-        Z=None,
+        X_zero=None,
         W=None,
-        sel_formula=None,
-        W_sel=None,
+        formula_zero=None,
+        W_zero=None,
         priors=None,
         logdet_method=None,
         robust=False,
@@ -132,28 +133,30 @@ class SARHurdleNegBin(HurdleMixin, SpatialModel):
             raise ValueError("SARHurdleNegBin needs at least one positive count.")
         self._y_int = np.round(self._y).astype(np.int64)
         self._Z, self._sel_feature_names = _selection_design(
-            Z, sel_formula, data, len(self._y)
+            X_zero, formula_zero, data, len(self._y)
         )
         if self._Z is None:
             self._Z = self._X.copy()
             self._sel_feature_names = list(self._feature_names)
-        if W_sel is not None:
-            self._W_sel_sparse, self._is_sel_row_std = _parse_W(W_sel, len(self._y))
+        if W_zero is not None:
+            self._W_zero_sparse, self._is_sel_row_std = _parse_W(W_zero, len(self._y))
             self._same_W = False
         else:
-            self._W_sel_sparse = self._W_sparse
+            self._W_zero_sparse = self._W_sparse
             self._is_sel_row_std = self._is_row_std
             self._same_W = True
 
-    def _bounds(self, prefix: str) -> tuple[float, float]:
+    def _bounds(self, zero: bool = False) -> tuple[float, float]:
+        """ρ's prior bounds in the count part, or in the zero part (``*_zero`` keys)."""
         b = self._logdet_bounds
-        lo = float(self.priors.get(f"{prefix}_lower", b.rho_min))
-        hi = float(self.priors.get(f"{prefix}_upper", b.rho_max))
+        z = "_zero" if zero else ""
+        lo = float(self.priors.get(f"rho_lower{z}", b.rho_min))
+        hi = float(self.priors.get(f"rho_upper{z}", b.rho_max))
         return max(lo, b.rho_min), min(hi, b.rho_max)
 
     def _model_coords(self, extra: Optional[dict] = None) -> dict:
         coords = super()._model_coords(extra)
-        coords["sel_coefficient"] = list(self._sel_feature_names)
+        coords["coefficient_zero"] = list(self._sel_feature_names)
         return coords
 
     # ------------------------------------------------------------------
@@ -194,8 +197,8 @@ class SARHurdleNegBin(HurdleMixin, SpatialModel):
             alpha_nu=a_nu,
             alpha_fixed=a_fixed,
         )
-        filt_cnt = SARFilter(self._W_sparse, 1, *self._bounds("rho"))
-        filt_bin = SARFilter(self._W_sel_sparse, 1, *self._bounds("lam"))
+        filt_cnt = SARFilter(self._W_sparse, 1, *self._bounds())
+        filt_bin = SARFilter(self._W_zero_sparse, 1, *self._bounds(zero=True))
         y = self._y.astype(np.float64)
         X = np.asarray(self._X, dtype=np.float64)
         Z = np.asarray(self._Z, dtype=np.float64)
@@ -235,18 +238,21 @@ class SARHurdleNegBin(HurdleMixin, SpatialModel):
             timeout=None,
         )
         stack = lambda key: np.stack([r[key] for r in results], axis=0)  # noqa: E731
-        post = {name: stack(name) for name in ("lam", "gamma", "rho", "beta", "alpha")}
+        post = {
+            name: stack(name)
+            for name in ("rho_zero", "beta_zero", "rho", "beta", "alpha")
+        }
         idata = gibbs_to_inference_data(
             posterior_samples=post,
             log_likelihood={"obs": stack("log_lik")} if log_likelihood else None,
             observed_data={"obs": self._y_int},
             coords={
-                "sel_coefficient": list(self._sel_feature_names),
+                "coefficient_zero": list(self._sel_feature_names),
                 "coefficient": list(self._feature_names),
                 "obs_id": list(range(len(self._y))),
             },
             dims={
-                "gamma": ["sel_coefficient"],
+                "beta_zero": ["coefficient_zero"],
                 "beta": ["coefficient"],
                 "obs": ["obs_id"],
             },
@@ -271,14 +277,14 @@ class SARHurdleNegBin(HurdleMixin, SpatialModel):
         )
         a_sigma, a_nu, a_fixed = self._hurdle_alpha()
         with pm.Model(coords=self._model_coords()) as model:
-            lam = pm.Uniform("lam", *self._bounds("lam"))
+            lam = pm.Uniform("rho_zero", *self._bounds(zero=True))
             gamma = pm.Normal(
-                "gamma", mu=gamma_mu, sigma=gamma_sigma, dims="sel_coefficient"
+                "beta_zero", mu=gamma_mu, sigma=gamma_sigma, dims="coefficient_zero"
             )
-            rho = pm.Uniform("rho", *self._bounds("rho"))
+            rho = pm.Uniform("rho", *self._bounds())
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
             alpha = nb_alpha_rv(a_fixed, a_nu, a_sigma)
-            eta_b = SparseSARSolveOp(self._W_sel_sparse)(
+            eta_b = SparseSARSolveOp(self._W_zero_sparse)(
                 lam, pt.dot(pt.as_tensor_variable(self._Z), gamma)
             )
             eta_c = SparseSARSolveOp(self._W_sparse)(
@@ -296,11 +302,11 @@ class SARHurdleNegBin(HurdleMixin, SpatialModel):
     def _part_etas(self, g: int) -> tuple[np.ndarray, np.ndarray]:
         """``(η_b, η_c)`` at posterior draw ``g``."""
         n = self._X.shape[0]
-        lam = float(self._flat_draw("lam")[g])
+        lam = float(self._flat_draw("rho_zero")[g])
         rho = float(self._flat_draw("rho")[g])
         eye = sp.eye(n, format="csc", dtype=np.float64)
-        eta_b = sp.linalg.splu((eye - lam * self._W_sel_sparse).tocsc()).solve(
-            self._Z @ self._flat_draw("gamma")[g]
+        eta_b = sp.linalg.splu((eye - lam * self._W_zero_sparse).tocsc()).solve(
+            self._Z @ self._flat_draw("beta_zero")[g]
         )
         eta_c = sp.linalg.splu((eye - rho * self._W_sparse).tocsc()).solve(
             self._X @ self._flat_draw("beta")[g]

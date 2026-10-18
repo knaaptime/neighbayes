@@ -19,7 +19,6 @@ from neighbayes.diagnostics.lmtests.core import (
     _neyman_adjust_scalar,
     _neyman_adjust_vector,
     _posterior_mean_sigma2,
-    _resolve_lam_name,
     _resolve_X_for_beta,
     _safe_inv,
     _trace_WtW_WW,
@@ -1509,8 +1508,7 @@ def bayesian_lm_lag_sdem_test(
 
     idata = model.inference_data
     beta_draws = _get_posterior_draws(idata, "beta")
-    lam_name = _resolve_lam_name(idata)
-    lam_draws = _get_posterior_draws(idata, lam_name).reshape(-1)
+    lam_draws = _get_posterior_draws(idata, "lam").reshape(-1)
 
     u = _compute_residuals(
         model,
@@ -2077,8 +2075,7 @@ def bayesian_robust_lm_lag_sem_test(
 
     idata = model.inference_data
     beta_draws = _get_posterior_draws(idata, "beta")
-    lam_name = _resolve_lam_name(idata)
-    lam_draws = _get_posterior_draws(idata, lam_name).reshape(-1)
+    lam_draws = _get_posterior_draws(idata, "lam").reshape(-1)
     sigma_draws = _get_posterior_draws(idata, "sigma")
 
     # Per-draw whitened residuals u_d = (I - lam_d W)(y - X beta_d)
@@ -2186,8 +2183,7 @@ def bayesian_robust_lm_wx_sem_test(
 
     idata = model.inference_data
     beta_draws = _get_posterior_draws(idata, "beta")
-    lam_name = _resolve_lam_name(idata)
-    lam_draws = _get_posterior_draws(idata, lam_name).reshape(-1)
+    lam_draws = _get_posterior_draws(idata, "lam").reshape(-1)
     sigma_draws = _get_posterior_draws(idata, "sigma")
 
     raw = y[None, :] - beta_draws @ X.T
@@ -2290,8 +2286,7 @@ def bayesian_robust_lm_lag_sdem_test(
 
     idata = model.inference_data
     beta_draws = _get_posterior_draws(idata, "beta")  # (draws, k+k_wx)
-    lam_name = _resolve_lam_name(idata)
-    lam_draws = _get_posterior_draws(idata, lam_name).reshape(-1)
+    lam_draws = _get_posterior_draws(idata, "lam").reshape(-1)
     sigma_draws = _get_posterior_draws(idata, "sigma")
 
     Z = np.hstack([X, WX])

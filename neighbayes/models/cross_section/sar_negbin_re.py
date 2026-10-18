@@ -429,17 +429,18 @@ class SARNegBinRE(SpatialModel):
 
         # Assemble DataTree
         # Stack chain results: each key has shape (n_keep, ...) per chain
-        param_keys = ["rho", "sigma", "alpha"]
+        # The chains' ``sigma`` is the sd of the random unit effects ν.
+        param_keys = {"rho": "rho", "sigma": "unit_effect_sd", "alpha": "alpha"}
         if return_eta:
-            param_keys.append("eta")
+            param_keys["eta"] = "eta"
 
         posterior_samples = {}
-        for key in param_keys:
+        for key, name in param_keys.items():
             arrays = [c[key] for c in chain_results]
             # Shape: (chains, n_keep, ...) for scalar params
             # Shape: (chains, n_keep, k) for beta
             # Shape: (chains, n_keep, n) for eta
-            posterior_samples[key] = np.stack(arrays, axis=0)
+            posterior_samples[name] = np.stack(arrays, axis=0)
 
         # beta has shape (n_keep, k) per chain
         posterior_samples["beta"] = np.stack([c["beta"] for c in chain_results], axis=0)

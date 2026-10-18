@@ -32,7 +32,7 @@ def test_gibbs_mixture_targets_the_half_t_prior(nu, scale):
     its quantiles must match the half-t's.
     """
     rng = np.random.default_rng(0)
-    priors = REGibbsPriors(sigma_alpha_nu=nu, sigma_alpha_scale=scale)
+    priors = REGibbsPriors(unit_effect_sd_nu=nu, unit_effect_sd_scale=scale)
     no_effects = np.zeros(0)
     s2, draws = scale**2, np.empty(200_000)
     for i in range(draws.size):
@@ -81,7 +81,7 @@ def test_nuts_and_gibbs_share_the_posterior():
     }
     nuts, gibbs = fits["nuts"], fits["gibbs"]
     assert int(nuts.sample_stats["diverging"].sum()) == 0
-    for name in ("sigma_alpha", "rho", "beta"):
+    for name in ("unit_effect_sd", "rho", "beta"):
         a = nuts.posterior[name].values.reshape(4 * 3000, -1)
         b = gibbs.posterior[name].values.reshape(a.shape)
         ess = min(

@@ -70,8 +70,8 @@ _PARAMS_DOC = """
     priors : dict, optional
         Overrides; see :class:`~neighbayes.models.priors.PanelCountPriors`
         (``beta_mu``, ``beta_sigma``, ``rho_lower``, ``rho_upper``,
-        ``alpha_sigma``, ``alpha_nu``, ``alpha_fixed``, ``group_effect_mu``,
-        ``group_effect_sd_scale``, ``time_effect_mu``, ``time_effect_sigma``).
+        ``alpha_sigma``, ``alpha_nu``, ``alpha_fixed``, ``unit_effect_mu``,
+        ``unit_effect_sd_scale``, ``time_effect_mu``, ``time_effect_sigma``).
     mundlak : bool, default False
         Add the unit means of the time-varying columns to the design (inside
         the filter), absorbing a correlation between the unit effects and
@@ -144,16 +144,16 @@ class _CountPanelBase(CountPanelFEMixin, SpatialPanelModel):
         thin: int = 1,
         n_jobs: int = -1,
         progressbar: bool = True,
-        store_group_effects: Optional[bool] = None,
+        store_effects: Optional[bool] = None,
         log_likelihood: bool = False,
     ) -> xr.DataTree:
         """Sample via reduced-form count Gibbs (registry entry ``("count", "panel")``).
 
         Reached through :meth:`SpatialPanelModel.fit` with ``sampler="gibbs"``,
-        the default (``sampler="nuts"`` runs :meth:`_build_pymc_model`).  ``store_group_effects``
+        the default (``sampler="nuts"`` runs :meth:`_build_pymc_model`).  ``store_effects``
         (a ``fit`` keyword) keeps every draw of the unit effects — by default
         when they fit in about 500 MB — and otherwise their posterior mean and
-        sd in ``idata["group_effect_summary"]``.
+        sd in ``idata["unit_effect_summary"]``.
         """
         beta_mu, beta_sigma = self._resolved_beta_prior(link="log")
         return self._run_count_panel_gibbs(
@@ -171,7 +171,7 @@ class _CountPanelBase(CountPanelFEMixin, SpatialPanelModel):
             progressbar=progressbar,
             n_jobs=n_jobs,
             log_likelihood=log_likelihood,
-            store_group_effects=store_group_effects,
+            store_effects=store_effects,
             model_type=type(self).__name__,
         )
 
@@ -242,10 +242,10 @@ class _CountPanelBase(CountPanelFEMixin, SpatialPanelModel):
         rho = float(self._posterior_mean("rho")) if self._count_spatial else None
         eta = self._eta_reduced(rho, self._posterior_mean("beta"))
         if self._fe_groups:
-            if "group_effect" in post.data_vars:
-                c = self._posterior_mean("group_effect")
+            if self._effect_name() in post.data_vars:
+                c = self._posterior_mean(self._effect_name())
             else:
-                c = self._idata["group_effect_summary"]["mean"].values
+                c = self._idata[self._effect_name("_summary")]["mean"].values
             eta = eta + np.asarray(c)[self._row_group]
         if self._fe_periods:
             eta = eta + self._D_tau @ self._posterior_mean("time_effect")
@@ -271,7 +271,7 @@ def _run_count_panel(
     n_jobs,
     progressbar,
     backend,
-    store_group_effects=None,
+    store_effects=None,
     log_likelihood=False,
 ):
     """Registry runner for the NB count panels: a thin adapter over ``_fit_gibbs``.
@@ -286,7 +286,7 @@ def _run_count_panel(
         thin=thin,
         n_jobs=n_jobs,
         progressbar=progressbar,
-        store_group_effects=store_group_effects,
+        store_effects=store_effects,
         log_likelihood=log_likelihood,
     )
 
@@ -296,7 +296,7 @@ register(
     "panel",
     run=_run_count_panel,
     backends={"numpy"},
-    options={"store_group_effects"},
+    options={"store_effects"},
     skips_log_likelihood=True,
 )
 

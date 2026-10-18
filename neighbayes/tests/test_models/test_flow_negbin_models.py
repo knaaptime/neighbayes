@@ -116,7 +116,7 @@ class TestNegativeBinomialPanelFlowConstruction:
         )
         assert list(model._feature_names) == list(data["col_names"])
         pm_model = model._build_pymc_model()
-        assert {"alpha", "group_effect", "group_sd", "time_effect"} <= set(
+        assert {"alpha", "pair_effect", "pair_effect_sd", "time_effect"} <= set(
             pm_model.named_vars
         )
 

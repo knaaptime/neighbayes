@@ -258,11 +258,12 @@ $$y_{it} = \phi y_{i,t-1} + x_{it}' \beta + W x_{it}' \theta + a_i + \tau_t + \e
 
 ### SEMProbit (random group effects)
 
-$$z = X\beta + \Delta\theta + \varepsilon, \quad \theta = \rho W \theta + u, \quad u \sim \mathcal{N}(0, \sigma_u^2 I), \quad \varepsilon \sim \mathcal{N}(0, I), \quad y_{ik} = \mathbf{1}[z_{ik} > 0]$$
+$$z = X\beta + \Delta\theta + \varepsilon, \quad \theta = \lambda W \theta + u, \quad u \sim \mathcal{N}(0, \sigma_u^2 I), \quad \varepsilon \sim \mathcal{N}(0, I), \quad y_{ik} = \mathbf{1}[z_{ik} > 0]$$
 
 Observations nest in groups (`group_col`, or `groups` in matrix mode), and
 $\Delta$ maps each observation to its group. The groups' random effects
-$\theta$ follow a SAR process on the group-level weights $W$; nothing of $X$
+$\theta$ (`group_effect`, with sd `group_effect_sd`) follow an error process on
+the group-level weights $W$, with dependence $\lambda$ (`lam`); nothing of $X$
 propagates. This is LeSage and Pace's (2009, §10.6) spatially structured
 effects probit (Smith and LeSage 2004), constructed as
 `SEMProbit(..., group_effects="random")`, not the standard SAR probit, which the
@@ -306,8 +307,9 @@ effects out of every $\rho$ update by an ω-weighted analogue of the within
 transform, recomputed each sweep from the Pólya–Gamma weights.
 
 The unit effects are **partially pooled**: $c_i \sim N(\mu, \sigma^2)$ with
-$\sigma$ learned (a half-$t_3$ prior with scale `group_effect_sd_scale`,
-default 1), so a unit seen in few periods is shrunk toward the common mean in
+$\sigma$ learned (a half-$t_3$ prior with scale `unit_effect_sd_scale`,
+default 1; the posterior's `unit_effect` and `unit_effect_sd`, or `pair_effect`
+and `pair_effect_sd` in the flow panels), so a unit seen in few periods is shrunk toward the common mean in
 proportion to how little its data say. Spatial panels typically have many units
 and few periods (Elhorst 2014), and there a fixed, wide prior leaves each
 unit's level pinned only by its own few periods, which biases the dispersion $\alpha$ and $\rho$ (the incidental-parameter problem)
@@ -339,14 +341,17 @@ No latent $\sigma$ — spatial dependence enters only through the mean propagato
 
 $$y_i \sim \operatorname{NegBin}(\mu_i, \alpha), \quad \eta = \rho W \eta + X\beta + \nu, \quad \nu \sim \mathcal{N}(0, \sigma^2 I)$$
 
-`SARNegBin(unit_effects="random")`: the log-mean carries a normal random effect per unit with scale $\sigma$, inside the SAR equation, so this is a different model from `SARNegBin`, not its structural form. Gibbs sampling only (PG augmentation).
+`SARNegBin(unit_effects="random")`: the log-mean carries a normal random effect per unit with scale $\sigma$ (`unit_effect_sd`), inside the SAR equation, so this is a different model from `SARNegBin`, not its structural form. Gibbs sampling only (PG augmentation).
 
 ### SARZINB
 
-$$y_i \sim \operatorname{ZINB}(\mu_i, \alpha, \pi_i), \quad \log \boldsymbol{\mu} = (I - \rho W)^{-1} X\beta, \quad \operatorname{logit} \boldsymbol{\pi} = (I - \lambda W_{\mathrm{sel}})^{-1} Z\gamma$$
+$$y_i \sim \operatorname{ZINB}(\mu_i, \alpha, \pi_i), \quad \log \boldsymbol{\mu} = (I - \rho W)^{-1} X\beta, \quad \operatorname{logit} \boldsymbol{\pi} = (I - \rho_z W_z)^{-1} X_z\beta_z$$
 
-Zero-inflated negative binomial: a spatial-lag logit selection (is the unit
-active?) and a spatial-lag NB count, both in reduced form. Pólya–Gamma Gibbs
+Zero-inflated negative binomial: a spatial-lag logit zero part (is the unit
+active?) and a spatial-lag NB count part, both reduced-form SARs. The zero
+part's parameters are the count part's names with a `_zero` suffix: `rho_zero`
+and `beta_zero` in the posterior, `X_zero`, `formula_zero` and `W_zero` in the
+constructor, and `beta_mu_zero`, `rho_lower_zero` and so on in the priors. Pólya–Gamma Gibbs
 by default; `sampler="nuts"` fits the same model in PyMC. Activation
 probabilities, zero attribution and fitted means are posterior expectations;
 `posterior_predictive` simulates the zero process too.
@@ -354,40 +359,42 @@ probabilities, zero attribution and fitted means are posterior expectations;
 **Identification.** Only the shape of the count distribution separates
 structural zeros from sampling zeros. When active units average about one
 count, NB with a smaller α explains the zeros nearly as well as zero inflation
-does. The selection equation is then weakly identified, the posterior of λ is
+does. The zero part is then weakly identified, the posterior of `rho_zero` is
 close to its prior, and the Gibbs chain mixes slowly. Repeated periods fix this:
 in a panel with unit (or pair) effects, a unit's other periods pin down its
 count distribution, and the zeros in excess of it are structural. For "any
 versus none" questions on sparse counts, use a hurdle model
-({ref}`below <hurdle-models>`), whose binary half is fit to the observed
+({ref}`below <hurdle-models>`), whose zero part is fit to the observed
 zeros.
 
 ### ZINB panels (`SARZINB`, `ZINB`)
 
-The same two equations per period, $T$ periods stacked time-first, with
-per-period structural zeros and unit and period effects on the count
-equation (`unit_effects="random"`, `time_effects=True`, as for the NB panels). The selection design `Z` may vary
-over time.
+The same two parts per period, $T$ periods stacked time-first, with
+per-period structural zeros and unit and period effects on the count part
+(`unit_effects="random"`, `time_effects=True`, as for the NB panels). The
+zero part's design `X_zero` may vary over time.
 
 ### Flow ZINB (`SARZINBFlow`, separable)
 
-Both equations are separable flow models,
-$\eta^{\mathrm{sel}} = (L^{\lambda}_o \otimes L^{\lambda}_d)^{-1} Z\gamma$ and
+Both parts are separable flow models,
+$\eta_z = (L_{z,o} \otimes L_{z,d})^{-1} X_z\beta_z$ and
 $\eta^{\mathrm{cnt}} = (L^{\rho}_o \otimes L^{\rho}_d)^{-1} X\beta$, sampled by a
 structured $n \times n$ sweep (NumPy or `backend="jax"`) that never forms
 an $n^2 \times n^2$ matrix. The panel adds pair and period effects on the count
-equation; the cross-section is the panel with $T = 1$. Flow counts are usually
+part; the cross-section is the panel with $T = 1$. Flow counts are usually
 sparse, so the identification caveat above bites hardest here: use the panel
 with pair effects, or the flow hurdle.
 
 (hurdle-models)=
 ### Hurdle models (SARHurdleNegBin and family)
 
-$$P(y > 0) = \operatorname{logit}^{-1}(\eta^{\mathrm{b}}), \quad y \mid y > 0 \sim \operatorname{NB}(\mu, \alpha) \text{ truncated at } 0, \quad \eta^{\mathrm{b}} = (I - \lambda W_{\mathrm{sel}})^{-1} Z\gamma, \quad \log \boldsymbol{\mu} = (I - \rho W)^{-1} X\beta$$
+$$P(y > 0) = \operatorname{logit}^{-1}(\eta_z), \quad y \mid y > 0 \sim \operatorname{NB}(\mu, \alpha) \text{ truncated at } 0, \quad \eta_z = (I - \rho_z W_z)^{-1} X_z\beta_z, \quad \log \boldsymbol{\mu} = (I - \rho W)^{-1} X\beta$$
 
 A hurdle separates *whether* a count is positive from *how large* it is when
-it is. Both halves are reduced form: the spatial lag acts on the linear
-predictor and no latent noise field enters, so neither half has a Jacobian.
+it is. Both parts are reduced-form SARs: the spatial lag acts on the linear
+predictor and no latent disturbance enters, so neither part has a Jacobian.
+The zero part is named as in SARZINB (`rho_zero`, `beta_zero`, `X_zero`,
+`W_zero`).
 
 **Hurdle or ZINB.** Both give positive counts the same zero-truncated NB
 distribution; they differ only in the probability of a positive count. The
@@ -395,34 +402,36 @@ hurdle models it directly, $P(y > 0) = \pi$. ZINB splits it into an
 activation probability and the NB's own chance of a positive count,
 $\pi\,(1 - \operatorname{NB}(0))$, and so can call a zero structural. The data
 see that split only through the shape of the positive counts, which on sparse
-counts barely constrains it (see SARZINB). The hurdle's binary half is fit to
+counts barely constrains it (see SARZINB). The hurdle's zero part is fit to
 the observed zeros, so it is identified however sparse the counts are. What it
-gives up is the split: its γ and λ describe whether any count occurs, not
+gives up is the split: its `beta_zero` and `rho_zero` describe whether any count occurs, not
 whether a unit is "open". Use the hurdle when the question is "any versus none",
 and ZINB, in a panel with unit or pair effects, when the question is
 "structurally closed versus open but quiet".
 
-**Sampling.** The binary half is a Pólya–Gamma logit. In the count half the
+**Sampling.** The zero part is a Pólya–Gamma logit. In the count part the
 truncation is augmented exactly: each positive cell gets a geometric count of
 the zeros the truncation hid, after which the cell is Pólya–Gamma conjugate.
 When the positive counts are mostly ones, the count level and α trade off along
 a ridge, so they are drawn jointly by a slice sampler that moves along it.
 `sampler="nuts"` fits the same model in PyMC (`HurdleNegativeBinomial`).
 
-- **SARHurdleNegBin**: cross-section, with separate `Z` (or `sel_formula`) and
-  `W_sel` for the binary half.
-- Panels (`SARHurdleNegBin`, `HurdleNegBin` with `time_col` or `T`): $T$ periods stacked time-first,
-  with unit and period effects (`unit_effects="random"`, `time_effects=True`) in **both** halves. In the binary
-  half a unit effect absorbs the unit's baseline chance of a positive count,
-  so γ comes mostly from within-unit switches between zero and positive
-  periods. Both halves' unit effects are partially pooled, with their own
+- **SARHurdleNegBin**: cross-section, with separate `X_zero` (or `formula_zero`)
+  and `W_zero` for the zero part.
+- Panels (`SARHurdleNegBin`, `HurdleNegBin` with `time_col` or `T`): $T$ periods
+  stacked time-first, with unit and period effects (`unit_effects="random"`,
+  `time_effects=True`) in **both** parts. In the zero part a unit effect
+  absorbs the unit's baseline chance of a positive count, so `beta_zero` comes
+  mostly from within-unit switches between zero and positive periods. The
+  posterior names the zero part's effects `unit_effect_zero`,
+  `unit_effect_sd_zero` and `time_effect_zero`. Both parts' unit effects are partially pooled, with their own
   learned sds; the pooling is what keeps α and ρ unbiased when units have few
   positive periods (about three per unit in simulations, where a fixed, wide
   prior gave α at half its true value).
-- Flows (`SARHurdleNegBinFlow(separable=True)`, cross-section or panel): both halves
-  are separable flow models, sampled by the structured $n \times n$ sweep
-  (NumPy or `backend="jax"`), with pair and period effects in both
-  halves.
+- Flows (`SARHurdleNegBinFlow(separable=True)`, cross-section or panel): both
+  parts are separable flow models, sampled by the structured $n \times n$
+  sweep (NumPy or `backend="jax"`), with pair and period effects in both
+  parts.
 
 The halves share no parameters, so the posterior factorizes. Linking them
 through correlated unit (pair) effects is a planned extension.
@@ -469,7 +478,7 @@ so a bare `SEMLogit(...)` raises. Pólya–Gamma Gibbs sampler only.
 
 ## Flow Models
 
-Vectorize the origin-destination flow matrix to $y \in \mathbb{R}^{N}$ with $N = n^2$, and define destination, origin, and network weight matrices as $W_d$, $W_o$, and $W_w$.
+Vectorize the origin-destination flow matrix to $y \in \mathbb{R}^{N}$ with $N = n^2$, and define destination, origin, and origin–destination weight matrices as $W_d$, $W_o$, and $W_w$.
 
 ### OLSFlow
 

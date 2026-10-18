@@ -89,14 +89,14 @@ def test_zinb_selection_direct_effect_distinct_W(_design):
     """A distinct selection W gets its own resolvent evaluator."""
     W, n, X, rng = _design
     y = rng.poisson(2.0, size=n).astype(float)
-    W_sel = _rook_W(8)  # same structure, distinct object → _same_W False
+    W_zero = _rook_W(8)  # same structure, distinct object → _same_W False
     model = SARZINB(
-        y=y, X=X, W=_graph(W), W_sel=_graph(W_sel), logdet_method="cheb_cholesky"
+        y=y, X=X, W=_graph(W), W_zero=_graph(W_zero), logdet_method="cheb_cholesky"
     )
     assert model._same_W is False
 
     lam = rng.uniform(0.05, 0.9, size=1500)
-    sel_eigs = np.linalg.eigvals(model._W_sel_sparse.toarray().astype(np.float64))
+    sel_eigs = np.linalg.eigvals(model._W_zero_sparse.toarray().astype(np.float64))
     md_res = model._sel_batch_mean_diag(lam)
     md_eig = _chunked_eig_means(lam, sel_eigs)
     np.testing.assert_allclose(md_res, md_eig, atol=1e-4, rtol=1e-4)

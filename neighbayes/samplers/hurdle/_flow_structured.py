@@ -54,7 +54,7 @@ def run_chain_hurdle_flow_structured(
     X: np.ndarray,
     Z: np.ndarray,
     W_csc,
-    W_sel_csc,
+    W_zero_csc,
     n: int,
     T: int,
     priors,
@@ -118,7 +118,7 @@ def run_chain_hurdle_flow_structured(
         Cc0 = np.log(mean_pos) - np.log(y_pos.mean())
 
     binary = StructuredEquation(
-        Z, W_sel_csc, n, T, priors.gamma_mu, priors.gamma_sigma,
+        Z, W_zero_csc, n, T, priors.gamma_mu, priors.gamma_sigma,
         init_beta=g0 + rng.normal(0.0, 0.1, size=g0.size), init_rho=jitter(),
         pair_effects=sel_pair_effects, period_effects=sel_period_effects,
         rho_lower=lam_bounds[0], rho_upper=lam_bounds[1], C_init=Cb0,
@@ -139,9 +139,17 @@ def run_chain_hurdle_flow_structured(
     n_keep = draws // thin if thin > 0 else draws
     out = {
         name: np.empty(n_keep)
-        for name in ("lam_d", "lam_o", "lam_w", "rho_d", "rho_o", "rho_w", "alpha")
+        for name in (
+            "rho_d_zero",
+            "rho_o_zero",
+            "rho_w_zero",
+            "rho_d",
+            "rho_o",
+            "rho_w",
+            "alpha",
+        )
     }
-    out["gamma"] = np.empty((n_keep, binary.k))
+    out["beta_zero"] = np.empty((n_keep, binary.k))
     out["sel_time_effect"] = np.empty((n_keep, binary.n_tau))
     out["beta"] = np.empty((n_keep, count.k))
     out["time_effect"] = np.empty((n_keep, count.n_tau))
@@ -194,13 +202,13 @@ def run_chain_hurdle_flow_structured(
             j = (it - tune) // thin
             if j < n_keep:
                 for eq, a, b, w in (
-                    (binary, "lam_d", "lam_o", "lam_w"),
+                    (binary, "rho_d_zero", "rho_o_zero", "rho_w_zero"),
                     (count, "rho_d", "rho_o", "rho_w"),
                 ):
                     out[a][j] = eq.rho["rho_d"]
                     out[b][j] = eq.rho["rho_o"]
                     out[w][j] = -eq.rho["rho_d"] * eq.rho["rho_o"]
-                out["gamma"][j] = binary.beta
+                out["beta_zero"][j] = binary.beta
                 out["sel_time_effect"][j] = binary.tau
                 out["beta"][j] = count.beta
                 out["time_effect"][j] = count.tau

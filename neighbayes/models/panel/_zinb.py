@@ -2,20 +2,21 @@ r"""Zero-inflated NB2 panels with count-equation effects.
 
 .. math::
 
-    \eta^{\mathrm{sel}}_t &= (I - \lambda W_{\mathrm{sel}})^{-1} Z_t \gamma, \qquad
-    z_{it} \sim \mathrm{Bernoulli}(\mathrm{logit}^{-1}(\eta^{\mathrm{sel}}_{it})), \\
+    \eta_{z,t} &= (I - \rho_z W_z)^{-1} X_{z,t} \beta_z, \qquad
+    z_{it} \sim \mathrm{Bernoulli}(\mathrm{logit}^{-1}(\eta_{z,it})), \\
     \eta^{\mathrm{cnt}}_t &= (I - \rho W)^{-1} X_t \beta + c + \tau_t, \qquad
     y_{it} \mid z_{it} = 1 \sim \mathrm{NB2}(e^{\eta^{\mathrm{cnt}}_{it}}, \alpha),
     \quad y_{it} \mid z_{it} = 0 = 0,
 
 stacked time-first over ``T`` periods of ``N`` units.  Structural zeros are per
-period; ``Z`` may vary over time (add period dummies to it for period effects
-in the selection).  ``effects`` sets unit (pooled) and period effects on
-the **count** equation only, as in :class:`~neighbayes.models.SARNegBinPanelRE`; the
-selection equation has none (a unit effect there would compete with the zero
-process for the same information).
+period; ``X_zero`` may vary over time (add period dummies to it for period
+effects in the zero part).  ``effects`` sets unit (pooled) and period effects
+on the **count** part only, as in :class:`~neighbayes.models.SARNegBinPanelRE`;
+the zero part has none (a unit effect there would compete with the zero
+process for the same information).  ``ρ_z``, ``β_z`` are the posterior's
+``rho_zero``, ``beta_zero``.
 
-* :class:`SARZINBPanelRE` — spatial lag in both equations.
+* :class:`SARZINBPanelRE` — spatial lag in both parts.
 * :class:`ZINBPanelRE` — the aspatial baseline.
 
 Both default to the Pólya–Gamma Gibbs sampler of
@@ -54,24 +55,24 @@ _PARAMS_DOC = """
         Stacked counts of shape ``(N*T,)``, time-first (matrix mode).
     X : array-like or pandas.DataFrame, optional
         Stacked count design (matrix mode).
-    Z : array-like or pandas.DataFrame, optional
-        Stacked selection design, time-first. Default: ``X``.
-    sel_formula : str, optional
-        Selection right-hand side, e.g. ``"~ z1 + z2"`` (formula mode).
+    X_zero : array-like or pandas.DataFrame, optional
+        Stacked zero-part design, time-first. Default: ``X``.
+    formula_zero : str, optional
+        Zero-part right-hand side, e.g. ``"~ z1 + z2"`` (formula mode).
     W : libpysal.graph.Graph or scipy.sparse matrix
-        ``N × N`` count-equation weights, row-standardized.
-    W_sel : libpysal.graph.Graph or scipy.sparse matrix, optional
-        ``N × N`` selection weights. Default: ``W``.
+        ``N × N`` count-part weights, row-standardized.
+    W_zero : libpysal.graph.Graph or scipy.sparse matrix, optional
+        ``N × N`` zero-part weights. Default: ``W``.
     unit_col, time_col : str, optional
         Unit and period columns (formula mode).
     N, T : int, optional
         Units and periods (matrix mode).
     effects : int or str, default 0
-        Count-equation effects: ``0``/``"pooled"``, ``1``/``"unit"``,
+        Count-part effects: ``0``/``"pooled"``, ``1``/``"unit"``,
         ``2``/``"time"``, ``3``/``"two_way"``.
     priors : dict, optional
         See :class:`~neighbayes.models.priors.PanelZINBPriors` (β, ρ, α incl.
-        ``alpha_fixed``, unit/period effects, γ, λ bounds).
+        ``alpha_fixed``, unit/period effects, and the zero part's ``*_zero``).
 """
 
 
@@ -86,9 +87,9 @@ class _ZINBPanelBase(ZINBMixin, CountPanelFEMixin, SpatialPanelModel):
     def __init__(
         self,
         *args,
-        Z=None,
-        sel_formula: Optional[str] = None,
-        W_sel=None,
+        X_zero=None,
+        formula_zero: Optional[str] = None,
+        W_zero=None,
         effects: Any = 0,
         mundlak: bool = False,
         **kwargs,
@@ -108,21 +109,21 @@ class _ZINBPanelBase(ZINBMixin, CountPanelFEMixin, SpatialPanelModel):
 
         # Selection design, before the count effects drop absorbed X columns.
         data = kwargs.get("data")
-        if sel_formula is not None and data is not None:
+        if formula_zero is not None and data is not None:
             data = data.sort_values(
                 [kwargs["time_col"], kwargs["unit_col"]]
             ).reset_index(drop=True)
         self._Z, self._sel_feature_names = _selection_design(
-            Z, sel_formula, data, N * T
+            X_zero, formula_zero, data, N * T
         )
         if self._Z is None:
             self._Z = np.asarray(self._X, dtype=np.float64).copy()
             self._sel_feature_names = list(self._feature_names)
-        if W_sel is not None:
-            self._W_sel_sparse, self._is_sel_row_std = _parse_W(W_sel, N)
+        if W_zero is not None:
+            self._W_zero_sparse, self._is_sel_row_std = _parse_W(W_zero, N)
             self._same_W = False
         else:
-            self._W_sel_sparse = self._W_sparse
+            self._W_zero_sparse = self._W_sparse
             self._is_sel_row_std = self._is_row_std
             self._same_W = True
 
@@ -144,17 +145,19 @@ class _ZINBPanelBase(ZINBMixin, CountPanelFEMixin, SpatialPanelModel):
     def _model_coords(self, extra: Optional[dict] = None) -> dict:
         coords = super()._model_coords(extra)
         coords.update(self._fe_coords())
-        coords["sel_coefficient"] = list(self._sel_feature_names)
+        coords["coefficient_zero"] = list(self._sel_feature_names)
         return coords
 
     # ------------------------------------------------------------------
     # Priors and filters
     # ------------------------------------------------------------------
 
-    def _bounds(self, prefix: str) -> tuple[float, float]:
+    def _bounds(self, zero: bool = False) -> tuple[float, float]:
+        """ρ's prior bounds in the count part, or in the zero part (``*_zero`` keys)."""
         b = self._logdet_bounds
-        lo = float(self.priors.get(f"{prefix}_lower", b.rho_min))
-        hi = float(self.priors.get(f"{prefix}_upper", b.rho_max))
+        z = "_zero" if zero else ""
+        lo = float(self.priors.get(f"rho_lower{z}", b.rho_min))
+        hi = float(self.priors.get(f"rho_upper{z}", b.rho_max))
         return max(lo, b.rho_min), min(hi, b.rho_max)
 
     def _gamma_prior(self) -> tuple[np.ndarray, np.ndarray]:
@@ -168,10 +171,10 @@ class _ZINBPanelBase(ZINBMixin, CountPanelFEMixin, SpatialPanelModel):
             link="logit",
         )
         mu = np.broadcast_to(
-            np.asarray(self.priors.get("gamma_mu", g_mu), dtype=float), (p,)
+            np.asarray(self.priors.get("beta_mu_zero", g_mu), dtype=float), (p,)
         )
         sd = np.broadcast_to(
-            np.asarray(self.priors.get("gamma_sigma", g_sd), dtype=float), (p,)
+            np.asarray(self.priors.get("beta_sigma_zero", g_sd), dtype=float), (p,)
         )
         return mu.copy(), sd.copy()
 
@@ -181,8 +184,8 @@ class _ZINBPanelBase(ZINBMixin, CountPanelFEMixin, SpatialPanelModel):
         if not self._count_spatial:
             return NoFilter(), NoFilter()
         return (
-            SARFilter(self._W_sparse, self._T, *self._bounds("rho")),
-            SARFilter(self._W_sel_sparse, self._T, *self._bounds("lam")),
+            SARFilter(self._W_sparse, self._T, *self._bounds()),
+            SARFilter(self._W_zero_sparse, self._T, *self._bounds(zero=True)),
         )
 
     # ------------------------------------------------------------------
@@ -198,7 +201,7 @@ class _ZINBPanelBase(ZINBMixin, CountPanelFEMixin, SpatialPanelModel):
         thin: int = 1,
         n_jobs: int = -1,
         progressbar: bool = True,
-        store_group_effects: Optional[bool] = None,
+        store_effects: Optional[bool] = None,
         log_likelihood: bool = False,
     ) -> xr.DataTree:
         """Sample via the generic ZINB Gibbs kernel (registry ``("zinb", "panel")``)."""
@@ -224,7 +227,7 @@ class _ZINBPanelBase(ZINBMixin, CountPanelFEMixin, SpatialPanelModel):
             alpha_fixed=nb_alpha_fixed(self.priors),
         )
         keep_groups = self._store_group_draws(
-            store_group_effects, chains, draws // max(thin, 1)
+            store_effects, chains, draws // max(thin, 1)
         )
         y = self._y.astype(np.float64)
         X = np.asarray(self._X, dtype=np.float64)
@@ -270,7 +273,7 @@ class _ZINBPanelBase(ZINBMixin, CountPanelFEMixin, SpatialPanelModel):
             scalars,
             keep_groups,
             log_likelihood,
-            extra={"gamma": ("sel_coefficient", self._sel_feature_names)},
+            extra={"beta_zero": ("coefficient_zero", self._sel_feature_names)},
         )
 
     def _build_pymc_model(self) -> pm.Model:
@@ -282,20 +285,20 @@ class _ZINBPanelBase(ZINBMixin, CountPanelFEMixin, SpatialPanelModel):
         with pm.Model(coords=self._model_coords()) as model:
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
             gamma = pm.Normal(
-                "gamma", mu=gamma_mu, sigma=gamma_sigma, dims="sel_coefficient"
+                "beta_zero", mu=gamma_mu, sigma=gamma_sigma, dims="coefficient_zero"
             )
             eta_cnt = pt.dot(X_t, beta)
             eta_sel = pt.dot(Z_t, gamma)
             if self._count_spatial:
                 from ..._ops import SparseSARSolveOp
 
-                rho = pm.Uniform("rho", *self._bounds("rho"))
-                lam = pm.Uniform("lam", *self._bounds("lam"))
+                rho = pm.Uniform("rho", *self._bounds())
+                lam = pm.Uniform("rho_zero", *self._bounds(zero=True))
                 eta_cnt = SparseSARSolveOp(self._W_sparse_NT)(rho, eta_cnt)
-                W_sel_NT = sp.csr_matrix(
-                    sp.kron(sp.eye(self._T, format="csr"), self._W_sel_sparse)
+                W_zero_NT = sp.csr_matrix(
+                    sp.kron(sp.eye(self._T, format="csr"), self._W_zero_sparse)
                 )
-                eta_sel = SparseSARSolveOp(W_sel_NT)(lam, eta_sel)
+                eta_sel = SparseSARSolveOp(W_zero_NT)(lam, eta_sel)
             eta_cnt = eta_cnt + self._pymc_fe_offset()
             alpha = nb_alpha_rv(
                 nb_alpha_fixed(self.priors),
@@ -325,25 +328,25 @@ class _ZINBPanelBase(ZINBMixin, CountPanelFEMixin, SpatialPanelModel):
         """``(η_sel, η_cnt)`` at draw ``g``.
 
         With the unit effects stored only as a summary
-        (``store_group_effects=False``), their posterior mean stands in.
+        (``store_effects=False``), their posterior mean stands in.
         """
         post = self._idata.posterior
-        gamma = self._flat_draw("gamma")[g]
+        gamma = self._flat_draw("beta_zero")[g]
         beta = self._flat_draw("beta")[g]
         eta_sel = self._Z @ gamma
         eta_cnt = self._X @ beta
         if self._count_spatial:
             eta_sel = self._solve_periods(
-                self._W_sel_sparse, float(self._flat_draw("lam")[g]), eta_sel
+                self._W_zero_sparse, float(self._flat_draw("rho_zero")[g]), eta_sel
             )
             eta_cnt = self._solve_periods(
                 self._W_sparse, float(self._flat_draw("rho")[g]), eta_cnt
             )
         if self._fe_groups:
-            if "group_effect" in post.data_vars:
-                c = self._flat_draw("group_effect")[g]
+            if self._effect_name() in post.data_vars:
+                c = self._flat_draw(self._effect_name())[g]
             else:
-                c = self._idata["group_effect_summary"]["mean"].values
+                c = self._idata[self._effect_name("_summary")]["mean"].values
             eta_cnt = eta_cnt + np.asarray(c)[self._row_group]
         if self._fe_periods:
             eta_cnt = eta_cnt + self._D_tau @ self._flat_draw("time_effect")[g]
@@ -361,7 +364,7 @@ def _run_zinb_panel(
     n_jobs,
     progressbar,
     backend,
-    store_group_effects=None,
+    store_effects=None,
     log_likelihood=False,
 ):
     """Registry runner for the ZINB panels: a thin adapter over ``_fit_gibbs``."""
@@ -373,7 +376,7 @@ def _run_zinb_panel(
         thin=thin,
         n_jobs=n_jobs,
         progressbar=progressbar,
-        store_group_effects=store_group_effects,
+        store_effects=store_effects,
         log_likelihood=log_likelihood,
     )
 
@@ -383,18 +386,18 @@ register(
     "panel",
     run=_run_zinb_panel,
     backends={"numpy"},
-    options={"store_group_effects"},
+    options={"store_effects"},
     skips_log_likelihood=True,
 )
 
 
 class SARZINBPanelRE(_ZINBPanelBase):
     __doc__ = (
-        r"""Zero-inflated SAR-NB panel: spatial lag in both equations.
+        r"""Zero-inflated SAR-NB panel: spatial lag in both parts.
 
     .. math::
 
-        \eta^{\mathrm{sel}}_t = (I - \lambda W_{\mathrm{sel}})^{-1} Z_t\gamma,
+        \eta_{z,t} = (I - \rho_z W_z)^{-1} X_{z,t}\beta_z,
         \quad \eta^{\mathrm{cnt}}_t = (I - \rho W)^{-1} X_t\beta + c + \tau_t
     """
         + _PARAMS_DOC
@@ -404,8 +407,7 @@ class SARZINBPanelRE(_ZINBPanelBase):
 
 class ZINBPanelRE(_ZINBPanelBase):
     __doc__ = (
-        r"""Aspatial zero-inflated NB panel with count-equation effects."""
-        + _PARAMS_DOC
+        r"""Aspatial zero-inflated NB panel with count-part effects.""" + _PARAMS_DOC
     )
     _count_spatial = False
 

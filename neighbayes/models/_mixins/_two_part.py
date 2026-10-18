@@ -1,8 +1,8 @@
 r"""Posterior summaries shared by the two-part count models (ZINB and hurdle).
 
-A two-part model has two linear predictors: a binary log-odds
-:math:`\eta^{\mathrm{sel}}` with :math:`\pi = \mathrm{logit}^{-1}(\eta^{\mathrm{sel}})`
-— whether a unit is active (ZINB) or has any count (hurdle) — and the count
+A two-part model has two linear predictors: the zero part's log-odds
+:math:`\eta_z` with :math:`\pi = \mathrm{logit}^{-1}(\eta_z)` — whether a
+unit is active (ZINB) or has any count (hurdle) — and the count part's
 log-mean :math:`\eta^{\mathrm{cnt}}`.  Each model supplies them for one
 posterior draw through :meth:`TwoPartMixin._part_etas`; everything here is
 built on that.
@@ -22,9 +22,6 @@ import numpy as np
 #: Draws averaged by the posterior summaries unless the caller asks otherwise.
 _SUMMARY_DRAWS = 200
 
-#: Accepted names of the binary equation in :meth:`TwoPartMixin.impacts`.
-_BINARY_NAMES = ("selection", "hurdle")
-
 
 def _expit(x: np.ndarray) -> np.ndarray:
     return 0.5 * (1.0 + np.tanh(0.5 * x))
@@ -39,7 +36,7 @@ def _nb_zero_prob(eta_cnt: np.ndarray, alpha: float) -> np.ndarray:
 class TwoPartMixin:
     """Two-equation impacts and binary-equation probabilities.
 
-    Hosts provide ``_Z``, ``_sel_feature_names``, ``_W_sel_sparse``,
+    Hosts provide ``_Z``, ``_sel_feature_names``, ``_W_zero_sparse``,
     ``_same_W``, ``_is_sel_row_std``, ``_y`` and :meth:`_part_etas`.
     """
 
@@ -68,29 +65,33 @@ class TwoPartMixin:
 
     @cached_property
     def _sel_logdet_grad_numpy_vec_fn(self):
-        """Vectorized ``(λ_arr) -> g(λ)`` logdet-gradient evaluator for W_sel."""
+        """Vectorized ``(λ_arr) -> g(λ)`` logdet-gradient evaluator for W_zero."""
         from ..._logdet import make_logdet_grad_numpy_vec_fn
 
         return make_logdet_grad_numpy_vec_fn(
-            self._W_sel_sparse,
+            self._W_zero_sparse,
             eigs=None,
             method=None,
-            rho_min=float(self.priors.get("lam_lower", self._logdet_bounds.rho_min)),
-            rho_max=float(self.priors.get("lam_upper", self._logdet_bounds.rho_max)),
+            rho_min=float(
+                self.priors.get("rho_lower_zero", self._logdet_bounds.rho_min)
+            ),
+            rho_max=float(
+                self.priors.get("rho_upper_zero", self._logdet_bounds.rho_max)
+            ),
         )
 
     def _sel_batch_mean_diag(self, lam_draws: np.ndarray) -> np.ndarray:
-        """``(1/n) tr((I − λ W_sel)⁻¹)`` per draw, via the resolvent identity."""
+        """``(1/n) tr((I − λ W_zero)⁻¹)`` per draw, via the resolvent identity."""
         if self._same_W:
             return self._batch_mean_diag(lam_draws)
         lam_draws = np.asarray(lam_draws, dtype=np.float64)
-        n = int(self._W_sel_sparse.shape[0])
+        n = int(self._W_zero_sparse.shape[0])
         g = np.asarray(self._sel_logdet_grad_numpy_vec_fn(lam_draws), dtype=np.float64)
         return 1.0 - (lam_draws / n) * g
 
     @cached_property
     def _sel_nonintercept_indices(self) -> list[int]:
-        """Indices of non-constant columns in Z (selection covariates)."""
+        """Indices of non-constant columns in the zero part's design."""
         indices: list[int] = []
         for j, name in enumerate(self._sel_feature_names):
             column = self._Z[:, j]
@@ -109,7 +110,7 @@ class TwoPartMixin:
     def _compute_impacts_posterior(
         self, equation: str = "count"
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Posterior impacts per draw for the count or the binary equation."""
+        """Posterior impacts per draw for the count or the zero part."""
         from ...diagnostics.lmtests import _get_posterior_draws
 
         idata = self.inference_data
@@ -125,12 +126,12 @@ class TwoPartMixin:
             mean_row_sum = self._batch_mean_row_sum(rho_draws)
             direct = mean_diag[:, None] * beta_draws[:, ni]
             total = mean_row_sum[:, None] * beta_draws[:, ni]
-        elif equation in _BINARY_NAMES:
-            gamma_draws = _get_posterior_draws(idata, "gamma")
-            if "lam" not in post.data_vars:  # aspatial binary equation
+        elif equation == "zero":
+            gamma_draws = _get_posterior_draws(idata, "beta_zero")
+            if "rho_zero" not in post.data_vars:  # aspatial binary equation
                 direct = gamma_draws[:, self._sel_nonintercept_indices]
                 return direct, np.zeros_like(direct), direct.copy()
-            lam_draws = _get_posterior_draws(idata, "lam")
+            lam_draws = _get_posterior_draws(idata, "rho_zero")
             mean_diag = self._sel_batch_mean_diag(lam_draws)
             if self._is_sel_row_std:
                 mean_row_sum = 1.0 / (1.0 - lam_draws)
@@ -139,8 +140,8 @@ class TwoPartMixin:
                 # non-row-standardized total keeps the eigen decomposition.
                 from ...diagnostics.impacts import _chunked_eig_means
 
-                n = self._W_sel_sparse.shape[0]
-                W_dense = self._W_sel_sparse.toarray().astype(np.float64)
+                n = self._W_zero_sparse.shape[0]
+                W_dense = self._W_zero_sparse.toarray().astype(np.float64)
                 eigvals, V = np.linalg.eig(W_dense)
                 c = np.linalg.solve(V, np.ones(n))
                 mean_row_sum = _chunked_eig_means(
@@ -150,9 +151,7 @@ class TwoPartMixin:
             direct = mean_diag[:, None] * gamma_draws[:, ni]
             total = mean_row_sum[:, None] * gamma_draws[:, ni]
         else:
-            raise ValueError(
-                f"equation must be 'count' or 'selection', got '{equation}'"
-            )
+            raise ValueError(f"equation must be 'count' or 'zero', got {equation!r}")
         return direct, total - direct, total
 
     def impacts(
@@ -164,11 +163,10 @@ class TwoPartMixin:
 
         Parameters
         ----------
-        equation : {"count", "selection"}, default "count"
-            ``"count"``: impacts of X on the count log-mean, through
-            ``(I − ρW)⁻¹Xβ``.  ``"selection"`` (alias ``"hurdle"``): impacts of
-            Z on the log-odds of the binary equation, through
-            ``(I − λW_sel)⁻¹Zγ``.
+        equation : {"count", "zero"}, default "count"
+            ``"count"``: impacts of X on the count part's log-mean, through
+            ``(I − ρW)⁻¹Xβ``.  ``"zero"``: impacts of ``X_zero`` on the zero
+            part's log-odds, through ``(I − ρ_zero W_zero)⁻¹ X_zero β_zero``.
         return_posterior_samples : bool, default False
             Also return the per-draw impacts.
         """
@@ -177,7 +175,7 @@ class TwoPartMixin:
         self._require_fit()
         direct, indirect, total = self._compute_impacts_posterior(equation=equation)
         k = direct.shape[1]
-        if equation in _BINARY_NAMES:
+        if equation == "zero":
             names = self._sel_nonintercept_feature_names
             feature_names = (
                 list(names) if len(names) == k else list(self._sel_feature_names[:k])

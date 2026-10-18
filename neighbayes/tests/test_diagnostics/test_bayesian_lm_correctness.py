@@ -24,7 +24,7 @@ from neighbayes.diagnostics.lmtests import (
     _flow_score_info,
     _info_matrix_blocks_sdem,
     _info_matrix_blocks_sdm,
-    _maybe_subtract_alpha,
+    _maybe_subtract_unit_effects,
     _neyman_adjust_scalar,
     _panel_spatial_lag,
     _resolve_X_for_beta,
@@ -553,30 +553,30 @@ class TestResolveXForBeta:
         assert out.shape == (n, k)
 
 
-class TestMaybeSubtractAlpha:
+class TestMaybeSubtractUnitEffects:
     def test_no_subtraction_without_unit_idx(self):
         model = MagicMock(spec=[])  # no _unit_idx attribute
         idata = _idata(beta=np.zeros((3, 2)))
         resid = np.ones((3, 4))
-        out = _maybe_subtract_alpha(model, idata, resid)
+        out = _maybe_subtract_unit_effects(model, idata, resid)
         np.testing.assert_array_equal(out, resid)
 
-    def test_no_subtraction_without_alpha_in_posterior(self):
+    def test_no_subtraction_without_unit_effects_in_posterior(self):
         model = MagicMock()
         model._unit_idx = np.array([0, 1, 0, 1])
-        idata = _idata(beta=np.zeros((3, 2)))  # no alpha
+        idata = _idata(beta=np.zeros((3, 2)))  # no unit effects
         resid = np.ones((3, 4))
-        out = _maybe_subtract_alpha(model, idata, resid)
+        out = _maybe_subtract_unit_effects(model, idata, resid)
         np.testing.assert_array_equal(out, resid)
 
-    def test_subtracts_alpha_when_present(self):
+    def test_subtracts_unit_effects_when_present(self):
         model = MagicMock()
         unit_idx = np.array([0, 1, 0, 1])
         model._unit_idx = unit_idx
         alpha = np.array([[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]])  # (3 draws, 2 units)
-        idata = _idata(alpha=alpha, beta=np.zeros((3, 2)))
+        idata = _idata(unit_effect=alpha, beta=np.zeros((3, 2)))
         resid = np.zeros((3, 4))
-        out = _maybe_subtract_alpha(model, idata, resid)
+        out = _maybe_subtract_unit_effects(model, idata, resid)
         # alpha[:, unit_idx] gives (3, 4); resid - that == -alpha[:, unit_idx]
         np.testing.assert_allclose(out, -alpha[:, unit_idx])
 

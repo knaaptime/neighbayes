@@ -471,8 +471,8 @@ def _sample_sigma_alpha2(
 
     ``Inv-Γ(s, r)`` has density ∝ x^(-s-1) e^(-r/x), drawn as 1/Gamma(s, 1/r).
     """
-    nu = priors.sigma_alpha_nu
-    A = priors.sigma_alpha_scale
+    nu = priors.unit_effect_sd_nu
+    A = priors.unit_effect_sd_scale
     a = 1.0 / rng.gamma((nu + 1.0) / 2.0, 1.0 / (nu / sigma_alpha2 + 1.0 / A**2))
     a_post = (len(alpha) + nu) / 2.0
     b_post = np.dot(alpha, alpha) / 2.0 + nu / a
@@ -512,9 +512,9 @@ def _noncentered_sigma_alpha(
         sd,
         float(a @ a) / s2,
         float(a @ r) / s2,
-        priors.sigma_alpha_scale,
+        priors.unit_effect_sd_scale,
         rng,
-        nu=priors.sigma_alpha_nu,
+        nu=priors.unit_effect_sd_nu,
     )
     state.sigma_alpha2 = new * new
     state.alpha = new * ct
@@ -725,7 +725,7 @@ def _initialize_re_gibbs(
         sigma_alpha2=sigma_alpha2_init,
         rho=rho_init,
         # a | σ_α² is drawn before it is used, so any positive start works.
-        sigma_alpha_aux=priors.sigma_alpha_scale**2,
+        sigma_alpha_aux=priors.unit_effect_sd_scale**2,
     )
 
 
@@ -945,7 +945,7 @@ def run_re_chain(
         spatial_param: rho_samples,
         "beta": beta_samples,
         "sigma": sigma_samples,
-        "alpha": alpha_samples,
-        "sigma_alpha": sigma_alpha_samples,
+        "unit_effect": alpha_samples,
+        "unit_effect_sd": sigma_alpha_samples,
         "log_lik": log_lik_samples,
     }

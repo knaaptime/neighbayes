@@ -1261,13 +1261,13 @@ class OLSFlowPanelFE(FlowPanelModel):
         out: dict[str, np.ndarray] = {}
         out["dest_total"] = bd + bi / n
         out["dest_destination"] = bd * (n - 1) / n
-        out["dest_intra"] = (bd + bi) / n
+        out["dest_intraunit"] = (bd + bi) / n
         out["dest_origin"] = zeros.copy()
         out["dest_network"] = zeros.copy()
 
         out["orig_total"] = bo
         out["orig_origin"] = bo * (n - 1) / n
-        out["orig_intra"] = bo / n
+        out["orig_intraunit"] = bo / n
         out["orig_destination"] = zeros.copy()
         out["orig_network"] = zeros.copy()
 
@@ -1293,7 +1293,7 @@ _COUNT_FE_DOC = """
     pair index rather than ``n²`` dummy columns.
 
     Pair effects are **partially pooled**: ``C_ij ~ N(μ, σ²)`` with σ learned
-    (half-t(3, ``group_effect_sd_scale``) prior, default scale 1).  A pair seen
+    (half-t(3, ``pair_effect_sd_scale``) prior, default scale 1).  A pair seen
     in few periods is shrunk toward the common mean in proportion to how little
     its data say; with weekly sparse flows a fixed, wide prior instead leaves
     the dispersion α and ρ with an incidental-parameter bias and lets ρ drift
@@ -1312,9 +1312,9 @@ _COUNT_FE_DOC = """
     that keeps the exact Pólya–Gamma sampler (see
     :mod:`neighbayes.models._base._nb`).
 
-    ``fit(store_group_effects=None)`` keeps every draw of the pair effects when
+    ``fit(store_effects=None)`` keeps every draw of the pair effects when
     they fit in about 500 MB and otherwise only their posterior mean and sd
-    (``idata["group_effect_summary"]``); ``posterior_predictive`` needs the
+    (``idata["pair_effect_summary"]``); ``posterior_predictive`` needs the
     draws.  Effects run on the NumPy Gibbs backend, and on JAX for the
     separable panels (the structured sweep that scales).
 """
@@ -1328,6 +1328,8 @@ def _pop_effects(kwargs: dict) -> int:
 
 class _FlowCountPanelMixin(CountPanelFEMixin):
     """Shared construction, effects and prediction for count flow panels."""
+
+    _effect_index = "pair"
 
     def _finish_count_init(self, y_arr: np.ndarray, effects, mundlak=False) -> None:
         self._y_int_vec = np.asarray(y_arr).reshape(-1).astype(np.int64)
@@ -1527,7 +1529,7 @@ class _AspatialCountFlowPanel(_FlowCountPanelMixin):
         progressbar,
         n_jobs,
         idata_kwargs,
-        store_group_effects,
+        store_effects,
         model_type,
         **sample_kwargs,
     ) -> xr.DataTree:
@@ -1565,7 +1567,7 @@ class _AspatialCountFlowPanel(_FlowCountPanelMixin):
             progressbar=progressbar,
             n_jobs=n_jobs,
             log_likelihood=bool((idata_kwargs or {}).get("log_likelihood", False)),
-            store_group_effects=store_group_effects,
+            store_effects=store_effects,
             model_type=model_type,
         )
 
@@ -1598,7 +1600,7 @@ class SARNegBinFlowPanelRE(_UnrestrictedCountFlowPanel, SARFlowPanelFE):
         progressbar: bool = True,
         n_jobs: int = -1,
         idata_kwargs: Optional[dict] = None,
-        store_group_effects: Optional[bool] = None,
+        store_effects: Optional[bool] = None,
         **sample_kwargs,
     ) -> xr.DataTree:
         """Sample the NB2 SAR flow panel posterior.
@@ -1647,7 +1649,7 @@ class SARNegBinFlowPanelRE(_UnrestrictedCountFlowPanel, SARFlowPanelFE):
                     progressbar=progressbar,
                     n_jobs=n_jobs,
                     log_likelihood=log_lik,
-                    store_group_effects=store_group_effects,
+                    store_effects=store_effects,
                     model_type="nb_sar_flow_panel_fe",
                 )
             else:
@@ -1764,7 +1766,7 @@ class SARNegBinFlowSeparablePanelRE(_SeparableCountFlowPanel, SARFlowSeparablePa
         progressbar: bool = True,
         n_jobs: int = -1,
         idata_kwargs: Optional[dict] = None,
-        store_group_effects: Optional[bool] = None,
+        store_effects: Optional[bool] = None,
         cell_mask: Optional[np.ndarray] = None,
         **sample_kwargs,
     ) -> xr.DataTree:
@@ -1791,11 +1793,11 @@ class SARNegBinFlowSeparablePanelRE(_SeparableCountFlowPanel, SARFlowSeparablePa
         drawn-then-discarded — their Pólya–Gamma variates keep the random
         stream mask-invariant — and pairs whose every period is masked stay
         prior-only and drop out of the learned pair-sd deviance, so masking
-        the intraregional diagonal leaves the posterior of every other cell
+        the intraunit diagonal leaves the posterior of every other cell
         bit-identical.  The default priors are data-derived, so under a mask
         they re-derive from the live cells alone (the Gelman intercept
         centring and the effect levels use ``log mean(y_live)``); explicit
-        ``beta_mu``/``group_effect_mu``/``time_effect_mu`` overrides pass
+        ``beta_mu``/``pair_effect_mu``/``time_effect_mu`` overrides pass
         through untouched.  Raises on the pooled or NUTS paths.
 
         ``idata_kwargs={"log_likelihood": True}`` stores the pointwise
@@ -1816,7 +1818,7 @@ class SARNegBinFlowSeparablePanelRE(_SeparableCountFlowPanel, SARFlowSeparablePa
                     progressbar=progressbar,
                     n_jobs=n_jobs,
                     log_likelihood=log_lik,
-                    store_group_effects=store_group_effects,
+                    store_effects=store_effects,
                     cell_mask=cell_mask,
                 )
             else:
@@ -1894,7 +1896,7 @@ class SARNegBinFlowSeparablePanelRE(_SeparableCountFlowPanel, SARFlowSeparablePa
         progressbar: bool,
         n_jobs: int,
         log_likelihood: bool,
-        store_group_effects: Optional[bool],
+        store_effects: Optional[bool],
         cell_mask: Optional[np.ndarray] = None,
     ) -> xr.DataTree:
         """Structured sweep with pair and period effects integrated out."""
@@ -1945,7 +1947,7 @@ class SARNegBinFlowSeparablePanelRE(_SeparableCountFlowPanel, SARFlowSeparablePa
             rho_lower=rho_lower,
             rho_upper=rho_upper,
         )
-        keep_groups = self._store_group_draws(store_group_effects, chains, draws)
+        keep_groups = self._store_group_draws(store_effects, chains, draws)
         y = self._y_int_vec.astype(np.float64)
         X = np.asarray(self._X, dtype=np.float64)
         struct = classify_flow_design(X, self._n, self._T)
@@ -2096,7 +2098,7 @@ class NegBinFlowPanelRE(_AspatialCountFlowPanel, OLSFlowPanelFE):
         progressbar: bool = True,
         n_jobs: int = -1,
         idata_kwargs: Optional[dict] = None,
-        store_group_effects: Optional[bool] = None,
+        store_effects: Optional[bool] = None,
         **sample_kwargs,
     ) -> xr.DataTree:
         """Sample the posterior: Gibbs (default, ρ fixed at 0, on NumPy) or
@@ -2111,7 +2113,7 @@ class NegBinFlowPanelRE(_AspatialCountFlowPanel, OLSFlowPanelFE):
             progressbar=progressbar,
             n_jobs=n_jobs,
             idata_kwargs=idata_kwargs,
-            store_group_effects=store_group_effects,
+            store_effects=store_effects,
             model_type="nb_flow_panel",
             **sample_kwargs,
         )
@@ -2132,15 +2134,16 @@ class SARZINBFlowSeparablePanelRE(
 
     .. math::
 
-        \eta^{\mathrm{sel}}_t &= (L_o^{\lambda} \otimes L_d^{\lambda})^{-1} Z_t\gamma,
-        \qquad z \sim \mathrm{Bernoulli}(\mathrm{logit}^{-1}(\eta^{\mathrm{sel}})), \\
+        \eta_{z,t} &= (L_{z,o} \otimes L_{z,d})^{-1} X_{z,t}\beta_z,
+        \qquad z \sim \mathrm{Bernoulli}(\mathrm{logit}^{-1}(\eta_z)), \\
         \eta^{\mathrm{cnt}}_t &= (L_o^{\rho} \otimes L_d^{\rho})^{-1} X_t\beta
         + \tau_t + C, \qquad y \mid z = 1 \sim \mathrm{NB2}(e^{\eta^{\mathrm{cnt}}}, \alpha),
 
-    with :math:`L_k^{\lambda} = I - \lambda_k W_{\mathrm{sel}}`,
+    with :math:`L_{z,k} = I - \rho_{z,k} W_z`,
     :math:`L_k^{\rho} = I - \rho_k W` and per-cell structural zeros
     (``y = 0`` when ``z = 0``).  ``effects`` sets pair and period effects on the
-    **count** equation only.
+    **count** part only.  ``ρ_{z,d}``, ``ρ_{z,o}``, ``β_z`` are the posterior's
+    ``rho_d_zero``, ``rho_o_zero``, ``beta_zero``.
 
     Sampling: ``fit()`` runs the structured ``n × n`` Pólya–Gamma sweep
     (:mod:`neighbayes.samplers.zinb._flow_structured`), on NumPy or
@@ -2150,21 +2153,21 @@ class SARZINBFlowSeparablePanelRE(
     ----------
     y, X, W, T, col_names, k, priors, shared_od_covariates
         As :class:`SARNegBinFlowSeparablePanelRE`.
-    Z : array-like or pandas.DataFrame, optional
-        Selection design, time-first stacked ``(n²·T, p)``.  Default: ``X``
-        (then selection impacts are available).
-    W_sel : libpysal.graph.Graph or scipy.sparse matrix, optional
-        ``n × n`` selection weights.  Default: ``W``.
+    X_zero : array-like or pandas.DataFrame, optional
+        Zero-part design, time-first stacked ``(n²·T, p)``.  Default: ``X``
+        (then the zero part's impacts are available).
+    W_zero : libpysal.graph.Graph or scipy.sparse matrix, optional
+        ``n × n`` zero-part weights.  Default: ``W``.
     effects : int, default 0
-        Count-equation effects: ``0`` pooled, ``1`` pair, ``2`` period,
+        Count-part effects: ``0`` pooled, ``1`` pair, ``2`` period,
         ``3`` both.
     priors : dict, optional
         Count keys as :class:`SARNegBinFlowSeparablePanelRE` (incl.
-        ``alpha_fixed``) plus ``gamma_mu``, ``gamma_sigma``, ``lam_lower`` and
-        ``lam_upper`` for the selection equation.
+        ``alpha_fixed``) plus ``beta_mu_zero``, ``beta_sigma_zero``,
+        ``rho_lower_zero`` and ``rho_upper_zero`` for the zero part.
     """
 
-    def __init__(self, y, X, W, Z=None, W_sel=None, **kwargs):
+    def __init__(self, y, X, W, X_zero=None, W_zero=None, **kwargs):
         effects = _pop_effects(kwargs)
         mundlak = pop_mundlak(kwargs)
         y_arr = require_counts(y, type(self).__name__)
@@ -2178,36 +2181,36 @@ class SARZINBFlowSeparablePanelRE(
         kwargs["logdet_method"] = method
         super().__init__(y_arr.astype(np.float64), X, W, effects=0, **kwargs)
         # Selection design, before the count effects drop absorbed X columns.
-        self._sel_is_X = Z is None
-        if Z is None:
+        self._sel_is_X = X_zero is None
+        if X_zero is None:
             self._Z = np.asarray(self._X, dtype=np.float64).copy()
             self._sel_feature_names = list(self._feature_names)
         else:
-            if isinstance(Z, pd.DataFrame):
-                self._sel_feature_names = [str(c) for c in Z.columns]
-            Z_arr = np.asarray(Z, dtype=np.float64)
+            if isinstance(X_zero, pd.DataFrame):
+                self._sel_feature_names = [str(c) for c in X_zero.columns]
+            Z_arr = np.asarray(X_zero, dtype=np.float64)
             Z_arr = Z_arr[:, None] if Z_arr.ndim == 1 else Z_arr
             if Z_arr.shape[0] != self._N_flow * self._T:
                 raise ValueError(
                     f"Z must have n²·T = {self._N_flow * self._T} rows, "
                     f"got {Z_arr.shape[0]}."
                 )
-            if not isinstance(Z, pd.DataFrame):
+            if not isinstance(X_zero, pd.DataFrame):
                 self._sel_feature_names = [f"z{j}" for j in range(Z_arr.shape[1])]
             self._Z = Z_arr
-        if W_sel is None:
-            self._W_sel_sparse, self._same_W = self._W_sparse, True
+        if W_zero is None:
+            self._W_zero_sparse, self._same_W = self._W_sparse, True
         else:
-            self._W_sel_sparse, self._same_W = _weights_to_csr(W_sel), False
-            if self._W_sel_sparse.shape != self._W_sparse.shape:
-                raise ValueError("W_sel must be n × n, like W.")
+            self._W_zero_sparse, self._same_W = _weights_to_csr(W_zero), False
+            if self._W_zero_sparse.shape != self._W_sparse.shape:
+                raise ValueError("W_zero must be n × n, like W.")
         self._is_sel_row_std = True
         self._effects_equation = "count"
         self._finish_count_init(y_arr, effects, mundlak)
 
     def _model_coords(self, extra: Optional[dict] = None) -> dict:
         coords = super()._model_coords(extra)
-        coords["sel_coefficient"] = list(self._sel_feature_names)
+        coords["coefficient_zero"] = list(self._sel_feature_names)
         return coords
 
     # ------------------------------------------------------------------
@@ -2228,10 +2231,10 @@ class SARZINBFlowSeparablePanelRE(
             link="logit",
         )
         gamma_mu = np.broadcast_to(
-            np.asarray(self.priors.get("gamma_mu", g_mu), dtype=float), (p,)
+            np.asarray(self.priors.get("beta_mu_zero", g_mu), dtype=float), (p,)
         ).copy()
         gamma_sigma = np.broadcast_to(
-            np.asarray(self.priors.get("gamma_sigma", g_sd), dtype=float), (p,)
+            np.asarray(self.priors.get("beta_sigma_zero", g_sd), dtype=float), (p,)
         ).copy()
         return SimpleNamespace(
             beta_mu=pv["beta_mu"],
@@ -2246,8 +2249,8 @@ class SARZINBFlowSeparablePanelRE(
                 float(self.priors.get("rho_upper", 0.999)),
             ),
             lam_bounds=(
-                float(self.priors.get("lam_lower", -0.999)),
-                float(self.priors.get("lam_upper", 0.999)),
+                float(self.priors.get("rho_lower_zero", -0.999)),
+                float(self.priors.get("rho_upper_zero", 0.999)),
             ),
         )
 
@@ -2267,7 +2270,7 @@ class SARZINBFlowSeparablePanelRE(
         progressbar: bool = True,
         n_jobs: int = -1,
         idata_kwargs: Optional[dict] = None,
-        store_group_effects: Optional[bool] = None,
+        store_effects: Optional[bool] = None,
         **sample_kwargs,
     ) -> xr.DataTree:
         """Sample the posterior: structured Gibbs (default) or ``sampler="nuts"``.
@@ -2275,7 +2278,7 @@ class SARZINBFlowSeparablePanelRE(
         ``backend="auto"`` (default) takes JAX when it is installed, else
         NumPy; ``"numpy"`` or ``"jax"`` pins one, and NUTS takes ``"pymc"``
         (its default), ``"nutpie"``, ``"numpyro"`` or ``"blackjax"``.
-        ``store_group_effects`` keeps every draw of the pair effects (default:
+        ``store_effects`` keeps every draw of the pair effects (default:
         when they fit in about 500 MB).  ``idata_kwargs={"log_likelihood":
         True}`` stores the marginal ZINB pointwise log-likelihood.
         """
@@ -2303,7 +2306,7 @@ class SARZINBFlowSeparablePanelRE(
             progressbar=progressbar,
             n_jobs=n_jobs,
             log_likelihood=bool((idata_kwargs or {}).get("log_likelihood", False)),
-            store_group_effects=store_group_effects,
+            store_effects=store_effects,
         )
 
     def _zinb_fe_args(self):
@@ -2327,7 +2330,7 @@ class SARZINBFlowSeparablePanelRE(
         progressbar: bool,
         n_jobs: int,
         log_likelihood: bool,
-        store_group_effects: Optional[bool],
+        store_effects: Optional[bool],
     ) -> xr.DataTree:
         from ...samplers._utils._seeds import seed_sequence_to_int, spawn_chain_seeds
         from ...samplers.gaussian._chain_runner import run_chains
@@ -2335,13 +2338,13 @@ class SARZINBFlowSeparablePanelRE(
 
         pr = self._zinb_flow_priors()
         pair, periods = self._zinb_fe_args()
-        keep_groups = self._store_group_draws(store_group_effects, chains, draws)
+        keep_groups = self._store_group_draws(store_effects, chains, draws)
         y = self._y_int_vec.astype(np.float64)
         X = np.asarray(self._X, dtype=np.float64)
         Z = np.asarray(self._Z, dtype=np.float64)
-        W_csc, W_sel_csc = self._W_sparse.tocsc(), self._W_sel_sparse.tocsc()
-        scalars = ["rho_d", "rho_o", "rho_w", "lam_d", "lam_o", "lam_w"]
-        extra = {"gamma": ("sel_coefficient", self._sel_feature_names)}
+        W_csc, W_zero_csc = self._W_sparse.tocsc(), self._W_zero_sparse.tocsc()
+        scalars = ["rho_d", "rho_o", "rho_w", "rho_d_zero", "rho_o_zero", "rho_w_zero"]
+        extra = {"beta_zero": ("coefficient_zero", self._sel_feature_names)}
 
         if backend == "jax":
             from ...samplers.zinb._flow_structured_jax import (
@@ -2356,7 +2359,7 @@ class SARZINBFlowSeparablePanelRE(
                 X,
                 Z,
                 W_csc,
-                W_sel_csc,
+                W_zero_csc,
                 self._n,
                 self._T,
                 pr,
@@ -2378,7 +2381,7 @@ class SARZINBFlowSeparablePanelRE(
                 X,
                 Z,
                 W_csc,
-                W_sel_csc,
+                W_zero_csc,
                 self._n,
                 self._T,
                 pr,
@@ -2426,14 +2429,14 @@ class SARZINBFlowSeparablePanelRE(
             rho_d = pm.Uniform("rho_d", *pr.rho_bounds)
             rho_o = pm.Uniform("rho_o", *pr.rho_bounds)
             pm.Deterministic("rho_w", -rho_d * rho_o)
-            lam_d = pm.Uniform("lam_d", *pr.lam_bounds)
-            lam_o = pm.Uniform("lam_o", *pr.lam_bounds)
-            pm.Deterministic("lam_w", -lam_d * lam_o)
+            lam_d = pm.Uniform("rho_d_zero", *pr.lam_bounds)
+            lam_o = pm.Uniform("rho_o_zero", *pr.lam_bounds)
+            pm.Deterministic("rho_w_zero", -lam_d * lam_o)
             beta = pm.Normal(
                 "beta", mu=pr.beta_mu, sigma=pr.beta_sigma, dims="coefficient"
             )
             gamma = pm.Normal(
-                "gamma", mu=pr.gamma_mu, sigma=pr.gamma_sigma, dims="sel_coefficient"
+                "beta_zero", mu=pr.gamma_mu, sigma=pr.gamma_sigma, dims="coefficient_zero"
             )
             Xb = pt.reshape(pt.dot(X_t, beta), (T, N)).T
             Zg = pt.reshape(pt.dot(Z_t, gamma), (T, N)).T
@@ -2442,7 +2445,7 @@ class SARZINBFlowSeparablePanelRE(
                 (N * T,),
             )
             eta_sel = pt.reshape(
-                KroneckerFlowSolveMatrixOp(self._W_sel_sparse, n)(lam_d, lam_o, Zg).T,
+                KroneckerFlowSolveMatrixOp(self._W_zero_sparse, n)(lam_d, lam_o, Zg).T,
                 (N * T,),
             )
             eta_cnt = eta_cnt + self._pymc_fe_offset()
@@ -2471,10 +2474,10 @@ class SARZINBFlowSeparablePanelRE(
         """``(η_sel, η_cnt)`` at draw ``g`` (pair-effect posterior mean if summarized)."""
         f = self._flat_draw
         eta_sel = self._kron_eta(
-            self._W_sel_sparse,
-            float(f("lam_d")[g]),
-            float(f("lam_o")[g]),
-            self._Z @ f("gamma")[g],
+            self._W_zero_sparse,
+            float(f("rho_d_zero")[g]),
+            float(f("rho_o_zero")[g]),
+            self._Z @ f("beta_zero")[g],
         )
         eta_cnt = self._kron_eta(
             self._W_sparse,
@@ -2484,10 +2487,10 @@ class SARZINBFlowSeparablePanelRE(
         )
         post = self._idata.posterior
         if self._fe_groups:
-            if "group_effect" in post.data_vars:
-                c = f("group_effect")[g]
+            if self._effect_name() in post.data_vars:
+                c = f(self._effect_name())[g]
             else:
-                c = self._idata["group_effect_summary"]["mean"].values
+                c = self._idata[self._effect_name("_summary")]["mean"].values
             eta_cnt = eta_cnt + np.asarray(c)[self._row_group]
         if self._fe_periods:
             eta_cnt = eta_cnt + self._D_tau @ f("time_effect")[g]
@@ -2497,11 +2500,11 @@ class SARZINBFlowSeparablePanelRE(
         if self._idata is None:
             raise RuntimeError("Model has not been fit yet. Call fit() first.")
         post = self._idata.posterior
-        if self._effects_equation == "selection":
-            coef = post["gamma"].values.reshape(-1, len(self._sel_feature_names))
+        if self._effects_equation == "zero":
+            coef = post["beta_zero"].values.reshape(-1, len(self._sel_feature_names))
             return self._compute_flow_effects_kron(
-                post["lam_d"].values.reshape(-1),
-                post["lam_o"].values.reshape(-1),
+                post["rho_d_zero"].values.reshape(-1),
+                post["rho_o_zero"].values.reshape(-1),
                 coef,
                 draws=draws,
             )
@@ -2520,21 +2523,20 @@ class SARZINBFlowSeparablePanelRE(
         ci: float = 0.95,
         mode: str = "auto",
     ):
-        """Origin, destination, intra and network effects for one equation.
+        """Origin, destination, intraunit and network impacts for one part.
 
-        ``equation="count"`` (default) on the count log-mean through
-        ``ρ``; ``"selection"`` on the activation log-odds through ``λ`` and γ,
-        available when the selection design is the flow design (``Z=None``).
+        ``equation="count"`` (default) on the count part's log-mean through
+        ``ρ``; ``"zero"`` on the activation log-odds through ``rho_zero`` and
+        ``beta_zero``, available when the zero part's design is the flow design
+        (``X_zero=None``).
         Other arguments as :meth:`FlowPanelModel.impacts`.
         """
-        if equation not in ("count", "selection"):
-            raise ValueError(
-                f"equation must be 'count' or 'selection', got {equation!r}"
-            )
-        if equation == "selection" and not self._sel_is_X:
+        if equation not in ("count", "zero"):
+            raise ValueError(f"equation must be 'count' or 'zero', got {equation!r}")
+        if equation == "zero" and not self._sel_is_X:
             raise NotImplementedError(
-                "Selection flow effects need the flow design layout; they are "
-                "available when the model is built with Z=None (Z = X)."
+                "Zero-part flow impacts need the flow design layout; they are "
+                "available when the model is built with X_zero=None (X_zero = X)."
             )
         self._effects_equation = equation
         try:
@@ -2556,11 +2558,12 @@ class SARZINBFlowSeparable(SARZINBFlowSeparablePanelRE):
     there for the model, sampling and arguments.  ``y`` is the ``n²`` flow
     vector (or the ``n × n`` matrix).
 
-    On sparse flows (active pairs averaging about one count) the selection
-    equation is weakly identified in a cross-section: only the shape of the
-    count distribution separates structural from sampling zeros, and NB with a
-    smaller α explains the zeros nearly as well.  Check λ against its prior and
-    the selection R-hat, or use the panel with pair effects, or
+    On sparse flows (active pairs averaging about one count) the zero part is
+    weakly identified in a cross-section: only the shape of the count
+    distribution separates structural from sampling zeros, and NB with a
+    smaller α explains the zeros nearly as well.  Check ``rho_d_zero`` and
+    ``rho_o_zero`` against their priors and the zero part's R-hat, or use the
+    panel with pair effects, or
     :class:`SARHurdleNegBinFlowSeparable`.
     """
 
@@ -2920,7 +2923,7 @@ class SARZINBFlow(metaclass=FacadeMeta):
     pair_effects : {None, "random"}, default None
     time_effects : bool, default False
     **kwargs
-        ``y``, ``X``, ``W``, the zero part's ``Z`` and ``W_sel``, ``priors``,
+        ``y``, ``X``, ``W``, the zero part's ``X_zero`` and ``W_zero``, ``priors``,
         and ``logdet_method``.
     """
 

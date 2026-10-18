@@ -81,7 +81,7 @@ def test_ols_panel_re_recovers_all(rng, W_panel_dense, W_panel_graph):
     idata = model.fit(**SAMPLE_KWARGS)
     _assert_beta(idata, "OLSPanelRE")
     _assert_scalar(
-        idata, "sigma_alpha", SIGMA_ALPHA_TRUE, ABS_TOL_SIGMA_ALPHA, "OLSPanelRE"
+        idata, "unit_effect_sd", SIGMA_ALPHA_TRUE, ABS_TOL_SIGMA_ALPHA, "OLSPanelRE"
     )
 
 
@@ -101,7 +101,7 @@ def test_sar_panel_re_recovers_all(rng, W_panel_dense, W_panel_graph):
     _assert_scalar(idata, "rho", RHO_TRUE, ABS_TOL_SPATIAL, "SARPanelRE")
     _assert_beta(idata, "SARPanelRE")
     _assert_scalar(
-        idata, "sigma_alpha", SIGMA_ALPHA_TRUE, ABS_TOL_SIGMA_ALPHA, "SARPanelRE"
+        idata, "unit_effect_sd", SIGMA_ALPHA_TRUE, ABS_TOL_SIGMA_ALPHA, "SARPanelRE"
     )
 
 
@@ -129,7 +129,11 @@ def test_sem_panel_re_recovers_all(rng, W_panel_dense, W_panel_graph):
     _assert_scalar(idata, "lam", LAM_TRUE, ABS_TOL_SPATIAL, "SEMPanelRE")
     _assert_beta(idata, "SEMPanelRE")
     _assert_scalar(
-        idata, "sigma_alpha", SIGMA_ALPHA_TRUE, ABS_TOL_SIGMA_ALPHA_SEM_RE, "SEMPanelRE"
+        idata,
+        "unit_effect_sd",
+        SIGMA_ALPHA_TRUE,
+        ABS_TOL_SIGMA_ALPHA_SEM_RE,
+        "SEMPanelRE",
     )
 
 
@@ -157,7 +161,7 @@ def test_sdem_panel_re_recovers_all(rng, W_panel_dense, W_panel_graph):
     _assert_sdem_beta(idata, "SDEMPanelRE")
     _assert_scalar(
         idata,
-        "sigma_alpha",
+        "unit_effect_sd",
         SIGMA_ALPHA_TRUE,
         ABS_TOL_SIGMA_ALPHA_SEM_RE,
         "SDEMPanelRE",

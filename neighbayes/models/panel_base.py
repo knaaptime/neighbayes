@@ -1055,10 +1055,10 @@ class SpatialPanelModel(SharedSpatialMethods, ABC):
         alpha_component = None
         if (
             hasattr(self, "_idata")
-            and "alpha" in self._idata.posterior
+            and "unit_effect" in self._idata.posterior
             and hasattr(self, "_unit_idx")
         ):
-            alpha_draws = self._idata.posterior["alpha"].values
+            alpha_draws = self._idata.posterior["unit_effect"].values
             alpha_flat = alpha_draws.reshape(-1, alpha_draws.shape[-1])
             alpha_component = alpha_flat[:, np.asarray(self._unit_idx, dtype=np.int64)]
 

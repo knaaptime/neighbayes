@@ -17,7 +17,7 @@ from .core import (
     _lm_vector as _lm_vector,
 )
 from .core import (
-    _maybe_subtract_alpha as _maybe_subtract_alpha,
+    _maybe_subtract_unit_effects as _maybe_subtract_unit_effects,
 )
 from .core import (
     _mx_cross as _mx_cross,

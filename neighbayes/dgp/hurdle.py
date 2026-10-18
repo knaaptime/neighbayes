@@ -63,13 +63,13 @@ def simulate_sar_hurdle_negbin(
     W=None,
     gdf=None,
     rho: float = 0.4,
-    lam: float = 0.3,
+    rho_zero: float = 0.3,
     beta: np.ndarray | None = None,
-    gamma: np.ndarray | None = None,
+    beta_zero: np.ndarray | None = None,
     alpha: float = 2.0,
-    Z: np.ndarray | None = None,
+    X_zero: np.ndarray | None = None,
     X: np.ndarray | None = None,
-    W_sel=None,
+    W_zero=None,
     rng: np.random.Generator | None = None,
     seed: int | None = None,
     contiguity: str = "queen",
@@ -82,34 +82,35 @@ def simulate_sar_hurdle_negbin(
 
     .. math::
 
-        \eta^{\mathrm{b}} = (I - \lambda W_{\mathrm{sel}})^{-1} Z\gamma, \qquad
+        \eta_z = (I - \rho_z W_z)^{-1} X_z\beta_z, \qquad
         \eta^{\mathrm{c}} = (I - \rho W)^{-1} X\beta,
 
-    ``d ~ Bernoulli(logit⁻¹(η^b))`` and ``y = d · tNB(e^{η^c}, α)``.
+    ``d ~ Bernoulli(logit⁻¹(η_z))`` and ``y = d · tNB(e^{η^c}, α)``.
 
     Parameters
     ----------
-    rho, lam : float
-        Count and binary spatial parameters.
-    beta, gamma : array-like, optional
-        Count and binary coefficients, intercept first; defaults ``[1.0, 0.6]``
-        and ``[0.3, 1.0]``.
+    rho, rho_zero : float
+        Count- and zero-part spatial parameters.
+    beta, beta_zero : array-like, optional
+        Count- and zero-part coefficients, intercept first; defaults
+        ``[1.0, 0.6]`` and ``[0.3, 1.0]``.
     alpha : float, default 2.0
-        NB2 dispersion of the count half.
+        NB2 dispersion of the count part.
     target_pi : float, optional
-        Shift the binary intercept (inside the filter) so ``mean P(y > 0)``
-        equals ``target_pi``; ``params_true["gamma"]`` reports the shifted γ.
+        Shift the zero part's intercept (inside the filter) so
+        ``mean P(y > 0)`` equals ``target_pi``; ``params_true["beta_zero"]``
+        reports the shifted coefficients.
     err_hetero : bool, default False
         Accepted for API parity; the count variance is set by the mean and
         ``alpha``, so it is ignored with a warning.
-    n_side, W, gdf, Z, X, W_sel, rng, seed, contiguity, create_gdf, geometry_type
+    n_side, W, gdf, X_zero, X, W_zero, rng, seed, contiguity, create_gdf, geometry_type
         As for :func:`~neighbayes.dgp.simulate_sar_zinb`.
 
     Returns
     -------
     dict
-        ``y``, ``d``, ``X``, ``Z``, ``eta_bin``, ``eta_cnt``, ``W_sparse``,
-        ``W_graph``, ``W_sel_sparse``, ``W_sel_graph``, ``params_true``.
+        ``y``, ``d``, ``X``, ``X_zero``, ``eta_zero``, ``eta_cnt``, ``W_sparse``,
+        ``W_graph``, ``W_zero_sparse``, ``W_zero_graph``, ``params_true``.
     """
     if alpha <= 0:
         raise ValueError("alpha must be strictly positive.")
@@ -120,37 +121,37 @@ def simulate_sar_hurdle_negbin(
     rng = ensure_rng(rng, seed)
     Ws, Wg = resolve_weights(W=W, gdf=gdf, n_side=n_side, contiguity=contiguity)
     n = Ws.shape[0]
-    if W_sel is not None:
-        W_sel_s, W_sel_g = resolve_weights(
-            W=W_sel, gdf=gdf, n_side=n_side, contiguity=contiguity
+    if W_zero is not None:
+        W_zero_s, W_zero_g = resolve_weights(
+            W=W_zero, gdf=gdf, n_side=n_side, contiguity=contiguity
         )
     else:
-        W_sel_s, W_sel_g = Ws, Wg
+        W_zero_s, W_zero_g = Ws, Wg
     beta = np.asarray([1.0, 0.6] if beta is None else beta, dtype=float)
-    gamma = np.asarray([0.3, 1.0] if gamma is None else gamma, dtype=float)
+    beta_zero = np.asarray([0.3, 1.0] if beta_zero is None else beta_zero, dtype=float)
     X = (
         make_design_matrix(rng, n, k=max(len(beta) - 1, 0), add_intercept=True)
         if X is None
         else np.asarray(X, dtype=np.float64)
     )
-    Z = (
-        make_design_matrix(rng, n, k=max(len(gamma) - 1, 0), add_intercept=True)
-        if Z is None
-        else np.asarray(Z, dtype=np.float64)
+    X_zero = (
+        make_design_matrix(rng, n, k=max(len(beta_zero) - 1, 0), add_intercept=True)
+        if X_zero is None
+        else np.asarray(X_zero, dtype=np.float64)
     )
     _check_rho_stability(rho, name="rho")
-    _check_rho_stability(lam, name="lam")
+    _check_rho_stability(rho_zero, name="rho_zero")
 
-    solve_b = spatial_filter_factor(W_sel_s, lam)
-    eta_bin = solve_b(Z @ gamma)
+    solve_b = spatial_filter_factor(W_zero_s, rho_zero)
+    eta_bin = solve_b(X_zero @ beta_zero)
     if target_pi is not None:
         if not 0.0 < float(target_pi) < 1.0:
             raise ValueError(f"target_pi must lie in (0, 1); got {target_pi!r}")
-        a0 = np.asarray(solve_b(np.ascontiguousarray(Z[:, 0])), dtype=float)
+        a0 = np.asarray(solve_b(np.ascontiguousarray(X_zero[:, 0])), dtype=float)
         s = _intercept_shift(eta_bin, a0, float(target_pi))
         eta_bin = eta_bin + s * a0
-        gamma = gamma.copy()
-        gamma[0] += s
+        beta_zero = beta_zero.copy()
+        beta_zero[0] += s
     d = rng.binomial(1, 1.0 / (1.0 + np.exp(-eta_bin)))
     eta_cnt = spatial_filter_factor(Ws, rho)(X @ beta)
     y = np.zeros(n, dtype=np.int64)
@@ -163,18 +164,18 @@ def simulate_sar_hurdle_negbin(
         "y": y.astype(np.float64),
         "d": d.astype(np.float64),
         "X": X,
-        "Z": Z,
-        "eta_bin": eta_bin,
+        "X_zero": X_zero,
+        "eta_zero": eta_bin,
         "eta_cnt": eta_cnt,
         "W_sparse": Ws,
         "W_graph": Wg,
-        "W_sel_sparse": W_sel_s,
-        "W_sel_graph": W_sel_g,
+        "W_zero_sparse": W_zero_s,
+        "W_zero_graph": W_zero_g,
         "params_true": {
             "rho": rho,
-            "lam": lam,
+            "rho_zero": rho_zero,
             "beta": beta,
-            "gamma": gamma,
+            "beta_zero": beta_zero,
             "alpha": float(alpha),
         },
     }
@@ -187,54 +188,53 @@ def _simulate_sar_hurdle_negbin_panel_re(
     N: int,
     T: int,
     rho: float = 0.4,
-    lam: float = 0.3,
+    rho_zero: float = 0.3,
     beta: np.ndarray | None = None,
-    gamma: np.ndarray | None = None,
+    beta_zero: np.ndarray | None = None,
     alpha: float = 2.0,
     unit_effect_sd: float = 0.0,
     time_effect_sd: float = 0.0,
-    sel_unit_effect_sd: float = 0.0,
-    sel_time_effect_sd: float = 0.0,
+    unit_effect_sd_zero: float = 0.0,
+    time_effect_sd_zero: float = 0.0,
     effect_corr: float = 0.0,
     fe_x_corr: float = 0.0,
     err_hetero: bool = False,
     rng: np.random.Generator | None = None,
     seed: int | None = None,
     W=None,
-    W_sel=None,
+    W_zero=None,
     gdf=None,
     n_side: int | None = None,
     contiguity: str = "queen",
 ) -> dict:
-    r"""Simulate a SAR hurdle NB panel with unit and period effects in both halves.
+    r"""Simulate a SAR hurdle NB panel with unit and period effects in both parts.
 
-    The count half is :func:`~neighbayes.dgp._simulate_sar_negbin_panel_re`'s
+    The count part is :func:`~neighbayes.dgp._simulate_sar_negbin_panel_re`'s
     log-mean (its ``unit_effect_sd``, ``time_effect_sd`` and ``fe_x_corr``),
-    truncated at zero; the binary half is
+    truncated at zero; the zero part is
 
     .. math::
 
-        \eta^{\mathrm{b}}_t = (I - \lambda W_{\mathrm{sel}})^{-1} Z_t\gamma
-        + c^{\mathrm{b}} + \tau^{\mathrm{b}}_t,
+        \eta_{z,t} = (I - \rho_z W_z)^{-1} X_{z,t}\beta_z + c_z + \tau_{z,t},
 
-    with a fresh ``Z_t`` (intercept plus standard-normal columns) each period,
-    ``d_{it} ~ Bernoulli(logit⁻¹(η^b_{it}))`` and ``y = d · tNB``.  Matches
-    :class:`~neighbayes.models.SARHurdleNegBinPanelRE` (``rho = lam = 0`` gives
-    :class:`~neighbayes.models.HurdleNegBinPanelRE`).
+    with a fresh ``X_{z,t}`` (intercept plus standard-normal columns) each
+    period, ``d_{it} ~ Bernoulli(logit⁻¹(η_{z,it}))`` and ``y = d · tNB``.
+    Matches :class:`~neighbayes.models.SARHurdleNegBin` panels
+    (``rho = rho_zero = 0`` gives the aspatial :class:`~neighbayes.models.HurdleNegBin`).
 
     Parameters
     ----------
-    lam : float, default 0.3
-        Binary spatial parameter.
-    gamma : array-like, optional
-        Binary coefficients including the intercept; default ``[0.5, 1.0]``.
-    sel_unit_effect_sd, sel_time_effect_sd : float, default 0.0
-        Standard deviations of the binary unit and period effects
-        (``τ^b_0 = 0``).
+    rho_zero : float, default 0.3
+        Zero-part spatial parameter.
+    beta_zero : array-like, optional
+        Zero-part coefficients including the intercept; default ``[0.5, 1.0]``.
+    unit_effect_sd_zero, time_effect_sd_zero : float, default 0.0
+        Standard deviations of the zero part's unit and period effects
+        (``τ_{z,0} = 0``).
     effect_corr : float, default 0.0
-        Correlation, in ``(−1, 1)``, between each unit's binary and count
-        effects (the halves are linked when it is non-zero; the models
-        assume it is zero).
+        Correlation, in ``(−1, 1)``, between each unit's zero- and count-part
+        effects (the parts are linked when it is non-zero; the models assume
+        it is zero).
     N, T, rho, beta, alpha, unit_effect_sd, time_effect_sd, fe_x_corr, \
     err_hetero, rng, seed, W, gdf, n_side, contiguity
         As for :func:`~neighbayes.dgp._simulate_sar_negbin_panel_re`.
@@ -242,9 +242,9 @@ def _simulate_sar_hurdle_negbin_panel_re(
     Returns
     -------
     dict
-        ``y``, ``X``, ``Z``, ``d``, ``mu``, ``eta_bin``, ``unit``, ``time``,
-        ``W_sparse``, ``W_graph``, ``W_sel_sparse``, ``params_true`` (with
-        both halves' effects).
+        ``y``, ``X``, ``X_zero``, ``d``, ``mu``, ``eta_zero``, ``unit``, ``time``,
+        ``W_sparse``, ``W_graph``, ``W_zero_sparse``, ``params_true`` (with
+        both parts' effects).
     """
     if alpha <= 0:
         raise ValueError("alpha must be strictly positive.")
@@ -255,41 +255,46 @@ def _simulate_sar_hurdle_negbin_panel_re(
         N, T, rho, beta, alpha, unit_effect_sd, time_effect_sd,
         fe_x_corr, err_hetero, rng, None, W, gdf, n_side, contiguity,
     )  # fmt: skip
-    gamma = np.asarray([0.5, 1.0] if gamma is None else gamma, dtype=float)
+    beta_zero = np.asarray([0.5, 1.0] if beta_zero is None else beta_zero, dtype=float)
     Ws_sel = (
-        resolve_weights(W=W_sel, gdf=gdf, n_side=n_side, contiguity=contiguity)[0]
-        if W_sel is not None
+        resolve_weights(W=W_zero, gdf=gdf, n_side=n_side, contiguity=contiguity)[0]
+        if W_zero is not None
         else out["W_sparse"]
     )
     c_cnt = np.asarray(out["params_true"]["unit_effect"], dtype=float)
     z_cnt = c_cnt / c_cnt.std() if c_cnt.std() > 0 else rng.standard_normal(N)
-    sel_unit = sel_unit_effect_sd * (
+    sel_unit = unit_effect_sd_zero * (
         effect_corr * z_cnt + np.sqrt(1.0 - effect_corr**2) * rng.standard_normal(N)
     )
     sel_time = np.zeros(T)
     if T > 1:
-        sel_time[1:] = sel_time_effect_sd * rng.standard_normal(T - 1)
-    solve = spatial_filter_factor(Ws_sel, lam)
+        sel_time[1:] = time_effect_sd_zero * rng.standard_normal(T - 1)
+    solve = spatial_filter_factor(Ws_sel, rho_zero)
     Z_list, eta_list = [], []
     for t in range(T):
-        Z_t = np.column_stack([np.ones(N), rng.standard_normal((N, len(gamma) - 1))])
+        Z_t = np.column_stack(
+            [np.ones(N), rng.standard_normal((N, len(beta_zero) - 1))]
+        )
         Z_list.append(Z_t)
-        eta_list.append(solve(Z_t @ gamma) + sel_unit + sel_time[t])
-    Z = np.vstack(Z_list)
+        eta_list.append(solve(Z_t @ beta_zero) + sel_unit + sel_time[t])
+    X_zero = np.vstack(Z_list)
     eta_bin = np.concatenate(eta_list)
     d = rng.binomial(1, 1.0 / (1.0 + np.exp(-eta_bin)))
     y = np.zeros(N * T, dtype=np.int64)
     pos = d == 1
     if pos.any():
         y[pos] = truncated_negative_binomial(rng, out["mu"][pos], alpha)
-    out.update(y=y, Z=Z, d=d, eta_bin=eta_bin, W_sel_sparse=Ws_sel)
+    out.update(y=y, X_zero=X_zero, d=d, eta_zero=eta_bin, W_zero_sparse=Ws_sel)
     out["params_true"].update(
-        lam=lam, gamma=gamma, sel_unit_effect=sel_unit, sel_time_effect=sel_time
+        rho_zero=rho_zero,
+        beta_zero=beta_zero,
+        unit_effect_zero=sel_unit,
+        time_effect_zero=sel_time,
     )
     return out
 
 
-@aspatial(simulate_sar_hurdle_negbin, {"rho": 0.0, "lam": 0.0}, panel_only=True)
+@aspatial(simulate_sar_hurdle_negbin, {"rho": 0.0, "rho_zero": 0.0}, panel_only=True)
 def simulate_hurdle_negbin():
     """Simulate an aspatial hurdle NB panel: :func:`simulate_sar_hurdle_negbin` at zero dependence.
 

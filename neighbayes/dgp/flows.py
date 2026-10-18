@@ -806,7 +806,7 @@ def _simulate_sar_flow_panel_fe(
         - ``"col_names"`` list[str]: feature names.
         - ``"G"`` libpysal.graph.Graph: spatial graph.
         - ``"rho_d"``, ``"rho_o"``, ``"rho_w"``, ``"sigma"``,
-          ``"sigma_alpha"``: true parameters.
+          ``"pair_effect_sd"``: true parameters.
         - ``"beta_d"``, ``"beta_o"``: true coefficient vectors.
         - ``"params_true"`` dict: nested dict of all true parameters
           (including ``"distribution"``).
@@ -897,7 +897,7 @@ def _simulate_sar_flow_panel_fe(
         "rho_o": rho_o,
         "rho_w": rho_w,
         "sigma": sigma,
-        "sigma_alpha": sigma_alpha,
+        "pair_effect_sd": sigma_alpha,
         "beta_d": beta_d_arr,
         "beta_o": beta_o_arr,
         "gamma_dist": gamma_dist,
@@ -906,7 +906,7 @@ def _simulate_sar_flow_panel_fe(
             "rho_o": rho_o,
             "rho_w": rho_w,
             "sigma": sigma,
-            "sigma_alpha": sigma_alpha,
+            "pair_effect_sd": sigma_alpha,
             "beta_d": beta_d_arr,
             "beta_o": beta_o_arr,
             "gamma_dist": gamma_dist,
@@ -1274,39 +1274,39 @@ def _simulate_sar_zinb_flow_separable(
     T: int = 1,
     rho_d: float = 0.3,
     rho_o: float = 0.2,
-    lam_d: float = 0.2,
-    lam_o: float = 0.1,
-    gamma: np.ndarray | None = None,
+    rho_d_zero: float = 0.2,
+    rho_o_zero: float = 0.1,
+    beta_zero: np.ndarray | None = None,
     target_pi: float | None = None,
     seed: int = 42,
     **kwargs,
 ) -> dict:
     r"""Zero-inflated separable SAR flow counts, cross-section (``T=1``) or panel.
 
-    The count equation is :func:`_simulate_sar_negbin_flow_separable_panel_re`
+    The count part is :func:`_simulate_sar_negbin_flow_separable_panel_re`
     (its ``pair_effect_sd``, ``time_effect_sd`` and ``fe_x_corr`` included);
-    the selection equation uses the same flow design ``X``:
+    the zero part uses the same flow design ``X``:
 
     .. math::
 
-        \eta^{\mathrm{sel}}_t = (L_o^{\lambda} \otimes L_d^{\lambda})^{-1} X_t\gamma,
-        \qquad d \sim \mathrm{Bernoulli}(\mathrm{logit}^{-1}(\eta^{\mathrm{sel}})),
+        \eta_{z,t} = (L_{z,o} \otimes L_{z,d})^{-1} X_t\beta_z,
+        \qquad d \sim \mathrm{Bernoulli}(\mathrm{logit}^{-1}(\eta_z)),
         \qquad y = d \cdot y_{\mathrm{NB}},
 
-    with :math:`L_k^{\lambda} = I_n - \lambda_k W`.  Matches
+    with :math:`L_{z,k} = I_n - \rho_{z,k} W`.  Matches
     :class:`~neighbayes.models.SARZINBFlowSeparable` and
     :class:`~neighbayes.models.SARZINBFlowSeparablePanelRE`.
 
     Parameters
     ----------
-    lam_d, lam_o : float
-        Selection destination and origin dependence.
-    gamma : array-like, optional
-        Selection coefficients on the columns of ``X``.  Default: 0.5 on the
+    rho_d_zero, rho_o_zero : float
+        The zero part's destination and origin dependence.
+    beta_zero : array-like, optional
+        Zero-part coefficients on the columns of ``X``.  Default: 0.5 on the
         intercept, −0.5 on log distance, 0.4 on the destination and origin
         attributes, 0 elsewhere.
     target_pi : float, optional
-        Shift the selection intercept so the mean activation probability is
+        Shift the zero part's intercept so the mean activation probability is
         ``target_pi``.
     n, T, rho_d, rho_o, seed, **kwargs
         As for :func:`_simulate_sar_negbin_flow_separable_panel_re`.
@@ -1315,27 +1315,28 @@ def _simulate_sar_zinb_flow_separable(
     -------
     dict
         The NB flow output with ``y`` zero-inflated (``y_vec`` too when
-        ``T=1``), plus ``d``, ``eta_sel``, ``gamma``, ``lam_d`` and ``lam_o``.
+        ``T=1``), plus ``d``, ``eta_zero``, ``beta_zero``, ``rho_d_zero`` and
+        ``rho_o_zero``.
     """
     out = _simulate_sar_negbin_flow_separable_panel_re(
         n=n, T=T, rho_d=rho_d, rho_o=rho_o, seed=seed, **kwargs
     )
     X, names = out["X"], list(out["col_names"])
-    if gamma is None:
-        gamma = np.zeros(X.shape[1])
+    if beta_zero is None:
+        beta_zero = np.zeros(X.shape[1])
         for j, name in enumerate(names):
             lname = name.lower()
             if lname == "intercept":
-                gamma[j] = 0.5
+                beta_zero[j] = 0.5
             elif "distance" in lname:
-                gamma[j] = -0.5
+                beta_zero[j] = -0.5
             elif lname.startswith(("dest_", "orig_")):
-                gamma[j] = 0.4
-    gamma = np.asarray(gamma, dtype=float)
+                beta_zero[j] = 0.4
+    beta_zero = np.asarray(beta_zero, dtype=float)
     W = _graph_to_csr(out["G"])
     nn = W.shape[0]
-    solve_d = spatial_filter_factor(W, lam_d)
-    solve_o = spatial_filter_factor(W, lam_o)
+    solve_d = spatial_filter_factor(W, rho_d_zero)
+    solve_o = spatial_filter_factor(W, rho_o_zero)
 
     def filt(v):
         B = np.asarray(v, dtype=float).reshape(T, nn, nn)
@@ -1343,7 +1344,7 @@ def _simulate_sar_zinb_flow_separable(
             [solve_d(np.asarray(solve_o(B[t])).T).T for t in range(T)]
         ).ravel()
 
-    eta_sel = filt(X @ gamma)
+    eta_sel = filt(X @ beta_zero)
     if target_pi is not None:
         # The shift moves the intercept inside the filter, so η moves by
         # shift·A⁻¹1, not by shift.
@@ -1360,15 +1361,23 @@ def _simulate_sar_zinb_flow_separable(
                 hi = mid
         shift = 0.5 * (lo + hi)
         eta_sel = eta_sel + shift * a0
-        gamma = gamma.copy()
-        gamma[icpt[0]] += shift
+        beta_zero = beta_zero.copy()
+        beta_zero[icpt[0]] += shift
     rng = np.random.default_rng(seed + 7919)
     d = rng.binomial(1, 1.0 / (1.0 + np.exp(-eta_sel)))
     out["y"] = (out["y"] * d).astype(np.int64)
     if T == 1:
         out["y_vec"] = out["y"]
-    out.update(d=d, eta_sel=eta_sel, gamma=gamma, lam_d=lam_d, lam_o=lam_o)
-    out["params_true"].update(gamma=gamma, lam_d=lam_d, lam_o=lam_o)
+    out.update(
+        d=d,
+        eta_zero=eta_sel,
+        beta_zero=beta_zero,
+        rho_d_zero=rho_d_zero,
+        rho_o_zero=rho_o_zero,
+    )
+    out["params_true"].update(
+        beta_zero=beta_zero, rho_d_zero=rho_d_zero, rho_o_zero=rho_o_zero
+    )
     return out
 
 
@@ -1377,27 +1386,27 @@ def _simulate_sar_hurdle_negbin_flow_separable(
     T: int = 1,
     rho_d: float = 0.3,
     rho_o: float = 0.2,
-    lam_d: float = 0.2,
-    lam_o: float = 0.1,
-    gamma: np.ndarray | None = None,
+    rho_d_zero: float = 0.2,
+    rho_o_zero: float = 0.1,
+    beta_zero: np.ndarray | None = None,
     target_pi: float | None = None,
-    sel_pair_effect_sd: float = 0.0,
-    sel_time_effect_sd: float = 0.0,
+    pair_effect_sd_zero: float = 0.0,
+    time_effect_sd_zero: float = 0.0,
     seed: int = 42,
     **kwargs,
 ) -> dict:
     r"""Separable SAR hurdle NB flows, cross-section (``T=1``) or panel.
 
-    The count half's log-mean is that of
+    The count part's log-mean is that of
     :func:`_simulate_sar_negbin_flow_separable_panel_re` (its ``pair_effect_sd``,
     ``time_effect_sd`` and ``fe_x_corr`` included), truncated at zero; the
-    binary half uses the same flow design ``X``:
+    zero part uses the same flow design ``X``:
 
     .. math::
 
-        \eta^{\mathrm{b}}_t = (L_o^{\lambda} \otimes L_d^{\lambda})^{-1} X_t\gamma
-        + \tau^{\mathrm{b}}_t + C^{\mathrm{b}},
-        \qquad d \sim \mathrm{Bernoulli}(\mathrm{logit}^{-1}(\eta^{\mathrm{b}})),
+        \eta_{z,t} = (L_{z,o} \otimes L_{z,d})^{-1} X_t\beta_z
+        + \tau_{z,t} + C_z,
+        \qquad d \sim \mathrm{Bernoulli}(\mathrm{logit}^{-1}(\eta_z)),
         \qquad y = d \cdot \mathrm{tNB}(\mu, \alpha).
 
     Matches :class:`~neighbayes.models.SARHurdleNegBinFlowSeparable` and
@@ -1405,17 +1414,17 @@ def _simulate_sar_hurdle_negbin_flow_separable(
 
     Parameters
     ----------
-    lam_d, lam_o : float
-        Binary destination and origin dependence.
-    gamma : array-like, optional
-        Binary coefficients on the columns of ``X``; default as
+    rho_d_zero, rho_o_zero : float
+        The zero part's destination and origin dependence.
+    beta_zero : array-like, optional
+        Zero-part coefficients on the columns of ``X``; default as
         :func:`_simulate_sar_zinb_flow_separable`.
     target_pi : float, optional
-        Shift the binary intercept (inside the filter) so ``mean P(y > 0)`` is
-        ``target_pi``.
-    sel_pair_effect_sd, sel_time_effect_sd : float, default 0.0
-        Standard deviations of the binary pair effects ``C^b`` and period
-        effects ``τ^b`` (``τ^b_0 = 0``).
+        Shift the zero part's intercept (inside the filter) so
+        ``mean P(y > 0)`` is ``target_pi``.
+    pair_effect_sd_zero, time_effect_sd_zero : float, default 0.0
+        Standard deviations of the zero part's pair effects ``C_z`` and period
+        effects ``τ_z`` (``τ_{z,0} = 0``).
     n, T, rho_d, rho_o, seed, **kwargs
         As for :func:`_simulate_sar_negbin_flow_separable_panel_re`.
 
@@ -1423,8 +1432,9 @@ def _simulate_sar_hurdle_negbin_flow_separable(
     -------
     dict
         The NB flow output with ``y`` replaced by the hurdle counts (``y_vec``
-        too when ``T=1``), plus ``d``, ``eta_bin``, ``gamma``, ``lam_d``,
-        ``lam_o``, ``sel_pair_effect`` and ``sel_time_effect``.
+        too when ``T=1``), plus ``d``, ``eta_zero``, ``beta_zero``,
+        ``rho_d_zero``, ``rho_o_zero``, ``pair_effect_zero`` and
+        ``time_effect_zero``.
     """
     from .hurdle import _intercept_shift, truncated_negative_binomial
 
@@ -1432,21 +1442,21 @@ def _simulate_sar_hurdle_negbin_flow_separable(
         n=n, T=T, rho_d=rho_d, rho_o=rho_o, seed=seed, **kwargs
     )
     X, names = out["X"], list(out["col_names"])
-    if gamma is None:
-        gamma = np.zeros(X.shape[1])
+    if beta_zero is None:
+        beta_zero = np.zeros(X.shape[1])
         for j, name in enumerate(names):
             lname = name.lower()
             if lname == "intercept":
-                gamma[j] = 0.5
+                beta_zero[j] = 0.5
             elif "distance" in lname:
-                gamma[j] = -0.5
+                beta_zero[j] = -0.5
             elif lname.startswith(("dest_", "orig_")):
-                gamma[j] = 0.4
-    gamma = np.asarray(gamma, dtype=float)
+                beta_zero[j] = 0.4
+    beta_zero = np.asarray(beta_zero, dtype=float)
     W = _graph_to_csr(out["G"])
     nn = W.shape[0]
-    solve_d = spatial_filter_factor(W, lam_d)
-    solve_o = spatial_filter_factor(W, lam_o)
+    solve_d = spatial_filter_factor(W, rho_d_zero)
+    solve_o = spatial_filter_factor(W, rho_o_zero)
 
     def filt(v):
         B = np.asarray(v, dtype=float).reshape(T, nn, nn)
@@ -1455,11 +1465,11 @@ def _simulate_sar_hurdle_negbin_flow_separable(
         ).ravel()
 
     rng = np.random.default_rng(seed + 7919)
-    sel_pair = sel_pair_effect_sd * rng.standard_normal(nn * nn)
+    sel_pair = pair_effect_sd_zero * rng.standard_normal(nn * nn)
     sel_time = np.zeros(T)
     if T > 1:
-        sel_time[1:] = sel_time_effect_sd * rng.standard_normal(T - 1)
-    eta_bin = filt(X @ gamma) + np.tile(sel_pair, T) + np.repeat(sel_time, nn * nn)
+        sel_time[1:] = time_effect_sd_zero * rng.standard_normal(T - 1)
+    eta_bin = filt(X @ beta_zero) + np.tile(sel_pair, T) + np.repeat(sel_time, nn * nn)
     if target_pi is not None:
         icpt = [j for j, nm in enumerate(names) if nm.lower() == "intercept"]
         if not icpt:
@@ -1467,8 +1477,8 @@ def _simulate_sar_hurdle_negbin_flow_separable(
         a0 = filt(X[:, icpt[0]])
         shift = _intercept_shift(eta_bin, a0, float(target_pi))
         eta_bin = eta_bin + shift * a0
-        gamma = gamma.copy()
-        gamma[icpt[0]] += shift
+        beta_zero = beta_zero.copy()
+        beta_zero[icpt[0]] += shift
     d = rng.binomial(1, 1.0 / (1.0 + np.exp(-eta_bin)))
     y = np.zeros(d.size, dtype=np.int64)
     pos = d == 1
@@ -1480,19 +1490,19 @@ def _simulate_sar_hurdle_negbin_flow_separable(
         out["y_vec"] = y
     out.update(
         d=d,
-        eta_bin=eta_bin,
-        gamma=gamma,
-        lam_d=lam_d,
-        lam_o=lam_o,
-        sel_pair_effect=sel_pair,
-        sel_time_effect=sel_time,
+        eta_zero=eta_bin,
+        beta_zero=beta_zero,
+        rho_d_zero=rho_d_zero,
+        rho_o_zero=rho_o_zero,
+        pair_effect_zero=sel_pair,
+        time_effect_zero=sel_time,
     )
     out["params_true"].update(
-        gamma=gamma,
-        lam_d=lam_d,
-        lam_o=lam_o,
-        sel_pair_effect=sel_pair,
-        sel_time_effect=sel_time,
+        beta_zero=beta_zero,
+        rho_d_zero=rho_d_zero,
+        rho_o_zero=rho_o_zero,
+        pair_effect_zero=sel_pair,
+        time_effect_zero=sel_time,
     )
     return out
 
@@ -1784,7 +1794,7 @@ def _simulate_sem_flow_panel_fe(
         "lam_o": lam_o,
         "lam_w": lam_w,
         "sigma": sigma,
-        "sigma_alpha": sigma_alpha,
+        "pair_effect_sd": sigma_alpha,
         "beta_d": beta_d_arr,
         "beta_o": beta_o_arr,
         "gamma_dist": gamma_dist,
@@ -1793,7 +1803,7 @@ def _simulate_sem_flow_panel_fe(
             "lam_o": lam_o,
             "lam_w": lam_w,
             "sigma": sigma,
-            "sigma_alpha": sigma_alpha,
+            "pair_effect_sd": sigma_alpha,
             "beta_d": beta_d_arr,
             "beta_o": beta_o_arr,
             "gamma_dist": gamma_dist,
@@ -1944,9 +1954,9 @@ def simulate_sar_zinb_flow(
     n: int | None = None,
     rho_d: float = 0.3,
     rho_o: float = 0.2,
-    lam_d: float = 0.2,
-    lam_o: float = 0.1,
-    gamma: np.ndarray | None = None,
+    rho_d_zero: float = 0.2,
+    rho_o_zero: float = 0.1,
+    beta_zero: np.ndarray | None = None,
     target_pi: float | None = None,
     seed: int = 42,
     **kwargs,
@@ -1962,9 +1972,9 @@ def simulate_sar_zinb_flow(
         n=n,
         rho_d=rho_d,
         rho_o=rho_o,
-        lam_d=lam_d,
-        lam_o=lam_o,
-        gamma=gamma,
+        rho_d_zero=rho_d_zero,
+        rho_o_zero=rho_o_zero,
+        beta_zero=beta_zero,
         target_pi=target_pi,
         seed=seed,
         **kwargs,
@@ -1976,12 +1986,12 @@ def simulate_sar_hurdle_negbin_flow(
     n: int | None = None,
     rho_d: float = 0.3,
     rho_o: float = 0.2,
-    lam_d: float = 0.2,
-    lam_o: float = 0.1,
-    gamma: np.ndarray | None = None,
+    rho_d_zero: float = 0.2,
+    rho_o_zero: float = 0.1,
+    beta_zero: np.ndarray | None = None,
     target_pi: float | None = None,
-    sel_pair_effect_sd: float = 0.0,
-    sel_time_effect_sd: float = 0.0,
+    pair_effect_sd_zero: float = 0.0,
+    time_effect_sd_zero: float = 0.0,
     seed: int = 42,
     **kwargs,
 ) -> dict:
@@ -1997,12 +2007,12 @@ def simulate_sar_hurdle_negbin_flow(
         n=n,
         rho_d=rho_d,
         rho_o=rho_o,
-        lam_d=lam_d,
-        lam_o=lam_o,
-        gamma=gamma,
+        rho_d_zero=rho_d_zero,
+        rho_o_zero=rho_o_zero,
+        beta_zero=beta_zero,
         target_pi=target_pi,
-        sel_pair_effect_sd=sel_pair_effect_sd,
-        sel_time_effect_sd=sel_time_effect_sd,
+        pair_effect_sd_zero=pair_effect_sd_zero,
+        time_effect_sd_zero=time_effect_sd_zero,
         seed=seed,
         **kwargs,
     )

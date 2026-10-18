@@ -35,7 +35,7 @@ def _xs(n_side=8, seed=0, **kw):
 
 
 def _panel(seed=1, **kw):
-    return dgp.simulate_sar_hurdle_negbin(N=25, T=4, n_side=5, seed=seed, sel_unit_effect_sd=0.5, sel_time_effect_sd=0.3, **kw, unit_effects="random", unit_effect_sd=0.5, time_effects=True, time_effect_sd=0.3)  # fmt: skip
+    return dgp.simulate_sar_hurdle_negbin(N=25, T=4, n_side=5, seed=seed, unit_effect_sd_zero=0.5, time_effect_sd_zero=0.3, **kw, unit_effects="random", unit_effect_sd=0.5, time_effects=True, time_effect_sd=0.3)  # fmt: skip
 
 
 def _agree(a, b, var, mean_tol=0.2, sd_tol=0.15):
@@ -56,7 +56,11 @@ def _agree_mc(a, b, var, z=4.0, sd_tol=0.3, min_ess=400):
     """
     import arviz as az
 
-    tf = np.log if var in ("alpha", "group_sd", "sel_group_sd") else (lambda v: v)
+    tf = (
+        np.log
+        if var in ("alpha", "unit_effect_sd", "unit_effect_sd_zero")
+        else (lambda v: v)
+    )
     x = tf(a[var].values.reshape(a[var].shape[0], a[var].shape[1], -1))
     r = tf(b[var].values.reshape(b[var].shape[0], b[var].shape[1], -1))
     for j in range(x.shape[-1]):
@@ -101,11 +105,11 @@ class TestDGP:
     def test_cross_section(self):
         from neighbayes.dgp.utils import spatial_filter_factor
 
-        d = _xs(lam=0.5, target_pi=0.6)
-        expected = spatial_filter_factor(d["W_sel_sparse"], 0.5)(
-            d["Z"] @ d["params_true"]["gamma"]
+        d = _xs(rho_zero=0.5, target_pi=0.6)
+        expected = spatial_filter_factor(d["W_zero_sparse"], 0.5)(
+            d["X_zero"] @ d["params_true"]["beta_zero"]
         )
-        np.testing.assert_allclose(d["eta_bin"], expected, atol=1e-10)
+        np.testing.assert_allclose(d["eta_zero"], expected, atol=1e-10)
         assert np.all((d["y"] > 0) == (d["d"] == 1))
 
     def test_truncated_draws_positive(self):
@@ -117,7 +121,7 @@ class TestDGP:
     def test_panel(self):
         d = _panel(effect_corr=0.6)
         assert d["y"].shape == (100,) and np.all((d["y"] > 0) == (d["d"] == 1))
-        assert {"sel_unit_effect", "sel_time_effect", "lam", "gamma"} <= set(
+        assert {"unit_effect_zero", "time_effect_zero", "rho_zero", "beta_zero"} <= set(
             d["params_true"]
         )
 
@@ -166,9 +170,9 @@ def test_level_direction_shifts_eta(effects):
 class TestSARHurdleNB:
     def test_api(self):
         d = _xs()
-        m = SARHurdleNegBin(y=d["y"], X=d["X"], Z=d["Z"], W=d["W_graph"])
+        m = SARHurdleNegBin(y=d["y"], X=d["X"], X_zero=d["X_zero"], W=d["W_graph"])
         idata = m.fit(idata_kwargs={"log_likelihood": True}, **QUICK)
-        assert {"rho", "lam", "beta", "gamma", "alpha"} <= set(
+        assert {"rho", "rho_zero", "beta", "beta_zero", "alpha"} <= set(
             idata.posterior.data_vars
         )
         assert idata["log_likelihood"]["obs"].shape[-1] == d["y"].size
@@ -176,7 +180,7 @@ class TestSARHurdleNB:
         assert np.all(m.positive_mean(draws=5) >= 1.0)
         pp = m.posterior_predictive(n_draws=4, random_seed=0)
         assert pp.shape == (4, d["y"].size) and pp.min() >= 0
-        for eq in ("count", "selection", "hurdle"):
+        for eq in ("count", "zero"):
             assert len(m.impacts(eq)) == 1
 
     @pytest.mark.parametrize("sampler", ["gibbs", "nuts"])
@@ -190,13 +194,13 @@ class TestSARHurdleNB:
 
     def test_names_and_formula(self):
         d = _xs()
-        df = pd.DataFrame({"y": d["y"], "x1": d["X"][:, 1], "z1": d["Z"][:, 1]})
+        df = pd.DataFrame({"y": d["y"], "x1": d["X"][:, 1], "z1": d["X_zero"][:, 1]})
         m = SARHurdleNegBin(
-            formula="y ~ x1", data=df, sel_formula="~ z1", W=d["W_graph"]
+            formula="y ~ x1", data=df, formula_zero="~ z1", W=d["W_graph"]
         )
         assert m._sel_feature_names == ["Intercept", "z1"]
         post = m.fit(**QUICK).posterior
-        assert list(post["gamma"].coords["sel_coefficient"].values) == [
+        assert list(post["beta_zero"].coords["coefficient_zero"].values) == [
             "Intercept",
             "z1",
         ]
@@ -222,15 +226,21 @@ def test_hurdle_panel_api(cls, effects, sampler):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
         m = cls(
-            y=d["y"], X=d["X"], Z=d["Z"], W=d["W_sparse"], N=25, T=4, effects=effects
+            y=d["y"],
+            X=d["X"],
+            X_zero=d["X_zero"],
+            W=d["W_sparse"],
+            N=25,
+            T=4,
+            effects=effects,
         )
         post = m.fit(sampler=sampler, **QUICK).posterior
     names = set(post.data_vars)
-    assert {"beta", "gamma", "alpha"} <= names
+    assert {"beta", "beta_zero", "alpha"} <= names
     assert ("rho" in names) == (cls is SARHurdleNegBinPanelRE)
-    for pre in ("", "sel_"):
-        assert (pre + "group_effect" in names) == (effects in (1, 3))
-        assert (pre + "time_effect" in names) == (effects in (2, 3))
+    for z in ("", "_zero"):
+        assert ("unit_effect" + z in names) == (effects in (1, 3))
+        assert ("time_effect" + z in names) == (effects in (2, 3))
     assert m.posterior_predictive(n_draws=2, random_seed=0).shape == (2, 100)
 
 
@@ -241,27 +251,33 @@ def test_hurdle_panel_registry_and_storage():
     assert resolve("hurdle", "cross_section") is not None
     d = _panel()
     m = SARHurdleNegBin(
-        unit_effects="random", y=d["y"], X=d["X"], Z=d["Z"], W=d["W_sparse"], N=25, T=4
+        unit_effects="random",
+        y=d["y"],
+        X=d["X"],
+        X_zero=d["X_zero"],
+        W=d["W_sparse"],
+        N=25,
+        T=4,
     )
-    idata = m.fit(store_group_effects=False, **QUICK)
-    assert "group_effect" not in idata.posterior.data_vars
-    assert {"group_effect_summary", "sel_group_effect_summary"} <= set(idata.children)
+    idata = m.fit(store_effects=False, **QUICK)
+    assert "unit_effect" not in idata.posterior.data_vars
+    assert {"unit_effect_summary", "unit_effect_summary_zero"} <= set(idata.children)
     assert m.activation_probabilities(draws=3).shape == (100,)
 
 
 def test_hurdle_panel_absorbs_and_warns():
     d = _panel()
     trend = np.repeat(np.arange(4.0), 25)  # varies only over time
-    Z = np.column_stack([d["Z"], np.tile(np.arange(25.0), 4), trend])
+    Z = np.column_stack([d["X_zero"], np.tile(np.arange(25.0), 4), trend])
     with pytest.warns(
-        UserWarning, match="absorbed by the period effects in the binary"
+        UserWarning, match="absorbed by the period effects in the zero part"
     ):
         m = SARHurdleNegBin(
             unit_effects="random",
             time_effects=True,
             y=d["y"],
             X=d["X"],
-            Z=Z,
+            X_zero=Z,
             W=d["W_sparse"],
             N=25,
             T=4,
@@ -272,7 +288,13 @@ def test_hurdle_panel_absorbs_and_warns():
     y.reshape(4, 25)[:, 0] = 0  # unit 0 never positive
     with pytest.warns(UserWarning, match="never switch"):
         SARHurdleNegBin(
-            unit_effects="random", y=y, X=d["X"], Z=d["Z"], W=d["W_sparse"], N=25, T=4
+            unit_effects="random",
+            y=y,
+            X=d["X"],
+            X_zero=d["X_zero"],
+            W=d["W_sparse"],
+            N=25,
+            T=4,
         )
 
 
@@ -281,14 +303,14 @@ def test_hurdle_panel_learned_sds_and_mundlak():
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
         m = SARHurdleNegBin(unit_effects="random",
-            y=d["y"], X=d["X"], Z=d["Z"], W=d["W_sparse"], N=25, T=4, mundlak=True,
+            y=d["y"], X=d["X"], X_zero=d["X_zero"], W=d["W_sparse"], N=25, T=4, mundlak=True,
         )  # fmt: skip
     assert m._feature_names[-1].endswith("_mean")
     assert m._sel_feature_names[-1].endswith("_mean")
     for sampler in ("gibbs", "nuts"):
         post = m.fit(sampler=sampler, **QUICK).posterior
-        assert {"group_sd", "sel_group_sd"} <= set(post.data_vars)
-    assert len(m.impacts("selection")) == 1  # the mean is not an effect
+        assert {"unit_effect_sd", "unit_effect_sd_zero"} <= set(post.data_vars)
+    assert len(m.impacts("zero")) == 1  # the mean is not an effect
 
 
 # ---------------------------------------------------------------------------
@@ -360,19 +382,22 @@ def test_binary_half_matches_sar_logit():
     """With unlinked halves the binary half is exactly SARLogit fit on d."""
     from neighbayes.models import SARLogit
 
-    d = _xs(n_side=15, seed=3, lam=0.4)
-    m = SARHurdleNegBin(y=d["y"], X=d["X"], Z=d["Z"], W=d["W_graph"])
-    lo, hi = m._bounds("lam")
+    d = _xs(n_side=15, seed=3, rho_zero=0.4)
+    m = SARHurdleNegBin(y=d["y"], X=d["X"], X_zero=d["X_zero"], W=d["W_graph"])
+    lo, hi = m._bounds("rho_zero")
     h = m.fit(draws=3000, tune=1000, chains=4, progressbar=False, random_seed=1)
     logit = SARLogit(
-        y=d["d"], X=d["Z"], W=d["W_graph"], priors={"rho_lower": lo, "rho_upper": hi}
+        y=d["d"],
+        X=d["X_zero"],
+        W=d["W_graph"],
+        priors={"rho_lower": lo, "rho_upper": hi},
     )
     r = logit.fit(draws=3000, tune=1000, chains=4, progressbar=False, random_seed=2)
     hp, rp = h.posterior, r.posterior
-    x, ref = hp["lam"].values.ravel(), rp["rho"].values.ravel()
+    x, ref = hp["rho_zero"].values.ravel(), rp["rho"].values.ravel()
     assert abs(x.mean() - ref.mean()) < 0.15 * ref.std()
     np.testing.assert_allclose(x.std(), ref.std(), rtol=0.15)
-    g, gr = hp["gamma"].values.reshape(-1, 2), rp["beta"].values.reshape(-1, 2)
+    g, gr = hp["beta_zero"].values.reshape(-1, 2), rp["beta"].values.reshape(-1, 2)
     assert np.all(np.abs(g.mean(0) - gr.mean(0)) < 0.15 * gr.std(0))
     np.testing.assert_allclose(g.std(0), gr.std(0), rtol=0.15)
 
@@ -382,13 +407,15 @@ def test_binary_half_matches_sar_logit():
 def test_sarhurdle_gibbs_matches_nuts(alpha_fixed):
     d = _xs(n_side=10, seed=4)
     priors = {} if alpha_fixed is None else {"alpha_fixed": alpha_fixed}
-    m = SARHurdleNegBin(y=d["y"], X=d["X"], Z=d["Z"], W=d["W_graph"], priors=priors)
+    m = SARHurdleNegBin(
+        y=d["y"], X=d["X"], X_zero=d["X_zero"], W=d["W_graph"], priors=priors
+    )
     g = m.fit(draws=4000, tune=1000, chains=4, progressbar=False, random_seed=1)
     n = m.fit(
         sampler="nuts", draws=2000, tune=1500, chains=4, progressbar=False,
         random_seed=2, target_accept=0.95,
     )  # fmt: skip
-    for var in ("rho", "lam", "beta", "gamma") + (
+    for var in ("rho", "rho_zero", "beta", "beta_zero") + (
         ("alpha",) if alpha_fixed is None else ()
     ):
         _agree(g.posterior, n.posterior, var)
@@ -404,7 +431,7 @@ def test_hurdle_panel_gibbs_matches_nuts():
             time_effects=True,
             y=d["y"],
             X=d["X"],
-            Z=d["Z"],
+            X_zero=d["X_zero"],
             W=d["W_sparse"],
             N=25,
             T=4,
@@ -414,8 +441,8 @@ def test_hurdle_panel_gibbs_matches_nuts():
         sampler="nuts", draws=2000, tune=1500, chains=4, progressbar=False,
         random_seed=2, target_accept=0.95,
     )  # fmt: skip
-    for var in ("rho", "lam", "beta", "gamma", "alpha", "time_effect",
-                "sel_time_effect", "group_effect", "sel_group_effect"):  # fmt: skip
+    for var in ("rho", "rho_zero", "beta", "beta_zero", "alpha", "time_effect",
+                "time_effect_zero", "unit_effect", "unit_effect_zero"):  # fmt: skip
         _agree(g.posterior, n.posterior, var, mean_tol=0.25, sd_tol=0.2)
 
 
@@ -431,7 +458,7 @@ def _flow(T=1, seed=2, n=6, **kw):
 def _flow_panel_data(n=5, T=3, seed=5):
     return _flow(
         T=T, n=n, seed=seed, pair_effects="random", pair_effect_sd=0.5,
-        time_effects=True, time_effect_sd=0.3, sel_pair_effect_sd=0.5, sel_time_effect_sd=0.3,
+        time_effects=True, time_effect_sd=0.3, pair_effect_sd_zero=0.5, time_effect_sd_zero=0.3,
     )  # fmt: skip
 
 
@@ -448,9 +475,17 @@ def test_flow_hurdle_cross_section(backend):
     kw = {"sampler": "nuts"} if backend == "nuts" else {"backend": backend}
     idata = m.fit(idata_kwargs={"log_likelihood": True}, **kw, **QUICK)
     names = set(idata.posterior.data_vars)
-    assert {"lam_d", "lam_o", "rho_d", "rho_o", "beta", "gamma", "alpha"} <= names
+    assert {
+        "rho_d_zero",
+        "rho_o_zero",
+        "rho_d",
+        "rho_o",
+        "beta",
+        "beta_zero",
+        "alpha",
+    } <= names
     assert idata["log_likelihood"]["obs"].shape[-1] == d["y_vec"].size
-    assert m.impacts("hurdle", draws=5).shape[0] > 0
+    assert m.impacts("zero", draws=5).shape[0] > 0
     assert m.positive_mean(draws=3).shape == (36,)
 
 
@@ -476,10 +511,10 @@ def test_flow_hurdle_panel(effects, backend):
         kw = {"sampler": "nuts"} if backend == "nuts" else {"backend": backend}
         post = m.fit(**kw, **QUICK).posterior
     names = set(post.data_vars)
-    for pre in ("", "sel_"):
-        assert (pre + "group_effect" in names) == (effects in (1, 3))
-        assert (pre + "group_sd" in names) == (effects in (1, 3))
-        assert (pre + "time_effect" in names) == (effects in (2, 3))
+    for z in ("", "_zero"):
+        assert ("pair_effect" + z in names) == (effects in (1, 3))
+        assert ("pair_effect_sd" + z in names) == (effects in (1, 3))
+        assert ("time_effect" + z in names) == (effects in (2, 3))
     assert m.posterior_predictive(n_draws=2, random_seed=0).shape == (2, 75)
 
 
@@ -495,9 +530,9 @@ def test_flow_hurdle_alpha_fixed_and_summaries(backend):
         m = SARHurdleNegBinFlow(
             d["y"], d["X"], d["G"], separable=True, pair_effects="random", T=3, col_names=d["col_names"], priors={"alpha_fixed": 4.0},
         )  # fmt: skip
-        idata = m.fit(backend=backend, store_group_effects=False, **QUICK)
+        idata = m.fit(backend=backend, store_effects=False, **QUICK)
     assert np.all(idata.posterior["alpha"].values == 4.0)
-    assert {"group_effect_summary", "sel_group_effect_summary"} <= set(idata.children)
+    assert {"pair_effect_summary", "pair_effect_summary_zero"} <= set(idata.children)
 
 
 def test_flow_hurdle_guards():
@@ -510,7 +545,7 @@ def test_flow_hurdle_guards():
         )
     with pytest.raises(ValueError, match="rows"):
         SARHurdleNegBinFlow(
-            d["y_vec"], d["X"], d["G"], separable=True, Z=np.ones((5, 1))
+            d["y_vec"], d["X"], d["G"], separable=True, X_zero=np.ones((5, 1))
         )
     with pytest.raises(ValueError, match="positive count"):
         SARHurdleNegBinFlow(np.zeros_like(d["y_vec"]), d["X"], d["G"], separable=True)
@@ -520,12 +555,12 @@ def test_flow_hurdle_guards():
         d["G"],
         separable=True,
         T=1,
-        Z=d["X"][:, :2],
+        X_zero=d["X"][:, :2],
         col_names=d["col_names"],
     )
     m.fit(**QUICK)
     with pytest.raises(NotImplementedError, match="flow design"):
-        m.impacts("selection")
+        m.impacts("zero")
 
 
 @pytest.mark.slow
@@ -540,7 +575,7 @@ def test_flow_hurdle_structured_matches_generic():
     # for a tight comparison.
     d = _flow(
         T=6, n=8, seed=7, target_pi=0.7, pair_effects="random", pair_effect_sd=0.5,
-        time_effects=True, time_effect_sd=0.3, sel_pair_effect_sd=0.5, sel_time_effect_sd=0.3,
+        time_effects=True, time_effect_sd=0.3, pair_effect_sd_zero=0.5, time_effect_sd_zero=0.3,
     )  # fmt: skip
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
@@ -585,11 +620,15 @@ def test_flow_hurdle_structured_matches_generic():
         )  # fmt: skip
         for c in range(4)
     ]
-    for var, key in (("rho_d", "rho_d"), ("lam_d", "lam_d"), ("alpha", "alpha")):
+    for var, key in (
+        ("rho_d", "rho_d"),
+        ("rho_d_zero", "rho_d_zero"),
+        ("alpha", "alpha"),
+    ):
         x, r = s[var].values.ravel(), np.concatenate([o[key] for o in outs])
         assert abs(x.mean() - r.mean()) < 0.2 * r.std(), var
         np.testing.assert_allclose(x.std(), r.std(), rtol=0.15, err_msg=var)
-    for var in ("beta", "gamma"):
+    for var in ("beta", "beta_zero"):
         x = s[var].values.reshape(-1, s[var].shape[-1])
         r = np.concatenate([o[var] for o in outs])
         assert np.all(np.abs(x.mean(0) - r.mean(0)) < 0.2 * r.std(0)), var
@@ -609,7 +648,7 @@ def test_flow_hurdle_matches_nuts():
         sampler="nuts", draws=2000, tune=1500, chains=4, progressbar=False,
         random_seed=2, target_accept=0.95,
     )  # fmt: skip
-    for var in ("rho_d", "rho_o", "lam_d", "lam_o", "beta", "gamma"):
+    for var in ("rho_d", "rho_o", "rho_d_zero", "rho_o_zero", "beta", "beta_zero"):
         _agree(g.posterior, n.posterior, var)
     # α is heavy-tailed on a few small positive counts; compare it on the log scale.
     la, lr = np.log(g.posterior["alpha"].values), np.log(n.posterior["alpha"].values)
@@ -638,8 +677,8 @@ def test_flow_hurdle_jax_matches_numpy():
     fit = dict(draws=3000, tune=1000, chains=4, progressbar=False)
     a = m.fit(backend="numpy", random_seed=1, n_jobs=4, **fit).posterior
     b = m.fit(backend="jax", random_seed=2, **fit).posterior
-    for var in ("rho_d", "rho_o", "lam_d", "lam_o", "beta", "gamma", "alpha",
-                "time_effect", "sel_time_effect", "group_sd", "sel_group_sd"):  # fmt: skip
+    for var in ("rho_d", "rho_o", "rho_d_zero", "rho_o_zero", "beta", "beta_zero", "alpha",
+                "time_effect", "time_effect_zero", "pair_effect_sd", "pair_effect_sd_zero"):  # fmt: skip
         _agree_mc(b, a, var)
 
 
@@ -659,8 +698,8 @@ def test_flow_hurdle_panel_recovers_sparse_flows():
 
     n, T = 20, 8
     d = _flow(
-        T=T, n=n, seed=8, lam_d=0.3, lam_o=0.2, target_pi=0.4, pair_effects="random",
-        pair_effect_sd=1.0, time_effects=True, time_effect_sd=0.3, sel_pair_effect_sd=1.0, sel_time_effect_sd=0.3,
+        T=T, n=n, seed=8, rho_d_zero=0.3, rho_o_zero=0.2, target_pi=0.4, pair_effects="random",
+        pair_effect_sd=1.0, time_effects=True, time_effect_sd=0.3, pair_effect_sd_zero=1.0, time_effect_sd_zero=0.3,
     )  # fmt: skip
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
@@ -678,13 +717,19 @@ def test_flow_hurdle_panel_recovers_sparse_flows():
         draws=3000, tune=1000, chains=4, progressbar=False, random_seed=1,
         backend="jax",
     ).posterior  # fmt: skip
-    truth = {"lam_d": 0.3, "lam_o": 0.2, "rho_d": 0.3, "rho_o": 0.2, "alpha": 3.0}
+    truth = {
+        "rho_d_zero": 0.3,
+        "rho_o_zero": 0.2,
+        "rho_d": 0.3,
+        "rho_o": 0.2,
+        "alpha": 3.0,
+    }
     for var, value in truth.items():
         x = post[var].values
         assert abs(x.mean() - value) < 3.0 * x.std(), var
         assert float(az.rhat(x)) < 1.05, var
-    keep = m._sel_keep if m._sel_keep is not None else np.arange(len(d["gamma"]))
-    g = post["gamma"].values
-    for j, value in enumerate(np.asarray(d["gamma"])[keep]):
+    keep = m._sel_keep if m._sel_keep is not None else np.arange(len(d["beta_zero"]))
+    g = post["beta_zero"].values
+    for j, value in enumerate(np.asarray(d["beta_zero"])[keep]):
         assert abs(g[..., j].mean() - value) < 3.0 * g[..., j].std(), j
         assert float(az.rhat(g[..., j])) < 1.05, j

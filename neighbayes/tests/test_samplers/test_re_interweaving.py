@@ -17,7 +17,15 @@ from neighbayes.models.panel._re import SARPanelRE, SEMPanelRE
 
 
 def _weak_effects(sim, seed):
-    return sim(N=400, T=3, n_side=20, sigma=1.0, unit_effects="random", unit_effect_sd=0.3, seed=seed)
+    return sim(
+        N=400,
+        T=3,
+        n_side=20,
+        sigma=1.0,
+        unit_effects="random",
+        unit_effect_sd=0.3,
+        seed=seed,
+    )
 
 
 def test_sigma_alpha_mixes_with_weak_effects():
@@ -29,7 +37,7 @@ def test_sigma_alpha_mixes_with_weak_effects():
         sampler="gibbs", draws=1000, tune=500, chains=2, progressbar=False,
         random_seed=1,
     ).posterior  # fmt: skip
-    x = post["sigma_alpha"].values
+    x = post["unit_effect_sd"].values
     # Centred-only sampling gave ~1% of draws here.
     assert float(az.ess(x)) > 0.05 * x.size
 
@@ -53,7 +61,7 @@ def test_re_gibbs_matches_nuts_with_weak_effects(cls, sim, spatial):
         sampler="nuts", draws=2000, tune=1500, chains=4, progressbar=False,
         random_seed=2, target_accept=0.95,
     ).posterior  # fmt: skip
-    for var in (spatial, "sigma", "sigma_alpha", "beta"):
+    for var in (spatial, "sigma", "unit_effect_sd", "beta"):
         a = g[var].values.reshape(-1, *g[var].shape[2:])
         b = n[var].values.reshape(-1, *n[var].shape[2:])
         assert np.all(np.abs(a.mean(0) - b.mean(0)) < 0.2 * b.std(0)), var

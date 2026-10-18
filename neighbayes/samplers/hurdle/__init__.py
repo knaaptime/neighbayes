@@ -55,6 +55,6 @@ register(
     "panel",
     run=_run_hurdle_gibbs,
     backends={"numpy"},
-    options={"store_group_effects"},
+    options={"store_effects"},
     skips_log_likelihood=True,
 )

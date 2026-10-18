@@ -306,14 +306,14 @@ def _resolve_X_for_beta(model, beta_draws: np.ndarray) -> np.ndarray:
     return model._X
 
 
-def _maybe_subtract_alpha(model, idata, resid: np.ndarray) -> np.ndarray:
-    """Subtract per-unit random-effect ``alpha[unit_idx]`` from ``resid`` if present.
+def _maybe_subtract_unit_effects(model, idata, resid: np.ndarray) -> np.ndarray:
+    """Subtract the random unit effects ``unit_effect[unit_idx]`` from ``resid``, if any.
 
     Used by panel LM tests so that the cross-sectional residual formulas
     transparently work for both pooled and random-effects fits.
     """
-    if hasattr(model, "_unit_idx") and "alpha" in idata.posterior:
-        alpha_draws = _get_posterior_draws(idata, "alpha")
+    if hasattr(model, "_unit_idx") and "unit_effect" in idata.posterior:
+        alpha_draws = _get_posterior_draws(idata, "unit_effect")
         resid = resid - alpha_draws[:, model._unit_idx]
     return resid
 
@@ -490,7 +490,7 @@ def _compute_residuals(
         Wu = _panel_spatial_lag(W_sp, resid, N, T)
         resid = resid - lam_draws[:, None] * Wu
 
-    resid = _maybe_subtract_alpha(model, idata, resid)
+    resid = _maybe_subtract_unit_effects(model, idata, resid)
     return resid
 
 
@@ -619,23 +619,3 @@ def _trace_WtW_WW(W_sparse) -> float:
     # tr(W'W) = ||W||_F^2 = sum(W_ij^2)  [O(nnz)]
     # tr(W^2) = sum_ij W_ij * W_ji = sum(W * W.T)  [O(nnz)]
     return float(W_sparse.power(2).sum() + W_sparse.multiply(W_sparse.T).sum())
-
-
-def _resolve_lam_name(idata) -> str:
-    """Return the posterior variable name for the SEM/SDEM spatial parameter.
-
-    Some models store the spatial-error parameter as ``"lam"`` and others as
-    ``"lambda"`` (PyMC reserves ``lambda`` for Python's keyword in some
-    contexts).  This helper checks which is present.
-
-    Parameters
-    ----------
-    idata : xarray.DataTree
-        Fitted-model inference data with a ``posterior`` group.
-
-    Returns
-    -------
-    str
-        Either ``"lam"`` or ``"lambda"``.
-    """
-    return "lam" if "lam" in idata.posterior else "lambda"

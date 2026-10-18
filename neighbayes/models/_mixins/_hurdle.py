@@ -1,6 +1,6 @@
 r"""Posterior summaries of the hurdle NB models.
 
-A hurdle's binary half gives :math:`\pi = P(y > 0)` and its count half a
+A hurdle's zero part gives :math:`\pi = P(y > 0)` and its count part a
 zero-truncated NB2, so
 
 .. math::
@@ -10,8 +10,8 @@ zero-truncated NB2, so
     p_0 = \Big(\frac{\alpha}{\mu + \alpha}\Big)^{\alpha}.
 
 The impacts and probabilities are those of
-:class:`~neighbayes.models._mixins._two_part.TwoPartMixin`; the binary
-equation is called ``"selection"`` there (alias ``"hurdle"``).
+:class:`~neighbayes.models._mixins._two_part.TwoPartMixin`; the zero part is
+``equation="zero"`` there.
 """
 
 from __future__ import annotations
@@ -67,7 +67,7 @@ class HurdleMixin(TwoPartMixin):
         return float(np.mean(np.asarray(self._y) > 0))
 
     def _hurdle_beta_prior(self, X, names) -> tuple[np.ndarray, np.ndarray]:
-        """Count half: Gelman et al. (2008) on the log scale, at ``log mean(y | y > 0)``."""
+        """Count part: Gelman et al. (2008) on the log scale, at ``log mean(y | y > 0)``."""
         from .._base._shared import gelman_default_beta_prior
 
         k = X.shape[1]
@@ -79,15 +79,17 @@ class HurdleMixin(TwoPartMixin):
         return mu.copy(), sd.copy()
 
     def _hurdle_gamma_prior(self, Z, names) -> tuple[np.ndarray, np.ndarray]:
-        """Binary half: Gelman et al. (2008) on the logit scale, at ``logit(mean d)``."""
+        """Zero part: Gelman et al. (2008) on the logit scale, at ``logit(mean d)``."""
         from .._base._shared import gelman_default_beta_prior
 
         p = Z.shape[1]
         d = (np.asarray(self._y) > 0).astype(np.float64)
         mu, sd = gelman_default_beta_prior(d, Z, list(names), link="logit")
-        mu = np.broadcast_to(np.asarray(self.priors.get("gamma_mu", mu), float), (p,))
+        mu = np.broadcast_to(
+            np.asarray(self.priors.get("beta_mu_zero", mu), float), (p,)
+        )
         sd = np.broadcast_to(
-            np.asarray(self.priors.get("gamma_sigma", sd), float), (p,)
+            np.asarray(self.priors.get("beta_sigma_zero", sd), float), (p,)
         )
         return mu.copy(), sd.copy()
 
@@ -124,7 +126,7 @@ class HurdleMixin(TwoPartMixin):
         if slopes:
             warnings.warn(
                 f"{slopes} vary only over time and are absorbed by the period "
-                "effects in the binary half; their coefficients are not "
+                "effects in the zero part; their coefficients are not "
                 "identified.",
                 UserWarning,
                 stacklevel=4,
@@ -138,27 +140,27 @@ class HurdleMixin(TwoPartMixin):
             n_fixed = int(np.sum((share == 0.0) | (share == 1.0)))
             if n_fixed:
                 warnings.warn(
-                    f"{n_fixed} of {n_groups} groups never switch between zero and "
-                    "positive counts; their binary effects are informed only by "
+                    f"{n_fixed} of {n_groups} {self._effect_index}s never switch between zero and "
+                    "positive counts; their zero-part effects are informed only by "
                     "the pooled effect distribution.",
                     UserWarning,
                     stacklevel=4,
                 )
 
     def _count_fe_priors(self) -> dict:
-        """Count-half effects, centred on the positive counts (``log mean(y | y > 0)``)."""
+        """Count-part effects, centred on the positive counts (``log mean(y | y > 0)``)."""
         level = float(np.log(max(self._positive_mean, 1e-3)))
-        return self._effect_priors(level, self._X, "")
+        return self._effect_priors(level, self._X)
 
     def _sel_fe_priors(self) -> dict:
-        """Binary-half effects, centred at ``logit(mean(y > 0))``; keys ``sel_*``."""
+        """Zero-part effects, centred at ``logit(mean(y > 0))``; keys ``*_zero``."""
         share = float(np.clip(self._positive_share, 1e-3, 1.0 - 1e-3))
         return self._effect_priors(
-            float(np.log(share / (1.0 - share))), self._Z, "sel_"
+            float(np.log(share / (1.0 - share))), self._Z, zero=True
         )
 
     def _sel_fe_spec(self):
-        """The binary half's :class:`~neighbayes.samplers.count_panel.CountPanelFE`."""
+        """The zero part's :class:`~neighbayes.samplers.count_panel.CountPanelFE`."""
         from ...samplers.count_panel import CountPanelFE
 
         groups = None
@@ -180,18 +182,19 @@ class HurdleMixin(TwoPartMixin):
             out.append(j)
         return out
 
-    def _effects_at(self, g: int, prefix: str) -> np.ndarray:
-        """``D_g c + D_τ τ`` of one half at draw ``g`` (summary mean if not stored)."""
+    def _effects_at(self, g: int, zero: bool) -> np.ndarray:
+        """``D_g c + D_τ τ`` of one part at draw ``g`` (summary mean if not stored)."""
         post = self._idata.posterior
         out = np.zeros(self._n_groups * self._T_count)
         if self._fe_groups:
-            if prefix + "group_effect" in post.data_vars:
-                c = self._flat_draw(prefix + "group_effect")[g]
+            name = self._effect_name(zero=zero)
+            if name in post.data_vars:
+                c = self._flat_draw(name)[g]
             else:
-                c = self._idata[prefix + "group_effect_summary"]["mean"].values
+                c = self._idata[self._effect_name("_summary", zero)]["mean"].values
             out += np.asarray(c)[self._row_group]
         if self._fe_periods:
-            out += self._D_tau @ self._flat_draw(prefix + "time_effect")[g]
+            out += self._D_tau @ self._flat_draw(self._time_name(zero=zero))[g]
         return out
 
     # ------------------------------------------------------------------

@@ -36,9 +36,9 @@ def test_panel_unit_effects_scale():
     random = d.simulate_sar(
         n_side=4, T=3, seed=1, unit_effects="random", unit_effect_sd=0.2
     )
-    assert none["params_true"]["sigma_alpha"] == 0.0
-    assert fixed["params_true"]["sigma_alpha"] == 0.5
-    assert random["params_true"]["sigma_alpha"] == 0.2
+    assert none["params_true"]["unit_effect_sd"] == 0.0
+    assert fixed["params_true"]["unit_effect_sd"] == 0.5
+    assert random["params_true"]["unit_effect_sd"] == 0.2
     assert none["y"].shape == (48,)
 
 

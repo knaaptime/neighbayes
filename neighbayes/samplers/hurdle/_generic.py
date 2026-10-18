@@ -168,7 +168,7 @@ def run_chain(
 
     n_keep = draws // thin if thin > 0 else draws
     out: dict[str, np.ndarray] = {
-        "gamma": np.empty((n_keep, p)),
+        "beta_zero": np.empty((n_keep, p)),
         "sel_time_effect": np.empty((n_keep, fe_bin.n_tau)),
         "beta": np.empty((n_keep, k)),
         "time_effect": np.empty((n_keep, fe_cnt.n_tau)),
@@ -234,7 +234,7 @@ def run_chain(
         if not tuning and (it - tune) % thin == 0:
             j = (it - tune) // thin
             if j < n_keep:
-                out["gamma"][j] = binary.theta[:p]
+                out["beta_zero"][j] = binary.theta[:p]
                 out["sel_time_effect"][j] = binary.theta[p:]
                 out["beta"][j] = count.theta[:k]
                 out["time_effect"][j] = count.theta[k:]

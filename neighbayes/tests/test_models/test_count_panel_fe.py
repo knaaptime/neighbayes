@@ -62,7 +62,7 @@ class TestConstruction:
         assert m._row_group.shape == (data["y"].size,)
         assert m._D_tau is None
         fp = m._count_fe_priors()
-        assert fp["group_effect_mu"] == 0.0 and fp["group_effect_sd_scale"] == 1.0
+        assert fp["effect_mu"] == 0.0 and fp["effect_sd_scale"] == 1.0
 
     def test_period_effects_absorb_time_only_columns(self):
         d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0)
@@ -144,13 +144,13 @@ class TestConstruction:
         with pytest.raises(ValueError, match="mundlak"):
             _place(SARNegBinPanelRE, d, 16, 3, effects=2, mundlak=True)
 
-    def test_all_zero_groups_warn(self):
+    def test_all_zero_units_warn(self):
         d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0)
         y = d["y"].copy()
         y[np.tile(np.arange(16), 3) == 0] = 0
         y[np.tile(np.arange(16), 3) == 5] = 0
         X = np.column_stack([np.ones(48), d["X"][:, 1]])
-        with pytest.warns(UserWarning, match="2 of 16 groups"):
+        with pytest.warns(UserWarning, match="2 of 16 units"):
             NegBin(unit_effects="random", y=y, X=X, W=d["W_sparse"], N=16, T=3)
 
     def test_unit_effects_need_two_periods(self):
@@ -191,11 +191,11 @@ def test_flow_fit_api(cls, effects):
         )
         idata = m.fit(sampler="gibbs", **QUICK)
     post = idata.posterior
-    assert ("group_effect" in post) == (effects in (1, 3))
-    assert ("group_sd" in post) == (effects in (1, 3))
+    assert ("pair_effect" in post) == (effects in (1, 3))
+    assert ("pair_effect_sd" in post) == (effects in (1, 3))
     assert ("time_effect" in post) == (effects in (2, 3))
     if effects in (1, 3):
-        assert post["group_effect"].shape[-1] == 16
+        assert post["pair_effect"].shape[-1] == 16
     assert np.all(np.isfinite(post["beta"].values))
     pp = m.posterior_predictive(n_draws=2, random_seed=0)
     assert pp.shape == (2, data["y"].size)
@@ -210,8 +210,8 @@ def test_panel_fit_api(cls, effects):
     idata = m.fit(**QUICK)  # Gibbs, the default, as for the Gaussian panels
     assert m._pymc_model is None
     post = idata.posterior
-    assert ("group_effect" in post) == (effects in (1, 3))
-    assert ("group_sd" in post) == (effects in (1, 3))
+    assert ("unit_effect" in post) == (effects in (1, 3))
+    assert ("unit_effect_sd" in post) == (effects in (1, 3))
     assert ("time_effect" in post) == (effects in (2, 3))
     assert ("rho" in post) == (cls is SARNegBinPanelRE)
     assert "alpha" in post
@@ -225,9 +225,9 @@ def test_panel_nuts_builds_fixed_effects(cls):
     d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=2)
     m = _place(cls, d, 16, 3, effects=3)
     model = m._build_pymc_model()
-    assert "group_effect" in model.named_vars
+    assert "unit_effect" in model.named_vars
     assert "time_effect" in model.named_vars
-    assert model.named_vars["group_effect"].shape.eval()[0] == 16
+    assert model.named_vars["unit_effect"].shape.eval()[0] == 16
 
 
 def test_nuts_on_request():
@@ -237,7 +237,7 @@ def test_nuts_on_request():
         sampler="nuts", draws=20, tune=20, chains=1, progressbar=False, random_seed=0
     )
     assert m._pymc_model is not None
-    assert {"group_effect", "group_sd"} <= set(idata.posterior.data_vars)
+    assert {"unit_effect", "unit_effect_sd"} <= set(idata.posterior.data_vars)
 
 
 def test_pooled_aspatial_gibbs_runs_on_request():
@@ -264,12 +264,12 @@ def test_gibbs_runs_through_the_registry():
 def test_group_effect_summary_storage():
     d = simulate_sar_negbin(N=25, T=3, n_side=5, seed=4)
     m = _place(SARNegBinPanelRE, d, 25, 3, effects=1)
-    idata = m.fit(store_group_effects=False, **QUICK)
-    assert "group_effect" not in idata.posterior
-    summary = idata["group_effect_summary"]
+    idata = m.fit(store_effects=False, **QUICK)
+    assert "unit_effect" not in idata.posterior
+    summary = idata["unit_effect_summary"]
     assert summary["mean"].shape == (25,)
     assert np.all(summary["sd"].values >= 0)
-    with pytest.raises(RuntimeError, match="store_group_effects=True"):
+    with pytest.raises(RuntimeError, match="store_effects=True"):
         m.posterior_predictive(n_draws=2)
     assert np.all(np.isfinite(m._fitted_mean_from_posterior()))
 
@@ -284,7 +284,7 @@ def test_separable_fixed_effects_jax_backend(effects, store):
         m = _flow_model(SARNegBinFlowSeparablePanelRE, data, 3, effects=effects)
         idata = m.fit(
             backend="jax",
-            store_group_effects=store,
+            store_effects=store,
             idata_kwargs={"log_likelihood": True},
             draws=20,
             tune=20,
@@ -294,12 +294,12 @@ def test_separable_fixed_effects_jax_backend(effects, store):
         )
     post = idata.posterior
     assert ("time_effect" in post) == (effects in (2, 3))
-    assert ("group_sd" in post) == (effects in (1, 3))
+    assert ("pair_effect_sd" in post) == (effects in (1, 3))
     if effects in (1, 3):
         if store:
-            assert post["group_effect"].shape == (2, 20, 16)
+            assert post["pair_effect"].shape == (2, 20, 16)
         else:
-            assert idata["group_effect_summary"]["sd"].shape == (16,)
+            assert idata["pair_effect_summary"]["sd"].shape == (16,)
     assert np.all(np.isfinite(idata.log_likelihood["obs"].values))
 
 
@@ -339,7 +339,7 @@ def _masked_diag_fit(y, backend):
             progressbar=False,
             random_seed=0,
             n_jobs=1,
-            store_group_effects=False,
+            store_effects=False,
         )
 
 
@@ -354,7 +354,7 @@ def _assert_mask_invariance(backend):
     y2 = y.reshape(T, n, n).copy()
     y2[:, np.eye(n, dtype=bool)] *= 100
     idatas = [_masked_diag_fit(yy, backend) for yy in (y, y2.reshape(-1))]
-    for var in ("rho_d", "rho_o", "beta", "alpha", "group_sd", "time_effect"):
+    for var in ("rho_d", "rho_o", "beta", "alpha", "pair_effect_sd", "time_effect"):
         a = idatas[0].posterior[var].values
         b = idatas[1].posterior[var].values
         assert np.array_equal(a, b), f"{var} traces differ under masked y x100"
@@ -444,7 +444,7 @@ def test_structured_and_materialized_separable_kernels_agree():
         progressbar=False,
         n_jobs=1,
         log_likelihood=False,
-        store_group_effects=True,
+        store_effects=True,
         model_type="check",
         separable_flow=True,
     )

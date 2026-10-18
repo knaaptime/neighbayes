@@ -415,7 +415,7 @@ def make_spatial_probit_data(
     """
     out = dgp.simulate_sem_probit(
         W=_as_sparse(W),
-        rho=rho,
+        lam=rho,
         beta=beta,
         rng=rng,
         group_effect_sd=sigma_a,

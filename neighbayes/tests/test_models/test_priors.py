@@ -126,8 +126,8 @@ def test_spatial_probit_priors_defaults():
     W = _make_w(n)
     m = SEMProbit(group_effects="random", y=y, X=X, W=W, groups=np.arange(n))
     assert isinstance(m.priors_obj, SARProbitPriors)
-    assert m.priors["rho_lower"] == -0.95
-    assert m.priors["rho_upper"] == 0.95
+    assert m.priors["lam_lower"] == -0.95
+    assert m.priors["lam_upper"] == 0.95
 
 
 def test_basepriors_is_abstract_default():
