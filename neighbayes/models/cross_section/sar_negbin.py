@@ -15,7 +15,7 @@ latent spatial random effect (no :math:`\sigma`).
 This is the reduced form that the spatial-econometrics literature
 (LeSage & Pace 2009) writes down by default and is the preferred
 specification when there is no substantive reason to model an
-additional unobserved spatially-smoothed latent field.
+additional normal random effect per unit inside the SAR equation.
 
 Sampling
 --------
@@ -35,9 +35,9 @@ Two samplers are available:
 
 See also
 --------
-SARNegBinStructural
-    P\u00f3lya-Gamma Gibbs sampler for the structural form (with
-    :math:`\sigma`).
+SARNegBinRE
+    The SAR-NB with random effects, whose log-mean carries a normal
+    random effect per unit with scale :math:`\sigma`.
 """
 
 from __future__ import annotations
@@ -62,11 +62,13 @@ from ...samplers.negbin_reduced._core import (
     _KRYLOV_DMAX_DEFAULT,
 )
 from .._base._nb import nb_alpha_fixed, nb_alpha_rv
+from .._design import discrete
 from ..base import SpatialModel
 from ..priors import SARNegBinPriors
 
 
 class SARNegBin(SpatialModel):
+    _dispatch = classmethod(discrete)
     _priors_cls = SARNegBinPriors
     _likelihood: str = "count"
     _gibbs_key: tuple[str, str] | None = ("count", "cross_section")
@@ -109,7 +111,7 @@ class SARNegBin(SpatialModel):
             \eta = (I - \rho W)^{-1} X \beta,
 
         No latent :math:`\sigma` or :math:`z` appears — this is the reduced
-        form, not the structural form.
+        form, not the SAR with random effects.
 
         **No log-determinant Jacobian.**  :math:`\log|I - \rho W|` belongs in
         the Gaussian SAR because there :math:`y` itself is transformed,

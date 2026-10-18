@@ -4,7 +4,7 @@ Each test verifies that:
 1. ``robust=True`` builds and samples without error
 2. ``nu`` (degrees of freedom) is a fixed hyperparameter, not sampled
 3. ``robust=False`` (default) still works (backward compatibility)
-4. SARProbit raises ``NotImplementedError`` when ``robust=True``
+4. SEMProbitRE raises ``NotImplementedError`` when ``robust=True``
 
 Run with::
 
@@ -24,21 +24,10 @@ from neighbayes.models import (
     SDM,
     SEM,
     SLX,
-    OLSPanelFE,
-    OLSPanelRE,
-    SARPanelFE,
-    SARPanelRE,
-    SARPanelTobit,
-    SARProbit,
     SARTobit,
-    SDEMPanelFE,
-    SDMPanelFE,
     SDMTobit,
-    SEMPanelFE,
-    SEMPanelRE,
-    SEMPanelTobit,
+    SEMProbit,
     SEMTobit,
-    SLXPanelFE,
 )
 from neighbayes.tests.helpers import (
     PANEL_N,
@@ -133,11 +122,11 @@ class TestRobustPanelFE:
 
     @pytest.fixture
     def panel_data(self, rng):
-        from neighbayes.dgp import simulate_panel_sar_fe
+        from neighbayes.dgp import simulate_sar_panel_fe
 
         W = make_line_W(PANEL_N)
         W_graph = W_to_graph(W)
-        out = simulate_panel_sar_fe(
+        out = simulate_sar_panel_fe(
             N=PANEL_N,
             T=PANEL_T,
             rho=0.3,
@@ -150,24 +139,24 @@ class TestRobustPanelFE:
 
     def test_ols_panel_fe_robust(self, panel_data):
         y, X, W_graph = panel_data
-        model = OLSPanelFE(
-            y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, effects=1, robust=True
+        model = OLS(
+            unit_effects="fixed", y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, robust=True
         )
         idata = model.fit(**QUICK_KWARGS)
         assert "nu" not in idata.posterior  # fixed, not sampled
 
     def test_sar_panel_fe_robust(self, panel_data):
         y, X, W_graph = panel_data
-        model = SARPanelFE(
-            y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, effects=1, robust=True
+        model = SAR(
+            unit_effects="fixed", y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, robust=True
         )
         idata = model.fit(**QUICK_KWARGS)
         assert "nu" not in idata.posterior  # fixed, not sampled
 
     def test_sem_panel_fe_robust(self, panel_data):
         y, X, W_graph = panel_data
-        model = SEMPanelFE(
-            y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, effects=1, robust=True
+        model = SEM(
+            unit_effects="fixed", y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, robust=True
         )
         idata = model.fit(**QUICK_KWARGS)
         assert "nu" not in idata.posterior  # fixed, not sampled
@@ -183,11 +172,11 @@ class TestRobustPanelRE:
 
     @pytest.fixture
     def panel_re_data(self, rng):
-        from neighbayes.dgp import simulate_panel_sar_re
+        from neighbayes.dgp import simulate_sar_panel_re
 
         W = make_line_W(PANEL_N)
         W_graph = W_to_graph(W)
-        out = simulate_panel_sar_re(
+        out = simulate_sar_panel_re(
             N=PANEL_N,
             T=PANEL_T,
             rho=0.3,
@@ -200,19 +189,43 @@ class TestRobustPanelRE:
 
     def test_ols_panel_re_robust(self, panel_re_data):
         y, X, W_graph = panel_re_data
-        model = OLSPanelRE(y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, robust=True)
+        model = OLS(
+            unit_effects="random",
+            y=y,
+            X=X,
+            W=W_graph,
+            N=PANEL_N,
+            T=PANEL_T,
+            robust=True,
+        )
         idata = model.fit(**QUICK_KWARGS)
         assert "nu" not in idata.posterior  # fixed, not sampled
 
     def test_sar_panel_re_robust(self, panel_re_data):
         y, X, W_graph = panel_re_data
-        model = SARPanelRE(y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, robust=True)
+        model = SAR(
+            unit_effects="random",
+            y=y,
+            X=X,
+            W=W_graph,
+            N=PANEL_N,
+            T=PANEL_T,
+            robust=True,
+        )
         idata = model.fit(**QUICK_KWARGS)
         assert "nu" not in idata.posterior  # fixed, not sampled
 
     def test_sem_panel_re_robust(self, panel_re_data):
         y, X, W_graph = panel_re_data
-        model = SEMPanelRE(y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, robust=True)
+        model = SEM(
+            unit_effects="random",
+            y=y,
+            X=X,
+            W=W_graph,
+            N=PANEL_N,
+            T=PANEL_T,
+            robust=True,
+        )
         idata = model.fit(**QUICK_KWARGS)
         assert "nu" not in idata.posterior  # fixed, not sampled
 
@@ -267,12 +280,12 @@ class TestRobustTobit:
 
 
 # ---------------------------------------------------------------------------
-# SARProbit — should raise NotImplementedError
+# SEMProbitRE — should raise NotImplementedError
 # ---------------------------------------------------------------------------
 
 
 class TestRobustSpatialProbit:
-    """SARProbit should raise NotImplementedError when robust=True."""
+    """SEMProbitRE should raise NotImplementedError when robust=True."""
 
     def test_spatial_probit_raises(self, rng):
         W = make_line_W(6)
@@ -282,9 +295,11 @@ class TestRobustSpatialProbit:
         n = m * 3
         X = rng.standard_normal((n, 2))
         y = rng.binomial(1, 0.5, size=n).astype(float)
-        model = SARProbit(y=y, X=X, W=W_graph, region_ids=region_ids, robust=True)
+        model = SEMProbit(
+            group_effects="random", y=y, X=X, W=W_graph, groups=region_ids, robust=True
+        )
         with pytest.raises(
-            NotImplementedError, match="Robust.*not supported.*SARProbit"
+            NotImplementedError, match="Robust.*not supported.*SEMProbitRE"
         ):
             model._build_pymc_model()
 

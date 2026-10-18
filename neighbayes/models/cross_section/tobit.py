@@ -19,6 +19,7 @@ from pytensor import sparse as pts
 
 from ..._lazy_deps import pm, xr
 from .._base._shared import _tobit_pointwise_loglik, _write_log_likelihood_to_idata
+from .._design import tobit
 from ..base import SpatialModel
 from ..priors import SARTobitPriors, SDMTobitPriors, SEMTobitPriors
 
@@ -291,6 +292,8 @@ class SARTobit(_SpatialTobitBase):
     ``priors={"nu": value}`` (default 4, LeSage's ``rval``).
     """
 
+    _dispatch = classmethod(tobit)
+
     _priors_cls = SARTobitPriors
 
     def _build_pymc_model(self) -> pm.Model:
@@ -325,7 +328,7 @@ class SARTobit(_SpatialTobitBase):
     def _fitted_mean_from_posterior(self) -> np.ndarray:
         """Reported fitted mean: ``max(c, E[y* | X, params])``.
 
-        The structural latent mean for SAR-Tobit is
+        The structural latent mean for SARTobit is
         :math:`E[y^* \\mid X] = (I - \\rho W)^{-1} X \\beta`, evaluated at the
         posterior mean of :math:`(\\rho, \\beta)`. Censored observations are
         reported at the censoring point ``c`` (consistent with the
@@ -441,6 +444,8 @@ class SEMTobit(_SpatialTobitBase):
     hyperparameter set by ``priors={"nu": value}`` (default 4).
     """
 
+    _dispatch = classmethod(tobit)
+
     _priors_cls = SEMTobitPriors
 
     def _build_pymc_model(self) -> pm.Model:
@@ -472,7 +477,7 @@ class SEMTobit(_SpatialTobitBase):
     def _fitted_mean_from_posterior(self) -> np.ndarray:
         """Reported fitted mean: ``max(c, E[y* | X, params])``.
 
-        For SEM-Tobit the structural latent mean is
+        For SEMTobit the structural latent mean is
         :math:`E[y^* \\mid X] = X\\beta` (the spatial filter operates on the
         error term and integrates out). Censored entries are reported at
         the censoring point.
@@ -581,6 +586,8 @@ class SDMTobit(_SpatialTobitBase):
     hyperparameter set by ``priors={"nu": value}`` (default 4).
     """
 
+    _dispatch = classmethod(tobit)
+
     _priors_cls = SDMTobitPriors
     _has_wx_in_beta: bool = True
 
@@ -617,7 +624,7 @@ class SDMTobit(_SpatialTobitBase):
     def _fitted_mean_from_posterior(self) -> np.ndarray:
         """Reported fitted mean: ``max(c, E[y* | X, params])``.
 
-        The structural latent mean for SDM-Tobit is
+        The structural latent mean for SDMTobit is
         :math:`E[y^* \\mid X] = (I - \\rho W)^{-1} (X\\beta + WX\\theta)`,
         evaluated at posterior means; censored entries are reported at
         the censoring point.

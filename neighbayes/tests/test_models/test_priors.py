@@ -7,8 +7,8 @@ import pytest
 from libpysal.graph import Graph
 from scipy import sparse as sp
 
-from neighbayes.models import OLS, SAR, SDEM, SDM, SEM, SLX
-from neighbayes.models.cross_section.sar_probit import SARProbit
+from neighbayes.models import OLS, SAR, SDEM, SDM, SEM, SLX, SEMProbit
+from neighbayes.models.cross_section.sem_probit import SEMProbitRE
 from neighbayes.models.cross_section.tobit import SARTobit
 from neighbayes.models.priors import (
     BasePriors,
@@ -124,7 +124,7 @@ def test_spatial_probit_priors_defaults():
     X = rng.normal(size=(n, 2))
     y = (rng.normal(size=n) > 0).astype(int)
     W = _make_w(n)
-    m = SARProbit(y=y, X=X, W=W, region_ids=np.arange(n))
+    m = SEMProbit(group_effects="random", y=y, X=X, W=W, groups=np.arange(n))
     assert isinstance(m.priors_obj, SARProbitPriors)
     assert m.priors["rho_lower"] == -0.95
     assert m.priors["rho_upper"] == 0.95

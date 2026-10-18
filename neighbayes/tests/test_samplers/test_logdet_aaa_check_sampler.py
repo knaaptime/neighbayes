@@ -126,7 +126,7 @@ def test_panel_fe_runs_refit_and_check():
             for t in range(T)
         ]
     )
-    model = SARPanelFE(y=y, X=X, W=W, N=N, T=T, effects=1, logdet_method="chol_aaa")
+    model = SAR(unit_effects="fixed", y=y, X=X, W=W, N=N, T=T, logdet_method="chol_aaa")
     idata = model.fit(
         sampler="gibbs",
         draws=300,

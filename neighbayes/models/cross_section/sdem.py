@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from .._design import gaussian
 from .._mixins import GaussianLikelihoodMixin, GaussianPredictionMixin
 from ..base import SpatialModel
 from ..priors import SDEMPriors
@@ -141,6 +142,8 @@ class SDEM(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     (default 4, LeSage's ``rval``); larger values approach the Normal.  Values
     must exceed 2 so the variance exists.
     """
+
+    _dispatch = classmethod(gaussian)
 
     _priors_cls = SDEMPriors
     _spatial_params: tuple[str, ...] = ("lam",)

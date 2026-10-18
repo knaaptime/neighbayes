@@ -571,8 +571,8 @@ def _slx_spec() -> TreeNode:
     #
     # When both naive precursors fire, both robust refinements are
     # consulted; if both robust tests survive, the smaller-p (larger-stat)
-    # side wins via ``lag_sdm_pval_le_error_sdem_pval``.  ``MANSAR`` is
-    # intentionally not a terminal here; users wanting MANSAR should fit
+    # side wins via ``lag_sdm_pval_le_error_sdem_pval``.  ``GNS`` is
+    # intentionally not a terminal here; users wanting GNS should fit
     # it explicitly and compare via :func:`bayes_factor_compare_models`.
     both_naive_sig = TreeNode(
         kind="test",
@@ -625,7 +625,7 @@ def _slx_spec() -> TreeNode:
 
 
 def _sdm_spec() -> TreeNode:
-    # Robust-after-naive: only escalate to MANSAR when both the naive SDM
+    # Robust-after-naive: only escalate to GNS when both the naive SDM
     # error score (``LM-Error-SDM``) and its Neyman-orthogonal
     # counterpart (``Robust-LM-Error-SDM``, Schur-purged for ρ at the
     # SDM posterior mean) survive.  Without the robust gate the naive
@@ -636,7 +636,7 @@ def _sdm_spec() -> TreeNode:
         if_true=TreeNode(
             kind="test",
             name="Robust-LM-Error-SDM",
-            if_true="MANSAR",
+            if_true="GNS",
             if_false="SDM",
         ),
         if_false="SDM",
@@ -644,7 +644,7 @@ def _sdm_spec() -> TreeNode:
 
 
 def _sdem_spec() -> TreeNode:
-    # Robust-after-naive: only escalate to MANSAR when both ``LM-Lag-SDEM``
+    # Robust-after-naive: only escalate to GNS when both ``LM-Lag-SDEM``
     # and ``Robust-LM-Lag-SDEM`` (Schur-purged for the WX block, with
     # λ filtered at its posterior mean) fire.
     return TreeNode(
@@ -653,14 +653,14 @@ def _sdem_spec() -> TreeNode:
         if_true=TreeNode(
             kind="test",
             name="Robust-LM-Lag-SDEM",
-            if_true="MANSAR",
+            if_true="GNS",
             if_false="SDEM",
         ),
         if_false="SDEM",
     )
 
 
-# Tobit variants: same logic with -Tobit suffix on leaves.
+# Tobit variants: the same logic, with Tobit leaves.
 def _sar_tobit_spec() -> TreeNode:
     # Tobit mirror of ``_sar_spec`` — see that docstring.  The error
     # branch is built twice (not shared) so the graphviz layout draws
@@ -672,10 +672,10 @@ def _sar_tobit_spec() -> TreeNode:
             if_true=TreeNode(
                 kind="test",
                 name="Robust-LM-Error",
-                if_true="SARAR-Tobit",
-                if_false="SAR-Tobit",
+                if_true="SARARTobit",
+                if_false="SARTobit",
             ),
-            if_false="SAR-Tobit",
+            if_false="SARTobit",
         )
 
     return TreeNode(
@@ -684,7 +684,7 @@ def _sar_tobit_spec() -> TreeNode:
         if_true=TreeNode(
             kind="test",
             name="Robust-LM-WX",
-            if_true="SDM-Tobit",
+            if_true="SDMTobit",
             if_false=_error_branch(),
         ),
         if_false=_error_branch(),
@@ -696,8 +696,8 @@ def _sem_tobit_spec() -> TreeNode:
     both_robust = TreeNode(
         kind="predicate",
         name="Robust-LM-Lag p <= Robust-LM-WX p",
-        if_true="SARAR-Tobit",
-        if_false="SDEM-Tobit",
+        if_true="SARARTobit",
+        if_false="SDEMTobit",
         predicate_id="lag_sem_pval_le_wx_sem_pval",
     )
     both_naive_sig = TreeNode(
@@ -707,13 +707,13 @@ def _sem_tobit_spec() -> TreeNode:
             kind="test",
             name="Robust-LM-WX",
             if_true=both_robust,
-            if_false="SARAR-Tobit",
+            if_false="SARARTobit",
         ),
         if_false=TreeNode(
             kind="test",
             name="Robust-LM-WX",
-            if_true="SDEM-Tobit",
-            if_false="SEM-Tobit",
+            if_true="SDEMTobit",
+            if_false="SEMTobit",
         ),
     )
     return TreeNode(
@@ -726,8 +726,8 @@ def _sem_tobit_spec() -> TreeNode:
             if_false=TreeNode(
                 kind="test",
                 name="Robust-LM-Lag",
-                if_true="SARAR-Tobit",
-                if_false="SEM-Tobit",
+                if_true="SARARTobit",
+                if_false="SEMTobit",
             ),
         ),
         if_false=TreeNode(
@@ -736,10 +736,10 @@ def _sem_tobit_spec() -> TreeNode:
             if_true=TreeNode(
                 kind="test",
                 name="Robust-LM-WX",
-                if_true="SDEM-Tobit",
-                if_false="SEM-Tobit",
+                if_true="SDEMTobit",
+                if_false="SEMTobit",
             ),
-            if_false="SEM-Tobit",
+            if_false="SEMTobit",
         ),
     )
 
@@ -752,10 +752,10 @@ def _sdm_tobit_spec() -> TreeNode:
         if_true=TreeNode(
             kind="test",
             name="Robust-LM-Error",
-            if_true="MANSAR-Tobit",
-            if_false="SDM-Tobit",
+            if_true="GNSTobit",
+            if_false="SDMTobit",
         ),
-        if_false="SDM-Tobit",
+        if_false="SDMTobit",
     )
 
 
@@ -789,18 +789,18 @@ def get_spec(model_type: str) -> TreeNode | str:
 # ---------------------------------------------------------------------------
 
 
-def _panel_ols_spec(suffix: str) -> TreeNode:
-    # Panel mirror of :func:`_ols_spec`.  ``SARARPanel{suffix}`` is
+def _panel_ols_spec() -> TreeNode:
+    # Panel mirror of :func:`_ols_spec`.  ``SARAR`` is
     # intentionally not a reachable terminal: its proper null is
-    # ``SARPanel{suffix}`` (or ``SEMPanel{suffix}``), and a valid
+    # ``SAR`` (or ``SEM``), and a valid
     # specification test for SARAR cannot be conducted from a panel-OLS
     # fit alone.  The tree recommends the dominant single-channel model
     # and the user re-runs diagnostics from there.
     robust_tie_break = TreeNode(
         kind="predicate",
         name="Panel-Robust-LM-Lag p <= Panel-Robust-LM-Error p",
-        if_true=f"SARPanel{suffix}",
-        if_false=f"SEMPanel{suffix}",
+        if_true="SAR",
+        if_false="SEM",
         predicate_id="panel_robust_lag_pval_le_error_pval",
     )
     both_sig = TreeNode(
@@ -810,17 +810,17 @@ def _panel_ols_spec(suffix: str) -> TreeNode:
             kind="test",
             name="Panel-Robust-LM-Error",
             if_true=robust_tie_break,
-            if_false=f"SARPanel{suffix}",
+            if_false="SAR",
         ),
         if_false=TreeNode(
             kind="test",
             name="Panel-Robust-LM-Error",
-            if_true=f"SEMPanel{suffix}",
+            if_true="SEM",
             if_false=TreeNode(
                 kind="predicate",
                 name="Panel-LM-Lag p <= Panel-LM-Error p",
-                if_true=f"SARPanel{suffix}",
-                if_false=f"SEMPanel{suffix}",
+                if_true="SAR",
+                if_false="SEM",
                 predicate_id="panel_lag_pval_le_error_pval",
             ),
         ),
@@ -835,18 +835,18 @@ def _panel_ols_spec(suffix: str) -> TreeNode:
             kind="test",
             name="Panel-LM-Error",
             if_true=both_sig,
-            if_false=f"SARPanel{suffix}",
+            if_false="SAR",
         ),
         if_false=TreeNode(
             kind="test",
             name="Panel-LM-Error",
-            if_true=f"SEMPanel{suffix}",
-            if_false=f"OLSPanel{suffix}",
+            if_true="SEM",
+            if_false="OLS",
         ),
     )
 
 
-def _panel_sar_spec(suffix: str) -> TreeNode:
+def _panel_sar_spec() -> TreeNode:
     # Panel mirror of ``_sar_spec`` — see that docstring.  Build the
     # error branch twice (not shared) so graphviz draws naive→robust
     # strictly within each channel.
@@ -854,8 +854,8 @@ def _panel_sar_spec(suffix: str) -> TreeNode:
         return TreeNode(
             kind="test",
             name="Panel-LM-Error",
-            if_true=f"SARARPanel{suffix}",
-            if_false=f"SARPanel{suffix}",
+            if_true="SARAR",
+            if_false="SAR",
         )
 
     return TreeNode(
@@ -864,14 +864,14 @@ def _panel_sar_spec(suffix: str) -> TreeNode:
         if_true=TreeNode(
             kind="test",
             name="Panel-Robust-LM-WX",
-            if_true=f"SDMPanel{suffix}",
+            if_true="SDM",
             if_false=_error_branch(),
         ),
         if_false=_error_branch(),
     )
 
 
-def _panel_sem_spec(suffix: str) -> TreeNode:
+def _panel_sem_spec() -> TreeNode:
     # Panel mirror of ``_sem_spec`` — see that docstring.
     return TreeNode(
         kind="test",
@@ -879,19 +879,19 @@ def _panel_sem_spec(suffix: str) -> TreeNode:
         if_true=TreeNode(
             kind="test",
             name="Panel-LM-WX",
-            if_true=f"SDEMPanel{suffix}",
-            if_false=f"SARARPanel{suffix}",
+            if_true="SDEM",
+            if_false="SARAR",
         ),
         if_false=TreeNode(
             kind="test",
             name="Panel-LM-WX",
-            if_true=f"SDEMPanel{suffix}",
-            if_false=f"SEMPanel{suffix}",
+            if_true="SDEM",
+            if_false="SEM",
         ),
     )
 
 
-def _panel_slx_spec(suffix: str) -> TreeNode:
+def _panel_slx_spec() -> TreeNode:
     # Panel mirror of ``_slx_spec`` — see that docstring.
     both_naive_sig = TreeNode(
         kind="test",
@@ -902,17 +902,17 @@ def _panel_slx_spec(suffix: str) -> TreeNode:
             if_true=TreeNode(
                 kind="predicate",
                 name="Panel-Robust-LM-Lag-SDM p <= Panel-Robust-LM-Error-SDEM p",
-                if_true=f"SDMPanel{suffix}",
-                if_false=f"SDEMPanel{suffix}",
+                if_true="SDM",
+                if_false="SDEM",
                 predicate_id="panel_lag_sdm_pval_le_error_sdem_pval",
             ),
-            if_false=f"SDMPanel{suffix}",
+            if_false="SDM",
         ),
         if_false=TreeNode(
             kind="test",
             name="Panel-Robust-LM-Error-SDEM",
-            if_true=f"SDEMPanel{suffix}",
-            if_false=f"SLXPanel{suffix}",
+            if_true="SDEM",
+            if_false="SLX",
         ),
     )
     return TreeNode(
@@ -925,8 +925,8 @@ def _panel_slx_spec(suffix: str) -> TreeNode:
             if_false=TreeNode(
                 kind="test",
                 name="Panel-Robust-LM-Lag-SDM",
-                if_true=f"SDMPanel{suffix}",
-                if_false=f"SLXPanel{suffix}",
+                if_true="SDM",
+                if_false="SLX",
             ),
         ),
         if_false=TreeNode(
@@ -935,44 +935,35 @@ def _panel_slx_spec(suffix: str) -> TreeNode:
             if_true=TreeNode(
                 kind="test",
                 name="Panel-Robust-LM-Error-SDEM",
-                if_true=f"SDEMPanel{suffix}",
-                if_false=f"SLXPanel{suffix}",
+                if_true="SDEM",
+                if_false="SLX",
             ),
-            if_false=f"SLXPanel{suffix}",
+            if_false="SLX",
         ),
     )
 
 
-def _panel_sdm_spec(suffix: str) -> TreeNode:
+def _panel_sdm_spec() -> TreeNode:
     return TreeNode(
         kind="test",
         name="Panel-LM-Error-SDM",
-        if_true=f"MANSARPanel{suffix}",
-        if_false=f"SDMPanel{suffix}",
+        if_true="GNS",
+        if_false="SDM",
     )
 
 
-def _panel_sdem_spec(suffix: str) -> TreeNode:
+def _panel_sdem_spec() -> TreeNode:
     return TreeNode(
         kind="test",
         name="Panel-LM-Lag-SDEM",
-        if_true=f"MANSARPanel{suffix}",
-        if_false=f"SDEMPanel{suffix}",
+        if_true="GNS",
+        if_false="SDEM",
     )
 
 
-_PANEL_SPECS: dict[str, Callable[[str], TreeNode]] = {
-    "OLSPanel": _panel_ols_spec,
-    "SARPanel": _panel_sar_spec,
-    "SEMPanel": _panel_sem_spec,
-    "SLXPanel": _panel_slx_spec,
-    "SDMPanel": _panel_sdm_spec,
-    "SDEMPanel": _panel_sdem_spec,
-}
-
-# Dynamic panels reuse the same tree structure as static panels;
-# the only difference is the leaf suffix ("Dynamic" instead of "FE"/"RE").
-_PANEL_DYNAMIC_SPECS: dict[str, Callable[[str], TreeNode]] = {
+# Static and dynamic panels share these trees: a leaf names the process, and
+# the panel design comes from the model the diagnostics were run on.
+_PANEL_SPECS: dict[str, Callable[[], TreeNode]] = {
     "OLSPanel": _panel_ols_spec,
     "SARPanel": _panel_sar_spec,
     "SEMPanel": _panel_sem_spec,
@@ -982,8 +973,7 @@ _PANEL_DYNAMIC_SPECS: dict[str, Callable[[str], TreeNode]] = {
 }
 
 
-# Panel Tobit specs mirror the cross-sectional Tobit specs but with
-# "PanelTobit" leaf suffix.
+# Panel Tobit specs mirror the cross-sectional Tobit specs.
 def _panel_tobit_sar_spec() -> TreeNode:
     return TreeNode(
         kind="test",
@@ -991,18 +981,18 @@ def _panel_tobit_sar_spec() -> TreeNode:
         if_true=TreeNode(
             kind="test",
             name="Panel-Robust-LM-WX",
-            if_true="SDMPanelTobit",
-            if_false="SARARPanelTobit",
+            if_true="SDMTobit",
+            if_false="SARARTobit",
         ),
         if_false=TreeNode(
             kind="test",
             name="Panel-Robust-LM-WX",
-            if_true="SDMPanelTobit",
+            if_true="SDMTobit",
             if_false=TreeNode(
                 kind="test",
                 name="Panel-LM-WX",
-                if_true="SDMPanelTobit",
-                if_false="SARPanelTobit",
+                if_true="SDMTobit",
+                if_false="SARTobit",
             ),
         ),
     )
@@ -1015,21 +1005,21 @@ def _panel_tobit_sem_spec() -> TreeNode:
         if_true=TreeNode(
             kind="test",
             name="Panel-LM-WX",
-            if_true="SDEMPanelTobit",
-            if_false="SARARPanelTobit",
+            if_true="SDEMTobit",
+            if_false="SARARTobit",
         ),
         if_false=TreeNode(
             kind="test",
             name="Panel-LM-WX",
-            if_true="SDEMPanelTobit",
-            if_false="SEMPanelTobit",
+            if_true="SDEMTobit",
+            if_false="SEMTobit",
         ),
     )
 
 
 _PANEL_TOBIT_SPECS: dict[str, Callable[[], TreeNode]] = {
-    "SARPanelTobit": _panel_tobit_sar_spec,
-    "SEMPanelTobit": _panel_tobit_sem_spec,
+    "SARTobitPanel": _panel_tobit_sar_spec,
+    "SEMTobitPanel": _panel_tobit_sem_spec,
 }
 
 
@@ -1040,24 +1030,16 @@ def get_panel_spec(model_type: str) -> TreeNode | str:
     ``Suffix`` is ``FE``, ``RE``, ``Dynamic``, or ``Tobit``.
     Falls back to a leaf if not found.
     """
-    # Panel Tobit (e.g. SARPanelTobit, SEMPanelTobit)
+    # Panel Tobit (e.g. SARTobitPanel, SEMTobitPanel)
     if "Tobit" in model_type:
         factory = _PANEL_TOBIT_SPECS.get(model_type)
         if factory is not None:
             return factory()
         return model_type
 
-    # Dynamic panels (e.g. OLSPanelDynamic, SARPanelDynamic)
-    if "Dynamic" in model_type:
-        suffix = "Dynamic"
-        specs = _PANEL_DYNAMIC_SPECS
-    else:
-        suffix = "FE" if "FE" in model_type else "RE" if "RE" in model_type else ""
-        specs = _PANEL_SPECS
-
-    for prefix, factory in specs.items():
+    for prefix, factory in _PANEL_SPECS.items():
         if model_type.startswith(prefix):
-            return factory(suffix)
+            return factory()
     return model_type
 
 
@@ -1108,30 +1090,30 @@ def _sar_flow_spec() -> TreeNode:
 
 
 def _panel_ols_flow_spec() -> TreeNode:
-    """OLSFlowPanel decision tree (panel mirror of ``_ols_flow_spec``)."""
+    """OLSFlowPanelFE decision tree (panel mirror of ``_ols_flow_spec``)."""
     return TreeNode(
         kind="test",
         name="Panel-LM-Flow-Joint",
-        if_true="SARFlowPanel",
-        if_false="OLSFlowPanel",
+        if_true="SARFlow",
+        if_false="OLSFlow",
     )
 
 
 def _panel_sar_flow_spec() -> TreeNode:
-    """SARFlowPanel decision tree (panel mirror of ``_sar_flow_spec``)."""
+    """SARFlowPanelFE decision tree (panel mirror of ``_sar_flow_spec``)."""
     return TreeNode(
         kind="test",
         name="Panel-Robust-LM-Flow-Dest",
-        if_true="SARFlowPanel",
+        if_true="SARFlow",
         if_false=TreeNode(
             kind="test",
             name="Panel-Robust-LM-Flow-Orig",
-            if_true="SARFlowPanel",
+            if_true="SARFlow",
             if_false=TreeNode(
                 kind="test",
                 name="Panel-Robust-LM-Flow-Network",
-                if_true="SARFlowPanel",
-                if_false="OLSFlowPanel",
+                if_true="SARFlow",
+                if_false="OLSFlow",
             ),
         ),
     )
@@ -1143,8 +1125,8 @@ _FLOW_SPECS: dict[str, Callable[[], TreeNode]] = {
 }
 
 _PANEL_FLOW_SPECS: dict[str, Callable[[], TreeNode]] = {
-    "OLSFlowPanel": _panel_ols_flow_spec,
-    "SARFlowPanel": _panel_sar_flow_spec,
+    "OLSFlowPanelFE": _panel_ols_flow_spec,
+    "SARFlowPanelFE": _panel_sar_flow_spec,
 }
 
 

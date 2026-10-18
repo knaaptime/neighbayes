@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from neighbayes.models import OLSPanelFE, OLSPanelRE, SARPanelFE, SLXPanelFE
+from neighbayes.models import OLS, SAR, SLX
+from neighbayes.models.panel._fe import OLSPanelFE, SARPanelFE, SLXPanelFE
+from neighbayes.models.panel._re import OLSPanelRE
 
 
 def test_panel_models_no_longer_expose_frequentist_diagnostics():

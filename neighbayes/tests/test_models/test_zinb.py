@@ -15,13 +15,10 @@ import pandas as pd
 import pytest
 
 from neighbayes import dgp
-from neighbayes.models import (
-    SARZINB,
-    SARZINBFlowSeparable,
-    SARZINBFlowSeparablePanel,
-    SARZINBPanel,
-    ZINBPanel,
-)
+from neighbayes.models import SARZINB, ZINB, SARZINBFlow
+from neighbayes.models.flow_panel._panel import SARZINBFlowSeparable
+from neighbayes.models.panel._zinb import SARZINBPanelRE, ZINBPanelRE
+from neighbayes.tests.helpers import effects_kwargs
 
 QUICK = dict(draws=20, tune=20, chains=1, progressbar=False, random_seed=0)
 A = 23.0
@@ -32,13 +29,13 @@ def _xs(n_side=7, seed=0):
 
 
 def _panel(seed=1):
-    return dgp.simulate_panel_sar_zinb(
+    return dgp.simulate_sar_zinb_panel_re(
         N=25, T=3, n_side=5, seed=seed, unit_effect_sd=0.5, time_effect_sd=0.3
     )
 
 
 def _flow(T=1, seed=2, **kw):
-    return dgp.generate_zinb_flow_data_separable(n=4, T=T, seed=seed, **kw)
+    return dgp.simulate_sar_zinb_flow_separable(n=4, T=T, seed=seed, **kw)
 
 
 def _agree(a, b, var, mean_tol=0.2, sd_tol=0.15):
@@ -123,7 +120,7 @@ class TestFixes:
         )
         np.testing.assert_allclose(d["eta_sel"], expected, atol=1e-10)
 
-        f = dgp.generate_zinb_flow_data_separable(
+        f = dgp.simulate_sar_zinb_flow_separable(
             n=6, T=2, lam_d=0.4, lam_o=0.3, target_pi=0.6, seed=3
         )
         W = _graph_to_csr(f["G"]).toarray()
@@ -206,7 +203,7 @@ class TestSARZINB:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("cls", [SARZINBPanel, ZINBPanel])
+@pytest.mark.parametrize("cls", [SARZINBPanelRE, ZINBPanelRE])
 @pytest.mark.parametrize("effects", [0, 1, 2, 3])
 @pytest.mark.parametrize("sampler", ["gibbs", "nuts"])
 def test_zinb_panel_api(cls, effects, sampler):
@@ -218,7 +215,7 @@ def test_zinb_panel_api(cls, effects, sampler):
     post = m.fit(**kw).posterior
     assert ("group_effect" in post) == (effects in (1, 3))
     assert ("time_effect" in post) == (effects in (2, 3))
-    assert ("lam" in post) == (cls is SARZINBPanel)
+    assert ("lam" in post) == (cls is SARZINBPanelRE)
     assert post["gamma"].shape[-1] == 2
     assert m.posterior_predictive(n_draws=2, random_seed=0).shape == (2, 75)
     assert m.spatial_effects().shape[0] == 1
@@ -230,14 +227,14 @@ def test_zinb_panel_registry_and_storage():
 
     assert resolve("zinb", "panel") is not None
     d = _panel()
-    m = SARZINBPanel(
+    m = SARZINB(
+        unit_effects="random",
         y=d["y"],
         X=d["X"],
         Z=d["Z"],
         W=d["W_sparse"],
         N=25,
         T=3,
-        effects=1,
         priors={"alpha_fixed": A},
     )
     idata = m.fit(store_group_effects=False, thin=2, n_jobs=1, **QUICK)
@@ -287,13 +284,14 @@ def test_flow_zinb_panel(effects, backend):
     X = np.column_stack([d["X"], np.random.default_rng(0).normal(size=d["X"].shape[0])])
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        m = SARZINBFlowSeparablePanel(
+        m = SARZINBFlow(
             d["y"],
             X,
             d["G"],
+            separable=True,
             T=3,
             col_names=list(d["col_names"]) + ["z"],
-            effects=effects,
+            **effects_kwargs(effects, "pair_effects", "random"),
         )
         post = m.fit(gibbs_backend=backend, n_jobs=1, **QUICK).posterior
     assert ("group_effect" in post) == (effects in (1, 3))
@@ -385,12 +383,19 @@ def test_generic_kernel_matches_sarzinb():
 
 @pytest.mark.slow
 def test_zinb_panel_gibbs_matches_nuts():
-    d = dgp.simulate_panel_sar_zinb(
+    d = dgp.simulate_sar_zinb_panel_re(
         N=49, T=4, n_side=7, seed=2, unit_effect_sd=0.6, time_effect_sd=0.3,
         fe_x_corr=0.5,
     )  # fmt: skip
-    m = SARZINBPanel(
-        y=d["y"], X=d["X"], Z=d["Z"], W=d["W_sparse"], N=49, T=4, effects=3
+    m = SARZINB(
+        unit_effects="random",
+        time_effects=True,
+        y=d["y"],
+        X=d["X"],
+        Z=d["Z"],
+        W=d["W_sparse"],
+        N=49,
+        T=4,
     )
     g = m.fit(
         draws=4000, tune=1000, chains=4, progressbar=False, random_seed=1, n_jobs=4
@@ -415,7 +420,7 @@ def test_flow_zinb_panel_pair_effects_identify_selection():
     import arviz as az
 
     n, T = 20, 8
-    d = dgp.generate_zinb_flow_data_separable(
+    d = dgp.simulate_sar_zinb_flow_separable(
         n=n, T=T, seed=8, beta_d=[0.4, 0.4], beta_o=[0.4, 0.4], gamma_dist=-0.4,
         alpha=3.0, lam_d=0.3, lam_o=0.2, target_pi=0.7, pair_effect_sd=1.5,
         time_effect_sd=0.3,
@@ -424,8 +429,16 @@ def test_flow_zinb_panel_pair_effects_identify_selection():
     idx = [names.index(c) for c in ("intercept", "dest_x0", "orig_x0", "log_distance")]
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
-        m = SARZINBFlowSeparablePanel(
-            d["y"], d["X"], d["G"], T=T, col_names=names, Z=d["X"][:, idx], effects=3
+        m = SARZINBFlow(
+            d["y"],
+            d["X"],
+            d["G"],
+            separable=True,
+            pair_effects="random",
+            time_effects=True,
+            T=T,
+            col_names=names,
+            Z=d["X"][:, idx],
         )
     post = m.fit(
         draws=3000, tune=1000, chains=4, progressbar=False, random_seed=1,
@@ -447,12 +460,19 @@ def test_flow_zinb_panel_pair_effects_identify_selection():
 def test_flow_zinb_jax_matches_numpy():
     # Data on which the selection half is identified and mixes: on a tiny,
     # sparse panel λ's ESS is ~1% of draws and the comparison is only noise.
-    d = dgp.generate_zinb_flow_data_separable(
+    d = dgp.simulate_sar_zinb_flow_separable(
         n=8, T=6, seed=5, beta_d=[0.4, 0.4], beta_o=[0.4, 0.4], gamma_dist=-0.4,
         alpha=3.0, pair_effect_sd=0.5, time_effect_sd=0.3, target_pi=0.7,
     )  # fmt: skip
-    m = SARZINBFlowSeparablePanel(
-        d["y"], d["X"], d["G"], T=6, col_names=d["col_names"], effects=3
+    m = SARZINBFlow(
+        d["y"],
+        d["X"],
+        d["G"],
+        separable=True,
+        pair_effects="random",
+        time_effects=True,
+        T=6,
+        col_names=d["col_names"],
     )
     fit = dict(draws=3000, tune=1000, chains=4, progressbar=False)
     a = m.fit(gibbs_backend="numpy", random_seed=1, n_jobs=4, **fit).posterior

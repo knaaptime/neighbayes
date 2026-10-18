@@ -1,4 +1,4 @@
-"""Fast branch and utility tests for SARProbit."""
+"""Fast branch and utility tests for SEMProbitRE."""
 
 from __future__ import annotations
 
@@ -10,7 +10,8 @@ import pytest
 import scipy.sparse as sp
 import xarray as xr
 
-from neighbayes.models import SARProbit
+from neighbayes.models import SEMProbit
+from neighbayes.models.cross_section.sem_probit import SEMProbitRE
 from neighbayes.tests.helpers import W_to_graph, make_line_W
 
 
@@ -22,7 +23,7 @@ class _LegacyW:
         return self
 
 
-def _idata_for_model(m: SARProbit) -> xr.DataTree:
+def _idata_for_model(m: SEMProbitRE) -> xr.DataTree:
     n = m._X.shape[0]
     r = m._m
     posterior = {
@@ -40,16 +41,16 @@ def _idata_for_model(m: SARProbit) -> xr.DataTree:
 def test_as_dense_region_W_warns_for_non_row_standardized_sparse():
     W = sp.csr_matrix(np.array([[0.0, 2.0], [1.0, 0.0]], dtype=float))
     with pytest.warns(UserWarning, match="row-standardized"):
-        dense = SARProbit._as_dense_region_W(W)
+        dense = SEMProbitRE._as_dense_region_W(W)
     assert dense.shape == (2, 2)
 
 
 def test_as_dense_region_W_rejects_legacy_and_dense_types():
     with pytest.raises(TypeError, match="legacy libpysal.weights.W"):
-        SARProbit._as_dense_region_W(_LegacyW())
+        SEMProbitRE._as_dense_region_W(_LegacyW())
 
     with pytest.raises(TypeError, match="Graph or a scipy sparse"):
-        SARProbit._as_dense_region_W(np.eye(2))
+        SEMProbitRE._as_dense_region_W(np.eye(2))
 
 
 def test_matrix_mode_region_parsing_with_ids_and_mobs():
@@ -57,11 +58,13 @@ def test_matrix_mode_region_parsing_with_ids_and_mobs():
     X = np.column_stack([np.ones(4), np.arange(4, dtype=float)])
     W = W_to_graph(make_line_W(2))
 
-    m_ids = SARProbit(y=y, X=X, W=W, region_ids=np.array([10, 10, 20, 20]))
+    m_ids = SEMProbit(
+        group_effects="random", y=y, X=X, W=W, groups=np.array([10, 10, 20, 20])
+    )
     assert m_ids._region_codes.tolist() == [0, 0, 1, 1]
     assert m_ids._region_names == ["10", "20"]
 
-    m_mobs = SARProbit(y=y, X=X, W=W, mobs=[2, 2])
+    m_mobs = SEMProbit(group_effects="random", y=y, X=X, W=W, group_sizes=[2, 2])
     assert m_mobs._region_codes.tolist() == [0, 0, 1, 1]
     assert m_mobs._region_names == ["region_0", "region_1"]
 
@@ -71,20 +74,26 @@ def test_spatial_probit_constructor_validation_errors():
     X = np.column_stack([np.ones(4), np.arange(4, dtype=float)])
     W = W_to_graph(make_line_W(2))
 
-    with pytest.raises(ValueError, match="Provide either region_ids or mobs"):
-        SARProbit(y=y, X=X, W=W)
+    with pytest.raises(ValueError, match="Group effects need group_col"):
+        SEMProbit(group_effects="random", y=y, X=X, W=W)
 
     with pytest.raises(ValueError, match="region_ids must have one entry"):
-        SARProbit(y=y, X=X, W=W, region_ids=np.array([0, 1, 0]))
+        SEMProbit(group_effects="random", y=y, X=X, W=W, groups=np.array([0, 1, 0]))
 
     with pytest.raises(ValueError, match=r"sum\(mobs\) must equal"):
-        SARProbit(y=y, X=X, W=W, mobs=[1, 1])
+        SEMProbit(group_effects="random", y=y, X=X, W=W, group_sizes=[1, 1])
 
     with pytest.raises(ValueError, match="y must be binary"):
-        SARProbit(y=np.array([0, 2, 0, 1], dtype=float), X=X, W=W, mobs=[2, 2])
+        SEMProbit(
+            group_effects="random",
+            y=np.array([0, 2, 0, 1], dtype=float),
+            X=X,
+            W=W,
+            group_sizes=[2, 2],
+        )
 
     with pytest.raises(ValueError, match="must match W dimension"):
-        SARProbit(y=y, X=X, W=W, mobs=[1, 1, 2])
+        SEMProbit(group_effects="random", y=y, X=X, W=W, group_sizes=[1, 1, 2])
 
 
 def test_formula_mode_validation_and_parsing():
@@ -98,12 +107,14 @@ def test_formula_mode_validation_and_parsing():
     W = W_to_graph(make_line_W(2))
 
     with pytest.raises(ValueError, match="data is required"):
-        SARProbit(formula="y ~ x", W=W, region_col="region")
+        SEMProbit(group_effects="random", formula="y ~ x", W=W, group_col="region")
 
-    with pytest.raises(ValueError, match="region_col is required"):
-        SARProbit(formula="y ~ x", data=df, W=W)
+    with pytest.raises(ValueError, match="Group effects need group_col"):
+        SEMProbit(group_effects="random", formula="y ~ x", data=df, W=W)
 
-    model = SARProbit(formula="y ~ x", data=df, W=W, region_col="region")
+    model = SEMProbit(
+        group_effects="random", formula="y ~ x", data=df, W=W, group_col="region"
+    )
     assert model._X.shape[0] == 4
     assert model._y.shape[0] == 4
     assert model._region_names == ["a", "b"]
@@ -113,7 +124,7 @@ def test_build_model_requires_predictor_columns():
     y = np.array([0, 1, 0, 1], dtype=float)
     X = np.empty((4, 0), dtype=float)
     W = W_to_graph(make_line_W(2))
-    model = SARProbit(y=y, X=X, W=W, mobs=[2, 2])
+    model = SEMProbit(group_effects="random", y=y, X=X, W=W, group_sizes=[2, 2])
 
     with pytest.raises(ValueError, match="at least one predictor"):
         model._build_pymc_model()
@@ -123,7 +134,7 @@ def test_post_fit_accessors_and_rename_helper_and_pymc_property(monkeypatch):
     y = np.array([0, 1, 0, 1], dtype=float)
     X = np.column_stack([np.ones(4), np.arange(4, dtype=float)])
     W = W_to_graph(make_line_W(2))
-    model = SARProbit(y=y, X=X, W=W, mobs=[2, 2])
+    model = SEMProbit(group_effects="random", y=y, X=X, W=W, group_sizes=[2, 2])
 
     # pre-fit guard coverage
     with pytest.raises(RuntimeError, match="Model has not been fit yet"):

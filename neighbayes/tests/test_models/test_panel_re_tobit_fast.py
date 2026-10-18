@@ -8,13 +8,7 @@ import pandas as pd
 import pytest
 import xarray as xr
 
-from neighbayes.models import (
-    OLSPanelRE,
-    SARPanelRE,
-    SARPanelTobit,
-    SEMPanelRE,
-    SEMPanelTobit,
-)
+from neighbayes.models import OLS, SAR, SEM, SARTobit, SEMTobit
 from neighbayes.tests.helpers import W_to_graph, make_line_W
 
 
@@ -39,7 +33,7 @@ def test_panel_re_fitted_values_and_effects_run_with_mock_posteriors():
     alpha = np.linspace(-0.2, 0.2, N)
     beta = np.array([0.3, 1.0])
 
-    ols = OLSPanelRE(y=y, X=X, W=W, N=N, T=T)
+    ols = OLS(unit_effects="random", y=y, X=X, W=W, N=N, T=T)
     ols._idata = _idata(
         {
             "beta": np.stack([beta, beta + 1e-3]),
@@ -47,7 +41,7 @@ def test_panel_re_fitted_values_and_effects_run_with_mock_posteriors():
         }
     )
 
-    sar = SARPanelRE(y=y, X=X, W=W, N=N, T=T)
+    sar = SAR(unit_effects="random", y=y, X=X, W=W, N=N, T=T)
     sar._idata = _idata(
         {
             "beta": np.stack([beta, beta + 1e-3]),
@@ -56,7 +50,7 @@ def test_panel_re_fitted_values_and_effects_run_with_mock_posteriors():
         }
     )
 
-    sem = SEMPanelRE(y=y, X=X, W=W, N=N, T=T)
+    sem = SEM(unit_effects="random", y=y, X=X, W=W, N=N, T=T)
     sem._idata = _idata(
         {
             "beta": np.stack([beta, beta + 1e-3]),
@@ -85,8 +79,8 @@ def test_panel_tobit_fitted_values_and_effects_run_with_latent_gap_draws():
     y = y.copy()
     y[[0, 3]] = 0.0  # force censoring at default threshold
 
-    sar_tobit = SARPanelTobit(y=y, X=X, W=W, N=N, T=T)
-    sem_tobit = SEMPanelTobit(y=y, X=X, W=W, N=N, T=T)
+    sar_tobit = SARTobit(y=y, X=X, W=W, N=N, T=T)
+    sem_tobit = SEMTobit(y=y, X=X, W=W, N=N, T=T)
 
     beta = np.array([0.2, 0.9])
     yc_sar = np.vstack(

@@ -23,7 +23,7 @@ only if β is redrawn from its conditional immediately after (van Dyk & Park
 
 **Both** equations are reduced-form: the selection is the reduced-form
 SAR-logit from :mod:`neighbayes.samplers.logit_reduced._core` (spatial lag on
-the linear predictor, no latent field — the ``|I−λW|`` Jacobian cancels when γ
+the linear predictor, no random effects — the ``|I−λW|`` Jacobian cancels when γ
 is marginalized out), and the count is the reduced-form SAR-NB from
 :mod:`neighbayes.samplers.negbin_reduced._core`.  This matches the JAX backend
 (:mod:`neighbayes.samplers.zinb._jax`) block-for-block, so both backends fit the

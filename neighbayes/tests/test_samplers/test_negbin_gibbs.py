@@ -145,7 +145,7 @@ class TestSARNegBinStructuralRhoMixing:
     def test_rho_not_stuck(self):
         """Rho should have more than 1 unique value after 200 draws."""
         from neighbayes import dgp
-        from neighbayes.models import SARNegBinStructural
+        from neighbayes.models import SARNegBin
         from neighbayes.tests.helpers import W_to_graph, _as_sparse, make_rook_W
 
         rng = np.random.default_rng(42)
@@ -157,7 +157,9 @@ class TestSARNegBinStructuralRhoMixing:
             sigma2=0.5,
             rng=rng,
         )
-        model = SARNegBinStructural(y=data["y"], X=data["X"], W=data["W_graph"])
+        model = SARNegBin(
+            unit_effects="random", y=data["y"], X=data["X"], W=data["W_graph"]
+        )
         idata = model.fit(
             draws=200, tune=200, chains=1, random_seed=42, n_jobs=1, progressbar=False
         )

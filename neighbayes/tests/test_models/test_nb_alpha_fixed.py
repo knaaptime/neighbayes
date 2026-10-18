@@ -13,22 +13,17 @@ import pytest
 
 from neighbayes import dgp
 from neighbayes.dgp.flows import (
-    generate_negbin_flow_data,
-    generate_panel_negbin_flow_data,
+    simulate_sar_negbin_flow,
+    simulate_sar_negbin_flow_panel_re,
 )
-from neighbayes.models import (
-    NegBin,
-    NegBinFlow,
-    NegBinFlowPanel,
-    NegBinPanel,
-    SARNegBin,
-    SARNegBinFlow,
-    SARNegBinFlowPanel,
-    SARNegBinFlowSeparable,
-    SARNegBinFlowSeparablePanel,
-    SARNegBinPanel,
-    SARNegBinStructural,
+from neighbayes.models import NegBin, NegBinFlow, SARNegBin, SARNegBinFlow
+from neighbayes.models.flow._flow import SARNegBinFlowSeparable
+from neighbayes.models.flow_panel._panel import (
+    NegBinFlowPanelRE,
+    SARNegBinFlowPanelRE,
+    SARNegBinFlowSeparablePanelRE,
 )
+from neighbayes.models.panel._count import NegBinPanelRE, SARNegBinPanelRE
 from neighbayes.tests.helpers import W_to_graph, make_rook_W
 
 A = 37.0
@@ -46,11 +41,11 @@ def _cross_section():
 
 
 def _flow():
-    return generate_negbin_flow_data(n=5, seed=2)
+    return simulate_sar_negbin_flow(n=5, seed=2)
 
 
 def _flow_panel():
-    return generate_panel_negbin_flow_data(n=4, T=3, seed=3)
+    return simulate_sar_negbin_flow_panel_re(n=4, T=3, seed=3)
 
 
 @pytest.mark.parametrize(
@@ -65,9 +60,11 @@ def test_sar_negbin(backend):
 @pytest.mark.parametrize(
     "backend", ["numpy", pytest.param("jax", marks=pytest.mark.requires_jax)]
 )
-def test_sar_negbin_structural(backend):
+def test_sar_negbin_re(backend):
     d, W = _cross_section()
-    m = SARNegBinStructural(y=d["y"], X=d["X"], W=W, priors={"alpha_fixed": A})
+    m = SARNegBin(
+        unit_effects="random", y=d["y"], X=d["X"], W=W, priors={"alpha_fixed": A}
+    )
     assert _held(m.fit(gibbs_backend=backend, n_jobs=1, **SHORT))
 
 
@@ -93,15 +90,15 @@ def test_flow_cross_section(cls, backend):
 @pytest.mark.parametrize(
     "cls,effects,backend",
     [
-        (SARNegBinFlowPanel, 0, "numpy"),
-        (SARNegBinFlowPanel, 3, "numpy"),
-        (SARNegBinFlowSeparablePanel, 0, "numpy"),
-        (SARNegBinFlowSeparablePanel, 3, "numpy"),
+        (SARNegBinFlowPanelRE, 0, "numpy"),
+        (SARNegBinFlowPanelRE, 3, "numpy"),
+        (SARNegBinFlowSeparablePanelRE, 0, "numpy"),
+        (SARNegBinFlowSeparablePanelRE, 3, "numpy"),
         pytest.param(
-            SARNegBinFlowSeparablePanel, 3, "jax", marks=pytest.mark.requires_jax
+            SARNegBinFlowSeparablePanelRE, 3, "jax", marks=pytest.mark.requires_jax
         ),
-        (NegBinFlowPanel, 0, "numpy"),
-        (NegBinFlowPanel, 3, "numpy"),
+        (NegBinFlowPanelRE, 0, "numpy"),
+        (NegBinFlowPanelRE, 3, "numpy"),
     ],
 )
 def test_flow_panels(cls, effects, backend):
@@ -117,7 +114,7 @@ def test_flow_panels(cls, effects, backend):
             effects=effects,
             priors={"alpha_fixed": A},
         )
-        kw = {} if cls is NegBinFlowPanel else {"gibbs_backend": backend}
+        kw = {} if cls is NegBinFlowPanelRE else {"gibbs_backend": backend}
         idata = (
             m.fit(n_jobs=1, attach_log_abs_det=False, **kw, **SHORT)
             if kw
@@ -126,10 +123,10 @@ def test_flow_panels(cls, effects, backend):
     assert _held(idata)
 
 
-@pytest.mark.parametrize("cls", [SARNegBinPanel, NegBinPanel])
+@pytest.mark.parametrize("cls", [SARNegBinPanelRE, NegBinPanelRE])
 @pytest.mark.parametrize("effects", [0, 3])
 def test_panels(cls, effects):
-    d = dgp.simulate_panel_sar_negbin(N=16, T=3, n_side=4, seed=4)
+    d = dgp.simulate_sar_negbin_panel_re(N=16, T=3, n_side=4, seed=4)
     m = cls(
         y=d["y"], X=d["X"], W=d["W_sparse"], N=16, T=3, effects=effects,
         priors={"alpha_fixed": A},
@@ -151,13 +148,17 @@ def test_panels(cls, effects):
             W=_cross_section()[1],
             priors={"alpha_fixed": A},
         ),
-        lambda: SARNegBinFlowSeparable(
-            _flow()["y_vec"], _flow()["X"], _flow()["G"], priors={"alpha_fixed": A}
+        lambda: SARNegBinFlow(
+            _flow()["y_vec"],
+            _flow()["X"],
+            _flow()["G"],
+            separable=True,
+            priors={"alpha_fixed": A},
         ),
-        lambda: SARNegBinPanel(
-            y=dgp.simulate_panel_sar_negbin(N=16, T=3, n_side=4, seed=4)["y"],
-            X=dgp.simulate_panel_sar_negbin(N=16, T=3, n_side=4, seed=4)["X"],
-            W=dgp.simulate_panel_sar_negbin(N=16, T=3, n_side=4, seed=4)["W_sparse"],
+        lambda: SARNegBin(
+            y=dgp.simulate_sar_negbin_panel_re(N=16, T=3, n_side=4, seed=4)["y"],
+            X=dgp.simulate_sar_negbin_panel_re(N=16, T=3, n_side=4, seed=4)["X"],
+            W=dgp.simulate_sar_negbin_panel_re(N=16, T=3, n_side=4, seed=4)["W_sparse"],
             N=16,
             T=3,
             priors={"alpha_fixed": A},
@@ -180,6 +181,8 @@ def test_pymc_fit_holds_alpha():
 @pytest.mark.parametrize("bad", [0.0, -2.0, np.inf])
 def test_alpha_fixed_must_be_positive(bad):
     d = _flow()
-    m = SARNegBinFlowSeparable(d["y_vec"], d["X"], d["G"], priors={"alpha_fixed": bad})
+    m = SARNegBinFlow(
+        d["y_vec"], d["X"], d["G"], separable=True, priors={"alpha_fixed": bad}
+    )
     with pytest.raises(ValueError, match="alpha_fixed"):
         m.fit(sampler="gibbs", **SHORT)

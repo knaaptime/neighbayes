@@ -4,36 +4,38 @@ import numpy as np
 import pytest
 
 from neighbayes.dgp.flows import (
-    generate_poisson_flow_data,
-    generate_poisson_flow_data_separable,
+    simulate_sar_poisson_flow,
+    simulate_sar_poisson_flow_separable,
 )
 from neighbayes.models.flow import SARPoissonFlow, SARPoissonFlowSeparable
 
 
 @pytest.fixture(scope="module")
 def sep_data():
-    return generate_poisson_flow_data_separable(n=36, rho_d=0.35, rho_o=0.25, seed=3)
+    return simulate_sar_poisson_flow_separable(n=36, rho_d=0.35, rho_o=0.25, seed=3)
 
 
 class TestConstruction:
     def test_rejects_non_integer(self, sep_data):
         y = sep_data["y_vec"].astype(float) + 0.5
         with pytest.raises(ValueError, match="integer"):
-            SARPoissonFlowSeparable(y, sep_data["X"], sep_data["G"])
+            SARPoissonFlow(y, sep_data["X"], sep_data["G"], separable=True)
 
     def test_rejects_negative(self, sep_data):
         y = sep_data["y_vec"].copy()
         y[0] = -1
         with pytest.raises(ValueError, match="non-negative"):
-            SARPoissonFlowSeparable(y, sep_data["X"], sep_data["G"])
+            SARPoissonFlow(y, sep_data["X"], sep_data["G"], separable=True)
 
     def test_accepts_float_valued_integers(self, sep_data):
         y = sep_data["y_vec"].astype(float)
-        m = SARPoissonFlowSeparable(y, sep_data["X"], sep_data["G"])
+        m = SARPoissonFlow(y, sep_data["X"], sep_data["G"], separable=True)
         assert m._y_int_vec.dtype == np.int64
 
     def test_rejects_nuts(self, sep_data):
-        m = SARPoissonFlowSeparable(sep_data["y_vec"], sep_data["X"], sep_data["G"])
+        m = SARPoissonFlow(
+            sep_data["y_vec"], sep_data["X"], sep_data["G"], separable=True
+        )
         with pytest.raises(NotImplementedError, match="gibbs"):
             m.fit(sampler="nuts")
 
@@ -42,10 +44,11 @@ class TestSeparableRecovery:
     """The separable 2-rho model is the recommended Poisson flow model."""
 
     def test_recovers_rho_and_mixes(self, sep_data):
-        m = SARPoissonFlowSeparable(
+        m = SARPoissonFlow(
             sep_data["y_vec"],
             sep_data["X"],
             sep_data["G"],
+            separable=True,
             col_names=sep_data["col_names"],
         )
         idata = m.fit(
@@ -65,10 +68,11 @@ class TestSeparableRecovery:
 
     def test_rho_w_is_deterministic(self, sep_data):
         """Separable model pins rho_w = -rho_d * rho_o."""
-        m = SARPoissonFlowSeparable(
+        m = SARPoissonFlow(
             sep_data["y_vec"],
             sep_data["X"],
             sep_data["G"],
+            separable=True,
             col_names=sep_data["col_names"],
         )
         idata = m.fit(
@@ -80,10 +84,11 @@ class TestSeparableRecovery:
         )
 
     def test_idata_surface(self, sep_data):
-        m = SARPoissonFlowSeparable(
+        m = SARPoissonFlow(
             sep_data["y_vec"],
             sep_data["X"],
             sep_data["G"],
+            separable=True,
             col_names=sep_data["col_names"],
         )
         idata = m.fit(
@@ -107,7 +112,7 @@ class TestUnrestricted:
     """The 3-rho variant is exposed but documented as poorly identified."""
 
     def test_runs_and_returns_three_rhos(self):
-        d = generate_poisson_flow_data(n=12, rho_d=0.3, rho_o=0.2, rho_w=0.1, seed=5)
+        d = simulate_sar_poisson_flow(n=12, rho_d=0.3, rho_o=0.2, rho_w=0.1, seed=5)
         m = SARPoissonFlow(d["y_vec"], d["X"], d["G"], col_names=d["col_names"])
         idata = m.fit(
             draws=80, tune=60, chains=1, random_seed=3, progressbar=False, n_jobs=1
@@ -125,10 +130,11 @@ class TestPosteriorPredictive:
     """
 
     def test_separable_replicates_are_counts(self, sep_data):
-        m = SARPoissonFlowSeparable(
+        m = SARPoissonFlow(
             sep_data["y_vec"],
             sep_data["X"],
             sep_data["G"],
+            separable=True,
             col_names=sep_data["col_names"],
         )
         m.fit(
@@ -143,8 +149,12 @@ class TestPosteriorPredictive:
     def test_separable_replicates_match_observed_dispersion(self, sep_data):
         """Poisson-drawn data: replicated var/mean must track the observed one."""
         y = sep_data["y_vec"]
-        m = SARPoissonFlowSeparable(
-            y, sep_data["X"], sep_data["G"], col_names=sep_data["col_names"]
+        m = SARPoissonFlow(
+            y,
+            sep_data["X"],
+            sep_data["G"],
+            separable=True,
+            col_names=sep_data["col_names"],
         )
         m.fit(
             draws=300, tune=200, chains=2, random_seed=11, progressbar=False, n_jobs=1
@@ -156,7 +166,7 @@ class TestPosteriorPredictive:
         assert rep == pytest.approx(obs, rel=0.35)
 
     def test_unrestricted_replicates_are_counts(self):
-        d = generate_poisson_flow_data(n=10, rho_d=0.3, rho_o=0.2, rho_w=0.1, seed=5)
+        d = simulate_sar_poisson_flow(n=10, rho_d=0.3, rho_o=0.2, rho_w=0.1, seed=5)
         m = SARPoissonFlow(d["y_vec"], d["X"], d["G"], col_names=d["col_names"])
         m.fit(draws=60, tune=40, chains=1, random_seed=3, progressbar=False, n_jobs=1)
         y_rep = m.posterior_predictive(random_seed=0)
@@ -166,10 +176,11 @@ class TestPosteriorPredictive:
         np.testing.assert_array_equal(y_rep, np.round(y_rep))
 
     def test_n_draws_truncates(self, sep_data):
-        m = SARPoissonFlowSeparable(
+        m = SARPoissonFlow(
             sep_data["y_vec"],
             sep_data["X"],
             sep_data["G"],
+            separable=True,
             col_names=sep_data["col_names"],
         )
         m.fit(draws=100, tune=80, chains=2, random_seed=2, progressbar=False, n_jobs=1)
@@ -184,22 +195,22 @@ class TestDispersionCheck:
     """
 
     def _fit(self, data):
-        m = SARPoissonFlowSeparable(data["y_vec"], data["X"], data["G"])
+        m = SARPoissonFlow(data["y_vec"], data["X"], data["G"], separable=True)
         return m.fit(draws=150, tune=150, chains=1, progressbar=False, random_seed=0)
 
     def test_poisson_data_is_quiet(self):
         import warnings
 
-        data = generate_poisson_flow_data_separable(n=10, seed=4)
+        data = simulate_sar_poisson_flow_separable(n=10, seed=4)
         with warnings.catch_warnings():
             warnings.filterwarnings("error", message="Pearson dispersion")
             idata = self._fit(data)
         assert 0.6 < idata.attrs["pearson_dispersion"] < 1.5
 
     def test_overdispersed_data_warns(self):
-        from neighbayes.dgp.flows import generate_negbin_flow_data_separable
+        from neighbayes.dgp.flows import simulate_sar_negbin_flow_separable
 
-        data = generate_negbin_flow_data_separable(
+        data = simulate_sar_negbin_flow_separable(
             n=10, seed=5, alpha=0.5, beta_d=[0.3, 0.3], beta_o=[0.3, 0.3]
         )
         with pytest.warns(UserWarning, match="Pearson dispersion"):

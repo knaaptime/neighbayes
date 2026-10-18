@@ -1,7 +1,7 @@
 """Gibbs sampler for the Gaussian spatial multilevel model.
 
 See :mod:`._core` for the model, the sweep and its references.  The model
-class (:class:`neighbayes.models.SpatialMultilevel`) registers the runner.
+class (:class:`neighbayes.models.Multilevel`) registers the runner.
 """
 
 from ._core import (

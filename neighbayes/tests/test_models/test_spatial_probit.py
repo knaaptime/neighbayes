@@ -1,4 +1,4 @@
-"""Parameter recovery tests for SARProbit.
+"""Parameter recovery tests for SEMProbitRE.
 
 Generates binary outcomes from known parameters, fits the model once, and
 verifies that posterior means recover the spatial / regression parameters
@@ -14,7 +14,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from neighbayes.models import SARProbit
+from neighbayes.models import SEMProbit
 from neighbayes.tests.helpers import (
     SAMPLE_KWARGS,
     W_to_graph,
@@ -47,23 +47,23 @@ def test_spatialprobit_recovery_and_fitted_probs(rng):
         sigma_a=SIGMA_A_TRUE,
         n_per_region=N_PER_REGION,
     )
-    model = SARProbit(y=y, X=X, W=W_graph, region_ids=region_ids)
+    model = SEMProbit(group_effects="random", y=y, X=X, W=W_graph, groups=region_ids)
     idata = model.fit(**SAMPLE_KWARGS)
 
     rho_hat = float(idata.posterior["rho"].mean())
     assert abs(rho_hat - RHO_TRUE) < ABS_TOL_RHO, (
-        f"SARProbit rho: expected ≈{RHO_TRUE}, got {rho_hat:.3f}"
+        f"SEMProbitRE rho: expected ≈{RHO_TRUE}, got {rho_hat:.3f}"
     )
 
     beta_hat = idata.posterior["beta"].mean(("chain", "draw")).values
     for j, (bhat, btrue) in enumerate(zip(beta_hat, BETA_TRUE)):
         assert abs(bhat - btrue) < ABS_TOL_BETA, (
-            f"SARProbit beta[{j}]: expected ≈{btrue}, got {bhat:.3f}"
+            f"SEMProbitRE beta[{j}]: expected ≈{btrue}, got {bhat:.3f}"
         )
 
     sa_hat = float(idata.posterior["sigma_a"].mean())
     assert abs(sa_hat - SIGMA_A_TRUE) < ABS_TOL_SIGMA_A, (
-        f"SARProbit sigma_a: expected ≈{SIGMA_A_TRUE}, got {sa_hat:.3f}"
+        f"SEMProbitRE sigma_a: expected ≈{SIGMA_A_TRUE}, got {sa_hat:.3f}"
     )
 
     p_hat = model.fitted_probabilities()

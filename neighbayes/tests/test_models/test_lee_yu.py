@@ -13,7 +13,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from neighbayes.models import SARPanelFE, SEMPanelFE
+from neighbayes.models import SAR, SEM
+from neighbayes.models.panel._fe import SARPanelFE, SEMPanelFE
 from neighbayes.tests.helpers import W_to_graph, make_line_W, make_panel_sar_data
 
 
@@ -59,15 +60,15 @@ def test_unit_fe_recovers_sigma2_at_short_T(sampler):
     y, X, _ = make_panel_sar_data(
         np.random.default_rng(1), W, N, T, rho=0.4, sigma=1.0, sigma_alpha=1.0
     )
-    m = SARPanelFE(y=y, X=X, W=W_to_graph(W), N=N, T=T, effects=1)
+    m = SAR(unit_effects="fixed", y=y, X=X, W=W_to_graph(W), N=N, T=T)
     assert abs(_fit_sigma2(m, sampler) - 1.0) < 0.17
 
 
 def _flow_panel(n, T, rho_d, rho_o, seed):
     """Gaussian flow panel with pair effects, from the package DGP."""
-    from neighbayes.dgp.flows import generate_panel_flow_data
+    from neighbayes.dgp.flows import simulate_sar_flow_panel_fe
 
-    d = generate_panel_flow_data(
+    d = simulate_sar_flow_panel_fe(
         n=n,
         T=T,
         seed=seed,
@@ -84,13 +85,13 @@ def _flow_panel(n, T, rho_d, rho_o, seed):
 
 @pytest.mark.slow
 @pytest.mark.parametrize(
-    "name", ["OLSFlowPanel", "SARFlowSeparablePanel", "SARFlowPanel"]
+    "name", ["OLSFlowPanelFE", "SARFlowSeparablePanelFE", "SARFlowPanelFE"]
 )
 def test_flow_pair_fe_recovers_sigma2_at_short_T(name):
     import neighbayes.models.flow_panel as fp
 
     cls = getattr(fp, name)
-    rho = (0.0, 0.0) if name == "OLSFlowPanel" else (0.3, 0.2)
+    rho = (0.0, 0.0) if name == "OLSFlowPanelFE" else (0.3, 0.2)
     y, X, G, names = _flow_panel(12, 3, *rho, seed=3)
     m = cls(y=y, X=X, W=G, T=3, col_names=names, effects=1)
     assert m._jacobian_T == 2 and m._n_effective == 2 * 144

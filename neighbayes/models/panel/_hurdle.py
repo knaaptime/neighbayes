@@ -18,8 +18,8 @@ in the count half it absorbs each unit's usual volume.  The halves share no
 parameters (linking them through correlated unit effects is a planned
 extension), so the posterior factorizes.
 
-* :class:`SARHurdleNBPanel` — spatial lag in both halves.
-* :class:`HurdleNBPanel` — the aspatial baseline.
+* :class:`SARHurdleNegBinPanelRE` — spatial lag in both halves.
+* :class:`HurdleNegBinPanelRE` — the aspatial baseline.
 
 Both default to the Pólya–Gamma Gibbs sampler of
 :mod:`neighbayes.samplers.hurdle._generic`; ``sampler="nuts"`` fits the same
@@ -38,6 +38,7 @@ from ..._lazy_deps import pm, xr
 from ...samplers import hurdle as _hurdle  # noqa: F401  (registers the runners)
 from .._base._nb import nb_alpha_rv
 from .._base._shared import _parse_W
+from .._design import FacadeMeta, discrete
 from .._mixins._count_panel import CountPanelFEMixin, require_counts
 from .._mixins._hurdle import HurdleMixin
 from ..cross_section.sar_zinb import _selection_design
@@ -336,7 +337,7 @@ class _HurdlePanelBase(HurdleMixin, CountPanelFEMixin, SpatialPanelModel):
         return eta_b + self._effects_at(g, "sel_"), eta_c + self._effects_at(g, "")
 
 
-class SARHurdleNBPanel(_HurdlePanelBase):
+class SARHurdleNegBinPanelRE(_HurdlePanelBase):
     __doc__ = (
         r"""Reduced-form SAR hurdle NB panel: spatial lag in both halves.
 
@@ -351,6 +352,23 @@ class SARHurdleNBPanel(_HurdlePanelBase):
     _count_spatial = True
 
 
-class HurdleNBPanel(_HurdlePanelBase):
+class HurdleNegBinPanelRE(_HurdlePanelBase):
     __doc__ = r"""Aspatial hurdle NB panel with effects in both halves.""" + _PARAMS_DOC
     _count_spatial = False
+
+
+class HurdleNegBin(metaclass=FacadeMeta):
+    """Hurdle negative binomial panel without spatial dependence.
+
+    Implemented for panels only: pass ``time_col`` (formula mode) or ``T``
+    (matrix mode).  The unit effects are random and the time effects fixed.
+
+    Parameters
+    ----------
+    unit_effects : {None, "random"}, default None
+    time_effects : bool, default False
+    **kwargs
+        As for :class:`SARHurdleNegBin` panels, without ``W``.
+    """
+
+    _dispatch = classmethod(discrete)

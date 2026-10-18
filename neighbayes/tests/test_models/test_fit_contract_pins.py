@@ -25,11 +25,12 @@ from neighbayes.models import (
     SEM,
     SLX,
     SARLogit,
-    SARLogitStructural,
     SARNegBin,
-    SARNegBinStructural,
     SEMLogit,
 )
+from neighbayes.models.cross_section.sar_logit_re import SARLogitRE
+from neighbayes.models.cross_section.sar_negbin_re import SARNegBinRE
+from neighbayes.models.cross_section.sem_logit import SEMLogitRE
 from neighbayes.models.panel._fe import (
     OLSPanelFE,
     SARPanelFE,
@@ -258,7 +259,7 @@ def test_gaussian_panel_re_fit_contract(name, ctor, data_fn, expected, sampler):
 # ---------------------------------------------------------------------------
 # Binary (Pólya-Gamma logit) cross-section family
 #
-# SARLogit/SEMLogit are Gibbs-only (no NUTS build).  The logit link fixes
+# SARLogit/SEMLogitRE are Gibbs-only (no NUTS build).  The logit link fixes
 # σ² = 1, so the posterior carries only the spatial parameter and β.
 # ---------------------------------------------------------------------------
 
@@ -279,13 +280,13 @@ def _binary_graph():
 
 
 # name -> (ctor, expected_varnames)
-# The canonical SARLogit is reduced-form (auto→jax); SARLogitStructural is the
-# structural latent-field model; SEMLogit is the structural SEM.  All three
+# The canonical SARLogit is reduced-form (auto→jax); SARLogitRE is the
+# structural latent-field model; SEMLogitRE is the structural SEM.  All three
 # expose only the spatial parameter and β.
 BINARY_XS: dict[str, tuple] = {
     "SARLogit": (SARLogit, {"beta", "rho"}),
-    "SARLogitStructural": (SARLogitStructural, {"beta", "rho"}),
-    "SEMLogit": (SEMLogit, {"beta", "lam"}),
+    "SARLogitRE": (SARLogitRE, {"beta", "rho"}),
+    "SEMLogitRE": (SEMLogitRE, {"beta", "lam"}),
 }
 
 
@@ -362,8 +363,8 @@ COUNT_XS: dict[str, tuple] = {
         False,
         {"gibbs": {"beta", "rho", "alpha"}, "nuts": {"beta", "rho", "alpha", "mu"}},
     ),
-    "SARNegBinStructural": (
-        SARNegBinStructural,
+    "SARNegBinRE": (
+        SARNegBinRE,
         False,
         {"gibbs": {"beta", "rho", "alpha", "sigma"}},
     ),
@@ -445,14 +446,16 @@ def _default_cases():
     )
     yield (
         "SARPanelFE",
-        lambda: SARPanelFE(
-            y=yp, X=Xp, W=_panel_graph(), N=PANEL_N, T=PANEL_T, effects=1
+        lambda: SAR(
+            unit_effects="fixed", y=yp, X=Xp, W=_panel_graph(), N=PANEL_N, T=PANEL_T
         ),
         {"n_jobs": 1},
     )
     yield (
         "SARPanelRE",
-        lambda: SARPanelRE(y=yp, X=Xp, W=_panel_graph(), N=PANEL_N, T=PANEL_T),
+        lambda: SAR(
+            unit_effects="random", y=yp, X=Xp, W=_panel_graph(), N=PANEL_N, T=PANEL_T
+        ),
         {"n_jobs": 1},
     )
     yb, Xb = _binary_xy()

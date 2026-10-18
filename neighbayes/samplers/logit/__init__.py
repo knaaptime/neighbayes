@@ -1,8 +1,8 @@
-"""Pólya–Gamma Gibbs sampler for structural-form SAR-logit and SEM-logit.
+"""Pólya–Gamma Gibbs sampler for the SAR and SEM logit with random effects.
 
-Serves the *structural* (latent-field) binary models ``SARLogitStructural``
-(``η = ρWη + Xβ + ν``) and ``SEMLogit`` (``η = Xβ + (I−λW)⁻¹ν``) under the
-registry key ``"binary_structural"``.  The canonical reduced-form ``SARLogit``
+Serves the random-effects binary models ``SARLogitRE``
+(``η = ρWη + Xβ + ν``) and ``SEMLogitRE`` (``η = Xβ + (I−λW)⁻¹ν``) under the
+registry key ``"binary_re"``.  The canonical reduced-form ``SARLogit``
 lives in :mod:`neighbayes.samplers.logit_reduced` (key ``"binary"``).
 """
 
@@ -37,7 +37,7 @@ __all__ = [
 # Gibbs registry entry
 # ---------------------------------------------------------------------------
 #
-# SARLogitStructural and SEMLogit are both structural cross-section binary
+# SARLogitRE and SEMLogitRE are both structural cross-section binary
 # (Bernoulli) models; the SAR-vs-SEM distinction is handled by MRO dispatch of
 # ``_fit_gibbs`` (each model owns its Pólya-Gamma orchestration).  ``auto``
 # prefers the ``jax`` path (fastest for cross-section); the CHOLMOD NumPy path
@@ -85,7 +85,7 @@ def _run_binary_gibbs(
 
 
 register(
-    "binary_structural",
+    "binary_re",
     "cross_section",
     run=_run_binary_gibbs,
     backends={"jax", "numpy"},

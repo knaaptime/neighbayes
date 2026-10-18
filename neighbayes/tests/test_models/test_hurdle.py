@@ -1,4 +1,4 @@
-"""Reduced-form SAR hurdle NB: SARHurdleNB, the hurdle panels and the flow hurdle.
+"""Reduced-form SAR hurdle NB: SARHurdleNegBin, the hurdle panels and the flow hurdle.
 
 Fast tests pin the truncated-NB pieces, the DGPs, construction, and the API
 of every class on short chains.  The ``slow`` tests check the augmentation
@@ -17,23 +17,25 @@ from scipy.special import logsumexp
 
 from neighbayes import dgp
 from neighbayes.dgp.hurdle import truncated_negative_binomial
-from neighbayes.models import HurdleNBPanel, SARHurdleNB, SARHurdleNBPanel
+from neighbayes.models import HurdleNegBin, SARHurdleNegBin
+from neighbayes.models.panel._hurdle import HurdleNegBinPanelRE, SARHurdleNegBinPanelRE
 from neighbayes.samplers.hurdle._truncated import (
     draw_missed_zeros,
     hurdle_loglik_pointwise,
     log_nb_zero,
     truncated_nb_loglik_pointwise,
 )
+from neighbayes.tests.helpers import effects_kwargs
 
 QUICK = dict(draws=20, tune=20, chains=1, progressbar=False, random_seed=0)
 
 
 def _xs(n_side=8, seed=0, **kw):
-    return dgp.simulate_sar_hurdle(n_side=n_side, seed=seed, **kw)
+    return dgp.simulate_sar_hurdle_negbin(n_side=n_side, seed=seed, **kw)
 
 
 def _panel(seed=1, **kw):
-    return dgp.simulate_panel_sar_hurdle(
+    return dgp.simulate_sar_hurdle_negbin_panel_re(
         N=25, T=4, n_side=5, seed=seed, unit_effect_sd=0.5, time_effect_sd=0.3,
         sel_unit_effect_sd=0.5, sel_time_effect_sd=0.3, **kw,
     )  # fmt: skip
@@ -160,14 +162,14 @@ def test_level_direction_shifts_eta(effects):
 
 
 # ---------------------------------------------------------------------------
-# SARHurdleNB
+# SARHurdleNegBin
 # ---------------------------------------------------------------------------
 
 
 class TestSARHurdleNB:
     def test_api(self):
         d = _xs()
-        m = SARHurdleNB(y=d["y"], X=d["X"], Z=d["Z"], W=d["W_graph"])
+        m = SARHurdleNegBin(y=d["y"], X=d["X"], Z=d["Z"], W=d["W_graph"])
         idata = m.fit(idata_kwargs={"log_likelihood": True}, **QUICK)
         assert {"rho", "lam", "beta", "gamma", "alpha"} <= set(
             idata.posterior.data_vars
@@ -183,14 +185,18 @@ class TestSARHurdleNB:
     @pytest.mark.parametrize("sampler", ["gibbs", "nuts"])
     def test_alpha_fixed(self, sampler):
         d = _xs()
-        m = SARHurdleNB(y=d["y"], X=d["X"], W=d["W_graph"], priors={"alpha_fixed": 7.0})
+        m = SARHurdleNegBin(
+            y=d["y"], X=d["X"], W=d["W_graph"], priors={"alpha_fixed": 7.0}
+        )
         post = m.fit(sampler=sampler, **QUICK).posterior
         assert np.all(post["alpha"].values == 7.0)
 
     def test_names_and_formula(self):
         d = _xs()
         df = pd.DataFrame({"y": d["y"], "x1": d["X"][:, 1], "z1": d["Z"][:, 1]})
-        m = SARHurdleNB(formula="y ~ x1", data=df, sel_formula="~ z1", W=d["W_graph"])
+        m = SARHurdleNegBin(
+            formula="y ~ x1", data=df, sel_formula="~ z1", W=d["W_graph"]
+        )
         assert m._sel_feature_names == ["Intercept", "z1"]
         post = m.fit(**QUICK).posterior
         assert list(post["gamma"].coords["sel_coefficient"].values) == [
@@ -201,9 +207,9 @@ class TestSARHurdleNB:
     def test_guards(self):
         d = _xs()
         with pytest.raises(ValueError, match="positive count"):
-            SARHurdleNB(y=np.zeros_like(d["y"]), X=d["X"], W=d["W_graph"])
+            SARHurdleNegBin(y=np.zeros_like(d["y"]), X=d["X"], W=d["W_graph"])
         with pytest.raises(ValueError, match="integer"):
-            SARHurdleNB(y=d["y"] + 0.5, X=d["X"], W=d["W_graph"])
+            SARHurdleNegBin(y=d["y"] + 0.5, X=d["X"], W=d["W_graph"])
 
 
 # ---------------------------------------------------------------------------
@@ -211,7 +217,7 @@ class TestSARHurdleNB:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("cls", [SARHurdleNBPanel, HurdleNBPanel])
+@pytest.mark.parametrize("cls", [SARHurdleNegBinPanelRE, HurdleNegBinPanelRE])
 @pytest.mark.parametrize("effects", [0, 1, 2, 3])
 @pytest.mark.parametrize("sampler", ["gibbs", "nuts"])
 def test_hurdle_panel_api(cls, effects, sampler):
@@ -224,7 +230,7 @@ def test_hurdle_panel_api(cls, effects, sampler):
         post = m.fit(sampler=sampler, **QUICK).posterior
     names = set(post.data_vars)
     assert {"beta", "gamma", "alpha"} <= names
-    assert ("rho" in names) == (cls is SARHurdleNBPanel)
+    assert ("rho" in names) == (cls is SARHurdleNegBinPanelRE)
     for pre in ("", "sel_"):
         assert (pre + "group_effect" in names) == (effects in (1, 3))
         assert (pre + "time_effect" in names) == (effects in (2, 3))
@@ -237,8 +243,8 @@ def test_hurdle_panel_registry_and_storage():
     assert resolve("hurdle", "panel") is not None
     assert resolve("hurdle", "cross_section") is not None
     d = _panel()
-    m = SARHurdleNBPanel(
-        y=d["y"], X=d["X"], Z=d["Z"], W=d["W_sparse"], N=25, T=4, effects=1
+    m = SARHurdleNegBin(
+        unit_effects="random", y=d["y"], X=d["X"], Z=d["Z"], W=d["W_sparse"], N=25, T=4
     )
     idata = m.fit(store_group_effects=False, **QUICK)
     assert "group_effect" not in idata.posterior.data_vars
@@ -253,24 +259,32 @@ def test_hurdle_panel_absorbs_and_warns():
     with pytest.warns(
         UserWarning, match="absorbed by the period effects in the binary"
     ):
-        m = SARHurdleNBPanel(
-            y=d["y"], X=d["X"], Z=Z, W=d["W_sparse"], N=25, T=4, effects=3
+        m = SARHurdleNegBin(
+            unit_effects="random",
+            time_effects=True,
+            y=d["y"],
+            X=d["X"],
+            Z=Z,
+            W=d["W_sparse"],
+            N=25,
+            T=4,
         )
     # Unit effects absorb nothing; the period effects absorb the trend.
     assert m._Z.shape[1] == 3
     y = d["y"].copy()
     y.reshape(4, 25)[:, 0] = 0  # unit 0 never positive
     with pytest.warns(UserWarning, match="never switch"):
-        SARHurdleNBPanel(y=y, X=d["X"], Z=d["Z"], W=d["W_sparse"], N=25, T=4, effects=1)
+        SARHurdleNegBin(
+            unit_effects="random", y=y, X=d["X"], Z=d["Z"], W=d["W_sparse"], N=25, T=4
+        )
 
 
 def test_hurdle_panel_learned_sds_and_mundlak():
     d = _panel()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
-        m = SARHurdleNBPanel(
-            y=d["y"], X=d["X"], Z=d["Z"], W=d["W_sparse"], N=25, T=4, effects=1,
-            mundlak=True,
+        m = SARHurdleNegBin(unit_effects="random",
+            y=d["y"], X=d["X"], Z=d["Z"], W=d["W_sparse"], N=25, T=4, mundlak=True,
         )  # fmt: skip
     assert m._feature_names[-1].endswith("_mean")
     assert m._sel_feature_names[-1].endswith("_mean")
@@ -350,7 +364,7 @@ def test_binary_half_matches_sar_logit():
     from neighbayes.models import SARLogit
 
     d = _xs(n_side=15, seed=3, lam=0.4)
-    m = SARHurdleNB(y=d["y"], X=d["X"], Z=d["Z"], W=d["W_graph"])
+    m = SARHurdleNegBin(y=d["y"], X=d["X"], Z=d["Z"], W=d["W_graph"])
     lo, hi = m._bounds("lam")
     h = m.fit(draws=3000, tune=1000, chains=4, progressbar=False, random_seed=1)
     logit = SARLogit(
@@ -371,7 +385,7 @@ def test_binary_half_matches_sar_logit():
 def test_sarhurdle_gibbs_matches_nuts(alpha_fixed):
     d = _xs(n_side=10, seed=4)
     priors = {} if alpha_fixed is None else {"alpha_fixed": alpha_fixed}
-    m = SARHurdleNB(y=d["y"], X=d["X"], Z=d["Z"], W=d["W_graph"], priors=priors)
+    m = SARHurdleNegBin(y=d["y"], X=d["X"], Z=d["Z"], W=d["W_graph"], priors=priors)
     g = m.fit(draws=4000, tune=1000, chains=4, progressbar=False, random_seed=1)
     n = m.fit(
         sampler="nuts", draws=2000, tune=1500, chains=4, progressbar=False,
@@ -388,8 +402,15 @@ def test_hurdle_panel_gibbs_matches_nuts():
     d = _panel(seed=2)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
-        m = SARHurdleNBPanel(
-            y=d["y"], X=d["X"], Z=d["Z"], W=d["W_sparse"], N=25, T=4, effects=3
+        m = SARHurdleNegBin(
+            unit_effects="random",
+            time_effects=True,
+            y=d["y"],
+            X=d["X"],
+            Z=d["Z"],
+            W=d["W_sparse"],
+            N=25,
+            T=4,
         )
     g = m.fit(draws=4000, tune=1000, chains=4, progressbar=False, random_seed=1)
     n = m.fit(
@@ -407,7 +428,7 @@ def test_hurdle_panel_gibbs_matches_nuts():
 
 
 def _flow(T=1, seed=2, n=6, **kw):
-    return dgp.generate_hurdle_flow_data_separable(
+    return dgp.simulate_sar_hurdle_negbin_flow_separable(
         n=n, T=T, seed=seed, beta_d=[0.4, 0.4], beta_o=[0.4, 0.4], gamma_dist=-0.4,
         alpha=3.0, **kw,
     )  # fmt: skip
@@ -424,10 +445,12 @@ def _flow_panel_data(n=5, T=3, seed=5):
     "backend", ["numpy", pytest.param("jax", marks=pytest.mark.requires_jax), "nuts"]
 )
 def test_flow_hurdle_cross_section(backend):
-    from neighbayes.models import SARHurdleNBFlowSeparable
+    from neighbayes.models import SARHurdleNegBinFlow
 
     d = _flow()
-    m = SARHurdleNBFlowSeparable(d["y_vec"], d["X"], d["G"], col_names=d["col_names"])
+    m = SARHurdleNegBinFlow(
+        d["y_vec"], d["X"], d["G"], separable=True, col_names=d["col_names"]
+    )
     kw = {"sampler": "nuts"} if backend == "nuts" else {"gibbs_backend": backend}
     idata = m.fit(idata_kwargs={"log_likelihood": True}, **kw, **QUICK)
     names = set(idata.posterior.data_vars)
@@ -442,13 +465,19 @@ def test_flow_hurdle_cross_section(backend):
     "backend", ["numpy", pytest.param("jax", marks=pytest.mark.requires_jax), "nuts"]
 )
 def test_flow_hurdle_panel(effects, backend):
-    from neighbayes.models import SARHurdleNBFlowSeparablePanel
+    from neighbayes.models import SARHurdleNegBinFlow
 
     d = _flow_panel_data()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
-        m = SARHurdleNBFlowSeparablePanel(
-            d["y"], d["X"], d["G"], T=3, col_names=d["col_names"], effects=effects
+        m = SARHurdleNegBinFlow(
+            d["y"],
+            d["X"],
+            d["G"],
+            separable=True,
+            T=3,
+            col_names=d["col_names"],
+            **effects_kwargs(effects, "pair_effects", "random"),
         )
         kw = {"sampler": "nuts"} if backend == "nuts" else {"gibbs_backend": backend}
         post = m.fit(**kw, **QUICK).posterior
@@ -464,14 +493,13 @@ def test_flow_hurdle_panel(effects, backend):
     "backend", ["numpy", pytest.param("jax", marks=pytest.mark.requires_jax)]
 )
 def test_flow_hurdle_alpha_fixed_and_summaries(backend):
-    from neighbayes.models import SARHurdleNBFlowSeparablePanel
+    from neighbayes.models import SARHurdleNegBinFlow
 
     d = _flow_panel_data()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
-        m = SARHurdleNBFlowSeparablePanel(
-            d["y"], d["X"], d["G"], T=3, col_names=d["col_names"], effects=1,
-            priors={"alpha_fixed": 4.0},
+        m = SARHurdleNegBinFlow(
+            d["y"], d["X"], d["G"], separable=True, pair_effects="random", T=3, col_names=d["col_names"], priors={"alpha_fixed": 4.0},
         )  # fmt: skip
         idata = m.fit(gibbs_backend=backend, store_group_effects=False, **QUICK)
     assert np.all(idata.posterior["alpha"].values == 4.0)
@@ -479,20 +507,27 @@ def test_flow_hurdle_alpha_fixed_and_summaries(backend):
 
 
 def test_flow_hurdle_guards():
-    from neighbayes.models import (
-        SARHurdleNBFlowSeparable,
-        SARHurdleNBFlowSeparablePanel,
-    )
+    from neighbayes.models import SARHurdleNegBinFlow
 
     d = _flow()
-    with pytest.raises(ValueError, match="cross-section"):
-        SARHurdleNBFlowSeparable(d["y_vec"], d["X"], d["G"], effects=1)
+    with pytest.raises(NotImplementedError, match="only in a panel"):
+        SARHurdleNegBinFlow(
+            d["y_vec"], d["X"], d["G"], separable=True, pair_effects="random"
+        )
     with pytest.raises(ValueError, match="rows"):
-        SARHurdleNBFlowSeparable(d["y_vec"], d["X"], d["G"], Z=np.ones((5, 1)))
+        SARHurdleNegBinFlow(
+            d["y_vec"], d["X"], d["G"], separable=True, Z=np.ones((5, 1))
+        )
     with pytest.raises(ValueError, match="positive count"):
-        SARHurdleNBFlowSeparable(np.zeros_like(d["y_vec"]), d["X"], d["G"])
-    m = SARHurdleNBFlowSeparablePanel(
-        d["y_vec"], d["X"], d["G"], T=1, Z=d["X"][:, :2], col_names=d["col_names"]
+        SARHurdleNegBinFlow(np.zeros_like(d["y_vec"]), d["X"], d["G"], separable=True)
+    m = SARHurdleNegBinFlow(
+        d["y_vec"],
+        d["X"],
+        d["G"],
+        separable=True,
+        T=1,
+        Z=d["X"][:, :2],
+        col_names=d["col_names"],
     )
     m.fit(**QUICK)
     with pytest.raises(NotImplementedError, match="flow design"):
@@ -502,7 +537,7 @@ def test_flow_hurdle_guards():
 @pytest.mark.slow
 def test_flow_hurdle_structured_matches_generic():
     """The structured n × n sweep against the materialized-U kernel (pair effects)."""
-    from neighbayes.models import SARHurdleNBFlowSeparablePanel
+    from neighbayes.models import SARHurdleNegBinFlow
     from neighbayes.samplers.count_panel._filters import FlowSeparableFilter
     from neighbayes.samplers.hurdle._generic import HurdlePriors, run_chain
 
@@ -515,8 +550,15 @@ def test_flow_hurdle_structured_matches_generic():
     )  # fmt: skip
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
-        m = SARHurdleNBFlowSeparablePanel(
-            d["y"], d["X"], d["G"], T=6, col_names=d["col_names"], effects=3
+        m = SARHurdleNegBinFlow(
+            d["y"],
+            d["X"],
+            d["G"],
+            separable=True,
+            pair_effects="random",
+            time_effects=True,
+            T=6,
+            col_names=d["col_names"],
         )
     s = m.fit(
         draws=4000, tune=1000, chains=4, progressbar=False, random_seed=1
@@ -562,10 +604,12 @@ def test_flow_hurdle_structured_matches_generic():
 
 @pytest.mark.slow
 def test_flow_hurdle_matches_nuts():
-    from neighbayes.models import SARHurdleNBFlowSeparable
+    from neighbayes.models import SARHurdleNegBinFlow
 
     d = _flow(n=7, seed=3)
-    m = SARHurdleNBFlowSeparable(d["y_vec"], d["X"], d["G"], col_names=d["col_names"])
+    m = SARHurdleNegBinFlow(
+        d["y_vec"], d["X"], d["G"], separable=True, col_names=d["col_names"]
+    )
     g = m.fit(draws=4000, tune=1000, chains=4, progressbar=False, random_seed=1)
     n = m.fit(
         sampler="nuts", draws=2000, tune=1500, chains=4, progressbar=False,
@@ -582,13 +626,20 @@ def test_flow_hurdle_matches_nuts():
 @pytest.mark.slow
 @pytest.mark.requires_jax
 def test_flow_hurdle_jax_matches_numpy():
-    from neighbayes.models import SARHurdleNBFlowSeparablePanel
+    from neighbayes.models import SARHurdleNegBinFlow
 
     d = _flow_panel_data(n=6, T=4, seed=5)
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
-        m = SARHurdleNBFlowSeparablePanel(
-            d["y"], d["X"], d["G"], T=4, col_names=d["col_names"], effects=3
+        m = SARHurdleNegBinFlow(
+            d["y"],
+            d["X"],
+            d["G"],
+            separable=True,
+            pair_effects="random",
+            time_effects=True,
+            T=4,
+            col_names=d["col_names"],
         )
     fit = dict(draws=3000, tune=1000, chains=4, progressbar=False)
     a = m.fit(gibbs_backend="numpy", random_seed=1, n_jobs=4, **fit).posterior
@@ -610,7 +661,7 @@ def test_flow_hurdle_panel_recovers_sparse_flows():
     """
     import arviz as az
 
-    from neighbayes.models import SARHurdleNBFlowSeparablePanel
+    from neighbayes.models import SARHurdleNegBinFlow
 
     n, T = 20, 8
     d = _flow(
@@ -619,8 +670,15 @@ def test_flow_hurdle_panel_recovers_sparse_flows():
     )  # fmt: skip
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
-        m = SARHurdleNBFlowSeparablePanel(
-            d["y"], d["X"], d["G"], T=T, col_names=d["col_names"], effects=3
+        m = SARHurdleNegBinFlow(
+            d["y"],
+            d["X"],
+            d["G"],
+            separable=True,
+            pair_effects="random",
+            time_effects=True,
+            T=T,
+            col_names=d["col_names"],
         )
     post = m.fit(
         draws=3000, tune=1000, chains=4, progressbar=False, random_seed=1,

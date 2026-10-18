@@ -2,20 +2,9 @@
 
 from __future__ import annotations
 
-from neighbayes.models import (
-    OLS,
-    SAR,
-    SDEM,
-    SDM,
-    SEM,
-    SLX,
-    OLSPanelFE,
-    OLSPanelRE,
-    SARPanelFE,
-    SARPanelRE,
-    SEMPanelFE,
-    SEMPanelRE,
-)
+from neighbayes.models import OLS, SAR, SDEM, SDM, SEM, SLX
+from neighbayes.models.panel._fe import OLSPanelFE, SARPanelFE, SEMPanelFE
+from neighbayes.models.panel._re import OLSPanelRE, SARPanelRE, SEMPanelRE
 
 
 def test_cross_sectional_models_no_frequentist_spec_tests():
@@ -52,9 +41,11 @@ def test_panel_models_no_frequentist_diagnostics():
         assert not hasattr(cls, "hausman_test")
 
 
-from neighbayes.models import SDEMPanelFE, SDEMPanelRE, SDMPanelFE, SLXPanelFE
+from neighbayes.models import SDEM, SDM, SLX
 from neighbayes.models.flow import OLSFlow, SARFlow
-from neighbayes.models.flow_panel import OLSFlowPanel
+from neighbayes.models.flow_panel import OLSFlowPanelFE
+from neighbayes.models.panel._fe import SDEMPanelFE, SDMPanelFE, SLXPanelFE
+from neighbayes.models.panel._re import SDEMPanelRE
 
 EXPECTED_REGISTRIES = {
     OLS: [
@@ -112,7 +103,7 @@ EXPECTED_REGISTRIES = {
         "Robust-LM-Flow-Network",
         "LM-Flow-Intra",
     ],
-    OLSFlowPanel: [
+    OLSFlowPanelFE: [
         "Panel-LM-Flow-Dest",
         "Panel-LM-Flow-Orig",
         "Panel-LM-Flow-Network",
@@ -185,10 +176,10 @@ def test_flow_decision_tree_dispatch():
     assert d4 == "OLSFlow"
 
     # Panel variants
-    spec_p = _dt.get_panel_flow_spec("OLSFlowPanel")
+    spec_p = _dt.get_panel_flow_spec("OLSFlowPanelFE")
     dp, _ = _dt.evaluate(spec_p, lambda name: name == "Panel-LM-Flow-Joint")
-    assert dp == "SARFlowPanel"
+    assert dp == "SARFlow"
 
-    spec_sp = _dt.get_panel_flow_spec("SARFlowPanel")
+    spec_sp = _dt.get_panel_flow_spec("SARFlowPanelFE")
     dp2, _ = _dt.evaluate(spec_sp, lambda name: False)
-    assert dp2 == "OLSFlowPanel"
+    assert dp2 == "OLSFlow"

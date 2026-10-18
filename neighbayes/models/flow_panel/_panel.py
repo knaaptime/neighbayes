@@ -27,6 +27,7 @@ from ..._logdet import (
 from ..._ops import kron_solve_matrix
 from ...graph import _weights_to_csr, flow_lags, flow_trace_blocks
 from .._base._nb import nb_alpha_rv
+from .._design import FacadeMeta, flow
 from .._mixins._count_panel import CountPanelFEMixin, pop_mundlak, require_counts
 from .._mixins._flow_shared import FlowSharedMethods
 from .._mixins._zinb import ZINBMixin
@@ -744,7 +745,7 @@ class _ResolventFlowPanelMixin:
         ...
 
 
-class SARFlowPanel(_ResolventFlowPanelMixin, FlowPanelModel):
+class SARFlowPanelFE(_ResolventFlowPanelMixin, FlowPanelModel):
     """Panel spatial-lag origin-destination flow model with unrestricted dependence.
 
     For each period :math:`t`, the vectorized flow matrix
@@ -913,7 +914,7 @@ class SARFlowPanel(_ResolventFlowPanelMixin, FlowPanelModel):
         )
 
 
-class SARFlowSeparablePanel(FlowPanelModel):
+class SARFlowSeparablePanelFE(FlowPanelModel):
     """Panel separable spatial-lag flow model with :math:`\\rho_w = -\\rho_d \\rho_o`.
 
     For each period :math:`t`,
@@ -983,7 +984,7 @@ class SARFlowSeparablePanel(FlowPanelModel):
         _VALID = {"eigenvalue", "chebyshev", "cheb_cholesky", "aaa", "cheb_stochastic"}
         if method is not None and method not in _VALID:
             raise ValueError(
-                f"SARFlowSeparablePanel logdet_method must be None (auto) or one of "
+                f"SARFlowSeparablePanelFE logdet_method must be None (auto) or one of "
                 f"{sorted(_VALID)}; got {method!r}."
             )
         kwargs["logdet_method"] = method
@@ -997,7 +998,7 @@ class SARFlowSeparablePanel(FlowPanelModel):
 
         if self._separable_logdet_fn is None:
             raise RuntimeError(
-                "SARFlowSeparablePanel requires precomputed logdet data; "
+                "SARFlowSeparablePanelFE requires precomputed logdet data; "
                 "initialize with a separable logdet_method (None/auto, "
                 "eigenvalue, chebyshev, cheb_cholesky, aaa, or cheb_stochastic)."
             )
@@ -1067,7 +1068,7 @@ class SARFlowSeparablePanel(FlowPanelModel):
         )
 
 
-class OLSFlowPanel(FlowPanelModel):
+class OLSFlowPanelFE(FlowPanelModel):
     r"""Non-spatial Bayesian OD-flow gravity model for balanced panel data.
 
     Panel analogue of :class:`~neighbayes.models.flow.OLSFlow`: implements
@@ -1562,7 +1563,7 @@ class _AspatialCountFlowPanel(_FlowCountPanelMixin):
         )
 
 
-class SARNegBinFlowPanel(_UnrestrictedCountFlowPanel, SARFlowPanel):
+class SARNegBinFlowPanelRE(_UnrestrictedCountFlowPanel, SARFlowPanelFE):
     """Panel NB2 SAR flow model with unrestricted dependence parameters."""
 
     __doc__ = __doc__ + _COUNT_FE_DOC
@@ -1573,7 +1574,7 @@ class SARNegBinFlowPanel(_UnrestrictedCountFlowPanel, SARFlowPanel):
         kwargs.setdefault("logdet_method", "none")
         effects = _pop_effects(kwargs)
         mundlak = pop_mundlak(kwargs)
-        y_arr = require_counts(y, "SARNegBinFlowPanel")
+        y_arr = require_counts(y, "SARNegBinFlowPanelRE")
         super().__init__(y_arr.astype(np.float64), X, W, effects=0, **kwargs)
         self._finish_count_init(y_arr, effects, mundlak)
 
@@ -1722,7 +1723,7 @@ class SARNegBinFlowPanel(_UnrestrictedCountFlowPanel, SARFlowPanel):
         return self._build_pymc_count_model()
 
 
-class SARNegBinFlowSeparablePanel(_SeparableCountFlowPanel, SARFlowSeparablePanel):
+class SARNegBinFlowSeparablePanelRE(_SeparableCountFlowPanel, SARFlowSeparablePanelFE):
     """Panel separable NB2 SAR flow model."""
 
     __doc__ = __doc__ + _COUNT_FE_DOC
@@ -1730,12 +1731,12 @@ class SARNegBinFlowSeparablePanel(_SeparableCountFlowPanel, SARFlowSeparablePane
     def __init__(self, y, X, W, **kwargs):
         effects = _pop_effects(kwargs)
         mundlak = pop_mundlak(kwargs)
-        y_arr = require_counts(y, "SARNegBinFlowSeparablePanel")
+        y_arr = require_counts(y, "SARNegBinFlowSeparablePanelRE")
         method = kwargs.pop("logdet_method", None)
         _VALID = {"eigenvalue", "chebyshev", "cheb_cholesky", "aaa", "cheb_stochastic"}
         if method is not None and method not in _VALID:
             raise ValueError(
-                f"SARNegBinFlowSeparablePanel logdet_method must be None (auto) or one of "
+                f"SARNegBinFlowSeparablePanelRE logdet_method must be None (auto) or one of "
                 f"{sorted(_VALID)}; got {method!r}."
             )
         kwargs["logdet_method"] = method
@@ -2052,14 +2053,14 @@ class SARNegBinFlowSeparablePanel(_SeparableCountFlowPanel, SARFlowSeparablePane
     def _build_pymc_model(self) -> pm.Model:
         if self._separable_logdet_fn is None:
             raise RuntimeError(
-                "SARNegBinFlowSeparablePanel requires precomputed logdet data; "
+                "SARNegBinFlowSeparablePanelRE requires precomputed logdet data; "
                 "initialize with a separable logdet_method (None/auto, "
                 "eigenvalue, chebyshev, cheb_cholesky, aaa, or cheb_stochastic)."
             )
         return self._build_pymc_count_model()
 
 
-class NegBinFlowPanel(_AspatialCountFlowPanel, OLSFlowPanel):
+class NegBinFlowPanelRE(_AspatialCountFlowPanel, OLSFlowPanelFE):
     """Aspatial panel OD-flow NB2 gravity baseline.
 
     ``fit()`` runs Pólya–Gamma Gibbs with ρ fixed at zero (pair effects
@@ -2071,7 +2072,7 @@ class NegBinFlowPanel(_AspatialCountFlowPanel, OLSFlowPanel):
     def __init__(self, y, X, W, T, **kwargs):
         effects = _pop_effects(kwargs)
         mundlak = pop_mundlak(kwargs)
-        y_arr = require_counts(y, "NegBinFlowPanel")
+        y_arr = require_counts(y, "NegBinFlowPanelRE")
         super().__init__(y_arr.astype(np.float64), X, W, T, effects=0, **kwargs)
         self._finish_count_init(y_arr, effects, mundlak)
 
@@ -2113,8 +2114,8 @@ class NegBinFlowPanel(_AspatialCountFlowPanel, OLSFlowPanel):
 # ---------------------------------------------------------------------------
 
 
-class SARZINBFlowSeparablePanel(
-    ZINBMixin, _SeparableCountFlowPanel, SARFlowSeparablePanel
+class SARZINBFlowSeparablePanelRE(
+    ZINBMixin, _SeparableCountFlowPanel, SARFlowSeparablePanelFE
 ):
     r"""Zero-inflated separable SAR flow panel.
 
@@ -2137,7 +2138,7 @@ class SARZINBFlowSeparablePanel(
     Parameters
     ----------
     y, X, W, T, col_names, k, priors, symmetric_xo_xd
-        As :class:`SARNegBinFlowSeparablePanel`.
+        As :class:`SARNegBinFlowSeparablePanelRE`.
     Z : array-like or pandas.DataFrame, optional
         Selection design, time-first stacked ``(n²·T, p)``.  Default: ``X``
         (then selection impacts are available).
@@ -2147,7 +2148,7 @@ class SARZINBFlowSeparablePanel(
         Count-equation effects: ``0`` pooled, ``1`` pair, ``2`` period,
         ``3`` both.
     priors : dict, optional
-        Count keys as :class:`SARNegBinFlowSeparablePanel` (incl.
+        Count keys as :class:`SARNegBinFlowSeparablePanelRE` (incl.
         ``alpha_fixed``) plus ``gamma_mu``, ``gamma_sigma``, ``lam_lower`` and
         ``lam_upper`` for the selection equation.
     """
@@ -2536,10 +2537,10 @@ class SARZINBFlowSeparablePanel(
             self._effects_equation = "count"
 
 
-class SARZINBFlowSeparable(SARZINBFlowSeparablePanel):
+class SARZINBFlowSeparable(SARZINBFlowSeparablePanelRE):
     """Cross-sectional zero-inflated separable SAR flow model (one period).
 
-    :class:`SARZINBFlowSeparablePanel` with ``T = 1`` and no effects; see
+    :class:`SARZINBFlowSeparablePanelRE` with ``T = 1`` and no effects; see
     there for the model, sampling and arguments.  ``y`` is the ``n²`` flow
     vector (or the ``n × n`` matrix).
 
@@ -2548,21 +2549,21 @@ class SARZINBFlowSeparable(SARZINBFlowSeparablePanel):
     count distribution separates structural from sampling zeros, and NB with a
     smaller α explains the zeros nearly as well.  Check λ against its prior and
     the selection R-hat, or use the panel with pair effects, or
-    :class:`SARHurdleNBFlowSeparable`.
+    :class:`SARHurdleNegBinFlowSeparable`.
     """
 
     def __init__(self, y, X, W, **kwargs):
         if _pop_effects(kwargs):
             raise ValueError(
                 "SARZINBFlowSeparable is a cross-section; pair and period effects need "
-                "SARZINBFlowSeparablePanel."
+                "SARZINBFlowSeparablePanelRE."
             )
         kwargs.pop("T", None)
         super().__init__(y, X, W, T=1, **kwargs)
 
 
 # ---------------------------------------------------------------------------
-# Panel SEM-Flow variants (spatial-error analogues of SARFlowPanel)
+# Panel SEM-Flow variants (spatial-error analogues of SARFlowPanelFE)
 # ---------------------------------------------------------------------------
 
 
@@ -2578,7 +2579,7 @@ class _SEMFlowPanelMixin:
         )
 
 
-class SEMFlowPanel(_ResolventFlowPanelMixin, _SEMFlowPanelMixin, FlowPanelModel):
+class SEMFlowPanelFE(_ResolventFlowPanelMixin, _SEMFlowPanelMixin, FlowPanelModel):
     """Panel spatial-error flow model with three free spatial parameters.
 
     Panel analogue of :class:`~neighbayes.models.flow.SEMFlow`: applies the
@@ -2591,9 +2592,9 @@ class SEMFlowPanel(_ResolventFlowPanelMixin, _SEMFlowPanelMixin, FlowPanelModel)
         \\quad \\varepsilon_t \\sim \\mathcal{N}(0, \\sigma^2 I_N).
 
     The Jacobian contribution scales as :math:`T \\cdot \\log|B|` — identical
-    in form to :class:`SARFlowPanel`. Marginal mean is :math:`X_t \\beta`,
+    in form to :class:`SARFlowPanelFE`. Marginal mean is :math:`X_t \\beta`,
     so there are no :math:`X`-mediated spillovers; effects collapse to the
-    closed-form expressions used by :class:`OLSFlowPanel`.
+    closed-form expressions used by :class:`OLSFlowPanelFE`.
 
     Parameters
     ----------
@@ -2668,7 +2669,7 @@ class SEMFlowPanel(_ResolventFlowPanelMixin, _SEMFlowPanelMixin, FlowPanelModel)
         # Jacobian was removed.  Only reached if a non-resolvent logdet_method
         # is forced.
         raise NotImplementedError(
-            "SEMFlowPanel samples via the resolvent-gradient sampler "
+            "SEMFlowPanelFE samples via the resolvent-gradient sampler "
             "(logdet_method='resolvent'); the legacy 'traces' PyMC path was removed."
         )
 
@@ -2698,7 +2699,7 @@ class SEMFlowPanel(_ResolventFlowPanelMixin, _SEMFlowPanelMixin, FlowPanelModel)
         self,
         draws: Optional[int] = None,
     ) -> dict[str, np.ndarray]:
-        """Closed-form effects (delegates to OLSFlowPanel logic)."""
+        """Closed-form effects (delegates to OLSFlowPanelFE logic)."""
         if self._idata is None:
             raise RuntimeError("Model has not been fit yet. Call fit() first.")
         return _compute_ols_flow_effects(
@@ -2713,11 +2714,11 @@ class SEMFlowPanel(_ResolventFlowPanelMixin, _SEMFlowPanelMixin, FlowPanelModel)
         )
 
 
-class SEMFlowSeparablePanel(_SEMFlowPanelMixin, FlowPanelModel):
+class SEMFlowSeparablePanelFE(_SEMFlowPanelMixin, FlowPanelModel):
     """Panel separable spatial-error flow model with :math:`\\lambda_w = -\\lambda_d \\lambda_o`.
 
     Panel analogue of :class:`~neighbayes.models.flow.SEMFlowSeparable` and
-    spatial-error counterpart of :class:`SARFlowSeparablePanel`. Uses the
+    spatial-error counterpart of :class:`SARFlowSeparablePanelFE`. Uses the
     eigenvalue / Chebyshev factorization of :math:`\\log|B|` with the panel
     Jacobian scaling :math:`T \\cdot \\log|B|`.
 
@@ -2773,7 +2774,7 @@ class SEMFlowSeparablePanel(_SEMFlowPanelMixin, FlowPanelModel):
         _VALID = {"eigenvalue", "chebyshev", "cheb_cholesky", "aaa", "cheb_stochastic"}
         if method is not None and method not in _VALID:
             raise ValueError(
-                f"SEMFlowSeparablePanel logdet_method must be None (auto) or one of "
+                f"SEMFlowSeparablePanelFE logdet_method must be None (auto) or one of "
                 f"{sorted(_VALID)}; got {method!r}."
             )
         kwargs["logdet_method"] = method
@@ -2788,7 +2789,7 @@ class SEMFlowSeparablePanel(_SEMFlowPanelMixin, FlowPanelModel):
 
         if self._separable_logdet_fn is None:
             raise RuntimeError(
-                "SEMFlowSeparablePanel requires precomputed logdet data; "
+                "SEMFlowSeparablePanelFE requires precomputed logdet data; "
                 "initialize with a separable logdet_method (None/auto, "
                 "eigenvalue, chebyshev, cheb_cholesky, aaa, or cheb_stochastic)."
             )
@@ -2889,3 +2890,26 @@ class SEMFlowSeparablePanel(_SEMFlowPanelMixin, FlowPanelModel):
             intra_idx=self._intra_idx,
             draws=draws,
         )
+
+
+class SARZINBFlow(metaclass=FacadeMeta):
+    """Zero-inflated negative binomial flow model with SAR dependence.
+
+    Implemented as the separable flow only: pass ``separable=True``.  Pass
+    ``T`` for a flow panel, whose pair effects are random and time effects
+    fixed.
+
+    Parameters
+    ----------
+    separable : bool
+        Must be ``True``.
+    T : int, optional
+        Periods; omit (or ``1``) for a cross-section.
+    pair_effects : {None, "random"}, default None
+    time_effects : bool, default False
+    **kwargs
+        ``y``, ``X``, ``W``, the zero part's ``Z`` and ``W_sel``, ``priors``,
+        and ``logdet_method``.
+    """
+
+    _dispatch = classmethod(flow)

@@ -15,8 +15,8 @@ demeaned error of order :math:`O(1/T)`, biasing the OLS / quasi-MLE
 estimator of :math:`\\phi` toward zero.  Bayesian inference suffers
 from the same identification pathology because the *likelihood* (not
 the estimator) is the source of the bias.  This package therefore
-forbids ``model=1`` (unit FE) for dynamic specifications and the
-constructor raises ``ValueError``.  Users who require unit FE with a
+forbids unit effects (``effects="unit"`` or ``"two_way"``) for dynamic
+specifications and the constructor raises ``ValueError``.  Users who require unit FE with a
 lagged dependent variable should use a GMM package (e.g. ``linearmodels``).
 
 References
@@ -58,14 +58,15 @@ class _DynamicPanelMixin:
     """Shared helpers for dynamic panel classes based on lagged stacked arrays.
 
     Dynamic panel models include a lagged dependent variable (φ·y_{t-1}).
-    When unit fixed effects are applied (model=1), the within-transformation
-    creates correlation between the demeaned lagged dependent variable and
-    the demeaned error term, biasing the estimator toward zero (Nickell, 1981).
-    This is known as the **Nickell bias** or **dynamic panel bias**.
+    When unit fixed effects are applied, alone or in two-way effects, the
+    within-transformation creates correlation between the demeaned lagged
+    dependent variable and the demeaned error term, biasing the estimator
+    toward zero (Nickell, 1981).  This is known as the **Nickell bias** or
+    **dynamic panel bias**.
 
-    To avoid this, dynamic panel models in this package require model=0
-    (pooled), model=2 (time FE), or model=3 (two-way FE).  Setting model=1
-    (unit FE) raises a ValueError at construction time.
+    To avoid this, dynamic panel models in this package take no effects or
+    time effects only; ``effects="unit"`` and ``effects="two_way"`` raise a
+    ValueError at construction time.
     """
 
     # Fixed-T bias here is Nickell's, not Lee & Yu's; see SpatialPanelModel.
@@ -111,7 +112,7 @@ class _DynamicPanelMixin:
             indirect_samples = np.zeros_like(direct_samples)
             total_samples = direct_samples.copy()
 
-        elif isinstance(self, (SDMRPanelDynamic, SDMUPanelDynamic)):
+        elif isinstance(self, (SDMPanelDynamicRestricted, SDMPanelDynamic)):
             self._prepare_dynamic_design()
             rho_draws = _get_posterior_draws(idata, "rho")
             beta_draws = _get_posterior_draws(idata, "beta")
@@ -158,22 +159,19 @@ class _DynamicPanelMixin:
 
     def __init__(self, *args, effects: Union[str, int] = 0, **kwargs):
         effects_int = _resolve_effects(effects) if isinstance(effects, str) else effects
-        if effects_int == 1:
+        if effects_int in (1, 3):
             raise ValueError(
-                "effects='unit' (unit fixed effects) is not supported for dynamic "
-                "panel models due to the Nickell bias (Nickell, 1981).  "
+                f"effects={effects!r} (unit fixed effects) is not supported for "
+                "dynamic panel models due to the Nickell bias (Nickell, 1981).  "
                 "When unit fixed effects are removed via within-demeaning, "
-                "the demeaned lagged dependent variable (y_{i,t-1} - ȳ_{i}) "
-                "becomes mechanically correlated with the demeaned error "
-                "(ε_{i,t} - ε̄_{i}), because ȳ_{i} contains ε_{i,t-1}.  "
-                "This correlation biases the autoregressive coefficient φ "
-                "toward zero, and the bias only vanishes as T → ∞.  "
-                "For short panels (small T), the bias is severe and renders "
-                "the estimator inconsistent.  Use effects='pooled', "
-                "effects='time', or effects='two_way' instead.  "
-                "For unit-specific heterogeneity with a lagged dependent "
-                "variable, consider the Arellano-Bond GMM estimator or "
-                "a random-effects specification (effects='pooled' with unit priors)."
+                "alone or in two-way effects, the demeaned lagged dependent "
+                "variable (y_{i,t-1} - ȳ_{i}) becomes mechanically correlated "
+                "with the demeaned error (ε_{i,t} - ε̄_{i}), because ȳ_{i} "
+                "contains ε_{i,t-1}.  This correlation biases the autoregressive "
+                "coefficient φ toward zero, and the bias only vanishes as "
+                "T → ∞.  Use effects='pooled' or effects='time' instead.  For "
+                "unit-specific heterogeneity with a lagged dependent variable, "
+                "consider the Arellano-Bond GMM estimator (e.g. linearmodels)."
             )
         super().__init__(*args, effects=effects, **kwargs)
 
@@ -526,7 +524,7 @@ class OLSPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
         return phi * self._y_lag + self._Z_dyn @ beta
 
 
-class SDMRPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
+class SDMPanelDynamicRestricted(_DynamicPanelMixin, SpatialPanelModel):
     _priors_cls = PanelSDMRDynamicPriors
     _has_wx_in_beta = True
 
@@ -630,7 +628,7 @@ class SDMRPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
         )
 
 
-class SDMUPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
+class SDMPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
     _priors_cls = PanelSDMUDynamicPriors
     _has_wx_in_beta = True
 

@@ -7,14 +7,14 @@ import pytest
 from libpysal.graph import Graph
 
 from neighbayes.dgp.flows import (
-    generate_flow_data,
-    generate_flow_data_separable,
-    generate_negbin_flow_data,
-    generate_negbin_flow_data_separable,
-    generate_panel_flow_data,
-    generate_panel_flow_data_separable,
-    generate_panel_negbin_flow_data,
-    generate_panel_negbin_flow_data_separable,
+    simulate_sar_flow,
+    simulate_sar_flow_panel_fe,
+    simulate_sar_flow_separable,
+    simulate_sar_flow_separable_panel_fe,
+    simulate_sar_negbin_flow,
+    simulate_sar_negbin_flow_panel_re,
+    simulate_sar_negbin_flow_separable,
+    simulate_sar_negbin_flow_separable_panel_re,
 )
 from neighbayes.dgp.utils import (
     pairwise_distance_matrix,
@@ -22,7 +22,7 @@ from neighbayes.dgp.utils import (
 )
 
 N = 5
-G = generate_flow_data(n=N, seed=0)["G"]
+G = simulate_sar_flow(n=N, seed=0)["G"]
 BETA_D = [1.0, -0.5]
 BETA_O = [0.5, 0.3]
 
@@ -31,9 +31,9 @@ BETA_O = [0.5, 0.3]
 def all_dgp_outputs():
     """Outputs from all 8 flow DGPs with default args."""
     return {
-        "flow": generate_flow_data(N, G, 0.2, 0.2, 0.05, BETA_D, BETA_O, seed=0),
-        "negbin": generate_negbin_flow_data(n=N, k=2, seed=0),
-        "panel": generate_panel_flow_data(
+        "flow": simulate_sar_flow(N, G, 0.2, 0.2, 0.05, BETA_D, BETA_O, seed=0),
+        "negbin": simulate_sar_negbin_flow(n=N, k=2, seed=0),
+        "panel": simulate_sar_flow_panel_fe(
             n=N,
             T=2,
             G=G,
@@ -44,12 +44,10 @@ def all_dgp_outputs():
             beta_o=BETA_O,
             seed=0,
         ),
-        "panel_negbin": generate_panel_negbin_flow_data(n=N, T=2, G=G, seed=0),
-        "flow_sep": generate_flow_data_separable(
-            N, G, 0.3, 0.2, BETA_D, BETA_O, seed=0
-        ),
-        "negbin_sep": generate_negbin_flow_data_separable(n=N, k=2, seed=0),
-        "panel_sep": generate_panel_flow_data_separable(
+        "panel_negbin": simulate_sar_negbin_flow_panel_re(n=N, T=2, G=G, seed=0),
+        "flow_sep": simulate_sar_flow_separable(N, G, 0.3, 0.2, BETA_D, BETA_O, seed=0),
+        "negbin_sep": simulate_sar_negbin_flow_separable(n=N, k=2, seed=0),
+        "panel_sep": simulate_sar_flow_separable_panel_fe(
             n=N,
             T=2,
             G=G,
@@ -59,7 +57,7 @@ def all_dgp_outputs():
             beta_o=BETA_O,
             seed=0,
         ),
-        "panel_negbin_sep": generate_panel_negbin_flow_data_separable(
+        "panel_negbin_sep": simulate_sar_negbin_flow_separable_panel_re(
             n=N, T=2, G=G, seed=0
         ),
     }
@@ -139,7 +137,7 @@ class TestDistanceFromUserGdf:
             {"id": np.arange(N)},
             geometry=[Point(x, y) for x, y in coords],
         )
-        out = generate_flow_data(N, G, 0.1, 0.1, 0.05, BETA_D, BETA_O, gdf=gdf, seed=0)
+        out = simulate_sar_flow(N, G, 0.1, 0.1, 0.05, BETA_D, BETA_O, gdf=gdf, seed=0)
         np.testing.assert_allclose(out["dist"], cdist(coords, coords), atol=1e-12)
 
     def test_polygon_gdf_uses_centroids(self):
@@ -151,16 +149,16 @@ class TestDistanceFromUserGdf:
         polys = [box(i, 0, i + 1, 1) for i in range(N)]
         gdf = gpd.GeoDataFrame({"id": np.arange(N)}, geometry=polys)
         cents = np.column_stack([gdf.geometry.centroid.x, gdf.geometry.centroid.y])
-        out = generate_flow_data(N, G, 0.1, 0.1, 0.05, BETA_D, BETA_O, gdf=gdf, seed=0)
+        out = simulate_sar_flow(N, G, 0.1, 0.1, 0.05, BETA_D, BETA_O, gdf=gdf, seed=0)
         np.testing.assert_allclose(out["dist"], cdist(cents, cents), atol=1e-12)
 
 
 class TestGammaDistOverride:
     def test_zero_disables_distance_effect(self):
-        out_neg = generate_flow_data(
+        out_neg = simulate_sar_flow(
             N, G, 0.2, 0.2, 0.05, BETA_D, BETA_O, gamma_dist=-0.5, seed=0
         )
-        out_zero = generate_flow_data(
+        out_zero = simulate_sar_flow(
             N, G, 0.2, 0.2, 0.05, BETA_D, BETA_O, gamma_dist=0.0, seed=0
         )
         # Identical X (same seed, same Xreg), but different y because of
@@ -176,7 +174,7 @@ class TestAutoBuildG:
 
     def test_auto_build_G_when_none(self):
         # Neither n, G nor gdf supplied → falls back to default_n=25.
-        out = generate_flow_data(seed=0)
+        out = simulate_sar_flow(seed=0)
         assert isinstance(out["G"], Graph)
         assert out["G"].n_nodes == 25
         assert len(out["gdf"]) == 25
@@ -187,7 +185,7 @@ class TestAutoBuildG:
 
     def test_n_only_auto_build(self):
         # Only n supplied → builds gdf and KNN graph for that n.
-        out = generate_negbin_flow_data(n=16, seed=0)
+        out = simulate_sar_negbin_flow(n=16, seed=0)
         assert out["G"].n_nodes == 16
         assert len(out["gdf"]) == 16
         assert out["y_mat"].shape == (16, 16)
@@ -195,7 +193,7 @@ class TestAutoBuildG:
     def test_user_gdf_drives_G(self):
         # gdf supplied without G → KNN graph derived from gdf.
         gdf = synth_point_geodataframe(9)
-        out = generate_flow_data(gdf=gdf, beta_d=BETA_D, beta_o=BETA_O, seed=0, knn_k=3)
+        out = simulate_sar_flow(gdf=gdf, beta_d=BETA_D, beta_o=BETA_O, seed=0, knn_k=3)
         assert out["G"].n_nodes == 9
         # The returned gdf is the same object the user passed in.
         assert out["gdf"] is gdf
@@ -206,7 +204,7 @@ class TestAutoBuildG:
 
     def test_explicit_G_synthesizes_gdf_for_distance(self):
         # G supplied without gdf → synthetic gdf used to populate distance.
-        out = generate_flow_data(G=G, beta_d=BETA_D, beta_o=BETA_O, seed=0)
+        out = simulate_sar_flow(G=G, beta_d=BETA_D, beta_o=BETA_O, seed=0)
         assert out["G"].n_nodes == G.n_nodes
         assert out["gdf"] is not None
         assert len(out["gdf"]) == G.n_nodes
@@ -214,13 +212,13 @@ class TestAutoBuildG:
 
     def test_n_inferred_from_G(self):
         # When G is supplied, n is inferred (and disagreeing n raises).
-        out = generate_panel_negbin_flow_data(T=2, G=G, seed=0)
+        out = simulate_sar_negbin_flow_panel_re(T=2, G=G, seed=0)
         assert out["G"].n_nodes == G.n_nodes
         assert out["y"].shape == (2 * G.n_nodes * G.n_nodes,)
         with pytest.raises(ValueError, match="disagrees"):
-            generate_panel_negbin_flow_data(n=G.n_nodes + 1, T=2, G=G, seed=0)
+            simulate_sar_negbin_flow_panel_re(n=G.n_nodes + 1, T=2, G=G, seed=0)
 
     def test_gdf_size_mismatch_raises(self):
         gdf = synth_point_geodataframe(7)
         with pytest.raises(ValueError, match="rows"):
-            generate_flow_data(G=G, gdf=gdf, beta_d=BETA_D, beta_o=BETA_O, seed=0)
+            simulate_sar_flow(G=G, gdf=gdf, beta_d=BETA_D, beta_o=BETA_O, seed=0)

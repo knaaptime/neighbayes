@@ -10,10 +10,10 @@ on the log-mean only — ``y`` is not transformed, so there is no
 :math:`\log|I - \rho W|` Jacobian (see
 :class:`~neighbayes.models.SARNegBin`).
 
-* :class:`SARNegBinPanel` — spatial lag on the log-mean, sampled by
+* :class:`SARNegBinPanelRE` — spatial lag on the log-mean, sampled by
   reduced-form Pólya–Gamma Gibbs with β, the period effects and the unit
   effects integrated out of every ρ update.
-* :class:`NegBinPanel` — the aspatial baseline.
+* :class:`NegBinPanelRE` — the aspatial baseline.
 
 Both default to Gibbs, as the Gaussian panels do; ``sampler="nuts"`` runs the
 PyMC model instead.
@@ -301,7 +301,7 @@ register(
 )
 
 
-class SARNegBinPanel(_CountPanelBase):
+class SARNegBinPanelRE(_CountPanelBase):
     __doc__ = (
         r"""Spatial-lag NB2 count panel with pooled unit effects and period effects.
 
@@ -317,7 +317,7 @@ class SARNegBinPanel(_CountPanelBase):
     _count_spatial = True
 
 
-class NegBinPanel(_CountPanelBase):
+class NegBinPanelRE(_CountPanelBase):
     __doc__ = (
         r"""Aspatial NB2 count panel with pooled unit effects and period effects.
 

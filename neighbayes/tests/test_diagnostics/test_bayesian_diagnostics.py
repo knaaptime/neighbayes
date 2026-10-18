@@ -31,6 +31,7 @@ from neighbayes.diagnostics.lmtests import (
     bayesian_robust_lm_lag_sdm_test,
     bayesian_robust_lm_wx_test,
 )
+from neighbayes.models import OLSFlow
 
 
 def make_sar_sem_data(n=20, seed=42):
@@ -416,7 +417,7 @@ class TestBayesianRobustLMErrorSDEMTest:
 
 
 # ---------------------------------------------------------------------------
-# SDM/SDEM-aware MANSAR-direction tests
+# SDM/SDEM-aware GNS-direction tests
 # ---------------------------------------------------------------------------
 
 
@@ -1231,15 +1232,13 @@ class TestSpatialDiagnosticsMethod:
         # Monkeypatch spatial_diagnostics to return a controlled DataFrame.
         # The new SDM tree requires both naive ``LM-Error-SDM`` and the
         # robust-after-naive ``Robust-LM-Error-SDM`` gate to fire before
-        # escalating to MANSAR.
+        # escalating to GNS.
         df = pd.DataFrame(
             {"p_value": [0.001, 0.001]},
             index=["LM-Error-SDM", "Robust-LM-Error-SDM"],
         )
         monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert (
-            model.spatial_diagnostics_decision(alpha=0.05, format="model") == "MANSAR"
-        )
+        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "GNS"
 
         df2 = pd.DataFrame(
             {"p_value": [0.9, 0.9]},
@@ -1260,9 +1259,7 @@ class TestSpatialDiagnosticsMethod:
             index=["LM-Lag-SDEM", "Robust-LM-Lag-SDEM"],
         )
         monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert (
-            model.spatial_diagnostics_decision(alpha=0.05, format="model") == "MANSAR"
-        )
+        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "GNS"
 
         df2 = pd.DataFrame({"p_value": [0.9]}, index=["LM-Lag-SDEM"])
         monkeypatch.setattr(model, "spatial_diagnostics", lambda: df2)
@@ -1326,11 +1323,11 @@ def _flow_ring_graph():
 
 @pytest.fixture(scope="module")
 def fitted_olsflow(_flow_ring_graph):
-    from neighbayes.dgp.flows import generate_flow_data
+    from neighbayes.dgp.flows import simulate_sar_flow
     from neighbayes.models.flow._flow import OLSFlow
 
     n, G = _flow_ring_graph
-    data = generate_flow_data(
+    data = simulate_sar_flow(
         n=n,
         G=G,
         rho_d=0.0,
@@ -1348,11 +1345,11 @@ def fitted_olsflow(_flow_ring_graph):
 
 @pytest.fixture(scope="module")
 def fitted_sarflow(_flow_ring_graph):
-    from neighbayes.dgp.flows import generate_flow_data
+    from neighbayes.dgp.flows import simulate_sar_flow
     from neighbayes.models.flow._flow import SARFlow
 
     n, G = _flow_ring_graph
-    data = generate_flow_data(
+    data = simulate_sar_flow(
         n=n,
         G=G,
         rho_d=0.3,
@@ -1447,8 +1444,8 @@ class TestFlowLMTests:
 
 @pytest.fixture(scope="module")
 def fitted_olsflow_panel(_flow_ring_graph):
-    from neighbayes.dgp.flows import generate_flow_data
-    from neighbayes.models.flow_panel._panel import OLSFlowPanel
+    from neighbayes.dgp.flows import simulate_sar_flow
+    from neighbayes.models.flow_panel._panel import OLSFlowPanelFE
 
     n, G = _flow_ring_graph
     T_periods = 3
@@ -1456,7 +1453,7 @@ def fitted_olsflow_panel(_flow_ring_graph):
     X_stack = []
     col_names = None
     for t in range(T_periods):
-        d = generate_flow_data(
+        d = simulate_sar_flow(
             n=n,
             G=G,
             rho_d=0.0,
@@ -1474,13 +1471,12 @@ def fitted_olsflow_panel(_flow_ring_graph):
     y_panel = np.concatenate(y_stack)
     X_panel = np.vstack(X_stack)
 
-    model = OLSFlowPanel(
+    model = OLSFlow(
         y_panel,
         X_panel,
         G,
         T=T_periods,
         col_names=col_names,
-        effects=0,
     )
     model.fit(draws=150, tune=150, chains=2, progressbar=False, random_seed=0)
     return model

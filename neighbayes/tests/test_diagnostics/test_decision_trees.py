@@ -390,7 +390,7 @@ class TestGetPanelSpec:
                 "panel_lag_pval_le_error_pval": lambda: True,
             },
         )
-        assert result == "SARPanelFE"
+        assert result == "SAR"
 
     def test_panel_ols_none_sig(self):
         tree = get_panel_spec("OLSPanelFE")
@@ -435,41 +435,41 @@ class TestGetPanelDynamicSpec:
                 "panel_lag_pval_le_error_pval": lambda: True,
             },
         )
-        assert result == "SARPanelDynamic"
+        assert result == "SAR"
 
     def test_dynamic_ols_none_sig(self):
         tree = get_panel_spec("OLSPanelDynamic")
         result, path = evaluate(tree, sig_lookup=lambda _: False)
-        assert "OLS" in result and "Dynamic" in result
+        assert result == "OLS"
 
 
 class TestGetPanelTobitSpec:
     """Panel Tobit decision trees mirror cross-sectional Tobit specs."""
 
     def test_sar_tobit_spec(self):
-        tree = get_panel_spec("SARPanelTobit")
+        tree = get_panel_spec("SARTobitPanel")
         assert isinstance(tree, TreeNode)
 
     def test_sem_tobit_spec(self):
-        tree = get_panel_spec("SEMPanelTobit")
+        tree = get_panel_spec("SEMTobitPanel")
         assert isinstance(tree, TreeNode)
 
     def test_sar_tobit_all_sig(self):
-        tree = get_panel_spec("SARPanelTobit")
+        tree = get_panel_spec("SARTobitPanel")
         result, path = evaluate(tree, sig_lookup=lambda _: True)
-        assert result == "SDMPanelTobit"
+        assert result == "SDMTobit"
 
     def test_sar_tobit_none_sig(self):
-        tree = get_panel_spec("SARPanelTobit")
+        tree = get_panel_spec("SARTobitPanel")
         result, path = evaluate(tree, sig_lookup=lambda _: False)
-        assert result == "SARPanelTobit"
+        assert result == "SARTobit"
 
     def test_sem_tobit_all_sig(self):
-        tree = get_panel_spec("SEMPanelTobit")
+        tree = get_panel_spec("SEMTobitPanel")
         result, path = evaluate(tree, sig_lookup=lambda _: True)
-        assert result == "SDEMPanelTobit"
+        assert result == "SDEMTobit"
 
     def test_sem_tobit_none_sig(self):
-        tree = get_panel_spec("SEMPanelTobit")
+        tree = get_panel_spec("SEMTobitPanel")
         result, path = evaluate(tree, sig_lookup=lambda _: False)
-        assert result == "SEMPanelTobit"
+        assert result == "SEMTobit"

@@ -6,7 +6,7 @@ r"""Hurdle NB DGPs: a reduced-form spatial logit for ``y > 0`` and a truncated N
     y \mid y > 0 \sim \mathrm{NB2}(e^{\eta^{\mathrm{c}}}, \alpha)
     \text{ truncated at } 0,
 
-matching :class:`~neighbayes.models.SARHurdleNB` and the hurdle panels.
+matching :class:`~neighbayes.models.SARHurdleNegBin` and the hurdle panels.
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ def _intercept_shift(eta, a0, target):
     return 0.5 * (lo + hi)
 
 
-def simulate_sar_hurdle(
+def simulate_sar_hurdle_negbin(
     n_side: int | None = None,
     W=None,
     gdf=None,
@@ -181,7 +181,7 @@ def simulate_sar_hurdle(
     )
 
 
-def simulate_panel_sar_hurdle(
+def simulate_sar_hurdle_negbin_panel_re(
     N: int,
     T: int,
     rho: float = 0.4,
@@ -206,7 +206,7 @@ def simulate_panel_sar_hurdle(
 ) -> dict:
     r"""Simulate a SAR hurdle NB panel with unit and period effects in both halves.
 
-    The count half is :func:`~neighbayes.dgp.simulate_panel_sar_negbin`'s
+    The count half is :func:`~neighbayes.dgp.simulate_sar_negbin_panel_re`'s
     log-mean (its ``unit_effect_sd``, ``time_effect_sd`` and ``fe_x_corr``),
     truncated at zero; the binary half is
 
@@ -217,8 +217,8 @@ def simulate_panel_sar_hurdle(
 
     with a fresh ``Z_t`` (intercept plus standard-normal columns) each period,
     ``d_{it} ~ Bernoulli(logit⁻¹(η^b_{it}))`` and ``y = d · tNB``.  Matches
-    :class:`~neighbayes.models.SARHurdleNBPanel` (``rho = lam = 0`` gives
-    :class:`~neighbayes.models.HurdleNBPanel`).
+    :class:`~neighbayes.models.SARHurdleNegBinPanelRE` (``rho = lam = 0`` gives
+    :class:`~neighbayes.models.HurdleNegBinPanelRE`).
 
     Parameters
     ----------
@@ -235,7 +235,7 @@ def simulate_panel_sar_hurdle(
         assume it is zero).
     N, T, rho, beta, alpha, unit_effect_sd, time_effect_sd, fe_x_corr, \
     err_hetero, rng, seed, W, gdf, n_side, contiguity
-        As for :func:`~neighbayes.dgp.simulate_panel_sar_negbin`.
+        As for :func:`~neighbayes.dgp.simulate_sar_negbin_panel_re`.
 
     Returns
     -------

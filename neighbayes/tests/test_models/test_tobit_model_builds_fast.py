@@ -7,7 +7,7 @@ import numpy as np
 import pymc as pm
 import xarray as xr
 
-from neighbayes.models import SARPanelTobit, SARTobit, SDMTobit, SEMPanelTobit, SEMTobit
+from neighbayes.models import SARTobit, SDMTobit, SEMTobit
 from neighbayes.tests.helpers import W_to_graph, make_line_W
 
 
@@ -63,8 +63,8 @@ def test_cross_section_tobit_models_build_and_handle_no_censoring():
 def test_panel_tobit_models_build_force_model_zero_and_handle_no_censoring():
     y, X, W, N, T = _panel_data()
 
-    sar = SARPanelTobit(y=y, X=X, W=W, N=N, T=T, effects=1)
-    sem = SEMPanelTobit(y=y, X=X, W=W, N=N, T=T, effects=1)
+    sar = SARTobit(y=y, X=X, W=W, N=N, T=T)
+    sem = SEMTobit(y=y, X=X, W=W, N=N, T=T)
 
     assert sar.model == 0
     assert sem.model == 0

@@ -1,4 +1,4 @@
-"""Fast build/method tests for SARLogit and SEMLogit."""
+"""Fast build/method tests for SARLogit and SEMLogitRE."""
 
 from __future__ import annotations
 
@@ -9,9 +9,10 @@ import scipy.sparse as sp
 import xarray as xr
 
 from neighbayes import dgp
+from neighbayes.models import SEMLogit
 from neighbayes.models.cross_section.sar_logit import SARLogit
-from neighbayes.models.cross_section.sar_logit_structural import SARLogitStructural
-from neighbayes.models.cross_section.sem_logit import SEMLogit
+from neighbayes.models.cross_section.sar_logit_re import SARLogitRE
+from neighbayes.models.cross_section.sem_logit import SEMLogitRE
 from neighbayes.models.priors import SARLogitPriors, SEMLogitPriors
 from neighbayes.tests.helpers import W_to_graph, make_line_W
 
@@ -224,17 +225,17 @@ class TestDGPIntegration:
 
 
 # ---------------------------------------------------------------------------
-# SEMLogit tests
+# SEMLogitRE tests
 # ---------------------------------------------------------------------------
 
 
 class TestSEMConstruction:
-    """SEMLogit construction and validation."""
+    """SEMLogitRE construction and validation."""
 
     def test_construct_matrix_mode(self):
         """Model can be constructed in matrix mode."""
         y, X, W = _binary_data()
-        model = SEMLogit(y=y, X=X, W=W)
+        model = SEMLogit(unit_effects="random", y=y, X=X, W=W)
         assert model._y.shape == (20,)
         assert model._X.shape == (20, 2)
 
@@ -243,24 +244,24 @@ class TestSEMConstruction:
         _, X, W = _binary_data()
         y_bad = np.array([0.0, 0.5, 1.0, 2.0] * 5)
         with pytest.raises(ValueError, match="binary"):
-            SEMLogit(y=y_bad, X=X, W=W)
+            SEMLogit(unit_effects="random", y=y_bad, X=X, W=W)
 
     def test_rejects_robust(self):
         """robust=True should raise NotImplementedError."""
         y, X, W = _binary_data()
         with pytest.raises(NotImplementedError, match="robust"):
-            SEMLogit(y=y, X=X, W=W, robust=True)
+            SEMLogit(unit_effects="random", y=y, X=X, W=W, robust=True)
 
     def test_priors_cls(self):
         """Model should use SEMLogitPriors."""
         y, X, W = _binary_data()
-        model = SEMLogit(y=y, X=X, W=W)
+        model = SEMLogit(unit_effects="random", y=y, X=X, W=W)
         assert model._priors_cls is SEMLogitPriors
 
     def test_spatial_params(self):
         """Model should declare lam as spatial parameter."""
         y, X, W = _binary_data()
-        model = SEMLogit(y=y, X=X, W=W)
+        model = SEMLogit(unit_effects="random", y=y, X=X, W=W)
         assert model._spatial_params == ("lam",)
         assert model._jacobian_param == "lam"
         assert model._model_type == "sem_logit"
@@ -272,7 +273,7 @@ class TestSEMBuildPyMCModel:
     def test_raises(self):
         """Gibbs-only model should not build a PyMC model."""
         y, X, W = _binary_data()
-        model = SEMLogit(y=y, X=X, W=W)
+        model = SEMLogit(unit_effects="random", y=y, X=X, W=W)
         with pytest.raises(NotImplementedError, match="Gibbs"):
             model._build_pymc_model()
 
@@ -282,13 +283,13 @@ class TestSEMFitKwargRejection:
 
     def test_rejects_nuts_sampler(self):
         y, X, W = _binary_data()
-        model = SEMLogit(y=y, X=X, W=W)
+        model = SEMLogit(unit_effects="random", y=y, X=X, W=W)
         with pytest.raises(TypeError, match="nuts_sampler"):
             model.fit(nuts_sampler="numpyro")
 
     def test_rejects_target_accept(self):
         y, X, W = _binary_data()
-        model = SEMLogit(y=y, X=X, W=W)
+        model = SEMLogit(unit_effects="random", y=y, X=X, W=W)
         with pytest.raises(TypeError, match="target_accept"):
             model.fit(target_accept=0.95)
 
@@ -298,7 +299,7 @@ class TestSEMFittedProbabilities:
 
     def test_output_range(self):
         y, X, W = _binary_data()
-        model = SEMLogit(y=y, X=X, W=W)
+        model = SEMLogit(unit_effects="random", y=y, X=X, W=W)
         n = X.shape[0]
         model._idata = _idata(
             {
@@ -334,17 +335,21 @@ class TestSEMDGPIntegration:
     def test_model_from_dgp(self):
         """Model should accept data from simulate_sem_logit."""
         out = dgp.simulate_sem_logit(n_side=5, lam=0.3, seed=42)
-        model = SEMLogit(y=out["y"], X=out["X"], W=out["W_graph"])
+        model = SEMLogit(
+            unit_effects="random", y=out["y"], X=out["X"], W=out["W_graph"]
+        )
         assert model._y.shape == (25,)
 
 
 class TestSEMFitIntegration:
-    """SEMLogit.fit() should produce valid InferenceData."""
+    """SEMLogitRE.fit() should produce valid InferenceData."""
 
     def test_fit_small(self):
         """Fit on small DGP data should return valid InferenceData."""
         out = dgp.simulate_sem_logit(n_side=5, lam=0.3, seed=42)
-        model = SEMLogit(y=out["y"], X=out["X"], W=out["W_graph"])
+        model = SEMLogit(
+            unit_effects="random", y=out["y"], X=out["X"], W=out["W_graph"]
+        )
         idata = model.fit(draws=50, tune=50, chains=2, random_seed=42)
         assert "lam" in idata.posterior
         assert "beta" in idata.posterior
@@ -407,9 +412,9 @@ class TestProgressForwarding:
         assert seen["chain_id"] == 0
 
     def test_sem_fit_forwards_progress_manager(self, monkeypatch):
-        """SEMLogit.fit should pass progress_manager through to run_chain_sem."""
+        """SEMLogitRE.fit should pass progress_manager through to run_chain_sem."""
         y, X, W = _binary_data()
-        model = SEMLogit(y=y, X=X, W=W)
+        model = SEMLogit(unit_effects="random", y=y, X=X, W=W)
         seen: dict[str, object] = {}
 
         def _fake_run_chain_sem(
@@ -490,9 +495,9 @@ class TestJaxVectorizedFit:
 
     def test_sar_jax_dense_rejects_return_eta(self):
         # return_eta is a structural-only option (the reduced-form SARLogit has
-        # no latent field); it lives on SARLogitStructural's jax_dense path.
+        # no latent field); it lives on SARLogitRE's jax_dense path.
         y, X, W = _binary_data()
-        model = SARLogitStructural(y=y, X=X, W=W)
+        model = SARLogit(unit_effects="random", y=y, X=X, W=W)
         with pytest.raises(NotImplementedError, match="return_eta"):
             model.fit(
                 draws=4,
@@ -507,7 +512,7 @@ class TestJaxVectorizedFit:
 
     def test_sem_jax_dense_runs_and_shapes(self):
         y, X, W = _binary_data()
-        model = SEMLogit(y=y, X=X, W=W)
+        model = SEMLogit(unit_effects="random", y=y, X=X, W=W)
         idata = model.fit(
             draws=20,
             tune=10,
@@ -525,7 +530,7 @@ class TestJaxVectorizedFit:
 
     def test_sem_jax_dense_rejects_return_eta(self):
         y, X, W = _binary_data()
-        model = SEMLogit(y=y, X=X, W=W)
+        model = SEMLogit(unit_effects="random", y=y, X=X, W=W)
         with pytest.raises(NotImplementedError, match="return_eta"):
             model.fit(
                 draws=4,

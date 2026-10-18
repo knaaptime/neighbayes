@@ -46,6 +46,7 @@ from ..._logdet import (
 from ..._ops import kron_solve_vec
 from ...graph import _weights_to_csr, flow_lags, flow_trace_blocks
 from .._base._nb import nb_alpha_rv
+from .._design import flow
 from .._mixins._flow_shared import FlowSharedMethods
 from ..base import SpatialModel
 
@@ -792,6 +793,8 @@ class SARFlow(FlowModel):
     remains reachable via ``logdet_method="traces"`` (PyMC/NUTS path).
     """
 
+    _dispatch = classmethod(flow)
+
     def __init__(self, y, X, W, **kwargs):
         # Default to the resolvent-gradient sampler; "traces" stays as an
         # explicit (deprecated) opt-in routed through the legacy PyMC path.
@@ -1136,8 +1139,8 @@ def _compute_ols_flow_effects(
     """Closed-form Thomas-Agnan & LeSage (2014, Table 83.1) effects.
 
     Shared between :class:`OLSFlow`, :class:`SEMFlow`,
-    :class:`SEMFlowSeparable` (cross-section), and :class:`OLSFlowPanel`,
-    :class:`SEMFlowPanel`, :class:`SEMFlowSeparablePanel` (panel) — all of
+    :class:`SEMFlowSeparable` (cross-section), and :class:`OLSFlowPanelFE`,
+    :class:`SEMFlowPanelFE`, :class:`SEMFlowSeparablePanelFE` (panel) — all of
     which have :math:`\\mathbb{E}[y] = X\\beta` (no :math:`X`-mediated
     spillovers).
     """
@@ -1241,6 +1244,8 @@ class OLSFlow(FlowModel):
     No spatial-lag term enters the likelihood, so no log-determinant
     is required and ``logdet_method`` is ignored if passed.
     """
+
+    _dispatch = classmethod(flow)
 
     def __init__(self, y, X, W, **kwargs):
         # Skip log-determinant precomputation: A = I_N has |A| = 1.
@@ -1469,6 +1474,8 @@ class SARNegBinFlow(_NegBinFlowMixin, SARFlow):
     where ``alpha`` is an overdispersion parameter sampled from a
     HalfNormal prior.
     """
+
+    _dispatch = classmethod(flow)
 
     def __init__(self, y, X, W, **kwargs):
         y_arr = np.asarray(y)
@@ -1737,6 +1744,8 @@ class SARNegBinFlowSeparable(_NegBinFlowMixin, SARFlowSeparable):
 
 class NegBinFlow(_NegBinFlowMixin, OLSFlow):
     """Aspatial OD-flow Negative Binomial gravity baseline."""
+
+    _dispatch = classmethod(flow)
 
     _gibbs_jax = False  # NumPy Gibbs only
 
@@ -2114,6 +2123,8 @@ class SARPoissonFlow(_PoissonFlowMixin, SARFlow):
        :class:`SARPoissonFlowSeparable` unless ρ_w is genuinely of interest.
     """
 
+    _dispatch = classmethod(flow)
+
     def __init__(self, y, X, W, **kwargs):
         y_arr = _require_counts(y, "SARPoissonFlow")
         super().__init__(y_arr.astype(np.float64), X, W, **kwargs)
@@ -2337,6 +2348,8 @@ class SEMFlow(FlowModel):
     Jacobian :math:`\\log|B|` reuses the same trace-based polynomial as
     :class:`SARFlow`.
     """
+
+    _dispatch = classmethod(flow)
 
     def __init__(self, y, X, W, **kwargs):
         # Default to the resolvent-gradient SEM sampler (separable subclasses pass

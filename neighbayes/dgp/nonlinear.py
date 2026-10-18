@@ -113,7 +113,7 @@ def simulate_sdm_tobit(
     return out
 
 
-def simulate_spatial_probit(
+def simulate_sar_probit(
     W=None,
     gdf=None,
     n_side: int | None = None,
@@ -126,7 +126,7 @@ def simulate_spatial_probit(
     seed: int | None = None,
     contiguity: str = "queen",
 ) -> dict:
-    """Simulate SARProbit-style binary outcome data.
+    """Simulate SEMProbitRE-style binary outcome data.
 
     DGP
     ---
@@ -232,8 +232,8 @@ def simulate_sar_logit(
     DGP
     ---
     ``eta = (I - rho W)^{-1} (X beta + nu)``, ``nu ~ N(0, I)``,
-    ``y ~ Bernoulli(logit^{-1}(eta))`` — the latent-field model
-    :class:`~neighbayes.models.SARLogitStructural` fits.  With
+    ``y ~ Bernoulli(logit^{-1}(eta))`` — the SAR logit with random effects
+    :class:`~neighbayes.models.SARLogitRE` fits.  With
     ``structural=False`` the noise is omitted, ``eta = (I - rho W)^{-1} X beta``,
     which is the reduced-form :class:`~neighbayes.models.SARLogit`.
 
@@ -261,7 +261,7 @@ def simulate_sar_logit(
         Geometry to generate when ``create_gdf=True`` and no source
         ``gdf`` is provided.
     structural : bool, default True
-        Include the latent ``nu`` (``SARLogitStructural``); ``False`` gives the
+        Include the latent ``nu`` (``SARLogitRE``); ``False`` gives the
         reduced form (``SARLogit``).
 
     Returns
@@ -282,7 +282,7 @@ def simulate_sar_logit(
 
     X = make_design_matrix(rng, n_obs, k=max(len(beta) - 1, 0), add_intercept=True)
 
-    # Latent field eta = (I - rho W)^{-1} (X beta + nu); nu = 0 in the reduced form.
+    # Latent index eta = (I - rho W)^{-1} (X beta + nu); nu = 0 in the reduced form.
     nu = rng.standard_normal(n_obs) if structural else 0.0
     Xbeta = X @ beta
     eta = spatial_filter_factor(W_sparse, rho)(Xbeta + nu)
@@ -372,7 +372,7 @@ def simulate_sem_logit(
 
     X = make_design_matrix(rng, n_obs, k=max(len(beta) - 1, 0), add_intercept=True)
 
-    # Generate latent field: eta = X beta + (I - lam W)^{-1} nu
+    # Latent index: eta = X beta + (I - lam W)^{-1} nu
     nu = rng.standard_normal(n_obs)
     Xbeta = X @ beta
     eta = Xbeta + spatial_filter_factor(W_sparse, lam)(nu)

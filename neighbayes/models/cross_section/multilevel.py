@@ -51,7 +51,7 @@ _PARAM = {"lag": "rho", "error": "lam", "none": None}
 
 @dataclass
 class Level:
-    """One level's equation for :class:`SpatialMultilevel`.
+    """One level's equation for :class:`Multilevel`.
 
     Parameters
     ----------
@@ -211,7 +211,7 @@ def _labels_from_units(unit_labels, unit_to_lower, lower_J, name):
     return np.asarray(uniques)[first]
 
 
-class SpatialMultilevel(SpatialModel):
+class Multilevel(SpatialModel):
     r"""Bayesian spatial multilevel model with a graph and a process at each level.
 
     .. math::
@@ -255,8 +255,8 @@ class SpatialMultilevel(SpatialModel):
 
     Examples
     --------
-    >>> from neighbayes.models import SpatialMultilevel, Level
-    >>> m = SpatialMultilevel(
+    >>> from neighbayes.models import Multilevel, Level
+    >>> m = Multilevel(
     ...     Level("score ~ frl", data=schools, W=W_schools),
     ...     Level("~ income", data=districts, W=W_districts, key="district"),
     ...     Level(data=states, W=W_states, key="state", process="error"),
@@ -276,7 +276,7 @@ class SpatialMultilevel(SpatialModel):
     ):
         if len(levels) < 2:
             raise ValueError(
-                "SpatialMultilevel needs the units and at least one level above them."
+                "Multilevel needs the units and at least one level above them."
             )
         for lv in levels:
             if not isinstance(lv, Level):
@@ -444,7 +444,7 @@ class SpatialMultilevel(SpatialModel):
         parts = []
         for ell, r in enumerate(self._levels):
             parts.append(f"{ell}:{r.name}(J={len(r.ids)}, {r.process})")
-        return f"SpatialMultilevel({', '.join(parts)})"
+        return f"Multilevel({', '.join(parts)})"
 
     # ------------------------------------------------------------------
     # Per-level logdets and priors
@@ -1047,7 +1047,7 @@ class SpatialMultilevel(SpatialModel):
             indirect_samples=indirect,
             total_samples=total,
             feature_names=names,
-            model_type=f"SpatialMultilevel[{self._levels[ell].name}]",
+            model_type=f"Multilevel[{self._levels[ell].name}]",
         )
         if return_posterior_samples:
             return df, {"direct": direct, "indirect": indirect, "total": total}

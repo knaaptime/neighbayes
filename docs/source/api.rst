@@ -5,157 +5,88 @@
 API reference
 =============
 
-Cross-Sectional Spatial Models
-------------------------------
+Models
+------
+
+A model class names a process and a family: ``SAR``, ``SEMLogit``,
+``SARNegBinFlow``. Panel structure, effects, dynamics, and the flow restriction
+are arguments to the same class:
+
+- ``time_col`` (formula mode) or ``T`` (matrix mode) makes the model a panel;
+- ``unit_effects`` (``pair_effects`` for flows) is ``None``, ``"fixed"``, or
+  ``"random"``, and ``time_effects=True`` adds fixed time effects;
+- ``dynamic=True`` adds the time lag :math:`y_{t-1}`, and ``dynamic="restricted"``
+  gives the restricted dynamic SDM;
+- ``separable=True`` pins :math:`\rho_w = -\rho_o \rho_d` in a flow model.
+
+A combination the package does not implement raises when the model is
+constructed.
 
 .. currentmodule:: neighbayes.models
+
+Gaussian
+^^^^^^^^
 
 .. autosummary::
    :toctree: generated/
 
    OLS
+   SLX
    SAR
    SEM
-   SLX
    SDM
    SDEM
 
-
-Panel Spatial Models (Fixed Effects)
-------------------------------------
-
-.. autosummary::
-   :toctree: generated/
-
-   OLSPanelFE
-   SARPanelFE
-   SEMPanelFE
-   SDMPanelFE
-   SDEMPanelFE
-   SLXPanelFE
-
-
-Panel Spatial Models (Random Effects)
--------------------------------------
+Censored and binary
+^^^^^^^^^^^^^^^^^^^
 
 .. autosummary::
    :toctree: generated/
 
-   OLSPanelRE
-   SARPanelRE
-   SEMPanelRE
-   SDEMPanelRE
-
-
-Dynamic Panel Spatial Models
-----------------------------
-
-.. autosummary::
-   :toctree: generated/
-
-   OLSPanelDynamic
-   SDMRPanelDynamic
-   SDMUPanelDynamic
-   SARPanelDynamic
-   SEMPanelDynamic
-   SDEMPanelDynamic
-   SLXPanelDynamic
-
-
-Multilevel Spatial Models
--------------------------
-
-.. autosummary::
-   :toctree: generated/
-
-   SpatialMultilevel
-   Level
-
-
-Non-Linear Spatial Models
--------------------------
-
-.. autosummary::
-   :toctree: generated/
-
-   SARProbit
    SARTobit
    SEMTobit
    SDMTobit
-   SARNegBin
-   SARNegBinStructural
-   SARZINB
-   SARHurdleNB
    Logit
-   NegBin
    SARLogit
    SEMLogit
+   SEMProbit
 
-
-Panel Spatial Models (Tobit)
-----------------------------
-
-.. autosummary::
-   :toctree: generated/
-
-   SARPanelTobit
-   SEMPanelTobit
-
-
-Panel Count Models
-------------------
+Counts
+^^^^^^
 
 .. autosummary::
    :toctree: generated/
 
-   SARNegBinPanel
-   NegBinPanel
-   SARZINBPanel
-   ZINBPanel
-   SARHurdleNBPanel
-   HurdleNBPanel
+   NegBin
+   SARNegBin
+   ZINB
+   SARZINB
+   HurdleNegBin
+   SARHurdleNegBin
 
-
-Flow Models
------------
-
-.. currentmodule:: neighbayes.models
+Flows
+^^^^^
 
 .. autosummary::
    :toctree: generated/
 
    OLSFlow
    SARFlow
-   SARFlowSeparable
+   SEMFlow
    NegBinFlow
    SARNegBinFlow
-   SARNegBinFlowSeparable
    SARPoissonFlow
-   SARPoissonFlowSeparable
-   SEMFlow
-   SEMFlowSeparable
+   SARZINBFlow
+   SARHurdleNegBinFlow
 
-
-Panel Flow Models
-^^^^^^^^^^^^^^^^^
-
-.. currentmodule:: neighbayes.models
+Multilevel
+^^^^^^^^^^
 
 .. autosummary::
    :toctree: generated/
 
-   OLSFlowPanel
-   SARFlowPanel
-   SARFlowSeparablePanel
-   NegBinFlowPanel
-   SARNegBinFlowPanel
-   SARNegBinFlowSeparablePanel
-   SARZINBFlowSeparable
-   SARZINBFlowSeparablePanel
-   SARHurdleNBFlowSeparable
-   SARHurdleNBFlowSeparablePanel
-   SEMFlowPanel
-   SEMFlowSeparablePanel
+   Multilevel
+   Level
 
 Default Gibbs Priors
 ---------------------
@@ -409,33 +340,33 @@ Data Generating Processes
    simulate_sdem
    simulate_sar_negbin
    simulate_sar_zinb
-   simulate_sar_hurdle
-   simulate_spatial_multilevel
-   simulate_spatial_probit
+   simulate_sar_hurdle_negbin
+   simulate_multilevel
+   simulate_sar_probit
    simulate_sar_tobit
    simulate_sem_tobit
    simulate_sdm_tobit
-   simulate_panel_ols_fe
-   simulate_panel_sar_fe
-   simulate_panel_sem_fe
-   simulate_panel_sdm_fe
-   simulate_panel_sdem_fe
-   simulate_panel_slx_fe
-   simulate_panel_ols_re
-   simulate_panel_sar_re
-   simulate_panel_sem_re
-   simulate_panel_dlm_fe
-   simulate_panel_sdmr_fe
-   simulate_panel_sdmu_fe
-   simulate_panel_sar_dynamic_fe
-   simulate_panel_sem_dynamic_fe
-   simulate_panel_sdem_dynamic_fe
-   simulate_panel_slx_dynamic_fe
-   simulate_panel_sar_tobit_fe
-   simulate_panel_sem_tobit_fe
-   simulate_panel_sar_negbin
-   simulate_panel_sar_zinb
-   simulate_panel_sar_hurdle
+   simulate_ols_panel_fe
+   simulate_sar_panel_fe
+   simulate_sem_panel_fe
+   simulate_sdm_panel_fe
+   simulate_sdem_panel_fe
+   simulate_slx_panel_fe
+   simulate_ols_panel_re
+   simulate_sar_panel_re
+   simulate_sem_panel_re
+   simulate_ols_panel_dynamic
+   simulate_sdm_panel_dynamic_restricted
+   simulate_sdm_panel_dynamic
+   simulate_sar_panel_dynamic
+   simulate_sem_panel_dynamic
+   simulate_sdem_panel_dynamic
+   simulate_slx_panel_dynamic
+   simulate_sar_tobit_panel
+   simulate_sem_tobit_panel
+   simulate_sar_negbin_panel_re
+   simulate_sar_zinb_panel_re
+   simulate_sar_hurdle_negbin_panel_re
 
 
 Flow Data Generating Processes
@@ -445,8 +376,8 @@ Each flow DGP accepts ``n``, ``G``, ``gdf``, and ``knn_k`` as optional
 arguments and (unless ``gamma_dist=0.0``) appends a ``log_distance``
 column ``log(1 + d_{ij})`` with default coefficient ``gamma_dist=-0.5``.
 
-The Gaussian flow DGPs (``generate_flow_data``,
-``generate_panel_flow_data`` and their separable variants) default to
+The Gaussian flow DGPs (``simulate_sar_flow``,
+``simulate_sar_flow_panel_fe`` and their separable variants) default to
 ``distribution="lognormal"``, returning strictly-positive flows
 ``y = exp(eta)`` where ``eta`` is the latent SAR-filtered linear
 predictor (also exposed in the result dict as ``"eta_vec"`` /
@@ -459,20 +390,20 @@ Binomial DGPs are unchanged.
 .. autosummary::
    :toctree: generated/
 
-   generate_flow_data
-   generate_flow_data_separable
-   generate_negbin_flow_data
-   generate_negbin_flow_data_separable
-   generate_sem_flow_data
-   generate_sem_flow_data_separable
-   generate_panel_flow_data
-   generate_panel_flow_data_separable
-   generate_panel_negbin_flow_data
-   generate_panel_negbin_flow_data_separable
-   generate_panel_sem_flow_data
-   generate_panel_sem_flow_data_separable
-   generate_zinb_flow_data_separable
-   generate_hurdle_flow_data_separable
+   simulate_sar_flow
+   simulate_sar_flow_separable
+   simulate_sar_negbin_flow
+   simulate_sar_negbin_flow_separable
+   simulate_sem_flow
+   simulate_sem_flow_separable
+   simulate_sar_flow_panel_fe
+   simulate_sar_flow_separable_panel_fe
+   simulate_sar_negbin_flow_panel_re
+   simulate_sar_negbin_flow_separable_panel_re
+   simulate_sem_flow_panel_fe
+   simulate_sem_flow_separable_panel_fe
+   simulate_sar_zinb_flow_separable
+   simulate_sar_hurdle_negbin_flow_separable
 
 
 

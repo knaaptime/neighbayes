@@ -3,22 +3,31 @@
 
 ## Model suite
 
-The package organizes models along three column dimensions — **likelihood** (linear / non-linear), **temporal structure** (cross-section / panel), and **outcome structure** (single / flow). Each cell lists the spatial structures implemented for that combination.
+A model class names a **process** (Aspatial, SLX, SAR, SEM, SDM, SDEM) and a
+**family** (Gaussian, Tobit, logit, probit, and the count families), plus `Flow`
+when the outcome is an origin–destination flow: `SAR`, `SEMLogit`,
+`SARNegBinFlow`. The **design** is a set of arguments to the same class:
+`time_col` (formula mode) or `T` (matrix mode) makes it a panel;
+`unit_effects` (`pair_effects` for flows) is `None`, `"fixed"`, or `"random"`;
+`time_effects=True` adds fixed time effects; `dynamic=True` adds the time lag
+(`"restricted"` for the restricted dynamic SDM); and `separable=True` pins
+$\rho_w = -\rho_d \rho_o$ in a flow model. A combination the package does not
+implement raises when the model is constructed. Each cell below lists the
+processes implemented for that combination.
 
-| | Linear · Cross-section | Linear · Panel | Non-linear · Cross-section | Non-linear · Panel |
+| | Gaussian · Cross-section | Gaussian · Panel | Other families · Cross-section | Other families · Panel |
 |---|---|---|---|---|
 | **Single** | Aspatial, SLX, SAR, SEM, SDM, SDEM | Aspatial, SLX, SAR, SEM, SDM, SDEM | Aspatial, SAR, SEM, SDM | Aspatial, SAR, SEM |
 | **Flow** | Aspatial, SAR, SEM | Aspatial, SAR, SEM | Aspatial, SAR | Aspatial, SAR |
 
-Panel models come in fixed-effects and random-effects variants, and the linear
-panel family additionally has dynamic (lagged-dependent-variable) forms. Every
-spatial flow model has a **separable** counterpart that pins
-$\rho_w = -\rho_d \rho_o$. The non-linear cells include negative binomial,
+Gaussian panels take fixed or random unit effects and have dynamic
+(lagged-dependent-variable) forms. Every spatial flow model has a **separable**
+form (`separable=True`) that pins $\rho_w = -\rho_d \rho_o$. The other families include negative binomial,
 zero-inflated NB and hurdle NB count models (and Poisson for cross-sectional
-flows). Outside the table, `SpatialMultilevel` nests units in groups in larger
+flows). Outside the table, `Multilevel` nests units in groups in larger
 groups, with a graph and a process at every level
 ([multilevel models](multilevel-models)). The sections below list every class
-individually.
+with its equation.
 
 ## Cross Sectional Models
 
@@ -47,6 +56,10 @@ $$y = \rho Wy + X\beta + WX\theta + \epsilon$$
 $$y = X\beta + WX\theta + u, \quad u = \lambda Wu + \epsilon$$
 
 ## Panel Models
+
+Each Gaussian class is a panel when `time_col` or `T` is given; the fixed-effects
+models below take `unit_effects="fixed"` and `time_effects=True` for two-way
+effects, and the random-effects models `unit_effects="random"`.
 
 ### OLS panel
 
@@ -98,7 +111,7 @@ $$y_{it} = x_{it}' \beta + W x_{it}' \theta + \alpha_i + u_{it}, \quad u_{it} = 
 (multilevel-models)=
 ## Multilevel Models
 
-### SpatialMultilevel
+### Multilevel
 
 $$\theta_\ell = \rho_\ell W_\ell \theta_\ell + X_\ell \beta_\ell + \Delta_\ell \theta_{\ell+1} + \varepsilon_\ell, \quad \varepsilon_\ell \sim N(0, \sigma_\ell^2 I), \quad \ell = 0, \dots, L, \quad \theta_0 \equiv y$$
 
@@ -129,9 +142,9 @@ upper levels drop theirs, since through row-standardized filters constants at
 different levels are confounded.
 
 ```python
-from neighbayes.models import Level, SpatialMultilevel
+from neighbayes.models import Level, Multilevel
 
-m = SpatialMultilevel(
+m = Multilevel(
     Level("score ~ frl + log_enroll", data=schools, W=W_schools),         # level 0
     Level("~ income + segregation", data=districts, W=W_districts,
           key="district_id"),                                             # level 1
@@ -202,52 +215,58 @@ level with an error process or none:
 The own-group trace is exact up to `exact_max` groups and estimated with
 Rademacher probes above.
 
-- **SpatialMultilevel**: Gaussian, cross-sectional, $L \ge 1$ nested levels.
+- **Multilevel**: Gaussian, cross-sectional, $L \ge 1$ nested levels.
   Panels, count likelihoods and crossed (non-nested) classifications are
   planned.
 
 ## Dynamic Panel Models
 
-### OLSPanelDynamic (Dynamic Linear Model)
+Pass `dynamic=True` to a panel, or `dynamic="restricted"` to an SDM panel. Dynamic
+panels take no unit effects (Nickell 1981) but may take `time_effects=True`.
+
+### OLS, dynamic (dynamic linear model)
 
 $$y_{it} = \phi y_{i,t-1} + x_{it}' \beta + a_i + \tau_t + \epsilon_{it}$$
 
-### SDMRPanelDynamic (Dynamic Restricted Spatial Durbin)
+### SDM, restricted dynamic (`dynamic="restricted"`)
 
 $$y_{it} = \phi y_{i,t-1} + \rho W y_{it} - \rho \phi W y_{i,t-1} + x_{it}' \beta + W x_{it}' \theta + a_i + \tau_t + \epsilon_{it}$$
 
-### SDMUPanelDynamic (Dynamic Unrestricted Spatial Durbin)
+### SDM, dynamic (unrestricted)
 
 $$y_{it} = \phi y_{i,t-1} + \rho W y_{it} + \theta W y_{i,t-1} + x_{it}' \beta + W x_{it}' \theta + a_i + \tau_t + \epsilon_{it}$$
 
-### SARPanelDynamic (Dynamic SAR)
+### SAR, dynamic
 
 $$y_{it} = \phi y_{i,t-1} + \rho W y_{it} + x_{it}' \beta + a_i + \tau_t + \epsilon_{it}$$
 
-### SEMPanelDynamic (Dynamic SEM)
+### SEM, dynamic
 
 $$y_{it} = \phi y_{i,t-1} + x_{it}' \beta + a_i + \tau_t + u_{it}, \quad u_{it} = \lambda W u_{it} + \epsilon_{it}$$
 
-### SDEMPanelDynamic (Dynamic SDEM)
+### SDEM, dynamic
 
 $$y_{it} = \phi y_{i,t-1} + x_{it}' \beta + W x_{it}' \theta + a_i + \tau_t + u_{it}, \quad u_{it} = \lambda W u_{it} + \epsilon_{it}$$
 
-### SLXPanelDynamic (Dynamic SLX)
+### SLX, dynamic
 
 $$y_{it} = \phi y_{i,t-1} + x_{it}' \beta + W x_{it}' \theta + a_i + \tau_t + \epsilon_{it}$$
 
 ## Non-Linear Models
 
-### SARProbit
+### SEMProbit (random group effects)
 
-$$y^* = \rho W y^* + X\beta + a + \varepsilon, \quad \varepsilon \sim \mathcal{N}(0, I), \quad y_i = \mathbf{1}[y_i^* > 0]$$
+$$z = X\beta + \Delta\theta + \varepsilon, \quad \theta = \rho W \theta + u, \quad u \sim \mathcal{N}(0, \sigma_u^2 I), \quad \varepsilon \sim \mathcal{N}(0, I), \quad y_{ik} = \mathbf{1}[z_{ik} > 0]$$
 
-Note the $a$ term: this is a **region-random-effects** specification, in which
-$\rho$ acts on region-level latent utilities and observations are nested within
-regions via `region_ids`. It is not the standard spatial probit of the LeSage
-toolbox. For spatial binary outcomes prefer the Pólya–Gamma logit classes
-(`SARLogit`, `SARLogitStructural`, `SEMLogit`), which are conjugate and have a
-Gibbs sampler.
+Observations nest in groups (`group_col`, or `groups` in matrix mode), and
+$\Delta$ maps each observation to its group. The groups' random effects
+$\theta$ follow a SAR process on the group-level weights $W$; nothing of $X$
+propagates. This is LeSage and Pace's (2009, §10.6) spatially structured
+effects probit (Smith and LeSage 2004), constructed as
+`SEMProbit(..., group_effects="random")`, not the standard SAR probit, which the
+package does not implement. For spatial binary outcomes prefer the
+Pólya–Gamma logit classes (`SARLogit`, with or without random effects, and
+`SEMLogit`), which are conjugate and have a Gibbs sampler.
 
 ### Tobit (SAR Tobit)
 
@@ -269,16 +288,18 @@ $$y_{it} = \max(c, y_{it}^*), \quad y_t^* = \rho W y_t^* + X_t\beta + \varepsilo
 
 $$y_{it} = \max(c, y_{it}^*), \quad y_t^* = X_t\beta + u_t, \quad u_t = \lambda W u_t + \varepsilon_t$$
 
-### Panel count models (SARNegBinPanel, NegBinPanel)
+### Panel count models (`SARNegBin`, `NegBin`)
 
 $$y_{it} \sim \operatorname{NegBin}(\mu_{it}, \alpha), \quad \log \boldsymbol{\mu}_t = (I - \rho W)^{-1} X_t\beta + c + \tau_t$$
 
-Unit effects $c$ and period effects $\tau_t$ are selected by `effects`
-(`"pooled"`, `"unit"`, `"time"`, `"two_way"`). The Gaussian panels' within
-transform does not carry to a log link, so the effects are parameters, held as
-a unit index rather than dummy columns. Unit effects sit outside the spatial
-filter: $(I_T \otimes A^{-1})$ commutes with the unit dummies, so this is the
-inside-filter model reparameterized. The Gibbs sampler integrates the unit
+Unit effects $c$ come from `unit_effects="random"` and period effects $\tau_t$
+from `time_effects=True`. The Gaussian panels' within transform does not carry
+to a log link, so the effects are parameters, held as a unit index rather than
+dummy columns. Unit effects sit outside the spatial filter. Unpooled, that
+would be the inside-filter model reparameterized, since
+$(I_T \otimes A^{-1})$ commutes with the unit dummies; under the partial
+pooling below it is not, because inside the filter the pooled effects would
+carry the SAR covariance $\sigma^2 (A'A)^{-1}$ in place of independence. The Gibbs sampler integrates the unit
 effects out of every $\rho$ update by an ω-weighted analogue of the within
 transform, recomputed each sweep from the Pólya–Gamma weights.
 
@@ -312,11 +333,11 @@ $$y_i \sim \operatorname{NegBin}(\mu_i, \alpha), \quad \mu = \exp(\eta), \quad \
 
 No latent $\sigma$ — spatial dependence enters only through the mean propagator. Supports both NUTS and Pólya–Gamma Gibbs sampling.
 
-### SARNegBinStructural (Structural Form)
+### SARNegBin with random effects
 
 $$y_i \sim \operatorname{NegBin}(\mu_i, \alpha), \quad \eta = \rho W \eta + X\beta + \nu, \quad \nu \sim \mathcal{N}(0, \sigma^2 I)$$
 
-Includes latent $\sigma$ — structural form with explicit noise. Gibbs sampling only (PG augmentation).
+`SARNegBin(unit_effects="random")`: the log-mean carries a normal random effect per unit with scale $\sigma$, inside the SAR equation, so this is a different model from `SARNegBin`, not its structural form. Gibbs sampling only (PG augmentation).
 
 ### SARZINB
 
@@ -339,14 +360,14 @@ versus none" questions on sparse counts, use a hurdle model
 ({ref}`below <hurdle-models>`), whose binary half is fit to the observed
 zeros.
 
-### ZINB panels (SARZINBPanel, ZINBPanel)
+### ZINB panels (`SARZINB`, `ZINB`)
 
 The same two equations per period, $T$ periods stacked time-first, with
 per-period structural zeros and unit and period effects on the count
-equation (`effects`, pooled as for the NB panels). The selection design `Z` may vary
+equation (`unit_effects="random"`, `time_effects=True`, as for the NB panels). The selection design `Z` may vary
 over time.
 
-### Flow ZINB (SARZINBFlowSeparable, SARZINBFlowSeparablePanel)
+### Flow ZINB (`SARZINBFlow`, separable)
 
 Both equations are separable flow models,
 $\eta^{\mathrm{sel}} = (L^{\lambda}_o \otimes L^{\lambda}_d)^{-1} Z\gamma$ and
@@ -358,7 +379,7 @@ sparse, so the identification caveat above bites hardest here: use the panel
 with pair effects, or the flow hurdle.
 
 (hurdle-models)=
-### Hurdle models (SARHurdleNB and family)
+### Hurdle models (SARHurdleNegBin and family)
 
 $$P(y > 0) = \operatorname{logit}^{-1}(\eta^{\mathrm{b}}), \quad y \mid y > 0 \sim \operatorname{NB}(\mu, \alpha) \text{ truncated at } 0, \quad \eta^{\mathrm{b}} = (I - \lambda W_{\mathrm{sel}})^{-1} Z\gamma, \quad \log \boldsymbol{\mu} = (I - \rho W)^{-1} X\beta$$
 
@@ -386,17 +407,17 @@ When the positive counts are mostly ones, the count level and α trade off along
 a ridge, so they are drawn jointly by a slice sampler that moves along it.
 `sampler="nuts"` fits the same model in PyMC (`HurdleNegativeBinomial`).
 
-- **SARHurdleNB**: cross-section, with separate `Z` (or `sel_formula`) and
+- **SARHurdleNegBin**: cross-section, with separate `Z` (or `sel_formula`) and
   `W_sel` for the binary half.
-- **SARHurdleNBPanel**, **HurdleNBPanel**: $T$ periods stacked time-first,
-  with unit and period effects (`effects`) in **both** halves. In the binary
+- Panels (`SARHurdleNegBin`, `HurdleNegBin` with `time_col` or `T`): $T$ periods stacked time-first,
+  with unit and period effects (`unit_effects="random"`, `time_effects=True`) in **both** halves. In the binary
   half a unit effect absorbs the unit's baseline chance of a positive count,
   so γ comes mostly from within-unit switches between zero and positive
   periods. Both halves' unit effects are partially pooled, with their own
   learned sds; the pooling is what keeps α and ρ unbiased when units have few
   positive periods (about three per unit in simulations, where a fixed, wide
   prior gave α at half its true value).
-- **SARHurdleNBFlowSeparable**, **SARHurdleNBFlowSeparablePanel**: both halves
+- Flows (`SARHurdleNegBinFlow(separable=True)`, cross-section or panel): both halves
   are separable flow models, sampled by the structured $n \times n$ sweep
   (NumPy or `gibbs_backend="jax"`), with pair and period effects in both
   halves.
@@ -421,22 +442,28 @@ Non-spatial negative binomial baseline.
 $$y_i \sim \operatorname{Bernoulli}(p_i), \quad \eta = (I - \rho W)^{-1}X\beta$$
 
 The reduced form: the spatial multiplier acts on the mean of the log-odds, with
-no latent noise field (that is `SARLogitStructural`). Pólya–Gamma Gibbs sampler
+no random effects (that is `SARLogit(unit_effects="random")`). Pólya–Gamma Gibbs sampler
 only — no NUTS path.
 
-### SARLogitStructural (Structural Form)
+### SARLogit with random effects
 
 $$y_i \sim \operatorname{Bernoulli}(p_i), \quad \eta = \rho W \eta + X\beta + \nu, \quad \nu \sim \mathcal{N}(0, I)$$
 
-A latent-field model: unlike `SARLogit`, the log-odds carry a noise term $\nu$
-that the spatial multiplier also propagates. Pólya–Gamma Gibbs sampler only.
+`SARLogit(unit_effects="random")`: unlike the reduced form, the log-odds carry a
+normal random effect per unit $\nu$ that the spatial multiplier also
+propagates. Its variance is fixed at 1, which fixes the ratio of the propagated
+variance to the logistic noise's $\pi^2/3$: a restriction, not a
+normalization. Pólya–Gamma Gibbs sampler only.
 
 ### SEMLogit
 
 $$y_i \sim \operatorname{Bernoulli}(p_i), \quad \eta = X\beta + u, \quad u = \lambda W u + \nu, \quad \nu \sim \mathcal{N}(0, I)$$
 
-Spatial error on the latent log-odds. The logit link fixes $\sigma^2 = 1$, so it
-does not appear in the posterior. Pólya–Gamma Gibbs sampler only.
+`SEMLogit(unit_effects="random")`: the random effects carry the spatial error
+process. Their variance is fixed at 1, a restriction rather than a
+normalization, as for the SAR logit with random effects. The latent SEM logit,
+whose error process carries the logistic disturbance itself, is not implemented,
+so a bare `SEMLogit(...)` raises. Pólya–Gamma Gibbs sampler only.
 
 ## Flow Models
 
@@ -454,7 +481,7 @@ $$y_{ij} \sim \operatorname{NegBin}(\mu_{ij}, \alpha), \quad \log \boldsymbol{\m
 
 $$y = \rho_d W_d y + \rho_o W_o y + \rho_w W_w y + X\beta + \varepsilon$$
 
-### SARFlowSeparable
+### SARFlow, separable
 
 $$y = \rho_d W_d y + \rho_o W_o y - \rho_d \rho_o W_w y + X\beta + \varepsilon$$
 
@@ -462,7 +489,7 @@ $$y = \rho_d W_d y + \rho_o W_o y - \rho_d \rho_o W_w y + X\beta + \varepsilon$$
 
 $$y_{ij} \sim \operatorname{NegBin}(\mu_{ij}, \alpha), \quad \log \boldsymbol{\mu} = A(\boldsymbol{\rho})^{-1} X\beta$$
 
-### SARNegBinFlowSeparable
+### SARNegBinFlow, separable
 
 $$y_{ij} \sim \operatorname{NegBin}(\mu_{ij}, \alpha), \quad \log \boldsymbol{\mu} = A(\boldsymbol{\rho})^{-1} X\beta, \quad \rho_w = -\rho_d \rho_o$$
 
@@ -480,7 +507,7 @@ flow models; an NB with `priors={"alpha_fixed": a}`, `a` 10-20 times the
 typical mean, is an essentially Poisson model on the exact Pólya–Gamma
 sampler.
 
-### SARPoissonFlowSeparable
+### SARPoissonFlow, separable
 
 $$y_{ij} \sim \operatorname{Poisson}(\mu_{ij}), \quad \log \boldsymbol{\mu} = A(\boldsymbol{\rho})^{-1} X\beta, \quad \rho_w = -\rho_d \rho_o$$
 
@@ -491,13 +518,13 @@ weakly-identified $\rho$ ridge of the unrestricted variant.
 
 $$y = X\beta + u, \quad u = \lambda_d W_d u + \lambda_o W_o u + \lambda_w W_w u + \varepsilon, \quad \varepsilon \sim \mathcal{N}(0, \sigma^2 I)$$
 
-### SEMFlowSeparable
+### SEMFlow, separable
 
 $$y = X\beta + u, \quad u = \lambda_d W_d u + \lambda_o W_o u - \lambda_d \lambda_o W_w u + \varepsilon, \quad \varepsilon \sim \mathcal{N}(0, \sigma^2 I)$$
 
 ## Panel Flow Models
 
-Stack the flow models above across $T$ periods in time-first order. The NB
+Stack the flow models above across $T$ periods in time-first order; any flow class is a panel when `T` is given, with `pair_effects` and `time_effects`. The NB
 panels take pair and period effects as parameters, the pair effects partially
 pooled,
 $\log \boldsymbol{\mu}_t = A(\boldsymbol{\rho})^{-1} X_t\beta + c + \tau_t$,
@@ -505,35 +532,35 @@ with one effect per origin-destination pair held as an index, never as $n^2$
 dummy columns; see the panel count models above. The separable NB panel keeps
 its structured $n \times n$ sweep with effects.
 
-### OLSFlowPanel
+### OLSFlow panel
 
 $$y_t = X_t\beta + \varepsilon_t, \quad \varepsilon_t \sim \mathcal{N}(0, \sigma^2 I_N)$$
 
-### NegBinFlowPanel
+### NegBinFlow panel
 
 $$y_{ij,t} \sim \operatorname{NegBin}(\mu_{ij,t}, \alpha), \quad \log \boldsymbol{\mu}_t = X_t\beta$$
 
-### SARFlowPanel
+### SARFlow panel
 
 $$y_t = \rho_d W_d y_t + \rho_o W_o y_t + \rho_w W_w y_t + X_t\beta + \varepsilon_t$$
 
-### SARFlowSeparablePanel
+### SARFlow panel, separable
 
 $$y_t = \rho_d W_d y_t + \rho_o W_o y_t - \rho_d \rho_o W_w y_t + X_t\beta + \varepsilon_t$$
 
-### SARNegBinFlowPanel
+### SARNegBinFlow panel
 
 $$y_{ij,t} \sim \operatorname{NegBin}(\mu_{ij,t}, \alpha), \quad \log \boldsymbol{\mu}_t = A(\boldsymbol{\rho})^{-1} X_t\beta$$
 
-### SARNegBinFlowSeparablePanel
+### SARNegBinFlow panel, separable
 
 $$y_{ij,t} \sim \operatorname{NegBin}(\mu_{ij,t}, \alpha), \quad \log \boldsymbol{\mu}_t = A(\boldsymbol{\rho})^{-1} X_t\beta, \quad \rho_w = -\rho_d \rho_o$$
 
-### SEMFlowPanel
+### SEMFlow panel
 
 $$y_t = X_t\beta + u_t, \quad u_t = \lambda_d W_d u_t + \lambda_o W_o u_t + \lambda_w W_w u_t + \varepsilon_t, \quad \varepsilon_t \sim \mathcal{N}(0, \sigma^2 I_N)$$
 
-### SEMFlowSeparablePanel
+### SEMFlow panel, separable
 
 $$y_t = X_t\beta + u_t, \quad u_t = \lambda_d W_d u_t + \lambda_o W_o u_t - \lambda_d \lambda_o W_w u_t + \varepsilon_t, \quad \varepsilon_t \sim \mathcal{N}(0, \sigma^2 I_N)$$
 
@@ -597,7 +624,7 @@ otherwise.** For SAR/SEM/SDM/SDEM, the count families, the ZINB model and the
 Gaussian panel families, that means Gibbs unless you ask for something else.
 
 NUTS is not universally available. The Pólya–Gamma logit classes
-(`SARLogit`, `SARLogitStructural`, `SEMLogit`) and the auxiliary-mixture
+(`SARLogit`, with or without random effects, and `SEMLogit`) and the auxiliary-mixture
 Poisson flow classes build no PyMC graph at all, and `fit(sampler="nuts")`
 raises `NotImplementedError`. Robust (Student-t) SAR/SEM/SDM/SDEM and
 Gaussian panel FE models keep Gibbs: the Student-t error is sampled as a
@@ -665,11 +692,11 @@ The reduced form has no latent σ² — spatial dependence enters only through t
 | ρ \| ω, y | 1-D non-conjugate | Adaptive slice sampling (β marginalised) |
 | α \| y, η | 1-D non-conjugate | Slice sampling on log(α) |
 
-`SARNegBinStructural` (structural form) adds latent η and σ² blocks via a separate Gibbs sampler in `neighbayes.samplers.negbin`.
+`SARNegBin(unit_effects="random")` adds η and σ² blocks via a separate Gibbs sampler in `neighbayes.samplers.negbin`.
 
 ### Gibbs Sampler (NB flow models)
 
-NB flow models (`SARNegBinFlow`, `SARNegBinFlowSeparable`, `NegBinFlow`) support a Pólya–Gamma Gibbs sampler via `sampler="gibbs"`:
+NB flow models (`SARNegBinFlow`, unrestricted or separable, and `NegBinFlow`) support a Pólya–Gamma Gibbs sampler via `sampler="gibbs"`:
 
 ```python
 model = SARNegBinFlow(y_int, X, G)   # positional: (y, X, W)
@@ -685,7 +712,7 @@ The sampler uses a reduced-form Pólya–Gamma augmentation strategy with no σ�
 | ρ \| ω, y | 1-D non-conjugate | Adaptive slice sampling (β marginalised) |
 | α \| y, η | 1-D non-conjugate | Slice sampling on log(α) |
 
-For the unrestricted model (`SARNegBinFlow`), each ρ parameter (ρ_d, ρ_o, ρ_w) is updated via independent 1-D slice sampling with β marginalised out. For the separable model (`SARNegBinFlowSeparable`), ρ_w = −ρ_d·ρ_o is deterministic and only ρ_d and ρ_o are sampled. The aspatial `NegBinFlow` omits the ρ block entirely.
+For the unrestricted model (`SARNegBinFlow`), each ρ parameter (ρ_d, ρ_o, ρ_w) is updated via independent 1-D slice sampling with β marginalised out. For the separable model (`separable=True`), ρ_w = −ρ_d·ρ_o is deterministic and only ρ_d and ρ_o are sampled. The aspatial `NegBinFlow` omits the ρ block entirely.
 
 ## Log-Determinant Methods
 

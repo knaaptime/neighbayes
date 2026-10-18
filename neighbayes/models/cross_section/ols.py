@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from .._design import gaussian
 from .._mixins import GaussianLikelihoodMixin, GaussianPredictionMixin
 from ..base import SpatialModel
 from ..priors import OLSPriors
@@ -77,6 +78,8 @@ class OLS(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     robust : bool, default False
         If True, use a Student-t error distribution instead of Normal.
     """
+
+    _dispatch = classmethod(gaussian)
 
     _priors_cls = OLSPriors
     _spatial_params: tuple[str, ...] = ()

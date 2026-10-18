@@ -20,58 +20,67 @@ from .cross_sectional import (
     simulate_slx as simulate_slx,
 )
 from .flows import (
-    generate_flow_data as generate_flow_data,
+    simulate_sar_flow as simulate_sar_flow,
 )
 from .flows import (
-    generate_flow_data_separable as generate_flow_data_separable,
+    simulate_sar_flow_panel_fe as simulate_sar_flow_panel_fe,
 )
 from .flows import (
-    generate_hurdle_flow_data_separable as generate_hurdle_flow_data_separable,
+    simulate_sar_flow_separable as simulate_sar_flow_separable,
 )
 from .flows import (
-    generate_negbin_flow_data as generate_negbin_flow_data,
+    simulate_sar_flow_separable_panel_fe as simulate_sar_flow_separable_panel_fe,
 )
 from .flows import (
-    generate_negbin_flow_data_separable as generate_negbin_flow_data_separable,
+    simulate_sar_hurdle_negbin_flow_separable as simulate_sar_hurdle_negbin_flow_separable,
 )
 from .flows import (
-    generate_panel_flow_data as generate_panel_flow_data,
+    simulate_sar_negbin_flow as simulate_sar_negbin_flow,
 )
 from .flows import (
-    generate_panel_flow_data_separable as generate_panel_flow_data_separable,
+    simulate_sar_negbin_flow_panel_re as simulate_sar_negbin_flow_panel_re,
 )
 from .flows import (
-    generate_panel_negbin_flow_data as generate_panel_negbin_flow_data,
+    simulate_sar_negbin_flow_separable as simulate_sar_negbin_flow_separable,
 )
 from .flows import (
-    generate_panel_negbin_flow_data_separable as generate_panel_negbin_flow_data_separable,
+    simulate_sar_negbin_flow_separable_panel_re as simulate_sar_negbin_flow_separable_panel_re,
 )
 from .flows import (
-    generate_panel_sem_flow_data as generate_panel_sem_flow_data,
+    simulate_sar_poisson_flow as simulate_sar_poisson_flow,
 )
 from .flows import (
-    generate_panel_sem_flow_data_separable as generate_panel_sem_flow_data_separable,
+    simulate_sar_poisson_flow_separable as simulate_sar_poisson_flow_separable,
 )
 from .flows import (
-    generate_sem_flow_data as generate_sem_flow_data,
+    simulate_sar_zinb_flow_separable as simulate_sar_zinb_flow_separable,
 )
 from .flows import (
-    generate_sem_flow_data_separable as generate_sem_flow_data_separable,
+    simulate_sem_flow as simulate_sem_flow,
 )
 from .flows import (
-    generate_zinb_flow_data_separable as generate_zinb_flow_data_separable,
+    simulate_sem_flow_panel_fe as simulate_sem_flow_panel_fe,
+)
+from .flows import (
+    simulate_sem_flow_separable as simulate_sem_flow_separable,
+)
+from .flows import (
+    simulate_sem_flow_separable_panel_fe as simulate_sem_flow_separable_panel_fe,
 )
 from .hurdle import (
-    simulate_panel_sar_hurdle as simulate_panel_sar_hurdle,
+    simulate_sar_hurdle_negbin as simulate_sar_hurdle_negbin,
 )
 from .hurdle import (
-    simulate_sar_hurdle as simulate_sar_hurdle,
+    simulate_sar_hurdle_negbin_panel_re as simulate_sar_hurdle_negbin_panel_re,
 )
 from .multilevel import (
-    simulate_spatial_multilevel as simulate_spatial_multilevel,
+    simulate_multilevel as simulate_multilevel,
 )
 from .nonlinear import (
     simulate_sar_logit as simulate_sar_logit,
+)
+from .nonlinear import (
+    simulate_sar_probit as simulate_sar_probit,
 )
 from .nonlinear import (
     simulate_sar_tobit as simulate_sar_tobit,
@@ -85,67 +94,64 @@ from .nonlinear import (
 from .nonlinear import (
     simulate_sem_tobit as simulate_sem_tobit,
 )
-from .nonlinear import (
-    simulate_spatial_probit as simulate_spatial_probit,
+from .panel_count import (
+    simulate_sar_negbin_panel_re as simulate_sar_negbin_panel_re,
 )
 from .panel_count import (
-    simulate_panel_sar_negbin as simulate_panel_sar_negbin,
-)
-from .panel_count import (
-    simulate_panel_sar_zinb as simulate_panel_sar_zinb,
+    simulate_sar_zinb_panel_re as simulate_sar_zinb_panel_re,
 )
 from .panel_dynamic import (
-    simulate_panel_dlm_fe as simulate_panel_dlm_fe,
+    simulate_ols_panel_dynamic as simulate_ols_panel_dynamic,
 )
 from .panel_dynamic import (
-    simulate_panel_sar_dynamic_fe as simulate_panel_sar_dynamic_fe,
+    simulate_sar_panel_dynamic as simulate_sar_panel_dynamic,
 )
 from .panel_dynamic import (
-    simulate_panel_sdem_dynamic_fe as simulate_panel_sdem_dynamic_fe,
+    simulate_sdem_panel_dynamic as simulate_sdem_panel_dynamic,
 )
 from .panel_dynamic import (
-    simulate_panel_sdmr_fe as simulate_panel_sdmr_fe,
+    simulate_sdm_panel_dynamic as simulate_sdm_panel_dynamic,
 )
 from .panel_dynamic import (
-    simulate_panel_sdmu_fe as simulate_panel_sdmu_fe,
+    simulate_sdm_panel_dynamic_restricted as simulate_sdm_panel_dynamic_restricted,
 )
 from .panel_dynamic import (
-    simulate_panel_sem_dynamic_fe as simulate_panel_sem_dynamic_fe,
+    simulate_sem_panel_dynamic as simulate_sem_panel_dynamic,
 )
 from .panel_dynamic import (
-    simulate_panel_slx_dynamic_fe as simulate_panel_slx_dynamic_fe,
+    simulate_slx_panel_dynamic as simulate_slx_panel_dynamic,
 )
 from .panel_fe import (
-    simulate_panel_ols_fe as simulate_panel_ols_fe,
+    simulate_ols_panel_fe as simulate_ols_panel_fe,
 )
 from .panel_fe import (
-    simulate_panel_sar_fe as simulate_panel_sar_fe,
+    simulate_sar_panel_fe as simulate_sar_panel_fe,
 )
 from .panel_fe import (
-    simulate_panel_sdem_fe as simulate_panel_sdem_fe,
+    simulate_sdem_panel_fe as simulate_sdem_panel_fe,
 )
 from .panel_fe import (
-    simulate_panel_sdm_fe as simulate_panel_sdm_fe,
+    simulate_sdm_panel_fe as simulate_sdm_panel_fe,
 )
 from .panel_fe import (
-    simulate_panel_sem_fe as simulate_panel_sem_fe,
+    simulate_sem_panel_fe as simulate_sem_panel_fe,
 )
 from .panel_fe import (
-    simulate_panel_slx_fe as simulate_panel_slx_fe,
+    simulate_slx_panel_fe as simulate_slx_panel_fe,
 )
 from .panel_re import (
-    simulate_panel_ols_re as simulate_panel_ols_re,
+    simulate_ols_panel_re as simulate_ols_panel_re,
 )
 from .panel_re import (
-    simulate_panel_sar_re as simulate_panel_sar_re,
+    simulate_sar_panel_re as simulate_sar_panel_re,
 )
 from .panel_re import (
-    simulate_panel_sem_re as simulate_panel_sem_re,
+    simulate_sem_panel_re as simulate_sem_panel_re,
 )
 from .panel_tobit import (
-    simulate_panel_sar_tobit_fe as simulate_panel_sar_tobit_fe,
+    simulate_sar_tobit_panel as simulate_sar_tobit_panel,
 )
 from .panel_tobit import (
-    simulate_panel_sem_tobit_fe as simulate_panel_sem_tobit_fe,
+    simulate_sem_tobit_panel as simulate_sem_tobit_panel,
 )
 from .zinb import simulate_sar_zinb as simulate_sar_zinb

@@ -25,10 +25,11 @@ from libpysal.graph import Graph
 from ..._backends.sampler_helpers import prepare_compile_kwargs, prepare_idata_kwargs
 from ..._lazy_deps import pm, xr
 from .._base._shared import SharedSpatialMethods
+from .._design import FacadeMeta, sem_probit
 from ..priors import SARProbitPriors, priors_as_dict, resolve_priors
 
 
-class SARProbit(SharedSpatialMethods):
+class SEMProbitRE(SharedSpatialMethods):
     """Bayesian spatial probit with regional random effects.
 
     A binary-response model in which the latent utility includes a
@@ -102,7 +103,7 @@ class SARProbit(SharedSpatialMethods):
 
     **Robust regression**
 
-    ``robust=True`` is not supported for SARProbit. The probit link
+    ``robust=True`` is not supported for SEMProbitRE. The probit link
     function uses a Normal CDF; a robust version would require a Student-t
     CDF link, which is not yet implemented. Use ``robust=True`` with
     Gaussian models (OLS, SAR, SEM, etc.) instead.
@@ -243,7 +244,7 @@ class SARProbit(SharedSpatialMethods):
         if self.robust:
             raise NotImplementedError(
                 "Robust (Student-t) error distribution is not supported for "
-                "SARProbit. The probit link function uses a Normal CDF; "
+                "SEMProbitRE. The probit link function uses a Normal CDF; "
                 "a robust version would require a t-link (Student-t CDF) which "
                 "is not yet implemented. Use robust=True with Gaussian models "
                 "(OLS, SAR, SEM, etc.) instead."
@@ -465,3 +466,37 @@ class SARProbit(SharedSpatialMethods):
             }
             return df, samples_dict
         return df
+
+
+class SEMProbit(metaclass=FacadeMeta):
+    r"""SEM probit with random group effects (LeSage and Pace 2009, §10.6).
+
+    Observations nest in groups, and the groups' random effects follow a SAR
+    process on the group-level weights (Smith and LeSage 2004):
+
+    .. math::
+
+        y_{ik} = 1[z_{ik} > 0], \quad z = X\beta + \Delta\theta + \varepsilon,
+        \quad \theta = \rho W \theta + u, \quad u \sim N(0, \sigma_u^2 I).
+
+    The latent SEM probit, whose error process carries the probit disturbance
+    itself, is not implemented, so the group effects are required.
+
+    Parameters
+    ----------
+    group_effects : {"random"}
+        Required.
+    group_col : str, optional
+        Group identifier column in ``data`` (formula mode).
+    groups : array-like, optional
+        Group identifier per observation (matrix mode).
+    group_sizes : array-like, optional
+        Observations per group, in sorted group order (matrix mode, in place of
+        ``groups``).
+    W : libpysal.graph.Graph or scipy.sparse matrix
+        Group-level ``m × m`` weights.
+    **kwargs
+        ``formula``, ``data``, ``y``, ``X``, ``priors``, and ``robust``.
+    """
+
+    _dispatch = classmethod(sem_probit)

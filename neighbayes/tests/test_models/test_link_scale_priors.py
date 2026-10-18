@@ -14,6 +14,7 @@ import numpy as np
 import pytest
 from scipy.special import logit, ndtri
 
+from neighbayes.models import SARNegBinFlow
 from neighbayes.models._base._shared import gelman_default_beta_prior
 
 
@@ -110,9 +111,9 @@ def test_tobit_estimates_are_free_of_the_scale_of_y():
 
 
 def _nb_flow():
-    from neighbayes.dgp import generate_negbin_flow_data
+    from neighbayes.dgp import simulate_sar_negbin_flow
 
-    return generate_negbin_flow_data(
+    return simulate_sar_negbin_flow(
         n=5, k=2, rho_d=0.1, rho_o=0.1, rho_w=0.0, alpha=5.0, seed=42
     )
 
@@ -122,7 +123,9 @@ def test_nb_flow_nuts_and_gibbs_resolve_the_same_priors(monkeypatch):
     from neighbayes.models.flow._flow import SARNegBinFlowSeparable
 
     d = _nb_flow()
-    m = SARNegBinFlowSeparable(d["y_vec"], d["X"], d["G"], logdet_method="eigenvalue")
+    m = SARNegBinFlow(
+        d["y_vec"], d["X"], d["G"], separable=True, logdet_method="eigenvalue"
+    )
     pv = m._flow_count_priors()
     np.testing.assert_allclose(pv["beta_sigma"][1:], 2.5 / m._X[:, 1:].std(0))
 
@@ -151,12 +154,12 @@ def test_nb_flow_nuts_and_gibbs_resolve_the_same_priors(monkeypatch):
 
 def test_nb_flow_panel_alpha_matches_gibbs():
     """The panel NUTS build uses the half-t on alpha that the Gibbs path uses."""
-    from neighbayes.dgp.flows import generate_panel_negbin_flow_data
-    from neighbayes.models.flow_panel import SARNegBinFlowSeparablePanel
+    from neighbayes.dgp.flows import simulate_sar_negbin_flow_panel_re
+    from neighbayes.models.flow_panel import SARNegBinFlowSeparablePanelRE
 
-    d = generate_panel_negbin_flow_data(n=5, T=3, seed=1)
-    m = SARNegBinFlowSeparablePanel(
-        y=d["y"], W=d["G"], X=d["X"], T=3, col_names=d["col_names"]
+    d = simulate_sar_negbin_flow_panel_re(n=5, T=3, seed=1)
+    m = SARNegBinFlow(
+        separable=True, y=d["y"], W=d["G"], X=d["X"], T=3, col_names=d["col_names"]
     )
     alpha = m._build_pymc_model().named_vars["alpha"]
     assert "StudentT" in type(alpha.owner.op).__name__

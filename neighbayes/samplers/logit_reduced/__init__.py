@@ -20,7 +20,7 @@ the working response is κ/ω with κ = y − ½ (no ``log α`` offset), and the
 dispersion parameter α (hence no α slice).
 
 Contrast with :mod:`neighbayes.samplers.logit`, which samples the *structural*
-latent-field SAR-logit / SEM-logit (``η = ρWη + Xβ + ν``).
+SAR and SEM logit with random effects (``η = ρWη + Xβ + ν``).
 """
 
 from .._registry import register

@@ -91,7 +91,7 @@ _register("neighbayes.models.cross_section.tobit.SDMTobit", SDM_TOBIT_SUITE)
 _register("neighbayes.models.cross_section.sar_negbin.SARNegBin", NEGBIN_SUITE)
 
 _register(
-    "neighbayes.models.cross_section.sar_negbin_structural.SARNegBinStructural",
+    "neighbayes.models.cross_section.sar_negbin_re.SARNegBinRE",
     SAR_NEGBIN_SUITE,
 )
 
@@ -140,20 +140,24 @@ _register("neighbayes.models.panel._re.SDEMPanelRE", SDEM_PANEL_SUITE)
 
 # Panel Dynamic
 _register("neighbayes.models.panel._dynamic.OLSPanelDynamic", OLS_PANEL_SUITE)
-_register("neighbayes.models.panel._dynamic.SDMRPanelDynamic", SDM_PANEL_SUITE)
-_register("neighbayes.models.panel._dynamic.SDMUPanelDynamic", SDM_PANEL_SUITE)
+_register("neighbayes.models.panel._dynamic.SDMPanelDynamicRestricted", SDM_PANEL_SUITE)
+_register("neighbayes.models.panel._dynamic.SDMPanelDynamic", SDM_PANEL_SUITE)
 _register("neighbayes.models.panel._dynamic.SARPanelDynamic", SAR_PANEL_SUITE)
 _register("neighbayes.models.panel._dynamic.SEMPanelDynamic", SEM_PANEL_DYNAMIC_SUITE)
 _register("neighbayes.models.panel._dynamic.SDEMPanelDynamic", SDEM_PANEL_SUITE)
 _register("neighbayes.models.panel._dynamic.SLXPanelDynamic", SLX_PANEL_DYNAMIC_SUITE)
 
 # Panel Tobit
-_register("neighbayes.models.panel._tobit.SARPanelTobit", SAR_PANEL_SUITE)
-_register("neighbayes.models.panel._tobit.SEMPanelTobit", SEM_PANEL_DYNAMIC_SUITE)
+_register("neighbayes.models.panel._tobit.SARTobitPanel", SAR_PANEL_SUITE)
+_register("neighbayes.models.panel._tobit.SEMTobitPanel", SEM_PANEL_DYNAMIC_SUITE)
 
 # Flow Panel
-_register("neighbayes.models.flow_panel._panel.SARFlowPanel", FLOW_PANEL_SUITE)
-_register("neighbayes.models.flow_panel._panel.SARFlowSeparablePanel", FLOW_PANEL_SUITE)
-_register("neighbayes.models.flow_panel._panel.OLSFlowPanel", FLOW_PANEL_SUITE)
-_register("neighbayes.models.flow_panel._panel.SEMFlowPanel", FLOW_PANEL_SUITE)
-_register("neighbayes.models.flow_panel._panel.SEMFlowSeparablePanel", FLOW_PANEL_SUITE)
+_register("neighbayes.models.flow_panel._panel.SARFlowPanelFE", FLOW_PANEL_SUITE)
+_register(
+    "neighbayes.models.flow_panel._panel.SARFlowSeparablePanelFE", FLOW_PANEL_SUITE
+)
+_register("neighbayes.models.flow_panel._panel.OLSFlowPanelFE", FLOW_PANEL_SUITE)
+_register("neighbayes.models.flow_panel._panel.SEMFlowPanelFE", FLOW_PANEL_SUITE)
+_register(
+    "neighbayes.models.flow_panel._panel.SEMFlowSeparablePanelFE", FLOW_PANEL_SUITE
+)

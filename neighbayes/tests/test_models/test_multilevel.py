@@ -9,13 +9,13 @@ import scipy.sparse as sp
 from scipy.stats import multivariate_normal
 
 from neighbayes import dgp
-from neighbayes.models import Level, SpatialMultilevel
+from neighbayes.models import Level, Multilevel
 from neighbayes.samplers.multilevel import MultilevelStructure, log_marginal
 
 
 def _data(n_side=8, blocks=(2, 2), processes=None, seed=0, **kw):
     L = len(blocks)
-    return dgp.simulate_spatial_multilevel(
+    return dgp.simulate_multilevel(
         n_side=n_side,
         blocks=blocks,
         processes=processes or ("lag",) * (L + 1),
@@ -46,7 +46,7 @@ def _model(d, processes=None, durbin=None, **kw):
                 durbin=durbin[ell],
             )
         )
-    return SpatialMultilevel(*levels, **kw)
+    return Multilevel(*levels, **kw)
 
 
 # ---------------------------------------------------------------------------
@@ -150,7 +150,7 @@ def test_keys_resolve_through_the_units_when_a_level_has_no_data():
     d = _data(n_side=8, blocks=(2, 2), seed=1)
     u, l1, l2 = d["frames"]
     a = _model(d)
-    b = SpatialMultilevel(
+    b = Multilevel(
         Level("y ~ x1 + x2", data=u, W=d["W"]),
         Level(W=d["levels"][0]["W"], key="g1"),  # no data: no covariates
         Level("~ z1", data=l2, W=d["levels"][1]["W"], key="g2"),
@@ -164,7 +164,7 @@ def test_graph_ids_order_the_groups_and_reindex_the_data():
     u, l1 = d["frames"]
     W1 = d["levels"][0]["W"]
     shuffled = l1.sample(frac=1.0, random_state=0)
-    m = SpatialMultilevel(
+    m = Multilevel(
         Level("y ~ x1 + x2", data=u, W=d["W"]),
         Level("~ z1", data=shuffled, W=W1, key="g1"),
     )
@@ -175,7 +175,7 @@ def test_graph_ids_order_the_groups_and_reindex_the_data():
 def test_matrix_mode_with_groups():
     d = _data(n_side=8, blocks=(2,), seed=2)
     lv = d["levels"][0]
-    m = SpatialMultilevel(
+    m = Multilevel(
         Level(y=d["y"], X=d["X"], W=d["W_sparse"]),
         Level(X=lv["X"], W=lv["W_sparse"], groups=d["parent"]),
     )
@@ -186,14 +186,14 @@ def test_matrix_mode_with_groups():
 def test_upper_intercepts_are_dropped():
     d = _data(n_side=8, blocks=(2,), seed=2)
     u, l1 = d["frames"]
-    m = SpatialMultilevel(
+    m = Multilevel(
         Level("y ~ x1", data=u, W=d["W"]),
         Level("~ z1", data=l1, W=d["levels"][0]["W"], key="g1"),
     )
     assert m._levels[1].names == ["z1"]
     X = np.column_stack([np.ones(16), l1["z1"]])
     with pytest.warns(UserWarning, match="constant"):
-        m2 = SpatialMultilevel(
+        m2 = Multilevel(
             Level("y ~ x1", data=u, W=d["W"]),
             Level(X=X, W=d["levels"][0]["W_sparse"], groups=u["g1"].to_numpy()),
         )
@@ -205,27 +205,27 @@ def test_linking_errors():
     u, l1, l2 = d["frames"]
     W1, W2 = d["levels"][0]["W"], d["levels"][1]["W"]
     with pytest.raises(ValueError, match="key"):
-        SpatialMultilevel(Level("y ~ x1", data=u, W=d["W"]), Level(W=W1))
+        Multilevel(Level("y ~ x1", data=u, W=d["W"]), Level(W=W1))
     with pytest.raises(ValueError, match="neither"):
-        SpatialMultilevel(Level("y ~ x1", data=u, W=d["W"]), Level(W=W1, key="nope"))
+        Multilevel(Level("y ~ x1", data=u, W=d["W"]), Level(W=W1, key="nope"))
     bad = u.copy()
     bad.loc[0, "g2"] = (bad.loc[0, "g2"] + 1) % 4  # one unit leaves its parent
     with pytest.raises(ValueError, match="not nested"):
-        SpatialMultilevel(
+        Multilevel(
             Level("y ~ x1", data=bad, W=d["W"]),
             Level(W=W1, key="g1"),
             Level(W=W2, key="g2"),
         )
     with pytest.raises(ValueError, match="needs W"):
-        SpatialMultilevel(Level("y ~ x1", data=u, W=d["W"]), Level(key="g1"))
+        Multilevel(Level("y ~ x1", data=u, W=d["W"]), Level(key="g1"))
     with pytest.raises(ValueError, match="at least one level"):
-        SpatialMultilevel(Level("y ~ x1", data=u, W=d["W"]))
+        Multilevel(Level("y ~ x1", data=u, W=d["W"]))
 
 
 def test_level_without_graph_when_process_is_none():
     d = _data(n_side=8, blocks=(2,), seed=2)
     u, l1 = d["frames"]
-    m = SpatialMultilevel(
+    m = Multilevel(
         Level("y ~ x1", data=u, W=d["W"]),
         Level("~ z1", data=l1, key="g1", process="none"),
     )

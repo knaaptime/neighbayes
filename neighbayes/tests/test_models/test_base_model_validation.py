@@ -483,9 +483,7 @@ class TestCrossSectionalDiagnosticsDecision:
             index=["LM-Error-SDM", "Robust-LM-Error-SDM"],
         )
         monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert (
-            model.spatial_diagnostics_decision(alpha=0.05, format="model") == "MANSAR"
-        )
+        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "GNS"
 
     def test_sdm_naive_only_keeps_sdm(self, W_graph, monkeypatch):
         from neighbayes.models.cross_section.sdm import SDM
@@ -509,9 +507,7 @@ class TestCrossSectionalDiagnosticsDecision:
             index=["LM-Lag-SDEM", "Robust-LM-Lag-SDEM"],
         )
         monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert (
-            model.spatial_diagnostics_decision(alpha=0.05, format="model") == "MANSAR"
-        )
+        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "GNS"
 
     def test_sdem_naive_only_keeps_sdem(self, W_graph, monkeypatch):
         from neighbayes.models.cross_section.sdem import SDEM
@@ -643,9 +639,7 @@ class TestCrossSectionalDiagnosticsDecision:
             index=["LM-Error-SDM", "Robust-LM-Error-SDM"],
         )
         monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert (
-            model.spatial_diagnostics_decision(alpha=0.05, format="model") == "MANSAR"
-        )
+        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "GNS"
 
     def test_sdem_lag_sdem_significant(self, W_graph, monkeypatch):
         from neighbayes.models.cross_section.sdem import SDEM
@@ -657,9 +651,7 @@ class TestCrossSectionalDiagnosticsDecision:
             index=["LM-Lag-SDEM", "Robust-LM-Lag-SDEM"],
         )
         monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert (
-            model.spatial_diagnostics_decision(alpha=0.05, format="model") == "MANSAR"
-        )
+        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "GNS"
 
     def test_sartobit_error_significant(self, W_graph, monkeypatch):
         from neighbayes.models.cross_section.tobit import SARTobit
@@ -678,7 +670,7 @@ class TestCrossSectionalDiagnosticsDecision:
         monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
         assert (
             model.spatial_diagnostics_decision(alpha=0.05, format="model")
-            == "SARAR-Tobit"
+            == "SARARTobit"
         )
 
     def test_semtobit_lag_significant(self, W_graph, monkeypatch):
@@ -698,7 +690,7 @@ class TestCrossSectionalDiagnosticsDecision:
         monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
         assert (
             model.spatial_diagnostics_decision(alpha=0.05, format="model")
-            == "SARAR-Tobit"
+            == "SARARTobit"
         )
 
     def test_sdmtobit_error_significant(self, W_graph, monkeypatch):
@@ -717,8 +709,7 @@ class TestCrossSectionalDiagnosticsDecision:
         )
         monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
         assert (
-            model.spatial_diagnostics_decision(alpha=0.05, format="model")
-            == "MANSAR-Tobit"
+            model.spatial_diagnostics_decision(alpha=0.05, format="model") == "GNSTobit"
         )
 
 

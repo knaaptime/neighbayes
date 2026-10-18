@@ -1,4 +1,4 @@
-r"""Structural-form SAR Negative Binomial with Pólya–Gamma Gibbs sampler.
+r"""SAR negative binomial with random effects, sampled by Pólya–Gamma Gibbs.
 
 .. math::
 
@@ -6,18 +6,19 @@ r"""Structural-form SAR Negative Binomial with Pólya–Gamma Gibbs sampler.
     \eta = \rho W \eta + X\beta + \nu, \quad
     \nu \sim N(0, \sigma^2 I)
 
-Same observable likelihood as :class:`SARNegBin` (reduced form)
-but sampled via Pólya–Gamma data augmentation and block Gibbs on the
-structural form, yielding substantially higher ESS/s for n > ~1000.
+The SAR process acts on a latent log-mean that carries its own Gaussian
+innovation ν, so this is a different model from :class:`SARNegBin`, not a
+rewriting of it: ν adds lognormal overdispersion on top of the NB's, and the
+two likelihoods agree only as σ² → 0.  Pólya–Gamma augmentation leaves every
+block but ρ and α conditionally conjugate, which yields substantially higher
+ESS/s than NUTS on the reduced form for n > ~1000.
 
 Use this model when:
-- You want the structural form with explicit ``sigma2`` noise.
+- You want a spatially smoothed latent log-mean with explicit ``sigma2`` noise.
 - You need reliable ρ and α posteriors without long tuning.
-- You want to compare with the NUTS path for validation.
 
-Use :class:`SARNegBin` (canonical reduced form, PG-Gibbs) for
-most spatial-econometric work, and :class:`SARNegBin` when
-you need the full PyMC model graph for custom inference (NUTS).
+Use :class:`SARNegBin` (reduced form, PG-Gibbs or NUTS) for most
+spatial-econometric work.
 """
 
 from __future__ import annotations
@@ -41,8 +42,8 @@ from ..base import SpatialModel
 from ..priors import SARNegBinPriors
 
 
-class SARNegBinStructural(SpatialModel):
-    """Bayesian structural-form SAR-NB with Pólya–Gamma Gibbs sampler.
+class SARNegBinRE(SpatialModel):
+    """Bayesian SAR-NB with random effects, sampled by Pólya–Gamma Gibbs.
 
     Parameters
     ----------
@@ -53,7 +54,7 @@ class SARNegBinStructural(SpatialModel):
 
     Notes
     -----
-    The structural form parameterizes the latent log-mean as
+    The model parameterizes the latent log-mean as
     ``eta = rho * W @ eta + X @ beta + nu`` with ``nu ~ N(0, sigma^2 I)``,
     and augments the NB likelihood with Pólya–Gamma auxiliary variables
     to obtain fully conjugate Gibbs updates for eta, beta, and sigma^2.
@@ -73,26 +74,20 @@ class SARNegBinStructural(SpatialModel):
 
     _priors_cls = SARNegBinPriors
     _likelihood: str = "count"
-    _gibbs_key: tuple[str, str] | None = ("count_structural", "cross_section")
+    _gibbs_key: tuple[str, str] | None = ("count_re", "cross_section")
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         if self.robust:
-            raise NotImplementedError(
-                "robust=True is not supported for SARNegBinStructural."
-            )
+            raise NotImplementedError("robust=True is not supported for SARNegBinRE.")
 
         # Validate y is integer and non-negative
         y_round = np.round(self._y).astype(np.int64)
         if not np.allclose(self._y, y_round):
-            raise ValueError(
-                "SARNegBinStructural requires integer-valued observations."
-            )
+            raise ValueError("SARNegBinRE requires integer-valued observations.")
         if np.any(y_round < 0):
-            raise ValueError(
-                "SARNegBinStructural requires non-negative integer observations."
-            )
+            raise ValueError("SARNegBinRE requires non-negative integer observations.")
         self._y_int = y_round
         self._y = y_round.astype(np.float64)
 
@@ -207,7 +202,7 @@ class SARNegBinStructural(SpatialModel):
             probes and Chebyshev draws; requires float64; viable for
             n ≲ 10 000 on machines with ≥ 32 GB RAM).
         return_eta : bool
-            If True, store the full latent field η in the posterior.
+            If True, store the latent index η in the posterior.
             Default False — η is n × draws × chains, which can be large.
             A scalar summary ||η||² is always stored.
         pg_n_terms : int, default 25
@@ -352,7 +347,7 @@ class SARNegBinStructural(SpatialModel):
             if return_eta:
                 raise NotImplementedError(
                     "return_eta=True is not supported with gibbs_backend='jax'. "
-                    "Use gibbs_backend='numpy' if you need the full latent field stored."
+                    "Use gibbs_backend='numpy' if you need the latent index stored."
                 )
             chain_inits = [
                 self._initialize_from_glm(np.random.default_rng(seed)) for seed in seeds
@@ -481,9 +476,9 @@ class SARNegBinStructural(SpatialModel):
         return idata
 
     def _build_pymc_model(self):
-        """Not supported — SARNegBinStructural uses a Gibbs sampler, not NUTS."""
+        """Not supported — SARNegBinRE uses a Gibbs sampler, not NUTS."""
         raise NotImplementedError(
-            "SARNegBinStructural does not build a PyMC model. "
+            "SARNegBinRE does not build a PyMC model. "
             "Use the fit() method for Gibbs sampling, or use "
             "SARNegBin for NUTS-based inference."
         )

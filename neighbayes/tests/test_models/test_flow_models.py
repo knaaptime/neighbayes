@@ -10,6 +10,7 @@ import numpy as np
 import pytest
 import scipy.sparse as sp
 
+from neighbayes.models import SARFlow
 from neighbayes.tests.helpers import SAMPLE_KWARGS
 
 # ---------------------------------------------------------------------------
@@ -50,11 +51,11 @@ class TestBarryPaceTraces:
 
 class TestFlowModelConstruction:
     def setup_method(self):
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
 
         self.n = 5
         self.N = self.n * self.n
-        out = generate_flow_data(
+        out = simulate_sar_flow(
             n=self.n,
             rho_d=0.0,
             rho_o=0.0,
@@ -99,7 +100,9 @@ class TestFlowModelConstruction:
     def test_sar_flow_separable_builds(self):
         from neighbayes.models.flow import SARFlowSeparable
 
-        model = SARFlowSeparable(self.y_vec, self.X, self.G, col_names=self.col_names)
+        model = SARFlow(
+            self.y_vec, self.X, self.G, separable=True, col_names=self.col_names
+        )
         assert model._n == self.n
 
     def test_wrong_y_length_raises(self):
@@ -109,10 +112,10 @@ class TestFlowModelConstruction:
             SARFlow(np.zeros(self.N + 1), self.X, self.G)
 
     def test_asymmetric_beta_shapes_work_in_dgp(self):
-        """generate_flow_data should support beta_d and beta_o of different lengths."""
-        from neighbayes.dgp.flows import generate_flow_data
+        """simulate_sar_flow should support beta_d and beta_o of different lengths."""
+        from neighbayes.dgp.flows import simulate_sar_flow
 
-        data = generate_flow_data(
+        data = simulate_sar_flow(
             n=self.n,
             rho_d=0.2,
             rho_o=0.2,
@@ -144,7 +147,9 @@ class TestFlowModelConstruction:
     def test_pymc_model_separable_builds_without_error(self):
         from neighbayes.models.flow import SARFlowSeparable
 
-        model = SARFlowSeparable(self.y_vec, self.X, self.G, col_names=self.col_names)
+        model = SARFlow(
+            self.y_vec, self.X, self.G, separable=True, col_names=self.col_names
+        )
         pm_model = model._build_pymc_model()
         assert pm_model is not None
 
@@ -159,9 +164,9 @@ class TestGenerateFlowData:
         self.n = 5
 
     def test_output_keys(self):
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
 
-        out = generate_flow_data(
+        out = simulate_sar_flow(
             n=self.n,
             rho_d=0.2,
             rho_o=0.2,
@@ -190,9 +195,9 @@ class TestGenerateFlowData:
         assert expected.issubset(set(out.keys()))
 
     def test_y_shapes(self):
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
 
-        out = generate_flow_data(
+        out = simulate_sar_flow(
             n=self.n,
             rho_d=0.2,
             rho_o=0.2,
@@ -206,9 +211,9 @@ class TestGenerateFlowData:
         assert out["y_mat"].shape == (self.n, self.n)
 
     def test_y_vec_mat_consistency(self):
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
 
-        out = generate_flow_data(
+        out = simulate_sar_flow(
             n=self.n,
             rho_d=0.2,
             rho_o=0.2,
@@ -221,9 +226,9 @@ class TestGenerateFlowData:
         np.testing.assert_allclose(out["y_vec"], out["y_mat"].ravel(), atol=1e-12)
 
     def test_reproducibility(self):
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
 
-        out1 = generate_flow_data(
+        out1 = simulate_sar_flow(
             n=self.n,
             rho_d=0.2,
             rho_o=0.2,
@@ -233,7 +238,7 @@ class TestGenerateFlowData:
             sigma=1.0,
             seed=99,
         )
-        out2 = generate_flow_data(
+        out2 = simulate_sar_flow(
             n=self.n,
             rho_d=0.2,
             rho_o=0.2,
@@ -246,9 +251,9 @@ class TestGenerateFlowData:
         np.testing.assert_allclose(out1["y_vec"], out2["y_vec"], atol=1e-12)
 
     def test_different_seeds_differ(self):
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
 
-        out1 = generate_flow_data(
+        out1 = simulate_sar_flow(
             n=self.n,
             rho_d=0.2,
             rho_o=0.2,
@@ -258,7 +263,7 @@ class TestGenerateFlowData:
             sigma=1.0,
             seed=1,
         )
-        out2 = generate_flow_data(
+        out2 = simulate_sar_flow(
             n=self.n,
             rho_d=0.2,
             rho_o=0.2,
@@ -280,31 +285,31 @@ class TestFlowDistributionDefault:
     )
 
     def test_default_is_lognormal_positive(self):
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
 
-        out = generate_flow_data(n=self.n, **self.kwargs)
+        out = simulate_sar_flow(n=self.n, **self.kwargs)
         assert out["distribution"] == "lognormal"
         assert (out["y_vec"] > 0).all()
         np.testing.assert_allclose(np.log(out["y_vec"]), out["eta_vec"], atol=1e-10)
         np.testing.assert_allclose(out["eta_vec"], out["eta_mat"].ravel(), atol=1e-12)
 
     def test_normal_optin_matches_eta(self):
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
 
-        out = generate_flow_data(n=self.n, distribution="normal", **self.kwargs)
+        out = simulate_sar_flow(n=self.n, distribution="normal", **self.kwargs)
         assert out["distribution"] == "normal"
         np.testing.assert_array_equal(out["y_vec"], out["eta_vec"])
 
     def test_invalid_distribution_raises(self):
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
 
         with pytest.raises(ValueError, match="distribution"):
-            generate_flow_data(n=self.n, distribution="poisson", **self.kwargs)
+            simulate_sar_flow(n=self.n, distribution="poisson", **self.kwargs)
 
     def test_panel_default_is_lognormal_positive(self):
-        from neighbayes.dgp.flows import generate_panel_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow_panel_fe
 
-        out = generate_panel_flow_data(
+        out = simulate_sar_flow_panel_fe(
             n=4,
             T=2,
             rho_d=0.2,
@@ -332,10 +337,10 @@ class TestSARFlowFitSmoke:
     """Minimal sampling smoke tests.  Marked slow; skipped in fast CI runs."""
 
     def setup_method(self):
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
 
         self.n = 5
-        out = generate_flow_data(
+        out = simulate_sar_flow(
             n=self.n,
             rho_d=0.25,
             rho_o=0.25,
@@ -371,7 +376,9 @@ class TestSARFlowFitSmoke:
     def test_sar_flow_separable_fit_posterior_keys(self):
         from neighbayes.models.flow import SARFlowSeparable
 
-        model = SARFlowSeparable(self.y, self.X, self.G, col_names=self.col_names)
+        model = SARFlow(
+            self.y, self.X, self.G, separable=True, col_names=self.col_names
+        )
         idata = model.fit(draws=50, tune=50, chains=1, progressbar=False, random_seed=0)
         posterior = idata.posterior
         assert "rho_d" in posterior
@@ -420,11 +427,11 @@ class TestEffectsAccountingIdentity:
     """total = origin + destination + intra + network (per draw, per variable)."""
 
     def test_effects_sum_to_total(self):
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
         from neighbayes.models.flow import SARFlowSeparable
 
         n = 4
-        out = generate_flow_data(
+        out = simulate_sar_flow(
             n=n,
             rho_d=0.3,
             rho_o=0.2,
@@ -435,7 +442,9 @@ class TestEffectsAccountingIdentity:
             seed=7,
         )
         G = out["G"]
-        model = SARFlowSeparable(out["y_vec"], out["X"], G, col_names=out["col_names"])
+        model = SARFlow(
+            out["y_vec"], out["X"], G, separable=True, col_names=out["col_names"]
+        )
         # Use minimal posterior (mock-style: just run prior predictive)
         model.fit(draws=20, tune=20, chains=1, progressbar=False, random_seed=0)
         effects = model._compute_spatial_effects_posterior(draws=5)
@@ -461,10 +470,10 @@ class TestSparseFlowSolveOp:
     @pytest.fixture(autouse=True)
     def _build_op(self):
         from neighbayes._ops import SparseFlowSolveOp
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
 
         n = 4
-        G = generate_flow_data(n=n, seed=0)["G"]
+        G = simulate_sar_flow(n=n, seed=0)["G"]
         W = G.sparse.astype(np.float64).tocsr()
         # Row-standardize
         row_sums = np.asarray(W.sum(axis=1)).ravel()
@@ -592,10 +601,10 @@ class TestSARFlowSeparableLogdetMethods:
 
     @pytest.fixture(params=["eigenvalue", "chebyshev"], scope="class")
     def fitted_model(self, request):
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
         from neighbayes.models.flow import SARFlowSeparable
 
-        out = generate_flow_data(
+        out = simulate_sar_flow(
             n=5,
             rho_d=0.3,
             rho_o=0.2,
@@ -606,10 +615,11 @@ class TestSARFlowSeparableLogdetMethods:
             seed=0,
         )
         G = out["G"]
-        model = SARFlowSeparable(
+        model = SARFlow(
             out["y_vec"],
             out["X"],
             G,
+            separable=True,
             col_names=out["col_names"],
             logdet_method=request.param,
         )
@@ -635,10 +645,10 @@ class TestSARFlowSeparableLogdetMethods:
     def test_invalid_method_raises(self):
         import pytest
 
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
         from neighbayes.models.flow import SARFlowSeparable
 
-        out = generate_flow_data(
+        out = simulate_sar_flow(
             n=4,
             rho_d=0.2,
             rho_o=0.1,
@@ -650,10 +660,11 @@ class TestSARFlowSeparableLogdetMethods:
         )
         G = out["G"]
         with pytest.raises(ValueError, match="logdet_method"):
-            SARFlowSeparable(
+            SARFlow(
                 out["y_vec"],
                 out["X"],
                 G,
+                separable=True,
                 col_names=out["col_names"],
                 logdet_method="traces",
             )
@@ -665,10 +676,10 @@ class TestSARFlowRecovery:
 
     @pytest.fixture(scope="class")
     def fitted_sar_flow(self):
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
         from neighbayes.models.flow import SARFlow
 
-        out = generate_flow_data(
+        out = simulate_sar_flow(
             n=FLOW_N,
             rho_d=RHO_D_TRUE,
             rho_o=RHO_O_TRUE,
@@ -722,10 +733,10 @@ class TestSARFlowSeparableRecovery:
 
     @pytest.fixture(scope="class")
     def fitted_separable(self):
-        from neighbayes.dgp.flows import generate_flow_data_separable
+        from neighbayes.dgp.flows import simulate_sar_flow_separable
         from neighbayes.models.flow import SARFlowSeparable
 
-        out = generate_flow_data_separable(
+        out = simulate_sar_flow_separable(
             n=FLOW_N_SEP,
             rho_d=RHO_D_SEP_TRUE,
             rho_o=RHO_O_SEP_TRUE,
@@ -736,10 +747,11 @@ class TestSARFlowSeparableRecovery:
         )
         G = out["G"]
         # Default DGP is lognormal; fit on the latent (log) scale.
-        model = SARFlowSeparable(
+        model = SARFlow(
             np.log(out["y_vec"]),
             out["X"],
             G,
+            separable=True,
             col_names=out["col_names"],
         )
         idata = model.fit(**SAMPLE_KWARGS)
@@ -816,11 +828,11 @@ class TestKronSolveUtilities:
 class TestFlowSpatialEffectsAndPPC:
     @pytest.fixture(scope="class")
     def fitted(self):
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
         from neighbayes.models.flow import SARFlow
 
         n = 5
-        data = generate_flow_data(
+        data = simulate_sar_flow(
             n=n,
             rho_d=0.2,
             rho_o=0.15,
@@ -975,11 +987,11 @@ class TestFlowEffectsLeSageDecomposition:
         """End-to-end: spatial_effects matches a hand-rolled LeSage solve at one draw."""
         import scipy.sparse as sp_local
 
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
         from neighbayes.models.flow import SARFlow
 
         n = 4
-        data = generate_flow_data(
+        data = simulate_sar_flow(
             n=n,
             rho_d=0.2,
             rho_o=0.15,
@@ -1043,13 +1055,13 @@ class TestFlowPanelSpatialEffectsAndPPC:
 
     @pytest.fixture(scope="class")
     def fitted_panel(self):
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
         from neighbayes.graph import flow_design_matrix
-        from neighbayes.models.flow_panel import SARFlowPanel
+        from neighbayes.models.flow_panel import SARFlowPanelFE
 
         n = 4
         T = 3
-        G = generate_flow_data(n=n, seed=0)["G"]
+        G = simulate_sar_flow(n=n, seed=0)["G"]
         rng = np.random.default_rng(5)
         y_list, X_list = [], []
         col_names = None
@@ -1062,7 +1074,7 @@ class TestFlowPanelSpatialEffectsAndPPC:
             y_list.append(rng.standard_normal(n * n))
         y = np.concatenate(y_list)
         X = np.vstack(X_list)
-        model = SARFlowPanel(
+        model = SARFlow(
             y=y,
             W=G,
             X=X,
@@ -1150,7 +1162,7 @@ class TestFlowEffectsAsymmetricAndIntra:
 
     def test_asymmetric_design_separate_mode(self):
         """Asymmetric Xo!=Xd auto-detects to 'separate' mode and reports both sides."""
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
         from neighbayes.graph import flow_design_matrix_with_orig
         from neighbayes.models.flow import SARFlow
 
@@ -1159,7 +1171,7 @@ class TestFlowEffectsAsymmetricAndIntra:
         Xd = rng.standard_normal((n, 1))
         Xo = rng.standard_normal((n, 1))  # different from Xd
 
-        data = generate_flow_data(
+        data = simulate_sar_flow(
             n=n,
             rho_d=0.1,
             rho_o=0.1,
@@ -1186,11 +1198,11 @@ class TestFlowEffectsAsymmetricAndIntra:
 
     def test_combined_mode_matches_dest_plus_orig(self):
         """mode='combined' equals the sum of per-side rows from mode='separate'."""
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
         from neighbayes.models.flow import SARFlow
 
         n = 4
-        data = generate_flow_data(
+        data = simulate_sar_flow(
             n=n,
             rho_d=0.15,
             rho_o=0.1,
@@ -1222,12 +1234,12 @@ class TestOLSFlowEffects:
 
     def test_olsflow_fits_and_effects_table_83_1(self):
         """OLSFlow analytic effects: TE = βd + βo, NE = 0, IE = (βd+βo+β_intra)/n."""
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
         from neighbayes.models.flow import OLSFlow
 
         n = 5
         # ρ = 0 in the DGP so the OLS model is correctly specified.
-        data = generate_flow_data(
+        data = simulate_sar_flow(
             n=n,
             rho_d=0.0,
             rho_o=0.0,
@@ -1255,11 +1267,11 @@ class TestOLSFlowEffects:
 
     def test_olsflow_posterior_predictive_shape(self):
         """OLSFlow posterior_predictive returns (n_draws, N) finite values."""
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
         from neighbayes.models.flow import OLSFlow
 
         n = 4
-        data = generate_flow_data(
+        data = simulate_sar_flow(
             n=n,
             rho_d=0.0,
             rho_o=0.0,
@@ -1289,12 +1301,12 @@ class TestFlowLogLikelihood:
 
     def setup_method(self):
         from neighbayes.dgp.flows import (
-            generate_flow_data,
-            generate_negbin_flow_data,
+            simulate_sar_flow,
+            simulate_sar_negbin_flow,
         )
 
         self.n = 5
-        self.gauss = generate_flow_data(
+        self.gauss = simulate_sar_flow(
             n=self.n,
             rho_d=0.20,
             rho_o=0.20,
@@ -1305,7 +1317,7 @@ class TestFlowLogLikelihood:
             seed=0,
         )
         self.G = self.gauss["G"]
-        self.poi = generate_negbin_flow_data(n=self.n, k=2, seed=0)
+        self.poi = simulate_sar_negbin_flow(n=self.n, k=2, seed=0)
 
     def _check_loo(self, idata):
         import arviz as az
@@ -1341,10 +1353,11 @@ class TestFlowLogLikelihood:
     def test_sar_flow_separable_loglik(self):
         from neighbayes.models.flow import SARFlowSeparable
 
-        m = SARFlowSeparable(
+        m = SARFlow(
             self.gauss["y_vec"],
             self.gauss["X"],
             self.G,
+            separable=True,
             col_names=self.gauss["col_names"],
         )
         idata = m.fit(
@@ -1389,10 +1402,11 @@ class TestFlowLogLikelihood:
             col_names=self.gauss["col_names"],
             restrict_positive=True,
         )
-        m_sep = SARFlowSeparable(
+        m_sep = SARFlow(
             self.gauss["y_vec"],
             self.gauss["X"],
             self.G,
+            separable=True,
             col_names=self.gauss["col_names"],
         )
         m_ols = OLSFlow(

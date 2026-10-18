@@ -200,7 +200,7 @@ class SARZINBPriors(NegBinPriors):
 
 @dataclass(frozen=True)
 class SARHurdlePriors(NegBinPriors):
-    """Priors for :class:`neighbayes.models.SARHurdleNB`.
+    """Priors for :class:`neighbayes.models.SARHurdleNegBin`.
 
     Attributes
     ----------
@@ -228,7 +228,7 @@ class SARHurdlePriors(NegBinPriors):
 
 @dataclass(frozen=True)
 class MultilevelPriors(BasePriors):
-    r"""Priors for :class:`neighbayes.models.SpatialMultilevel`.
+    r"""Priors for :class:`neighbayes.models.Multilevel`.
 
     Attributes
     ----------
@@ -298,7 +298,7 @@ class SDMTobitPriors(SDMPriors):
 
 @dataclass(frozen=True)
 class SARProbitPriors:
-    """Priors for :class:`neighbayes.models.SARProbit`.
+    """Priors for :class:`neighbayes.models.SEMProbitRE`.
 
     Differs from :class:`SARPriors`: there is no ``sigma`` parameter (the
     probit link absorbs the noise scale) and the regional random-effect
@@ -333,7 +333,7 @@ LogitPriors = SARLogitPriors
 
 @dataclass
 class SEMLogitPriors:
-    """Priors for :class:`neighbayes.models.SEMLogit`.
+    """Priors for :class:`neighbayes.models.SEMLogitRE`.
 
     Like :class:`SARLogitPriors` but with ``lam_lower``/``lam_upper``
     instead of ``rho_lower``/``rho_upper``.
@@ -470,7 +470,7 @@ class PanelSARPriors(PanelBasePriors):
 
 @dataclass(frozen=True)
 class PanelCountPriors(PanelSARPriors):
-    """Priors for the count panels (:class:`neighbayes.models.SARNegBinPanel` & co).
+    """Priors for the count panels (:class:`neighbayes.models.SARNegBinPanelRE` & co).
 
     Attributes
     ----------
@@ -504,7 +504,7 @@ class PanelCountPriors(PanelSARPriors):
 
 @dataclass(frozen=True)
 class PanelZINBPriors(PanelCountPriors):
-    """Priors for the ZINB panels (:class:`neighbayes.models.SARZINBPanel` & co).
+    """Priors for the ZINB panels (:class:`neighbayes.models.SARZINBPanelRE` & co).
 
     The count-equation priors of :class:`PanelCountPriors` (β, ρ, α, the unit
     and period effects), plus the selection equation's:
@@ -526,7 +526,7 @@ class PanelZINBPriors(PanelCountPriors):
 
 @dataclass(frozen=True)
 class PanelHurdlePriors(PanelCountPriors):
-    """Priors for the hurdle panels (:class:`neighbayes.models.SARHurdleNBPanel` & co).
+    """Priors for the hurdle panels (:class:`neighbayes.models.SARHurdleNegBinPanelRE` & co).
 
     The count half takes the priors of :class:`PanelCountPriors` (β, ρ, α,
     the unit and period effects), centred on the positive counts: the
@@ -630,12 +630,12 @@ class PanelSDEMREPriors(PanelSDEMPriors, PanelREMixinPriors):
 
 @dataclass(frozen=True)
 class PanelSARTobitPriors(PanelSARPriors):
-    """Priors for :class:`neighbayes.models.SARPanelTobit`."""
+    """Priors for :class:`neighbayes.models.SARTobitPanel`."""
 
 
 @dataclass(frozen=True)
 class PanelSEMTobitPriors(PanelSEMPriors):
-    """Priors for :class:`neighbayes.models.SEMPanelTobit`."""
+    """Priors for :class:`neighbayes.models.SEMTobitPanel`."""
 
 
 # -- Panel dynamic (tighter [-0.95, 0.95] bounds; adds phi) -----------------
@@ -681,12 +681,12 @@ class PanelSEMDynamicPriors(PanelDynamicBasePriors):
 
 @dataclass(frozen=True)
 class PanelSDMRDynamicPriors(PanelSARDynamicPriors):
-    """Priors for :class:`neighbayes.models.SDMRPanelDynamic`."""
+    """Priors for :class:`neighbayes.models.SDMPanelDynamicRestricted`."""
 
 
 @dataclass(frozen=True)
 class PanelSDMUDynamicPriors(PanelSARDynamicPriors):
-    """Priors for :class:`neighbayes.models.SDMUPanelDynamic`.
+    """Priors for :class:`neighbayes.models.SDMPanelDynamic`.
 
     Adds bounds on the time-space cross-term coefficient ``theta``.
     """
@@ -784,7 +784,7 @@ class ReducedGibbsPriors:
 
     Notes
     -----
-    The ``sigma2_*`` fields present on the structural-form
+    The ``sigma2_*`` fields present on the random-effects
     :class:`GibbsPriors` are intentionally absent — this sampler has no
     :math:`\\sigma` parameter.
     """

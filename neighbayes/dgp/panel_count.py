@@ -5,8 +5,8 @@ r"""NB2 count panel DGP with unit and period effects.
     \eta_t = (I - \rho W)^{-1} X_t \beta + c + \tau_t \mathbf 1, \qquad
     y_{it} \sim \mathrm{NB2}(e^{\eta_{it}}, \alpha),
 
-stacked time-first, matching :class:`~neighbayes.models.SARNegBinPanel`
-(``rho = 0`` gives :class:`~neighbayes.models.NegBinPanel`).
+stacked time-first, matching :class:`~neighbayes.models.SARNegBinPanelRE`
+(``rho = 0`` gives :class:`~neighbayes.models.NegBinPanelRE`).
 """
 
 from __future__ import annotations
@@ -93,7 +93,7 @@ def _simulate_panel_count(
     }
 
 
-def simulate_panel_sar_negbin(
+def simulate_sar_negbin_panel_re(
     N: int,
     T: int,
     rho: float = 0.4,
@@ -132,7 +132,7 @@ def simulate_panel_sar_negbin(
         Accepted for API parity; the count variance is set by the mean (and
         ``alpha``), so it is ignored with a warning.
     rng, seed, W, gdf, n_side, contiguity
-        As for :func:`~neighbayes.dgp.simulate_panel_sar_fe`.
+        As for :func:`~neighbayes.dgp.simulate_sar_panel_fe`.
 
     Returns
     -------
@@ -148,7 +148,7 @@ def simulate_panel_sar_negbin(
     )  # fmt: skip
 
 
-def simulate_panel_sar_zinb(
+def simulate_sar_zinb_panel_re(
     N: int,
     T: int,
     rho: float = 0.4,
@@ -170,7 +170,7 @@ def simulate_panel_sar_zinb(
 ) -> dict:
     r"""Simulate a zero-inflated SAR-NB panel with per-period structural zeros.
 
-    The count equation is :func:`simulate_panel_sar_negbin` (including its
+    The count equation is :func:`simulate_sar_negbin_panel_re` (including its
     unit- and period-effect knobs); the selection equation is
 
     .. math::
@@ -180,8 +180,8 @@ def simulate_panel_sar_zinb(
 
     with a fresh selection design ``Z_t`` (intercept plus standard-normal
     columns) each period, and ``y = d · y_NB``.  Matches
-    :class:`~neighbayes.models.SARZINBPanel` (``rho = lam = 0`` gives
-    :class:`~neighbayes.models.ZINBPanel`).
+    :class:`~neighbayes.models.SARZINBPanelRE` (``rho = lam = 0`` gives
+    :class:`~neighbayes.models.ZINBPanelRE`).
 
     Parameters
     ----------
@@ -193,12 +193,12 @@ def simulate_panel_sar_zinb(
         Selection weights; default the count weights.
     N, T, rho, beta, alpha, unit_effect_sd, time_effect_sd, fe_x_corr, \
     err_hetero, rng, seed, W, gdf, n_side, contiguity
-        As for :func:`simulate_panel_sar_negbin`.
+        As for :func:`simulate_sar_negbin_panel_re`.
 
     Returns
     -------
     dict
-        As :func:`simulate_panel_sar_negbin`, with ``y`` zero-inflated, plus
+        As :func:`simulate_sar_negbin_panel_re`, with ``y`` zero-inflated, plus
         ``Z``, ``d`` (the activity indicators), ``eta_sel`` and ``W_sel_sparse``;
         ``params_true`` gains ``lam`` and ``gamma``.
     """

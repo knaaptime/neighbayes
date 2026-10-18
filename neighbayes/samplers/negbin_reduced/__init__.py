@@ -17,8 +17,8 @@ model :math:`\\eta = \\rho W \\eta + X\\beta + \\nu,\\; \\nu \\sim N(0,
 
 The reduced form is the form most commonly written down in the spatial
 econometrics literature (LeSage & Pace 2009), and is the preferred
-default when you do not have substantive reason to model an unobserved
-spatially-smoothed latent field.
+default when you do not have substantive reason to model a normal random
+effect per unit inside the SAR equation.
 """
 
 from .._registry import register

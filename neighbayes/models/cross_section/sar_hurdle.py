@@ -28,13 +28,14 @@ from ..._lazy_deps import xr
 from ...samplers import hurdle as _hurdle  # noqa: F401  (registers the runners)
 from .._base._nb import nb_alpha_rv
 from .._base._shared import _parse_W
+from .._design import discrete
 from .._mixins._hurdle import HurdleMixin
 from ..base import SpatialModel
 from ..priors import SARHurdlePriors
 from .sar_zinb import _selection_design
 
 
-class SARHurdleNB(HurdleMixin, SpatialModel):
+class SARHurdleNegBin(HurdleMixin, SpatialModel):
     """Bayesian reduced-form SAR hurdle NB2 with a Pólya–Gamma Gibbs sampler.
 
     Parameters
@@ -82,6 +83,8 @@ class SARHurdleNB(HurdleMixin, SpatialModel):
     :meth:`conditional_mean` ``E[y | y > 0]``.
     """
 
+    _dispatch = classmethod(discrete)
+
     _spatial_params: tuple[str, ...] = ("rho", "lam")
     _lag_terms: tuple[str, ...] = ()
     _jacobian_param: str | None = None
@@ -107,7 +110,9 @@ class SARHurdleNB(HurdleMixin, SpatialModel):
         **kwargs,
     ):
         if robust:
-            raise NotImplementedError("robust=True is not supported for SARHurdleNB.")
+            raise NotImplementedError(
+                "robust=True is not supported for SARHurdleNegBin."
+            )
         super().__init__(
             formula=formula,
             data=data,
@@ -120,9 +125,11 @@ class SARHurdleNB(HurdleMixin, SpatialModel):
             **kwargs,
         )
         if np.any(self._y < 0) or not np.allclose(self._y, np.round(self._y)):
-            raise ValueError("y must be non-negative integer counts for SARHurdleNB.")
+            raise ValueError(
+                "y must be non-negative integer counts for SARHurdleNegBin."
+            )
         if not np.any(self._y > 0):
-            raise ValueError("SARHurdleNB needs at least one positive count.")
+            raise ValueError("SARHurdleNegBin needs at least one positive count.")
         self._y_int = np.round(self._y).astype(np.int64)
         self._Z, self._sel_feature_names = _selection_design(
             Z, sel_formula, data, len(self._y)

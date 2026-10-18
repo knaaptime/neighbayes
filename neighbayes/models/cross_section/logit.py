@@ -15,6 +15,7 @@ import numpy as np
 import pytensor.tensor as pt
 
 from ..._lazy_deps import pm
+from .._design import discrete
 from ..base import SpatialModel
 from ..priors import SARLogitPriors
 
@@ -54,6 +55,8 @@ class Logit(SpatialModel):
           :math:`\beta`.  Default uses the Gelman et al. (2008)
           weakly-informative scale.
     """
+
+    _dispatch = classmethod(discrete)
 
     _priors_cls = SARLogitPriors
     _spatial_params: tuple[str, ...] = ()

@@ -1,14 +1,14 @@
-from ._hurdle import SARHurdleNBFlowSeparable, SARHurdleNBFlowSeparablePanel
+from ._hurdle import SARHurdleNegBinFlowSeparable, SARHurdleNegBinFlowSeparablePanelRE
 from ._panel import (
     FlowPanelModel,
-    NegBinFlowPanel,
-    OLSFlowPanel,
-    SARFlowPanel,
-    SARFlowSeparablePanel,
-    SARNegBinFlowPanel,
-    SARNegBinFlowSeparablePanel,
+    NegBinFlowPanelRE,
+    OLSFlowPanelFE,
+    SARFlowPanelFE,
+    SARFlowSeparablePanelFE,
+    SARNegBinFlowPanelRE,
+    SARNegBinFlowSeparablePanelRE,
     SARZINBFlowSeparable,
-    SARZINBFlowSeparablePanel,
-    SEMFlowPanel,
-    SEMFlowSeparablePanel,
+    SARZINBFlowSeparablePanelRE,
+    SEMFlowPanelFE,
+    SEMFlowSeparablePanelFE,
 )

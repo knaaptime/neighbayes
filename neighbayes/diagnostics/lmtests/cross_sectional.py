@@ -1422,7 +1422,7 @@ def bayesian_lm_error_sdm_test(
 ) -> BayesianLMTestResult:
     r"""Bayesian LM-Error test from an SDM posterior (H₀: λ = 0 | SDM).
 
-    Tests whether an SDM model should be extended to a MANSAR (Manski)
+    Tests whether an SDM model should be extended to a general nesting spatial (GNS)
     model that adds a spatially correlated error term. Residuals are
     computed using the SDM mean structure including the spatial lag of
     ``y``:
@@ -1466,7 +1466,7 @@ def bayesian_lm_lag_sdem_test(
 ) -> BayesianLMTestResult:
     r"""Bayesian LM-Lag test from an SDEM posterior (H₀: ρ = 0 | SDEM).
 
-    Tests whether an SDEM model should be extended to MANSAR by adding a
+    Tests whether an SDEM model should be extended to GNS by adding a
     spatial lag of ``y``. Residuals are the spatially filtered SDEM
     residuals:
 
@@ -1846,7 +1846,7 @@ def bayesian_robust_lm_error_sdm_test(
 ) -> BayesianLMTestResult:
     r"""Bayesian robust LM-Error test in SDM context (H₀: λ = 0 | SDM).
 
-    Tests whether a SDM fit should be extended to MANSAR by adding a
+    Tests whether a SDM fit should be extended to GNS by adding a
     spatial-error process, robust to the SDM lag parameter
     :math:`\rho`.  The WX coefficients :math:`\gamma` are already in the
     SDM mean structure and are absorbed via the
@@ -2233,7 +2233,7 @@ def bayesian_robust_lm_lag_sdem_test(
 ) -> BayesianLMTestResult:
     r"""Bayesian robust LM-Lag test in SDEM context (H₀: ρ = 0 | SDEM).
 
-    Tests whether a SDEM fit should be extended to MANSAR by adding a
+    Tests whether a SDEM fit should be extended to GNS by adding a
     spatial lag, with the WX block already absorbed in the SDEM mean
     structure and the SDEM error parameter :math:`\lambda` absorbed via a
     posterior-mean filter

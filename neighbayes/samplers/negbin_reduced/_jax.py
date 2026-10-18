@@ -572,7 +572,7 @@ def _make_reduced_gibbs_step(
         where ``state`` is a dict with keys ``beta``, ``rho``, ``alpha``,
         ``omega``, ``V_stack``, ``rho_basis``; ``key`` is a JAX PRNG key;
         ``slice_width`` is the ρ slice's stepping-out width; ``eta`` is the
-        fitted latent field at the new state; and ``rho_steps`` is the
+        fitted latent index at the new state; and ``rho_steps`` is the
         ``(left, right)`` pair of step-out counts from the ρ slice.
     """
     import jax
@@ -811,7 +811,7 @@ def _sample_alpha_jax_reduced(eta, y_jax, alpha_current, alpha_sigma, alpha_nu, 
     Parameters
     ----------
     eta : jax.numpy.ndarray
-        Current latent field (n,).
+        Current latent index (n,).
     y_jax : jax.numpy.ndarray
         Integer response vector.
     alpha_current : jax.numpy.ndarray

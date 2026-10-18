@@ -18,7 +18,7 @@ adaptive slice sampler), differing only in the Pólya–Gamma augmentation:
   (no ``log α`` offset);
 * there is **no dispersion parameter α** (hence no α slice).
 
-Contrast with :mod:`..logit` (structural latent-field SAR/SEM-logit).
+Contrast with :mod:`..logit` (the SAR and SEM logit with random effects).
 """
 
 from __future__ import annotations

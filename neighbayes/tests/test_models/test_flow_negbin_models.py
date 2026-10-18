@@ -10,22 +10,22 @@ from neighbayes.models.flow._flow import (
     SARNegBinFlowSeparable,
 )
 from neighbayes.models.flow_panel._panel import (
-    NegBinFlowPanel,
-    SARNegBinFlowPanel,
-    SARNegBinFlowSeparablePanel,
+    NegBinFlowPanelRE,
+    SARNegBinFlowPanelRE,
+    SARNegBinFlowSeparablePanelRE,
 )
 
 
 def _small_negbin_flow(seed: int = 0):
-    from neighbayes.dgp.flows import generate_negbin_flow_data
+    from neighbayes.dgp.flows import simulate_sar_negbin_flow
 
-    return generate_negbin_flow_data(n=6, seed=seed)
+    return simulate_sar_negbin_flow(n=6, seed=seed)
 
 
 def _small_panel_negbin_flow(seed: int = 0):
-    from neighbayes.dgp.flows import generate_panel_negbin_flow_data
+    from neighbayes.dgp.flows import simulate_sar_negbin_flow_panel_re
 
-    return generate_panel_negbin_flow_data(n=5, T=3, seed=seed)
+    return simulate_sar_negbin_flow_panel_re(n=5, T=3, seed=seed)
 
 
 class TestNegativeBinomialFlowConstruction:
@@ -42,10 +42,11 @@ class TestNegativeBinomialFlowConstruction:
 
     def test_negbin_sar_flow_separable_builds(self):
         data = _small_negbin_flow(seed=2)
-        model = SARNegBinFlowSeparable(
+        model = SARNegBinFlow(
             data["y_vec"],
             data["X"],
             data["G"],
+            separable=True,
             col_names=data["col_names"],
         )
         pm_model = model._build_pymc_model()
@@ -66,39 +67,37 @@ class TestNegativeBinomialFlowConstruction:
 class TestNegativeBinomialPanelFlowConstruction:
     def test_negbin_panel_builds(self):
         data = _small_panel_negbin_flow(seed=4)
-        model = SARNegBinFlowPanel(
+        model = SARNegBinFlow(
             y=data["y"],
             W=data["G"],
             X=data["X"],
             T=3,
             col_names=data["col_names"],
-            effects=0,
         )
         pm_model = model._build_pymc_model()
         assert "alpha" in pm_model.named_vars
 
     def test_negbin_panel_separable_builds(self):
         data = _small_panel_negbin_flow(seed=5)
-        model = SARNegBinFlowSeparablePanel(
+        model = SARNegBinFlow(
+            separable=True,
             y=data["y"],
             W=data["G"],
             X=data["X"],
             T=3,
             col_names=data["col_names"],
-            effects=0,
         )
         pm_model = model._build_pymc_model()
         assert "alpha" in pm_model.named_vars
 
     def test_negbin_panel_aspatial_builds(self):
         data = _small_panel_negbin_flow(seed=6)
-        model = NegBinFlowPanel(
+        model = NegBinFlow(
             y=data["y"],
             W=data["G"],
             X=data["X"],
             T=3,
             col_names=data["col_names"],
-            effects=0,
         )
         pm_model = model._build_pymc_model()
         assert "alpha" in pm_model.named_vars
@@ -106,13 +105,14 @@ class TestNegativeBinomialPanelFlowConstruction:
     def test_negbin_panel_pair_effects_build(self):
         """Pair effects are pooled parameters (see test_count_panel_fe.py), not demeaning."""
         data = _small_panel_negbin_flow(seed=7)
-        model = SARNegBinFlowPanel(
+        model = SARNegBinFlow(
+            pair_effects="random",
+            time_effects=True,
             y=data["y"],
             W=data["G"],
             X=data["X"],
             T=3,
             col_names=data["col_names"],
-            effects=3,
         )
         assert list(model._feature_names) == list(data["col_names"])
         pm_model = model._build_pymc_model()
@@ -158,14 +158,14 @@ class TestNegativeBinomialFlowRecovery:
     """Parameter recovery checks for NB flow variants (deselected by default)."""
 
     def test_negbin_sar_flow_recovers_all_params(self):
-        from neighbayes.dgp.flows import generate_negbin_flow_data
+        from neighbayes.dgp.flows import simulate_sar_negbin_flow
 
         rho_d_true, rho_o_true, rho_w_true = 0.25, 0.2, 0.1
         beta_d_true, beta_o_true = [1.5, -0.8], [0.7, 1.2]
         gamma_dist_true = -0.5
         alpha_true = 2.0
 
-        out = generate_negbin_flow_data(
+        out = simulate_sar_negbin_flow(
             n=15,
             rho_d=rho_d_true,
             rho_o=rho_o_true,
@@ -212,14 +212,14 @@ class TestNegativeBinomialFlowRecovery:
         _check_beta_recovery(idata, beta_d_true, beta_o_true, gamma_dist_true)
 
     def test_negbin_sar_flow_separable_recovers_all_params(self):
-        from neighbayes.dgp.flows import generate_negbin_flow_data_separable
+        from neighbayes.dgp.flows import simulate_sar_negbin_flow_separable
 
         rho_d_true, rho_o_true = 0.4, 0.3
         beta_d_true, beta_o_true = [1.2, -0.6], [0.9, 1.1]
         gamma_dist_true = -0.5
         alpha_true = 1.8
 
-        out = generate_negbin_flow_data_separable(
+        out = simulate_sar_negbin_flow_separable(
             n=15,
             rho_d=rho_d_true,
             rho_o=rho_o_true,
@@ -229,10 +229,11 @@ class TestNegativeBinomialFlowRecovery:
             alpha=alpha_true,
             seed=43,
         )
-        model = SARNegBinFlowSeparable(
+        model = SARNegBinFlow(
             out["y_vec"],
             out["X"],
             out["G"],
+            separable=True,
             col_names=out["col_names"],
         )
         idata = model.fit(
@@ -268,14 +269,14 @@ class TestNegativeBinomialPanelFlowRecovery:
     """Parameter recovery checks for panel NB flow variants."""
 
     def test_negbin_panel_sar_recovers_all_params(self):
-        from neighbayes.dgp.flows import generate_panel_negbin_flow_data
+        from neighbayes.dgp.flows import simulate_sar_negbin_flow_panel_re
 
         rho_d_true, rho_o_true, rho_w_true = 0.25, 0.2, 0.1
         beta_d_true, beta_o_true = [1.4, -0.7], [0.8, 1.1]
         gamma_dist_true = -0.5
         alpha_true = 2.2
 
-        out = generate_panel_negbin_flow_data(
+        out = simulate_sar_negbin_flow_panel_re(
             n=7,
             T=5,
             rho_d=rho_d_true,
@@ -287,13 +288,12 @@ class TestNegativeBinomialPanelFlowRecovery:
             alpha=alpha_true,
             seed=44,
         )
-        model = SARNegBinFlowPanel(
+        model = SARNegBinFlow(
             y=out["y"],
             W=out["G"],
             X=out["X"],
             T=5,
             col_names=out["col_names"],
-            effects=0,
         )
         idata = model.fit(
             sampler="gibbs",
@@ -328,7 +328,7 @@ class TestNegativeBinomialPanelFlowRecovery:
         _check_beta_recovery(idata, beta_d_true, beta_o_true, gamma_dist_true)
 
     def test_negbin_panel_sar_separable_recovers_all_params(self):
-        from neighbayes.dgp.flows import generate_panel_negbin_flow_data_separable
+        from neighbayes.dgp.flows import simulate_sar_negbin_flow_separable_panel_re
 
         rho_d_true, rho_o_true = 0.4, 0.3
         beta_d_true, beta_o_true = [1.3, -0.5], [0.6, 1.0]
@@ -339,7 +339,7 @@ class TestNegativeBinomialPanelFlowRecovery:
         # mode (rho_o≈0 with beta_d absorbing the origin-side signal) that
         # beats the DGP truth in exact likelihood — the (rho_o, beta) split is
         # simply not identified there.
-        out = generate_panel_negbin_flow_data_separable(
+        out = simulate_sar_negbin_flow_separable_panel_re(
             n=10,
             T=6,
             rho_d=rho_d_true,
@@ -350,13 +350,13 @@ class TestNegativeBinomialPanelFlowRecovery:
             alpha=alpha_true,
             seed=45,
         )
-        model = SARNegBinFlowSeparablePanel(
+        model = SARNegBinFlow(
+            separable=True,
             y=out["y"],
             W=out["G"],
             X=out["X"],
             T=6,
             col_names=out["col_names"],
-            effects=0,
         )
         idata = model.fit(
             sampler="gibbs",
@@ -389,13 +389,13 @@ class TestNegBinFlowAspatialRecovery:
     """Recovery for the aspatial NegBinFlow (no spatial parameters)."""
 
     def test_negbin_flow_recovers_beta_and_alpha(self):
-        from neighbayes.dgp.flows import generate_negbin_flow_data
+        from neighbayes.dgp.flows import simulate_sar_negbin_flow
 
         beta_d_true, beta_o_true = [1.5, -0.8], [0.7, 1.2]
         gamma_dist_true = -0.5
         alpha_true = 2.0
 
-        out = generate_negbin_flow_data(
+        out = simulate_sar_negbin_flow(
             n=15,
             rho_d=0.0,
             rho_o=0.0,
@@ -430,16 +430,16 @@ class TestNegBinFlowAspatialRecovery:
 
 @pytest.mark.slow
 class TestNegBinFlowPanelAspatialRecovery:
-    """Recovery for the aspatial NegBinFlowPanel (no spatial parameters)."""
+    """Recovery for the aspatial NegBinFlowPanelRE (no spatial parameters)."""
 
     def test_negbin_flow_panel_recovers_beta_and_alpha(self):
-        from neighbayes.dgp.flows import generate_panel_negbin_flow_data
+        from neighbayes.dgp.flows import simulate_sar_negbin_flow_panel_re
 
         beta_d_true, beta_o_true = [1.4, -0.7], [0.8, 1.1]
         gamma_dist_true = -0.5
         alpha_true = 2.2
 
-        out = generate_panel_negbin_flow_data(
+        out = simulate_sar_negbin_flow_panel_re(
             n=7,
             T=5,
             rho_d=0.0,
@@ -451,13 +451,12 @@ class TestNegBinFlowPanelAspatialRecovery:
             alpha=alpha_true,
             seed=42,
         )
-        model = NegBinFlowPanel(
+        model = NegBinFlow(
             y=out["y"],
             W=out["G"],
             X=out["X"],
             T=5,
             col_names=out["col_names"],
-            effects=0,
         )
         idata = model.fit(
             draws=1500,
@@ -480,17 +479,19 @@ class TestFlowGibbsBackend:
     def test_public_fits_default_to_auto(self):
         import inspect
 
-        from neighbayes.models.flow_panel._hurdle import SARHurdleNBFlowSeparablePanel
-        from neighbayes.models.flow_panel._panel import SARZINBFlowSeparablePanel
+        from neighbayes.models.flow_panel._hurdle import (
+            SARHurdleNegBinFlowSeparablePanelRE,
+        )
+        from neighbayes.models.flow_panel._panel import SARZINBFlowSeparablePanelRE
 
         for cls in (
             SARNegBinFlow,
             SARNegBinFlowSeparable,
             NegBinFlow,
-            SARNegBinFlowPanel,
-            SARNegBinFlowSeparablePanel,
-            SARZINBFlowSeparablePanel,
-            SARHurdleNBFlowSeparablePanel,
+            SARNegBinFlowPanelRE,
+            SARNegBinFlowSeparablePanelRE,
+            SARZINBFlowSeparablePanelRE,
+            SARHurdleNegBinFlowSeparablePanelRE,
         ):
             default = inspect.signature(cls.fit).parameters["gibbs_backend"].default
             assert default == "auto", cls.__name__
@@ -513,7 +514,7 @@ class TestFlowGibbsBackend:
     def test_unrestricted_panel_auto_runs_numpy(self):
         """The unrestricted JAX kernel is cross-section only, so a panel stays NumPy."""
         data = _small_panel_negbin_flow(seed=5)
-        model = SARNegBinFlowPanel(
+        model = SARNegBinFlow(
             data["y"], data["X"], data["G"], T=3, col_names=data["col_names"]
         )
         assert (

@@ -30,19 +30,20 @@ from ..._lazy_deps import pm, xr
 from ..._ops import kron_solve_matrix
 from ...graph import _weights_to_csr
 from .._base._nb import nb_alpha_rv
+from .._design import FacadeMeta, flow
 from .._mixins._count_panel import pop_mundlak, require_counts
 from .._mixins._hurdle import HurdleMixin
 from ..priors import PanelHurdlePriors
 from ._panel import (
     FlowPanelModel,
-    SARFlowSeparablePanel,
+    SARFlowSeparablePanelFE,
     _pop_effects,
     _SeparableCountFlowPanel,
 )
 
 
-class SARHurdleNBFlowSeparablePanel(
-    HurdleMixin, _SeparableCountFlowPanel, SARFlowSeparablePanel
+class SARHurdleNegBinFlowSeparablePanelRE(
+    HurdleMixin, _SeparableCountFlowPanel, SARFlowSeparablePanelFE
 ):
     r"""Reduced-form separable SAR hurdle NB flow panel.
 
@@ -68,7 +69,7 @@ class SARHurdleNBFlowSeparablePanel(
     Parameters
     ----------
     y, X, W, T, col_names, k, priors, symmetric_xo_xd
-        As :class:`SARNegBinFlowSeparablePanel`.
+        As :class:`SARNegBinFlowSeparablePanelRE`.
     Z : array-like or pandas.DataFrame, optional
         Binary design, time-first stacked ``(n²·T, p)``.  Default: ``X`` (then
         binary flow effects are available).
@@ -449,10 +450,10 @@ class SARHurdleNBFlowSeparablePanel(
             self._effects_equation = "count"
 
 
-class SARHurdleNBFlowSeparable(SARHurdleNBFlowSeparablePanel):
+class SARHurdleNegBinFlowSeparable(SARHurdleNegBinFlowSeparablePanelRE):
     """Cross-sectional separable SAR hurdle NB flow model (one period).
 
-    :class:`SARHurdleNBFlowSeparablePanel` with ``T = 1`` and no
+    :class:`SARHurdleNegBinFlowSeparablePanelRE` with ``T = 1`` and no
     effects; see there for the model, sampling and arguments.  ``y`` is the
     ``n²`` flow vector (or the ``n × n`` matrix).
     """
@@ -460,8 +461,31 @@ class SARHurdleNBFlowSeparable(SARHurdleNBFlowSeparablePanel):
     def __init__(self, y, X, W, **kwargs):
         if _pop_effects(kwargs):
             raise ValueError(
-                "SARHurdleNBFlowSeparable is a cross-section; pair and period effects need "
-                "SARHurdleNBFlowSeparablePanel."
+                "SARHurdleNegBinFlowSeparable is a cross-section; pair and period effects need "
+                "SARHurdleNegBinFlowSeparablePanelRE."
             )
         kwargs.pop("T", None)
         super().__init__(y, X, W, T=1, **kwargs)
+
+
+class SARHurdleNegBinFlow(metaclass=FacadeMeta):
+    """Hurdle negative binomial flow model with SAR dependence.
+
+    Implemented as the separable flow only: pass ``separable=True``.  Pass
+    ``T`` for a flow panel, whose pair effects are random and time effects
+    fixed.
+
+    Parameters
+    ----------
+    separable : bool
+        Must be ``True``.
+    T : int, optional
+        Periods; omit (or ``1``) for a cross-section.
+    pair_effects : {None, "random"}, default None
+    time_effects : bool, default False
+    **kwargs
+        ``y``, ``X``, ``W``, the zero part's ``Z`` and ``W_sel``, ``priors``,
+        and ``logdet_method``.
+    """
+
+    _dispatch = classmethod(flow)

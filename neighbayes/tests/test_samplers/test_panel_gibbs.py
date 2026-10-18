@@ -13,6 +13,7 @@ import numpy as np
 import pytest
 import scipy.sparse as sp
 
+from neighbayes.models import SAR, SEM
 from neighbayes.tests.helpers import (
     PANEL_N,
     PANEL_T,
@@ -57,7 +58,7 @@ class TestPanelGibbsDispatch:
             beta=np.array([1.0, 2.0]),
             sigma=0.8,
         )
-        model = SARPanelFE(y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, effects=1)
+        model = SAR(unit_effects="fixed", y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T)
         idata = model.fit(
             sampler="gibbs",
             draws=50,
@@ -91,7 +92,7 @@ class TestPanelGibbsDispatch:
             beta=np.array([1.0, 2.0]),
             sigma=0.8,
         )
-        model = SEMPanelFE(y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, effects=1)
+        model = SEM(unit_effects="fixed", y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T)
         idata = model.fit(
             sampler="gibbs",
             draws=50,
@@ -124,7 +125,7 @@ class TestPanelGibbsDispatch:
             beta=np.array([1.0, 2.0]),
             sigma=0.8,
         )
-        model = SARPanelFE(y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, effects=1)
+        model = SAR(unit_effects="fixed", y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T)
         idata = model.fit(
             sampler="gibbs",
             draws=30,
@@ -151,7 +152,7 @@ class TestPanelGibbsDispatch:
             beta=np.array([1.0, 2.0]),
             sigma=0.8,
         )
-        model = SEMPanelFE(y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, effects=1)
+        model = SEM(unit_effects="fixed", y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T)
         idata = model.fit(
             sampler="gibbs",
             draws=30,
@@ -182,8 +183,8 @@ class TestPanelGibbsEdgeCases:
             beta=np.array([1.0, 2.0]),
             sigma=0.8,
         )
-        model = SARPanelFE(
-            y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, effects=1, robust=True
+        model = SAR(
+            unit_effects="fixed", y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, robust=True
         )
         idata = model.fit(
             sampler="gibbs",
@@ -211,8 +212,8 @@ class TestPanelGibbsEdgeCases:
             beta=np.array([1.0, 2.0]),
             sigma=0.8,
         )
-        model = SEMPanelFE(
-            y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, effects=1, robust=True
+        model = SEM(
+            unit_effects="fixed", y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, robust=True
         )
         idata = model.fit(
             sampler="gibbs",
@@ -240,7 +241,7 @@ class TestPanelGibbsEdgeCases:
             beta=np.array([1.0, 2.0]),
             sigma=0.8,
         )
-        model = SARPanelFE(y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, effects=1)
+        model = SAR(unit_effects="fixed", y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T)
         idata = model.fit(
             sampler="gibbs",
             draws=60,
@@ -269,7 +270,7 @@ class TestPanelGibbsEdgeCases:
             beta=np.array([1.0, 2.0]),
             sigma=0.8,
         )
-        model = SEMPanelFE(y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, effects=1)
+        model = SEM(unit_effects="fixed", y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T)
         idata = model.fit(
             sampler="gibbs",
             draws=60,
@@ -308,7 +309,7 @@ class TestPanelGibbsRecovery:
             beta=np.array([1.0, 2.0]),
             sigma=0.8,
         )
-        model = SARPanelFE(y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, effects=1)
+        model = SAR(unit_effects="fixed", y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T)
         idata = model.fit(
             sampler="gibbs",
             draws=500,
@@ -339,7 +340,7 @@ class TestPanelGibbsRecovery:
             beta=np.array([1.0, 2.0]),
             sigma=0.8,
         )
-        model = SEMPanelFE(y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, effects=1)
+        model = SEM(unit_effects="fixed", y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T)
         idata = model.fit(
             sampler="gibbs",
             draws=500,
@@ -375,7 +376,9 @@ class TestPanelGibbsVsNUTS:
             sigma=0.8,
         )
 
-        model_nuts = SARPanelFE(y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, effects=1)
+        model_nuts = SAR(
+            unit_effects="fixed", y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T
+        )
         idata_nuts = model_nuts.fit(
             sampler="nuts",
             draws=300,
@@ -386,7 +389,9 @@ class TestPanelGibbsVsNUTS:
             progressbar=False,
         )
 
-        model_gibbs = SARPanelFE(y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, effects=1)
+        model_gibbs = SAR(
+            unit_effects="fixed", y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T
+        )
         idata_gibbs = model_gibbs.fit(
             sampler="gibbs",
             draws=300,
@@ -426,7 +431,9 @@ class TestPanelGibbsVsNUTS:
             sigma=0.8,
         )
 
-        model_nuts = SEMPanelFE(y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, effects=1)
+        model_nuts = SEM(
+            unit_effects="fixed", y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T
+        )
         idata_nuts = model_nuts.fit(
             sampler="nuts",
             draws=300,
@@ -437,7 +444,9 @@ class TestPanelGibbsVsNUTS:
             progressbar=False,
         )
 
-        model_gibbs = SEMPanelFE(y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, effects=1)
+        model_gibbs = SEM(
+            unit_effects="fixed", y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T
+        )
         idata_gibbs = model_gibbs.fit(
             sampler="gibbs",
             draws=300,
@@ -486,7 +495,7 @@ class TestPanelGibbsJAX:
             beta=np.array([1.0, 2.0]),
             sigma=0.8,
         )
-        model = SARPanelFE(y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, effects=1)
+        model = SAR(unit_effects="fixed", y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T)
         idata = model.fit(
             sampler="gibbs",
             draws=30,
@@ -519,7 +528,7 @@ class TestPanelGibbsJAX:
             beta=np.array([1.0, 2.0]),
             sigma=0.8,
         )
-        model = SEMPanelFE(y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, effects=1)
+        model = SEM(unit_effects="fixed", y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T)
         idata = model.fit(
             sampler="gibbs",
             draws=30,
@@ -552,7 +561,7 @@ class TestPanelGibbsJAX:
             beta=np.array([1.0, 2.0]),
             sigma=0.8,
         )
-        model = SARPanelFE(y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, effects=1)
+        model = SAR(unit_effects="fixed", y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T)
         idata = model.fit(
             sampler="gibbs",
             draws=20,
@@ -581,7 +590,7 @@ class TestPanelGibbsJAX:
             beta=np.array([1.0, 2.0]),
             sigma=0.8,
         )
-        model = SEMPanelFE(y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, effects=1)
+        model = SEM(unit_effects="fixed", y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T)
         idata = model.fit(
             sampler="gibbs",
             draws=20,

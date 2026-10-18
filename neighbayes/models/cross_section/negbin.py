@@ -18,6 +18,7 @@ import pytensor.tensor as pt
 
 from ..._lazy_deps import pm
 from .._base._nb import nb_alpha_fixed, nb_alpha_rv
+from .._design import discrete
 from ..base import SpatialModel
 from ..priors import NegBinPriors
 
@@ -33,7 +34,7 @@ class NegBin(SpatialModel):
     NB2 parameterization: :math:`\mathrm{Var}(y_i) = \mu_i + \mu_i^2 / \alpha`.
     Sampled with NUTS.  ``W`` is optional and is used only by Bayesian
     LM diagnostics to assess whether a spatial count model
-    (e.g. :class:`neighbayes.models.SARNegBinStructural`) is warranted.
+    (e.g. :class:`neighbayes.models.SARNegBinRE`) is warranted.
 
     Parameters
     ----------
@@ -65,6 +66,8 @@ class NegBin(SpatialModel):
           :math:`\mathrm{Half\text{-}Student\text{-}t}` prior on
           :math:`\alpha`.
     """
+
+    _dispatch = classmethod(discrete)
 
     _priors_cls = NegBinPriors
     _spatial_params: tuple[str, ...] = ()
@@ -116,7 +119,7 @@ class NegBin(SpatialModel):
         raise NotImplementedError(
             "NegBin has no spatial structure and therefore no "
             "spatial effects. Use Bayesian LM diagnostics to assess whether "
-            "a spatial count model (e.g. SARNegBinStructural) is appropriate."
+            "a spatial count model (e.g. SARNegBinRE) is appropriate."
         )
 
     def _fitted_mean_from_posterior(self) -> np.ndarray:

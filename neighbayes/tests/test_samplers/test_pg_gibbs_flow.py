@@ -10,6 +10,7 @@ import pytest
 import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 
+from neighbayes.models import SARNegBinFlow
 from neighbayes.samplers.panel._kronecker import (
     kron_At_matvec,
     kron_eigenvalue_bounds,
@@ -156,9 +157,9 @@ class TestKronEigenvalueBounds:
 
 def _make_flow_data(n=5, k=2, seed=42):
     """Generate small NB flow dataset for testing."""
-    from neighbayes.dgp import generate_negbin_flow_data
+    from neighbayes.dgp import simulate_sar_negbin_flow
 
-    return generate_negbin_flow_data(
+    return simulate_sar_negbin_flow(
         n=n, k=k, rho_d=0.1, rho_o=0.1, rho_w=0.0, alpha=5.0, seed=seed
     )
 
@@ -247,10 +248,11 @@ class TestNegativeBinomialSARFlowSeparableGibbs:
         from neighbayes.models.flow._flow import SARNegBinFlowSeparable
 
         data = _make_flow_data()
-        model = SARNegBinFlowSeparable(
+        model = SARNegBinFlow(
             data["y_vec"],
             data["X"],
             data["G"],
+            separable=True,
             logdet_method="eigenvalue",
         )
         idata = model.fit(
@@ -272,10 +274,11 @@ class TestNegativeBinomialSARFlowSeparableGibbs:
         from neighbayes.models.flow._flow import SARNegBinFlowSeparable
 
         data = _make_flow_data()
-        model = SARNegBinFlowSeparable(
+        model = SARNegBinFlow(
             data["y_vec"],
             data["X"],
             data["G"],
+            separable=True,
             logdet_method="eigenvalue",
         )
         idata = model.fit(
@@ -296,10 +299,11 @@ class TestNegativeBinomialSARFlowSeparableGibbs:
         from neighbayes.models.flow._flow import SARNegBinFlowSeparable
 
         data = _make_flow_data()
-        model = SARNegBinFlowSeparable(
+        model = SARNegBinFlow(
             data["y_vec"],
             data["X"],
             data["G"],
+            separable=True,
             logdet_method="eigenvalue",
         )
         draws, chains = 30, 2
@@ -376,7 +380,7 @@ class TestNegativeBinomialSARFlowGibbs:
         from neighbayes.models.flow._flow import SARNegBinFlowSeparable
 
         data = _make_flow_data()
-        model = SARNegBinFlowSeparable(data["y_vec"], data["X"], data["G"])
+        model = SARNegBinFlow(data["y_vec"], data["X"], data["G"], separable=True)
         idata = model.fit(
             draws=10,
             tune=10,

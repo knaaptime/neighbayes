@@ -230,13 +230,13 @@ def test_jax_fits_do_not_warn():
 
     pytest.importorskip("pgjax")
     from neighbayes import dgp
-    from neighbayes.models import SARZINB, SARNegBinStructural
+    from neighbayes.models import SARZINB, SARNegBin
 
     d = dgp.simulate_sar_negbin(n_side=6, seed=3)
     dz = dgp.simulate_sar_zinb(n_side=6, seed=3)
     models = [
         _nb_model(),
-        SARNegBinStructural(y=d["y"], X=d["X"], W=d["W_sparse"]),
+        SARNegBin(unit_effects="random", y=d["y"], X=d["X"], W=d["W_sparse"]),
         SARZINB(y=dz["y"], X=dz["X"], W=dz["W_sparse"]),
     ]
     for model in models:

@@ -40,7 +40,7 @@ def test_cross_section_directed_resolves_aaa():
 
 
 def test_panel_directed_resolves_aaa():
-    from neighbayes.models import SARPanelFE
+    from neighbayes.models import SAR
 
     N, T = 600, 3
     rng = np.random.default_rng(0)
@@ -48,6 +48,6 @@ def test_panel_directed_resolves_aaa():
     X = np.column_stack([np.ones(N * T), rng.normal(size=N * T)])
     y = rng.normal(size=N * T)
 
-    model = SARPanelFE(y=y, X=X, W=W, N=N, T=T)
+    model = SAR(y=y, X=X, W=W, N=N, T=T)
     assert model._resolved_logdet_method == "aaa"
     assert model._logdet_bounds.method == "aaa"

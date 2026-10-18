@@ -267,8 +267,8 @@ def simulate_sar_negbin(
     When ``sigma2 = 0`` (the default), the DGP reduces to the
     deterministic reduced form :math:`\eta = (I - \rho W)^{-1} X\beta`,
     matching the :class:`SARNegBin` model specification.
-    When ``sigma2 > 0``, the structural-form noise is included,
-    matching the :class:`SARNegBinStructural` model specification.
+    When ``sigma2 > 0``, a normal random effect ν per unit is included,
+    matching the :class:`SARNegBinRE` model specification.
 
     Counts are sampled as NB2:
 
@@ -296,9 +296,9 @@ def simulate_sar_negbin(
     alpha : float, default 2.0
         NB2 dispersion parameter. Must be strictly positive.
     sigma2 : float, default 0.0
-        Structural-form residual variance. When 0, the DGP is
-        deterministic (no noise in the latent field). When > 0,
-        Gaussian noise is added to the structural form.
+        Variance of the random effects ν. When 0, the DGP is
+        deterministic (no random effects in the latent index). When > 0,
+        Gaussian noise is added to the latent log-mean.
     err_hetero : bool, default False
         Heteroskedastic errors (not yet implemented; ignored with a
         warning).

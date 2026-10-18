@@ -23,7 +23,7 @@ def _filter(W: sp.csr_matrix, coef: float, rhs: np.ndarray) -> np.ndarray:
     return splu(A).solve(rhs)
 
 
-def simulate_spatial_multilevel(
+def simulate_multilevel(
     n_side: int = 24,
     blocks: Sequence[int] = (4, 2),
     processes: Sequence[str] = ("lag", "lag", "lag"),
@@ -88,7 +88,7 @@ def simulate_spatial_multilevel(
     """
     if gdf is not None:
         raise NotImplementedError(
-            "simulate_spatial_multilevel builds nested grids; pass n_side."
+            "simulate_multilevel builds nested grids; pass n_side."
         )
     rng = ensure_rng(rng, seed)
     L = len(blocks)

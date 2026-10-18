@@ -22,7 +22,7 @@ current η draw.  The collapsed log-density is:
 where P_η = A_ρ^T A_ρ / σ² + diag(ω) and rhs = A_ρ^T Xβ / σ² + κ.
 
 **Backend dispatch**: The sampler supports three computational paths,
-selected via ``gibbs_method`` in :meth:`SARNegBinStructural.fit`:
+selected via ``gibbs_method`` in :meth:`SARNegBinRE.fit`:
 
 - ``"factorize"``: CHOLMOD/splu factorization (exact, O(nnz^{1.5})).
 - ``"iterative"``: CG + Lanczos + Chebyshev (approximate, avoids
@@ -86,7 +86,7 @@ class GibbsState:
     For the JAX-dense path, use :class:`JAXGibbsState` instead.
     """
 
-    eta: np.ndarray  # (n,) latent field
+    eta: np.ndarray  # (n,) latent index
     beta: np.ndarray  # (k,) regression coefficients
     sigma2: float  # residual variance σ²
     rho: float  # spatial autoregressive parameter
@@ -241,7 +241,7 @@ def _sample_omega(
     alpha : float
         NB dispersion parameter.
     eta : ndarray of shape (n,)
-        Current latent field.
+        Current latent index.
     rng : numpy.random.Generator
         Random state.
 
@@ -295,7 +295,7 @@ def _sample_eta(
     Returns
     -------
     eta_new : ndarray of shape (n,)
-        New draw of the latent field.
+        New draw of the latent index.
     factor : CholmodFactor
         Factorisation (for potential reuse within the sweep).
     """
@@ -1122,7 +1122,7 @@ def run_chain(
     thin : int, default 1
         Keep every ``thin``-th draw after warmup.
     return_eta : bool, default False
-        If True, store the full latent field η in the posterior.
+        If True, store the latent index η in the posterior.
     rng : numpy.random.Generator, optional
         Random state. If None, a fresh generator is created.
 

@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 from scipy import stats
 
-from neighbayes.models import SARPanelRE
+from neighbayes.models import SAR
 from neighbayes.models.priors import REGibbsPriors
 from neighbayes.samplers.panel._re_core import _sample_sigma_alpha2
 from neighbayes.tests.helpers import (
@@ -51,7 +51,8 @@ def test_old_half_normal_key_is_rejected():
         np.random.default_rng(0), W, PANEL_N, PANEL_T, rho=0.3
     )
     with pytest.raises(TypeError, match="sigma_alpha_sigma"):
-        SARPanelRE(
+        SAR(
+            unit_effects="random",
             y=y,
             X=X,
             W=W_to_graph(W),
@@ -73,7 +74,7 @@ def test_nuts_and_gibbs_share_the_posterior():
     )
     kw = dict(draws=3000, tune=1500, chains=4, random_seed=7, progressbar=False)
     fits = {
-        sampler: SARPanelRE(y=y, X=X, W=W_to_graph(W), N=N, T=T).fit(
+        sampler: SAR(unit_effects="random", y=y, X=X, W=W_to_graph(W), N=N, T=T).fit(
             sampler=sampler, **kw
         )
         for sampler in ("nuts", "gibbs")

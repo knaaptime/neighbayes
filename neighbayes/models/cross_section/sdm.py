@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from .._design import gaussian
 from .._mixins import GaussianLikelihoodMixin, GaussianPredictionMixin
 from ..base import SpatialModel
 from ..priors import SDMPriors
@@ -141,6 +142,8 @@ class SDM(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     (default 4, LeSage's ``rval``); larger values approach the Normal.  Values
     must exceed 2 so the variance exists.
     """
+
+    _dispatch = classmethod(gaussian)
 
     _priors_cls = SDMPriors
     _spatial_params: tuple[str, ...] = ("rho",)

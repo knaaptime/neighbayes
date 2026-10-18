@@ -9,7 +9,7 @@ Target posterior
     \eta = (I - \rho W)^{-1} X \beta.
 
 Parameters are :math:`(\beta, \rho, \alpha)`.  Unlike
-:mod:`neighbayes.samplers.negbin`, the latent field :math:`\eta` is a
+:mod:`neighbayes.samplers.negbin`, the latent index :math:`\eta` is a
 *deterministic* function of :math:`(\beta, \rho)` — there is no
 :math:`\sigma`-noise term and no n-dimensional augmentation step.
 

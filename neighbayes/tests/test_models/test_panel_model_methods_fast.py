@@ -11,14 +11,7 @@ import pytest
 import xarray as xr
 from libpysal.graph import Graph
 
-from neighbayes.models import (
-    OLSPanelFE,
-    SARPanelFE,
-    SDEMPanelFE,
-    SDMPanelFE,
-    SEMPanelFE,
-    SLXPanelFE,
-)
+from neighbayes.models import OLS, SAR, SDEM, SDM, SEM, SLX
 from neighbayes.models.panel_base import SpatialPanelModel
 from neighbayes.tests.helpers import W_to_graph, make_line_W
 
@@ -49,12 +42,12 @@ def test_panel_fe_build_pymc_models():
     y, X, W, N, T = _panel_data()
 
     models = [
-        OLSPanelFE(y=y, X=X, W=W, N=N, T=T, effects=1),
-        SARPanelFE(y=y, X=X, W=W, N=N, T=T, effects=1),
-        SEMPanelFE(y=y, X=X, W=W, N=N, T=T, effects=1),
-        SDMPanelFE(y=y, X=X, W=W, N=N, T=T, effects=1),
-        SDEMPanelFE(y=y, X=X, W=W, N=N, T=T, effects=1),
-        SLXPanelFE(y=y, X=X, W=W, N=N, T=T, effects=1),
+        OLS(unit_effects="fixed", y=y, X=X, W=W, N=N, T=T),
+        SAR(unit_effects="fixed", y=y, X=X, W=W, N=N, T=T),
+        SEM(unit_effects="fixed", y=y, X=X, W=W, N=N, T=T),
+        SDM(unit_effects="fixed", y=y, X=X, W=W, N=N, T=T),
+        SDEM(unit_effects="fixed", y=y, X=X, W=W, N=N, T=T),
+        SLX(unit_effects="fixed", y=y, X=X, W=W, N=N, T=T),
     ]
 
     for model in models:
@@ -70,10 +63,10 @@ def test_panel_fe_fitted_values_and_effects_with_mock_posteriors():
     beta_1 = np.array([0.9])  # slope only (intercept dropped)
     beta_2_fe = np.array([0.9, 0.15])  # slope + WX (intercept dropped)
 
-    ols = OLSPanelFE(y=y, X=X, W=W, N=N, T=T, effects=1)
+    ols = OLS(unit_effects="fixed", y=y, X=X, W=W, N=N, T=T)
     ols._idata = _idata({"beta": np.stack([beta_1, beta_1 + 1e-3])})
 
-    sar = SARPanelFE(y=y, X=X, W=W, N=N, T=T, effects=1)
+    sar = SAR(unit_effects="fixed", y=y, X=X, W=W, N=N, T=T)
     sar._idata = _idata(
         {
             "beta": np.stack([beta_1, beta_1 + 1e-3]),
@@ -81,7 +74,7 @@ def test_panel_fe_fitted_values_and_effects_with_mock_posteriors():
         }
     )
 
-    sem = SEMPanelFE(y=y, X=X, W=W, N=N, T=T, effects=1)
+    sem = SEM(unit_effects="fixed", y=y, X=X, W=W, N=N, T=T)
     sem._idata = _idata(
         {
             "beta": np.stack([beta_1, beta_1 + 1e-3]),
@@ -89,7 +82,7 @@ def test_panel_fe_fitted_values_and_effects_with_mock_posteriors():
         }
     )
 
-    sdm = SDMPanelFE(y=y, X=X, W=W, N=N, T=T, effects=1)
+    sdm = SDM(unit_effects="fixed", y=y, X=X, W=W, N=N, T=T)
     sdm._idata = _idata(
         {
             "beta": np.stack([beta_2_fe, beta_2_fe + 1e-3]),
@@ -97,7 +90,7 @@ def test_panel_fe_fitted_values_and_effects_with_mock_posteriors():
         }
     )
 
-    sdem = SDEMPanelFE(y=y, X=X, W=W, N=N, T=T, effects=1)
+    sdem = SDEM(unit_effects="fixed", y=y, X=X, W=W, N=N, T=T)
     sdem._idata = _idata(
         {
             "beta": np.stack([beta_2_fe, beta_2_fe + 1e-3]),
@@ -105,7 +98,7 @@ def test_panel_fe_fitted_values_and_effects_with_mock_posteriors():
         }
     )
 
-    slx = SLXPanelFE(y=y, X=X, W=W, N=N, T=T, effects=1)
+    slx = SLX(unit_effects="fixed", y=y, X=X, W=W, N=N, T=T)
     slx._idata = _idata(
         {
             "beta": np.stack([beta_2_fe, beta_2_fe + 1e-3]),
@@ -144,7 +137,7 @@ def test_panel_fe_spatial_effects_accept_numeric_row_standardized_graph_without_
 
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
-        model = SDMPanelFE(y=y, X=X, W=W, N=N, T=T, effects=1)
+        model = SDM(unit_effects="fixed", y=y, X=X, W=W, N=N, T=T)
 
     model._idata = _idata(
         {
@@ -176,14 +169,14 @@ def test_panel_fe_warns_on_non_row_standardized_graph_without_transform():
     assert getattr(W, "transformation", None) == "O"
 
     with pytest.warns(UserWarning, match="row-standardized"):
-        model = OLSPanelFE(y=y, X=X, W=W, N=N, T=T, effects=1)
+        model = OLS(unit_effects="fixed", y=y, X=X, W=W, N=N, T=T)
 
     assert model._is_row_std is False
 
 
 def test_sem_panel_fe_fit_adds_log_likelihood_when_missing(monkeypatch):
     y, X, W, N, T = _panel_data(seed=62)
-    model = SEMPanelFE(y=y, X=X, W=W, N=N, T=T, effects=1)
+    model = SEM(unit_effects="fixed", y=y, X=X, W=W, N=N, T=T)
 
     posterior = {
         "lam": np.array([[0.1, 0.11]]),
@@ -209,7 +202,7 @@ def test_sem_panel_fe_fit_adds_log_likelihood_when_missing(monkeypatch):
 
 def test_sem_panel_fe_fit_returns_early_when_log_likelihood_exists(monkeypatch):
     y, X, W, N, T = _panel_data(seed=63)
-    model = SEMPanelFE(y=y, X=X, W=W, N=N, T=T, effects=1)
+    model = SEM(unit_effects="fixed", y=y, X=X, W=W, N=N, T=T)
 
     n = y.shape[0]
     fake_idata = az.from_dict(
@@ -240,7 +233,7 @@ def test_sem_panel_fe_fit_returns_early_when_log_likelihood_exists(monkeypatch):
 
 def test_sdem_panel_fe_fit_adds_log_likelihood_when_missing(monkeypatch):
     y, X, W, N, T = _panel_data(seed=64)
-    model = SDEMPanelFE(y=y, X=X, W=W, N=N, T=T, effects=1)
+    model = SDEM(unit_effects="fixed", y=y, X=X, W=W, N=N, T=T)
 
     posterior = {
         "lam": np.array([[0.1, 0.11]]),
@@ -267,7 +260,7 @@ def test_sdem_panel_fe_fit_adds_log_likelihood_when_missing(monkeypatch):
 def test_sar_panel_fe_fit_applies_jacobian_when_loglik_requested(monkeypatch):
     """Jacobian correction should run when log_likelihood is requested."""
     y, X, W, N, T = _panel_data(seed=67)
-    model = SARPanelFE(y=y, X=X, W=W, N=N, T=T, effects=1)
+    model = SAR(unit_effects="fixed", y=y, X=X, W=W, N=N, T=T)
 
     n = y.shape[0]
     fake_idata = az.from_dict(

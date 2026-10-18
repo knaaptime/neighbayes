@@ -22,7 +22,7 @@ def _flow_score_info(model, *, restrict_keys=("d", "o", "w"), T: int | None = No
 
     Parameters
     ----------
-    model : OLSFlow or OLSFlowPanel
+    model : OLSFlow or OLSFlowPanelFE
         Fitted flow model providing ``inference_data`` (with ``beta`` and
         ``sigma`` posterior draws), the cached spatial lags
         ``_Wd_y``/``_Wo_y``/``_Ww_y``, the cached trace matrix

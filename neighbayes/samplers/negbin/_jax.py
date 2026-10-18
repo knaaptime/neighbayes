@@ -551,7 +551,7 @@ def _jax_nb_log_density_alpha(log_a, y_jax, eta, alpha_sigma, alpha_nu):
     y_jax : jax.numpy.ndarray
         Integer response vector.
     eta : jax.numpy.ndarray
-        Current latent field.
+        Current latent index.
     alpha_sigma : float
         Prior scale for α.
 
@@ -844,7 +844,7 @@ def run_chain_jax(
     thin : int
         Keep every thin-th draw.
     return_eta : bool
-        If True, store the full latent field η.
+        If True, store the latent index η.
     rng : numpy.random.Generator, optional
         Random state.
     pg_n_terms : int
@@ -1047,7 +1047,7 @@ def run_chains_jax_vectorized(
     Parameters mirror :func:`run_chain_jax`, except ``init`` is replaced
     by a list of per-chain initial states and ``return_eta`` is not
     supported (use the per-chain :func:`run_chain_jax` if you need the
-    full latent field stored).
+    latent index stored).
 
     Returns
     -------
@@ -1124,7 +1124,7 @@ def run_chains_jax_vectorized(
 
         return _sweep
 
-    _sweep = cached_sweep(("sar_negbin_structural", *static), _build)
+    _sweep = cached_sweep(("sar_negbin_re", *static), _build)
 
     with GibbsProgressBarManager(
         chains=chains,

@@ -1,4 +1,4 @@
-"""Pólya–Gamma Gibbs sampler for structural-form SAR-logit.
+"""Pólya–Gamma Gibbs sampler for the SAR logit with random effects.
 
 Orchestrates the 4-block Gibbs sweep:
   1. ω | η          (PG augmentation, h = 1)
@@ -6,7 +6,7 @@ Orchestrates the 4-block Gibbs sweep:
   3. β | η, ρ      (conjugate normal, σ² = 1)
   4. ρ | β, ω, y   (collapsed 1-D slice, η integrated out)
 
-The structural form parameterizes the latent log-odds as
+The model parameterizes the latent log-odds as
 ``η = ρ W η + X β + ν`` with ``ν ~ N(0, I)``, and augments the
 logistic likelihood with Pólya–Gamma auxiliary variables to obtain
 fully conjugate Gibbs updates for η and β.
@@ -712,7 +712,7 @@ def run_chain(
     thin : int
         Keep every thin-th draw.
     return_eta : bool
-        If True, store the full latent field η.
+        If True, store the latent index η.
     rng : numpy.random.Generator, optional
         Random state.
 
@@ -804,7 +804,7 @@ def run_chain(
 # SEM-logit Gibbs sampler
 # ===========================================================================
 #
-# Structural form:  y_i ~ Bernoulli(logit⁻¹(η_i))
+# SEM logit with random effects:  y_i ~ Bernoulli(logit⁻¹(η_i))
 #   η = Xβ + u,  u = λWu + ν,  ν ~ N(0, I)
 #
 # Reduced form:  η = Xβ + (I - λW)⁻¹ν
@@ -1503,7 +1503,7 @@ def run_chain_sem(
     thin : int
         Keep every thin-th draw.
     return_eta : bool
-        If True, store the full latent field η.
+        If True, store the latent index η.
     rng : numpy.random.Generator, optional
         Random state.
 

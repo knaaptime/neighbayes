@@ -513,7 +513,7 @@ def run_chain_jax(
     thin : int
         Keep every thin-th draw.
     return_eta : bool
-        If True, store the full latent field η.
+        If True, store the latent index η.
     rng : numpy.random.Generator, optional
         Random state.
     pg_n_terms : int
@@ -953,7 +953,7 @@ def run_chain_jax_sem(
     thin : int
         Keep every thin-th draw.
     return_eta : bool
-        If True, store the full latent field η.
+        If True, store the latent index η.
     rng : numpy.random.Generator, optional
         Random state.
     pg_n_terms : int
@@ -1242,7 +1242,7 @@ def run_chains_jax_vectorized(
     draw_keys = jax.random.split(jax.random.fold_in(master_key, 1), chains)
 
     _sweep = _cached_logit_sweep(
-        "sar_logit_structural", _make_logit_step, "rho", n, k, logdet_params,
+        "sar_logit_re", _make_logit_step, "rho", n, k, logdet_params,
         sparsax_pattern is not None, krylov_degree, krylov_dmax, store_log_lik,
     )  # fmt: skip
 

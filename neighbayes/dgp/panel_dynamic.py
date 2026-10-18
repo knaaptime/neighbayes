@@ -1,6 +1,6 @@
 """Dynamic panel DGP functions.
 
-The :func:`simulate_panel_sdmu_fe` (Spatial Durbin, Unrestricted) generator
+The :func:`simulate_sdm_panel_dynamic` (Spatial Durbin, Unrestricted) generator
 is the most general lag-on-y dynamic panel DGP in this module: it allows
 free coefficients on ``W y_t``, ``y_{t-1}``, and ``W y_{t-1}``. Other
 lag-on-y wrappers nest under it via parameter restrictions:
@@ -8,19 +8,19 @@ lag-on-y wrappers nest under it via parameter restrictions:
 ==========================================  ============  ==============  ==========
 Wrapper                                     :math:`\\rho`     :math:`\\phi`        :math:`\\theta`
 ==========================================  ============  ==============  ==========
-``simulate_panel_dlm_fe``                   0             free            0
-``simulate_panel_slx_dynamic_fe``           0             free            0
-``simulate_panel_sar_dynamic_fe``           free          free            0
-``simulate_panel_sdmr_fe``                  free          free            :math:`-\\rho\\phi`
-``simulate_panel_sdmu_fe``                  free          free            free
+``simulate_ols_panel_dynamic``                   0             free            0
+``simulate_slx_panel_dynamic``           0             free            0
+``simulate_sar_panel_dynamic``           free          free            0
+``simulate_sdm_panel_dynamic_restricted``                  free          free            :math:`-\\rho\\phi`
+``simulate_sdm_panel_dynamic``                  free          free            free
 ==========================================  ============  ==============  ==========
 
-For the lag-on-error branch, :func:`simulate_panel_sdem_dynamic_fe` is the
-core; :func:`simulate_panel_sem_dynamic_fe` calls it with the same
+For the lag-on-error branch, :func:`simulate_sdem_panel_dynamic` is the
+core; :func:`simulate_sem_panel_dynamic` calls it with the same
 algebra (the two functions share the underlying DGP today).
 
-Note: the existing implementations of ``simulate_panel_slx_dynamic_fe``
-and ``simulate_panel_sdem_dynamic_fe`` do not add an explicit ``W X_t
+Note: the existing implementations of ``simulate_slx_panel_dynamic``
+and ``simulate_sdem_panel_dynamic`` do not add an explicit ``W X_t
 theta`` term to the data equation; this preserves their pre-refactor
 behavior. See the module-level discussion in the neighbayes docs for
 the exact form.
@@ -42,7 +42,7 @@ from .utils import (
 )
 
 
-def _simulate_panel_sdmu_fe_core(
+def _simulate_sdm_panel_dynamic_core(
     *,
     N: int,
     T: int,
@@ -86,7 +86,7 @@ def _simulate_panel_sdmu_fe_core(
     return _panel_finalize(y_list, X_list, N, T)
 
 
-def _simulate_panel_sdem_dynamic_fe_core(
+def _simulate_sdem_panel_dynamic_core(
     *,
     N: int,
     T: int,
@@ -103,8 +103,8 @@ def _simulate_panel_sdem_dynamic_fe_core(
 
     ``y_t = phi y_{t-1} + X_t beta + alpha + u_t,  u_t = (I - lam W)^-1 eps_t``.
 
-    Both :func:`simulate_panel_sem_dynamic_fe` and
-    :func:`simulate_panel_sdem_dynamic_fe` route through this kernel.
+    Both :func:`simulate_sem_panel_dynamic` and
+    :func:`simulate_sdem_panel_dynamic` route through this kernel.
     """
     use_solve = lam != 0.0
     solve = spatial_filter_factor(Ws, lam) if use_solve else None
@@ -139,13 +139,13 @@ def _resolve_panel_weights(W, gdf, contiguity, N):
     return Ws, Wg
 
 
-def simulate_panel_dlm_fe(
+def simulate_ols_panel_dynamic(
     N: int,
     T: int,
     phi: float = 0.4,
     beta: np.ndarray | None = None,
     sigma: float = 1.0,
-    sigma_alpha: float = 0.5,
+    sigma_alpha: float = 0.0,
     err_hetero: bool = False,
     rng: np.random.Generator | None = None,
     seed: int | None = None,
@@ -160,12 +160,12 @@ def simulate_panel_dlm_fe(
 
     DGP: ``y_t = phi y_{t-1} + X_t beta + alpha + eps_t``.
 
-    Equivalent to :func:`simulate_panel_sdmu_fe` with ``rho=0`` and ``theta=0``.
+    Equivalent to :func:`simulate_sdm_panel_dynamic` with ``rho=0`` and ``theta=0``.
     """
     rng = ensure_rng(rng, seed)
     Ws, Wg = _resolve_panel_weights(W, gdf, contiguity, N)
     beta = _coerce_beta(beta)
-    y, X, idx = _simulate_panel_sdmu_fe_core(
+    y, X, idx = _simulate_sdm_panel_dynamic_core(
         N=N,
         T=T,
         Ws=Ws,
@@ -199,14 +199,14 @@ def simulate_panel_dlm_fe(
     )
 
 
-def simulate_panel_sdmr_fe(
+def simulate_sdm_panel_dynamic_restricted(
     N: int,
     T: int,
     rho: float = 0.3,
     phi: float = 0.4,
     beta: np.ndarray | None = None,
     sigma: float = 1.0,
-    sigma_alpha: float = 0.5,
+    sigma_alpha: float = 0.0,
     err_hetero: bool = False,
     rng: np.random.Generator | None = None,
     seed: int | None = None,
@@ -222,12 +222,12 @@ def simulate_panel_sdmr_fe(
     DGP:
     ``y_t = rho W y_t + phi y_{t-1} - rho phi W y_{t-1} + X_t beta + alpha + eps_t``.
 
-    Equivalent to :func:`simulate_panel_sdmu_fe` with ``theta = -rho * phi``.
+    Equivalent to :func:`simulate_sdm_panel_dynamic` with ``theta = -rho * phi``.
     """
     rng = ensure_rng(rng, seed)
     Ws, Wg = _resolve_panel_weights(W, gdf, contiguity, N)
     beta = _coerce_beta(beta)
-    y, X, idx = _simulate_panel_sdmu_fe_core(
+    y, X, idx = _simulate_sdm_panel_dynamic_core(
         N=N,
         T=T,
         Ws=Ws,
@@ -262,7 +262,7 @@ def simulate_panel_sdmr_fe(
     )
 
 
-def simulate_panel_sdmu_fe(
+def simulate_sdm_panel_dynamic(
     N: int,
     T: int,
     rho: float = 0.3,
@@ -270,7 +270,7 @@ def simulate_panel_sdmu_fe(
     theta: float = -0.1,
     beta: np.ndarray | None = None,
     sigma: float = 1.0,
-    sigma_alpha: float = 0.5,
+    sigma_alpha: float = 0.0,
     err_hetero: bool = False,
     rng: np.random.Generator | None = None,
     seed: int | None = None,
@@ -286,14 +286,15 @@ def simulate_panel_sdmu_fe(
     DGP:
     ``y_t = rho W y_t + phi y_{t-1} + theta W y_{t-1} + X_t beta + alpha + eps_t``.
 
-    This is the most general lag-on-y dynamic panel-FE DGP; the other
-    dynamic generators in this module (``dlm_fe``, ``sar_dynamic_fe``,
-    ``slx_dynamic_fe``, ``sdmr_fe``) are wrappers around this kernel.
+    This is the most general lag-on-y dynamic panel DGP; the other
+    dynamic simulators in this module (``simulate_ols_panel_dynamic``,
+    ``simulate_sar_panel_dynamic``, ``simulate_slx_panel_dynamic``,
+    ``simulate_sdm_panel_dynamic_restricted``) are wrappers around this kernel.
     """
     rng = ensure_rng(rng, seed)
     Ws, Wg = _resolve_panel_weights(W, gdf, contiguity, N)
     beta = _coerce_beta(beta)
-    y, X, idx = _simulate_panel_sdmu_fe_core(
+    y, X, idx = _simulate_sdm_panel_dynamic_core(
         N=N,
         T=T,
         Ws=Ws,
@@ -329,14 +330,14 @@ def simulate_panel_sdmu_fe(
     )
 
 
-def simulate_panel_sar_dynamic_fe(
+def simulate_sar_panel_dynamic(
     N: int,
     T: int,
     rho: float = 0.3,
     phi: float = 0.4,
     beta: np.ndarray | None = None,
     sigma: float = 1.0,
-    sigma_alpha: float = 0.5,
+    sigma_alpha: float = 0.0,
     err_hetero: bool = False,
     rng: np.random.Generator | None = None,
     seed: int | None = None,
@@ -351,12 +352,12 @@ def simulate_panel_sar_dynamic_fe(
 
     DGP: ``y_t = rho W y_t + phi y_{t-1} + X_t beta + alpha + eps_t``.
 
-    Equivalent to :func:`simulate_panel_sdmu_fe` with ``theta=0``.
+    Equivalent to :func:`simulate_sdm_panel_dynamic` with ``theta=0``.
     """
     rng = ensure_rng(rng, seed)
     Ws, Wg = _resolve_panel_weights(W, gdf, contiguity, N)
     beta = _coerce_beta(beta)
-    y, X, idx = _simulate_panel_sdmu_fe_core(
+    y, X, idx = _simulate_sdm_panel_dynamic_core(
         N=N,
         T=T,
         Ws=Ws,
@@ -391,14 +392,14 @@ def simulate_panel_sar_dynamic_fe(
     )
 
 
-def simulate_panel_sem_dynamic_fe(
+def simulate_sem_panel_dynamic(
     N: int,
     T: int,
     lam: float = 0.3,
     phi: float = 0.4,
     beta: np.ndarray | None = None,
     sigma: float = 1.0,
-    sigma_alpha: float = 0.5,
+    sigma_alpha: float = 0.0,
     err_hetero: bool = False,
     rng: np.random.Generator | None = None,
     seed: int | None = None,
@@ -413,13 +414,13 @@ def simulate_panel_sem_dynamic_fe(
 
     DGP: ``y_t = phi y_{t-1} + X_t beta + alpha + u_t,  u_t = lam W u_t + eps_t``.
 
-    Equivalent to :func:`simulate_panel_sdem_dynamic_fe` (the two share the
+    Equivalent to :func:`simulate_sdem_panel_dynamic` (the two share the
     same algebra in the current implementation).
     """
     rng = ensure_rng(rng, seed)
     Ws, Wg = _resolve_panel_weights(W, gdf, contiguity, N)
     beta = _coerce_beta(beta)
-    y, X, idx = _simulate_panel_sdem_dynamic_fe_core(
+    y, X, idx = _simulate_sdem_panel_dynamic_core(
         N=N,
         T=T,
         Ws=Ws,
@@ -453,14 +454,14 @@ def simulate_panel_sem_dynamic_fe(
     )
 
 
-def simulate_panel_sdem_dynamic_fe(
+def simulate_sdem_panel_dynamic(
     N: int,
     T: int,
     lam: float = 0.3,
     phi: float = 0.4,
     beta: np.ndarray | None = None,
     sigma: float = 1.0,
-    sigma_alpha: float = 0.5,
+    sigma_alpha: float = 0.0,
     err_hetero: bool = False,
     rng: np.random.Generator | None = None,
     seed: int | None = None,
@@ -475,13 +476,13 @@ def simulate_panel_sdem_dynamic_fe(
 
     DGP: ``y_t = phi y_{t-1} + X_t beta + alpha + u_t,  u_t = lam W u_t + eps_t``.
 
-    This is the lag-on-error dynamic core that :func:`simulate_panel_sem_dynamic_fe`
+    This is the lag-on-error dynamic core that :func:`simulate_sem_panel_dynamic`
     also dispatches to.
     """
     rng = ensure_rng(rng, seed)
     Ws, Wg = _resolve_panel_weights(W, gdf, contiguity, N)
     beta = _coerce_beta(beta)
-    y, X, idx = _simulate_panel_sdem_dynamic_fe_core(
+    y, X, idx = _simulate_sdem_panel_dynamic_core(
         N=N,
         T=T,
         Ws=Ws,
@@ -515,13 +516,13 @@ def simulate_panel_sdem_dynamic_fe(
     )
 
 
-def simulate_panel_slx_dynamic_fe(
+def simulate_slx_panel_dynamic(
     N: int,
     T: int,
     phi: float = 0.4,
     beta: np.ndarray | None = None,
     sigma: float = 1.0,
-    sigma_alpha: float = 0.5,
+    sigma_alpha: float = 0.0,
     err_hetero: bool = False,
     rng: np.random.Generator | None = None,
     seed: int | None = None,
@@ -536,14 +537,14 @@ def simulate_panel_slx_dynamic_fe(
 
     DGP: ``y_t = phi y_{t-1} + X_t beta + alpha + eps_t``.
 
-    Equivalent to :func:`simulate_panel_sdmu_fe` with ``rho=0`` and ``theta=0``;
+    Equivalent to :func:`simulate_sdm_panel_dynamic` with ``rho=0`` and ``theta=0``;
     in the current implementation no explicit ``W X_t`` term is added (this
     matches the pre-refactor behavior).
     """
     rng = ensure_rng(rng, seed)
     Ws, Wg = _resolve_panel_weights(W, gdf, contiguity, N)
     beta = _coerce_beta(beta)
-    y, X, idx = _simulate_panel_sdmu_fe_core(
+    y, X, idx = _simulate_sdm_panel_dynamic_core(
         N=N,
         T=T,
         Ws=Ws,

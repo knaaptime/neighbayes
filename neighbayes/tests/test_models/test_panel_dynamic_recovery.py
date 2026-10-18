@@ -26,12 +26,13 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from neighbayes.models import (
+from neighbayes.models import OLS, SAR, SDEM, SDM, SEM, SLX
+from neighbayes.models.panel._dynamic import (
     OLSPanelDynamic,
     SARPanelDynamic,
     SDEMPanelDynamic,
-    SDMRPanelDynamic,
-    SDMUPanelDynamic,
+    SDMPanelDynamic,
+    SDMPanelDynamicRestricted,
     SEMPanelDynamic,
     SLXPanelDynamic,
 )
@@ -123,10 +124,10 @@ def test_sdmr_panel_fe_recovers_all(rng, W_panel_dense, W_panel_graph):
         sigma=SIGMA_TRUE,
         sigma_alpha=SIGMA_ALPHA_TRUE,
     )
-    idata = _fit(SDMRPanelDynamic, y, X, W_panel_graph)
-    _assert_scalar(idata, "rho", RHO_TRUE, ABS_TOL_SPATIAL, "SDMRPanelDynamic")
-    _assert_scalar(idata, "phi", PHI_TRUE, ABS_TOL_PHI, "SDMRPanelDynamic")
-    _assert_beta(idata, "SDMRPanelDynamic")
+    idata = _fit(SDMPanelDynamicRestricted, y, X, W_panel_graph)
+    _assert_scalar(idata, "rho", RHO_TRUE, ABS_TOL_SPATIAL, "SDMPanelDynamicRestricted")
+    _assert_scalar(idata, "phi", PHI_TRUE, ABS_TOL_PHI, "SDMPanelDynamicRestricted")
+    _assert_beta(idata, "SDMPanelDynamicRestricted")
 
 
 # ---------------------------------------------------------------------------
@@ -147,11 +148,11 @@ def test_sdmu_panel_fe_recovers_all(rng, W_panel_dense, W_panel_graph):
         sigma=SIGMA_TRUE,
         sigma_alpha=SIGMA_ALPHA_TRUE,
     )
-    idata = _fit(SDMUPanelDynamic, y, X, W_panel_graph)
-    _assert_scalar(idata, "rho", RHO_TRUE, ABS_TOL_SPATIAL, "SDMUPanelDynamic")
-    _assert_scalar(idata, "phi", PHI_TRUE, ABS_TOL_PHI, "SDMUPanelDynamic")
-    _assert_scalar(idata, "theta", THETA_TRUE, ABS_TOL_THETA, "SDMUPanelDynamic")
-    _assert_beta(idata, "SDMUPanelDynamic")
+    idata = _fit(SDMPanelDynamic, y, X, W_panel_graph)
+    _assert_scalar(idata, "rho", RHO_TRUE, ABS_TOL_SPATIAL, "SDMPanelDynamic")
+    _assert_scalar(idata, "phi", PHI_TRUE, ABS_TOL_PHI, "SDMPanelDynamic")
+    _assert_scalar(idata, "theta", THETA_TRUE, ABS_TOL_THETA, "SDMPanelDynamic")
+    _assert_beta(idata, "SDMPanelDynamic")
 
 
 # ---------------------------------------------------------------------------

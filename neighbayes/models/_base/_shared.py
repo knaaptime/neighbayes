@@ -30,6 +30,7 @@ from ..._logdet import (
     make_logdet_numpy_fn,
     make_logdet_numpy_vec_fn,
 )
+from .._design import FacadeMeta
 
 
 def gelman_default_beta_prior(
@@ -436,7 +437,7 @@ _DECISION_PREDICATE_PAIRS: dict[str, tuple[str, str]] = {
 }
 
 
-class SharedSpatialMethods:
+class SharedSpatialMethods(metaclass=FacadeMeta):
     """Behaviour-preserving mixin of methods shared verbatim by the two base
     classes (:class:`SpatialModel` and :class:`SpatialPanelModel`).
 
@@ -1784,11 +1785,11 @@ class SharedSpatialMethods:
 
         - Robust-LM-Lag-SDM significant → SDM;
           Robust-LM-Error-SDEM significant → SDEM;
-          both → MANSAR; neither → SLX.
+          both → GNS; neither → SLX.
 
-        **From SDM**: LM-Error-SDM significant → MANSAR; else SDM.
+        **From SDM**: LM-Error-SDM significant → GNS; else SDM.
 
-        **From SDEM**: LM-Lag-SDEM significant → MANSAR; else SDEM.
+        **From SDEM**: LM-Lag-SDEM significant → GNS; else SDEM.
 
         Parameters
         ----------

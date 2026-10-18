@@ -1,4 +1,4 @@
-r"""Structural-form SAR-logit with Pólya–Gamma Gibbs sampler.
+r"""SAR logit with random effects, sampled by Pólya–Gamma Gibbs.
 
 .. math::
 
@@ -6,11 +6,12 @@ r"""Structural-form SAR-logit with Pólya–Gamma Gibbs sampler.
     \eta = \rho W \eta + X\beta + \nu, \quad
     \nu \sim N(0, I)
 
-This is the *structural* (latent-field) SAR-logit: the spatial lag acts on the
+This is the SAR logit with random effects: the spatial lag acts on the
 latent log-odds :math:`\eta`, and an i.i.d. Gaussian innovation :math:`\nu`
-enters through :math:`(I-\rho W)^{-1}`.  The logit link absorbs the error scale
-(σ² = 1).  Contrast with the canonical reduced-form :class:`SARLogit`, where the
-spatial lag is a deterministic mean-propagator (no latent field) — that is the
+enters through :math:`(I-\rho W)^{-1}`.  Its variance is fixed at σ² = 1, which
+fixes the ratio of the propagated variance to the logistic noise's π²/3: a
+restriction, not a normalization.  Contrast with the canonical reduced-form :class:`SARLogit`, where the
+spatial lag is a deterministic mean-propagator (no random effects) — that is the
 default and the model with the richer probability-scale impacts.
 
 Use this model when you specifically want the latent spatially-smoothed
@@ -47,8 +48,8 @@ from ..base import SpatialModel
 from ..priors import SARLogitPriors
 
 
-class SARLogitStructural(SpatialModel):
-    """Bayesian structural-form SAR-logit with Pólya–Gamma Gibbs sampler.
+class SARLogitRE(SpatialModel):
+    """Bayesian SAR logit with random effects, sampled by Pólya–Gamma Gibbs.
 
     Parameters
     ----------
@@ -83,7 +84,7 @@ class SARLogitStructural(SpatialModel):
 
     Notes
     -----
-    The structural form parameterizes the latent log-odds as
+    The model parameterizes the latent log-odds as
     ``eta = rho * W @ eta + X @ beta + nu`` with ``nu ~ N(0, I)``,
     and augments the logistic likelihood with Pólya–Gamma auxiliary
     variables to obtain fully conjugate Gibbs updates for η and β.
@@ -98,18 +99,16 @@ class SARLogitStructural(SpatialModel):
     _lag_terms: tuple[str, ...] = ("Wy",)
     _jacobian_param: str | None = "rho"
     _gibbs_class: str | None = None  # Gibbs-only, no NUTS
-    _model_type: str = "sar_logit_structural"
+    _model_type: str = "sar_logit_re"
     _likelihood: str = "binary"
-    _gibbs_key: tuple[str, str] | None = ("binary_structural", "cross_section")
+    _gibbs_key: tuple[str, str] | None = ("binary_re", "cross_section")
     _priors_cls = SARLogitPriors
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         if self.robust:
-            raise NotImplementedError(
-                "robust=True is not supported for SARLogitStructural."
-            )
+            raise NotImplementedError("robust=True is not supported for SARLogitRE.")
 
         # Validate y is binary
         if not np.isin(self._y, [0.0, 1.0]).all():
@@ -218,7 +217,7 @@ class SARLogitStructural(SpatialModel):
             path; ``"jax"`` uses the JAX-accelerated dense path (requires
             float64; viable for n ≲ 10 000).
         return_eta : bool
-            If True, store the full latent field η in the posterior.
+            If True, store the latent index η in the posterior.
             Default False — η is n × draws × chains, which can be large.
         pg_n_terms : int, default 25
             Ignored (kept for API compatibility).  Only relevant on the
@@ -316,7 +315,7 @@ class SARLogitStructural(SpatialModel):
             if return_eta:
                 raise NotImplementedError(
                     "return_eta=True is not supported with gibbs_backend='jax'. "
-                    "Use gibbs_backend='numpy' if you need the full latent field "
+                    "Use gibbs_backend='numpy' if you need the latent index "
                     "stored."
                 )
             chain_inits = [
@@ -378,7 +377,7 @@ class SARLogitStructural(SpatialModel):
                 parallel=parallel,
                 draws=draws,
                 tune=tune,
-                model_type="sar_logit_structural",
+                model_type="sar_logit_re",
             )
 
         # Assemble DataTree
@@ -422,9 +421,9 @@ class SARLogitStructural(SpatialModel):
         return idata
 
     def _build_pymc_model(self):
-        """Not supported — SARLogitStructural uses a Gibbs sampler, not NUTS."""
+        """Not supported — SARLogitRE uses a Gibbs sampler, not NUTS."""
         raise NotImplementedError(
-            "SARLogitStructural does not build a PyMC model. "
+            "SARLogitRE does not build a PyMC model. "
             "Use the fit() method for Gibbs sampling."
         )
 

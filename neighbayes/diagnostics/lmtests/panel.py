@@ -1256,7 +1256,7 @@ def _flow_panel_marginal_lm(model, key: str, test_type: str) -> BayesianLMTestRe
 
 def bayesian_panel_lm_flow_dest_test(model) -> BayesianLMTestResult:
     r"""Panel analogue of :func:`bayesian_lm_flow_dest_test` operating on a
-    fitted :class:`~neighbayes.models.flow_panel.OLSFlowPanel`.
+    fitted :class:`~neighbayes.models.flow_panel.OLSFlowPanelFE`.
 
     The score is summed over the demeaned panel stack
     (length :math:`n^{2}\cdot T`); the information matrix scales the
@@ -1291,7 +1291,7 @@ def bayesian_panel_lm_flow_network_test(model) -> BayesianLMTestResult:
 
 def bayesian_panel_lm_flow_joint_test(model) -> BayesianLMTestResult:
     r"""Panel analogue of :func:`bayesian_lm_flow_joint_test` on
-    :class:`OLSFlowPanel`. The joint score over
+    :class:`OLSFlowPanelFE`. The joint score over
     :math:`(\rho_d, \rho_o, \rho_w)` is :math:`\chi^2_3` under :math:`H_0`.
     See :func:`bayesian_panel_lm_flow_dest_test` for additional details
     and references (:cite:p:`lesage2008SpatialEconometric`,
@@ -1310,7 +1310,7 @@ def bayesian_panel_lm_flow_joint_test(model) -> BayesianLMTestResult:
 
 def bayesian_panel_lm_flow_intra_test(model) -> BayesianLMTestResult:
     r"""Panel analogue of :func:`bayesian_lm_flow_intra_test` on
-    :class:`OLSFlowPanel`. Operates on the demeaned panel design.
+    :class:`OLSFlowPanelFE`. Operates on the demeaned panel design.
     Score :math:`g = X_{\text{intra}}^\top e` and information
     :math:`V = X_{\text{intra}}^\top X_{\text{intra}} / \bar\sigma^2`,
     distributed :math:`\chi^2_{k_{\text{intra}}}` under :math:`H_0`.

@@ -18,7 +18,7 @@ from libpysal.graph import Graph
 from neighbayes.diagnostics.spatial_effects import _chunked_eig_means
 from neighbayes.models.cross_section.sar_logit import SARLogit
 from neighbayes.models.cross_section.sar_negbin import SARNegBin
-from neighbayes.models.cross_section.sar_negbin_structural import SARNegBinStructural
+from neighbayes.models.cross_section.sar_negbin_re import SARNegBinRE
 from neighbayes.models.cross_section.sar_zinb import SARZINB
 
 
@@ -53,7 +53,7 @@ def _design():
     [
         (SARLogit, "binary"),
         (SARNegBin, "count"),
-        (SARNegBinStructural, "count"),
+        (SARNegBinRE, "count"),
     ],
 )
 def test_direct_effect_trace_matches_eigen_reference(model_cls, y_kind, _design):

@@ -1,4 +1,4 @@
-r"""Structural-form SEM-logit with Pólya–Gamma Gibbs sampler.
+r"""SEM logit with random effects, sampled by Pólya–Gamma Gibbs.
 
 .. math::
 
@@ -7,8 +7,8 @@ r"""Structural-form SEM-logit with Pólya–Gamma Gibbs sampler.
     u = \lambda W u + \nu, \quad
     \nu \sim N(0, I)
 
-The logit link absorbs the error scale, so σ² is fixed at 1 and does
-not appear as a free parameter.  The Pólya–Gamma augmentation yields
+σ² is fixed at 1, which fixes the ratio of the propagated variance to the
+logistic noise's π²/3: a restriction, not a normalization.  The Pólya–Gamma augmentation yields
 fully conjugate Gibbs updates for η, β, and λ (via collapsed slice
 sampling).
 
@@ -48,12 +48,13 @@ from ...samplers.logit import (
 from ...samplers.logit._jax import (
     run_chains_jax_sem_vectorized,
 )
+from .._design import FacadeMeta, discrete
 from ..base import SpatialModel
 from ..priors import SEMLogitPriors
 
 
-class SEMLogit(SpatialModel):
-    """Bayesian structural-form SEM-logit with Pólya–Gamma Gibbs sampler.
+class SEMLogitRE(SpatialModel):
+    """Bayesian SEM logit with random effects, sampled by Pólya–Gamma Gibbs.
 
     Parameters
     ----------
@@ -88,7 +89,7 @@ class SEMLogit(SpatialModel):
 
     Notes
     -----
-    The structural form parameterizes the latent log-odds as
+    The model parameterizes the latent log-odds as
     ``eta = X @ beta + u`` with ``u = lam * W @ u + nu``,
     ``nu ~ N(0, I)``, and augments the logistic likelihood with
     Pólya–Gamma auxiliary variables to obtain fully conjugate Gibbs
@@ -102,8 +103,8 @@ class SEMLogit(SpatialModel):
     ``target_accept`` kwargs — these are NUTS-specific and will raise
     ``TypeError`` if passed.
 
-    Because the logit link absorbs the error scale, σ² is fixed at 1
-    and does not appear in the posterior.  The PG shape parameter is
+    σ² is fixed at 1, a restriction on the ratio of the propagated variance
+    to the logistic noise, not a normalization.  The PG shape parameter is
     always h = 1 (one trial per observation), so the Devroye method
     is valid and typically fastest.
     """
@@ -114,14 +115,14 @@ class SEMLogit(SpatialModel):
     _gibbs_class: str | None = None  # Gibbs-only, no NUTS
     _model_type: str = "sem_logit"
     _likelihood: str = "binary"
-    _gibbs_key: tuple[str, str] | None = ("binary_structural", "cross_section")
+    _gibbs_key: tuple[str, str] | None = ("binary_re", "cross_section")
     _priors_cls = SEMLogitPriors
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         if self.robust:
-            raise NotImplementedError("robust=True is not supported for SEMLogit.")
+            raise NotImplementedError("robust=True is not supported for SEMLogitRE.")
 
         # Validate y is binary
         if not np.isin(self._y, [0.0, 1.0]).all():
@@ -211,7 +212,7 @@ class SEMLogit(SpatialModel):
             path (the default); ``"jax"`` uses the JAX-accelerated dense path
             (requires float64; viable for n ≲ 10 000).
         return_eta : bool
-            If True, store the full latent field η in the posterior.
+            If True, store the latent index η in the posterior.
             Default False — η is n × draws × chains, which can be large.
         pg_n_terms : int, default 25
             Ignored (kept for API compatibility).  PG draws now use the
@@ -311,7 +312,7 @@ class SEMLogit(SpatialModel):
             if return_eta:
                 raise NotImplementedError(
                     "return_eta=True is not supported with gibbs_backend='jax'. "
-                    "Use gibbs_backend='numpy' if you need the full latent field stored."
+                    "Use gibbs_backend='numpy' if you need the latent index stored."
                 )
             chain_inits = [
                 self._initialize_from_ols(np.random.default_rng(seed)) for seed in seeds
@@ -421,9 +422,9 @@ class SEMLogit(SpatialModel):
         return idata
 
     def _build_pymc_model(self):
-        """Not supported — SEMLogit uses a Gibbs sampler, not NUTS."""
+        """Not supported — SEMLogitRE uses a Gibbs sampler, not NUTS."""
         raise NotImplementedError(
-            "SEMLogit does not build a PyMC model. "
+            "SEMLogitRE does not build a PyMC model. "
             "Use the fit() method for Gibbs sampling."
         )
 
@@ -468,3 +469,31 @@ class SEMLogit(SpatialModel):
         indirect_samples = total_samples - direct_samples  # zeros
 
         return direct_samples, indirect_samples, total_samples
+
+
+class SEMLogit(metaclass=FacadeMeta):
+    r"""SEM logit: spatial error dependence on the latent log-odds.
+
+    ``SEMLogit(..., unit_effects="random")`` is the SEM logit with random
+    effects, sampled by Pólya–Gamma Gibbs:
+
+    .. math::
+
+        y_i \sim \mathrm{Bernoulli}(\mathrm{logit}^{-1}(\eta_i)), \quad
+        \eta = X\beta + u, \quad u = \lambda W u + \nu, \quad
+        \nu \sim N(0, I).
+
+    The latent SEM logit, whose error process carries the logistic disturbance
+    itself, is not implemented, so a bare ``SEMLogit(...)`` raises.
+
+    Parameters
+    ----------
+    unit_effects : {"random"}
+        Required: the normal random effect per unit that the error process
+        carries.
+    **kwargs
+        ``formula``, ``data``, ``y``, ``X``, ``W``, ``priors``, and
+        ``logdet_method``, as for :class:`SARLogit`.
+    """
+
+    _dispatch = classmethod(discrete)

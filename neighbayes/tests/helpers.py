@@ -212,7 +212,7 @@ def make_panel_ols_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate panel OLS data with unit random effects."""
-    out = dgp.simulate_panel_ols_fe(
+    out = dgp.simulate_ols_panel_fe(
         N=N,
         T=T,
         beta=beta,
@@ -239,7 +239,7 @@ def make_panel_sar_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate SAR panel data with unit random effects."""
-    out = dgp.simulate_panel_sar_fe(
+    out = dgp.simulate_sar_panel_fe(
         N=N,
         T=T,
         rho=rho,
@@ -267,7 +267,7 @@ def make_panel_sem_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate SEM panel data with unit random effects."""
-    out = dgp.simulate_panel_sem_fe(
+    out = dgp.simulate_sem_panel_fe(
         N=N,
         T=T,
         lam=lam,
@@ -295,7 +295,7 @@ def make_panel_dlm_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate dynamic non-spatial panel data with unit effects."""
-    out = dgp.simulate_panel_dlm_fe(
+    out = dgp.simulate_ols_panel_dynamic(
         N=N,
         T=T,
         phi=phi,
@@ -324,7 +324,7 @@ def make_panel_sdmr_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate dynamic restricted SDM panel data with unit effects."""
-    out = dgp.simulate_panel_sdmr_fe(
+    out = dgp.simulate_sdm_panel_dynamic_restricted(
         N=N,
         T=T,
         rho=rho,
@@ -355,7 +355,7 @@ def make_panel_sdmu_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate dynamic unrestricted SDM panel data with unit effects."""
-    out = dgp.simulate_panel_sdmu_fe(
+    out = dgp.simulate_sdm_panel_dynamic(
         N=N,
         T=T,
         rho=rho,
@@ -387,7 +387,7 @@ def make_spatial_probit_data(
     sigma_a: float = 0.8,
     n_per_region: int = 25,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Generate SARProbit data in matrix mode.
+    """Generate SEMProbitRE data in matrix mode.
 
     Returns
     -------
@@ -398,7 +398,7 @@ def make_spatial_probit_data(
     region_ids : np.ndarray
         Region code for each observation, shape ``(nobs,)``.
     """
-    out = dgp.simulate_spatial_probit(
+    out = dgp.simulate_sar_probit(
         W=_as_sparse(W),
         rho=rho,
         beta=beta,
@@ -449,7 +449,7 @@ def make_sar_logit_data(
     return y, X
 
 
-def make_sar_logit_structural_data(
+def make_sar_logit_re_data(
     rng: np.random.Generator,
     W: np.ndarray,
     rho: float = 0.35,
@@ -459,7 +459,7 @@ def make_sar_logit_structural_data(
 
     DGP: ``eta = (I - rho W)^{-1}(X beta + nu)``, ``nu ~ N(0, I)``,
     ``y ~ Bernoulli(logit^{-1}(eta))``.  Matches the structural
-    ``SARLogitStructural`` model (latent field with noise).
+    ``SARLogitRE`` model (latent field with noise).
     """
     out = dgp.simulate_sar_logit(W=_as_sparse(W), rho=rho, beta=beta, rng=rng)
     return out["y"], out["X"]
@@ -552,7 +552,7 @@ def make_panel_sar_tobit_data(
     censoring: float = 0.0,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Generate left-censored panel SAR FE Tobit data using the dgp module."""
-    out = dgp.simulate_panel_sar_tobit_fe(
+    out = dgp.simulate_sar_tobit_panel(
         N=N,
         T=T,
         W=_as_sparse(W),
@@ -576,7 +576,7 @@ def make_panel_sem_tobit_data(
     censoring: float = 0.0,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Generate left-censored panel SEM FE Tobit data using the dgp module."""
-    out = dgp.simulate_panel_sem_tobit_fe(
+    out = dgp.simulate_sem_tobit_panel(
         N=N,
         T=T,
         W=_as_sparse(W),
@@ -606,7 +606,7 @@ def make_panel_sar_dynamic_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate dynamic SAR panel FE data."""
-    out = dgp.simulate_panel_sar_dynamic_fe(
+    out = dgp.simulate_sar_panel_dynamic(
         N=N,
         T=T,
         W=_as_sparse(W),
@@ -635,7 +635,7 @@ def make_panel_sem_dynamic_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate dynamic SEM panel FE data."""
-    out = dgp.simulate_panel_sem_dynamic_fe(
+    out = dgp.simulate_sem_panel_dynamic(
         N=N,
         T=T,
         W=_as_sparse(W),
@@ -664,7 +664,7 @@ def make_panel_sdem_dynamic_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate dynamic SDEM panel FE data."""
-    out = dgp.simulate_panel_sdem_dynamic_fe(
+    out = dgp.simulate_sdem_panel_dynamic(
         N=N,
         T=T,
         W=_as_sparse(W),
@@ -692,7 +692,7 @@ def make_panel_slx_dynamic_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate dynamic SLX panel FE data."""
-    out = dgp.simulate_panel_slx_dynamic_fe(
+    out = dgp.simulate_slx_panel_dynamic(
         N=N,
         T=T,
         W=_as_sparse(W),
@@ -725,7 +725,7 @@ def make_panel_sdm_fe_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate SDM panel FE data with WX terms."""
-    out = dgp.simulate_panel_sdm_fe(
+    out = dgp.simulate_sdm_panel_fe(
         N=N,
         T=T,
         W=_as_sparse(W),
@@ -754,7 +754,7 @@ def make_panel_sdem_fe_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate SDEM panel FE data with WX terms."""
-    out = dgp.simulate_panel_sdem_fe(
+    out = dgp.simulate_sdem_panel_fe(
         N=N,
         T=T,
         W=_as_sparse(W),
@@ -794,3 +794,13 @@ def make_idata(samples_by_var: dict[str, np.ndarray]) -> xr.DataTree:
             arr = arr[None, ...]
         posterior[k] = arr
     return az.from_dict({"posterior": posterior})
+
+
+def effects_kwargs(
+    code: int, index: str = "unit_effects", treatment: str = "fixed"
+) -> dict:
+    """Design keywords for a legacy effects code: 0 none, 1 unit or pair, 2 time, 3 both."""
+    return {
+        index: treatment if code in (1, 3) else None,
+        "time_effects": code in (2, 3),
+    }

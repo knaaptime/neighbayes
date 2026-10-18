@@ -14,8 +14,8 @@ Gibbs updates for β and ρ (via a collapsed slice sampler).
 
 Both backends fit the same model: ``gibbs_backend="jax"`` (the default via
 ``"auto"``) runs the chains in parallel threads, one ``jax.jit`` program each;
-``"numpy"`` uses the CHOLMOD factorization path.  For the *structural*
-latent-field SAR-logit, use :class:`SARLogitStructural`.
+``"numpy"`` uses the CHOLMOD factorization path.  For the SAR logit with
+random effects, pass ``unit_effects="random"``.
 
 Use this model when:
 - The response is binary (0/1).
@@ -52,6 +52,7 @@ from ...samplers.negbin_reduced._core import (
     ReducedGibbsCache,
     _make_cholmod_pattern,
 )
+from .._design import discrete
 from ..base import SpatialModel
 from ..priors import SARLogitPriors
 
@@ -108,10 +109,11 @@ class SARLogit(SpatialModel):
     ``target_accept`` kwargs — these are NUTS-specific and will raise
     ``TypeError`` if passed.
 
-    Because the logit link absorbs the error scale, σ² is fixed at 1
-    and does not appear in the posterior.  The PG shape parameter is
+    The PG shape parameter is
     always h = 1 (one trial per observation).
     """
+
+    _dispatch = classmethod(discrete)
 
     _spatial_params: tuple[str, ...] = ("rho",)
     _lag_terms: tuple[str, ...] = ("Wy",)

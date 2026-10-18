@@ -192,11 +192,11 @@ class TestDGPAsymmetric:
     """Tests for DGP functions with k_d ≠ k_o."""
 
     def test_generate_flow_data_asymmetric(self):
-        """generate_flow_data works with beta_d and beta_o of different lengths."""
-        from neighbayes.dgp.flows import generate_flow_data
+        """simulate_sar_flow works with beta_d and beta_o of different lengths."""
+        from neighbayes.dgp.flows import simulate_sar_flow
 
         n = 5
-        data = generate_flow_data(
+        data = simulate_sar_flow(
             n=n,
             rho_d=0.15,
             rho_o=0.1,
@@ -217,12 +217,12 @@ class TestDGPAsymmetric:
 
     def test_generate_flow_data_asymmetric_beta_layout(self):
         """Beta layout in asymmetric DGP places coefficients correctly."""
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
 
         n = 5
         beta_d = [1.0, -0.5]
         beta_o = [0.5]
-        data = generate_flow_data(
+        data = simulate_sar_flow(
             n=n,
             rho_d=0.15,
             rho_o=0.1,
@@ -239,10 +239,10 @@ class TestDGPAsymmetric:
         assert "orig_y0" in names
 
     def test_generate_negbin_flow_data_asymmetric(self):
-        """generate_negbin_flow_data works with k_d ≠ k_o."""
-        from neighbayes.dgp.flows import generate_negbin_flow_data
+        """simulate_sar_negbin_flow works with k_d ≠ k_o."""
+        from neighbayes.dgp.flows import simulate_sar_negbin_flow
 
-        data = generate_negbin_flow_data(
+        data = simulate_sar_negbin_flow(
             n=5,
             k_d=2,
             k_o=1,
@@ -256,10 +256,10 @@ class TestDGPAsymmetric:
         assert data["design"].k_o == 1
 
     def test_generate_panel_flow_data_asymmetric(self):
-        """generate_panel_flow_data works with k_d ≠ k_o."""
-        from neighbayes.dgp.flows import generate_panel_flow_data
+        """simulate_sar_flow_panel_fe works with k_d ≠ k_o."""
+        from neighbayes.dgp.flows import simulate_sar_flow_panel_fe
 
-        data = generate_panel_flow_data(
+        data = simulate_sar_flow_panel_fe(
             n=5,
             T=3,
             beta_d=[1.0, -0.5],
@@ -272,9 +272,9 @@ class TestDGPAsymmetric:
 
     def test_generate_flow_data_symmetric_backward_compat(self):
         """Symmetric case (k_d == k_o) still works as before."""
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
 
-        data = generate_flow_data(
+        data = simulate_sar_flow(
             n=5,
             rho_d=0.15,
             rho_o=0.1,
@@ -299,10 +299,10 @@ class TestModelAsymmetric:
 
     def test_model_infers_kd_ko_from_colnames(self):
         """FlowModel infers k_d and k_o from dest_*/orig_* column names."""
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
         from neighbayes.models.flow._flow import SARFlow
 
-        data = generate_flow_data(
+        data = simulate_sar_flow(
             n=5,
             rho_d=0.15,
             rho_o=0.1,
@@ -324,10 +324,10 @@ class TestModelAsymmetric:
 
     def test_effects_asymmetric_shape(self):
         """Spatial effects have correct shapes when k_d ≠ k_o."""
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
         from neighbayes.models.flow._flow import OLSFlow
 
-        data = generate_flow_data(
+        data = simulate_sar_flow(
             n=5,
             rho_d=0.0,
             rho_o=0.0,
@@ -353,10 +353,10 @@ class TestModelAsymmetric:
 
     def test_effects_symmetric_shape(self):
         """Spatial effects have correct shapes when k_d == k_o (symmetric)."""
-        from neighbayes.dgp.flows import generate_flow_data
+        from neighbayes.dgp.flows import simulate_sar_flow
         from neighbayes.models.flow._flow import OLSFlow
 
-        data = generate_flow_data(
+        data = simulate_sar_flow(
             n=5,
             rho_d=0.0,
             rho_o=0.0,

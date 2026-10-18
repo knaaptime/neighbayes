@@ -1,6 +1,6 @@
 """Panel fixed-effects style DGP functions.
 
-The :func:`simulate_panel_sdm_fe` and :func:`simulate_panel_sdem_fe`
+The :func:`simulate_sdm_panel_fe` and :func:`simulate_sdem_panel_fe`
 generators are the most general lag-on-y and lag-on-error panel DGPs.
 The simpler models in this module (``sar``, ``sem``, ``slx``, ``ols``)
 are thin wrappers that call the corresponding core kernel with
@@ -44,7 +44,7 @@ def _panel_finalize(
     return y, X, {"unit": idx_df["unit"].to_numpy(), "time": idx_df["time"].to_numpy()}
 
 
-def _simulate_panel_sdm_fe_core(
+def _simulate_sdm_panel_fe_core(
     *,
     N: int,
     T: int,
@@ -91,7 +91,7 @@ def _simulate_panel_sdm_fe_core(
     return _panel_finalize(y_list, X_list, N, T)
 
 
-def _simulate_panel_sdem_fe_core(
+def _simulate_sdem_panel_fe_core(
     *,
     N: int,
     T: int,
@@ -138,7 +138,7 @@ def _simulate_panel_sdem_fe_core(
     return _panel_finalize(y_list, X_list, N, T)
 
 
-def simulate_panel_ols_fe(
+def simulate_ols_panel_fe(
     N: int,
     T: int,
     beta: np.ndarray | None = None,
@@ -156,7 +156,7 @@ def simulate_panel_ols_fe(
 ) -> dict:
     """Simulate pooled data compatible with OLSPanelFE model assumptions.
 
-    Equivalent to :func:`simulate_panel_sdm_fe` with ``rho=0`` and ``beta2=[]``;
+    Equivalent to :func:`simulate_sdm_panel_fe` with ``rho=0`` and ``beta2=[]``;
     the spatial weights matrix is required for shape validation but does not
     appear in the data equation.
 
@@ -175,7 +175,7 @@ def simulate_panel_ols_fe(
         beta = np.array([1.0, 2.0], dtype=float)
     beta = np.asarray(beta, dtype=float)
 
-    y, X, idx = _simulate_panel_sdm_fe_core(
+    y, X, idx = _simulate_sdm_panel_fe_core(
         N=N,
         T=T,
         Ws=Ws,
@@ -203,7 +203,7 @@ def simulate_panel_ols_fe(
     )
 
 
-def simulate_panel_sar_fe(
+def simulate_sar_panel_fe(
     N: int,
     T: int,
     rho: float = 0.4,
@@ -225,7 +225,7 @@ def simulate_panel_sar_fe(
 
     DGP: ``y_t = (I - rho W)^-1 (X_t beta + alpha + eps_t)``.
 
-    Equivalent to :func:`simulate_panel_sdm_fe` with ``beta2=[]``.
+    Equivalent to :func:`simulate_sdm_panel_fe` with ``beta2=[]``.
     """
     rng = ensure_rng(rng, seed)
     Ws, Wg = resolve_weights(W=W, gdf=gdf, n_side=n_side, contiguity=contiguity)
@@ -236,7 +236,7 @@ def simulate_panel_sar_fe(
         beta = np.array([1.0, 2.0], dtype=float)
     beta = np.asarray(beta, dtype=float)
 
-    y, X, idx = _simulate_panel_sdm_fe_core(
+    y, X, idx = _simulate_sdm_panel_fe_core(
         N=N,
         T=T,
         Ws=Ws,
@@ -269,7 +269,7 @@ def simulate_panel_sar_fe(
     )
 
 
-def simulate_panel_sem_fe(
+def simulate_sem_panel_fe(
     N: int,
     T: int,
     lam: float = 0.4,
@@ -291,7 +291,7 @@ def simulate_panel_sem_fe(
 
     DGP: ``u_t = (I - lam W)^-1 eps_t`` and ``y_t = X_t beta + alpha + u_t``.
 
-    Equivalent to :func:`simulate_panel_sdem_fe` with ``beta2=[]``.
+    Equivalent to :func:`simulate_sdem_panel_fe` with ``beta2=[]``.
     """
     rng = ensure_rng(rng, seed)
     Ws, Wg = resolve_weights(W=W, gdf=gdf, n_side=n_side, contiguity=contiguity)
@@ -302,7 +302,7 @@ def simulate_panel_sem_fe(
         beta = np.array([1.0, 2.0], dtype=float)
     beta = np.asarray(beta, dtype=float)
 
-    y, X, idx = _simulate_panel_sdem_fe_core(
+    y, X, idx = _simulate_sdem_panel_fe_core(
         N=N,
         T=T,
         Ws=Ws,
@@ -335,7 +335,7 @@ def simulate_panel_sem_fe(
     )
 
 
-def simulate_panel_sdm_fe(
+def simulate_sdm_panel_fe(
     N: int,
     T: int,
     rho: float = 0.4,
@@ -372,7 +372,7 @@ def simulate_panel_sdm_fe(
         beta2 = np.array([0.8], dtype=float)
     beta2 = np.asarray(beta2, dtype=float)
 
-    y, X, idx = _simulate_panel_sdm_fe_core(
+    y, X, idx = _simulate_sdm_panel_fe_core(
         N=N,
         T=T,
         Ws=Ws,
@@ -406,7 +406,7 @@ def simulate_panel_sdm_fe(
     )
 
 
-def simulate_panel_sdem_fe(
+def simulate_sdem_panel_fe(
     N: int,
     T: int,
     lam: float = 0.4,
@@ -444,7 +444,7 @@ def simulate_panel_sdem_fe(
         beta2 = np.array([0.8], dtype=float)
     beta2 = np.asarray(beta2, dtype=float)
 
-    y, X, idx = _simulate_panel_sdem_fe_core(
+    y, X, idx = _simulate_sdem_panel_fe_core(
         N=N,
         T=T,
         Ws=Ws,
@@ -478,7 +478,7 @@ def simulate_panel_sdem_fe(
     )
 
 
-def simulate_panel_slx_fe(
+def simulate_slx_panel_fe(
     N: int,
     T: int,
     beta1: np.ndarray | None = None,
@@ -499,7 +499,7 @@ def simulate_panel_slx_fe(
 
     DGP: ``y_t = X_t beta1 + W X_t[:,1:] beta2 + alpha + eps_t``.
 
-    Equivalent to :func:`simulate_panel_sdm_fe` with ``rho=0``.
+    Equivalent to :func:`simulate_sdm_panel_fe` with ``rho=0``.
     """
     rng = ensure_rng(rng, seed)
     Ws, Wg = resolve_weights(W=W, gdf=gdf, contiguity=contiguity)
@@ -513,7 +513,7 @@ def simulate_panel_slx_fe(
         beta2 = np.array([0.8], dtype=float)
     beta2 = np.asarray(beta2, dtype=float)
 
-    y, X, idx = _simulate_panel_sdm_fe_core(
+    y, X, idx = _simulate_sdm_panel_fe_core(
         N=N,
         T=T,
         Ws=Ws,

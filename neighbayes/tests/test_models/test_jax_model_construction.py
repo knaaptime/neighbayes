@@ -19,6 +19,7 @@ import pytest
 from libpysal.graph import Graph
 
 from neighbayes._backends.sampler_helpers import use_jax_likelihood
+from neighbayes.models import SDEM, SEM, SEMTobit
 from neighbayes.models.base import SpatialModel
 from neighbayes.models.panel_base import SpatialPanelModel
 from neighbayes.tests.helpers import W_to_graph, make_line_W, make_rook_W
@@ -194,13 +195,13 @@ class TestSEMPanelFEModelConstruction:
     def _make_model(self, robust: bool = False, nuts_sampler: str = "pymc"):
         from neighbayes.models.panel._fe import SEMPanelFE
 
-        return SEMPanelFE(
+        return SEM(
+            unit_effects="fixed",
             y=self.y,
             X=self.X,
             W=self.W,
             N=self.N,
             T=self.T,
-            effects=1,
             logdet_method="eigenvalue",
             robust=robust,
         )
@@ -236,13 +237,13 @@ class TestSDEMPanelFEModelConstruction:
     def _make_model(self, robust: bool = False, nuts_sampler: str = "pymc"):
         from neighbayes.models.panel._fe import SDEMPanelFE
 
-        return SDEMPanelFE(
+        return SDEM(
+            unit_effects="fixed",
             y=self.y,
             X=self.X,
             W=self.W,
             N=self.N,
             T=self.T,
-            effects=1,
             w_vars=["x1"],
             logdet_method="eigenvalue",
             robust=robust,
@@ -279,13 +280,13 @@ class TestSEMPanelREModelConstruction:
     def _make_model(self, robust: bool = False, nuts_sampler: str = "pymc"):
         from neighbayes.models.panel._re import SEMPanelRE
 
-        return SEMPanelRE(
+        return SEM(
+            unit_effects="random",
             y=self.y,
             X=self.X,
             W=self.W,
             N=self.N,
             T=self.T,
-            effects=1,
             logdet_method="eigenvalue",
             robust=robust,
         )
@@ -321,13 +322,13 @@ class TestSDEMPanelREModelConstruction:
     def _make_model(self, robust: bool = False, nuts_sampler: str = "pymc"):
         from neighbayes.models.panel._re import SDEMPanelRE
 
-        return SDEMPanelRE(
+        return SDEM(
+            unit_effects="random",
             y=self.y,
             X=self.X,
             W=self.W,
             N=self.N,
             T=self.T,
-            effects=1,
             w_vars=["x1"],
             logdet_method="eigenvalue",
             robust=robust,
@@ -364,7 +365,8 @@ class TestSEMPanelDynamicModelConstruction:
     def _make_model(self, robust: bool = False, nuts_sampler: str = "pymc"):
         from neighbayes.models.panel._dynamic import SEMPanelDynamic
 
-        return SEMPanelDynamic(
+        return SEM(
+            dynamic=True,
             y=self.y,
             X=self.X,
             W=self.W,
@@ -405,7 +407,8 @@ class TestSDEMPanelDynamicModelConstruction:
     def _make_model(self, robust: bool = False, nuts_sampler: str = "pymc"):
         from neighbayes.models.panel._dynamic import SDEMPanelDynamic
 
-        return SDEMPanelDynamic(
+        return SDEM(
+            dynamic=True,
             y=self.y,
             X=self.X,
             W=self.W,
@@ -438,7 +441,7 @@ class TestSDEMPanelDynamicModelConstruction:
 
 
 class TestSEMPanelTobitModelConstruction:
-    """Test SEMPanelTobit._build_pymc_model with different nuts_sampler values."""
+    """Test SEMTobitPanel._build_pymc_model with different nuts_sampler values."""
 
     @pytest.fixture(autouse=True)
     def setup_data(self):
@@ -447,15 +450,14 @@ class TestSEMPanelTobitModelConstruction:
         self.y = np.where(self.y > 0, self.y, 0.0)
 
     def _make_model(self, robust: bool = False, nuts_sampler: str = "pymc"):
-        from neighbayes.models.panel._tobit import SEMPanelTobit
+        from neighbayes.models.panel._tobit import SEMTobitPanel
 
-        return SEMPanelTobit(
+        return SEMTobit(
             y=self.y,
             X=self.X,
             W=self.W,
             N=self.N,
             T=self.T,
-            effects=1,
             logdet_method="eigenvalue",
             robust=robust,
         )
@@ -463,22 +465,22 @@ class TestSEMPanelTobitModelConstruction:
     def test_pymc_path_has_potential(self):
         model = self._make_model(nuts_sampler="pymc")
         pm_model = model._build_pymc_model(nuts_sampler="pymc")
-        _assert_has_potential(pm_model, "SEMPanelTobit[pymc]")
+        _assert_has_potential(pm_model, "SEMTobitPanel[pymc]")
 
     def test_numpyro_path_has_obs_rv(self):
         model = self._make_model(nuts_sampler="numpyro")
         pm_model = model._build_pymc_model(nuts_sampler="numpyro")
-        _assert_has_obs_rv(pm_model, "SEMPanelTobit[numpyro]")
+        _assert_has_obs_rv(pm_model, "SEMTobitPanel[numpyro]")
 
     def test_pymc_robust_path_has_potential(self):
         model = self._make_model(robust=True, nuts_sampler="pymc")
         pm_model = model._build_pymc_model(nuts_sampler="pymc")
-        _assert_has_potential(pm_model, "SEMPanelTobit[robust,pymc]")
+        _assert_has_potential(pm_model, "SEMTobitPanel[robust,pymc]")
 
     def test_numpyro_robust_path_has_obs_rv(self):
         model = self._make_model(robust=True, nuts_sampler="numpyro")
         pm_model = model._build_pymc_model(nuts_sampler="numpyro")
-        _assert_has_obs_rv(pm_model, "SEMPanelTobit[robust,numpyro]")
+        _assert_has_obs_rv(pm_model, "SEMTobitPanel[robust,numpyro]")
 
 
 # ===========================================================================

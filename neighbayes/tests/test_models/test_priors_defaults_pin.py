@@ -9,12 +9,12 @@ Note the deliberate entanglement this captures — it is why the priors do not
 factor into three orthogonal axes:
 
 * ``rho``/``lam`` bounds differ by likelihood and static/dynamic:
-  SAR ``[-1, 1]``, SARProbit ``[-0.95, 0.95]``, SARLogit ``[-0.999, 0.999]``,
+  SAR ``[-1, 1]``, SEMProbitRE ``[-0.95, 0.95]``, SARLogit ``[-0.999, 0.999]``,
   PanelSARDynamic ``[-0.95, 0.95]``.
 * ``beta`` defaults are data-scaled (omitted) for every family, resolved on
   the link scale (identity, log, logit or probit) at fit time.
 * the noise block differs: Gaussian/NB/Tobit carry ``sigma2_alpha``;
-  SARProbit carries ``sigma_a_sigma``; Logit carries neither.
+  SEMProbitRE carries ``sigma_a_sigma``; Logit carries neither.
 """
 
 from __future__ import annotations

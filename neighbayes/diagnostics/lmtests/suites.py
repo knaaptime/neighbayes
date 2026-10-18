@@ -147,7 +147,7 @@ SDEM_SUITE = DiagnosticSuite(
 # variants, matching the pre-suite behavior preserved verbatim here.
 
 SAR_TOBIT_SUITE = DiagnosticSuite(
-    name="SAR-Tobit",
+    name="SARTobit",
     tests=_suite(
         ("bayesian_lm_error_test", "LM-Error"),
         ("bayesian_lm_wx_test", "LM-WX"),
@@ -175,7 +175,7 @@ NEGBIN_SUITE = DiagnosticSuite(
 )
 
 SDM_TOBIT_SUITE = DiagnosticSuite(
-    name="SDM-Tobit",
+    name="SDMTobit",
     tests=_suite(
         ("bayesian_lm_error_test", "LM-Error"),
         ("bayesian_robust_lm_error_sdm_test", "Robust-LM-Error"),

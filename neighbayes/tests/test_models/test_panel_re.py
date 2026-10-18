@@ -14,7 +14,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from neighbayes.models import OLSPanelRE, SARPanelRE, SDEMPanelRE, SEMPanelRE
+from neighbayes.models import OLS, SAR, SDEM, SEM
 from neighbayes.tests.helpers import (
     PANEL_N,
     PANEL_T,
@@ -77,7 +77,7 @@ def test_ols_panel_re_recovers_all(rng, W_panel_dense, W_panel_graph):
         sigma=SIGMA_TRUE,
         sigma_alpha=SIGMA_ALPHA_TRUE,
     )
-    model = OLSPanelRE(y=y, X=X, W=W_panel_graph, N=PANEL_N, T=PANEL_T)
+    model = OLS(unit_effects="random", y=y, X=X, W=W_panel_graph, N=PANEL_N, T=PANEL_T)
     idata = model.fit(**SAMPLE_KWARGS)
     _assert_beta(idata, "OLSPanelRE")
     _assert_scalar(
@@ -96,7 +96,7 @@ def test_sar_panel_re_recovers_all(rng, W_panel_dense, W_panel_graph):
         sigma=SIGMA_TRUE,
         sigma_alpha=SIGMA_ALPHA_TRUE,
     )
-    model = SARPanelRE(y=y, X=X, W=W_panel_graph, N=PANEL_N, T=PANEL_T)
+    model = SAR(unit_effects="random", y=y, X=X, W=W_panel_graph, N=PANEL_N, T=PANEL_T)
     idata = model.fit(**SAMPLE_KWARGS)
     _assert_scalar(idata, "rho", RHO_TRUE, ABS_TOL_SPATIAL, "SARPanelRE")
     _assert_beta(idata, "SARPanelRE")
@@ -124,7 +124,7 @@ def test_sem_panel_re_recovers_all(rng, W_panel_dense, W_panel_graph):
         sigma=SIGMA_TRUE,
         sigma_alpha=SIGMA_ALPHA_TRUE,
     )
-    model = SEMPanelRE(y=y, X=X, W=W_panel_graph, N=PANEL_N, T=PANEL_T)
+    model = SEM(unit_effects="random", y=y, X=X, W=W_panel_graph, N=PANEL_N, T=PANEL_T)
     idata = model.fit(**SAMPLE_KWARGS)
     _assert_scalar(idata, "lam", LAM_TRUE, ABS_TOL_SPATIAL, "SEMPanelRE")
     _assert_beta(idata, "SEMPanelRE")
@@ -151,7 +151,7 @@ def test_sdem_panel_re_recovers_all(rng, W_panel_dense, W_panel_graph):
         sigma=SIGMA_TRUE,
         sigma_alpha=SIGMA_ALPHA_TRUE,
     )
-    model = SDEMPanelRE(y=y, X=X, W=W_panel_graph, N=PANEL_N, T=PANEL_T)
+    model = SDEM(unit_effects="random", y=y, X=X, W=W_panel_graph, N=PANEL_N, T=PANEL_T)
     idata = model.fit(**SAMPLE_KWARGS)
     _assert_scalar(idata, "lam", LAM_TRUE, ABS_TOL_SPATIAL, "SDEMPanelRE")
     _assert_sdem_beta(idata, "SDEMPanelRE")

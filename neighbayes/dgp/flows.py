@@ -232,7 +232,7 @@ def _hetero_flow_eps(
     return rng.standard_normal(N) * scale_vec
 
 
-def generate_flow_data(
+def simulate_sar_flow(
     n: Optional[int] = None,
     G: Optional[Graph] = None,
     rho_d: float = 0.3,
@@ -489,7 +489,7 @@ def generate_flow_data(
     }
 
 
-def generate_negbin_flow_data(
+def simulate_sar_negbin_flow(
     n: int | None = None,
     k: int = 2,
     k_d: int | None = None,
@@ -681,7 +681,7 @@ def generate_negbin_flow_data(
     }
 
 
-def generate_negbin_flow_data_separable(
+def simulate_sar_negbin_flow_separable(
     n: int | None = None,
     rho_d: float = 0.3,
     rho_o: float = 0.2,
@@ -689,7 +689,7 @@ def generate_negbin_flow_data_separable(
 ) -> dict:
     """NB2 flow DGP with separability constraint ``rho_w = -rho_d * rho_o``."""
     rho_w = -rho_d * rho_o
-    return generate_negbin_flow_data(
+    return simulate_sar_negbin_flow(
         n=n,
         rho_d=rho_d,
         rho_o=rho_o,
@@ -698,7 +698,7 @@ def generate_negbin_flow_data_separable(
     )
 
 
-def generate_panel_flow_data(
+def simulate_sar_flow_panel_fe(
     n: Optional[int] = None,
     T: int = 5,
     G: Optional[Graph] = None,
@@ -740,8 +740,8 @@ def generate_panel_flow_data(
     at time :math:`t`.
 
     To recover the SAR parameters with the existing
-    :class:`~neighbayes.models.flow_panel.SARFlowPanel` /
-    :class:`~neighbayes.models.flow_panel.SARFlowSeparablePanel`,
+    :class:`~neighbayes.models.flow_panel.SARFlowPanelFE` /
+    :class:`~neighbayes.models.flow_panel.SARFlowSeparablePanelFE`,
     fit on ``np.log(y)``.
 
     Parameters
@@ -909,7 +909,7 @@ def generate_panel_flow_data(
     }
 
 
-def generate_panel_negbin_flow_data(
+def simulate_sar_negbin_flow_panel_re(
     n: int | None = None,
     T: int = 5,
     G: Graph | None = None,
@@ -1131,7 +1131,7 @@ def generate_panel_negbin_flow_data(
     }
 
 
-def generate_flow_data_separable(
+def simulate_sar_flow_separable(
     n: Optional[int] = None,
     G: Optional[Graph] = None,
     rho_d: float = 0.3,
@@ -1142,7 +1142,7 @@ def generate_flow_data_separable(
 ) -> dict:
     """Simulate flow data from a *separable* SAR flow model.
 
-    Identical to :func:`generate_flow_data` except the network parameter is
+    Identical to :func:`simulate_sar_flow` except the network parameter is
     derived from the separability constraint
     :math:`\\rho_w = -\\rho_d \\rho_o`, so it is **not** a free argument.
     Use this function to generate training data for
@@ -1163,17 +1163,17 @@ def generate_flow_data_separable(
     beta_o : array-like, shape (k,)
         Origin-side regression coefficients.
     **kwargs
-        Forwarded to :func:`generate_flow_data` (e.g. ``sigma``, ``seed``,
+        Forwarded to :func:`simulate_sar_flow` (e.g. ``sigma``, ``seed``,
         ``X``, ``col_names``).
 
     Returns
     -------
     dict
-        Same as :func:`generate_flow_data`.  The ``"rho_w"`` entry will equal
+        Same as :func:`simulate_sar_flow`.  The ``"rho_w"`` entry will equal
         ``-rho_d * rho_o``.
     """
     rho_w = -rho_d * rho_o
-    return generate_flow_data(
+    return simulate_sar_flow(
         n=n,
         G=G,
         rho_d=rho_d,
@@ -1185,7 +1185,7 @@ def generate_flow_data_separable(
     )
 
 
-def generate_panel_flow_data_separable(
+def simulate_sar_flow_separable_panel_fe(
     n: Optional[int] = None,
     T: int = 5,
     G: Optional[Graph] = None,
@@ -1197,10 +1197,10 @@ def generate_panel_flow_data_separable(
 ) -> dict:
     """Simulate panel flow data from a *separable* SAR flow model.
 
-    Identical to :func:`generate_panel_flow_data` except the network parameter
+    Identical to :func:`simulate_sar_flow_panel_fe` except the network parameter
     is derived as :math:`\\rho_w = -\\rho_d \\rho_o`.  Use this function to
     generate training data for
-    :class:`~neighbayes.models.flow_panel.SARFlowSeparablePanel`.
+    :class:`~neighbayes.models.flow_panel.SARFlowSeparablePanelFE`.
 
     Parameters
     ----------
@@ -1219,17 +1219,17 @@ def generate_panel_flow_data_separable(
     beta_o : array-like, shape (k,)
         Origin-side regression coefficients.
     **kwargs
-        Forwarded to :func:`generate_panel_flow_data` (e.g. ``sigma``,
+        Forwarded to :func:`simulate_sar_flow_panel_fe` (e.g. ``sigma``,
         ``sigma_alpha``, ``seed``).
 
     Returns
     -------
     dict
-        Same as :func:`generate_panel_flow_data`.  The ``"rho_w"`` entry will
+        Same as :func:`simulate_sar_flow_panel_fe`.  The ``"rho_w"`` entry will
         equal ``-rho_d * rho_o``.
     """
     rho_w = -rho_d * rho_o
-    return generate_panel_flow_data(
+    return simulate_sar_flow_panel_fe(
         n=n,
         T=T,
         G=G,
@@ -1242,7 +1242,7 @@ def generate_panel_flow_data_separable(
     )
 
 
-def generate_panel_negbin_flow_data_separable(
+def simulate_sar_negbin_flow_separable_panel_re(
     n: int | None = None,
     T: int = 5,
     G: Graph | None = None,
@@ -1252,7 +1252,7 @@ def generate_panel_negbin_flow_data_separable(
 ) -> dict:
     """Panel NB2 flow DGP with separability constraint ``rho_w=-rho_d*rho_o``."""
     rho_w = -rho_d * rho_o
-    return generate_panel_negbin_flow_data(
+    return simulate_sar_negbin_flow_panel_re(
         n=n,
         T=T,
         G=G,
@@ -1263,7 +1263,7 @@ def generate_panel_negbin_flow_data_separable(
     )
 
 
-def generate_zinb_flow_data_separable(
+def simulate_sar_zinb_flow_separable(
     n: int | None = None,
     T: int = 1,
     rho_d: float = 0.3,
@@ -1277,7 +1277,7 @@ def generate_zinb_flow_data_separable(
 ) -> dict:
     r"""Zero-inflated separable SAR flow counts, cross-section (``T=1``) or panel.
 
-    The count equation is :func:`generate_panel_negbin_flow_data_separable`
+    The count equation is :func:`simulate_sar_negbin_flow_separable_panel_re`
     (its ``pair_effect_sd``, ``time_effect_sd`` and ``fe_x_corr`` included);
     the selection equation uses the same flow design ``X``:
 
@@ -1289,7 +1289,7 @@ def generate_zinb_flow_data_separable(
 
     with :math:`L_k^{\lambda} = I_n - \lambda_k W`.  Matches
     :class:`~neighbayes.models.SARZINBFlowSeparable` and
-    :class:`~neighbayes.models.SARZINBFlowSeparablePanel`.
+    :class:`~neighbayes.models.SARZINBFlowSeparablePanelRE`.
 
     Parameters
     ----------
@@ -1303,7 +1303,7 @@ def generate_zinb_flow_data_separable(
         Shift the selection intercept so the mean activation probability is
         ``target_pi``.
     n, T, rho_d, rho_o, seed, **kwargs
-        As for :func:`generate_panel_negbin_flow_data_separable`.
+        As for :func:`simulate_sar_negbin_flow_separable_panel_re`.
 
     Returns
     -------
@@ -1311,7 +1311,7 @@ def generate_zinb_flow_data_separable(
         The NB flow output with ``y`` zero-inflated (``y_vec`` too when
         ``T=1``), plus ``d``, ``eta_sel``, ``gamma``, ``lam_d`` and ``lam_o``.
     """
-    out = generate_panel_negbin_flow_data_separable(
+    out = simulate_sar_negbin_flow_separable_panel_re(
         n=n, T=T, rho_d=rho_d, rho_o=rho_o, seed=seed, **kwargs
     )
     X, names = out["X"], list(out["col_names"])
@@ -1366,7 +1366,7 @@ def generate_zinb_flow_data_separable(
     return out
 
 
-def generate_hurdle_flow_data_separable(
+def simulate_sar_hurdle_negbin_flow_separable(
     n: int | None = None,
     T: int = 1,
     rho_d: float = 0.3,
@@ -1383,7 +1383,7 @@ def generate_hurdle_flow_data_separable(
     r"""Separable SAR hurdle NB flows, cross-section (``T=1``) or panel.
 
     The count half's log-mean is that of
-    :func:`generate_panel_negbin_flow_data_separable` (its ``pair_effect_sd``,
+    :func:`simulate_sar_negbin_flow_separable_panel_re` (its ``pair_effect_sd``,
     ``time_effect_sd`` and ``fe_x_corr`` included), truncated at zero; the
     binary half uses the same flow design ``X``:
 
@@ -1394,8 +1394,8 @@ def generate_hurdle_flow_data_separable(
         \qquad d \sim \mathrm{Bernoulli}(\mathrm{logit}^{-1}(\eta^{\mathrm{b}})),
         \qquad y = d \cdot \mathrm{tNB}(\mu, \alpha).
 
-    Matches :class:`~neighbayes.models.SARHurdleNBFlowSeparable` and
-    :class:`~neighbayes.models.SARHurdleNBFlowSeparablePanel`.
+    Matches :class:`~neighbayes.models.SARHurdleNegBinFlowSeparable` and
+    :class:`~neighbayes.models.SARHurdleNegBinFlowSeparablePanelRE`.
 
     Parameters
     ----------
@@ -1403,7 +1403,7 @@ def generate_hurdle_flow_data_separable(
         Binary destination and origin dependence.
     gamma : array-like, optional
         Binary coefficients on the columns of ``X``; default as
-        :func:`generate_zinb_flow_data_separable`.
+        :func:`simulate_sar_zinb_flow_separable`.
     target_pi : float, optional
         Shift the binary intercept (inside the filter) so ``mean P(y > 0)`` is
         ``target_pi``.
@@ -1411,7 +1411,7 @@ def generate_hurdle_flow_data_separable(
         Standard deviations of the binary pair effects ``C^b`` and period
         effects ``τ^b`` (``τ^b_0 = 0``).
     n, T, rho_d, rho_o, seed, **kwargs
-        As for :func:`generate_panel_negbin_flow_data_separable`.
+        As for :func:`simulate_sar_negbin_flow_separable_panel_re`.
 
     Returns
     -------
@@ -1422,7 +1422,7 @@ def generate_hurdle_flow_data_separable(
     """
     from .hurdle import _intercept_shift, truncated_negative_binomial
 
-    out = generate_panel_negbin_flow_data_separable(
+    out = simulate_sar_negbin_flow_separable_panel_re(
         n=n, T=T, rho_d=rho_d, rho_o=rho_o, seed=seed, **kwargs
     )
     X, names = out["X"], list(out["col_names"])
@@ -1496,7 +1496,7 @@ def generate_hurdle_flow_data_separable(
 # ---------------------------------------------------------------------------
 
 
-def generate_sem_flow_data(
+def simulate_sem_flow(
     n: Optional[int] = None,
     G: Optional[Graph] = None,
     lam_d: float = 0.3,
@@ -1518,7 +1518,7 @@ def generate_sem_flow_data(
 ) -> dict:
     r"""Simulate flow data from a *spatial-error* (SEM) flow model.
 
-    Spatial-error analogue of :func:`generate_flow_data`.  The latent
+    Spatial-error analogue of :func:`simulate_sar_flow`.  The latent
     additive linear predictor is
 
     .. math::
@@ -1531,7 +1531,7 @@ def generate_sem_flow_data(
     or :math:`y = \eta` (``"normal"``).  Use to generate training data for
     :class:`~neighbayes.models.flow.SEMFlow`.
 
-    Parameters and return dict mirror :func:`generate_flow_data`.
+    Parameters and return dict mirror :func:`simulate_sar_flow`.
     """
     rng = np.random.default_rng(seed)
 
@@ -1647,7 +1647,7 @@ def generate_sem_flow_data(
     }
 
 
-def generate_sem_flow_data_separable(
+def simulate_sem_flow_separable(
     n: Optional[int] = None,
     G: Optional[Graph] = None,
     lam_d: float = 0.3,
@@ -1658,10 +1658,10 @@ def generate_sem_flow_data_separable(
 ) -> dict:
     r"""Simulate SEM flow data with the separability constraint :math:`\lambda_w = -\lambda_d \lambda_o`.
 
-    Spatial-error analogue of :func:`generate_flow_data_separable`.
+    Spatial-error analogue of :func:`simulate_sar_flow_separable`.
     """
     lam_w = -lam_d * lam_o
-    return generate_sem_flow_data(
+    return simulate_sem_flow(
         n=n,
         G=G,
         lam_d=lam_d,
@@ -1673,7 +1673,7 @@ def generate_sem_flow_data_separable(
     )
 
 
-def generate_panel_sem_flow_data(
+def simulate_sem_flow_panel_fe(
     n: Optional[int] = None,
     T: int = 5,
     G: Optional[Graph] = None,
@@ -1701,9 +1701,9 @@ def generate_panel_sem_flow_data(
         \eta_t = X_t\beta + \alpha + B^{-1}\varepsilon_t, \quad
         \varepsilon_t \sim \mathcal{N}(0, \sigma^2 I_N).
 
-    Panel analogue of :func:`generate_panel_flow_data` for SEM.  Use to
+    Panel analogue of :func:`simulate_sar_flow_panel_fe` for SEM.  Use to
     generate training data for
-    :class:`~neighbayes.models.flow_panel.SEMFlowPanel`.
+    :class:`~neighbayes.models.flow_panel.SEMFlowPanelFE`.
     """
     rng = np.random.default_rng(seed)
 
@@ -1793,7 +1793,7 @@ def generate_panel_sem_flow_data(
     }
 
 
-def generate_panel_sem_flow_data_separable(
+def simulate_sem_flow_separable_panel_fe(
     n: Optional[int] = None,
     T: int = 5,
     G: Optional[Graph] = None,
@@ -1805,7 +1805,7 @@ def generate_panel_sem_flow_data_separable(
 ) -> dict:
     r"""Panel SEM flow DGP with separability constraint :math:`\lambda_w = -\lambda_d \lambda_o`."""
     lam_w = -lam_d * lam_o
-    return generate_panel_sem_flow_data(
+    return simulate_sem_flow_panel_fe(
         n=n,
         T=T,
         G=G,
@@ -1842,7 +1842,7 @@ def _poissonize_flow(out: dict, mean_count: float, seed: int) -> dict:
     return out
 
 
-def generate_poisson_flow_data(
+def simulate_sar_poisson_flow(
     n: int | None = None,
     rho_d: float = 0.3,
     rho_o: float = 0.2,
@@ -1881,23 +1881,23 @@ def generate_poisson_flow_data(
     seed : int, default 42
         Random seed.
     **kwargs
-        Forwarded to :func:`generate_negbin_flow_data`.
+        Forwarded to :func:`simulate_sar_negbin_flow`.
 
     Returns
     -------
     dict
-        As :func:`generate_negbin_flow_data`, without ``alpha``.
+        As :func:`simulate_sar_negbin_flow`, without ``alpha``.
     """
     kwargs.setdefault("beta_d", [signal, signal])
     kwargs.setdefault("beta_o", [signal, signal])
     kwargs.setdefault("gamma_dist", -signal)
-    out = generate_negbin_flow_data(
+    out = simulate_sar_negbin_flow(
         n=n, rho_d=rho_d, rho_o=rho_o, rho_w=rho_w, alpha=2.0, seed=seed, **kwargs
     )
     return _poissonize_flow(out, mean_count, seed)
 
 
-def generate_poisson_flow_data_separable(
+def simulate_sar_poisson_flow_separable(
     n: int | None = None,
     rho_d: float = 0.3,
     rho_o: float = 0.2,
@@ -1908,12 +1908,12 @@ def generate_poisson_flow_data_separable(
 ) -> dict:
     r"""Separable Poisson flow DGP (:math:`\rho_w = -\rho_d \rho_o`).
 
-    See :func:`generate_poisson_flow_data` for the parameters.
+    See :func:`simulate_sar_poisson_flow` for the parameters.
     """
     kwargs.setdefault("beta_d", [signal, signal])
     kwargs.setdefault("beta_o", [signal, signal])
     kwargs.setdefault("gamma_dist", -signal)
-    out = generate_negbin_flow_data_separable(
+    out = simulate_sar_negbin_flow_separable(
         n=n, rho_d=rho_d, rho_o=rho_o, alpha=2.0, seed=seed, **kwargs
     )
     return _poissonize_flow(out, mean_count, seed)

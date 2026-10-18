@@ -45,7 +45,7 @@ __all__ = [
 # cross-section); the CHOLMOD NumPy path is available via gibbs_backend="numpy".
 
 
-def _run_count_structural_gibbs(
+def _run_count_re_gibbs(
     model,
     *,
     draws,
@@ -85,9 +85,9 @@ def _run_count_structural_gibbs(
 
 
 register(
-    "count_structural",
+    "count_re",
     "cross_section",
-    run=_run_count_structural_gibbs,
+    run=_run_count_re_gibbs,
     backends={"jax", "numpy"},
     auto_backend="jax",
     options={

@@ -14,9 +14,9 @@ reduced-form SAR-NB count equation via a zero-allocation block:
     \eta^{\mathrm{cnt}} &= (I - \rho W_{\mathrm{cnt}})^{-1} X\beta
 
 Both equations are reduced-form: the spatial lag enters each linear
-predictor as a deterministic mean-propagator (no latent noise field), so
+predictor as a deterministic mean-propagator (no random effects), so
 the ``|I − λW|`` / ``|I − ρW|`` Jacobians cancel under marginalization.
-The logit link fixes σ² = 1 in the selection equation.  The Pólya–Gamma
+The Pólya–Gamma
 augmentation yields fully conjugate Gibbs updates for all blocks except
 ρ, λ, and α, which use 1-D adaptive slice sampling.  The NumPy and JAX
 backends fit the same model block-for-block.
@@ -61,6 +61,7 @@ from ...samplers.zinb import (
 )
 from .._base._nb import nb_alpha_fixed, nb_alpha_rv
 from .._base._shared import _parse_W
+from .._design import discrete
 from .._mixins._zinb import ZINBMixin
 from ..base import SpatialModel
 from ..priors import SARZINBPriors
@@ -157,6 +158,8 @@ class SARZINB(ZINBMixin, SpatialModel):
     posterior expectations averaged over draws; ``posterior_predictive``
     simulates ``d ~ Bern(π)``, ``y = d · NB``.
     """
+
+    _dispatch = classmethod(discrete)
 
     _spatial_params: tuple[str, ...] = ("rho", "lam")
     _lag_terms: tuple[str, ...] = ()

@@ -18,6 +18,8 @@ import pytest
 import scipy.sparse as sp
 from pytensor.gradient import verify_grad
 
+from neighbayes.models import SARNegBinFlow
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -372,7 +374,7 @@ class TestSeparableNegBinLogpCompiles:
         y = rng.poisson(5.0, size=(n, n)).astype(np.int64)
         X = rng.normal(size=(n * n, 2))
 
-        model_obj = SARNegBinFlowSeparable(y, X, graph)
+        model_obj = SARNegBinFlow(y, X, graph, separable=True)
         pm_model = model_obj._build_pymc_model()
 
         # Just test that logp can be evaluated at the initial point

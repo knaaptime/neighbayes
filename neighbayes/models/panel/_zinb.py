@@ -11,12 +11,12 @@ r"""Zero-inflated NB2 panels with count-equation effects.
 stacked time-first over ``T`` periods of ``N`` units.  Structural zeros are per
 period; ``Z`` may vary over time (add period dummies to it for period effects
 in the selection).  ``effects`` sets unit (pooled) and period effects on
-the **count** equation only, as in :class:`~neighbayes.models.SARNegBinPanel`; the
+the **count** equation only, as in :class:`~neighbayes.models.SARNegBinPanelRE`; the
 selection equation has none (a unit effect there would compete with the zero
 process for the same information).
 
-* :class:`SARZINBPanel` — spatial lag in both equations.
-* :class:`ZINBPanel` — the aspatial baseline.
+* :class:`SARZINBPanelRE` — spatial lag in both equations.
+* :class:`ZINBPanelRE` — the aspatial baseline.
 
 Both default to the Pólya–Gamma Gibbs sampler of
 :mod:`neighbayes.samplers.zinb._generic`; ``sampler="nuts"`` fits the same
@@ -35,6 +35,7 @@ from ..._lazy_deps import pm, xr
 from ...samplers._registry import register
 from .._base._nb import nb_alpha_fixed, nb_alpha_rv
 from .._base._shared import _parse_W
+from .._design import FacadeMeta, discrete
 from .._mixins._count_panel import CountPanelFEMixin, require_counts
 from .._mixins._zinb import ZINBMixin
 from ..cross_section.sar_zinb import _selection_design
@@ -387,7 +388,7 @@ register(
 )
 
 
-class SARZINBPanel(_ZINBPanelBase):
+class SARZINBPanelRE(_ZINBPanelBase):
     __doc__ = (
         r"""Zero-inflated SAR-NB panel: spatial lag in both equations.
 
@@ -401,9 +402,27 @@ class SARZINBPanel(_ZINBPanelBase):
     _count_spatial = True
 
 
-class ZINBPanel(_ZINBPanelBase):
+class ZINBPanelRE(_ZINBPanelBase):
     __doc__ = (
         r"""Aspatial zero-inflated NB panel with count-equation effects."""
         + _PARAMS_DOC
     )
     _count_spatial = False
+
+
+class ZINB(metaclass=FacadeMeta):
+    """Zero-inflated negative binomial panel without spatial dependence.
+
+    Implemented for panels only: pass ``time_col`` (formula mode) or ``T``
+    (matrix mode).  The count part's unit effects are random and its time
+    effects fixed.
+
+    Parameters
+    ----------
+    unit_effects : {None, "random"}, default None
+    time_effects : bool, default False
+    **kwargs
+        As for :class:`SARZINB` panels, without ``W``.
+    """
+
+    _dispatch = classmethod(discrete)

@@ -7,17 +7,8 @@ have been removed in favor of the Bayesian LM tests in ``diagnostics.bayesian_di
 
 from __future__ import annotations
 
-from neighbayes.models import (
-    OLS,
-    SAR,
-    SDEM,
-    SDM,
-    SEM,
-    SLX,
-    OLSPanelFE,
-    SARPanelFE,
-    SEMPanelFE,
-)
+from neighbayes.models import OLS, SAR, SDEM, SDM, SEM, SLX
+from neighbayes.models.panel._fe import OLSPanelFE, SARPanelFE, SEMPanelFE
 
 
 def test_cross_sectional_models_no_longer_expose_frequentist_spec_tests():
