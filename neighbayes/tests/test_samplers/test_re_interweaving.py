@@ -17,13 +17,13 @@ from neighbayes.models.panel._re import SARPanelRE, SEMPanelRE
 
 
 def _weak_effects(sim, seed):
-    return sim(N=400, T=3, n_side=20, sigma=1.0, sigma_alpha=0.3, seed=seed)
+    return sim(N=400, T=3, n_side=20, sigma=1.0, unit_effects="random", unit_effect_sd=0.3, seed=seed)
 
 
 def test_sigma_alpha_mixes_with_weak_effects():
     import arviz as az
 
-    d = _weak_effects(dgp.simulate_sar_panel_re, 3)
+    d = _weak_effects(dgp.simulate_sar, 3)
     m = SAR(unit_effects="random", y=d["y"], X=d["X"], W=d["W_sparse"], N=400, T=3)
     post = m.fit(
         sampler="gibbs", draws=1000, tune=500, chains=2, progressbar=False,
@@ -38,8 +38,8 @@ def test_sigma_alpha_mixes_with_weak_effects():
 @pytest.mark.parametrize(
     "cls, sim, spatial",
     [
-        (SARPanelRE, dgp.simulate_sar_panel_re, "rho"),
-        (SEMPanelRE, dgp.simulate_sem_panel_re, "lam"),
+        (SARPanelRE, dgp.simulate_sar, "rho"),
+        (SEMPanelRE, dgp.simulate_sem, "lam"),
     ],
 )
 def test_re_gibbs_matches_nuts_with_weak_effects(cls, sim, spatial):

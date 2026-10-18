@@ -6,16 +6,7 @@ import numpy as np
 import pytest
 from libpysal.graph import Graph
 
-from neighbayes.dgp.flows import (
-    simulate_sar_flow,
-    simulate_sar_flow_panel_fe,
-    simulate_sar_flow_separable,
-    simulate_sar_flow_separable_panel_fe,
-    simulate_sar_negbin_flow,
-    simulate_sar_negbin_flow_panel_re,
-    simulate_sar_negbin_flow_separable,
-    simulate_sar_negbin_flow_separable_panel_re,
-)
+from neighbayes.dgp import simulate_sar_flow, simulate_sar_negbin_flow
 from neighbayes.dgp.utils import (
     pairwise_distance_matrix,
     synth_point_geodataframe,
@@ -33,7 +24,7 @@ def all_dgp_outputs():
     return {
         "flow": simulate_sar_flow(N, G, 0.2, 0.2, 0.05, BETA_D, BETA_O, seed=0),
         "negbin": simulate_sar_negbin_flow(n=N, k=2, seed=0),
-        "panel": simulate_sar_flow_panel_fe(
+        "panel": simulate_sar_flow(
             n=N,
             T=2,
             G=G,
@@ -43,11 +34,21 @@ def all_dgp_outputs():
             beta_d=BETA_D,
             beta_o=BETA_O,
             seed=0,
+            pair_effects="fixed",
         ),
-        "panel_negbin": simulate_sar_negbin_flow_panel_re(n=N, T=2, G=G, seed=0),
-        "flow_sep": simulate_sar_flow_separable(N, G, 0.3, 0.2, BETA_D, BETA_O, seed=0),
-        "negbin_sep": simulate_sar_negbin_flow_separable(n=N, k=2, seed=0),
-        "panel_sep": simulate_sar_flow_separable_panel_fe(
+        "panel_negbin": simulate_sar_negbin_flow(n=N, T=2, G=G, seed=0),
+        "flow_sep": simulate_sar_flow(
+            n=N,
+            G=G,
+            rho_d=0.3,
+            rho_o=0.2,
+            beta_d=BETA_D,
+            beta_o=BETA_O,
+            seed=0,
+            separable=True,
+        ),
+        "negbin_sep": simulate_sar_negbin_flow(n=N, k=2, seed=0, separable=True),
+        "panel_sep": simulate_sar_flow(
             n=N,
             T=2,
             G=G,
@@ -56,9 +57,11 @@ def all_dgp_outputs():
             beta_d=BETA_D,
             beta_o=BETA_O,
             seed=0,
+            separable=True,
+            pair_effects="fixed",
         ),
-        "panel_negbin_sep": simulate_sar_negbin_flow_separable_panel_re(
-            n=N, T=2, G=G, seed=0
+        "panel_negbin_sep": simulate_sar_negbin_flow(
+            n=N, T=2, G=G, seed=0, separable=True
         ),
     }
 
@@ -212,11 +215,11 @@ class TestAutoBuildG:
 
     def test_n_inferred_from_G(self):
         # When G is supplied, n is inferred (and disagreeing n raises).
-        out = simulate_sar_negbin_flow_panel_re(T=2, G=G, seed=0)
+        out = simulate_sar_negbin_flow(T=2, G=G, seed=0)
         assert out["G"].n_nodes == G.n_nodes
         assert out["y"].shape == (2 * G.n_nodes * G.n_nodes,)
         with pytest.raises(ValueError, match="disagrees"):
-            simulate_sar_negbin_flow_panel_re(n=G.n_nodes + 1, T=2, G=G, seed=0)
+            simulate_sar_negbin_flow(n=G.n_nodes + 1, T=2, G=G, seed=0)
 
     def test_gdf_size_mismatch_raises(self):
         gdf = synth_point_geodataframe(7)

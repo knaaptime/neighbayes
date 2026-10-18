@@ -58,7 +58,7 @@ SIDE = 4  # 16 cross-sectional units (small for speed)
 
 def _make_sar_data(side=SIDE, rho_true=0.4, beta_true=None, sigma_true=1.0, seed=42):
     """Create a small synthetic SAR dataset using the DGP module."""
-    from neighbayes.dgp.cross_sectional import simulate_sar
+    from neighbayes.dgp import simulate_sar
 
     rng = np.random.default_rng(seed)
     W_dense = make_rook_W(side)
@@ -74,7 +74,7 @@ def _make_sar_data(side=SIDE, rho_true=0.4, beta_true=None, sigma_true=1.0, seed
 
 def _make_sem_data(side=SIDE, lam_true=0.4, beta_true=None, sigma_true=1.0, seed=42):
     """Create a small synthetic SEM dataset using the DGP module."""
-    from neighbayes.dgp.cross_sectional import simulate_sem
+    from neighbayes.dgp import simulate_sem
 
     rng = np.random.default_rng(seed)
     W_dense = make_rook_W(side)

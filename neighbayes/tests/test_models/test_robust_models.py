@@ -122,11 +122,11 @@ class TestRobustPanelFE:
 
     @pytest.fixture
     def panel_data(self, rng):
-        from neighbayes.dgp import simulate_sar_panel_fe
+        from neighbayes.dgp import simulate_sar
 
         W = make_line_W(PANEL_N)
         W_graph = W_to_graph(W)
-        out = simulate_sar_panel_fe(
+        out = simulate_sar(
             N=PANEL_N,
             T=PANEL_T,
             rho=0.3,
@@ -134,6 +134,7 @@ class TestRobustPanelFE:
             sigma=0.5,
             rng=rng,
             W=_as_sparse(W),
+            unit_effects="fixed",
         )
         return out["y"], out["X"], W_graph
 
@@ -172,11 +173,11 @@ class TestRobustPanelRE:
 
     @pytest.fixture
     def panel_re_data(self, rng):
-        from neighbayes.dgp import simulate_sar_panel_re
+        from neighbayes.dgp import simulate_sar
 
         W = make_line_W(PANEL_N)
         W_graph = W_to_graph(W)
-        out = simulate_sar_panel_re(
+        out = simulate_sar(
             N=PANEL_N,
             T=PANEL_T,
             rho=0.3,
@@ -184,6 +185,7 @@ class TestRobustPanelRE:
             sigma=0.5,
             rng=rng,
             W=_as_sparse(W),
+            unit_effects="random",
         )
         return out["y"], out["X"], W_graph
 

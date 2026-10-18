@@ -8,6 +8,7 @@ from typing import Any
 import numpy as np
 import scipy.sparse as sp
 
+from ._design import aspatial, count, gaussian, simulator
 from .utils import (
     _hetero_scale,
     ensure_rng,
@@ -140,6 +141,7 @@ def _simulate_sdem_core(
     return X @ beta1 + wx_beta + u
 
 
+@simulator(gaussian)
 def simulate_sar(
     n_side: int | None = None,
     W=None,
@@ -235,6 +237,7 @@ def simulate_sar(
     )
 
 
+@simulator(count)
 def simulate_sar_negbin(
     n_side: int | None = None,
     W=None,
@@ -377,6 +380,7 @@ def simulate_sar_negbin(
     )
 
 
+@simulator(gaussian)
 def simulate_ols(
     n_side: int | None = None,
     W=None,
@@ -491,6 +495,7 @@ def simulate_ols(
     )
 
 
+@simulator(gaussian)
 def simulate_sem(
     n_side: int | None = None,
     W=None,
@@ -555,6 +560,7 @@ def simulate_sem(
     )
 
 
+@simulator(gaussian)
 def simulate_slx(
     n_side: int | None = None,
     W=None,
@@ -614,6 +620,7 @@ def simulate_slx(
     )
 
 
+@simulator(gaussian)
 def simulate_sdm(
     n_side: int | None = None,
     W=None,
@@ -674,6 +681,7 @@ def simulate_sdm(
     )
 
 
+@simulator(gaussian)
 def simulate_sdem(
     n_side: int | None = None,
     W=None,
@@ -732,3 +740,8 @@ def simulate_sdem(
         create_gdf=create_gdf,
         geometry_type=geometry_type,
     )
+
+
+@aspatial(simulate_sar_negbin, {"rho": 0.0}, xs_random=False)
+def simulate_negbin():
+    """Simulate an aspatial NB2 regression: :func:`simulate_sar_negbin` with ``rho = 0``."""

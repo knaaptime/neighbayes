@@ -61,7 +61,7 @@ def test_unknown_link_raises():
 
 
 def _tobit(scale=1.0, seed=3):
-    from neighbayes.dgp.nonlinear import simulate_sar_tobit
+    from neighbayes.dgp import simulate_sar_tobit
 
     return simulate_sar_tobit(
         n_side=12,
@@ -154,10 +154,10 @@ def test_nb_flow_nuts_and_gibbs_resolve_the_same_priors(monkeypatch):
 
 def test_nb_flow_panel_alpha_matches_gibbs():
     """The panel NUTS build uses the half-t on alpha that the Gibbs path uses."""
-    from neighbayes.dgp.flows import simulate_sar_negbin_flow_panel_re
+    from neighbayes.dgp import simulate_sar_negbin_flow
     from neighbayes.models.flow_panel import SARNegBinFlowSeparablePanelRE
 
-    d = simulate_sar_negbin_flow_panel_re(n=5, T=3, seed=1)
+    d = simulate_sar_negbin_flow(n=5, T=3, seed=1)
     m = SARNegBinFlow(
         separable=True, y=d["y"], W=d["G"], X=d["X"], T=3, col_names=d["col_names"]
     )

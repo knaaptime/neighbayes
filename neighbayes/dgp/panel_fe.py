@@ -1,6 +1,6 @@
 """Panel fixed-effects style DGP functions.
 
-The :func:`simulate_sdm_panel_fe` and :func:`simulate_sdem_panel_fe`
+The :func:`_simulate_sdm_panel_fe` and :func:`_simulate_sdem_panel_fe`
 generators are the most general lag-on-y and lag-on-error panel DGPs.
 The simpler models in this module (``sar``, ``sem``, ``slx``, ``ols``)
 are thin wrappers that call the corresponding core kernel with
@@ -27,6 +27,7 @@ import scipy.sparse as sp
 from .utils import (
     _hetero_scale,
     _maybe_geodataframe,
+    _time_effects,
     ensure_rng,
     make_design_matrix,
     panel_index,
@@ -55,6 +56,7 @@ def _simulate_sdm_panel_fe_core(
     sigma: float,
     sigma_alpha: float,
     err_hetero: bool,
+    time_effect_sd: float = 0.0,
     rng: np.random.Generator,
 ) -> tuple[np.ndarray, np.ndarray, dict]:
     """Panel SDM-FE kernel.
@@ -69,8 +71,9 @@ def _simulate_sdm_panel_fe_core(
     solve = spatial_filter_factor(Ws, rho) if use_solve else None
 
     alpha = rng.normal(0.0, sigma_alpha, N)
+    tau = _time_effects(rng, T, time_effect_sd)
     y_list, X_list = [], []
-    for _ in range(T):
+    for t in range(T):
         Xt = make_design_matrix(rng, N, k=max(len(beta1) - 1, 0), add_intercept=True)
         if has_wx:
             Wx = Ws @ Xt[:, 1:]
@@ -84,7 +87,7 @@ def _simulate_sdm_panel_fe_core(
         eps = (_hetero_scale(Xt, sigma) if err_hetero else sigma) * rng.standard_normal(
             N
         )
-        rhs = Xt @ beta1 + wx_beta + alpha + eps
+        rhs = Xt @ beta1 + wx_beta + alpha + tau[t] + eps
         yt = solve(rhs) if use_solve else rhs
         y_list.append(yt)
         X_list.append(Xt)
@@ -102,6 +105,7 @@ def _simulate_sdem_panel_fe_core(
     sigma: float,
     sigma_alpha: float,
     err_hetero: bool,
+    time_effect_sd: float = 0.0,
     rng: np.random.Generator,
 ) -> tuple[np.ndarray, np.ndarray, dict]:
     """Panel SDEM-FE kernel.
@@ -116,8 +120,9 @@ def _simulate_sdem_panel_fe_core(
     solve = spatial_filter_factor(Ws, lam) if use_solve else None
 
     alpha = rng.normal(0.0, sigma_alpha, N)
+    tau = _time_effects(rng, T, time_effect_sd)
     y_list, X_list = [], []
-    for _ in range(T):
+    for t in range(T):
         Xt = make_design_matrix(rng, N, k=max(len(beta1) - 1, 0), add_intercept=True)
         if has_wx:
             Wx = Ws @ Xt[:, 1:]
@@ -132,18 +137,19 @@ def _simulate_sdem_panel_fe_core(
             N
         )
         u = solve(eps) if use_solve else eps
-        yt = Xt @ beta1 + wx_beta + alpha + u
+        yt = Xt @ beta1 + wx_beta + alpha + tau[t] + u
         y_list.append(yt)
         X_list.append(Xt)
     return _panel_finalize(y_list, X_list, N, T)
 
 
-def simulate_ols_panel_fe(
+def _simulate_ols_panel_fe(
     N: int,
     T: int,
     beta: np.ndarray | None = None,
     sigma: float = 1.0,
     sigma_alpha: float = 0.5,
+    time_effect_sd: float = 0.0,
     err_hetero: bool = False,
     rng: np.random.Generator | None = None,
     seed: int | None = None,
@@ -156,7 +162,7 @@ def simulate_ols_panel_fe(
 ) -> dict:
     """Simulate pooled data compatible with OLSPanelFE model assumptions.
 
-    Equivalent to :func:`simulate_sdm_panel_fe` with ``rho=0`` and ``beta2=[]``;
+    Equivalent to :func:`_simulate_sdm_panel_fe` with ``rho=0`` and ``beta2=[]``;
     the spatial weights matrix is required for shape validation but does not
     appear in the data equation.
 
@@ -184,6 +190,7 @@ def simulate_ols_panel_fe(
         rho=0.0,
         sigma=sigma,
         sigma_alpha=sigma_alpha,
+        time_effect_sd=time_effect_sd,
         err_hetero=err_hetero,
         rng=rng,
     )
@@ -203,13 +210,14 @@ def simulate_ols_panel_fe(
     )
 
 
-def simulate_sar_panel_fe(
+def _simulate_sar_panel_fe(
     N: int,
     T: int,
     rho: float = 0.4,
     beta: np.ndarray | None = None,
     sigma: float = 1.0,
     sigma_alpha: float = 0.5,
+    time_effect_sd: float = 0.0,
     err_hetero: bool = False,
     rng: np.random.Generator | None = None,
     seed: int | None = None,
@@ -225,7 +233,7 @@ def simulate_sar_panel_fe(
 
     DGP: ``y_t = (I - rho W)^-1 (X_t beta + alpha + eps_t)``.
 
-    Equivalent to :func:`simulate_sdm_panel_fe` with ``beta2=[]``.
+    Equivalent to :func:`_simulate_sdm_panel_fe` with ``beta2=[]``.
     """
     rng = ensure_rng(rng, seed)
     Ws, Wg = resolve_weights(W=W, gdf=gdf, n_side=n_side, contiguity=contiguity)
@@ -245,6 +253,7 @@ def simulate_sar_panel_fe(
         rho=rho,
         sigma=sigma,
         sigma_alpha=sigma_alpha,
+        time_effect_sd=time_effect_sd,
         err_hetero=err_hetero,
         rng=rng,
     )
@@ -269,13 +278,14 @@ def simulate_sar_panel_fe(
     )
 
 
-def simulate_sem_panel_fe(
+def _simulate_sem_panel_fe(
     N: int,
     T: int,
     lam: float = 0.4,
     beta: np.ndarray | None = None,
     sigma: float = 1.0,
     sigma_alpha: float = 0.5,
+    time_effect_sd: float = 0.0,
     err_hetero: bool = False,
     rng: np.random.Generator | None = None,
     seed: int | None = None,
@@ -291,7 +301,7 @@ def simulate_sem_panel_fe(
 
     DGP: ``u_t = (I - lam W)^-1 eps_t`` and ``y_t = X_t beta + alpha + u_t``.
 
-    Equivalent to :func:`simulate_sdem_panel_fe` with ``beta2=[]``.
+    Equivalent to :func:`_simulate_sdem_panel_fe` with ``beta2=[]``.
     """
     rng = ensure_rng(rng, seed)
     Ws, Wg = resolve_weights(W=W, gdf=gdf, n_side=n_side, contiguity=contiguity)
@@ -311,6 +321,7 @@ def simulate_sem_panel_fe(
         lam=lam,
         sigma=sigma,
         sigma_alpha=sigma_alpha,
+        time_effect_sd=time_effect_sd,
         err_hetero=err_hetero,
         rng=rng,
     )
@@ -335,7 +346,7 @@ def simulate_sem_panel_fe(
     )
 
 
-def simulate_sdm_panel_fe(
+def _simulate_sdm_panel_fe(
     N: int,
     T: int,
     rho: float = 0.4,
@@ -343,6 +354,7 @@ def simulate_sdm_panel_fe(
     beta2: np.ndarray | None = None,
     sigma: float = 1.0,
     sigma_alpha: float = 0.5,
+    time_effect_sd: float = 0.0,
     err_hetero: bool = False,
     rng: np.random.Generator | None = None,
     seed: int | None = None,
@@ -381,6 +393,7 @@ def simulate_sdm_panel_fe(
         rho=rho,
         sigma=sigma,
         sigma_alpha=sigma_alpha,
+        time_effect_sd=time_effect_sd,
         err_hetero=err_hetero,
         rng=rng,
     )
@@ -406,7 +419,7 @@ def simulate_sdm_panel_fe(
     )
 
 
-def simulate_sdem_panel_fe(
+def _simulate_sdem_panel_fe(
     N: int,
     T: int,
     lam: float = 0.4,
@@ -414,6 +427,7 @@ def simulate_sdem_panel_fe(
     beta2: np.ndarray | None = None,
     sigma: float = 1.0,
     sigma_alpha: float = 0.5,
+    time_effect_sd: float = 0.0,
     err_hetero: bool = False,
     rng: np.random.Generator | None = None,
     seed: int | None = None,
@@ -453,6 +467,7 @@ def simulate_sdem_panel_fe(
         lam=lam,
         sigma=sigma,
         sigma_alpha=sigma_alpha,
+        time_effect_sd=time_effect_sd,
         err_hetero=err_hetero,
         rng=rng,
     )
@@ -478,13 +493,14 @@ def simulate_sdem_panel_fe(
     )
 
 
-def simulate_slx_panel_fe(
+def _simulate_slx_panel_fe(
     N: int,
     T: int,
     beta1: np.ndarray | None = None,
     beta2: np.ndarray | None = None,
     sigma: float = 1.0,
     sigma_alpha: float = 0.5,
+    time_effect_sd: float = 0.0,
     err_hetero: bool = False,
     rng: np.random.Generator | None = None,
     seed: int | None = None,
@@ -499,7 +515,7 @@ def simulate_slx_panel_fe(
 
     DGP: ``y_t = X_t beta1 + W X_t[:,1:] beta2 + alpha + eps_t``.
 
-    Equivalent to :func:`simulate_sdm_panel_fe` with ``rho=0``.
+    Equivalent to :func:`_simulate_sdm_panel_fe` with ``rho=0``.
     """
     rng = ensure_rng(rng, seed)
     Ws, Wg = resolve_weights(W=W, gdf=gdf, contiguity=contiguity)
@@ -522,6 +538,7 @@ def simulate_slx_panel_fe(
         rho=0.0,
         sigma=sigma,
         sigma_alpha=sigma_alpha,
+        time_effect_sd=time_effect_sd,
         err_hetero=err_hetero,
         rng=rng,
     )

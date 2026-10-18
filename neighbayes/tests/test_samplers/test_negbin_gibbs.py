@@ -154,8 +154,9 @@ class TestSARNegBinStructuralRhoMixing:
             rho=0.4,
             beta=np.array([1.0, 0.5]),
             alpha=2.0,
-            sigma2=0.5,
             rng=rng,
+            unit_effects="random",
+            unit_effect_sd=0.7071067811865476,
         )
         model = SARNegBin(
             unit_effects="random", y=data["y"], X=data["X"], W=data["W_graph"]

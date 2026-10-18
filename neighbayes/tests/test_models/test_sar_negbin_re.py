@@ -112,8 +112,9 @@ def sar_nb_data():
         rho=RHO_TRUE,
         beta=BETA_TRUE,
         alpha=ALPHA_TRUE,
-        sigma2=SIGMA2_TRUE,
         rng=rng,
+        unit_effects="random",
+        unit_effect_sd=(SIGMA2_TRUE) ** 0.5,
     )
 
 
@@ -414,12 +415,7 @@ def sar_nb_reduced_data():
     W_dense = make_rook_W(SIDE)
     W_graph = W_to_graph(W_dense)
     return dgp.simulate_sar_negbin(
-        W=_as_sparse(W_graph),
-        rho=RHO_TRUE,
-        beta=BETA_TRUE,
-        alpha=ALPHA_TRUE,
-        sigma2=0.0,  # reduced form: deterministic latent
-        rng=rng,
+        W=_as_sparse(W_graph), rho=RHO_TRUE, beta=BETA_TRUE, alpha=ALPHA_TRUE, rng=rng
     )
 
 

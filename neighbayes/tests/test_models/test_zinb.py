@@ -29,13 +29,20 @@ def _xs(n_side=7, seed=0):
 
 
 def _panel(seed=1):
-    return dgp.simulate_sar_zinb_panel_re(
-        N=25, T=3, n_side=5, seed=seed, unit_effect_sd=0.5, time_effect_sd=0.3
+    return dgp.simulate_sar_zinb(
+        N=25,
+        T=3,
+        n_side=5,
+        seed=seed,
+        unit_effects="random",
+        unit_effect_sd=0.5,
+        time_effects=True,
+        time_effect_sd=0.3,
     )
 
 
 def _flow(T=1, seed=2, **kw):
-    return dgp.simulate_sar_zinb_flow_separable(n=4, T=T, seed=seed, **kw)
+    return dgp.simulate_sar_zinb_flow(n=4, T=T, seed=seed, **kw, separable=True)
 
 
 def _agree(a, b, var, mean_tol=0.2, sd_tol=0.15):
@@ -103,7 +110,7 @@ class TestFixes:
     def test_logit_dgp_reduced_form_option(self):
         from neighbayes.dgp.utils import spatial_filter_factor
 
-        d = dgp.simulate_sar_logit(n_side=6, seed=4, rho=0.3, structural=False)
+        d = dgp.simulate_sar_logit(n_side=6, seed=4, rho=0.3)
         expected = spatial_filter_factor(d["W_sparse"], 0.3)(
             d["X"] @ d["params_true"]["beta"]
         )
@@ -120,8 +127,8 @@ class TestFixes:
         )
         np.testing.assert_allclose(d["eta_sel"], expected, atol=1e-10)
 
-        f = dgp.simulate_sar_zinb_flow_separable(
-            n=6, T=2, lam_d=0.4, lam_o=0.3, target_pi=0.6, seed=3
+        f = dgp.simulate_sar_zinb_flow(
+            n=6, T=2, lam_d=0.4, lam_o=0.3, target_pi=0.6, seed=3, separable=True
         )
         W = _graph_to_csr(f["G"]).toarray()
         eye = np.eye(W.shape[0])
@@ -280,7 +287,7 @@ def test_flow_zinb_cross_section(backend):
     "backend", ["numpy", pytest.param("jax", marks=pytest.mark.requires_jax)]
 )
 def test_flow_zinb_panel(effects, backend):
-    d = _flow(T=3, pair_effect_sd=0.4, time_effect_sd=0.3)
+    d = _flow(T=3, pair_effects="random", pair_effect_sd=0.4, time_effects=True, time_effect_sd=0.3)
     X = np.column_stack([d["X"], np.random.default_rng(0).normal(size=d["X"].shape[0])])
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -383,10 +390,7 @@ def test_generic_kernel_matches_sarzinb():
 
 @pytest.mark.slow
 def test_zinb_panel_gibbs_matches_nuts():
-    d = dgp.simulate_sar_zinb_panel_re(
-        N=49, T=4, n_side=7, seed=2, unit_effect_sd=0.6, time_effect_sd=0.3,
-        fe_x_corr=0.5,
-    )  # fmt: skip
+    d = dgp.simulate_sar_zinb(N=49, T=4, n_side=7, seed=2, fe_x_corr=0.5, unit_effects="random", unit_effect_sd=0.6, time_effects=True, time_effect_sd=0.3)  # fmt: skip
     m = SARZINB(
         unit_effects="random",
         time_effects=True,
@@ -420,11 +424,7 @@ def test_flow_zinb_panel_pair_effects_identify_selection():
     import arviz as az
 
     n, T = 20, 8
-    d = dgp.simulate_sar_zinb_flow_separable(
-        n=n, T=T, seed=8, beta_d=[0.4, 0.4], beta_o=[0.4, 0.4], gamma_dist=-0.4,
-        alpha=3.0, lam_d=0.3, lam_o=0.2, target_pi=0.7, pair_effect_sd=1.5,
-        time_effect_sd=0.3,
-    )  # fmt: skip
+    d = dgp.simulate_sar_zinb_flow(n=n, T=T, seed=8, beta_d=[0.4, 0.4], beta_o=[0.4, 0.4], gamma_dist=-0.4, alpha=3.0, lam_d=0.3, lam_o=0.2, target_pi=0.7, separable=True, pair_effects="random", pair_effect_sd=1.5, time_effects=True, time_effect_sd=0.3)  # fmt: skip
     names = d["col_names"]
     idx = [names.index(c) for c in ("intercept", "dest_x0", "orig_x0", "log_distance")]
     with warnings.catch_warnings():
@@ -460,10 +460,7 @@ def test_flow_zinb_panel_pair_effects_identify_selection():
 def test_flow_zinb_jax_matches_numpy():
     # Data on which the selection half is identified and mixes: on a tiny,
     # sparse panel λ's ESS is ~1% of draws and the comparison is only noise.
-    d = dgp.simulate_sar_zinb_flow_separable(
-        n=8, T=6, seed=5, beta_d=[0.4, 0.4], beta_o=[0.4, 0.4], gamma_dist=-0.4,
-        alpha=3.0, pair_effect_sd=0.5, time_effect_sd=0.3, target_pi=0.7,
-    )  # fmt: skip
+    d = dgp.simulate_sar_zinb_flow(n=8, T=6, seed=5, beta_d=[0.4, 0.4], beta_o=[0.4, 0.4], gamma_dist=-0.4, alpha=3.0, target_pi=0.7, separable=True, pair_effects="random", pair_effect_sd=0.5, time_effects=True, time_effect_sd=0.3)  # fmt: skip
     m = SARZINBFlow(
         d["y"],
         d["X"],

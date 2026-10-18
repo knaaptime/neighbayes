@@ -11,21 +11,22 @@ import numpy as np
 import pytest
 import scipy.sparse as sp
 
-from neighbayes.dgp.flows import simulate_sar_flow_panel_fe
+from neighbayes.dgp import simulate_sar_flow
 from neighbayes.models import OLSFlow, SARFlow
 from neighbayes.models.flow_panel import OLSFlowPanelFE, SARFlowPanelFE
 from neighbayes.tests.helpers import effects_kwargs
 
 
 def _data(effects_sigma=1.0):
-    return simulate_sar_flow_panel_fe(
+    return simulate_sar_flow(
         n=6,
         T=3,
         seed=0,
         distribution="normal",
         beta_d=[1.0, -0.5],
         beta_o=[0.5, 0.3],
-        sigma_alpha=effects_sigma,
+        pair_effects="fixed",
+        pair_effect_sd=effects_sigma,
     )
 
 
@@ -219,7 +220,7 @@ def test_old_sigma_sigma_key_is_rejected():
 @pytest.mark.slow
 def test_sar_flow_panel_nuts_and_gibbs_agree():
     """Same likelihood, same priors: the two samplers share a posterior."""
-    d = simulate_sar_flow_panel_fe(
+    d = simulate_sar_flow(
         n=8,
         T=3,
         seed=1,
@@ -229,7 +230,8 @@ def test_sar_flow_panel_nuts_and_gibbs_agree():
         rho_d=0.3,
         rho_o=0.2,
         rho_w=0.1,
-        sigma_alpha=1.0,
+        pair_effects="fixed",
+        pair_effect_sd=1.0,
     )
     fits = {}
     for sampler in ("nuts", "gibbs"):

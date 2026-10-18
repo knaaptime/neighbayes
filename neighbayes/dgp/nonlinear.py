@@ -10,6 +10,7 @@ from __future__ import annotations
 import numpy as np
 from scipy.special import erf
 
+from ._design import aspatial, logit, sem_probit, simulator, tobit
 from .cross_sectional import (
     _attach_optional_gdf,
     simulate_sar,
@@ -26,6 +27,7 @@ from .utils import (
 )
 
 
+@simulator(tobit)
 def simulate_sar_tobit(
     *, censoring: float = 0.0, err_hetero: bool = False, **kwargs
 ) -> dict:
@@ -55,6 +57,7 @@ def simulate_sar_tobit(
     return out
 
 
+@simulator(tobit)
 def simulate_sem_tobit(
     *, censoring: float = 0.0, err_hetero: bool = False, **kwargs
 ) -> dict:
@@ -84,6 +87,7 @@ def simulate_sem_tobit(
     return out
 
 
+@simulator(tobit)
 def simulate_sdm_tobit(
     *, censoring: float = 0.0, err_hetero: bool = False, **kwargs
 ) -> dict:
@@ -113,7 +117,7 @@ def simulate_sdm_tobit(
     return out
 
 
-def simulate_sar_probit(
+def _simulate_sar_probit(
     W=None,
     gdf=None,
     n_side: int | None = None,
@@ -213,6 +217,7 @@ def simulate_sar_probit(
     }
 
 
+@simulator(logit)
 def simulate_sar_logit(
     W=None,
     gdf=None,
@@ -310,6 +315,7 @@ def simulate_sar_logit(
     )
 
 
+@simulator(logit)
 def simulate_sem_logit(
     W=None,
     gdf=None,
@@ -398,3 +404,45 @@ def simulate_sem_logit(
         create_gdf=create_gdf,
         geometry_type=geometry_type,
     )
+
+
+@simulator(sem_probit)
+def simulate_sem_probit(
+    W=None,
+    gdf=None,
+    n_side: int | None = None,
+    rho: float = 0.35,
+    beta: np.ndarray | None = None,
+    group_effect_sd: float = 0.8,
+    group_size: int = 25,
+    err_hetero: bool = False,
+    rng: np.random.Generator | None = None,
+    seed: int | None = None,
+    contiguity: str = "queen",
+) -> dict:
+    """Simulate the SEM probit with random group effects.
+
+    Draws from :class:`~neighbayes.models.SEMProbit`; pass
+    ``group_effects="random"``.  Observations nest in groups of ``group_size``,
+    and the groups' effects follow a SAR process with parameter ``rho`` on the
+    group-level weights, with scale ``group_effect_sd`` (LeSage and Pace 2009,
+    §10.6).
+    """
+    return _simulate_sar_probit(
+        W=W,
+        gdf=gdf,
+        n_side=n_side,
+        rho=rho,
+        beta=beta,
+        sigma_a=group_effect_sd,
+        n_per_region=group_size,
+        err_hetero=err_hetero,
+        rng=rng,
+        seed=seed,
+        contiguity=contiguity,
+    )
+
+
+@aspatial(simulate_sar_logit, {"rho": 0.0}, xs_random=False)
+def simulate_logit():
+    """Simulate an aspatial logit: :func:`simulate_sar_logit` with ``rho = 0``."""

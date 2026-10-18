@@ -12,10 +12,7 @@ import numpy as np
 import pytest
 
 from neighbayes import dgp
-from neighbayes.dgp.flows import (
-    simulate_sar_negbin_flow,
-    simulate_sar_negbin_flow_panel_re,
-)
+from neighbayes.dgp import simulate_sar_negbin_flow
 from neighbayes.models import NegBin, NegBinFlow, SARNegBin, SARNegBinFlow
 from neighbayes.models.flow._flow import SARNegBinFlowSeparable
 from neighbayes.models.flow_panel._panel import (
@@ -45,7 +42,7 @@ def _flow():
 
 
 def _flow_panel():
-    return simulate_sar_negbin_flow_panel_re(n=4, T=3, seed=3)
+    return simulate_sar_negbin_flow(n=4, T=3, seed=3)
 
 
 @pytest.mark.parametrize(
@@ -126,7 +123,7 @@ def test_flow_panels(cls, effects, backend):
 @pytest.mark.parametrize("cls", [SARNegBinPanelRE, NegBinPanelRE])
 @pytest.mark.parametrize("effects", [0, 3])
 def test_panels(cls, effects):
-    d = dgp.simulate_sar_negbin_panel_re(N=16, T=3, n_side=4, seed=4)
+    d = dgp.simulate_sar_negbin(N=16, T=3, n_side=4, seed=4)
     m = cls(
         y=d["y"], X=d["X"], W=d["W_sparse"], N=16, T=3, effects=effects,
         priors={"alpha_fixed": A},
@@ -156,9 +153,9 @@ def test_panels(cls, effects):
             priors={"alpha_fixed": A},
         ),
         lambda: SARNegBin(
-            y=dgp.simulate_sar_negbin_panel_re(N=16, T=3, n_side=4, seed=4)["y"],
-            X=dgp.simulate_sar_negbin_panel_re(N=16, T=3, n_side=4, seed=4)["X"],
-            W=dgp.simulate_sar_negbin_panel_re(N=16, T=3, n_side=4, seed=4)["W_sparse"],
+            y=dgp.simulate_sar_negbin(N=16, T=3, n_side=4, seed=4)["y"],
+            X=dgp.simulate_sar_negbin(N=16, T=3, n_side=4, seed=4)["X"],
+            W=dgp.simulate_sar_negbin(N=16, T=3, n_side=4, seed=4)["W_sparse"],
             N=16,
             T=3,
             priors={"alpha_fixed": A},

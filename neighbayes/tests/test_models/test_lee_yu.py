@@ -66,9 +66,9 @@ def test_unit_fe_recovers_sigma2_at_short_T(sampler):
 
 def _flow_panel(n, T, rho_d, rho_o, seed):
     """Gaussian flow panel with pair effects, from the package DGP."""
-    from neighbayes.dgp.flows import simulate_sar_flow_panel_fe
+    from neighbayes.dgp import simulate_sar_flow
 
-    d = simulate_sar_flow_panel_fe(
+    d = simulate_sar_flow(
         n=n,
         T=T,
         seed=seed,
@@ -78,7 +78,8 @@ def _flow_panel(n, T, rho_d, rho_o, seed):
         rho_w=-rho_d * rho_o,
         beta_d=[1.0, -0.5],
         beta_o=[0.5, 0.3],
-        sigma_alpha=1.0,
+        pair_effects="fixed",
+        pair_effect_sd=1.0,
     )
     return d["y"], d["X"], d["G"], d["col_names"]
 

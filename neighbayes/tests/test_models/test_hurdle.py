@@ -35,10 +35,7 @@ def _xs(n_side=8, seed=0, **kw):
 
 
 def _panel(seed=1, **kw):
-    return dgp.simulate_sar_hurdle_negbin_panel_re(
-        N=25, T=4, n_side=5, seed=seed, unit_effect_sd=0.5, time_effect_sd=0.3,
-        sel_unit_effect_sd=0.5, sel_time_effect_sd=0.3, **kw,
-    )  # fmt: skip
+    return dgp.simulate_sar_hurdle_negbin(N=25, T=4, n_side=5, seed=seed, sel_unit_effect_sd=0.5, sel_time_effect_sd=0.3, **kw, unit_effects="random", unit_effect_sd=0.5, time_effects=True, time_effect_sd=0.3)  # fmt: skip
 
 
 def _agree(a, b, var, mean_tol=0.2, sd_tol=0.15):
@@ -428,16 +425,13 @@ def test_hurdle_panel_gibbs_matches_nuts():
 
 
 def _flow(T=1, seed=2, n=6, **kw):
-    return dgp.simulate_sar_hurdle_negbin_flow_separable(
-        n=n, T=T, seed=seed, beta_d=[0.4, 0.4], beta_o=[0.4, 0.4], gamma_dist=-0.4,
-        alpha=3.0, **kw,
-    )  # fmt: skip
+    return dgp.simulate_sar_hurdle_negbin_flow(n=n, T=T, seed=seed, beta_d=[0.4, 0.4], beta_o=[0.4, 0.4], gamma_dist=-0.4, alpha=3.0, **kw, separable=True)  # fmt: skip
 
 
 def _flow_panel_data(n=5, T=3, seed=5):
     return _flow(
-        T=T, n=n, seed=seed, pair_effect_sd=0.5, time_effect_sd=0.3,
-        sel_pair_effect_sd=0.5, sel_time_effect_sd=0.3,
+        T=T, n=n, seed=seed, pair_effects="random", pair_effect_sd=0.5,
+        time_effects=True, time_effect_sd=0.3, sel_pair_effect_sd=0.5, sel_time_effect_sd=0.3,
     )  # fmt: skip
 
 
@@ -545,8 +539,8 @@ def test_flow_hurdle_structured_matches_generic():
     # tiny panel (~2 positive weeks per pair) both samplers mix too slowly
     # for a tight comparison.
     d = _flow(
-        T=6, n=8, seed=7, target_pi=0.7, pair_effect_sd=0.5, time_effect_sd=0.3,
-        sel_pair_effect_sd=0.5, sel_time_effect_sd=0.3,
+        T=6, n=8, seed=7, target_pi=0.7, pair_effects="random", pair_effect_sd=0.5,
+        time_effects=True, time_effect_sd=0.3, sel_pair_effect_sd=0.5, sel_time_effect_sd=0.3,
     )  # fmt: skip
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)
@@ -665,8 +659,8 @@ def test_flow_hurdle_panel_recovers_sparse_flows():
 
     n, T = 20, 8
     d = _flow(
-        T=T, n=n, seed=8, lam_d=0.3, lam_o=0.2, target_pi=0.4, pair_effect_sd=1.0,
-        time_effect_sd=0.3, sel_pair_effect_sd=1.0, sel_time_effect_sd=0.3,
+        T=T, n=n, seed=8, lam_d=0.3, lam_o=0.2, target_pi=0.4, pair_effects="random",
+        pair_effect_sd=1.0, time_effects=True, time_effect_sd=0.3, sel_pair_effect_sd=1.0, sel_time_effect_sd=0.3,
     )  # fmt: skip
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", UserWarning)

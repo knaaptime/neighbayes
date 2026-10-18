@@ -23,16 +23,16 @@ from neighbayes.tests.helpers import effects_kwargs
 
 def _flow_test_graph(n: int):
     """Return a small Graph for tests via neighbayes's DGP machinery."""
-    from neighbayes.dgp.flows import simulate_sar_flow
+    from neighbayes.dgp import simulate_sar_flow
 
     return simulate_sar_flow(n=n, seed=0)["G"]
 
 
 def _panel_flow_stack(n: int, T: int, k: int, seed: int = 0):
     """Build a noise-only panel-flow stack via neighbayes's panel DGP."""
-    from neighbayes.dgp.flows import simulate_sar_flow_panel_fe
+    from neighbayes.dgp import simulate_sar_flow
 
-    out = simulate_sar_flow_panel_fe(
+    out = simulate_sar_flow(
         n=n,
         T=T,
         k=k,
@@ -42,7 +42,6 @@ def _panel_flow_stack(n: int, T: int, k: int, seed: int = 0):
         beta_d=np.zeros(k),
         beta_o=np.zeros(k),
         sigma=1.0,
-        sigma_alpha=0.0,
         seed=seed,
     )
     return out["y"], out["X"], out["col_names"]
@@ -183,10 +182,10 @@ class TestSARFlowPanelRecovery:
 
     @pytest.fixture(scope="class")
     def fitted_panel(self):
-        from neighbayes.dgp.flows import simulate_sar_flow_panel_fe
+        from neighbayes.dgp import simulate_sar_flow
 
         G = _flow_test_graph(PANEL_FLOW_N)
-        out = simulate_sar_flow_panel_fe(
+        out = simulate_sar_flow(
             n=PANEL_FLOW_N,
             T=PANEL_FLOW_T,
             G=G,
@@ -196,8 +195,9 @@ class TestSARFlowPanelRecovery:
             beta_d=PF_BETA_D_TRUE,
             beta_o=PF_BETA_O_TRUE,
             sigma=PF_SIGMA_TRUE,
-            sigma_alpha=PF_SIGMA_ALPHA_TRUE,
             seed=42,
+            pair_effects="fixed",
+            pair_effect_sd=PF_SIGMA_ALPHA_TRUE,
         )
         # Default panel-flow DGP is lognormal; SARFlowPanelFE has Gaussian
         # likelihood, so fit on np.log(y) (== eta).
@@ -265,10 +265,10 @@ class TestSARFlowSeparablePanelRecovery:
 
     @pytest.fixture(scope="class")
     def fitted_separable_panel(self):
-        from neighbayes.dgp.flows import simulate_sar_flow_separable_panel_fe
+        from neighbayes.dgp import simulate_sar_flow
 
         G = _flow_test_graph(PANEL_FLOW_N)
-        out = simulate_sar_flow_separable_panel_fe(
+        out = simulate_sar_flow(
             n=PANEL_FLOW_N,
             T=PANEL_FLOW_T,
             G=G,
@@ -277,8 +277,10 @@ class TestSARFlowSeparablePanelRecovery:
             beta_d=PF_BETA_D_TRUE,
             beta_o=PF_BETA_O_TRUE,
             sigma=PF_SIGMA_TRUE,
-            sigma_alpha=PF_SIGMA_ALPHA_TRUE,
             seed=42,
+            separable=True,
+            pair_effects="fixed",
+            pair_effect_sd=PF_SIGMA_ALPHA_TRUE,
         )
         # Default panel-flow DGP is lognormal; fit on np.log(y).
         model = SARFlow(
@@ -332,9 +334,9 @@ class TestSARFlowSeparablePanelRecovery:
 
 def _ols_panel_flow_data(n: int, T: int, beta_d, beta_o, sigma, seed=0):
     """Stack T panel-flow periods with rho = 0 via neighbayes's panel DGP."""
-    from neighbayes.dgp.flows import simulate_sar_flow_panel_fe
+    from neighbayes.dgp import simulate_sar_flow
 
-    out = simulate_sar_flow_panel_fe(
+    out = simulate_sar_flow(
         n=n,
         T=T,
         k=len(beta_d),
@@ -344,7 +346,6 @@ def _ols_panel_flow_data(n: int, T: int, beta_d, beta_o, sigma, seed=0):
         beta_d=beta_d,
         beta_o=beta_o,
         sigma=sigma,
-        sigma_alpha=0.0,
         seed=seed,
     )
     return out["G"], out["y"], out["X"], out["col_names"]

@@ -717,3 +717,15 @@ def _maybe_geodataframe(
             wide=wide,
         )
     return out
+
+
+def _time_effects(rng: np.random.Generator, T: int, sd: float) -> np.ndarray:
+    """Period effects with the first period as baseline; no draw when ``sd`` is 0.
+
+    Drawing nothing at ``sd == 0`` keeps the random stream, and so every seeded
+    dataset without time effects, unchanged.
+    """
+    tau = np.zeros(T)
+    if sd > 0.0 and T > 1:
+        tau[1:] = rng.normal(0.0, sd, T - 1)
+    return tau

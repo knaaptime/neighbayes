@@ -17,6 +17,18 @@ from libpysal.graph import Graph
 
 from neighbayes import dgp
 
+# These helpers draw unit effects into dynamic panels (sigma_alpha), which the
+# public simulators refuse, so they call the private dynamic simulators.
+from neighbayes.dgp.panel_dynamic import (
+    _simulate_ols_panel_dynamic,
+    _simulate_sar_panel_dynamic,
+    _simulate_sdem_panel_dynamic,
+    _simulate_sdm_panel_dynamic,
+    _simulate_sdm_panel_dynamic_restricted,
+    _simulate_sem_panel_dynamic,
+    _simulate_slx_panel_dynamic,
+)
+
 # ---------------------------------------------------------------------------
 # Optional-dependency skip helpers
 # ---------------------------------------------------------------------------
@@ -212,14 +224,15 @@ def make_panel_ols_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate panel OLS data with unit random effects."""
-    out = dgp.simulate_ols_panel_fe(
+    out = dgp.simulate_ols(
         N=N,
         T=T,
         beta=beta,
         sigma=sigma,
-        sigma_alpha=sigma_alpha,
         W=_as_sparse(W),
         rng=rng,
+        unit_effects="fixed",
+        unit_effect_sd=sigma_alpha,
     )
     y, X = out["y"], out["X"]
     units = out["unit"]
@@ -239,15 +252,16 @@ def make_panel_sar_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate SAR panel data with unit random effects."""
-    out = dgp.simulate_sar_panel_fe(
+    out = dgp.simulate_sar(
         N=N,
         T=T,
         rho=rho,
         beta=beta,
         sigma=sigma,
-        sigma_alpha=sigma_alpha,
         W=_as_sparse(W),
         rng=rng,
+        unit_effects="fixed",
+        unit_effect_sd=sigma_alpha,
     )
     y, X = out["y"], out["X"]
     units = out["unit"]
@@ -267,15 +281,16 @@ def make_panel_sem_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate SEM panel data with unit random effects."""
-    out = dgp.simulate_sem_panel_fe(
+    out = dgp.simulate_sem(
         N=N,
         T=T,
         lam=lam,
         beta=beta,
         sigma=sigma,
-        sigma_alpha=sigma_alpha,
         W=_as_sparse(W),
         rng=rng,
+        unit_effects="fixed",
+        unit_effect_sd=sigma_alpha,
     )
     y, X = out["y"], out["X"]
     units = out["unit"]
@@ -295,7 +310,7 @@ def make_panel_dlm_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate dynamic non-spatial panel data with unit effects."""
-    out = dgp.simulate_ols_panel_dynamic(
+    out = _simulate_ols_panel_dynamic(
         N=N,
         T=T,
         phi=phi,
@@ -324,7 +339,7 @@ def make_panel_sdmr_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate dynamic restricted SDM panel data with unit effects."""
-    out = dgp.simulate_sdm_panel_dynamic_restricted(
+    out = _simulate_sdm_panel_dynamic_restricted(
         N=N,
         T=T,
         rho=rho,
@@ -355,7 +370,7 @@ def make_panel_sdmu_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate dynamic unrestricted SDM panel data with unit effects."""
-    out = dgp.simulate_sdm_panel_dynamic(
+    out = _simulate_sdm_panel_dynamic(
         N=N,
         T=T,
         rho=rho,
@@ -398,13 +413,14 @@ def make_spatial_probit_data(
     region_ids : np.ndarray
         Region code for each observation, shape ``(nobs,)``.
     """
-    out = dgp.simulate_sar_probit(
+    out = dgp.simulate_sem_probit(
         W=_as_sparse(W),
         rho=rho,
         beta=beta,
-        sigma_a=sigma_a,
-        n_per_region=n_per_region,
         rng=rng,
+        group_effect_sd=sigma_a,
+        group_size=n_per_region,
+        group_effects="random",
     )
     return out["y"], out["X"], out["region_ids"]
 
@@ -461,7 +477,9 @@ def make_sar_logit_re_data(
     ``y ~ Bernoulli(logit^{-1}(eta))``.  Matches the structural
     ``SARLogitRE`` model (latent field with noise).
     """
-    out = dgp.simulate_sar_logit(W=_as_sparse(W), rho=rho, beta=beta, rng=rng)
+    out = dgp.simulate_sar_logit(
+        W=_as_sparse(W), rho=rho, beta=beta, rng=rng, unit_effects="random"
+    )
     return out["y"], out["X"]
 
 
@@ -475,7 +493,9 @@ def make_sem_logit_data(
 
     DGP: ``eta = X beta + (I - lam W)^{-1} nu``, ``y ~ Bernoulli(logit^{-1}(eta))``.
     """
-    out = dgp.simulate_sem_logit(W=_as_sparse(W), lam=lam, beta=beta, rng=rng)
+    out = dgp.simulate_sem_logit(
+        W=_as_sparse(W), lam=lam, beta=beta, rng=rng, unit_effects="random"
+    )
     return out["y"], out["X"]
 
 
@@ -552,7 +572,7 @@ def make_panel_sar_tobit_data(
     censoring: float = 0.0,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Generate left-censored panel SAR FE Tobit data using the dgp module."""
-    out = dgp.simulate_sar_tobit_panel(
+    out = dgp.simulate_sar_tobit(
         N=N,
         T=T,
         W=_as_sparse(W),
@@ -576,7 +596,7 @@ def make_panel_sem_tobit_data(
     censoring: float = 0.0,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Generate left-censored panel SEM FE Tobit data using the dgp module."""
-    out = dgp.simulate_sem_tobit_panel(
+    out = dgp.simulate_sem_tobit(
         N=N,
         T=T,
         W=_as_sparse(W),
@@ -606,7 +626,7 @@ def make_panel_sar_dynamic_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate dynamic SAR panel FE data."""
-    out = dgp.simulate_sar_panel_dynamic(
+    out = _simulate_sar_panel_dynamic(
         N=N,
         T=T,
         W=_as_sparse(W),
@@ -635,7 +655,7 @@ def make_panel_sem_dynamic_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate dynamic SEM panel FE data."""
-    out = dgp.simulate_sem_panel_dynamic(
+    out = _simulate_sem_panel_dynamic(
         N=N,
         T=T,
         W=_as_sparse(W),
@@ -664,7 +684,7 @@ def make_panel_sdem_dynamic_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate dynamic SDEM panel FE data."""
-    out = dgp.simulate_sdem_panel_dynamic(
+    out = _simulate_sdem_panel_dynamic(
         N=N,
         T=T,
         W=_as_sparse(W),
@@ -692,7 +712,7 @@ def make_panel_slx_dynamic_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate dynamic SLX panel FE data."""
-    out = dgp.simulate_slx_panel_dynamic(
+    out = _simulate_slx_panel_dynamic(
         N=N,
         T=T,
         W=_as_sparse(W),
@@ -725,7 +745,7 @@ def make_panel_sdm_fe_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate SDM panel FE data with WX terms."""
-    out = dgp.simulate_sdm_panel_fe(
+    out = dgp.simulate_sdm(
         N=N,
         T=T,
         W=_as_sparse(W),
@@ -733,8 +753,9 @@ def make_panel_sdm_fe_data(
         beta1=beta1,
         beta2=beta2,
         sigma=sigma,
-        sigma_alpha=sigma_alpha,
         rng=rng,
+        unit_effects="fixed",
+        unit_effect_sd=sigma_alpha,
     )
     y, X = out["y"], out["X"]
     units, times = out["unit"], out["time"]
@@ -754,7 +775,7 @@ def make_panel_sdem_fe_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate SDEM panel FE data with WX terms."""
-    out = dgp.simulate_sdem_panel_fe(
+    out = dgp.simulate_sdem(
         N=N,
         T=T,
         W=_as_sparse(W),
@@ -762,8 +783,9 @@ def make_panel_sdem_fe_data(
         beta1=beta1,
         beta2=beta2,
         sigma=sigma,
-        sigma_alpha=sigma_alpha,
         rng=rng,
+        unit_effects="fixed",
+        unit_effect_sd=sigma_alpha,
     )
     y, X = out["y"], out["X"]
     units, times = out["unit"], out["time"]

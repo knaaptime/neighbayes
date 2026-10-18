@@ -193,7 +193,7 @@ class TestDGPAsymmetric:
 
     def test_generate_flow_data_asymmetric(self):
         """simulate_sar_flow works with beta_d and beta_o of different lengths."""
-        from neighbayes.dgp.flows import simulate_sar_flow
+        from neighbayes.dgp import simulate_sar_flow
 
         n = 5
         data = simulate_sar_flow(
@@ -217,7 +217,7 @@ class TestDGPAsymmetric:
 
     def test_generate_flow_data_asymmetric_beta_layout(self):
         """Beta layout in asymmetric DGP places coefficients correctly."""
-        from neighbayes.dgp.flows import simulate_sar_flow
+        from neighbayes.dgp import simulate_sar_flow
 
         n = 5
         beta_d = [1.0, -0.5]
@@ -240,7 +240,7 @@ class TestDGPAsymmetric:
 
     def test_generate_negbin_flow_data_asymmetric(self):
         """simulate_sar_negbin_flow works with k_d ≠ k_o."""
-        from neighbayes.dgp.flows import simulate_sar_negbin_flow
+        from neighbayes.dgp import simulate_sar_negbin_flow
 
         data = simulate_sar_negbin_flow(
             n=5,
@@ -256,23 +256,24 @@ class TestDGPAsymmetric:
         assert data["design"].k_o == 1
 
     def test_generate_panel_flow_data_asymmetric(self):
-        """simulate_sar_flow_panel_fe works with k_d ≠ k_o."""
-        from neighbayes.dgp.flows import simulate_sar_flow_panel_fe
+        """simulate_sar_flow panels work with k_d ≠ k_o."""
+        from neighbayes.dgp import simulate_sar_flow
 
-        data = simulate_sar_flow_panel_fe(
+        data = simulate_sar_flow(
             n=5,
             T=3,
             beta_d=[1.0, -0.5],
             beta_o=[0.5],
             sigma=1.0,
             seed=42,
+            pair_effects="fixed",
         )
         assert data["beta_d"].shape == (2,)
         assert data["beta_o"].shape == (1,)
 
     def test_generate_flow_data_symmetric_backward_compat(self):
         """Symmetric case (k_d == k_o) still works as before."""
-        from neighbayes.dgp.flows import simulate_sar_flow
+        from neighbayes.dgp import simulate_sar_flow
 
         data = simulate_sar_flow(
             n=5,
@@ -299,7 +300,7 @@ class TestModelAsymmetric:
 
     def test_model_infers_kd_ko_from_colnames(self):
         """FlowModel infers k_d and k_o from dest_*/orig_* column names."""
-        from neighbayes.dgp.flows import simulate_sar_flow
+        from neighbayes.dgp import simulate_sar_flow
         from neighbayes.models.flow._flow import SARFlow
 
         data = simulate_sar_flow(
@@ -324,7 +325,7 @@ class TestModelAsymmetric:
 
     def test_effects_asymmetric_shape(self):
         """Spatial effects have correct shapes when k_d ≠ k_o."""
-        from neighbayes.dgp.flows import simulate_sar_flow
+        from neighbayes.dgp import simulate_sar_flow
         from neighbayes.models.flow._flow import OLSFlow
 
         data = simulate_sar_flow(
@@ -353,7 +354,7 @@ class TestModelAsymmetric:
 
     def test_effects_symmetric_shape(self):
         """Spatial effects have correct shapes when k_d == k_o (symmetric)."""
-        from neighbayes.dgp.flows import simulate_sar_flow
+        from neighbayes.dgp import simulate_sar_flow
         from neighbayes.models.flow._flow import OLSFlow
 
         data = simulate_sar_flow(

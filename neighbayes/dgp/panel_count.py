@@ -93,7 +93,7 @@ def _simulate_panel_count(
     }
 
 
-def simulate_sar_negbin_panel_re(
+def _simulate_sar_negbin_panel_re(
     N: int,
     T: int,
     rho: float = 0.4,
@@ -132,7 +132,7 @@ def simulate_sar_negbin_panel_re(
         Accepted for API parity; the count variance is set by the mean (and
         ``alpha``), so it is ignored with a warning.
     rng, seed, W, gdf, n_side, contiguity
-        As for :func:`~neighbayes.dgp.simulate_sar_panel_fe`.
+        As for :func:`~neighbayes.dgp._simulate_sar_panel_fe`.
 
     Returns
     -------
@@ -148,7 +148,7 @@ def simulate_sar_negbin_panel_re(
     )  # fmt: skip
 
 
-def simulate_sar_zinb_panel_re(
+def _simulate_sar_zinb_panel_re(
     N: int,
     T: int,
     rho: float = 0.4,
@@ -170,7 +170,7 @@ def simulate_sar_zinb_panel_re(
 ) -> dict:
     r"""Simulate a zero-inflated SAR-NB panel with per-period structural zeros.
 
-    The count equation is :func:`simulate_sar_negbin_panel_re` (including its
+    The count equation is :func:`_simulate_sar_negbin_panel_re` (including its
     unit- and period-effect knobs); the selection equation is
 
     .. math::
@@ -193,12 +193,12 @@ def simulate_sar_zinb_panel_re(
         Selection weights; default the count weights.
     N, T, rho, beta, alpha, unit_effect_sd, time_effect_sd, fe_x_corr, \
     err_hetero, rng, seed, W, gdf, n_side, contiguity
-        As for :func:`simulate_sar_negbin_panel_re`.
+        As for :func:`_simulate_sar_negbin_panel_re`.
 
     Returns
     -------
     dict
-        As :func:`simulate_sar_negbin_panel_re`, with ``y`` zero-inflated, plus
+        As :func:`_simulate_sar_negbin_panel_re`, with ``y`` zero-inflated, plus
         ``Z``, ``d`` (the activity indicators), ``eta_sel`` and ``W_sel_sparse``;
         ``params_true`` gains ``lam`` and ``gamma``.
     """

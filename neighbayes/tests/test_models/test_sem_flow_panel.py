@@ -10,10 +10,10 @@ from neighbayes.models import SEMFlow
 
 class TestGeneratePanelSemFlowData:
     def test_output_shapes(self):
-        from neighbayes.dgp.flows import simulate_sem_flow_panel_fe
+        from neighbayes.dgp import simulate_sem_flow
 
         n, T = 5, 3
-        out = simulate_sem_flow_panel_fe(
+        out = simulate_sem_flow(
             n=n,
             T=T,
             lam_d=0.2,
@@ -22,9 +22,10 @@ class TestGeneratePanelSemFlowData:
             beta_d=[1.0],
             beta_o=[0.5],
             sigma=0.5,
-            sigma_alpha=0.3,
             seed=0,
             distribution="normal",
+            pair_effects="fixed",
+            pair_effect_sd=0.3,
         )
         N = n * n
         assert out["y"].shape == (N * T,)
@@ -33,10 +34,7 @@ class TestGeneratePanelSemFlowData:
         assert "params_true" in out
 
     def test_separable_substitutes_rho_w(self):
-        from neighbayes.dgp.flows import (
-            simulate_sem_flow_panel_fe,
-            simulate_sem_flow_separable_panel_fe,
-        )
+        from neighbayes.dgp import simulate_sem_flow
 
         kwargs = dict(
             n=5,
@@ -46,21 +44,20 @@ class TestGeneratePanelSemFlowData:
             beta_d=[1.0],
             beta_o=[0.5],
             sigma=0.5,
-            sigma_alpha=0.0,
             seed=1,
             distribution="normal",
         )
-        sep = simulate_sem_flow_separable_panel_fe(**kwargs)
-        full = simulate_sem_flow_panel_fe(lam_w=-0.3 * 0.2, **kwargs)
+        sep = simulate_sem_flow(**kwargs, separable=True)
+        full = simulate_sem_flow(lam_w=-0.3 * 0.2, **kwargs)
         np.testing.assert_allclose(sep["y"], full["y"])
 
 
 class TestSemFlowPanelConstruction:
     def setup_method(self):
-        from neighbayes.dgp.flows import simulate_sem_flow_panel_fe
+        from neighbayes.dgp import simulate_sem_flow
 
         self.n, self.T = 5, 3
-        self.data = simulate_sem_flow_panel_fe(
+        self.data = simulate_sem_flow(
             n=self.n,
             T=self.T,
             lam_d=0.0,
@@ -69,7 +66,6 @@ class TestSemFlowPanelConstruction:
             beta_d=[1.0],
             beta_o=[0.5],
             sigma=0.5,
-            sigma_alpha=0.0,
             seed=2,
             distribution="normal",
         )
@@ -118,11 +114,11 @@ class TestSemFlowPanelConstruction:
 class TestSemFlowPanelRecovery:
     def test_rho_recovery(self):
         """Panel SEM should recover lam_d, lam_o reasonably (lam_w is noisier)."""
-        from neighbayes.dgp.flows import simulate_sem_flow_panel_fe
+        from neighbayes.dgp import simulate_sem_flow
         from neighbayes.models.flow_panel._panel import SEMFlowPanelFE
 
         rho_d_true, rho_o_true, rho_w_true = 0.25, 0.20, 0.10
-        data = simulate_sem_flow_panel_fe(
+        data = simulate_sem_flow(
             n=15,
             T=4,
             lam_d=rho_d_true,
@@ -131,9 +127,10 @@ class TestSemFlowPanelRecovery:
             beta_d=[1.0, -0.5],
             beta_o=[0.8, 0.3],
             sigma=0.6,
-            sigma_alpha=0.3,
             seed=11,
             distribution="normal",
+            pair_effects="fixed",
+            pair_effect_sd=0.3,
         )
         model = SEMFlow(
             data["y"],
@@ -159,10 +156,10 @@ class TestSemFlowPanelRecovery:
             )
 
     def test_separable_constraint_panel(self):
-        from neighbayes.dgp.flows import simulate_sem_flow_separable_panel_fe
+        from neighbayes.dgp import simulate_sem_flow
         from neighbayes.models.flow_panel._panel import SEMFlowSeparablePanelFE
 
-        data = simulate_sem_flow_separable_panel_fe(
+        data = simulate_sem_flow(
             n=8,
             T=3,
             lam_d=0.2,
@@ -170,9 +167,9 @@ class TestSemFlowPanelRecovery:
             beta_d=[1.0],
             beta_o=[0.5],
             sigma=0.5,
-            sigma_alpha=0.0,
             seed=3,
             distribution="normal",
+            separable=True,
         )
         model = SEMFlow(
             data["y"],
@@ -198,7 +195,7 @@ class TestSemFlowPanelRecovery:
 
     def test_separable_panel_recovery_normal(self):
         """SEMFlowSeparablePanelFE should recover lam_d, lam_o from DGP data."""
-        from neighbayes.dgp.flows import simulate_sem_flow_separable_panel_fe
+        from neighbayes.dgp import simulate_sem_flow
         from neighbayes.models.flow_panel._panel import SEMFlowSeparablePanelFE
 
         lam_d_true, lam_o_true = 0.25, 0.20
@@ -206,7 +203,7 @@ class TestSemFlowPanelRecovery:
         beta_o_true = [0.8, 0.3]
         sigma_true = 0.6
 
-        data = simulate_sem_flow_separable_panel_fe(
+        data = simulate_sem_flow(
             n=15,
             T=4,
             lam_d=lam_d_true,
@@ -214,10 +211,10 @@ class TestSemFlowPanelRecovery:
             beta_d=beta_d_true,
             beta_o=beta_o_true,
             sigma=sigma_true,
-            sigma_alpha=0.0,
             gamma_dist=-0.4,
             seed=11,
             distribution="normal",
+            separable=True,
         )
         model = SEMFlow(
             data["y"],

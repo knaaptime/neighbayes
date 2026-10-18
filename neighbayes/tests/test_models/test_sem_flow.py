@@ -19,7 +19,7 @@ from neighbayes.models import SEMFlow
 
 class TestGenerateSemFlowData:
     def test_output_keys_and_shapes(self):
-        from neighbayes.dgp.flows import simulate_sem_flow
+        from neighbayes.dgp import simulate_sem_flow
 
         n = 5
         out = simulate_sem_flow(
@@ -43,10 +43,7 @@ class TestGenerateSemFlowData:
         assert out["lam_w"] == 0.05
 
     def test_separable_substitutes_rho_w(self):
-        from neighbayes.dgp.flows import (
-            simulate_sem_flow,
-            simulate_sem_flow_separable,
-        )
+        from neighbayes.dgp import simulate_sem_flow
 
         kwargs = dict(
             n=5,
@@ -58,13 +55,13 @@ class TestGenerateSemFlowData:
             seed=1,
             distribution="normal",
         )
-        sep = simulate_sem_flow_separable(**kwargs)
+        sep = simulate_sem_flow(**kwargs, separable=True)
         full = simulate_sem_flow(lam_w=-0.3 * 0.2, **kwargs)
         np.testing.assert_allclose(sep["y_vec"], full["y_vec"])
         assert sep["lam_w"] == pytest.approx(-0.3 * 0.2)
 
     def test_unstable_rho_warns(self):
-        from neighbayes.dgp.flows import simulate_sem_flow
+        from neighbayes.dgp import simulate_sem_flow
 
         with pytest.warns(UserWarning, match="stability"):
             simulate_sem_flow(
@@ -87,7 +84,7 @@ class TestGenerateSemFlowData:
 
 class TestSemFlowConstruction:
     def setup_method(self):
-        from neighbayes.dgp.flows import simulate_sem_flow
+        from neighbayes.dgp import simulate_sem_flow
 
         self.n = 5
         self.N = self.n * self.n
@@ -169,7 +166,7 @@ class TestSemFlowConstruction:
 
 class TestSemFlowRecovery:
     def test_parameter_recovery_normal(self):
-        from neighbayes.dgp.flows import simulate_sem_flow
+        from neighbayes.dgp import simulate_sem_flow
         from neighbayes.models.flow._flow import SEMFlow
 
         rho_d_true, rho_o_true, rho_w_true = 0.25, 0.20, 0.10
@@ -230,10 +227,10 @@ class TestSemFlowRecovery:
 
     def test_separable_constraint_holds(self):
         """SEMFlowSeparable should impose lam_w = -lam_d * lam_o exactly."""
-        from neighbayes.dgp.flows import simulate_sem_flow_separable
+        from neighbayes.dgp import simulate_sem_flow
         from neighbayes.models.flow._flow import SEMFlowSeparable
 
-        data = simulate_sem_flow_separable(
+        data = simulate_sem_flow(
             n=10,
             lam_d=0.2,
             lam_o=0.15,
@@ -242,6 +239,7 @@ class TestSemFlowRecovery:
             sigma=0.5,
             seed=3,
             distribution="normal",
+            separable=True,
         )
         model = SEMFlow(
             data["y_vec"],
@@ -266,7 +264,7 @@ class TestSemFlowRecovery:
 
     def test_separable_recovery_normal(self):
         """SEMFlowSeparable should recover lam_d, lam_o from DGP data."""
-        from neighbayes.dgp.flows import simulate_sem_flow_separable
+        from neighbayes.dgp import simulate_sem_flow
         from neighbayes.models.flow._flow import SEMFlowSeparable
 
         lam_d_true, lam_o_true = 0.25, 0.20
@@ -274,7 +272,7 @@ class TestSemFlowRecovery:
         beta_o_true = [0.8, 0.3]
         sigma_true = 0.6
 
-        data = simulate_sem_flow_separable(
+        data = simulate_sem_flow(
             n=20,
             lam_d=lam_d_true,
             lam_o=lam_o_true,
@@ -284,6 +282,7 @@ class TestSemFlowRecovery:
             gamma_dist=-0.4,
             seed=11,
             distribution="normal",
+            separable=True,
         )
         model = SEMFlow(
             data["y_vec"],

@@ -3,16 +3,15 @@
 import numpy as np
 import pytest
 
-from neighbayes.dgp.flows import (
-    simulate_sar_poisson_flow,
-    simulate_sar_poisson_flow_separable,
-)
+from neighbayes.dgp import simulate_sar_poisson_flow
 from neighbayes.models.flow import SARPoissonFlow, SARPoissonFlowSeparable
 
 
 @pytest.fixture(scope="module")
 def sep_data():
-    return simulate_sar_poisson_flow_separable(n=36, rho_d=0.35, rho_o=0.25, seed=3)
+    return simulate_sar_poisson_flow(
+        n=36, rho_d=0.35, rho_o=0.25, seed=3, separable=True
+    )
 
 
 class TestConstruction:
@@ -201,17 +200,22 @@ class TestDispersionCheck:
     def test_poisson_data_is_quiet(self):
         import warnings
 
-        data = simulate_sar_poisson_flow_separable(n=10, seed=4)
+        data = simulate_sar_poisson_flow(n=10, seed=4, separable=True)
         with warnings.catch_warnings():
             warnings.filterwarnings("error", message="Pearson dispersion")
             idata = self._fit(data)
         assert 0.6 < idata.attrs["pearson_dispersion"] < 1.5
 
     def test_overdispersed_data_warns(self):
-        from neighbayes.dgp.flows import simulate_sar_negbin_flow_separable
+        from neighbayes.dgp import simulate_sar_negbin_flow
 
-        data = simulate_sar_negbin_flow_separable(
-            n=10, seed=5, alpha=0.5, beta_d=[0.3, 0.3], beta_o=[0.3, 0.3]
+        data = simulate_sar_negbin_flow(
+            n=10,
+            seed=5,
+            alpha=0.5,
+            beta_d=[0.3, 0.3],
+            beta_o=[0.3, 0.3],
+            separable=True,
         )
         with pytest.warns(UserWarning, match="Pearson dispersion"):
             idata = self._fit(data)

@@ -17,15 +17,15 @@ from neighbayes.models.flow_panel._panel import (
 
 
 def _small_negbin_flow(seed: int = 0):
-    from neighbayes.dgp.flows import simulate_sar_negbin_flow
+    from neighbayes.dgp import simulate_sar_negbin_flow
 
     return simulate_sar_negbin_flow(n=6, seed=seed)
 
 
 def _small_panel_negbin_flow(seed: int = 0):
-    from neighbayes.dgp.flows import simulate_sar_negbin_flow_panel_re
+    from neighbayes.dgp import simulate_sar_negbin_flow
 
-    return simulate_sar_negbin_flow_panel_re(n=5, T=3, seed=seed)
+    return simulate_sar_negbin_flow(n=5, T=3, seed=seed)
 
 
 class TestNegativeBinomialFlowConstruction:
@@ -158,7 +158,7 @@ class TestNegativeBinomialFlowRecovery:
     """Parameter recovery checks for NB flow variants (deselected by default)."""
 
     def test_negbin_sar_flow_recovers_all_params(self):
-        from neighbayes.dgp.flows import simulate_sar_negbin_flow
+        from neighbayes.dgp import simulate_sar_negbin_flow
 
         rho_d_true, rho_o_true, rho_w_true = 0.25, 0.2, 0.1
         beta_d_true, beta_o_true = [1.5, -0.8], [0.7, 1.2]
@@ -212,14 +212,14 @@ class TestNegativeBinomialFlowRecovery:
         _check_beta_recovery(idata, beta_d_true, beta_o_true, gamma_dist_true)
 
     def test_negbin_sar_flow_separable_recovers_all_params(self):
-        from neighbayes.dgp.flows import simulate_sar_negbin_flow_separable
+        from neighbayes.dgp import simulate_sar_negbin_flow
 
         rho_d_true, rho_o_true = 0.4, 0.3
         beta_d_true, beta_o_true = [1.2, -0.6], [0.9, 1.1]
         gamma_dist_true = -0.5
         alpha_true = 1.8
 
-        out = simulate_sar_negbin_flow_separable(
+        out = simulate_sar_negbin_flow(
             n=15,
             rho_d=rho_d_true,
             rho_o=rho_o_true,
@@ -228,6 +228,7 @@ class TestNegativeBinomialFlowRecovery:
             gamma_dist=gamma_dist_true,
             alpha=alpha_true,
             seed=43,
+            separable=True,
         )
         model = SARNegBinFlow(
             out["y_vec"],
@@ -269,14 +270,14 @@ class TestNegativeBinomialPanelFlowRecovery:
     """Parameter recovery checks for panel NB flow variants."""
 
     def test_negbin_panel_sar_recovers_all_params(self):
-        from neighbayes.dgp.flows import simulate_sar_negbin_flow_panel_re
+        from neighbayes.dgp import simulate_sar_negbin_flow
 
         rho_d_true, rho_o_true, rho_w_true = 0.25, 0.2, 0.1
         beta_d_true, beta_o_true = [1.4, -0.7], [0.8, 1.1]
         gamma_dist_true = -0.5
         alpha_true = 2.2
 
-        out = simulate_sar_negbin_flow_panel_re(
+        out = simulate_sar_negbin_flow(
             n=7,
             T=5,
             rho_d=rho_d_true,
@@ -328,7 +329,7 @@ class TestNegativeBinomialPanelFlowRecovery:
         _check_beta_recovery(idata, beta_d_true, beta_o_true, gamma_dist_true)
 
     def test_negbin_panel_sar_separable_recovers_all_params(self):
-        from neighbayes.dgp.flows import simulate_sar_negbin_flow_separable_panel_re
+        from neighbayes.dgp import simulate_sar_negbin_flow
 
         rho_d_true, rho_o_true = 0.4, 0.3
         beta_d_true, beta_o_true = [1.3, -0.5], [0.6, 1.0]
@@ -339,7 +340,7 @@ class TestNegativeBinomialPanelFlowRecovery:
         # mode (rho_o≈0 with beta_d absorbing the origin-side signal) that
         # beats the DGP truth in exact likelihood — the (rho_o, beta) split is
         # simply not identified there.
-        out = simulate_sar_negbin_flow_separable_panel_re(
+        out = simulate_sar_negbin_flow(
             n=10,
             T=6,
             rho_d=rho_d_true,
@@ -349,6 +350,7 @@ class TestNegativeBinomialPanelFlowRecovery:
             gamma_dist=gamma_dist_true,
             alpha=alpha_true,
             seed=45,
+            separable=True,
         )
         model = SARNegBinFlow(
             separable=True,
@@ -389,7 +391,7 @@ class TestNegBinFlowAspatialRecovery:
     """Recovery for the aspatial NegBinFlow (no spatial parameters)."""
 
     def test_negbin_flow_recovers_beta_and_alpha(self):
-        from neighbayes.dgp.flows import simulate_sar_negbin_flow
+        from neighbayes.dgp import simulate_sar_negbin_flow
 
         beta_d_true, beta_o_true = [1.5, -0.8], [0.7, 1.2]
         gamma_dist_true = -0.5
@@ -433,13 +435,13 @@ class TestNegBinFlowPanelAspatialRecovery:
     """Recovery for the aspatial NegBinFlowPanelRE (no spatial parameters)."""
 
     def test_negbin_flow_panel_recovers_beta_and_alpha(self):
-        from neighbayes.dgp.flows import simulate_sar_negbin_flow_panel_re
+        from neighbayes.dgp import simulate_sar_negbin_flow
 
         beta_d_true, beta_o_true = [1.4, -0.7], [0.8, 1.1]
         gamma_dist_true = -0.5
         alpha_true = 2.2
 
-        out = simulate_sar_negbin_flow_panel_re(
+        out = simulate_sar_negbin_flow(
             n=7,
             T=5,
             rho_d=0.0,

@@ -15,10 +15,7 @@ import arviz as az
 import numpy as np
 import pytest
 
-from neighbayes.dgp.flows import (
-    simulate_sar_negbin_flow_separable,
-    simulate_sar_negbin_flow_separable_panel_re,
-)
+from neighbayes.dgp import simulate_sar_negbin_flow
 from neighbayes.models import SARNegBinFlow
 from neighbayes.models._base._shared import gelman_default_beta_prior
 from neighbayes.models.priors import FlowReducedGibbsPriors
@@ -34,8 +31,8 @@ DRAWS, TUNE, CHAINS = 4000, 800, 4
 
 @pytest.fixture(scope="module")
 def data():
-    return simulate_sar_negbin_flow_separable(
-        n=N_REGIONS, rho_d=0.35, rho_o=0.25, seed=3
+    return simulate_sar_negbin_flow(
+        n=N_REGIONS, rho_d=0.35, rho_o=0.25, seed=3, separable=True
     )
 
 
@@ -112,8 +109,8 @@ PANEL_N, PANEL_T = 20, 4
 
 @pytest.fixture(scope="module")
 def panel_model():
-    d = simulate_sar_negbin_flow_separable_panel_re(
-        n=PANEL_N, T=PANEL_T, rho_d=0.35, rho_o=0.25, seed=5
+    d = simulate_sar_negbin_flow(
+        n=PANEL_N, T=PANEL_T, rho_d=0.35, rho_o=0.25, seed=5, separable=True
     )
     return SARNegBinFlow(
         d["y"], d["X"], d["G"], separable=True, T=PANEL_T, col_names=d["col_names"]

@@ -207,7 +207,7 @@ class TestDGPIntegration:
     """simulate_sar_logit should produce valid data."""
 
     def test_dgp_output(self):
-        out = dgp.simulate_sar_logit(n_side=5, rho=0.3, seed=42)
+        out = dgp.simulate_sar_logit(n_side=5, rho=0.3, seed=42, unit_effects="random")
         assert "y" in out
         assert "X" in out
         assert "W_sparse" in out
@@ -219,7 +219,7 @@ class TestDGPIntegration:
 
     def test_model_from_dgp(self):
         """Model should accept data from simulate_sar_logit."""
-        out = dgp.simulate_sar_logit(n_side=5, rho=0.3, seed=42)
+        out = dgp.simulate_sar_logit(n_side=5, rho=0.3, seed=42, unit_effects="random")
         model = SARLogit(y=out["y"], X=out["X"], W=out["W_graph"])
         assert model._y.shape == (25,)
 
@@ -322,7 +322,7 @@ class TestSEMDGPIntegration:
     """simulate_sem_logit should produce valid data."""
 
     def test_dgp_output(self):
-        out = dgp.simulate_sem_logit(n_side=5, lam=0.3, seed=42)
+        out = dgp.simulate_sem_logit(n_side=5, lam=0.3, seed=42, unit_effects="random")
         assert "y" in out
         assert "X" in out
         assert "W_sparse" in out
@@ -334,7 +334,7 @@ class TestSEMDGPIntegration:
 
     def test_model_from_dgp(self):
         """Model should accept data from simulate_sem_logit."""
-        out = dgp.simulate_sem_logit(n_side=5, lam=0.3, seed=42)
+        out = dgp.simulate_sem_logit(n_side=5, lam=0.3, seed=42, unit_effects="random")
         model = SEMLogit(
             unit_effects="random", y=out["y"], X=out["X"], W=out["W_graph"]
         )
@@ -346,7 +346,7 @@ class TestSEMFitIntegration:
 
     def test_fit_small(self):
         """Fit on small DGP data should return valid InferenceData."""
-        out = dgp.simulate_sem_logit(n_side=5, lam=0.3, seed=42)
+        out = dgp.simulate_sem_logit(n_side=5, lam=0.3, seed=42, unit_effects="random")
         model = SEMLogit(
             unit_effects="random", y=out["y"], X=out["X"], W=out["W_graph"]
         )

@@ -15,6 +15,7 @@ import warnings
 
 import numpy as np
 
+from ._design import aspatial, count, simulator
 from .cross_sectional import _attach_optional_gdf, _check_rho_stability
 from .panel_count import _simulate_panel_count
 from .utils import (
@@ -56,6 +57,7 @@ def _intercept_shift(eta, a0, target):
     return 0.5 * (lo + hi)
 
 
+@simulator(count)
 def simulate_sar_hurdle_negbin(
     n_side: int | None = None,
     W=None,
@@ -181,7 +183,7 @@ def simulate_sar_hurdle_negbin(
     )
 
 
-def simulate_sar_hurdle_negbin_panel_re(
+def _simulate_sar_hurdle_negbin_panel_re(
     N: int,
     T: int,
     rho: float = 0.4,
@@ -206,7 +208,7 @@ def simulate_sar_hurdle_negbin_panel_re(
 ) -> dict:
     r"""Simulate a SAR hurdle NB panel with unit and period effects in both halves.
 
-    The count half is :func:`~neighbayes.dgp.simulate_sar_negbin_panel_re`'s
+    The count half is :func:`~neighbayes.dgp._simulate_sar_negbin_panel_re`'s
     log-mean (its ``unit_effect_sd``, ``time_effect_sd`` and ``fe_x_corr``),
     truncated at zero; the binary half is
 
@@ -235,7 +237,7 @@ def simulate_sar_hurdle_negbin_panel_re(
         assume it is zero).
     N, T, rho, beta, alpha, unit_effect_sd, time_effect_sd, fe_x_corr, \
     err_hetero, rng, seed, W, gdf, n_side, contiguity
-        As for :func:`~neighbayes.dgp.simulate_sar_negbin_panel_re`.
+        As for :func:`~neighbayes.dgp._simulate_sar_negbin_panel_re`.
 
     Returns
     -------
@@ -285,3 +287,12 @@ def simulate_sar_hurdle_negbin_panel_re(
         lam=lam, gamma=gamma, sel_unit_effect=sel_unit, sel_time_effect=sel_time
     )
     return out
+
+
+@aspatial(simulate_sar_hurdle_negbin, {"rho": 0.0, "lam": 0.0}, panel_only=True)
+def simulate_hurdle_negbin():
+    """Simulate an aspatial hurdle NB panel: :func:`simulate_sar_hurdle_negbin` at zero dependence.
+
+    Panels only, as for :class:`~neighbayes.models.HurdleNegBin`: pass ``T`` and
+    ``N``.
+    """

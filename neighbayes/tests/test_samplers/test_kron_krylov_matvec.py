@@ -128,7 +128,7 @@ class TestFlowSystemInvertibility:
 
     def test_matches_true_spectrum_on_a_real_lattice(self):
         """Cross-check the corner test against explicit eigenvalues of A."""
-        from neighbayes.dgp.flows import simulate_sar_poisson_flow
+        from neighbayes.dgp import simulate_sar_poisson_flow
         from neighbayes.samplers.negbin_reduced._flow import (
             flow_system_is_invertible,
         )
@@ -163,7 +163,7 @@ class TestUnrestrictedKrylovBasis:
 
     @staticmethod
     def _setup(n_units=9):
-        from neighbayes.dgp.flows import simulate_sar_poisson_flow
+        from neighbayes.dgp import simulate_sar_poisson_flow
 
         d = simulate_sar_poisson_flow(n=n_units, seed=3)
         n = d["W"].shape[0]

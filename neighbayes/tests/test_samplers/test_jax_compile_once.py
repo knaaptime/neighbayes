@@ -49,7 +49,7 @@ def _cases():
             d["y"],
             lambda y, d=d, cls=cls: cls(y=y, X=d["X"], W=d["W_sparse"]),
         )
-    dp = dgp.simulate_sar_panel_fe(N=36, T=3, n_side=6, seed=2)
+    dp = dgp.simulate_sar(N=36, T=3, n_side=6, seed=2, unit_effects="fixed")
     out["SARPanelFE"] = (
         dp["y"],
         lambda y: M.SAR(
@@ -77,10 +77,7 @@ def _cases():
         ("SARNegBin", M.SARNegBin, 0.0),
         ("SARNegBinRE", partial(M.SARNegBin, unit_effects="random"), 0.5),
     ):
-        dn = dgp.simulate_sar_negbin(
-            W=_as_sparse(W), rho=0.4, beta=np.array([0.5, 0.8]), alpha=2.0,
-            sigma2=s2, rng=np.random.default_rng(4),
-        )  # fmt: skip
+        dn = dgp.simulate_sar_negbin(W=_as_sparse(W), rho=0.4, beta=np.array([0.5, 0.8]), alpha=2.0, rng=np.random.default_rng(4), unit_effects="random", unit_effect_sd=(s2) ** 0.5)  # fmt: skip
         out[name] = (dn["y"], lambda y, dn=dn, cls=cls: cls(y=y, X=dn["X"], W=W))
     dz = dgp.simulate_sar_zinb(n_side=6, seed=6)
     out["SARZINB"] = (dz["y"], lambda y: M.SARZINB(y=y, X=dz["X"], W=dz["W_sparse"]))
@@ -95,10 +92,7 @@ def _cases():
         fd["y_vec"],
         lambda y: M.SARNegBinFlow(y, fd["X"], fd["G"], separable=True),
     )
-    pf = dgp.simulate_sar_negbin_flow_separable_panel_re(
-        n=5, T=3, rho_d=0.3, rho_o=0.2, seed=21, alpha=3.0, beta_d=[0.4, 0.4],
-        beta_o=[0.4, 0.4], gamma_dist=-0.4, pair_effect_sd=0.5, time_effect_sd=0.3,
-    )  # fmt: skip
+    pf = dgp.simulate_sar_negbin_flow(n=5, T=3, rho_d=0.3, rho_o=0.2, seed=21, alpha=3.0, beta_d=[0.4, 0.4], beta_o=[0.4, 0.4], gamma_dist=-0.4, separable=True, pair_effects="random", pair_effect_sd=0.5, time_effects=True, time_effect_sd=0.3)  # fmt: skip
     out["SARNegBinFlowSeparablePanelRE"] = (
         pf["y"],
         lambda y: M.SARNegBinFlow(
@@ -112,18 +106,22 @@ def _cases():
             col_names=pf["col_names"],
         ),
     )
-    hd = dgp.simulate_sar_hurdle_negbin_flow_separable(
-        n=6, T=1, seed=2, beta_d=[0.4, 0.4], beta_o=[0.4, 0.4], gamma_dist=-0.4,
-        alpha=3.0,
-    )  # fmt: skip
+    hd = dgp.simulate_sar_hurdle_negbin_flow(n=6, T=1, seed=2, beta_d=[0.4, 0.4], beta_o=[0.4, 0.4], gamma_dist=-0.4, alpha=3.0, separable=True)  # fmt: skip
     out["SARHurdleNegBinFlowSeparable"] = (
         hd["y_vec"],
         lambda y: M.SARHurdleNegBinFlow(
             y, hd["X"], hd["G"], separable=True, col_names=hd["col_names"]
         ),
     )
-    zd = dgp.simulate_sar_zinb_flow_separable(
-        n=4, T=3, seed=2, pair_effect_sd=0.4, time_effect_sd=0.3
+    zd = dgp.simulate_sar_zinb_flow(
+        n=4,
+        T=3,
+        seed=2,
+        separable=True,
+        pair_effects="random",
+        pair_effect_sd=0.4,
+        time_effects=True,
+        time_effect_sd=0.3,
     )
     out["SARZINBFlowSeparablePanelRE"] = (
         zd["y"],

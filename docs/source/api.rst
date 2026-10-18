@@ -327,46 +327,37 @@ Data Generating Processes
    :func:`~neighbayes.dgp.utils.synth_point_geodataframe` and builds a
    row-standardised KNN graph automatically.
 
+   Each simulator draws from the model class it is named for and takes the
+   same design arguments: ``T`` (with ``N``) for a panel, ``unit_effects`` and
+   ``time_effects`` (scaled by ``unit_effect_sd`` and ``time_effect_sd``,
+   default 0.5), and ``dynamic``.  Fixed and random unit effects draw the same
+   data; the distinction belongs to the model.
+
 .. currentmodule:: neighbayes.dgp
 
 .. autosummary::
    :toctree: generated/
 
    simulate_ols
+   simulate_slx
    simulate_sar
    simulate_sem
-   simulate_slx
    simulate_sdm
    simulate_sdem
-   simulate_sar_negbin
-   simulate_sar_zinb
-   simulate_sar_hurdle_negbin
-   simulate_multilevel
-   simulate_sar_probit
    simulate_sar_tobit
    simulate_sem_tobit
    simulate_sdm_tobit
-   simulate_ols_panel_fe
-   simulate_sar_panel_fe
-   simulate_sem_panel_fe
-   simulate_sdm_panel_fe
-   simulate_sdem_panel_fe
-   simulate_slx_panel_fe
-   simulate_ols_panel_re
-   simulate_sar_panel_re
-   simulate_sem_panel_re
-   simulate_ols_panel_dynamic
-   simulate_sdm_panel_dynamic_restricted
-   simulate_sdm_panel_dynamic
-   simulate_sar_panel_dynamic
-   simulate_sem_panel_dynamic
-   simulate_sdem_panel_dynamic
-   simulate_slx_panel_dynamic
-   simulate_sar_tobit_panel
-   simulate_sem_tobit_panel
-   simulate_sar_negbin_panel_re
-   simulate_sar_zinb_panel_re
-   simulate_sar_hurdle_negbin_panel_re
+   simulate_logit
+   simulate_sar_logit
+   simulate_sem_logit
+   simulate_sem_probit
+   simulate_negbin
+   simulate_sar_negbin
+   simulate_zinb
+   simulate_sar_zinb
+   simulate_hurdle_negbin
+   simulate_sar_hurdle_negbin
+   simulate_multilevel
 
 
 Flow Data Generating Processes
@@ -376,8 +367,9 @@ Each flow DGP accepts ``n``, ``G``, ``gdf``, and ``knn_k`` as optional
 arguments and (unless ``gamma_dist=0.0``) appends a ``log_distance``
 column ``log(1 + d_{ij})`` with default coefficient ``gamma_dist=-0.5``.
 
-The Gaussian flow DGPs (``simulate_sar_flow``,
-``simulate_sar_flow_panel_fe`` and their separable variants) default to
+Each flow simulator takes ``separable``, ``T``, ``pair_effects``, and
+``time_effects`` as its model class does.  The Gaussian flow DGPs
+(``simulate_sar_flow`` and ``simulate_sem_flow``) default to
 ``distribution="lognormal"``, returning strictly-positive flows
 ``y = exp(eta)`` where ``eta`` is the latent SAR-filtered linear
 predictor (also exposed in the result dict as ``"eta_vec"`` /
@@ -390,20 +382,14 @@ Binomial DGPs are unchanged.
 .. autosummary::
    :toctree: generated/
 
+   simulate_ols_flow
    simulate_sar_flow
-   simulate_sar_flow_separable
-   simulate_sar_negbin_flow
-   simulate_sar_negbin_flow_separable
    simulate_sem_flow
-   simulate_sem_flow_separable
-   simulate_sar_flow_panel_fe
-   simulate_sar_flow_separable_panel_fe
-   simulate_sar_negbin_flow_panel_re
-   simulate_sar_negbin_flow_separable_panel_re
-   simulate_sem_flow_panel_fe
-   simulate_sem_flow_separable_panel_fe
-   simulate_sar_zinb_flow_separable
-   simulate_sar_hurdle_negbin_flow_separable
+   simulate_negbin_flow
+   simulate_sar_negbin_flow
+   simulate_sar_poisson_flow
+   simulate_sar_zinb_flow
+   simulate_sar_hurdle_negbin_flow
 
 
 

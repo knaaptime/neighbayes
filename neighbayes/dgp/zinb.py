@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from ._design import aspatial, count, simulator
 from .cross_sectional import (
     _attach_optional_gdf,
     _check_rho_stability,
@@ -16,6 +17,7 @@ from .utils import (
 )
 
 
+@simulator(count)
 def simulate_sar_zinb(
     n_side: int | None = None,
     W=None,
@@ -236,3 +238,11 @@ def simulate_sar_zinb(
         create_gdf=create_gdf,
         geometry_type=geometry_type,
     )
+
+
+@aspatial(simulate_sar_zinb, {"rho": 0.0, "lam": 0.0}, panel_only=True)
+def simulate_zinb():
+    """Simulate an aspatial ZINB panel: :func:`simulate_sar_zinb` with ``rho = lam = 0``.
+
+    Panels only, as for :class:`~neighbayes.models.ZINB`: pass ``T`` and ``N``.
+    """

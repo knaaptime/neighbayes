@@ -216,12 +216,7 @@ def sar_negbin_data():
     rng = np.random.default_rng(42)
     W = W_to_graph(make_rook_W(SIDE_NB))
     return dgp.simulate_sar_negbin(
-        W=_as_sparse(W),
-        rho=RHO_NB,
-        beta=BETA_NB,
-        alpha=ALPHA_NB,
-        sigma2=0.0,
-        rng=rng,
+        W=_as_sparse(W), rho=RHO_NB, beta=BETA_NB, alpha=ALPHA_NB, rng=rng
     )
 
 
@@ -267,8 +262,9 @@ def sar_negbin_struct_data():
         rho=RHO_NB,
         beta=BETA_NB,
         alpha=ALPHA_NB,
-        sigma2=SIGMA2_NB,
         rng=rng,
+        unit_effects="random",
+        unit_effect_sd=(SIGMA2_NB) ** 0.5,
     )
 
 
@@ -547,10 +543,10 @@ def test_backends_agree(request, model_name, fixture_name, tols):
 @pytest.fixture(scope="module")
 def nb_flow_sep_data():
     """Separable NB flow counts on a 20x20 origin-destination grid (N=400)."""
-    from neighbayes.dgp.flows import simulate_sar_negbin_flow_separable
+    from neighbayes.dgp import simulate_sar_negbin_flow
 
-    return simulate_sar_negbin_flow_separable(
-        n=20, rho_d=0.35, rho_o=0.25, alpha=2.0, seed=7
+    return simulate_sar_negbin_flow(
+        n=20, rho_d=0.35, rho_o=0.25, alpha=2.0, seed=7, separable=True
     )
 
 

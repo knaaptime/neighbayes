@@ -26,7 +26,7 @@ pytestmark = pytest.mark.skipif(
     not (_HAS_JAX and _HAS_BLACKJAX), reason="JAX + blackjax required"
 )
 
-from neighbayes.dgp.cross_sectional import simulate_ols, simulate_sar  # noqa: E402
+from neighbayes.dgp import simulate_ols, simulate_sar  # noqa: E402
 from neighbayes.models.priors import OLSPriors, SARPriors  # noqa: E402
 from neighbayes.samplers.gaussian._blackjax import (  # noqa: E402
     make_sar_joint_logdensity,
