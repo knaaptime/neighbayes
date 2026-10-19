@@ -38,7 +38,8 @@ Two independent families live here:
 
 * **Internal Gibbs-sampler structs** — resolved-hyperparameter containers
   the numpy/JAX kernels consume (``GibbsBasePriors`` →
-  ``GaussianGibbsPriors`` / ``LogitGibbsPriors`` / ``REGibbsPriors``;
+  ``GaussianGibbsPriors`` / ``LogitGibbsPriors`` (→ ``LogitREGibbsPriors``) /
+  ``REGibbsPriors``;
   standalone ``GibbsPriors``, ``ReducedGibbsPriors``,
   ``FlowReducedGibbsPriors``, ``ZINBGibbsPriors``, ``SEMLogitGibbsPriors``).  Models build these internally in
   ``_fit_gibbs``; they are not part of the user-facing ``priors=`` API.
@@ -331,11 +332,25 @@ class SARLogitPriors:
 LogitPriors = SARLogitPriors
 
 
+@dataclass(frozen=True)
+class SARLogitREPriors(SARLogitPriors):
+    """Priors for the SAR logit with random effects.
+
+    ``unit_effect_sd`` (the sd σ of the random effects ν, on the log-odds
+    scale) gets a half-t(``unit_effect_sd_nu``, ``unit_effect_sd_scale``)
+    prior, half-Cauchy(1) by default — the family of
+    :class:`PanelSARREPriors`, scaled to the link.
+    """
+
+    unit_effect_sd_nu: float = 1.0
+    unit_effect_sd_scale: float = 1.0
+
+
 @dataclass
 class SEMLogitPriors:
     """Priors for :class:`neighbayes.models.SEMLogitRE`.
 
-    Like :class:`SARLogitPriors` but with ``lam_lower``/``lam_upper``
+    Like :class:`SARLogitREPriors` but with ``lam_lower``/``lam_upper``
     instead of ``rho_lower``/``rho_upper``.
     """
 
@@ -343,6 +358,8 @@ class SEMLogitPriors:
     lam_upper: float = 0.999
     beta_mu: float | Any = None  # Gelman et al. (2008), link scale
     beta_sigma: float | Any = None
+    unit_effect_sd_nu: float = 1.0
+    unit_effect_sd_scale: float = 1.0
 
 
 # ---------------------------------------------------------------------------
@@ -880,16 +897,31 @@ class LogitGibbsPriors(GibbsBasePriors):
 
 
 @dataclass
+class LogitREGibbsPriors(LogitGibbsPriors):
+    """:class:`LogitGibbsPriors` for the SAR logit with random effects.
+
+    ``sd_nu`` and ``sd_scale`` set the half-t prior on the sd of the random
+    effects, on the log-odds scale (half-Cauchy(1) by default).
+    """
+
+    sd_nu: float = 1.0
+    sd_scale: float = 1.0
+
+
+@dataclass
 class SEMLogitGibbsPriors:
     """Prior hyperparameters for the SEM-logit Gibbs sampler.
 
-    No σ² parameter (logit link absorbs error scale).
+    ``sd_nu`` and ``sd_scale``: the half-t prior on the random effects' sd, on
+    the log-odds scale (half-Cauchy(1) by default).
     """
 
     beta_mu: np.ndarray | float = 0.0
     beta_sigma: np.ndarray | float = 1e6
     lam_lower: float = -0.999
     lam_upper: float = 0.999
+    sd_nu: float = 1.0
+    sd_scale: float = 1.0
 
 
 @dataclass
@@ -929,6 +961,7 @@ __all__ = [
     "SDMTobitPriors",
     "SARProbitPriors",
     "SARLogitPriors",
+    "SARLogitREPriors",
     "SEMLogitPriors",
     "MultilevelPriors",
     "PanelBasePriors",
@@ -960,6 +993,7 @@ __all__ = [
     "FlowReducedGibbsPriors",
     "ZINBGibbsPriors",
     "LogitGibbsPriors",
+    "LogitREGibbsPriors",
     "SEMLogitGibbsPriors",
     "REGibbsPriors",
     "PriorsLike",

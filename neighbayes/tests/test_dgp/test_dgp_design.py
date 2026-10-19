@@ -70,8 +70,16 @@ def test_count_panels_and_cross_section_random_effects():
 
 def test_sar_logit_defaults_to_the_reduced_form():
     public = d.simulate_sar_logit(n_side=5, seed=3)
-    reduced = d.simulate_sar_logit.__wrapped__(n_side=5, seed=3, structural=False)
+    reduced = d.simulate_sar_logit.__wrapped__(n_side=5, seed=3, unit_effect_sd=0.0)
     np.testing.assert_array_equal(public["y"], reduced["y"])
+
+
+@pytest.mark.parametrize("fn", ["simulate_sar_logit", "simulate_sem_logit"])
+def test_logit_random_effects_take_their_sd(fn):
+    out = getattr(d, fn)(n_side=5, seed=3, unit_effects="random", unit_effect_sd=0.8)
+    assert out["params_true"]["unit_effect_sd"] == pytest.approx(0.8)
+    with pytest.raises(ValueError, match="unit_effect_sd needs unit_effects"):
+        d.simulate_sar_logit(n_side=5, seed=3, unit_effect_sd=0.8)
 
 
 def test_flow_routes():

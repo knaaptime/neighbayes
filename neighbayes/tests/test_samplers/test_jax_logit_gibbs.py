@@ -31,7 +31,7 @@ from neighbayes._logdet import make_logdet_jax_fn
 from neighbayes.samplers.logit._core import (
     JAXLogitGibbsState,
     JAXSEMLogitGibbsState,
-    LogitGibbsPriors,
+    LogitREGibbsPriors,
     SEMLogitGibbsPriors,
 )
 from neighbayes.samplers.logit._jax import (
@@ -91,6 +91,7 @@ def _make_sar_inits(y, X, W_dense, n_chains: int = 2, rho_init: float = 0.1):
                 beta=jnp.zeros(k, dtype=jnp.float64),
                 rho=jnp.float64(rho_init + 0.01 * c),
                 omega=jnp.ones(n, dtype=jnp.float64),
+                sigma=jnp.float64(1.0),
             )
         )
     return inits
@@ -107,6 +108,7 @@ def _make_sem_inits(y, X, W_dense, n_chains: int = 2, lam_init: float = 0.1):
                 beta=jnp.zeros(k, dtype=jnp.float64),
                 lam=jnp.float64(lam_init + 0.01 * c),
                 omega=jnp.ones(n, dtype=jnp.float64),
+                sigma=jnp.float64(1.0),
             )
         )
     return inits
@@ -126,7 +128,7 @@ class TestRunChainsJaxVectorized:
         logdet_jax = _make_logdet_jax(W_sparse)
         W_sym_dense = jnp.asarray(W_dense + W_dense.T, dtype=jnp.float64)
         WtW_dense = jnp.asarray(W_dense.T @ W_dense, dtype=jnp.float64)
-        priors = LogitGibbsPriors()
+        priors = LogitREGibbsPriors()
         return (
             y,
             X,

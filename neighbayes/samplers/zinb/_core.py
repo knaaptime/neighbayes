@@ -47,10 +47,9 @@ from typing import NamedTuple
 import numpy as np
 import scipy.sparse as sp
 
-from ...models.priors import ZINBGibbsPriors
+from ...models.priors import LogitGibbsPriors, ZINBGibbsPriors
 from .._utils._polyagamma import sample_polyagamma
 from .._utils._spatial_normal import CholmodFactor
-from ..logit._core import LogitGibbsPriors
 from ..logit_reduced._core import ReducedLogitGibbsState
 from ..logit_reduced._core import (
     _sample_beta as _sample_gamma_sel,

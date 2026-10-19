@@ -1,25 +1,16 @@
-r"""JAX-accelerated full-JIT Gibbs sampler for SAR-logit.
+r"""JAX ports of the SAR- and SEM-logit Gibbs sweeps with random effects.
 
-Composes all Gibbs blocks (PG ω, η, β, ρ slice) into a single
-``@jax.jit``-compiled function, eliminating Python→JAX dispatch overhead
-entirely.
+The sweep of :mod:`._core` — ω → r (η and β integrated out) → σ (η and β
+integrated out) → β → η → ridge move → scale move, for SAR (``r = ρ``) and SEM
+(``r = λ``) alike — compiled into one program per structure and run
+thread-per-chain through :func:`.._utils._jax_utils.run_chains_chunked`.
 
-Architecture
-------------
-The sampler uses:
-
-- **PG sampling**: Exact Pólya-Gamma draws via :func:`make_pg_draw`
-  (pgjax's Devroye sampler when installed; numpy C extension fallback).
-  Since h = 1 for binary logit, draws are exact with no truncation bias.
-- **η and β draws**: Dense Cholesky factorization via ``jnp.linalg.cholesky``
-  and ``jnp.linalg.solve``.  O(n³) but fast for n ≤ ~2000.
-- **ρ/λ draw**: 1-D slice sampler on the doubly-collapsed log-density.
-  For SAR-logit, the density marginalizes out both η and β via a
-  multi-RHS Cholesky solve.  For SEM-logit, the density marginalizes
-  out η but conditions on β.  Slice sampling avoids the expensive
-  gradient computation that MALA requires (autodiff through Cholesky
-  + solve is ~3× the forward cost).
-
+- **PG sampling**: exact Pólya–Gamma draws via :func:`make_pg_draw` (pgjax's
+  Devroye sampler when installed; NumPy C extension fallback).
+- **Precisions**: ``P = AᵀA/σ² + Ω`` is assembled as ``P̃ = σ²P``, the σ = 1
+  assembly with ``σ²ω`` on the diagonal, and factored by sparsax (sparse
+  Cholesky) or, without it, densely.  Optional Krylov reuse factors ``P̃`` once
+  per r slice.
 
 References
 ----------
@@ -30,14 +21,13 @@ for logistic models using Pólya–Gamma latent variables.
 
 from __future__ import annotations
 
+from functools import partial
+
 import numpy as np
 
 from ..._jax_dispatch import ensure_x64
 from .._utils._jax_utils import (
     build_w_bcoo as _build_w_bcoo,
-)
-from .._utils._jax_utils import (
-    check_jax_available as _check_jax_available_impl,
 )
 from .._utils._jax_utils import (
     make_pg_draw,
@@ -48,7 +38,7 @@ from .._utils._spatial_normal import (
     eval_precision_logdet_from_basis_jax,
     eval_precision_solve_from_basis_jax,
 )
-from ._core import JAXLogitGibbsState
+from ._core import _ATTENUATION, JAXLogitGibbsState, JAXSEMLogitGibbsState
 
 # Pólya-Gamma for the ω ~ PG(1, η) block.  pgjax's exact Devroye sampler is
 # on-device (no host round-trip) and exact for any h; falls back to the numpy
@@ -56,26 +46,98 @@ from ._core import JAXLogitGibbsState
 _draw_pg1 = make_pg_draw()
 
 
-def _check_jax_available() -> None:
-    """Raise ImportError if JAX or equinox is not installed."""
-    _check_jax_available_impl(require_equinox=True)
+def _sd_log_prior_jax(jnp, s, nu_sd, sd_scale):
+    """See :func:`._core._sd_log_prior`."""
+    return -0.5 * (nu_sd + 1.0) * jnp.log1p(s * s / (nu_sd * sd_scale**2))
 
 
-def _make_logit_step(
+def _slice_log_sd_jax(jnp, jax_slice_sample_1d, log_density, sigma, sd_scale, w,
+                      key):  # fmt: skip
+    """One slice draw of ``log σ`` on ``[log A − 10, log A + 5]``, returned as σ.
+
+    See :func:`.._utils._group_effects._slice_log_sd`.
+    """
+    la = jnp.log(sd_scale)
+    lo, hi = la - 10.0, la + 5.0
+    ls, _ = jax_slice_sample_1d(
+        log_density, jnp.clip(jnp.log(sigma), lo, hi), lo, hi, key=key, w=w
+    )
+    return jnp.exp(ls)
+
+
+def _ridge_move_jax(jnp, jax_slice_sample_1d, y, eta, m, beta, sigma, beta_mu,
+                    beta_sigma2, nu_sd, sd_scale, key):  # fmt: skip
+    """σ with ``ν/σ`` and ``β/g(σ)`` held; see :func:`._core._ridge_move`."""
+    k = beta.shape[0]
+    g0 = jnp.sqrt(1.0 + _ATTENUATION * sigma**2)
+    d = eta - m
+    bt = beta / g0
+
+    def at(s):
+        g = jnp.sqrt(1.0 + _ATTENUATION * s * s)
+        return (g / g0) * m + (s / sigma) * d, g * bt, g
+
+    def log_density(ls):
+        s = jnp.exp(ls)
+        e, b, g = at(s)
+        val = (
+            jnp.sum(y * e - jnp.logaddexp(0.0, e))
+            - 0.5 * jnp.sum((b - beta_mu) ** 2 / beta_sigma2)
+            + k * jnp.log(g)
+            + _sd_log_prior_jax(jnp, s, nu_sd, sd_scale)
+            + ls
+        )
+        return jnp.where(jnp.isfinite(val), val, -jnp.inf)
+
+    s = _slice_log_sd_jax(
+        jnp, jax_slice_sample_1d, log_density, sigma, sd_scale, 0.3, key
+    )
+    e, b, _ = at(s)
+    return e, b, s
+
+
+def _scale_move_jax(jnp, jax_slice_sample_1d, y, eta, beta, sigma, beta_mu,
+                    beta_sigma2, nu_sd, sd_scale, key):  # fmt: skip
+    """``(η, β, σ) → eᵗ(η, β, σ)``; see :func:`._core._scale_move`."""
+    k = beta.shape[0]
+
+    def log_density(t):
+        e = jnp.exp(t)
+        eta_t = e * eta
+        val = (
+            jnp.sum(y * eta_t - jnp.logaddexp(0.0, eta_t))
+            - 0.5 * jnp.sum((e * beta - beta_mu) ** 2 / beta_sigma2)
+            + _sd_log_prior_jax(jnp, e * sigma, nu_sd, sd_scale)
+            + (k + 1) * t
+        )
+        return jnp.where(jnp.isfinite(val), val, -jnp.inf)
+
+    t, _ = jax_slice_sample_1d(log_density, 0.0, -30.0, 30.0, key=key, w=0.2)
+    e = jnp.exp(t)
+    return e * eta, e * beta, e * sigma
+
+
+def _make_step(
     n,
     k,
     *,
+    sem,
     logdet_kind,
     logdet_closure=None,
     use_sparsax=True,
     krylov_degree: int = 0,
     krylov_dmax: float = 0.4,
 ):
-    """The structural SAR-logit Gibbs step, closing over static settings only.
+    """The SAR- or (``sem``) SEM-logit Gibbs step, closing over static settings.
 
     ``gibbs_step(state, key, data, slice_width, return_steps=False)``, with
     ``data`` from :func:`_logit_data`: one compiled program serves every fit
-    of the same structure.
+    of the same structure.  The sweep is that of :mod:`._core`, on the
+    design's ``u(r) = AᵀD`` and ``DᵀD(r)`` (``data["U"]``, ``data["G"]``, the
+    coefficients of their polynomials in r).  With ``P̃ = σ²P``,
+    ``sol = P̃⁻¹[κ | u]``: ``Σ_β⁻¹ = (DᵀD − uᵀP̃⁻¹u)/σ² + V₀⁻¹``,
+    ``r_β = uᵀP̃⁻¹κ + V₀⁻¹b₀``, ``κᵀP⁻¹κ = σ²κᵀP̃⁻¹κ``, and
+    ``−n log σ − ½log|P| = −½log|P̃|``.
     """
     import equinox as eqx
     import jax
@@ -86,262 +148,176 @@ def _make_logit_step(
     from .._utils._jax_slice import jax_slice_sample_1d
     from .._utils._sparsax_utils import make_sparsax_ops
 
+    state_cls = JAXSEMLogitGibbsState if sem else JAXLogitGibbsState
+    spatial = "lam" if sem else "rho"
+    use_krylov = use_sparsax and krylov_degree > 0 and _sparsax_factor_ops_available()
+
     @eqx.filter_jit
     def gibbs_step(state, key, data, slice_width, return_steps=False):
-        """One complete Gibbs sweep: ω → η → β → ρ (slice).
+        """One sweep; with ``return_steps`` also the r slice's step-out counts."""
+        eta, r, sigma = state.eta, getattr(state, spatial), state.sigma
+        X, kappa, U, G = data["X"], data["kappa"], data["U"], data["G"]
+        y = kappa + 0.5
+        beta_mu, beta_sigma2 = data["beta_mu"], data["beta_sigma2"]
+        V0_inv = 1.0 / beta_sigma2
+        lower, upper = data["lower"], data["upper"]
+        nu_sd, sd_scale = data["sd_nu"], data["sd_scale"]
 
-        Parameters
-        ----------
-        state : JAXLogitGibbsState
-            Current state.
-        key : jax.random.PRNGKey
-            JAX random key.
-        slice_width : jax.numpy.float64
-            Stepping-out width for the ρ slice sampler.
-        return_steps : bool, default False
-            Also return the ρ slice's ``(left, right)`` step-out counts.
+        def u_of(rv):
+            return jnp.tensordot(rv ** jnp.arange(U.shape[0]), U, axes=1)
 
-        Returns
-        -------
-        new_state : JAXLogitGibbsState
-            Updated state.
-        accept : jax.numpy.float64
-            Always 1.0 (slice sampling always accepts).
-        steps : tuple of jax.numpy scalars
-            Step-out counts; returned only when ``return_steps``.
-        """
-        eta = state.eta
-        beta = state.beta
-        rho = state.rho
-        X_jax, XtX_jax = data["X"], data["XtX"]
-        WtX, kappa = data["WtX"], data["kappa"]
-        beta_mu_jax, beta_sigma2_jax = data["beta_mu"], data["beta_sigma2"]
-        beta_prior_prec = jnp.diag(1.0 / beta_sigma2_jax)
-        V0_inv_b0 = beta_mu_jax / beta_sigma2_jax
-        rho_lower_jax, rho_upper_jax = data["lower"], data["upper"]
-        W_bcoo, Wt_bcoo = data["W"], data["Wt"]
-
-        def W_matvec(x):
-            return W_bcoo @ x
-
-        def Wt_matvec(x):
-            return Wt_bcoo @ x
+        def DtD_of(rv):
+            return jnp.tensordot(rv ** jnp.arange(G.shape[0]), G, axes=1)
 
         if use_sparsax:
             sp_ = data["sparsax"]
-            _Ai, _Aj = sp_["Ai"], sp_["Aj"]
-            _W_sym_vals, _WtW_vals = sp_["W_sym_vals"], sp_["WtW_vals"]
-            _diag_idx = sp_["diag_idx"]
-            _nnz = _Ai.shape[0]
-            _n_static = n
-            # Factor-once closures: the η-draw and each density evaluation do
+            Ai, Aj = sp_["Ai"], sp_["Aj"]
+            W_sym_vals, WtW_vals = sp_["W_sym_vals"], sp_["WtW_vals"]
+            diag_idx = sp_["diag_idx"]
+            nnz = Ai.shape[0]
+            # Factor-once closures: the η draw and each density evaluation do
             # exactly ONE numeric factorization (sample_gaussian / factor_solve).
-            _eta_sample, _solve_logdet = make_sparsax_ops(_Ai, _Aj, _n_static)
+            eta_sample, solve_logdet = make_sparsax_ops(Ai, Aj, n)
 
-            def _assemble_Ax(omega, coef):
-                """COO values of P = I + diag(ω) − c(W+Wᵀ) + c²WᵀW."""
-                Ax = -coef * _W_sym_vals + coef**2 * _WtW_vals
-                diag_vals = jnp.zeros(_nnz, dtype=jnp.float64)
-                diag_vals = diag_vals.at[_diag_idx].set(1.0 + omega)
-                return Ax + diag_vals
+            def assemble(om_t, rv):
+                """COO values of ``I + diag(om_t) − r(W+Wᵀ) + r²WᵀW``."""
+                Ax = -rv * W_sym_vals + rv**2 * WtW_vals
+                return Ax + jnp.zeros(nnz, dtype=jnp.float64).at[diag_idx].set(
+                    1.0 + om_t
+                )
+
+            def solve_P(om_t, rv, rhs):
+                return solve_logdet(assemble(om_t, rv), rhs)
+
+            def sample_P(om_t, rv, rhs, z):
+                return eta_sample(assemble(om_t, rv), rhs, z)
 
         else:
             W_sym, WtW = data["W_sym_dense"], data["WtW_dense"]
 
-        def logdet_jax(r):
+            def chol_P(om_t, rv):
+                P = jnp.diag(1.0 + om_t) - rv * W_sym + rv**2 * WtW
+                return jnp.linalg.cholesky(P)
+
+            def solve_P(om_t, rv, rhs):
+                L = chol_P(om_t, rv)
+                return cho_solve((L, True), rhs), 2.0 * jnp.sum(jnp.log(jnp.diag(L)))
+
+            def sample_P(om_t, rv, rhs, z):
+                L = chol_P(om_t, rv)
+                return cho_solve((L, True), rhs) + solve_triangular(L.T, z, lower=False)
+
+        def logdet_A(rv):
             prm = logdet_closure if logdet_kind == "closure" else data["logdet"]
-            return eval_logdet_params(logdet_kind, prm, r)
+            return eval_logdet_params(logdet_kind, prm, rv)
 
-        key_omega, key_eta, key_beta, key_rho = jax.random.split(key, 4)
+        keys = jax.random.split(key, 8)
 
-        # ── Block 1: ω ~ PG(1, η) — on-device (pgjax Devroye, else exp) ──
-        omega_new = _draw_pg1(jnp.ones(n), eta, key_omega)
+        # ── 1. ω ~ PG(1, η) — on-device (pgjax Devroye, else exp) ──
+        omega = _draw_pg1(jnp.ones(n), eta, keys[0])
 
-        # ── Block 2: η | ω, ρ, β — Cholesky solve (σ² = 1) ──
-        # P = I + diag(ω) - ρ(W+W^T) + ρ²W^TW  (no 1/σ² scaling)
-        Xbeta = X_jax @ beta
-        # RHS: Xbeta - ρ W'Xbeta + κ  (σ² = 1); W'Xbeta = (WᵀX)β reuses WtX.
-        rhs = Xbeta - rho * (WtX @ beta) + kappa
-
-        if use_sparsax:
-            # Sparse SPD Cholesky via sparsax — mean + draw ~ N(P⁻¹ rhs, P⁻¹)
-            # from ONE factorization.
-            Ax = _assemble_Ax(omega_new, rho)
-            z_eta = jax.random.normal(key_eta, shape=(n,), dtype=jnp.float64)
-            eta_new = _eta_sample(Ax, rhs, z_eta)
-        else:
-            P_diag = jnp.ones(n) + omega_new
-            P = jnp.diag(P_diag) - rho * W_sym + rho**2 * WtW
-            P = P + 1e-6 * jnp.eye(n)  # regularization for numerical stability
-
-            L = jnp.linalg.cholesky(P)
-            P_inv_rhs = cho_solve((L, True), rhs)
-            z_eta = jax.random.normal(key_eta, shape=(n,), dtype=jnp.float64)
-            eta_new = P_inv_rhs + solve_triangular(L.T, z_eta, lower=False)
-
-        # ── Block 3: β | η, ρ — conjugate normal (σ² = 1) ──
-        A_rho_eta = eta_new - rho * W_matvec(eta_new)
-        # Σ_β⁻¹ = Λ₀⁻¹ + X^TX  (no 1/σ² scaling)
-        Sigma_beta_inv = beta_prior_prec + XtX_jax
-        # rhs = Λ₀⁻¹μ₀ + X^T A_ρη  (no 1/σ² scaling)
-        rhs_beta = beta_mu_jax / beta_sigma2_jax + X_jax.T @ A_rho_eta
-        L_beta = jnp.linalg.cholesky(Sigma_beta_inv)
-        m_beta = cho_solve((L_beta, True), rhs_beta)
-        z_beta = jax.random.normal(key_beta, shape=(k,), dtype=jnp.float64)
-        beta_new = m_beta + solve_triangular(L_beta.T, z_beta, lower=False)
-
-        # ── Block 4: ρ — 1-D slice sampler (doubly-collapsed density) ──
-        #
-        # The doubly-collapsed log-density (η AND β integrated out) is:
-        #
-        #   log p(ρ | ω, y) = log|I - ρW| - ½ log|P_η|
-        #                     - ½ log|Σ_β*⁻¹| + ½ κ' P_η⁻¹ κ
-        #                     + ½ m_β*' Σ_β*⁻¹ m_β*
-        #
-        # Slice sampling avoids the expensive gradient computation that
-        # MALA requires (autodiff through Cholesky + solve is ~3× the
-        # forward cost).  Each slice candidate needs only a forward
-        # evaluation — no backward pass.
-        #
-        # ── Krylov basis (sparsax factor-reuse path) ──
-        # When krylov_degree > 0 and the sparsax factor-reuse primitives
-        # are available, factor P(ρ_c) ONCE at the slice centre ρ_c = ρ,
-        # build the shift-invert Krylov basis via a fori_loop of
-        # solve_factor calls (zero refactors), and evaluate every candidate
-        # within krylov_dmax via a Horner recurrence in pure JAX.  Candidates
-        # outside the radius fall back to a direct factor_solve.  This is
-        # the JAX-native analog of the NumPy KrylovPrecisionBasis.
-        _use_krylov = (
-            use_sparsax and krylov_degree > 0 and _sparsax_factor_ops_available()
-        )
-        if _use_krylov:
-            # G = ∂P/∂ρ|_{ρ_c} = G1 − 2ρ_c G2  (COO values at the pattern)
-            _G_vals_c = _W_sym_vals - 2.0 * rho * _WtW_vals
-            # Seed with the ρ-independent RHS columns [κ, X, WtX]
-            # so P(ρ)⁻¹u(ρ) = P(ρ)⁻¹X − ρ·P(ρ)⁻¹WtX is a linear combo of
-            # two Horner evaluations against the same basis.
-            _rhs_seed = jnp.column_stack([kappa, X_jax, WtX])  # (n, 1 + 2k)
-            _Ax_c = _assemble_Ax(omega_new, rho)
-            (
-                _token,
-                _V_stack,
-                _ld_coefs,
-                _safe_dmax,
-            ) = build_precision_krylov_basis_jax(
-                _Ai,
-                _Aj,
-                _Ax_c,
-                _G_vals_c,
-                _WtW_vals,
-                _rhs_seed,
-                n=_n_static,
-                degree=krylov_degree,
-                dmax=krylov_dmax,
-            )
-
-        def log_density_rho(rho_val):
-            """Doubly-collapsed log-density of ρ (η and β integrated out).
-
-            Uses one Cholesky of P_η with (k+1) right-hand sides
-            to obtain both the κ quadratic form and the β-marginal
-            terms.
-            """
-            # u = X - ρ W^T X  — (n, k)
-            u = X_jax - rho_val * WtX
-
-            # Multi-RHS: P_η [z | M] = [κ | u]
-            rhs_stack = jnp.column_stack([kappa, u])  # (n, k+1)
-
-            if use_sparsax:
-                if _use_krylov:
-                    # Krylov-accelerated path: Horner eval against the basis
-                    # built at ρ_c, plus first-order logdet trace correction.
-                    drho = rho_val - rho
-                    within = jnp.abs(drho) <= _safe_dmax
-                    # Horner in pure JAX (no sparsax calls):
-                    sol_all = eval_precision_solve_from_basis_jax(_V_stack, drho)
-                    # sol_all columns: [P(ρ)⁻¹κ, P(ρ)⁻¹X, P(ρ)⁻¹WtX]
-                    z_kry = sol_all[:, 0]
-                    PX = sol_all[:, 1 : 1 + k]
-                    PWtX = sol_all[:, 1 + k :]
-                    # u(ρ) = X − ρ·WtX  →  P(ρ)⁻¹u = PX − ρ·PWtX
-                    M_kry = PX - rho_val * PWtX
-                    log_det_P_kry = eval_precision_logdet_from_basis_jax(
-                        _ld_coefs, drho
-                    )
-                    # Direct solve for candidates outside the Krylov radius.
-                    # `jnp.where` evaluates both operands, so this factorization
-                    # runs regardless and the basis is pure added work — see the
-                    # note in ``samplers/negbin/_jax.py`` for why the fallback
-                    # cannot simply be dropped.
-                    Ax_r = _assemble_Ax(omega_new, rho_val)
-                    sol_dir, log_det_P_dir = _solve_logdet(Ax_r, rhs_stack)
-                    z_vec = jnp.where(within, z_kry, sol_dir[:, 0])
-                    M_mat = jnp.where(within, M_kry, sol_dir[:, 1:])
-                    log_det_P = jnp.where(within, log_det_P_kry, log_det_P_dir)
-                else:
-                    Ax_r = _assemble_Ax(omega_new, rho_val)
-                    # Multi-RHS solve + logdet from one factorization (factor_solve).
-                    sol, log_det_P = _solve_logdet(Ax_r, rhs_stack)  # sol: (n, k+1)
-                    z_vec = sol[:, 0]
-                    M_mat = sol[:, 1:]
-            else:
-                # P_η = I + diag(ω) - ρ(W+W^T) + ρ²W^TW  (σ² = 1)
-                P_diag_r = jnp.ones(n) + omega_new
-                P_r = jnp.diag(P_diag_r) - rho_val * W_sym + rho_val**2 * WtW
-                P_r = P_r + 1e-6 * jnp.eye(n)
-
-                L_r = jnp.linalg.cholesky(P_r)
-                sol = cho_solve((L_r, True), rhs_stack)  # (n, k+1)
-                log_det_P = 2.0 * jnp.sum(jnp.log(jnp.diag(L_r)))
-                z_vec = sol[:, 0]
-                M_mat = sol[:, 1:]
-
-            # Σ_β*⁻¹ = X^TX + V₀⁻¹ - u^T M  — (k, k)
-            Sig_beta_inv = XtX_jax + beta_prior_prec - u.T @ M_mat
-            Sig_beta_inv = Sig_beta_inv + 1e-10 * jnp.eye(k)  # regularize
-
-            L_sig = jnp.linalg.cholesky(Sig_beta_inv)
-            log_det_Sig_inv = 2.0 * jnp.sum(jnp.log(jnp.diag(L_sig)))
-
-            # m_β* = Σ_β* (u^T z + V₀⁻¹ b₀)
-            rhs_b = u.T @ z_vec + V0_inv_b0
+        def collapsed(rv, s, basis=None):
+            """``log p(r, σ | ω)`` with η and β integrated out, and β's moments."""
+            s2 = s * s
+            u = u_of(rv)
+            sol, log_det = solve_P(s2 * omega, rv, jnp.column_stack([kappa, u]))
+            if basis is not None:
+                V_stack, ld_coefs, safe_dmax = basis
+                dr = rv - r
+                within = jnp.abs(dr) <= safe_dmax
+                sol_all = eval_precision_solve_from_basis_jax(V_stack, dr)
+                M_kry = sum(
+                    rv**j * sol_all[:, 1 + j * k : 1 + (j + 1) * k]
+                    for j in range(U.shape[0])
+                )
+                ld_kry = eval_precision_logdet_from_basis_jax(ld_coefs, dr)
+                # Both operands are evaluated; the direct solve covers
+                # candidates outside the Krylov radius.
+                sol = jnp.where(within, jnp.column_stack([sol_all[:, 0], M_kry]), sol)
+                log_det = jnp.where(within, ld_kry, log_det)
+            z_t, M_t = sol[:, 0], sol[:, 1:]
+            Sig_inv = (DtD_of(rv) - u.T @ M_t) / s2 + jnp.diag(V0_inv)
+            L_sig = jnp.linalg.cholesky(Sig_inv + 1e-10 * jnp.eye(k))
+            rhs_b = u.T @ z_t + V0_inv * beta_mu
             m_b = cho_solve((L_sig, True), rhs_b)
-
-            # Quadratic forms
-            quad_kappa = kappa @ z_vec
-            quad_beta = rhs_b @ m_b
-
-            logdet_W = logdet_jax(rho_val)
-
-            log_prior = jnp.where(
-                (rho_val >= rho_lower_jax) & (rho_val <= rho_upper_jax), 0.0, -jnp.inf
+            val = (
+                logdet_A(rv)
+                - 0.5 * log_det
+                - jnp.sum(jnp.log(jnp.diag(L_sig)))
+                + 0.5 * s2 * (kappa @ z_t)
+                + 0.5 * (rhs_b @ m_b)
             )
-            return (
-                logdet_W
-                - 0.5 * log_det_P
-                - 0.5 * log_det_Sig_inv
-                + 0.5 * quad_kappa
-                + 0.5 * quad_beta
-                + log_prior
-            )
+            val = jnp.where((rv >= lower) & (rv <= upper), val, -jnp.inf)
+            return jnp.where(jnp.isfinite(val), val, -jnp.inf), L_sig, m_b
 
-        # ── Slice sampling for ρ (shared JAX helper) ──
-        rho_new, _, steps_left, steps_right = jax_slice_sample_1d(
-            log_density_rho,
-            rho,
-            rho_lower_jax,
-            rho_upper_jax,
-            key=key_rho,
+        # ── 2. r | ω, σ, then σ | ω, r — η and β integrated out ──
+        basis = None
+        if use_krylov:
+            # Factor P̃(r_c) once at the slice centre and evaluate candidates
+            # within krylov_dmax by a Horner recurrence on the shift-invert basis.
+            seeds = jnp.column_stack([kappa, *[U[j] for j in range(U.shape[0])]])
+            (_token, V_stack, ld_coefs, safe_dmax) = build_precision_krylov_basis_jax(
+                Ai, Aj, assemble(sigma**2 * omega, r), W_sym_vals - 2.0 * r * WtW_vals,
+                WtW_vals, seeds, n=n, degree=krylov_degree, dmax=krylov_dmax,
+            )  # fmt: skip
+            basis = (V_stack, ld_coefs, safe_dmax)
+
+        r_new, _, steps_left, steps_right = jax_slice_sample_1d(
+            lambda rv: collapsed(rv, sigma, basis)[0],
+            r,
+            lower,
+            upper,
+            key=keys[1],
             w=slice_width,
             return_steps=True,
         )
 
-        new_state = JAXLogitGibbsState(
+        def sigma_density(ls):
+            s = jnp.exp(ls)
+            return (
+                collapsed(r_new, s)[0] + _sd_log_prior_jax(jnp, s, nu_sd, sd_scale) + ls
+            )
+
+        sigma_new = _slice_log_sd_jax(
+            jnp, jax_slice_sample_1d, sigma_density, sigma, sd_scale, 0.5, keys[2]
+        )
+
+        # ── 3. β | ω, r, σ — from the collapsed moments ──
+        _, L_sig, m_b = collapsed(r_new, sigma_new)
+        z_beta = jax.random.normal(keys[3], shape=(k,), dtype=jnp.float64)
+        beta_new = m_b + solve_triangular(L_sig.T, z_beta, lower=False)
+
+        # ── 4. η | ω, r, β, σ ~ N(P⁻¹rhs, P⁻¹) = σ·N(P̃⁻¹(σ rhs), P̃⁻¹) ──
+        s2 = sigma_new**2
+        u_beta = u_of(r_new) @ beta_new
+        z_eta = jax.random.normal(keys[4], shape=(n,), dtype=jnp.float64)
+        eta_new = sigma_new * sample_P(
+            s2 * omega, r_new, sigma_new * (u_beta / s2 + kappa), z_eta
+        )
+
+        # ── 5. the ridge move, on η's β part m = A⁻¹Dβ ──
+        if sem:
+            m = X @ beta_new
+        else:
+            # m = A⁻¹Xβ from the normal equations AᵀA m = AᵀXβ = u β.
+            m, _ = solve_P(jnp.zeros(n), r_new, u_beta)
+        eta_new, beta_new, sigma_new = _ridge_move_jax(
+            jnp, jax_slice_sample_1d, y, eta_new, m, beta_new, sigma_new, beta_mu,
+            beta_sigma2, nu_sd, sd_scale, keys[5],
+        )  # fmt: skip
+
+        # ── 6. the scale move ──
+        eta_new, beta_new, sigma_new = _scale_move_jax(
+            jnp, jax_slice_sample_1d, y, eta_new, beta_new, sigma_new, beta_mu,
+            beta_sigma2, nu_sd, sd_scale, keys[6],
+        )  # fmt: skip
+
+        new_state = state_cls(
             eta=eta_new,
             beta=beta_new,
-            rho=rho_new,
-            omega=omega_new,
+            omega=omega,
+            sigma=sigma_new,
+            **{spatial: r_new},
         )
         if return_steps:
             return new_state, jnp.float64(1.0), (steps_left, steps_right)
@@ -350,36 +326,33 @@ def _make_logit_step(
     return gibbs_step
 
 
-def _logit_loglik_pointwise_jax(y, eta):
-    """Pointwise logit log-likelihood for storage (host-side, returns NumPy).
-
-    Delegates to the single NumPy source in :mod:`..logit._core`: this runs
-    off-device on already-materialized draws, so there is nothing for JAX to
-    do here and no reason to keep a second copy of the formula.
-    """
-    from ._core import _logit_loglik_pointwise
-
-    return _logit_loglik_pointwise(
-        np.asarray(y, dtype=np.float64), np.asarray(eta, dtype=np.float64)
-    )
-
-
 def _logit_data(
     y, X, W_bcoo, Wt_bcoo, priors, logdet_params, *, spatial="rho",
     W_sym_dense=None, WtW_dense=None, sparsax_pattern=None,
 ):  # fmt: skip
-    """The logit steps' ``data``: every data-dependent array and scalar."""
+    """The logit steps' ``data``: every data-dependent array and scalar.
+
+    ``U`` and ``G`` hold the coefficients of ``u(r) = AᵀD`` and ``DᵀD(r)``,
+    polynomials in r (see :class:`._core._Design`): ``D = X`` for SAR
+    (``spatial="rho"``), ``D = AX`` for SEM.
+    """
     import jax.numpy as jnp
 
     k = X.shape[1]
     X_jax = jnp.asarray(X, dtype=jnp.float64)
+    WX, WtX = W_bcoo @ X_jax, Wt_bcoo @ X_jax
+    XtX = X_jax.T @ X_jax
+    if spatial == "lam":
+        WsX, WtWX = WX + WtX, Wt_bcoo @ WX
+        U = jnp.stack([X_jax, -WsX, WtWX])
+        G = jnp.stack([XtX, -(X_jax.T @ WsX), X_jax.T @ WtWX])
+    else:
+        U, G = jnp.stack([X_jax, -WtX]), XtX[None]
     data = {
         "X": X_jax,
-        "XtX": X_jax.T @ X_jax,
-        "WtX": Wt_bcoo @ X_jax,
+        "U": U,
+        "G": G,
         "kappa": jnp.asarray(y, dtype=jnp.float64) - 0.5,
-        "W": W_bcoo,
-        "Wt": Wt_bcoo,
         "beta_mu": jnp.broadcast_to(
             jnp.asarray(priors.beta_mu, dtype=jnp.float64), (k,)
         ),
@@ -388,6 +361,8 @@ def _logit_data(
         ),
         "lower": jnp.float64(getattr(priors, f"{spatial}_lower")),
         "upper": jnp.float64(getattr(priors, f"{spatial}_upper")),
+        "sd_nu": jnp.float64(priors.sd_nu),
+        "sd_scale": jnp.float64(priors.sd_scale),
         "logdet": None if logdet_params[0] == "closure" else logdet_params[1],
     }
     if sparsax_pattern is not None:
@@ -402,672 +377,6 @@ def _logit_data(
         data["W_sym_dense"] = jnp.asarray(W_sym_dense, dtype=jnp.float64)
         data["WtW_dense"] = jnp.asarray(WtW_dense, dtype=jnp.float64)
     return data
-
-
-def _bound_step(core, data):
-    """``gibbs_step(state, key, slice_width, return_steps=False)`` with ``data`` fixed."""
-
-    def gibbs_step(state, key, slice_width, return_steps=False):
-        return core(state, key, data, slice_width, return_steps)
-
-    return gibbs_step
-
-
-def _make_gibbs_step_with_data(
-    y_jax, X_jax, W_bcoo, Wt_bcoo, n, k, W_sym_dense, WtW_dense, logdet_jax,
-    XtX_jax, priors, n_probes, lanczos_deg, sparsax_pattern=None,
-    krylov_degree: int = 0, krylov_dmax: float = 0.4,
-):  # fmt: skip
-    """A structural SAR-logit Gibbs step with this model's data bound in.
-
-    For single-chain use and tests; the chunked runner passes the data as an
-    argument so its program compiles once per structure.  ``logdet_jax`` is a
-    ``(rho) -> logdet`` function; ``XtX_jax``, ``n_probes`` and ``lanczos_deg``
-    are accepted for signature compatibility.
-    """
-    ensure_x64()
-    data = _logit_data(
-        y_jax, X_jax, W_bcoo, Wt_bcoo, priors, ("closure", logdet_jax),
-        W_sym_dense=W_sym_dense, WtW_dense=WtW_dense, sparsax_pattern=sparsax_pattern,
-    )  # fmt: skip
-    core = _make_logit_step(
-        n, k, logdet_kind="closure", logdet_closure=logdet_jax,
-        use_sparsax=sparsax_pattern is not None,
-        krylov_degree=krylov_degree, krylov_dmax=krylov_dmax,
-    )  # fmt: skip
-    return _bound_step(core, data)
-
-
-def _make_gibbs_step_with_data_sem(
-    y_jax, X_jax, W_bcoo, Wt_bcoo, n, k, W_sym_dense, WtW_dense, logdet_jax,
-    priors, n_probes, lanczos_deg, sparsax_pattern=None,
-    krylov_degree: int = 0, krylov_dmax: float = 0.4,
-):  # fmt: skip
-    """A SEM-logit Gibbs step with this model's data bound in (see the SAR one)."""
-    ensure_x64()
-    data = _logit_data(
-        y_jax, X_jax, W_bcoo, Wt_bcoo, priors, ("closure", logdet_jax), spatial="lam",
-        W_sym_dense=W_sym_dense, WtW_dense=WtW_dense, sparsax_pattern=sparsax_pattern,
-    )  # fmt: skip
-    core = _make_sem_logit_step(
-        n, k, logdet_kind="closure", logdet_closure=logdet_jax,
-        use_sparsax=sparsax_pattern is not None,
-        krylov_degree=krylov_degree, krylov_dmax=krylov_dmax,
-    )  # fmt: skip
-    return _bound_step(core, data)
-
-
-def run_chain_jax(
-    y: np.ndarray,
-    X: np.ndarray,
-    W_sparse,
-    W_sym_dense,
-    WtW_dense,
-    logdet_jax,
-    priors,
-    init,
-    draws: int,
-    tune: int,
-    thin: int = 1,
-    return_eta: bool = False,
-    rng=None,
-    pg_n_terms: int = 25,
-    n_probes: int = 5,
-    lanczos_deg: int = 15,
-    krylov_degree: int = 0,
-    krylov_dmax: float = 0.4,
-    progress_manager=None,
-    chain_id: int = 0,
-    store_log_lik: bool = True,
-):
-    """Run one chain of the full-JIT JAX Gibbs sampler for SAR-logit.
-
-    Creates a JIT-compiled Gibbs step function and runs it in a Python
-    loop, handling warmup, thinning, and storage.  The ρ update uses a
-    1-D slice sampler on the doubly-collapsed log-density (η and β
-    integrated out).
-
-    Parameters
-    ----------
-    y : ndarray of shape (n,)
-        Binary response vector.
-    X : ndarray of shape (n, k)
-        Design matrix.
-    W_sparse : csr_matrix
-        Spatial weights matrix (used to extract W_dense).
-    W_sym_dense : jax.numpy.ndarray of shape (n, n)
-        Dense (W + W^T).
-    WtW_dense : jax.numpy.ndarray of shape (n, n)
-        Dense W^T W.
-    logdet_jax : callable
-        JAX-native function ``(rho) -> jax.numpy.ndarray`` computing
-        log|I - rho*W|.
-    priors : LogitGibbsPriors
-        Prior hyperparameters.
-    init : LogitGibbsState
-        Initial state.
-    draws : int
-        Number of post-warmup draws.
-    tune : int
-        Number of warmup draws.
-    thin : int
-        Keep every thin-th draw.
-    return_eta : bool
-        If True, store the latent index η.
-    rng : numpy.random.Generator, optional
-        Random state.
-    pg_n_terms : int
-        Ignored (kept for API compatibility).  PG draws now use the
-        exact sum-of-exponentials method which does not require
-        truncation.
-    n_probes : int
-        Ignored (kept for API compatibility).
-    lanczos_deg : int
-        Ignored (kept for API compatibility).
-    progress_manager : optional
-        Progress bar manager.
-    chain_id : int, default 0
-        Chain identifier for progress reporting.
-
-    Returns
-    -------
-    dict[str, np.ndarray]
-        Posterior samples with keys ``rho``, ``beta``, ``log_lik``,
-        ``eta_norm``, and optionally ``eta``.
-        Also includes ``mh_accept_rate`` (always 1.0; slice sampling
-        always accepts).
-    """
-    import jax
-    import jax.numpy as jnp
-
-    ensure_x64()
-
-    if rng is None:
-        rng = np.random.default_rng()
-
-    n, k = X.shape
-    total_iters = tune + draws
-    n_keep = draws // thin if thin > 0 else draws
-
-    # Convert data to JAX arrays
-    y_jax = jnp.asarray(y, dtype=jnp.float64)
-    X_jax = jnp.asarray(X, dtype=jnp.float64)
-    XtX_jax = jnp.asarray(X.T @ X, dtype=jnp.float64)
-
-    # Sparse W as BCOO — never densify W for the O(nnz) matvecs.
-    W_bcoo, Wt_bcoo = _build_w_bcoo(W_sparse)
-
-    # Initialize state
-    state = JAXLogitGibbsState(
-        eta=jnp.asarray(init.eta, dtype=jnp.float64),
-        beta=jnp.asarray(init.beta, dtype=jnp.float64),
-        rho=jnp.float64(init.rho),
-        omega=jnp.asarray(init.omega, dtype=jnp.float64),
-    )
-
-    # Pre-allocate storage
-    rho_samples = np.empty(n_keep, dtype=np.float64)
-    beta_samples = np.empty((n_keep, k), dtype=np.float64)
-    log_lik_samples = np.empty((n_keep, n), dtype=np.float64) if store_log_lik else None
-    eta_norm_samples = np.empty(n_keep, dtype=np.float64)
-    eta_samples = np.empty((n_keep, n), dtype=np.float64) if return_eta else None
-
-    # Build the JIT-compiled step function
-    gibbs_step = _make_gibbs_step_with_data(
-        y_jax=y_jax,
-        X_jax=X_jax,
-        W_bcoo=W_bcoo,
-        Wt_bcoo=Wt_bcoo,
-        n=n,
-        k=k,
-        W_sym_dense=W_sym_dense,
-        WtW_dense=WtW_dense,
-        logdet_jax=logdet_jax,
-        XtX_jax=XtX_jax,
-        priors=priors,
-        n_probes=n_probes,
-        lanczos_deg=lanczos_deg,
-        krylov_degree=krylov_degree,
-        krylov_dmax=krylov_dmax,
-    )
-
-    # Warmup the JIT function (first call triggers compilation)
-    key = jax.random.PRNGKey(rng.integers(2**31))
-    key, warmup_key = jax.random.split(key)
-    slice_width = jnp.float64(0.2)
-    _ = gibbs_step(state, warmup_key, slice_width)
-
-    # Run the chain
-    for i in range(total_iters):
-        key, step_key = jax.random.split(key)
-        state, _ = gibbs_step(state, step_key, slice_width)
-
-        # Store post-warmup draws
-        if i >= tune and (i - tune) % thin == 0:
-            idx = (i - tune) // thin
-            if idx < n_keep:
-                rho_samples[idx] = float(state.rho)
-                beta_samples[idx] = np.asarray(state.beta)
-                eta_np = np.asarray(state.eta)
-                eta_norm_samples[idx] = float(eta_np @ eta_np)
-                if return_eta:
-                    eta_samples[idx] = eta_np
-                if store_log_lik:
-                    log_lik_samples[idx] = _logit_loglik_pointwise_jax(y, eta_np)
-
-        if progress_manager is not None:
-            progress_manager.update(chain_id, i, tuning=i < tune)
-
-    if progress_manager is not None:
-        progress_manager.refresh()
-
-    result = {
-        "rho": rho_samples,
-        "beta": beta_samples,
-        "log_lik": log_lik_samples,
-        "eta_norm": eta_norm_samples,
-        "mh_accept_rate": 1.0,  # slice always accepts
-    }
-    if return_eta:
-        result["eta"] = eta_samples
-
-    return result
-
-
-# ===========================================================================
-# SEM-logit JAX Gibbs sampler
-# ===========================================================================
-
-
-def _make_sem_logit_step(
-    n,
-    k,
-    *,
-    logdet_kind,
-    logdet_closure=None,
-    use_sparsax=True,
-    krylov_degree: int = 0,
-    krylov_dmax: float = 0.4,
-):
-    """The SEM-logit Gibbs step, closing over static settings only.
-
-    Same 4-block structure as SAR-logit (ω, η, β, λ) with the SEM rhs
-    (``A_λ'A_λXβ + κ``) and β block (``X* = A_λX``, ``η* = A_λη``);
-    ``gibbs_step(state, key, data, slice_width, return_steps=False)``.
-    """
-    import equinox as eqx
-    import jax
-    import jax.numpy as jnp
-    from jax.scipy.linalg import cho_solve, solve_triangular
-
-    from ..._logdet._jax import eval_logdet_params
-    from .._utils._jax_slice import jax_slice_sample_1d
-    from .._utils._sparsax_utils import make_sparsax_ops
-    from ._core import JAXSEMLogitGibbsState
-
-    @eqx.filter_jit
-    def gibbs_step(state, key, data, slice_width, return_steps=False):
-        """One complete SEM-logit Gibbs sweep: ω → η → β → λ (slice).
-
-        With ``return_steps`` it also returns the λ slice's ``(left, right)``
-        step-out counts.
-        """
-        eta = state.eta
-        beta = state.beta
-        lam = state.lam
-        X_jax, kappa = data["X"], data["kappa"]
-        beta_mu_jax, beta_sigma2_jax = data["beta_mu"], data["beta_sigma2"]
-        beta_prior_prec = jnp.diag(1.0 / beta_sigma2_jax)
-        lam_lower_jax, lam_upper_jax = data["lower"], data["upper"]
-        W_bcoo, Wt_bcoo = data["W"], data["Wt"]
-
-        def W_matvec(x):
-            return W_bcoo @ x
-
-        def Wt_matvec(x):
-            return Wt_bcoo @ x
-
-        def Wsym_matvec(x):
-            return W_matvec(x) + Wt_matvec(x)
-
-        def WtW_matvec(x):
-            return Wt_matvec(W_matvec(x))
-
-        if use_sparsax:
-            sp_ = data["sparsax"]
-            _Ai, _Aj = sp_["Ai"], sp_["Aj"]
-            _W_sym_vals, _WtW_vals = sp_["W_sym_vals"], sp_["WtW_vals"]
-            _diag_idx = sp_["diag_idx"]
-            _nnz = _Ai.shape[0]
-            _n_static = n
-            # Factor-once closures: the η-draw and each density evaluation do
-            # exactly ONE numeric factorization (sample_gaussian / factor_solve).
-            _eta_sample, _solve_logdet = make_sparsax_ops(_Ai, _Aj, _n_static)
-
-            def _assemble_Ax(omega, coef):
-                """COO values of P = I + diag(ω) − c(W+Wᵀ) + c²WᵀW."""
-                Ax = -coef * _W_sym_vals + coef**2 * _WtW_vals
-                diag_vals = jnp.zeros(_nnz, dtype=jnp.float64)
-                diag_vals = diag_vals.at[_diag_idx].set(1.0 + omega)
-                return Ax + diag_vals
-
-        else:
-            W_sym, WtW = data["W_sym_dense"], data["WtW_dense"]
-
-        def logdet_jax(r):
-            prm = logdet_closure if logdet_kind == "closure" else data["logdet"]
-            return eval_logdet_params(logdet_kind, prm, r)
-
-        key_omega, key_eta, key_beta, key_lam = jax.random.split(key, 4)
-
-        # ── Block 1: ω ~ PG(1, η) — on-device (pgjax Devroye, else exp) ──
-        omega_new = _draw_pg1(jnp.ones(n), eta, key_omega)
-
-        # ── Block 2: η | ω, β, λ — SEM-specific rhs ──
-        # P = I + diag(ω) - λ(W+W^T) + λ²W^TW
-        Xbeta = X_jax @ beta
-        # SEM rhs: A_λ'A_λXβ + κ = Xβ - λ(W+W')Xβ + λ²W'WXβ + κ
-        WsymXbeta = Wsym_matvec(Xbeta)
-        WtWXbeta = WtW_matvec(Xbeta)
-        rhs = Xbeta - lam * WsymXbeta + lam**2 * WtWXbeta + kappa
-
-        if use_sparsax:
-            # Mean + draw ~ N(P⁻¹ rhs, P⁻¹) from ONE factorization.
-            Ax = _assemble_Ax(omega_new, lam)
-            z_eta = jax.random.normal(key_eta, shape=(n,), dtype=jnp.float64)
-            eta_new = _eta_sample(Ax, rhs, z_eta)
-        else:
-            P_diag = jnp.ones(n) + omega_new
-            P = jnp.diag(P_diag) - lam * W_sym + lam**2 * WtW
-            P = P + 1e-6 * jnp.eye(n)
-
-            L = jnp.linalg.cholesky(P)
-            P_inv_rhs = cho_solve((L, True), rhs)
-            z_eta = jax.random.normal(key_eta, shape=(n,), dtype=jnp.float64)
-            eta_new = P_inv_rhs + solve_triangular(L.T, z_eta, lower=False)
-
-        # ── Block 3: β | η, λ — SEM-style transformed data ──
-        # X* = (I - λW)X,  η* = (I - λW)η
-        A_lam_eta = eta_new - lam * W_matvec(eta_new)
-        X_star = X_jax - lam * W_matvec(X_jax)
-        eta_star = A_lam_eta
-
-        XstXs = X_star.T @ X_star
-        Sigma_beta_inv = beta_prior_prec + XstXs
-        rhs_beta = beta_mu_jax / beta_sigma2_jax + X_star.T @ eta_star
-        L_beta = jnp.linalg.cholesky(Sigma_beta_inv)
-        m_beta = cho_solve((L_beta, True), rhs_beta)
-        z_beta = jax.random.normal(key_beta, shape=(k,), dtype=jnp.float64)
-        beta_new = m_beta + solve_triangular(L_beta.T, z_beta, lower=False)
-
-        # ── Block 4: λ — 1-D slice sampler (η-collapsed density) ──
-        #
-        # The collapsed log-density (η integrated out, β conditioned) is:
-        #
-        #   log p(λ | β, ω, y) = log|I - λW| - ½ log|P_η|
-        #                       + ½ rhs^T P_η⁻¹ rhs - ½ Xβ^T A_λ^T A_λ Xβ
-        #
-        # Slice sampling avoids the expensive gradient computation that
-        # MALA requires (autodiff through Cholesky + solve is ~3× the
-        # forward cost).
-
-        # Hoist the λ-independent matvecs out of the slice density: Xβ and the
-        # (W+Wᵀ)Xβ, WᵀWXβ products are constant across every stepping-out /
-        # shrink evaluation, so a single set of sparse matvecs per sweep
-        # replaces recomputing them dozens of times.
-        Xbeta_r = X_jax @ beta_new
-        WsymXbeta_r = Wsym_matvec(Xbeta_r)
-        WtWXbeta_r = WtW_matvec(Xbeta_r)
-
-        # ── Krylov basis (sparsax factor-reuse path, SEM) ──
-        # The SEM RHS is quadratic in λ: rhs = Xβ − λ·W_sym·Xβ + λ²·WtW·Xβ + κ.
-        # Seed with [κ, Xβ, W_sym·Xβ, WtW·Xβ] and reconstruct the solve as a
-        # quadratic combination of Horner evaluations.
-        _use_krylov_sem = (
-            use_sparsax and krylov_degree > 0 and _sparsax_factor_ops_available()
-        )
-        if _use_krylov_sem:
-            _lam_c = lam
-            _G_vals_c_sem = _W_sym_vals - 2.0 * _lam_c * _WtW_vals
-            _rhs_seed_sem = jnp.column_stack(
-                [
-                    kappa,
-                    Xbeta_r,
-                    WsymXbeta_r,
-                    WtWXbeta_r,
-                ]
-            )  # (n, 4)
-            _Ax_c_sem = _assemble_Ax(omega_new, _lam_c)
-            (
-                _token_sem,
-                _V_stack_sem,
-                _ld_coefs_sem,
-                _safe_dmax_sem,
-            ) = build_precision_krylov_basis_jax(
-                _Ai,
-                _Aj,
-                _Ax_c_sem,
-                _G_vals_c_sem,
-                _WtW_vals,
-                _rhs_seed_sem,
-                n=_n_static,
-                degree=krylov_degree,
-                dmax=krylov_dmax,
-            )
-
-        def log_density_lam(lam_val):
-            """Collapsed log-density of λ (η integrated out, β conditioned).
-
-            Uses one Cholesky of P_r to obtain log|P_r| and the
-            quadratic form exactly.
-            """
-            rhs_r = Xbeta_r - lam_val * WsymXbeta_r + lam_val**2 * WtWXbeta_r + kappa
-
-            if use_sparsax:
-                if _use_krylov_sem:
-                    dlam = lam_val - _lam_c
-                    within = jnp.abs(dlam) <= _safe_dmax_sem
-                    sol_all = eval_precision_solve_from_basis_jax(_V_stack_sem, dlam)
-                    # sol_all: [P(λ)⁻¹κ, P(λ)⁻¹Xβ, P(λ)⁻¹W_symXβ, P(λ)⁻¹WtWXβ]
-                    Pkappa = sol_all[:, 0]
-                    PXbeta = sol_all[:, 1:2]
-                    PWsymXbeta = sol_all[:, 2:3]
-                    PWtWXbeta = sol_all[:, 3:]
-                    # rhs = Xβ − λ·W_symXβ + λ²·WtWXβ + κ
-                    m_kry = (
-                        PXbeta - lam_val * PWsymXbeta + lam_val**2 * PWtWXbeta
-                    ).ravel() + Pkappa
-                    log_det_P_kry = eval_precision_logdet_from_basis_jax(
-                        _ld_coefs_sem, dlam
-                    )
-                    quad_kry = rhs_r @ m_kry
-                    # Direct solve outside the radius (see the SAR-logit site).
-                    Ax_r = _assemble_Ax(omega_new, lam_val)
-                    m_dir, log_det_P_dir = _solve_logdet(Ax_r, rhs_r)
-                    quad_dir = rhs_r @ m_dir
-                    m = jnp.where(within, m_kry, m_dir)
-                    log_det_P = jnp.where(within, log_det_P_kry, log_det_P_dir)
-                    quad_r = jnp.where(within, quad_kry, quad_dir)
-                else:
-                    Ax_r = _assemble_Ax(omega_new, lam_val)
-                    # Solve + logdet from one factorization (factor_solve).
-                    m, log_det_P = _solve_logdet(Ax_r, rhs_r)
-                    quad_r = rhs_r @ m
-            else:
-                P_diag_r = jnp.ones(n) + omega_new
-                P_r = jnp.diag(P_diag_r) - lam_val * W_sym + lam_val**2 * WtW
-                P_r = P_r + 1e-6 * jnp.eye(n)
-
-                L_r = jnp.linalg.cholesky(P_r)
-                log_det_P = 2.0 * jnp.sum(jnp.log(jnp.diag(L_r)))
-                v = solve_triangular(L_r, rhs_r, lower=True)
-                quad_r = v @ v
-
-            logdet_W = logdet_jax(lam_val)
-
-            # SEM correction: -½Xβ'A_λ'A_λXβ
-            # = ½λXβ'(W+W')Xβ - ½λ²Xβ'W'WXβ + const
-            xbeta_correction = 0.5 * lam_val * (
-                Xbeta_r @ WsymXbeta_r
-            ) - 0.5 * lam_val**2 * (Xbeta_r @ WtWXbeta_r)
-
-            log_prior = jnp.where(
-                (lam_val >= lam_lower_jax) & (lam_val <= lam_upper_jax), 0.0, -jnp.inf
-            )
-            return (
-                logdet_W - 0.5 * log_det_P + 0.5 * quad_r + xbeta_correction + log_prior
-            )
-
-        # ── Slice sampling for λ (shared JAX helper) ──
-        lam_new, _, steps_left, steps_right = jax_slice_sample_1d(
-            log_density_lam,
-            lam,
-            lam_lower_jax,
-            lam_upper_jax,
-            key=key_lam,
-            w=slice_width,
-            return_steps=True,
-        )
-
-        new_state = JAXSEMLogitGibbsState(
-            eta=eta_new,
-            beta=beta_new,
-            lam=lam_new,
-            omega=omega_new,
-        )
-        if return_steps:
-            return new_state, jnp.float64(1.0), (steps_left, steps_right)
-        return new_state, jnp.float64(1.0)  # slice always accepts
-
-    return gibbs_step
-
-
-def run_chain_jax_sem(
-    y: np.ndarray,
-    X: np.ndarray,
-    W_sparse,
-    W_sym_dense,
-    WtW_dense,
-    logdet_jax,
-    priors,
-    init,
-    draws: int,
-    tune: int,
-    thin: int = 1,
-    return_eta: bool = False,
-    rng=None,
-    pg_n_terms: int = 25,
-    n_probes: int = 5,
-    lanczos_deg: int = 15,
-    krylov_degree: int = 0,
-    krylov_dmax: float = 0.4,
-    progress_manager=None,
-    chain_id: int = 0,
-    store_log_lik: bool = True,
-):
-    """Run one chain of the full-JIT JAX Gibbs sampler for SEM-logit.
-
-    Parameters
-    ----------
-    y : ndarray of shape (n,)
-        Binary response vector.
-    X : ndarray of shape (n, k)
-        Design matrix.
-    W_sparse : csr_matrix
-        Spatial weights matrix.
-    W_sym_dense : jax.numpy.ndarray of shape (n, n)
-        Dense (W + W^T).
-    WtW_dense : jax.numpy.ndarray of shape (n, n)
-        Dense W^T W.
-    logdet_jax : callable
-        JAX-native function ``(lam) -> jax.numpy.ndarray`` computing
-        log|I - lam*W|.
-    priors : SEMLogitGibbsPriors
-        Prior hyperparameters.
-    init : SEMLogitGibbsState
-        Initial state.
-    draws : int
-        Number of post-warmup draws.
-    tune : int
-        Number of warmup draws.
-    thin : int
-        Keep every thin-th draw.
-    return_eta : bool
-        If True, store the latent index η.
-    rng : numpy.random.Generator, optional
-        Random state.
-    pg_n_terms : int
-        Ignored (kept for API compatibility).  PG draws now use the
-        exact sum-of-exponentials method which does not require
-        truncation.
-    n_probes : int
-        Number of Lanczos probes for log|P| estimation.
-    lanczos_deg : int
-        Lanczos iteration depth.
-
-    Returns
-    -------
-    dict[str, np.ndarray]
-        Posterior samples with keys ``lam``, ``beta``, ``log_lik``,
-        ``eta_norm``, and optionally ``eta``.
-        Also includes ``mh_accept_rate`` (always 1.0; slice sampling
-        always accepts).
-    """
-    import jax
-    import jax.numpy as jnp
-
-    ensure_x64()
-
-    from ._core import JAXSEMLogitGibbsState
-
-    if rng is None:
-        rng = np.random.default_rng()
-
-    n, k = X.shape
-    total_iters = tune + draws
-    n_keep = draws // thin if thin > 0 else draws
-
-    # Convert data to JAX arrays
-    y_jax = jnp.asarray(y, dtype=jnp.float64)
-    X_jax = jnp.asarray(X, dtype=jnp.float64)
-
-    # Sparse W as BCOO — never densify W for the O(nnz) matvecs.
-    W_bcoo, Wt_bcoo = _build_w_bcoo(W_sparse)
-
-    # Initialize state
-    state = JAXSEMLogitGibbsState(
-        eta=jnp.asarray(init.eta, dtype=jnp.float64),
-        beta=jnp.asarray(init.beta, dtype=jnp.float64),
-        lam=jnp.float64(init.lam),
-        omega=jnp.asarray(init.omega, dtype=jnp.float64),
-    )
-
-    # Pre-allocate storage
-    lam_samples = np.empty(n_keep, dtype=np.float64)
-    beta_samples = np.empty((n_keep, k), dtype=np.float64)
-    log_lik_samples = np.empty((n_keep, n), dtype=np.float64) if store_log_lik else None
-    eta_norm_samples = np.empty(n_keep, dtype=np.float64)
-    eta_samples = np.empty((n_keep, n), dtype=np.float64) if return_eta else None
-
-    # Build the JIT-compiled step function
-    gibbs_step = _make_gibbs_step_with_data_sem(
-        y_jax=y_jax,
-        X_jax=X_jax,
-        W_bcoo=W_bcoo,
-        Wt_bcoo=Wt_bcoo,
-        n=n,
-        k=k,
-        W_sym_dense=W_sym_dense,
-        WtW_dense=WtW_dense,
-        logdet_jax=logdet_jax,
-        priors=priors,
-        n_probes=n_probes,
-        lanczos_deg=lanczos_deg,
-        krylov_degree=krylov_degree,
-        krylov_dmax=krylov_dmax,
-    )
-
-    # Warmup the JIT function
-    key = jax.random.PRNGKey(rng.integers(2**31))
-    key, warmup_key = jax.random.split(key)
-    slice_width = jnp.float64(0.2)
-    _ = gibbs_step(state, warmup_key, slice_width)
-
-    # Run the chain
-    for i in range(total_iters):
-        key, step_key = jax.random.split(key)
-        state, _ = gibbs_step(state, step_key, slice_width)
-
-        # Store post-warmup draws
-        if i >= tune and (i - tune) % thin == 0:
-            idx = (i - tune) // thin
-            if idx < n_keep:
-                lam_samples[idx] = float(state.lam)
-                beta_samples[idx] = np.asarray(state.beta)
-                eta_np = np.asarray(state.eta)
-                eta_norm_samples[idx] = float(eta_np @ eta_np)
-                if return_eta:
-                    eta_samples[idx] = eta_np
-                if store_log_lik:
-                    log_lik_samples[idx] = _logit_loglik_pointwise_jax(y, eta_np)
-
-        if progress_manager is not None:
-            progress_manager.update(chain_id, i, tuning=i < tune)
-
-    if progress_manager is not None:
-        progress_manager.refresh()
-
-    result = {
-        "lam": lam_samples,
-        "beta": beta_samples,
-        "log_lik": log_lik_samples,
-        "eta_norm": eta_norm_samples,
-        "mh_accept_rate": 1.0,  # slice always accepts
-    }
-    if return_eta:
-        result["eta"] = eta_samples
-
-    return result
 
 
 # ===========================================================================
@@ -1104,6 +413,7 @@ def _stack_chain_inits(inits, state_cls, scalar_field):
             eta=jnp.asarray(init.eta, dtype=jnp.float64),
             beta=jnp.asarray(init.beta, dtype=jnp.float64),
             omega=jnp.asarray(init.omega, dtype=jnp.float64),
+            sigma=jnp.float64(init.sigma),
             **{scalar_field: jnp.float64(getattr(init, scalar_field))},
         )
         for init in inits
@@ -1139,7 +449,12 @@ def _cached_logit_sweep(
                 state, key, data, width, return_steps=True
             )
             width = adapt_slice_width(width, steps_left, steps_right, tuning)
-            trace = (getattr(state, spatial), state.beta, state.eta @ state.eta)
+            trace = (
+                getattr(state, spatial),
+                state.beta,
+                state.sigma,
+                state.eta @ state.eta,
+            )
             if store_log_lik:
                 trace += (
                     _logit_loglik_pointwise_jax_op(data["kappa"] + 0.5, state.eta),
@@ -1164,9 +479,6 @@ def run_chains_jax_vectorized(
     tune: int,
     thin: int = 1,
     jax_seeds: list[int] | None = None,
-    pg_n_terms: int = 25,
-    n_probes: int = 5,
-    lanczos_deg: int = 15,
     progressbar: bool = True,
     sparsax_pattern=None,
     krylov_degree: int = 0,
@@ -1186,33 +498,30 @@ def run_chains_jax_vectorized(
 
     Parameters
     ----------
-    y, X, W_sparse, W_sym_dense, WtW_dense, logdet_jax, priors :
-        Same meaning as in :func:`run_chain_jax`.
+    y, X, W_sparse :
+        Binary outcome, design and sparse W.
+    W_sym_dense, WtW_dense :
+        Dense ``W + Wᵀ`` and ``WᵀW`` for the dense path (no sparsax).
+    logdet_jax :
+        ``log|I − ρW|`` as a JAX closure, used when ``logdet_params`` is not
+        given.
+    priors : LogitREGibbsPriors
     inits : list of LogitGibbsState
-        Per-chain initial states.  Length determines the number of
-        chains.
+        Per-chain initial states; their number is the number of chains.
     draws, tune, thin :
-        Same meaning as in :func:`run_chain_jax`.
+        Kept draws per chain, warmup sweeps and the thinning interval.
     jax_seeds : list of int, optional
-        Per-chain JAX PRNG seeds.  Defaults to ``range(chains)``.
-    pg_n_terms, n_probes, lanczos_deg :
-        Same meaning as in :func:`run_chain_jax`.
+        The first seeds the master PRNG key, from which every chain's keys
+        are split.  Defaults to ``range(chains)``.
     progressbar : bool, default True
-        Show per-chain progress bars.  Because all chains advance in
-        lock-step under vmap, the bar is updated in bulk at the end of
-        each phase.
+        Show per-chain progress bars, updated once per chunk.
 
     Returns
     -------
     list of dict
-        One dict per chain with keys ``rho``, ``beta``, ``log_lik``,
-        ``eta_norm``, ``mh_accept_rate``.
-
-    Notes
-    -----
-    ``return_eta=True`` is not supported by this runner; use the
-    sequential :func:`run_chain_jax` path if you need the full latent
-    field.
+        One dict per chain with keys ``rho``, ``beta``, ``sigma``,
+        ``eta_norm``, ``log_lik`` and ``mh_accept_rate``.  The latent field
+        is not kept.
     """
     import jax
     import jax.numpy as jnp
@@ -1242,7 +551,7 @@ def run_chains_jax_vectorized(
     draw_keys = jax.random.split(jax.random.fold_in(master_key, 1), chains)
 
     _sweep = _cached_logit_sweep(
-        "sar_logit_re", _make_logit_step, "rho", n, k, logdet_params,
+        "sar_logit_re", partial(_make_step, sem=False), "rho", n, k, logdet_params,
         sparsax_pattern is not None, krylov_degree, krylov_dmax, store_log_lik,
     )  # fmt: skip
 
@@ -1277,8 +586,8 @@ def run_chains_jax_vectorized(
         )
 
     # Thin and pack as per-chain dicts
-    rhos, betas, eta_norms = traces[:3]
-    log_liks = traces[3] if store_log_lik else None
+    rhos, betas, sigmas, eta_norms = traces[:4]
+    log_liks = traces[4] if store_log_lik else None
     thin_slice = slice(None, None, thin) if thin > 1 else slice(None)
     results = []
     for c in range(chains):
@@ -1286,6 +595,7 @@ def run_chains_jax_vectorized(
             {
                 "rho": rhos[c, thin_slice].copy(),
                 "beta": betas[c, thin_slice].copy(),
+                "sigma": sigmas[c, thin_slice].copy(),
                 "eta_norm": eta_norms[c, thin_slice].copy(),
                 "log_lik": log_liks[c, thin_slice].copy() if store_log_lik else None,
                 "mh_accept_rate": 1.0,
@@ -1307,9 +617,6 @@ def run_chains_jax_sem_vectorized(
     tune: int,
     thin: int = 1,
     jax_seeds: list[int] | None = None,
-    pg_n_terms: int = 25,
-    n_probes: int = 5,
-    lanczos_deg: int = 15,
     progressbar: bool = True,
     sparsax_pattern=None,
     krylov_degree: int = 0,
@@ -1327,8 +634,6 @@ def run_chains_jax_sem_vectorized(
     import jax.numpy as jnp
 
     ensure_x64()
-
-    from ._core import JAXSEMLogitGibbsState
 
     chains = len(inits)
     n, k = X.shape
@@ -1353,7 +658,7 @@ def run_chains_jax_sem_vectorized(
     draw_keys = jax.random.split(jax.random.fold_in(master_key, 1), chains)
 
     _sweep = _cached_logit_sweep(
-        "sem_logit", _make_sem_logit_step, "lam", n, k, logdet_params,
+        "sem_logit", partial(_make_step, sem=True), "lam", n, k, logdet_params,
         sparsax_pattern is not None, krylov_degree, krylov_dmax, store_log_lik,
     )  # fmt: skip
 
@@ -1387,8 +692,8 @@ def run_chains_jax_sem_vectorized(
             consts=data,
         )
 
-    lams, betas, eta_norms = traces[:3]
-    log_liks = traces[3] if store_log_lik else None
+    lams, betas, sigmas, eta_norms = traces[:4]
+    log_liks = traces[4] if store_log_lik else None
     thin_slice = slice(None, None, thin) if thin > 1 else slice(None)
     results = []
     for c in range(chains):
@@ -1396,6 +701,7 @@ def run_chains_jax_sem_vectorized(
             {
                 "lam": lams[c, thin_slice].copy(),
                 "beta": betas[c, thin_slice].copy(),
+                "sigma": sigmas[c, thin_slice].copy(),
                 "eta_norm": eta_norms[c, thin_slice].copy(),
                 "log_lik": log_liks[c, thin_slice].copy() if store_log_lik else None,
                 "mh_accept_rate": 1.0,

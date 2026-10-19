@@ -6,30 +6,27 @@ registry key ``"binary_re"``.  The canonical reduced-form ``SARLogit``
 lives in :mod:`neighbayes.samplers.logit_reduced` (key ``"binary"``).
 """
 
+from ...models.priors import LogitGibbsPriors, LogitREGibbsPriors, SEMLogitGibbsPriors
 from .._registry import register
 from ._core import (
     LogitGibbsCache,
-    LogitGibbsPriors,
     LogitGibbsState,
     SEMLogitGibbsCache,
-    SEMLogitGibbsPriors,
     SEMLogitGibbsState,
     run_chain,
     run_chain_sem,
 )
-from ._jax import run_chain_jax, run_chain_jax_sem
 
 __all__ = [
     "LogitGibbsCache",
     "LogitGibbsPriors",
     "LogitGibbsState",
+    "LogitREGibbsPriors",
     "SEMLogitGibbsCache",
     "SEMLogitGibbsPriors",
     "SEMLogitGibbsState",
     "run_chain",
-    "run_chain_jax",
     "run_chain_sem",
-    "run_chain_jax_sem",
 ]
 
 
@@ -57,9 +54,6 @@ def _run_binary_gibbs(
     progressbar,
     backend,
     return_eta=False,
-    pg_n_terms=25,
-    n_probes=5,
-    lanczos_deg=15,
     krylov_degree=0,
     krylov_dmax=0.4,
     log_likelihood=False,
@@ -75,9 +69,6 @@ def _run_binary_gibbs(
         progressbar=progressbar,
         backend=backend,
         return_eta=return_eta,
-        pg_n_terms=pg_n_terms,
-        n_probes=n_probes,
-        lanczos_deg=lanczos_deg,
         krylov_degree=krylov_degree,
         krylov_dmax=krylov_dmax,
         log_likelihood=log_likelihood,
@@ -92,9 +83,6 @@ register(
     auto_backend="jax",
     options={
         "return_eta",
-        "pg_n_terms",
-        "n_probes",
-        "lanczos_deg",
         "krylov_degree",
         "krylov_dmax",
     },

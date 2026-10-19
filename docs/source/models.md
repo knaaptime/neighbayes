@@ -458,28 +458,41 @@ Non-spatial negative binomial baseline.
 $$y_i \sim \operatorname{Bernoulli}(p_i), \quad \eta = (I - \rho W)^{-1}X\beta$$
 
 The reduced form: the spatial multiplier acts on the mean of the log-odds, with
-no random effects (that is `SARLogit(unit_effects="random")`). Pólya–Gamma Gibbs sampler
-only — no NUTS path.
+no random effects (for those, `SARLogit(unit_effects="random")` below). Pólya–Gamma
+Gibbs sampler only — no NUTS path.
 
 ### SARLogit with random effects
 
-$$y_i \sim \operatorname{Bernoulli}(p_i), \quad \eta = \rho W \eta + X\beta + \nu, \quad \nu \sim \mathcal{N}(0, I)$$
+$$y_i \sim \operatorname{Bernoulli}(p_i), \quad \eta = \rho W \eta + X\beta + \nu, \quad \nu \sim \mathcal{N}(0, \sigma^2 I)$$
 
 `SARLogit(unit_effects="random")`: unlike the reduced form, the log-odds carry a
 normal random effect per unit $\nu$ that the spatial multiplier also
-propagates. Its variance is fixed at 1, which fixes the ratio of the propagated
-variance to the logistic noise's $\pi^2/3$: a restriction, not a
-normalization. Pólya–Gamma Gibbs sampler only.
+propagates. Its sd $\sigma$ (`unit_effect_sd`) is learned under a half-t prior
+(`unit_effect_sd_nu`, `unit_effect_sd_scale`; half-Cauchy(1) on the log-odds
+scale by default). It is identified only because $\nu$ propagates through the
+filter while the logistic noise does not, so in a cross-section it is weakly
+identified, and its posterior leans on the prior; $\beta$ scales with it, as
+logit coefficients do with unobserved heterogeneity. Fixing $\sigma = 1$ would
+instead pin the ratio of the propagated variance to the logistic noise's
+$\pi^2/3$. Pólya–Gamma Gibbs sampler only: $\rho$ and then $\sigma$, each
+with $\eta$ and $\beta$ integrated out, then $\beta$ and $\eta$; then two
+moves on the exact likelihood, free of the Pólya–Gamma weights: one along the
+ridge where the data hold $\beta/\sqrt{1 + \pi\sigma^2/8}$, and a joint
+rescaling of $(\eta, \beta, \sigma)$. Because the likelihood barely tells a
+small $\sigma$ from a large one with a larger $\beta$, $\sigma$'s posterior
+has a long right tail, and its effective sample (and $\beta$'s) runs well
+below $\rho$'s.
 
 ### SEMLogit
 
-$$y_i \sim \operatorname{Bernoulli}(p_i), \quad \eta = X\beta + u, \quad u = \lambda W u + \nu, \quad \nu \sim \mathcal{N}(0, I)$$
+$$y_i \sim \operatorname{Bernoulli}(p_i), \quad \eta = X\beta + u, \quad u = \lambda W u + \nu, \quad \nu \sim \mathcal{N}(0, \sigma^2 I)$$
 
 `SEMLogit(unit_effects="random")`: the random effects carry the spatial error
-process. Their variance is fixed at 1, a restriction rather than a
-normalization, as for the SAR logit with random effects. The latent SEM logit,
+process. Their sd $\sigma$ is learned under the same prior as for the SAR logit
+with random effects, and is as weakly identified. The latent SEM logit,
 whose error process carries the logistic disturbance itself, is not implemented,
-so a bare `SEMLogit(...)` raises. Pólya–Gamma Gibbs sampler only.
+so a bare `SEMLogit(...)` raises. Pólya–Gamma Gibbs sampler only, with the
+SAR logit's sweep.
 
 ## Flow Models
 

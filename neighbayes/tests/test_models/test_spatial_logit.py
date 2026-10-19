@@ -440,6 +440,7 @@ class TestProgressForwarding:
             return {
                 "lam": np.zeros(n_keep),
                 "beta": np.zeros((n_keep, k)),
+                "sigma": np.ones(n_keep),
                 "log_lik": np.zeros((n_keep, n)),
                 "eta_norm": np.zeros(n_keep),
             }

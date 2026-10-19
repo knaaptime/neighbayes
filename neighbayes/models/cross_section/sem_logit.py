@@ -5,12 +5,13 @@ r"""SEM logit with random effects, sampled by Pólya–Gamma Gibbs.
     y_i \sim \mathrm{Bernoulli}(\mathrm{logit}^{-1}(\eta_i)), \quad
     \eta = X\beta + u, \quad
     u = \lambda W u + \nu, \quad
-    \nu \sim N(0, I)
+    \nu \sim N(0, \sigma^2 I)
 
-σ² is fixed at 1, which fixes the ratio of the propagated variance to the
-logistic noise's π²/3: a restriction, not a normalization.  The Pólya–Gamma augmentation yields
-fully conjugate Gibbs updates for η, β, and λ (via collapsed slice
-sampling).
+The random effects' sd σ (``unit_effect_sd``) is learned under a half-t prior;
+it is identified only through the spatial structure ν takes from the filter,
+so in a cross-section it is weakly identified.  The Pólya–Gamma augmentation
+yields conjugate Gibbs updates for η and β, and λ by collapsed slice sampling
+(:mod:`neighbayes.samplers.logit`).
 
 Use this model when:
 - The response is binary (0/1).
@@ -80,6 +81,9 @@ class SEMLogitRE(SpatialModel):
           Uniform prior on :math:`\\lambda`.
         - ``beta_mu``, ``beta_sigma`` (float or array, default Gelman et al.
           2008): Normal prior on :math:`\\beta`, on the logit scale (intercept at ``logit(mean(y))``, scale 2.5; slopes ``2.5 / sd(x_j)``).
+        - ``unit_effect_sd_nu`` (float, default 1.0), ``unit_effect_sd_scale``
+          (float, default 1.0): half-t prior on the random effects' sd σ, on
+          the log-odds scale (half-Cauchy(1) by default).
 
     logdet_method : {"exact", "cheb", "aaa", "spline", "stochastic"}, optional
         How ``log|I - rho*W|`` is approximated over rho: evaluated exactly at
@@ -104,7 +108,7 @@ class SEMLogitRE(SpatialModel):
     -----
     The model parameterizes the latent log-odds as
     ``eta = X @ beta + u`` with ``u = lam * W @ u + nu``,
-    ``nu ~ N(0, I)``, and augments the logistic likelihood with
+    ``nu ~ N(0, sigma**2 I)``, and augments the logistic likelihood with
     Pólya–Gamma auxiliary variables to obtain fully conjugate Gibbs
     updates for η and β.
 
@@ -115,9 +119,8 @@ class SEMLogitRE(SpatialModel):
     With the Gibbs sampler, ``fit()`` does **not** accept ``target_accept``,
     a NUTS-only argument; passing it raises ``TypeError``.
 
-    σ² is fixed at 1, a restriction on the ratio of the propagated variance
-    to the logistic noise, not a normalization.  The PG shape parameter is
-    always h = 1 (one trial per observation), so the Devroye method
+    The random effects' sd σ is learned (``unit_effect_sd``).  The PG shape
+    parameter is always h = 1 (one trial per observation), so the Devroye method
     is valid and typically fastest.
     """
 
@@ -184,6 +187,7 @@ class SEMLogitRE(SpatialModel):
             beta=beta_init,
             lam=lam_init,
             omega=omega_init,
+            sigma=float(self.priors.get("unit_effect_sd_scale", 1.0)),
         )
 
     def _fit_gibbs(
@@ -198,9 +202,6 @@ class SEMLogitRE(SpatialModel):
         progressbar: bool = True,
         backend: str = "numpy",
         return_eta: bool = False,
-        pg_n_terms: int = 25,
-        n_probes: int = 5,
-        lanczos_deg: int = 15,
         krylov_degree: int = 0,
         krylov_dmax: float = 0.4,
         log_likelihood: bool = False,
@@ -226,19 +227,9 @@ class SEMLogitRE(SpatialModel):
         return_eta : bool
             If True, store the latent index η in the posterior.
             Default False — η is n × draws × chains, which can be large.
-        pg_n_terms : int, default 25
-            Ignored (kept for API compatibility).  PG draws now use the
-            exact sum-of-exponentials method which does not require
-            truncation.  Only relevant on the JAX path.
-        n_probes : int, default 5
-            Number of Lanczos probe vectors for stochastic log|P|
-            estimation.  Only used on the JAX path.
-        lanczos_deg : int, default 15
-            Lanczos iteration depth for log|P| estimation.  Only used
-            on the JAX path.
-        krylov_degree : int, default 12
+        krylov_degree : int, default 0
             Krylov basis degree for the λ-slice factor-reuse path
-            (JAX + sparsax, or NumPy + CHOLMOD).  Set 0 to disable.
+            (JAX + sparsax, or NumPy + CHOLMOD); 0 disables it.
         krylov_dmax : float, default 0.4
             Maximum |Δλ| for the Krylov basis reuse radius.
 
@@ -259,13 +250,14 @@ class SEMLogitRE(SpatialModel):
             beta_sigma=beta_sigma,
             lam_lower=self._logdet_bounds.rho_min,
             lam_upper=self._logdet_bounds.rho_max,
+            sd_nu=float(self.priors.get("unit_effect_sd_nu", 1.0)),
+            sd_scale=float(self.priors.get("unit_effect_sd_scale", 1.0)),
         )
 
         # Build cache
         XtX = X.T @ X
 
-        # Precompute matrix pieces for the precision expansion:
-        # P = I + diag(ω) - λ*(W+W^T) + λ²*W^T W  (σ² = 1)
+        # Pieces of the precision P = (I − λ(W+Wᵀ) + λ²WᵀW)/σ² + diag(ω).
         W_sym = W_sparse + W_sparse.T
         WtW = W_sparse.T @ W_sparse
 
@@ -282,7 +274,6 @@ class SEMLogitRE(SpatialModel):
             n=n,
             logdet_bounds=self._logdet_bounds,
         )
-        solve_method = logdet_P_method = sample_method = method
         W_sym_dense = _jax_parts["W_sym_dense"]
         WtW_dense = _jax_parts["WtW_dense"]
         logdet_jax = _jax_parts["logdet_jax"]
@@ -297,14 +288,8 @@ class SEMLogitRE(SpatialModel):
             cholmod_factor=cholmod_factor,
             W_sym=W_sym,
             WtW=WtW,
-            solve_method=solve_method,
-            logdet_P_method=logdet_P_method,
-            sample_method=sample_method,
             krylov_degree=krylov_degree,
             krylov_dmax=krylov_dmax,
-            W_sym_dense=W_sym_dense,
-            WtW_dense=WtW_dense,
-            logdet_jax=logdet_jax,
             lam_adaptive_width=True,
             lam_slice_width_state=SliceWidthState(w=0.2),
         )
@@ -316,7 +301,7 @@ class SEMLogitRE(SpatialModel):
         seeds = [seed_sequence_to_int(s) for s in child_seeds]
 
         # Define the per-chain function
-        _use_jax_full = sample_method in ("jax_dense", "cholmod_jax")
+        _use_jax_full = method in ("jax_dense", "cholmod_jax")
 
         # JAX dense path: the Gibbs step compiles once and the chains run in
         # parallel threads (see run_chains_chunked).
@@ -342,9 +327,6 @@ class SEMLogitRE(SpatialModel):
                 tune=tune,
                 thin=thin,
                 jax_seeds=seeds,
-                pg_n_terms=pg_n_terms,
-                n_probes=n_probes,
-                lanczos_deg=lanczos_deg,
                 progressbar=progressbar,
                 sparsax_pattern=sparsax_pattern,
                 krylov_degree=krylov_degree,
@@ -402,6 +384,9 @@ class SEMLogitRE(SpatialModel):
 
         # beta has shape (n_keep, k) per chain
         posterior_samples["beta"] = np.stack([c["beta"] for c in chain_results], axis=0)
+        posterior_samples["unit_effect_sd"] = np.stack(
+            [c["sigma"] for c in chain_results], axis=0
+        )
 
         # Feature names for coords
         feature_names = list(self._feature_names)
@@ -493,7 +478,9 @@ class SEMLogit(metaclass=FacadeMeta):
 
         y_i \sim \mathrm{Bernoulli}(\mathrm{logit}^{-1}(\eta_i)), \quad
         \eta = X\beta + u, \quad u = \lambda W u + \nu, \quad
-        \nu \sim N(0, I).
+        \nu \sim N(0, \sigma^2 I),
+
+    with σ (``unit_effect_sd``) learned.
 
     The latent SEM logit, whose error process carries the logistic disturbance
     itself, is not implemented, so a bare ``SEMLogit(...)`` raises.

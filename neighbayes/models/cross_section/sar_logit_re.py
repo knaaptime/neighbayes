@@ -4,13 +4,15 @@ r"""SAR logit with random effects, sampled by Pólya–Gamma Gibbs.
 
     y_i \sim \mathrm{Bernoulli}(\mathrm{logit}^{-1}(\eta_i)), \quad
     \eta = \rho W \eta + X\beta + \nu, \quad
-    \nu \sim N(0, I)
+    \nu \sim N(0, \sigma^2 I)
 
 This is the SAR logit with random effects: the spatial lag acts on the
 latent log-odds :math:`\eta`, and an i.i.d. Gaussian innovation :math:`\nu`
-enters through :math:`(I-\rho W)^{-1}`.  Its variance is fixed at σ² = 1, which
-fixes the ratio of the propagated variance to the logistic noise's π²/3: a
-restriction, not a normalization.  Contrast with the canonical reduced-form :class:`SARLogit`, where the
+enters through :math:`(I-\rho W)^{-1}`.  Its sd σ (``unit_effect_sd``) is
+learned under a half-t prior.  It is identified only because ν propagates
+through the filter while the logistic noise does not, so in a cross-section it
+is weakly identified — honestly so; fixing it would pin the ratio of the
+propagated variance to the logistic noise's π²/3.  Contrast with the canonical reduced-form :class:`SARLogit`, where the
 spatial lag is a deterministic mean-propagator (no random effects) — that is the
 default and the model with the richer probability-scale impacts.
 
@@ -39,13 +41,13 @@ from ...samplers._utils._spatial_normal import CholmodFactor
 from ...samplers.gaussian._chain_runner import run_chains
 from ...samplers.logit import (
     LogitGibbsCache,
-    LogitGibbsPriors,
     LogitGibbsState,
+    LogitREGibbsPriors,
     run_chain,
 )
 from ...samplers.logit._jax import run_chains_jax_vectorized
 from ..base import SpatialModel
-from ..priors import SARLogitPriors
+from ..priors import SARLogitREPriors
 
 
 class SARLogitRE(SpatialModel):
@@ -75,6 +77,9 @@ class SARLogitRE(SpatialModel):
           Uniform prior on :math:`\\rho`.
         - ``beta_mu``, ``beta_sigma`` (float or array, default Gelman et al.
           2008): Normal prior on :math:`\\beta`, on the logit scale (intercept at ``logit(mean(y))``, scale 2.5; slopes ``2.5 / sd(x_j)``).
+        - ``unit_effect_sd_nu`` (float, default 1.0), ``unit_effect_sd_scale``
+          (float, default 1.0): half-t prior on the random effects' sd σ, on
+          the log-odds scale (half-Cauchy(1) by default).
 
     logdet_method : {"exact", "cheb", "aaa", "spline", "stochastic"}, optional
         How ``log|I - rho*W|`` is approximated over rho: evaluated exactly at
@@ -98,9 +103,10 @@ class SARLogitRE(SpatialModel):
     Notes
     -----
     The model parameterizes the latent log-odds as
-    ``eta = rho * W @ eta + X @ beta + nu`` with ``nu ~ N(0, I)``,
+    ``eta = rho * W @ eta + X @ beta + nu`` with ``nu ~ N(0, sigma**2 I)``,
     and augments the logistic likelihood with Pólya–Gamma auxiliary
-    variables to obtain fully conjugate Gibbs updates for η and β.
+    variables to obtain conjugate Gibbs updates for η and β
+    (:mod:`neighbayes.samplers.logit`).
 
     The sampler bypasses PyMC's NUTS entirely. It produces an
     ``xarray.DataTree`` object compatible with all downstream
@@ -115,7 +121,7 @@ class SARLogitRE(SpatialModel):
     _model_type: str = "sar_logit_re"
     _likelihood: str = "binary"
     _gibbs_key: tuple[str, str] | None = ("binary_re", "cross_section")
-    _priors_cls = SARLogitPriors
+    _priors_cls = SARLogitREPriors
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -190,6 +196,7 @@ class SARLogitRE(SpatialModel):
             beta=beta_init,
             rho=rho_init,
             omega=omega_init,
+            sigma=float(self.priors.get("unit_effect_sd_scale", 1.0)),
         )
 
     def _fit_gibbs(
@@ -204,9 +211,6 @@ class SARLogitRE(SpatialModel):
         progressbar: bool = True,
         backend: str = "numpy",
         return_eta: bool = False,
-        pg_n_terms: int = 25,
-        n_probes: int = 5,
-        lanczos_deg: int = 15,
         krylov_degree: int = 0,
         krylov_dmax: float = 0.4,
         log_likelihood: bool = False,
@@ -232,18 +236,9 @@ class SARLogitRE(SpatialModel):
         return_eta : bool
             If True, store the latent index η in the posterior.
             Default False — η is n × draws × chains, which can be large.
-        pg_n_terms : int, default 25
-            Ignored (kept for API compatibility).  Only relevant on the
-            JAX path.
-        n_probes : int, default 5
-            Number of Lanczos probe vectors for stochastic log|P|
-            estimation.  Only used on the JAX path.
-        lanczos_deg : int, default 15
-            Lanczos iteration depth for log|P| estimation.  Only used
-            on the JAX path.
-        krylov_degree : int, default 12
+        krylov_degree : int, default 0
             Krylov basis degree for the ρ-slice factor-reuse path
-            (JAX + sparsax, or NumPy + CHOLMOD).  Set 0 to disable.
+            (JAX + sparsax, or NumPy + CHOLMOD); 0 disables it.
         krylov_dmax : float, default 0.4
             Maximum |Δρ| for the Krylov basis reuse radius.
 
@@ -259,18 +254,19 @@ class SARLogitRE(SpatialModel):
 
         # Link-scale Gelman et al. (2008) default unless overridden.
         beta_mu, beta_sigma = self._resolved_beta_prior(link="logit")
-        priors = LogitGibbsPriors(
+        priors = LogitREGibbsPriors(
             beta_mu=beta_mu,
             beta_sigma=beta_sigma,
             rho_lower=self._logdet_bounds.rho_min,
             rho_upper=self._logdet_bounds.rho_max,
+            sd_nu=float(self.priors.get("unit_effect_sd_nu", 1.0)),
+            sd_scale=float(self.priors.get("unit_effect_sd_scale", 1.0)),
         )
 
         # Build cache
         XtX = X.T @ X
 
-        # Precompute matrix pieces for the precision expansion:
-        # P = I + diag(ω) - ρ*(W+W^T) + ρ²*W^T W  (σ² = 1)
+        # Pieces of the precision P = (I − ρ(W+Wᵀ) + ρ²WᵀW)/σ² + diag(ω).
         W_sym = W_sparse + W_sparse.T
         WtW = W_sparse.T @ W_sparse
 
@@ -287,7 +283,6 @@ class SARLogitRE(SpatialModel):
             n=n,
             logdet_bounds=self._logdet_bounds,
         )
-        solve_method = logdet_P_method = sample_method = method
         W_sym_dense = _jax_parts["W_sym_dense"]
         WtW_dense = _jax_parts["WtW_dense"]
         logdet_jax = _jax_parts["logdet_jax"]
@@ -303,14 +298,8 @@ class SARLogitRE(SpatialModel):
             W_sym=W_sym,
             WtW=WtW,
             WtX=np.asarray(W_sparse.T @ X, dtype=np.float64),
-            solve_method=solve_method,
-            logdet_P_method=logdet_P_method,
-            sample_method=sample_method,
             krylov_degree=krylov_degree,
             krylov_dmax=krylov_dmax,
-            W_sym_dense=W_sym_dense,
-            WtW_dense=WtW_dense,
-            logdet_jax=logdet_jax,
             rho_adaptive_width=True,
             rho_slice_width_state=SliceWidthState(w=0.2),
         )
@@ -322,7 +311,7 @@ class SARLogitRE(SpatialModel):
         seeds = [seed_sequence_to_int(s) for s in child_seeds]
 
         # Define the per-chain function
-        _use_jax_full = sample_method in ("jax_dense", "cholmod_jax")
+        _use_jax_full = method in ("jax_dense", "cholmod_jax")
 
         if _use_jax_full:
             if return_eta:
@@ -347,9 +336,6 @@ class SARLogitRE(SpatialModel):
                 tune=tune,
                 thin=thin,
                 jax_seeds=seeds,
-                pg_n_terms=pg_n_terms,
-                n_probes=n_probes,
-                lanczos_deg=lanczos_deg,
                 progressbar=progressbar,
                 sparsax_pattern=sparsax_pattern,
                 krylov_degree=krylov_degree,
@@ -404,6 +390,9 @@ class SARLogitRE(SpatialModel):
             posterior_samples[key] = np.stack(arrays, axis=0)
 
         posterior_samples["beta"] = np.stack([c["beta"] for c in chain_results], axis=0)
+        posterior_samples["unit_effect_sd"] = np.stack(
+            [c["sigma"] for c in chain_results], axis=0
+        )
 
         feature_names = list(self._feature_names)
         coords = {

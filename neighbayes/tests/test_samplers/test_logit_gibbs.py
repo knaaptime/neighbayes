@@ -1,15 +1,9 @@
-"""Tests for the logit Gibbs sampler primitives.
+"""Tests for the logit-with-random-effects Gibbs sampler (NumPy path).
 
-Covers:
-- _sample_omega: h=1, correct shape, positive values
-- _sample_eta: correct shape, finite values
-- _sample_beta: correct shape, finite values
-- _sample_rho: stays in bounds, finite log-density
-- run_chain: produces correct output shapes
-- _logit_loglik_pointwise: correct values at known points
-- SEM variants: _sample_eta_sem, _sample_beta_sem, _sample_lam, run_chain_sem
-- _sem_logit_collapsed_log_density: analytical check
-- Parameter recovery: posterior means near true values
+Covers the PG draw and the pointwise log-likelihood; the doubly collapsed
+density of ``(r, σ)`` and the conditional moments against dense linear algebra,
+for SAR and SEM; the invariants of the ridge and scale moves; chain output;
+and SEM parameter recovery.
 """
 
 from __future__ import annotations
@@ -17,25 +11,28 @@ from __future__ import annotations
 import numpy as np
 import pytest
 import scipy.sparse as sp
+from scipy.stats import multivariate_normal
 
+from neighbayes.samplers._utils._polyagamma import sample_polyagamma
 from neighbayes.samplers._utils._slice import SliceWidthState
 from neighbayes.samplers._utils._spatial_normal import CholmodFactor
 from neighbayes.samplers.logit._core import (
     LogitGibbsCache,
-    LogitGibbsPriors,
     LogitGibbsState,
+    LogitREGibbsPriors,
     SEMLogitGibbsCache,
     SEMLogitGibbsPriors,
     SEMLogitGibbsState,
+    _attenuation,
+    _collapsed_parts,
     _logit_loglik_pointwise,
-    _sample_beta,
-    _sample_beta_sem,
+    _ridge_move,
     _sample_eta,
-    _sample_eta_sem,
-    _sample_lam,
     _sample_omega,
-    _sample_rho,
-    _sem_logit_collapsed_log_density,
+    _sample_r_sigma_beta,
+    _sar_design,
+    _scale_move,
+    _sem_design,
     run_chain,
     run_chain_sem,
 )
@@ -45,748 +42,275 @@ from neighbayes.samplers.logit._core import (
 # ---------------------------------------------------------------------------
 
 
-def _make_small_problem(n=20, k=3, rho=0.3, seed=42):
-    """Create a small test problem with known parameters."""
+def _ring(n):
+    W = np.zeros((n, n))
+    for i in range(n):
+        W[i, (i + 1) % n] = W[i, (i - 1) % n] = 0.5
+    return W
+
+
+def _problem(n=20, k=3, rho=0.3, sigma=0.8, sem=False, seed=42):
     rng = np.random.default_rng(seed)
     X = np.column_stack([np.ones(n), rng.standard_normal((n, k - 1))])
     beta = np.array([0.5, -1.0, 0.8])[:k]
-
-    # Row-standardized W (ring lattice)
-    W_dense = np.zeros((n, n))
-    for i in range(n):
-        W_dense[i, (i + 1) % n] = 1.0
-        W_dense[i, (i - 1) % n] = 1.0
-    row_sums = W_dense.sum(axis=1, keepdims=True)
-    W_dense = W_dense / row_sums
-    W_sparse = sp.csr_matrix(W_dense)
-
-    # Generate latent field and binary response
-    nu = rng.standard_normal(n)
-    Xbeta = X @ beta
-    A_rho_inv = sp.linalg.spsolve(sp.eye(n, format="csr") - rho * W_sparse, Xbeta + nu)
-    eta = A_rho_inv
-    probs = 1.0 / (1.0 + np.exp(-eta))
-    y = rng.binomial(1, probs).astype(float)
-
-    return y, X, W_sparse, W_dense, beta, rho, eta
+    W_dense = _ring(n)
+    W = sp.csr_matrix(W_dense)
+    A = sp.eye(n, format="csc") - rho * sp.csc_matrix(W)
+    nu = sigma * rng.standard_normal(n)
+    if sem:
+        eta = X @ beta + sp.linalg.spsolve(A, nu)
+    else:
+        eta = sp.linalg.spsolve(A, X @ beta + nu)
+    y = rng.binomial(1, 1.0 / (1.0 + np.exp(-eta))).astype(float)
+    return y, X, W, W_dense, beta, eta
 
 
-def _make_state(eta, beta, rho=0.3, omega=None):
-    """Create a LogitGibbsState for unit tests."""
-    n = len(eta)
-    if omega is None:
-        omega = np.ones(n)
-    return LogitGibbsState(eta=eta, beta=beta, rho=rho, omega=omega)
+def _logdet_fn(W_dense):
+    ev = np.linalg.eigvals(W_dense)
+    return lambda r: float(np.sum(np.log(np.abs(1.0 - r * ev))))
 
 
-def _make_cache(W_sparse, n, priors=None):
-    """Create a LogitGibbsCache for unit tests."""
-    if priors is None:
-        priors = LogitGibbsPriors()
-
-    W_sym = W_sparse + W_sparse.T
-    WtW = W_sparse.T @ W_sparse
-
-    # Simple eigenvalue-based logdet
-    W_eigs = np.linalg.eigvalsh(W_sparse.toarray())
-
-    def logdet_fn(rho):
-        return float(np.sum(np.log(np.maximum(1.0 - rho * W_eigs, 1e-300))))
-
-    _P0 = sp.eye(n, format="csr") + 0.5 * W_sym + 0.25 * WtW
-    cholmod_factor = CholmodFactor(_P0)
-
-    return LogitGibbsCache(
-        W_sparse=W_sparse,
-        XtX=np.eye(W_sparse.shape[1]) if False else np.zeros((3, 3)),  # placeholder
-        logdet_fn=logdet_fn,
-        rho_lower=priors.rho_lower,
-        rho_upper=priors.rho_upper,
-        cholmod_factor=cholmod_factor,
+def _cache(W, X, sem=False):
+    n = W.shape[0]
+    W_sym, WtW = W + W.T, W.T @ W
+    factor = CholmodFactor(sp.eye(n, format="csr") + 0.5 * W_sym + 0.25 * WtW)
+    common = dict(
+        W_sparse=W,
+        XtX=X.T @ X,
+        logdet_fn=_logdet_fn(W.toarray()),
+        cholmod_factor=factor,
         W_sym=W_sym,
         WtW=WtW,
-        solve_method="cholmod",
-        logdet_P_method="cholmod",
-        sample_method="cholmod",
-        rho_adaptive_width=True,
+    )
+    if sem:
+        return SEMLogitGibbsCache(
+            lam_lower=-0.999,
+            lam_upper=0.999,
+            lam_slice_width_state=SliceWidthState(w=0.2),
+            **common,
+        )
+    return LogitGibbsCache(
+        rho_lower=-0.999,
+        rho_upper=0.999,
+        WtX=np.asarray(W.T @ X),
         rho_slice_width_state=SliceWidthState(w=0.2),
+        **common,
     )
 
 
+PRIORS = LogitREGibbsPriors(beta_mu=0.0, beta_sigma=2.0)
+SEM_PRIORS = SEMLogitGibbsPriors(beta_mu=0.0, beta_sigma=2.0)
+
+
+def _init(y, X, rng, sem=False, sigma=1.0):
+    beta = np.linalg.lstsq(X, y, rcond=None)[0]
+    eta = X @ beta
+    omega = sample_polyagamma(np.ones(len(y)), eta, rng=rng)
+    if sem:
+        return SEMLogitGibbsState(eta=eta, beta=beta, lam=0.0, omega=omega, sigma=sigma)
+    return LogitGibbsState(eta=eta, beta=beta, rho=0.0, omega=omega, sigma=sigma)
+
+
 # ---------------------------------------------------------------------------
-# _sample_omega tests
+# PG draw and log-likelihood
 # ---------------------------------------------------------------------------
 
 
 class TestSampleOmega:
-    """_sample_omega should draw PG(1, eta) correctly."""
-
-    def test_shape(self):
-        """Output shape matches input."""
-        rng = np.random.default_rng(0)
-        eta = np.zeros(20)
-        omega = _sample_omega(eta, rng=rng)
-        assert omega.shape == (20,)
-
-    def test_positive(self):
-        """PG draws are always positive."""
-        rng = np.random.default_rng(1)
-        eta = np.array([-5.0, -1.0, 0.0, 1.0, 5.0])
-        omega = _sample_omega(eta, rng=rng)
-        assert np.all(omega > 0)
+    def test_shape_and_positive(self):
+        omega = _sample_omega(
+            np.array([-5.0, -1.0, 0.0, 1.0, 5.0]), rng=np.random.default_rng(1)
+        )
+        assert omega.shape == (5,) and np.all(omega > 0)
 
     def test_mean_at_zero_tilting(self):
-        """PG(1, 0) has mean 0.25 (known result)."""
-        rng = np.random.default_rng(2)
-        eta = np.zeros(10000)
-        omega = _sample_omega(eta, rng=rng)
-        # E[PG(1, 0)] = 1/4
-        assert abs(np.mean(omega) - 0.25) < 0.02
-
-
-# ---------------------------------------------------------------------------
-# _sample_eta tests
-# ---------------------------------------------------------------------------
-
-
-class TestSampleEta:
-    """_sample_eta should draw from the spatial-normal conditional."""
-
-    def test_shape(self):
-        """Output shape matches input."""
-        rng = np.random.default_rng(0)
-        y, X, W_sparse, _, _, rho, eta = _make_small_problem()
-        state = _make_state(eta, np.array([0.5, -1.0, 0.8]))
-        cache = _make_cache(W_sparse, len(y))
-        cache = cache._replace(XtX=X.T @ X)
-        eta_new, _ = _sample_eta(state, y, X, W_sparse, rng=rng, cache=cache)
-        assert eta_new.shape == (len(y),)
-
-    def test_finite(self):
-        """Draws should be finite."""
-        rng = np.random.default_rng(1)
-        y, X, W_sparse, _, _, rho, eta = _make_small_problem()
-        state = _make_state(eta, np.array([0.5, -1.0, 0.8]))
-        cache = _make_cache(W_sparse, len(y))
-        cache = cache._replace(XtX=X.T @ X)
-        eta_new, _ = _sample_eta(state, y, X, W_sparse, rng=rng, cache=cache)
-        assert np.all(np.isfinite(eta_new))
-
-
-# ---------------------------------------------------------------------------
-# _sample_beta tests
-# ---------------------------------------------------------------------------
-
-
-class TestSampleBeta:
-    """_sample_beta should draw from the conjugate normal conditional."""
-
-    def test_shape(self):
-        """Output shape matches number of coefficients."""
-        rng = np.random.default_rng(0)
-        y, X, W_sparse, _, beta, rho, eta = _make_small_problem()
-        state = _make_state(eta, beta)
-        priors = LogitGibbsPriors()
-        XtX = X.T @ X
-        A_rho = sp.eye(len(y), format="csr") - rho * W_sparse
-        A_rho_eta = A_rho @ eta
-        beta_new = _sample_beta(state, X, XtX, priors, A_rho_eta, rng=rng)
-        assert beta_new.shape == (3,)
-
-    def test_finite(self):
-        """Draws should be finite."""
-        rng = np.random.default_rng(1)
-        y, X, W_sparse, _, beta, rho, eta = _make_small_problem()
-        state = _make_state(eta, beta)
-        priors = LogitGibbsPriors()
-        XtX = X.T @ X
-        A_rho = sp.eye(len(y), format="csr") - rho * W_sparse
-        A_rho_eta = A_rho @ eta
-        beta_new = _sample_beta(state, X, XtX, priors, A_rho_eta, rng=rng)
-        assert np.all(np.isfinite(beta_new))
-
-
-# ---------------------------------------------------------------------------
-# _sample_rho tests
-# ---------------------------------------------------------------------------
-
-
-class TestSampleRho:
-    """_sample_rho should draw from the collapsed slice sampler."""
-
-    def test_stays_in_bounds(self):
-        """ρ should stay within [rho_lower, rho_upper]."""
-        rng = np.random.default_rng(0)
-        y, X, W_sparse, _, beta, rho, eta = _make_small_problem()
-        state = _make_state(eta, beta, rho=rho)
-        priors = LogitGibbsPriors()
-        cache = _make_cache(W_sparse, len(y), priors)
-        cache = cache._replace(XtX=X.T @ X)
-        rho_new, log_dens = _sample_rho(
-            state, cache, priors, y, X, rng=rng, sweep_idx=0, tune=100
-        )
-        assert priors.rho_lower <= rho_new <= priors.rho_upper
-
-    def test_finite_log_density(self):
-        """Log-density at new ρ should be finite."""
-        rng = np.random.default_rng(1)
-        y, X, W_sparse, _, beta, rho, eta = _make_small_problem()
-        state = _make_state(eta, beta, rho=rho)
-        priors = LogitGibbsPriors()
-        cache = _make_cache(W_sparse, len(y), priors)
-        cache = cache._replace(XtX=X.T @ X)
-        rho_new, log_dens = _sample_rho(
-            state, cache, priors, y, X, rng=rng, sweep_idx=0, tune=100
-        )
-        assert np.isfinite(log_dens)
-
-
-# ---------------------------------------------------------------------------
-# _logit_loglik_pointwise tests
-# ---------------------------------------------------------------------------
+        omega = _sample_omega(np.zeros(10000), rng=np.random.default_rng(2))
+        assert abs(np.mean(omega) - 0.25) < 0.02  # E[PG(1, 0)] = 1/4
 
 
 class TestLogitLoglik:
-    """_logit_loglik_pointwise should compute correct log-likelihood."""
-
-    def test_at_zero_eta(self):
-        """At η=0, log p(y|η) = -log(2) for both y=0 and y=1."""
-        y = np.array([0.0, 1.0])
-        eta = np.zeros(2)
-        ll = _logit_loglik_pointwise(y, eta)
-        # log p(y=0|η=0) = 0 - 0 - log(1+exp(0)) = -log(2)
-        # log p(y=1|η=0) = 0 - 0 - log(1+exp(0)) = -log(2)
-        expected = -np.log(2)
-        assert np.allclose(ll, expected, atol=1e-10)
-
-    def test_at_large_positive_eta(self):
-        """At large positive η, P(y=1) ≈ 1."""
-        y = np.array([1.0])
-        eta = np.array([50.0])
-        ll = _logit_loglik_pointwise(y, eta)
-        # log p(y=1|η=50) ≈ 50 - 50 - log(1+exp(-50)) ≈ 0
-        assert ll[0] > -1e-10
-
-    def test_at_large_negative_eta(self):
-        """At large negative η, P(y=0) ≈ 1."""
-        y = np.array([0.0])
-        eta = np.array([-50.0])
-        ll = _logit_loglik_pointwise(y, eta)
-        # log p(y=0|η=-50) ≈ 0 - 0 - log(1+exp(-50)) ≈ 0
-        assert ll[0] > -1e-10
-
-
-# ---------------------------------------------------------------------------
-# run_chain tests
-# ---------------------------------------------------------------------------
-
-
-class TestRunChain:
-    """run_chain should produce correct output shapes."""
-
-    def test_output_shapes(self):
-        """Output arrays have correct shapes."""
-        rng = np.random.default_rng(0)
-        y, X, W_sparse, _, beta, rho, eta = _make_small_problem()
-        n, k = X.shape
-
-        priors = LogitGibbsPriors()
-        cache = _make_cache(W_sparse, n, priors)
-        cache = cache._replace(XtX=X.T @ X)
-
-        # Initialize from OLS
-        beta_init = np.linalg.lstsq(X, y, rcond=None)[0]
-        eta_init = X @ beta_init
-        from neighbayes.samplers._utils._polyagamma import sample_polyagamma
-
-        omega_init = sample_polyagamma(np.ones(n), eta_init, rng=rng)
-
-        init = LogitGibbsState(eta=eta_init, beta=beta_init, rho=0.0, omega=omega_init)
-
-        draws = 50
-        tune = 50
-        result = run_chain(
-            y=y,
-            X=X,
-            W_sparse=W_sparse,
-            priors=priors,
-            cache=cache,
-            init=init,
-            draws=draws,
-            tune=tune,
-            rng=rng,
+    def test_values(self):
+        ll = _logit_loglik_pointwise(
+            np.array([0.0, 1.0, 1.0, 0.0]), np.array([0.0, 0.0, 40.0, -40.0])
         )
-
-        assert result["rho"].shape == (draws,)
-        assert result["beta"].shape == (draws, k)
-        assert result["log_lik"].shape == (draws, n)
-        assert result["eta_norm"].shape == (draws,)
-
-    def test_return_eta(self):
-        """When return_eta=True, eta is included in output."""
-        rng = np.random.default_rng(1)
-        y, X, W_sparse, _, beta, rho, eta = _make_small_problem()
-        n, k = X.shape
-
-        priors = LogitGibbsPriors()
-        cache = _make_cache(W_sparse, n, priors)
-        cache = cache._replace(XtX=X.T @ X)
-
-        beta_init = np.linalg.lstsq(X, y, rcond=None)[0]
-        eta_init = X @ beta_init
-        from neighbayes.samplers._utils._polyagamma import sample_polyagamma
-
-        omega_init = sample_polyagamma(np.ones(n), eta_init, rng=rng)
-
-        init = LogitGibbsState(eta=eta_init, beta=beta_init, rho=0.0, omega=omega_init)
-
-        draws = 20
-        tune = 20
-        result = run_chain(
-            y=y,
-            X=X,
-            W_sparse=W_sparse,
-            priors=priors,
-            cache=cache,
-            init=init,
-            draws=draws,
-            tune=tune,
-            return_eta=True,
-            rng=rng,
-        )
-
-        assert "eta" in result
-        assert result["eta"].shape == (draws, n)
-
-    def test_rho_in_bounds(self):
-        """All ρ draws should be within prior bounds."""
-        rng = np.random.default_rng(2)
-        y, X, W_sparse, _, beta, rho, eta = _make_small_problem()
-        n, k = X.shape
-
-        priors = LogitGibbsPriors()
-        cache = _make_cache(W_sparse, n, priors)
-        cache = cache._replace(XtX=X.T @ X)
-
-        beta_init = np.linalg.lstsq(X, y, rcond=None)[0]
-        eta_init = X @ beta_init
-        from neighbayes.samplers._utils._polyagamma import sample_polyagamma
-
-        omega_init = sample_polyagamma(np.ones(n), eta_init, rng=rng)
-
-        init = LogitGibbsState(eta=eta_init, beta=beta_init, rho=0.0, omega=omega_init)
-
-        draws = 50
-        tune = 50
-        result = run_chain(
-            y=y,
-            X=X,
-            W_sparse=W_sparse,
-            priors=priors,
-            cache=cache,
-            init=init,
-            draws=draws,
-            tune=tune,
-            rng=rng,
-        )
-
-        assert np.all(result["rho"] >= priors.rho_lower)
-        assert np.all(result["rho"] <= priors.rho_upper)
+        np.testing.assert_allclose(ll, [-np.log(2), -np.log(2), 0.0, 0.0], atol=1e-12)
 
 
 # ---------------------------------------------------------------------------
-# SEM-logit helpers
+# The collapsed algebra against dense linear algebra (σ ≠ 1)
 # ---------------------------------------------------------------------------
+#
+# Given ω, the PG working likelihood is that of z = κ/ω ~ N(η, Ω⁻¹), so every
+# collapsed density must differ from a dense Gaussian marginal of z by a
+# constant.
 
 
-def _make_small_sem_problem(n=20, k=3, lam=0.3, seed=42):
-    """Create a small SEM-logit test problem with known parameters."""
+def _working(n, seed=3):
     rng = np.random.default_rng(seed)
-    X = np.column_stack([np.ones(n), rng.standard_normal((n, k - 1))])
-    beta = np.array([0.5, -1.0, 0.8])[:k]
-
-    # Row-standardized W (ring lattice)
-    W_dense = np.zeros((n, n))
-    for i in range(n):
-        W_dense[i, (i + 1) % n] = 1.0
-        W_dense[i, (i - 1) % n] = 1.0
-    row_sums = W_dense.sum(axis=1, keepdims=True)
-    W_dense = W_dense / row_sums
-    W_sparse = sp.csr_matrix(W_dense)
-
-    # Generate latent field: eta = X beta + (I - lam W)^{-1} nu
-    nu = rng.standard_normal(n)
-    Xbeta = X @ beta
-    A_lam_inv = sp.linalg.spsolve(sp.eye(n, format="csr") - lam * W_sparse, nu)
-    eta = Xbeta + A_lam_inv
-    probs = 1.0 / (1.0 + np.exp(-eta))
-    y = rng.binomial(1, probs).astype(float)
-
-    return y, X, W_sparse, W_dense, beta, lam, eta
+    omega = rng.uniform(0.1, 0.3, n)
+    y = rng.binomial(1, 0.5, n).astype(float)
+    return y, omega, (y - 0.5) / omega
 
 
-def _make_sem_state(eta, beta, lam=0.3, omega=None):
-    """Create a SEMLogitGibbsState for unit tests."""
-    n = len(eta)
-    if omega is None:
-        omega = np.ones(n)
-    return SEMLogitGibbsState(eta=eta, beta=beta, lam=lam, omega=omega)
+def _filter(Wd, r, sem):
+    """``S = A⁻¹`` and the design's map of X into η, ``SX`` (SAR) or ``X``."""
+    S = np.linalg.inv(np.eye(Wd.shape[0]) - r * Wd)
+    return S, (lambda X: X) if sem else (lambda X: S @ X)
 
 
-def _make_sem_cache(W_sparse, n, priors=None):
-    """Create a SEMLogitGibbsCache for unit tests."""
-    if priors is None:
-        priors = SEMLogitGibbsPriors()
+SEM_CASES = pytest.mark.parametrize("sem", [False, True], ids=["sar", "sem"])
 
-    W_sym = W_sparse + W_sparse.T
-    WtW = W_sparse.T @ W_sparse
 
-    W_eigs = np.linalg.eigvalsh(W_sparse.toarray())
+@SEM_CASES
+def test_collapsed_density_matches_dense_marginal(sem):
+    y, X, W, Wd, _, _ = _problem(sem=sem)
+    n, k = X.shape
+    cache = _cache(W, X, sem=sem)
+    design = (_sem_design if sem else _sar_design)(X, cache)
+    priors = SEM_PRIORS if sem else PRIORS
+    yw, omega, z = _working(n)
+    gaps = []
+    for r, sigma in ((-0.5, 0.7), (0.0, 1.0), (0.3, 0.2), (0.7, 2.5), (0.9, 1.3)):
+        S, into = _filter(Wd, r, sem)
+        cov = np.diag(1 / omega) + sigma**2 * S @ S.T + 4.0 * into(X) @ into(X).T
+        exact = multivariate_normal(np.zeros(n), cov).logpdf(z)
+        ours, _, _ = _collapsed_parts(r, sigma, omega, yw - 0.5, design, cache, priors)
+        gaps.append(exact - ours)
+    # The gap is the PG working likelihood's normalizer, free of (r, σ).
+    np.testing.assert_allclose(gaps, gaps[0], atol=1e-8)
 
-    def logdet_fn(lam):
-        return float(np.sum(np.log(np.maximum(1.0 - lam * W_eigs, 1e-300))))
 
-    _P0 = sp.eye(n, format="csr") + 0.5 * W_sym + 0.25 * WtW
-    cholmod_factor = CholmodFactor(_P0)
+@SEM_CASES
+def test_beta_moments_integrate_eta_out(sem):
+    y, X, W, Wd, _, _ = _problem(sem=sem)
+    n, k = X.shape
+    cache = _cache(W, X, sem=sem)
+    design = (_sem_design if sem else _sar_design)(X, cache)
+    b0, sd = np.array([0.2, -0.1, 0.3]), np.sqrt(2.0)
+    cls = SEMLogitGibbsPriors if sem else LogitREGibbsPriors
+    priors = cls(beta_mu=b0, beta_sigma=sd)
+    yw, omega, z = _working(n, seed=4)
+    r, sigma = 0.4, 1.3
+    _, Lb, rhs_b = _collapsed_parts(r, sigma, omega, yw - 0.5, design, cache, priors)
+    S, into = _filter(Wd, r, sem)
+    Ci = np.linalg.inv(np.diag(1 / omega) + sigma**2 * S @ S.T)
+    U = into(X)
+    prec = U.T @ Ci @ U + np.eye(k) / sd**2
+    mean = np.linalg.solve(prec, U.T @ Ci @ z + b0 / sd**2)
+    np.testing.assert_allclose(Lb @ Lb.T, prec, rtol=1e-8)
+    np.testing.assert_allclose(np.linalg.solve(Lb @ Lb.T, rhs_b), mean, atol=1e-8)
 
-    return SEMLogitGibbsCache(
-        W_sparse=W_sparse,
-        XtX=np.zeros((3, 3)),  # placeholder
-        logdet_fn=logdet_fn,
-        lam_lower=priors.lam_lower,
-        lam_upper=priors.lam_upper,
-        cholmod_factor=cholmod_factor,
-        W_sym=W_sym,
-        WtW=WtW,
-        solve_method="cholmod",
-        logdet_P_method="cholmod",
-        sample_method="cholmod",
-        lam_adaptive_width=True,
-        lam_slice_width_state=SliceWidthState(w=0.2),
+
+@SEM_CASES
+def test_eta_conditional_mean(sem):
+    y, X, W, Wd, beta, _ = _problem(sem=sem)
+    n = X.shape[0]
+    cache = _cache(W, X, sem=sem)
+    design = (_sem_design if sem else _sar_design)(X, cache)
+    yw, omega, _ = _working(n, seed=5)
+    r, sigma = 0.5, 0.6
+    A = np.eye(n) - r * Wd
+    D = A @ X if sem else X
+    P = A.T @ A / sigma**2 + np.diag(omega)
+    mean = np.linalg.solve(P, A.T @ D @ beta / sigma**2 + (yw - 0.5))
+    rng = np.random.default_rng(0)
+    draws = np.array(
+        [
+            _sample_eta(r, sigma, beta, omega, yw, design, cache, rng=rng)
+            for _ in range(4000)
+        ]
+    )
+    np.testing.assert_allclose(
+        draws.mean(0), mean, atol=4 * np.sqrt(np.diag(np.linalg.inv(P)) / 4000).max()
     )
 
 
 # ---------------------------------------------------------------------------
-# SEM _sample_eta tests
+# The moves on the exact likelihood
 # ---------------------------------------------------------------------------
 
 
-class TestSampleEtaSEM:
-    """_sample_eta_sem should draw from the SEM spatial-normal conditional."""
+def test_ridge_move_holds_standardized_effects_and_attenuated_beta():
+    y, X, W, _, beta, eta = _problem(sem=True)
+    m = X @ beta
+    e, b, s = _ridge_move(eta, m, beta, 0.8, y, SEM_PRIORS, np.random.default_rng(0))
+    assert s != 0.8
+    np.testing.assert_allclose(b / _attenuation(s), beta / _attenuation(0.8))
+    np.testing.assert_allclose((e - X @ b) / s, (eta - m) / 0.8, atol=1e-12)
 
-    def test_shape(self):
-        """Output shape matches input."""
-        rng = np.random.default_rng(0)
-        y, X, W_sparse, _, _, lam, eta = _make_small_sem_problem()
-        state = _make_sem_state(eta, np.array([0.5, -1.0, 0.8]))
-        cache = _make_sem_cache(W_sparse, len(y))
-        cache = cache._replace(XtX=X.T @ X)
-        eta_new, _ = _sample_eta_sem(state, y, X, W_sparse, rng=rng, cache=cache)
-        assert eta_new.shape == (len(y),)
 
-    def test_finite(self):
-        """Draws should be finite."""
-        rng = np.random.default_rng(1)
-        y, X, W_sparse, _, _, lam, eta = _make_small_sem_problem()
-        state = _make_sem_state(eta, np.array([0.5, -1.0, 0.8]))
-        cache = _make_sem_cache(W_sparse, len(y))
-        cache = cache._replace(XtX=X.T @ X)
-        eta_new, _ = _sample_eta_sem(state, y, X, W_sparse, rng=rng, cache=cache)
-        assert np.all(np.isfinite(eta_new))
+def test_scale_move_holds_the_ratios():
+    y, X, _, _, beta, eta = _problem()
+    e, b, s = _scale_move(eta, beta, 0.8, y, PRIORS, np.random.default_rng(0))
+    c = s / 0.8
+    assert c != 1.0
+    np.testing.assert_allclose(e, c * eta)
+    np.testing.assert_allclose(b, c * beta)
 
 
 # ---------------------------------------------------------------------------
-# SEM _sample_beta tests
+# Blocks and chains
 # ---------------------------------------------------------------------------
 
 
-class TestSampleBetaSEM:
-    """_sample_beta_sem should draw from the SEM conjugate normal conditional."""
-
-    def test_shape(self):
-        """Output shape matches number of coefficients."""
-        rng = np.random.default_rng(0)
-        y, X, W_sparse, _, beta, lam, eta = _make_small_sem_problem()
-        state = _make_sem_state(eta, beta)
-        priors = SEMLogitGibbsPriors()
-        A_lam = sp.eye(len(y), format="csr") - lam * W_sparse
-        A_lam_eta = A_lam @ eta
-        beta_new = _sample_beta_sem(state, X, priors, A_lam_eta, W_sparse, rng=rng)
-        assert beta_new.shape == (3,)
-
-    def test_finite(self):
-        """Draws should be finite."""
-        rng = np.random.default_rng(1)
-        y, X, W_sparse, _, beta, lam, eta = _make_small_sem_problem()
-        state = _make_sem_state(eta, beta)
-        priors = SEMLogitGibbsPriors()
-        A_lam = sp.eye(len(y), format="csr") - lam * W_sparse
-        A_lam_eta = A_lam @ eta
-        beta_new = _sample_beta_sem(state, X, priors, A_lam_eta, W_sparse, rng=rng)
-        assert np.all(np.isfinite(beta_new))
+@SEM_CASES
+def test_collapsed_block_stays_in_bounds(sem):
+    y, X, W, _, _, eta = _problem(sem=sem)
+    cache = _cache(W, X, sem=sem)
+    r, sigma, b = _sample_r_sigma_beta(
+        0.3, 0.8, np.ones(len(y)), y, X,
+        (_sem_design if sem else _sar_design)(X, cache), cache,
+        SEM_PRIORS if sem else PRIORS, (-0.999, 0.999), SliceWidthState(w=0.2),
+        rng=np.random.default_rng(0), tuning=True,
+    )  # fmt: skip
+    assert -0.999 <= r <= 0.999 and sigma > 0
+    assert b.shape == (3,) and np.all(np.isfinite(b))
 
 
-# ---------------------------------------------------------------------------
-# SEM _sample_lam tests
-# ---------------------------------------------------------------------------
-
-
-class TestSampleLam:
-    """_sample_lam should draw from the collapsed slice sampler."""
-
-    def test_stays_in_bounds(self):
-        """λ should stay within [lam_lower, lam_upper]."""
-        rng = np.random.default_rng(0)
-        y, X, W_sparse, _, beta, lam, eta = _make_small_sem_problem()
-        state = _make_sem_state(eta, beta, lam=lam)
-        priors = SEMLogitGibbsPriors()
-        cache = _make_sem_cache(W_sparse, len(y), priors)
-        cache = cache._replace(XtX=X.T @ X)
-        lam_new, log_dens = _sample_lam(
-            state, cache, priors, y, X, rng=rng, sweep_idx=0, tune=100
-        )
-        assert priors.lam_lower <= lam_new <= priors.lam_upper
-
-    def test_finite_log_density(self):
-        """Log-density at new λ should be finite."""
-        rng = np.random.default_rng(1)
-        y, X, W_sparse, _, beta, lam, eta = _make_small_sem_problem()
-        state = _make_sem_state(eta, beta, lam=lam)
-        priors = SEMLogitGibbsPriors()
-        cache = _make_sem_cache(W_sparse, len(y), priors)
-        cache = cache._replace(XtX=X.T @ X)
-        lam_new, log_dens = _sample_lam(
-            state, cache, priors, y, X, rng=rng, sweep_idx=0, tune=100
-        )
-        assert np.isfinite(log_dens)
+@pytest.mark.parametrize("sem", [False, True])
+def test_chain_output(sem):
+    y, X, W, _, _, _ = _problem(sem=sem)
+    n, k = X.shape
+    rng = np.random.default_rng(0)
+    run = run_chain_sem if sem else run_chain
+    out = run(
+        y=y, X=X, W_sparse=W, priors=SEM_PRIORS if sem else PRIORS,
+        cache=_cache(W, X, sem=sem), init=_init(y, X, rng, sem=sem),
+        draws=30, tune=30, rng=rng, return_eta=True,
+    )  # fmt: skip
+    spatial = out["lam" if sem else "rho"]
+    assert spatial.shape == (30,) and np.all(np.abs(spatial) < 1.0)
+    assert out["beta"].shape == (30, k)
+    assert out["sigma"].shape == (30,) and np.all(out["sigma"] > 0)
+    assert out["log_lik"].shape == (30, n) and out["eta"].shape == (30, n)
 
 
 # ---------------------------------------------------------------------------
-# SEM collapsed log-density test
+# Recovery
 # ---------------------------------------------------------------------------
 
 
-class TestSEMCollapsedLogDensity:
-    """_sem_logit_collapsed_log_density should match analytical formula."""
+@pytest.mark.slow
+def test_sem_logit_recovery():
+    """The truth lies in the posterior's bulk for what the data identify.
 
-    def test_finite_at_zero(self):
-        """Log-density at λ=0 should be finite."""
-        y, X, W_sparse, _, beta, lam, eta = _make_small_sem_problem()
-        n = len(y)
-        omega = np.ones(n)
-        Xbeta = X @ beta
-        W_eigs = np.linalg.eigvalsh(W_sparse.toarray())
+    That is λ and the attenuated ``β/g(σ)``, not β and σ apart.  The effects
+    are strong (σ = 2): at the simulator's default σ = 0.5 they barely move
+    binary outcomes and λ's posterior is close to its prior.
+    """
+    from neighbayes.dgp import simulate_sem_logit
 
-        def logdet_fn(lam):
-            return float(np.sum(np.log(np.maximum(1.0 - lam * W_eigs, 1e-300))))
-
-        log_dens = _sem_logit_collapsed_log_density(
-            0.0, y, X, W_sparse, logdet_fn, omega, Xbeta, n, X.shape[1]
-        )
-        assert np.isfinite(log_dens)
-
-    def test_symmetric(self):
-        """Log-density at λ and -λ should differ (not symmetric in general)."""
-        y, X, W_sparse, _, beta, lam, eta = _make_small_sem_problem()
-        n = len(y)
-        omega = np.ones(n)
-        Xbeta = X @ beta
-        W_eigs = np.linalg.eigvalsh(W_sparse.toarray())
-
-        def logdet_fn(lam):
-            return float(np.sum(np.log(np.maximum(1.0 - lam * W_eigs, 1e-300))))
-
-        ld_pos = _sem_logit_collapsed_log_density(
-            0.3, y, X, W_sparse, logdet_fn, omega, Xbeta, n, X.shape[1]
-        )
-        ld_neg = _sem_logit_collapsed_log_density(
-            -0.3, y, X, W_sparse, logdet_fn, omega, Xbeta, n, X.shape[1]
-        )
-        # They should be different (not symmetric due to rhs structure)
-        assert ld_pos != ld_neg
-
-
-# ---------------------------------------------------------------------------
-# SEM run_chain tests
-# ---------------------------------------------------------------------------
-
-
-class TestRunChainSEM:
-    """run_chain_sem should produce correct output shapes."""
-
-    def test_output_shapes(self):
-        """Output arrays have correct shapes."""
-        rng = np.random.default_rng(0)
-        y, X, W_sparse, _, beta, lam, eta = _make_small_sem_problem()
-        n, k = X.shape
-
-        priors = SEMLogitGibbsPriors()
-        cache = _make_sem_cache(W_sparse, n, priors)
-        cache = cache._replace(XtX=X.T @ X)
-
-        beta_init = np.linalg.lstsq(X, y, rcond=None)[0]
-        eta_init = X @ beta_init
-        from neighbayes.samplers._utils._polyagamma import sample_polyagamma
-
-        omega_init = sample_polyagamma(np.ones(n), eta_init, rng=rng)
-
-        init = SEMLogitGibbsState(
-            eta=eta_init, beta=beta_init, lam=0.0, omega=omega_init
-        )
-
-        draws = 50
-        tune = 50
-        result = run_chain_sem(
-            y=y,
-            X=X,
-            W_sparse=W_sparse,
-            priors=priors,
-            cache=cache,
-            init=init,
-            draws=draws,
-            tune=tune,
-            rng=rng,
-        )
-
-        assert result["lam"].shape == (draws,)
-        assert result["beta"].shape == (draws, k)
-        assert result["log_lik"].shape == (draws, n)
-        assert result["eta_norm"].shape == (draws,)
-
-    def test_lam_in_bounds(self):
-        """All λ draws should be within prior bounds."""
-        rng = np.random.default_rng(2)
-        y, X, W_sparse, _, beta, lam, eta = _make_small_sem_problem()
-        n, k = X.shape
-
-        priors = SEMLogitGibbsPriors()
-        cache = _make_sem_cache(W_sparse, n, priors)
-        cache = cache._replace(XtX=X.T @ X)
-
-        beta_init = np.linalg.lstsq(X, y, rcond=None)[0]
-        eta_init = X @ beta_init
-        from neighbayes.samplers._utils._polyagamma import sample_polyagamma
-
-        omega_init = sample_polyagamma(np.ones(n), eta_init, rng=rng)
-
-        init = SEMLogitGibbsState(
-            eta=eta_init, beta=beta_init, lam=0.0, omega=omega_init
-        )
-
-        draws = 50
-        tune = 50
-        result = run_chain_sem(
-            y=y,
-            X=X,
-            W_sparse=W_sparse,
-            priors=priors,
-            cache=cache,
-            init=init,
-            draws=draws,
-            tune=tune,
-            rng=rng,
-        )
-
-        assert np.all(result["lam"] >= priors.lam_lower)
-        assert np.all(result["lam"] <= priors.lam_upper)
-
-
-# ---------------------------------------------------------------------------
-# Parameter recovery tests
-# ---------------------------------------------------------------------------
-
-
-class TestSEMLogitRecovery:
-    """SEM-logit Gibbs should recover true parameters from DGP data."""
-
-    def test_lam_recovery(self):
-        """Posterior mean of λ should be near true value (large sample)."""
-        from neighbayes.dgp import simulate_sem_logit
-
-        # Use n=8 (64 obs) for better recovery
-        out = simulate_sem_logit(n_side=8, lam=0.5, seed=42, unit_effects="random")
-        y = out["y"]
-        X = out["X"]
-        W_sparse = out["W_sparse"]
-        n = len(y)
-
-        priors = SEMLogitGibbsPriors()
-        cache = _make_sem_cache(W_sparse, n, priors)
-        cache = cache._replace(XtX=X.T @ X)
-
-        rng = np.random.default_rng(0)
-        beta_init = np.linalg.lstsq(X, y, rcond=None)[0]
-        eta_init = X @ beta_init
-        from neighbayes.samplers._utils._polyagamma import sample_polyagamma
-
-        omega_init = sample_polyagamma(np.ones(n), eta_init, rng=rng)
-
-        init = SEMLogitGibbsState(
-            eta=eta_init, beta=beta_init, lam=0.0, omega=omega_init
-        )
-
-        result = run_chain_sem(
-            y=y,
-            X=X,
-            W_sparse=W_sparse,
-            priors=priors,
-            cache=cache,
-            init=init,
-            draws=2000,
-            tune=1000,
-            rng=rng,
-        )
-
-        lam_mean = np.mean(result["lam"])
-        # With 2000 draws and n=64, we expect reasonable recovery
-        assert abs(lam_mean - 0.5) < 0.4, f"λ mean = {lam_mean}, expected ~0.5"
-
-    def test_beta_recovery(self):
-        """Posterior mean of β should be near true value (large sample)."""
-        from neighbayes.dgp import simulate_sem_logit
-
-        # Use n=8 (64 obs) for better recovery
-        out = simulate_sem_logit(
-            n_side=8,
-            lam=0.3,
-            beta=np.array([0.3, 1.0]),
-            seed=456,
-            unit_effects="random",
-        )
-        y = out["y"]
-        X = out["X"]
-        W_sparse = out["W_sparse"]
-        n = len(y)
-
-        priors = SEMLogitGibbsPriors()
-        cache = _make_sem_cache(W_sparse, n, priors)
-        cache = cache._replace(XtX=X.T @ X)
-
-        rng = np.random.default_rng(0)
-        beta_init = np.linalg.lstsq(X, y, rcond=None)[0]
-        eta_init = X @ beta_init
-        from neighbayes.samplers._utils._polyagamma import sample_polyagamma
-
-        omega_init = sample_polyagamma(np.ones(n), eta_init, rng=rng)
-
-        init = SEMLogitGibbsState(
-            eta=eta_init, beta=beta_init, lam=0.0, omega=omega_init
-        )
-
-        result = run_chain_sem(
-            y=y,
-            X=X,
-            W_sparse=W_sparse,
-            priors=priors,
-            cache=cache,
-            init=init,
-            draws=2000,
-            tune=1000,
-            rng=rng,
-        )
-
-        beta_mean = np.mean(result["beta"], axis=0)
-        # Wide tolerance for small sample
-        assert np.all(np.abs(beta_mean - np.array([0.3, 1.0])) < 1.5), (
-            f"β mean = {beta_mean}, expected ~[0.3, 1.0]"
-        )
+    sd, lam, beta = 2.0, 0.7, np.array([0.3, 1.0])
+    out = simulate_sem_logit(
+        n_side=12, lam=lam, beta=beta, seed=42, unit_effects="random",
+        unit_effect_sd=sd,
+    )  # fmt: skip
+    y, X, W = out["y"], out["X"], out["W_sparse"]
+    rng = np.random.default_rng(0)
+    res = run_chain_sem(
+        y=y, X=X, W_sparse=W, priors=SEM_PRIORS, cache=_cache(W, X, sem=True),
+        init=_init(y, X, rng, sem=True), draws=2000, tune=1000, rng=rng,
+    )  # fmt: skip
+    assert abs(res["lam"].mean() - lam) < 2 * res["lam"].std()
+    att = res["beta"] / _attenuation(res["sigma"])[:, None]
+    assert np.all(np.abs(att.mean(0) - beta / _attenuation(sd)) < 2 * att.std(0))

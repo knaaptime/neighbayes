@@ -230,18 +230,18 @@ def simulate_sar_logit(
     contiguity: str = "queen",
     create_gdf: bool = False,
     geometry_type: str = "polygon",
-    structural: bool = True,
+    unit_effect_sd: float = 0.0,
     **kwargs,
 ) -> dict:
     """Simulate SAR-logit binary outcome data.
 
     DGP
     ---
-    ``eta = (I - rho W)^{-1} (X beta + nu)``, ``nu ~ N(0, I)``,
-    ``y ~ Bernoulli(logit^{-1}(eta))`` — the SAR logit with random effects
-    :class:`~neighbayes.models.SARLogitRE` fits.  With
-    ``structural=False`` the noise is omitted, ``eta = (I - rho W)^{-1} X beta``,
-    which is the reduced-form :class:`~neighbayes.models.SARLogit`.
+    ``eta = (I - rho W)^{-1} (X beta + nu)``, ``nu ~ N(0, unit_effect_sd² I)``,
+    ``y ~ Bernoulli(logit^{-1}(eta))``.  With ``unit_effects="random"`` that is
+    the SAR logit with random effects; without them ``nu = 0`` and
+    ``eta = (I - rho W)^{-1} X beta``, the reduced-form
+    :class:`~neighbayes.models.SARLogit`.
 
     Parameters
     ----------
@@ -266,9 +266,9 @@ def simulate_sar_logit(
     geometry_type : {"point", "polygon"}, default="polygon"
         Geometry to generate when ``create_gdf=True`` and no source
         ``gdf`` is provided.
-    structural : bool, default True
-        Include the latent ``nu`` (``SARLogitRE``); ``False`` gives the
-        reduced form (``SARLogit``).
+    unit_effect_sd : float
+        The random effects' sd, set by the design arguments
+        (``unit_effects="random"``, default 0.5); 0 for the reduced form.
 
     Returns
     -------
@@ -289,7 +289,7 @@ def simulate_sar_logit(
     X = make_design_matrix(rng, n_obs, k=max(len(beta) - 1, 0), add_intercept=True)
 
     # Latent index eta = (I - rho W)^{-1} (X beta + nu); nu = 0 in the reduced form.
-    nu = rng.standard_normal(n_obs) if structural else 0.0
+    nu = unit_effect_sd * rng.standard_normal(n_obs) if unit_effect_sd > 0 else 0.0
     Xbeta = X @ beta
     eta = spatial_filter_factor(W_sparse, rho)(Xbeta + nu)
 
@@ -306,6 +306,7 @@ def simulate_sar_logit(
         "params_true": {
             "rho": rho,
             "beta": beta,
+            "unit_effect_sd": float(unit_effect_sd),
         },
     }
     return _attach_optional_gdf(
@@ -328,13 +329,14 @@ def simulate_sem_logit(
     contiguity: str = "queen",
     create_gdf: bool = False,
     geometry_type: str = "polygon",
+    unit_effect_sd: float = 0.5,
     **kwargs,
 ) -> dict:
     """Simulate SEM-logit binary outcome data.
 
     DGP
     ---
-    ``eta = X beta + (I - lam W)^{-1} nu``, ``nu ~ N(0, I)``,
+    ``eta = X beta + (I - lam W)^{-1} nu``, ``nu ~ N(0, unit_effect_sd² I)``,
     ``y ~ Bernoulli(logit^{-1}(eta))``.
 
     Parameters
@@ -349,6 +351,8 @@ def simulate_sem_logit(
         Spatial error parameter.
     beta : np.ndarray, optional
         Coefficients including intercept. Defaults to ``[0.3, 1.0]``.
+    unit_effect_sd : float, default 0.5
+        The random effects' sd (``unit_effect_sd`` of the design arguments).
     rng, seed
         Random state controls.
     contiguity : str, default "queen"
@@ -380,7 +384,7 @@ def simulate_sem_logit(
     X = make_design_matrix(rng, n_obs, k=max(len(beta) - 1, 0), add_intercept=True)
 
     # Latent index: eta = X beta + (I - lam W)^{-1} nu
-    nu = rng.standard_normal(n_obs)
+    nu = unit_effect_sd * rng.standard_normal(n_obs)
     Xbeta = X @ beta
     eta = Xbeta + spatial_filter_factor(W_sparse, lam)(nu)
 
@@ -397,6 +401,7 @@ def simulate_sem_logit(
         "params_true": {
             "lam": lam,
             "beta": beta,
+            "unit_effect_sd": float(unit_effect_sd),
         },
     }
     return _attach_optional_gdf(

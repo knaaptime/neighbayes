@@ -250,21 +250,21 @@ def tobit(fn, design, kw):
     return target, _with_N(target, kw)
 
 
-@accepts("unit_effects")
+@accepts("unit_effects", "unit_effect_sd")
 def logit(fn, design, kw):
     """SAR and SEM logit: the reduced form, or random effects."""
     name = fn.__name__
     unit, _, _ = _validate(design)
     if unit == "fixed":
         raise NotImplementedError(f"{name} takes no fixed unit effects.")
-    if name == "simulate_sem_logit":
-        if unit != "random":
-            raise NotImplementedError(
-                "The latent SEM logit is not implemented; pass unit_effects='random' "
-                "for the SEM logit with random effects."
-            )
-        return fn, kw
-    kw["structural"] = unit == "random"
+    if name == "simulate_sem_logit" and unit != "random":
+        raise NotImplementedError(
+            "The latent SEM logit is not implemented; pass unit_effects='random' "
+            "for the SEM logit with random effects."
+        )
+    kw["unit_effect_sd"] = _scale(
+        design, "unit_effect_sd", unit == "random", "unit_effects"
+    )
     return fn, kw
 
 

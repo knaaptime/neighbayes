@@ -260,7 +260,7 @@ def test_gaussian_panel_re_fit_contract(name, ctor, data_fn, expected, sampler):
 # Binary (Pólya-Gamma logit) cross-section family
 #
 # SARLogit/SEMLogitRE are Gibbs-only (no NUTS build).  The logit link fixes
-# σ² = 1, so the posterior carries only the spatial parameter and β.
+# the noise scale; the random-effects forms also learn the effects' sd.
 # ---------------------------------------------------------------------------
 
 _N_BINARY = 24
@@ -280,13 +280,12 @@ def _binary_graph():
 
 
 # name -> (ctor, expected_varnames)
-# The canonical SARLogit is reduced-form (auto→jax); SARLogitRE is the
-# structural latent-field model; SEMLogitRE is the structural SEM.  All three
-# expose only the spatial parameter and β.
+# The canonical SARLogit is reduced-form (auto→jax): the spatial parameter
+# and β.  SARLogitRE and SEMLogitRE carry random effects, and their sd.
 BINARY_XS: dict[str, tuple] = {
     "SARLogit": (SARLogit, {"beta", "rho"}),
-    "SARLogitRE": (SARLogitRE, {"beta", "rho"}),
-    "SEMLogitRE": (SEMLogitRE, {"beta", "lam"}),
+    "SARLogitRE": (SARLogitRE, {"beta", "rho", "unit_effect_sd"}),
+    "SEMLogitRE": (SEMLogitRE, {"beta", "lam", "unit_effect_sd"}),
 }
 
 
