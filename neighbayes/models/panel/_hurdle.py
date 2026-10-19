@@ -39,12 +39,13 @@ import scipy.sparse as sp
 from ..._lazy_deps import pm, xr
 from ...samplers import hurdle as _hurdle  # noqa: F401  (registers the runners)
 from .._base._nb import nb_alpha_rv
+from .._base._panel import _EFFECTS_NAMES
 from .._base._shared import _parse_W
 from .._design import FacadeMeta, discrete
 from .._mixins._count_panel import CountPanelFEMixin, require_counts
 from .._mixins._hurdle import HurdleMixin
+from ..base import SpatialModel
 from ..cross_section.sar_zinb import _selection_design
-from ..panel_base import _EFFECTS_NAMES, SpatialPanelModel
 from ..priors import PanelHurdlePriors
 
 _PARAMS_DOC = """
@@ -80,7 +81,7 @@ _PARAMS_DOC = """
 """
 
 
-class _HurdlePanelBase(HurdleMixin, CountPanelFEMixin, SpatialPanelModel):
+class _HurdlePanelBase(HurdleMixin, CountPanelFEMixin, SpatialModel):
     """Shared construction, sampling and prediction for the hurdle panels."""
 
     _priors_cls = PanelHurdlePriors

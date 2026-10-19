@@ -34,7 +34,6 @@ from neighbayes.models import (
 from neighbayes.models.base import SpatialModel
 from neighbayes.models.cross_section.tobit import _SpatialTobitBase
 from neighbayes.models.panel._tobit import _PanelTobitBase
-from neighbayes.models.panel_base import SpatialPanelModel
 from neighbayes.tests.helpers import W_to_graph, make_line_W
 
 # ---------------------------------------------------------------------------
@@ -628,7 +627,7 @@ class TestLogLikelihoodStructureFast:
             self._idata = fake_idata
             return fake_idata, True
 
-        monkeypatch.setattr(SpatialPanelModel, "_fit_nuts", _fake_fit_nuts)
+        monkeypatch.setattr(SpatialModel, "_fit_nuts", _fake_fit_nuts)
         out = model.fit(
             sampler="nuts",
             draws=2,
@@ -658,7 +657,7 @@ class TestLogLikelihoodStructureFast:
             self._idata = fake_idata
             return fake_idata, True
 
-        monkeypatch.setattr(SpatialPanelModel, "_fit_nuts", _fake_fit_nuts)
+        monkeypatch.setattr(SpatialModel, "_fit_nuts", _fake_fit_nuts)
         out = model.fit(
             sampler="nuts",
             draws=2,
@@ -693,7 +692,7 @@ class TestLogLikelihoodStructureFast:
             self._idata = fake_idata
             return fake_idata, True
 
-        monkeypatch.setattr(SpatialPanelModel, "_fit_nuts", _fake_fit_nuts)
+        monkeypatch.setattr(SpatialModel, "_fit_nuts", _fake_fit_nuts)
         out = model.fit(
             sampler="nuts",
             draws=2,
@@ -725,7 +724,7 @@ class TestLogLikelihoodStructureFast:
             self._idata = fake_idata
             return fake_idata, True
 
-        monkeypatch.setattr(SpatialPanelModel, "_fit_nuts", _fake_fit_nuts)
+        monkeypatch.setattr(SpatialModel, "_fit_nuts", _fake_fit_nuts)
         out = model.fit(
             sampler="nuts",
             draws=2,

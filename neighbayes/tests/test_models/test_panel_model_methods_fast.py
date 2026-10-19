@@ -12,7 +12,7 @@ import xarray as xr
 from libpysal.graph import Graph
 
 from neighbayes.models import OLS, SAR, SDEM, SDM, SEM, SLX
-from neighbayes.models.panel_base import SpatialPanelModel
+from neighbayes.models.base import SpatialModel
 from neighbayes.tests.helpers import W_to_graph, make_line_W
 
 

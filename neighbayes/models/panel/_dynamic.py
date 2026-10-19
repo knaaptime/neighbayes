@@ -37,12 +37,13 @@ from pytensor import sparse as pts
 from ..._backends.sampler_helpers import select_backend, use_jax_likelihood
 from ..._lazy_deps import pm
 from ..._logdet import get_cached_logdet_fn
+from .._base._panel import _resolve_effects
 from .._base._shared import (
     _pointwise_gaussian_loglik,
     _write_log_likelihood_to_idata,
     gelman_default_beta_prior,
 )
-from ..panel_base import SpatialPanelModel, _resolve_effects
+from ..base import SpatialModel
 from ..priors import (
     PanelOLSDynamicPriors,
     PanelSARDynamicPriors,
@@ -69,7 +70,7 @@ class _DynamicPanelMixin:
     ValueError at construction time.
     """
 
-    # Fixed-T bias here is Nickell's, not Lee & Yu's; see SpatialPanelModel.
+    # Fixed-T bias here is Nickell's, not Lee & Yu's; see SpatialModel.
     _lee_yu = False
 
     _y_dyn: np.ndarray
@@ -409,7 +410,7 @@ class _DynamicPanelMixin:
         return self._idata
 
 
-class OLSPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
+class OLSPanelDynamic(_DynamicPanelMixin, SpatialModel):
     _priors_cls = PanelOLSDynamicPriors
     _has_wx_in_beta = True
 
@@ -543,7 +544,7 @@ class OLSPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
         return phi * self._y_lag + self._Z_dyn @ beta
 
 
-class SDMPanelDynamicRestricted(_DynamicPanelMixin, SpatialPanelModel):
+class SDMPanelDynamicRestricted(_DynamicPanelMixin, SpatialModel):
     _priors_cls = PanelSDMRDynamicPriors
     _has_wx_in_beta = True
 
@@ -651,7 +652,7 @@ class SDMPanelDynamicRestricted(_DynamicPanelMixin, SpatialPanelModel):
         )
 
 
-class SDMPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
+class SDMPanelDynamic(_DynamicPanelMixin, SpatialModel):
     _priors_cls = PanelSDMUDynamicPriors
     _has_wx_in_beta = True
 
@@ -833,7 +834,7 @@ class SDMPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
         )
 
 
-class SARPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
+class SARPanelDynamic(_DynamicPanelMixin, SpatialModel):
     _priors_cls = PanelSARDynamicPriors
 
     """Dynamic spatial-lag panel regression.
@@ -992,7 +993,7 @@ class SARPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
         return phi * self._y_lag + rho * self._Wy_dyn + self._X_dyn @ beta
 
 
-class SEMPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
+class SEMPanelDynamic(_DynamicPanelMixin, SpatialModel):
     _priors_cls = PanelSEMDynamicPriors
 
     """Dynamic spatial-error panel regression.
@@ -1209,7 +1210,7 @@ class SEMPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
         return phi * self._y_lag + self._X_dyn @ beta
 
 
-class SDEMPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
+class SDEMPanelDynamic(_DynamicPanelMixin, SpatialModel):
     _priors_cls = PanelSDEMDynamicPriors
     _has_wx_in_beta = True
 
@@ -1439,7 +1440,7 @@ class SDEMPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
         return phi * self._y_lag + Z @ beta
 
 
-class SLXPanelDynamic(_DynamicPanelMixin, SpatialPanelModel):
+class SLXPanelDynamic(_DynamicPanelMixin, SpatialModel):
     _priors_cls = PanelSLXDynamicPriors
     _has_wx_in_beta = True
 

@@ -81,33 +81,35 @@ are variations on a small number of themes.
 
 ### Cross-section and panel share one implementation
 
-Cross-sectional and panel models differ in only a few operations: what the spatial lag
-means, what operand the log-determinant factory receives, and what the symbolic sparse
-operator looks like inside a PyMC model. Those three are isolated behind the
-`SpatialStructure` strategy in
+A cross-section is the `T = 1` panel. One base class,
+[`SpatialModel`](https://github.com/pysal/neighbayes/blob/main/neighbayes/models/base.py),
+parses either kind of data: given time (`time_col`, or `T`), it sorts and stacks the
+panel by period, then unit, and applies the within transformation its fixed effects
+need; without time it holds `N = n` units and `T = 1` period. The operations that
+depend on that layout are isolated in the `SpatialStructure` of
 [`models/_base/_structure.py`](https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_structure.py):
 
 :::{list-table}
 :header-rows: 1
-:widths: 22 39 39
+:widths: 30 70
 
 * - operation
-  - `CrossSectionStructure`
-  - `PanelStructure`
+  - what it does
 * - `spatial_lag(x)`
-  - `W @ x`
-  - `W` applied per period via the Kronecker structure
+  - `W` applied within each period of the stacked data (`W @ x` in a cross-section)
+* - `batch_spatial_lag(resid)`
+  - the same lag for a batch of residual draws, one sparse multiply
+* - `W_sparse_NT()`
+  - the `(N·T)×(N·T)` block `I_T ⊗ W`, so one multiply lags a stacked panel; `W`
+    itself in a cross-section
 * - `logdet_W_operand()`
-  - dense `W`
-  - sparse `W` (the panel logdet path stays sparse)
-* - `W_pt_sparse()`
-  - the `N×N` `W`
-  - the `(N·T)×(N·T)` block `I_T ⊗ W`, so one symbolic multiply lags a stacked panel
+  - the sparse `W` handed to the log-determinant factory
 :::
 
-Everything that is behaviour-identical across the two lives in the shared base. This is
-why panel models inherit the diagnostics, effects, and prior handling of their
-cross-sectional counterparts without re-implementation.
+Everything else is behaviour-identical across the two, so panel models inherit the
+diagnostics, effects, and prior handling of their cross-sectional counterparts without
+re-implementation. The fixed-effects likelihood dimensions (Lee and Yu 2010) reduce to
+the cross-section's when there are no effects and `T = 1`.
 
 ### Priors mirror model inheritance
 

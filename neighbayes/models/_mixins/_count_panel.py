@@ -50,7 +50,7 @@ _GROUP_DRAWS_MAX_BYTES = 500 * 1024**2
 
 
 def _resolve_count_effects(effects) -> int:
-    from ..panel_base import _resolve_effects
+    from .._base._panel import _resolve_effects
 
     if isinstance(effects, (np.integer,)):
         effects = int(effects)

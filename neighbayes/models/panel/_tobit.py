@@ -45,11 +45,11 @@ from pytensor import sparse as pts
 from ..._backends.sampler_helpers import use_jax_likelihood
 from ..._lazy_deps import pm, xr
 from .._base._shared import _tobit_pointwise_loglik, _write_log_likelihood_to_idata
-from ..panel_base import SpatialPanelModel
+from ..base import SpatialModel
 from ..priors import PanelSARTobitPriors, PanelSEMTobitPriors
 
 
-class _PanelTobitBase(SpatialPanelModel):
+class _PanelTobitBase(SpatialModel):
     """Shared helpers for panel Tobit classes."""
 
     # Censored likelihood: the Lee & Yu dimensions are Gaussian-only.

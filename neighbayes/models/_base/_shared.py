@@ -1,8 +1,8 @@
 """Shared helper functions for Bayesian spatial regression models.
 
-These utilities are used by multiple base classes (SpatialModel,
-SpatialPanelModel, FlowModel, FlowPanelModel) and are collected here
-to avoid circular imports and code duplication.
+These utilities are used by the base classes (SpatialModel, FlowModel,
+FlowPanelModel) and are collected here to avoid circular imports and code
+duplication.
 """
 
 from __future__ import annotations
@@ -438,21 +438,15 @@ _DECISION_PREDICATE_PAIRS: dict[str, tuple[str, str]] = {
 
 
 class SharedSpatialMethods(metaclass=FacadeMeta):
-    """Behaviour-preserving mixin of methods shared verbatim by the two base
-    classes (:class:`SpatialModel` and :class:`SpatialPanelModel`).
+    """Methods shared by every model: :class:`SpatialModel` (cross-section or
+    panel) and the flow bases.
 
-    Phase 5c converges the ~39 duplicated methods into this single home before
-    the two hierarchies are collapsed.  Only methods whose bodies are *already
-    identical* across the two classes live here; anything that differs (N vs NT
-    sizing, cross-section vs panel Jacobians, ...) stays on the subclasses and
-    overrides the mixin via normal MRO.  All methods rely only on attributes
-    both classes provide (``self._X``, ``self._feature_names``, ``self.priors``,
-    ``self._idata``).
-
+    They rely only on attributes every model provides (``self._X``,
+    ``self._feature_names``, ``self.priors``, ``self._idata``).
     Structure-dependent operations (spatial lag, logdet ``W`` operand) are
     delegated to ``self._structure`` (a
-    :class:`neighbayes.models._base._structure.SpatialStructure`), which the two
-    base ``__init__`` methods assign.  The class-level ``None`` default keeps the
+    :class:`neighbayes.models._base._structure.SpatialStructure`), which
+    :class:`SpatialModel` assigns.  The class-level ``None`` default keeps the
     attribute resolvable for classes that do not use it (e.g. flow models, which
     shadow ``_spatial_lag`` and never touch the single-``W`` logdet path).
     """
@@ -460,7 +454,7 @@ class SharedSpatialMethods(metaclass=FacadeMeta):
     _structure = None
 
     # Panel decision trees use "Panel-"-prefixed test names, "panel_"-prefixed
-    # predicate keys, and the panel spec registry; SpatialPanelModel flips this.
+    # predicate keys, and the panel spec registry; a panel SpatialModel sets it.
     _panel_diagnostics = False
 
     @property
@@ -1318,9 +1312,9 @@ class SharedSpatialMethods(metaclass=FacadeMeta):
     # Lazy logdet evaluators (cross-section is the T=1 case)
     # ------------------------------------------------------------------
 
-    # Likelihood dimensions.  A cross-section (and a pooled panel) counts
-    # every observation and applies the Jacobian T times; fixed-effects
-    # panels override these (Lee & Yu 2010; see ``SpatialPanelModel``).
+    # Likelihood dimensions: every observation counts and the Jacobian applies
+    # T times.  SpatialModel overrides these with the fixed-effects panel
+    # dimensions (Lee & Yu 2010).
 
     @property
     def _jacobian_T(self) -> int:

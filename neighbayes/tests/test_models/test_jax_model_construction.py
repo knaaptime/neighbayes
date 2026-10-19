@@ -21,7 +21,6 @@ from libpysal.graph import Graph
 from neighbayes._backends.sampler_helpers import use_jax_likelihood
 from neighbayes.models import SDEM, SEM, SEMTobit
 from neighbayes.models.base import SpatialModel
-from neighbayes.models.panel_base import SpatialPanelModel
 from neighbayes.tests.helpers import W_to_graph, make_line_W, make_rook_W
 
 # ---------------------------------------------------------------------------

@@ -3,7 +3,7 @@
 The mixin is driven by declarative attributes already present on the model
 class (``_jacobian_param``, ``_has_wx_in_beta``, ``_spatial_params``).
 Subclasses only need to set those attributes and inherit from both
-``SpatialModel`` (or ``SpatialPanelModel``) and ``GaussianLikelihoodMixin``;
+``SpatialModel`` and ``GaussianLikelihoodMixin``;
 the mixin supplies the full ``_build_pymc_model`` implementation.
 
 Three likelihood branches are dispatched based on ``_jacobian_param``:
@@ -42,8 +42,7 @@ class GaussianLikelihoodMixin:
     """Mixin that provides ``_build_pymc_model`` for Gaussian spatial models.
 
     Expects the host class to also inherit from
-    :class:`~neighbayes.models.base.SpatialModel` (or
-    :class:`~neighbayes.models.panel_base.SpatialPanelModel`) and to define
+    :class:`~neighbayes.models.base.SpatialModel` and to define
     the following declarative attributes:
 
     * ``_jacobian_param``: ``None``, ``"rho"``, or ``"lam"``
@@ -59,19 +58,15 @@ class GaussianLikelihoodMixin:
     * ``_nu`` → fixed Student-t degrees of freedom (robust models)
     * ``_logdet_pytensor_fn``: pytensor log-determinant callable
 
-    The ``_spatial_lag(X)`` method defaults to ``self._W_sparse @ X``
-    (cross-section).  Panel models override it to use
-    ``self._sparse_panel_lag(X)``.
+    ``_spatial_lag(X)`` is ``W ⊗ I_T`` applied to stacked data: ``W @ X`` in
+    a cross-section.
     """
 
     # ------------------------------------------------------------------
     # Spatial lag hook
     # ------------------------------------------------------------------
-    # ``_spatial_lag(X)`` is defined on ``SpatialModel`` (cross-section:
-    # ``self._W_sparse @ X``) and overridden on ``SpatialPanelModel`` (panel:
-    # ``self._sparse_panel_lag(X)`` which applies W ⊗ I_T).  The mixin calls
-    # ``self._spatial_lag(X)`` so the correct implementation is dispatched
-    # via MRO regardless of which base class the model inherits from.
+    # ``_spatial_lag(X)`` delegates to the model's ``SpatialStructure``, which
+    # applies W ⊗ I_T to stacked data (``W @ X`` in a cross-section).
 
     # ------------------------------------------------------------------
     # Design matrix
@@ -522,10 +517,9 @@ def _run_gaussian_gibbs(
     """Registry runner for Gaussian Gibbs (cross-section and panel FE).
 
     Thin adapter over ``model._fit_gibbs``; ``backend`` (``"jax"`` or
-    ``"numpy"``) maps directly onto the sampler's ``gibbs_method``.  The
-    cross-section vs panel FE distinction is handled entirely by MRO dispatch
-    of ``_fit_gibbs`` (``SpatialModel`` vs ``SpatialPanelModel``), so the same
-    runner serves both registry keys.
+    ``"numpy"``) maps directly onto the sampler's ``gibbs_method``.
+    :meth:`SpatialModel._fit_gibbs` passes a panel's ``W ⊗ I_T`` and
+    fixed-effects dimensions, so the same runner serves both registry keys.
     """
     return model._fit_gibbs(
         draws=draws,

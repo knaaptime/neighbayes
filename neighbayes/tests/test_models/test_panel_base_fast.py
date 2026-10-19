@@ -1,7 +1,7 @@
-"""Fast unit tests for neighbayes.models.panel_base helpers and input validation.
+"""Fast unit tests for the panel helpers and panel input validation.
 
 These tests exercise _demean_panel, resolve_W, _as_dense_W,
-SpatialPanelModel.__init__ (formula mode, error paths), and
+SpatialModel.__init__ for panels (formula mode, error paths), and
 spatial_diagnostics_decision branches without running MCMC.
 """
 
@@ -14,11 +14,11 @@ import scipy.sparse as sp
 from libpysal.graph import Graph
 
 from neighbayes.models import OLS, SAR, SDEM, SDM, SEM, SLX
-from neighbayes.models._base._shared import resolve_W
-from neighbayes.models.panel_base import (
+from neighbayes.models._base._panel import (
     _as_dense_W,
     _demean_panel,
 )
+from neighbayes.models._base._shared import resolve_W
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -226,12 +226,12 @@ class TestAsDenseW:
 
 
 # ---------------------------------------------------------------------------
-# SpatialPanelModel.__init__ error paths
+# SpatialModel.__init__ panel error paths
 # ---------------------------------------------------------------------------
 
 
-class TestSpatialPanelModelInit:
-    """Test SpatialPanelModel constructor validation (no MCMC)."""
+class TestPanelInit:
+    """Test the panel constructor's validation (no MCMC)."""
 
     @pytest.fixture
     def W_graph(self):
@@ -758,7 +758,7 @@ class TestBatchSparseLag:
 
     def _dense_lag(self, model, resid):
         """Reference: full Kronecker dense W_NT @ resid.T then transpose."""
-        from neighbayes.models.panel_base import _as_dense_W
+        from neighbayes.models._base._panel import _as_dense_W
 
         W_dense = _as_dense_W(model._W_sparse, model._N, model._T)
         return (W_dense @ resid.T).T
@@ -830,8 +830,8 @@ class TestWDenseMemoryWarning:
         import warnings
 
         W_graph = _W_to_graph(_rook_W(4))
+        from neighbayes.models.base import SpatialModel
         from neighbayes.models.panel._fe import OLSPanelFE
-        from neighbayes.models.panel_base import SpatialPanelModel
 
         rng = np.random.default_rng(0)
         model = OLS(
@@ -842,10 +842,10 @@ class TestWDenseMemoryWarning:
             T=3,
         )
         # Force the threshold to 0 so any materialization triggers the warning.
-        original = SpatialPanelModel._DENSE_W_WARN_BYTES
+        original = SpatialModel._DENSE_W_WARN_BYTES
         try:
-            SpatialPanelModel._DENSE_W_WARN_BYTES = 0
+            SpatialModel._DENSE_W_WARN_BYTES = 0
             with pytest.warns(ResourceWarning, match="dense panel weight matrix"):
                 _ = model._W_dense
         finally:
-            SpatialPanelModel._DENSE_W_WARN_BYTES = original
+            SpatialModel._DENSE_W_WARN_BYTES = original

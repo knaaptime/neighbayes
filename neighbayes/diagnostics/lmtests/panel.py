@@ -115,7 +115,7 @@ def _panel_residuals(model, beta_draws: np.ndarray) -> np.ndarray:
 
     Parameters
     ----------
-    model : SpatialPanelModel
+    model : SpatialModel
         Fitted panel model with ``inference_data`` attribute.
     beta_draws : np.ndarray
         Posterior draws of beta, shape ``(draws, k)``.
@@ -281,7 +281,7 @@ def bayesian_panel_lm_lag_test(
 
     Parameters
     ----------
-    model : SpatialPanelModel
+    model : SpatialModel
         Fitted panel model (e.g. ``OLSPanelFE``, ``OLSPanelRE``) with
         ``inference_data`` attribute containing posterior draws for
         ``beta`` and ``sigma``.
@@ -374,7 +374,7 @@ def bayesian_panel_lm_error_test(
 
     Parameters
     ----------
-    model : SpatialPanelModel
+    model : SpatialModel
         Fitted panel model (e.g. ``OLSPanelFE``, ``OLSPanelRE``) with
         ``inference_data`` attribute containing posterior draws for
         ``beta`` and ``sigma``.
@@ -449,7 +449,7 @@ def bayesian_panel_robust_lm_lag_test(
 
     Parameters
     ----------
-    model : SpatialPanelModel
+    model : SpatialModel
         Fitted panel model (e.g. ``OLSPanelFE``) with ``inference_data``
         attribute containing posterior draws for ``beta`` and ``sigma``.
 
@@ -544,7 +544,7 @@ def bayesian_panel_robust_lm_error_test(
 
     Parameters
     ----------
-    model : SpatialPanelModel
+    model : SpatialModel
         Fitted panel model (e.g. ``OLSPanelFE``) with ``inference_data``
         attribute containing posterior draws for ``beta`` and ``sigma``.
 
@@ -724,7 +724,7 @@ def bayesian_panel_lm_sdm_joint_test(
 
     Parameters
     ----------
-    model : SpatialPanelModel
+    model : SpatialModel
         Fitted OLS panel model with ``inference_data`` containing
         posterior draws for ``beta`` and ``sigma``.
 
@@ -824,7 +824,7 @@ def bayesian_panel_lm_slx_error_joint_test(
 
     Parameters
     ----------
-    model : SpatialPanelModel
+    model : SpatialModel
         Fitted OLS panel model with ``inference_data`` containing
         posterior draws for ``beta`` and ``sigma``.
 

@@ -44,8 +44,9 @@ import scipy.sparse as sp
 from ..._lazy_deps import pm, xr
 from ...samplers._registry import register
 from .._base._nb import nb_alpha_fixed, nb_alpha_rv
+from .._base._panel import _EFFECTS_NAMES
 from .._mixins._count_panel import CountPanelFEMixin, require_counts
-from ..panel_base import _EFFECTS_NAMES, SpatialPanelModel
+from ..base import SpatialModel
 from ..priors import PanelCountPriors
 
 _PARAMS_DOC = """
@@ -97,7 +98,7 @@ _PARAMS_DOC = """
 """
 
 
-class _CountPanelBase(CountPanelFEMixin, SpatialPanelModel):
+class _CountPanelBase(CountPanelFEMixin, SpatialModel):
     """Shared construction, sampling and prediction for the NB count panels."""
 
     _priors_cls = PanelCountPriors
@@ -165,7 +166,7 @@ class _CountPanelBase(CountPanelFEMixin, SpatialPanelModel):
     ) -> xr.DataTree:
         """Sample via reduced-form count Gibbs (registry entry ``("count", "panel")``).
 
-        Reached through :meth:`SpatialPanelModel.fit` with ``sampler="gibbs"``,
+        Reached through :meth:`SpatialModel.fit` with ``sampler="gibbs"``,
         the default (``sampler="nuts"`` runs :meth:`_build_pymc_model`).  ``store_effects``
         (a ``fit`` keyword) keeps every draw of the unit effects — by default
         when they fit in about 500 MB — and otherwise their posterior mean and

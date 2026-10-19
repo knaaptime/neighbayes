@@ -29,17 +29,18 @@ from ..._logdet import (
 from ..._ops import kron_solve_matrix
 from ...graph import _weights_to_csr, flow_lags, flow_trace_blocks
 from .._base._nb import nb_alpha_rv
+from .._base._panel import _absorbed_columns, _demean_panel
 from .._design import FacadeMeta, flow
 from .._mixins._count_panel import CountPanelFEMixin, pop_mundlak, require_counts
 from .._mixins._flow_shared import FlowSharedMethods
 from .._mixins._zinb import ZINBMixin
+from ..base import SpatialModel
 from ..flow import (
     _compute_ols_flow_effects,
 )
-from ..panel_base import SpatialPanelModel, _absorbed_columns, _demean_panel
 
 
-class FlowPanelModel(FlowSharedMethods, SpatialPanelModel):
+class FlowPanelModel(FlowSharedMethods, SpatialModel):
     """Abstract base class for balanced panel spatial flow models.
 
     Parameters
@@ -76,6 +77,8 @@ class FlowPanelModel(FlowSharedMethods, SpatialPanelModel):
     robust : bool, default False
         If True, use Student-t observation errors.
     """
+
+    _is_panel = True
 
     #: Whether the class samples the unrestricted three-ρ flow, whose
     #: log-determinant is the trace series or the resolvent estimator.
@@ -235,7 +238,7 @@ class FlowPanelModel(FlowSharedMethods, SpatialPanelModel):
         # Columns fixed within the demeaning groups (intercept, intra indicator
         # and log distance under pair effects; any time-invariant attribute)
         # are zero after demeaning: absorbed by the fixed effects, not
-        # identified.  Drop them from the sampled design, as SpatialPanelModel
+        # identified.  Drop them from the sampled design, as SpatialModel
         # does; effects read beta in the full layout via _beta_layout, with NaN
         # for absorbed columns.
         self._design_feature_names = list(self._feature_names)
@@ -317,7 +320,7 @@ class FlowPanelModel(FlowSharedMethods, SpatialPanelModel):
         """Construct and return the PyMC model."""
 
     # ------------------------------------------------------------------
-    # Fixed-effects likelihood (Lee & Yu 2010; see SpatialPanelModel)
+    # Fixed-effects likelihood (Lee & Yu 2010; see SpatialModel)
     # ------------------------------------------------------------------
     # The panel units are the N_flow origin-destination pairs.  With time
     # effects and a row-standardized W, each of W_d, W_o, W_w has unit row
@@ -776,7 +779,7 @@ class SARFlowPanelFE(_ResolventFlowPanelMixin, FlowPanelModel):
     argument controls pooled, pair fixed-effects, time fixed-effects, or
     two-way demeaning before the likelihood is evaluated. The Jacobian
     contribution scales as :math:`T \\log |A(\\rho_d, \\rho_o, \\rho_w)|`
-    (:math:`T - 1` under pair effects; see :class:`SpatialPanelModel`).
+    (:math:`T - 1` under pair effects; see :class:`SpatialModel`).
     ``sampler="nuts"`` evaluates it exactly from ``n × n`` trace moments.
 
     Parameters

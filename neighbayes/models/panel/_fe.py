@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 
 from .._mixins import GaussianLikelihoodMixin
-from ..panel_base import SpatialPanelModel
+from ..base import SpatialModel
 from ..priors import (
     PanelOLSPriors,
     PanelSARPriors,
@@ -16,7 +16,7 @@ from ..priors import (
 )
 
 
-class OLSPanelFE(GaussianLikelihoodMixin, SpatialPanelModel):
+class OLSPanelFE(GaussianLikelihoodMixin, SpatialModel):
     """Bayesian pooled and fixed-effects linear panel regression.
 
     Implements the Gaussian panel model
@@ -29,7 +29,7 @@ class OLSPanelFE(GaussianLikelihoodMixin, SpatialPanelModel):
     where the included effects depend on ``model``: ``0`` pooled,
     ``1`` unit effects, ``2`` time effects, ``3`` two-way effects. The
     within transformation is handled by
-    :class:`~neighbayes.models.panel_base.SpatialPanelModel` before the
+    :class:`~neighbayes.models.base.SpatialModel` before the
     likelihood is evaluated.
 
     Parameters
@@ -137,7 +137,7 @@ class OLSPanelFE(GaussianLikelihoodMixin, SpatialPanelModel):
         return self._sem_effects()
 
 
-class SARPanelFE(GaussianLikelihoodMixin, SpatialPanelModel):
+class SARPanelFE(GaussianLikelihoodMixin, SpatialModel):
     """Bayesian spatial-lag panel regression.
 
     Implements
@@ -261,7 +261,7 @@ class SARPanelFE(GaussianLikelihoodMixin, SpatialPanelModel):
         return self._sar_effects()
 
 
-class SEMPanelFE(GaussianLikelihoodMixin, SpatialPanelModel):
+class SEMPanelFE(GaussianLikelihoodMixin, SpatialModel):
     """Bayesian spatial-error panel regression.
 
     Implements
@@ -384,7 +384,7 @@ class SEMPanelFE(GaussianLikelihoodMixin, SpatialPanelModel):
         return self._sem_effects()
 
 
-class SDMPanelFE(GaussianLikelihoodMixin, SpatialPanelModel):
+class SDMPanelFE(GaussianLikelihoodMixin, SpatialModel):
     """Bayesian spatial Durbin panel regression.
 
     Implements
@@ -516,7 +516,7 @@ class SDMPanelFE(GaussianLikelihoodMixin, SpatialPanelModel):
         return self._sdm_effects()
 
 
-class SDEMPanelFE(GaussianLikelihoodMixin, SpatialPanelModel):
+class SDEMPanelFE(GaussianLikelihoodMixin, SpatialModel):
     """Bayesian spatial Durbin error panel regression.
 
     Implements
@@ -647,7 +647,7 @@ class SDEMPanelFE(GaussianLikelihoodMixin, SpatialPanelModel):
         return self._slx_effects()
 
 
-class SLXPanelFE(GaussianLikelihoodMixin, SpatialPanelModel):
+class SLXPanelFE(GaussianLikelihoodMixin, SpatialModel):
     """Bayesian SLX panel regression.
 
     Implements

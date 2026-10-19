@@ -41,7 +41,7 @@ from pytensor import sparse as pts
 from ..._backends.sampler_helpers import use_jax_likelihood
 from ..._lazy_deps import pm, xr
 from ...samplers._registry import register
-from ..panel_base import SpatialPanelModel
+from ..base import SpatialModel
 from ..priors import (
     PanelOLSREPriors,
     PanelSARREPriors,
@@ -117,7 +117,7 @@ class _RandomEffectsMixin:
         super().__init__(**kwargs)
 
 
-class OLSPanelRE(_RandomEffectsMixin, SpatialPanelModel):
+class OLSPanelRE(_RandomEffectsMixin, SpatialModel):
     """Bayesian random effects panel regression (non-spatial).
 
     .. math::
@@ -293,7 +293,7 @@ class OLSPanelRE(_RandomEffectsMixin, SpatialPanelModel):
         return direct_samples, indirect_samples, total_samples
 
 
-class SARPanelRE(_RandomEffectsMixin, SpatialPanelModel):
+class SARPanelRE(_RandomEffectsMixin, SpatialModel):
     """Bayesian spatial lag panel model with unit random effects.
 
     .. math::
@@ -565,7 +565,7 @@ class SARPanelRE(_RandomEffectsMixin, SpatialPanelModel):
         return direct_samples, indirect_samples, total_samples
 
 
-class SEMPanelRE(_RandomEffectsMixin, SpatialPanelModel):
+class SEMPanelRE(_RandomEffectsMixin, SpatialModel):
     """Bayesian spatial error panel model with unit random effects.
 
     .. math::
@@ -927,7 +927,7 @@ class SEMPanelRE(_RandomEffectsMixin, SpatialPanelModel):
         return direct_samples, indirect_samples, total_samples
 
 
-class SDEMPanelRE(_RandomEffectsMixin, SpatialPanelModel):
+class SDEMPanelRE(_RandomEffectsMixin, SpatialModel):
     """Bayesian spatial Durbin error panel model with unit random effects.
 
     .. math::
