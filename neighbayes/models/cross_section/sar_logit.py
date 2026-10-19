@@ -14,8 +14,9 @@ Gibbs updates for β and ρ (via a collapsed slice sampler).
 
 Both backends fit the same model: ``backend="jax"`` (the default via
 ``"auto"``) runs the chains in parallel threads, one ``jax.jit`` program each;
-``"numpy"`` uses the CHOLMOD factorization path.  For the SAR logit with
-random effects, pass ``unit_effects="random"``.
+``"numpy"`` uses the CHOLMOD factorization path.  There is no SAR logit with
+random effects: in a cross-section their sd and ρ are barely identified from
+binary outcomes.
 
 Use this model when:
 - The response is binary (0/1).
@@ -40,7 +41,6 @@ from ..._lazy_deps import xr
 from ...samplers._utils._idata import gibbs_to_inference_data
 from ...samplers._utils._slice import SliceWidthState
 from ...samplers.gaussian._chain_runner import run_chains
-from ...samplers.logit import LogitGibbsPriors
 from ...samplers.logit_reduced import (
     ReducedLogitGibbsState,
     run_chain,
@@ -54,7 +54,7 @@ from ...samplers.negbin_reduced._core import (
 )
 from .._design import discrete
 from ..base import SpatialModel
-from ..priors import SARLogitPriors
+from ..priors import LogitGibbsPriors, SARLogitPriors
 
 
 class SARLogit(SpatialModel):

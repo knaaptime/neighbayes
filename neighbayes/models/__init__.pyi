@@ -11,7 +11,6 @@ from .cross_section.sar_zinb import SARZINB as SARZINB
 from .cross_section.sdem import SDEM as SDEM
 from .cross_section.sdm import SDM as SDM
 from .cross_section.sem import SEM as SEM
-from .cross_section.sem_logit import SEMLogit as SEMLogit
 from .cross_section.sem_probit import SEMProbit as SEMProbit
 from .cross_section.slx import SLX as SLX
 from .cross_section.tobit import SARTobit as SARTobit

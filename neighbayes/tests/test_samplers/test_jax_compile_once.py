@@ -32,8 +32,6 @@ def _cases():
         _as_sparse,
         make_rook_W,
         make_sar_logit_data,
-        make_sar_logit_re_data,
-        make_sem_logit_data,
     )
 
     Wd = make_rook_W(6)
@@ -56,23 +54,8 @@ def _cases():
             unit_effects="fixed", y=y, X=dp["X"], W=dp["W_sparse"], N=36, T=3
         ),
     )
-    for name, make, cls, kw in (
-        ("SARLogit", make_sar_logit_data, M.SARLogit, {"rho": 0.4}),
-        (
-            "SARLogitRE",
-            make_sar_logit_re_data,
-            partial(M.SARLogit, unit_effects="random"),
-            {"rho": 0.4},
-        ),
-        (
-            "SEMLogitRE",
-            make_sem_logit_data,
-            partial(M.SEMLogit, unit_effects="random"),
-            {"lam": 0.4},
-        ),
-    ):
-        y, X = make(np.random.default_rng(3), Wd, beta=beta, **kw)
-        out[name] = (y, lambda y, X=X, cls=cls: cls(y=y, X=X, W=W))
+    y, X = make_sar_logit_data(np.random.default_rng(3), Wd, rho=0.4, beta=beta)
+    out["SARLogit"] = (y, lambda y, X=X: M.SARLogit(y=y, X=X, W=W))
     for name, cls, s2 in (
         ("SARNegBin", M.SARNegBin, 0.0),
         ("SARNegBinRE", partial(M.SARNegBin, unit_effects="random"), 0.5),
@@ -144,8 +127,6 @@ _CASES = (
     "SEM",
     "SARPanelFE",
     "SARLogit",
-    "SARLogitRE",
-    "SEMLogitRE",
     "SARNegBin",
     "SARNegBinRE",
     "SARZINB",

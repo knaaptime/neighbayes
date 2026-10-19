@@ -1,22 +1,9 @@
-"""Parameter recovery tests for spatial logit models.
+"""Parameter recovery tests for the reduced-form spatial logit.
 
-Generates binary outcomes from known parameters, fits each model once
-through the public ``.fit()`` API, and verifies that posterior means
-recover the spatial and regression parameters within a small tolerance.
-
-The three logit variants cover distinct DGPs, each matched to its model:
-
-- **SARLogit** (reduced-form): ``eta = (I - rho W)^{-1} X beta`` — the
-  spatial lag is a deterministic mean propagator (no latent noise field).
-  Data is generated *without* the ``nu ~ N(0, I)`` noise term that
-  ``dgp.simulate_sar_logit`` adds (that noise matches the structural
-  model, not the reduced form).
-
-- **SARLogitRE** (latent-field): ``eta = rho W eta + X beta + nu``
-  — data from ``dgp.simulate_sar_logit`` (with noise) matches exactly.
-
-- **SEMLogitRE** (spatial error): ``eta = X beta + (I - lam W)^{-1} nu``
-  — data from ``dgp.simulate_sem_logit`` matches exactly.
+Generates binary outcomes from known parameters,
+``eta = (I - rho W)^{-1} X beta``, fits ``SARLogit`` once through the public
+``.fit()`` API, and verifies that posterior means recover ρ and β within a
+small tolerance.
 
 Run with::
 
@@ -28,14 +15,12 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from neighbayes.models import SARLogit, SEMLogit
+from neighbayes.models import SARLogit
 from neighbayes.tests.helpers import (
     SAMPLE_KWARGS,
     W_to_graph,
     make_rook_W,
     make_sar_logit_data,
-    make_sar_logit_re_data,
-    make_sem_logit_data,
 )
 
 pytestmark = [pytest.mark.slow, pytest.mark.recovery]
@@ -48,16 +33,12 @@ SIDE = 30  # 900 cross-sectional units
 
 # True parameters
 RHO_TRUE = 0.4
-LAM_TRUE = 0.4
 BETA_TRUE = np.array([0.3, 1.0])
 
-# Recovery tolerances — all models match their DGP, so tight tolerances
-# apply to spatial parameters and slopes.  The SEM-logit intercept is
-# harder to recover (the spatial error's mean shifts the constant), so
-# it gets a wider band.
+# Recovery tolerances — the model matches its DGP, so tight tolerances apply
+# to ρ and the slopes.
 ABS_TOL_SPATIAL = 0.15
 ABS_TOL_BETA = 0.25
-ABS_TOL_BETA_INTERCEPT_SEM = 0.50
 
 
 # ---------------------------------------------------------------------------
@@ -71,24 +52,6 @@ def sar_logit_reduced_data():
     rng = np.random.default_rng(42)
     W_dense = make_rook_W(SIDE)
     y, X = make_sar_logit_data(rng, W_dense, rho=RHO_TRUE, beta=BETA_TRUE)
-    return y, X, W_dense
-
-
-@pytest.fixture(scope="module")
-def sar_logit_re_data():
-    """Structural-form SAR-logit binary data (with noise) on a 30x30 rook grid."""
-    rng = np.random.default_rng(42)
-    W_dense = make_rook_W(SIDE)
-    y, X = make_sar_logit_re_data(rng, W_dense, rho=RHO_TRUE, beta=BETA_TRUE)
-    return y, X, W_dense
-
-
-@pytest.fixture(scope="module")
-def sem_logit_data():
-    """SEM-logit binary data on a 30x30 rook grid (n=900)."""
-    rng = np.random.default_rng(42)
-    W_dense = make_rook_W(SIDE)
-    y, X = make_sem_logit_data(rng, W_dense, lam=LAM_TRUE, beta=BETA_TRUE)
     return y, X, W_dense
 
 
@@ -121,79 +84,6 @@ class TestSARLogitRecovery:
         y, X, W_dense = sar_logit_reduced_data
         W_graph = W_to_graph(W_dense)
         model = SARLogit(y=y, X=X, W=W_graph)
-        model.fit(**SAMPLE_KWARGS)
-
-        p_hat = model.fitted_probabilities()
-        assert p_hat.shape == (len(y),)
-        assert np.all((p_hat >= 0.0) & (p_hat <= 1.0))
-
-
-# ---------------------------------------------------------------------------
-# SARLogitRE (latent-field, noisy DGP)
-# ---------------------------------------------------------------------------
-
-
-class TestSARLogitStructuralRecovery:
-    """Parameter recovery for the structural-form SARLogitRE model."""
-
-    def test_recovers_rho_and_beta(self, sar_logit_re_data):
-        y, X, W_dense = sar_logit_re_data
-        W_graph = W_to_graph(W_dense)
-        model = SARLogit(unit_effects="random", y=y, X=X, W=W_graph)
-        idata = model.fit(**SAMPLE_KWARGS)
-
-        rho_hat = float(idata.posterior["rho"].mean())
-        assert abs(rho_hat - RHO_TRUE) < ABS_TOL_SPATIAL, (
-            f"SARLogitRE rho: expected ~{RHO_TRUE}, got {rho_hat:.3f}"
-        )
-
-        beta_hat = idata.posterior["beta"].mean(("chain", "draw")).values
-        for j, (bhat, btrue) in enumerate(zip(beta_hat, BETA_TRUE)):
-            assert abs(bhat - btrue) < ABS_TOL_BETA, (
-                f"SARLogitRE beta[{j}]: expected ~{btrue}, got {bhat:.3f}"
-            )
-
-    def test_fitted_probabilities_in_range(self, sar_logit_re_data):
-        y, X, W_dense = sar_logit_re_data
-        W_graph = W_to_graph(W_dense)
-        model = SARLogit(unit_effects="random", y=y, X=X, W=W_graph)
-        model.fit(**SAMPLE_KWARGS)
-
-        p_hat = model.fitted_probabilities()
-        assert p_hat.shape == (len(y),)
-        assert np.all((p_hat >= 0.0) & (p_hat <= 1.0))
-
-
-# ---------------------------------------------------------------------------
-# SEMLogitRE (spatial error)
-# ---------------------------------------------------------------------------
-
-
-class TestSEMLogitRecovery:
-    """Parameter recovery for the SEMLogitRE model."""
-
-    def test_recovers_lam_and_beta(self, sem_logit_data):
-        y, X, W_dense = sem_logit_data
-        W_graph = W_to_graph(W_dense)
-        model = SEMLogit(unit_effects="random", y=y, X=X, W=W_graph)
-        idata = model.fit(**SAMPLE_KWARGS)
-
-        lam_hat = float(idata.posterior["lam"].mean())
-        assert abs(lam_hat - LAM_TRUE) < ABS_TOL_SPATIAL, (
-            f"SEMLogitRE lam: expected ~{LAM_TRUE}, got {lam_hat:.3f}"
-        )
-
-        beta_hat = idata.posterior["beta"].mean(("chain", "draw")).values
-        for j, (bhat, btrue) in enumerate(zip(beta_hat, BETA_TRUE)):
-            tol = ABS_TOL_BETA_INTERCEPT_SEM if j == 0 else ABS_TOL_BETA
-            assert abs(bhat - btrue) < tol, (
-                f"SEMLogitRE beta[{j}]: expected ~{btrue}, got {bhat:.3f}"
-            )
-
-    def test_fitted_probabilities_in_range(self, sem_logit_data):
-        y, X, W_dense = sem_logit_data
-        W_graph = W_to_graph(W_dense)
-        model = SEMLogit(unit_effects="random", y=y, X=X, W=W_graph)
         model.fit(**SAMPLE_KWARGS)
 
         p_hat = model.fitted_probabilities()

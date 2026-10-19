@@ -36,7 +36,7 @@ _DESIGN = {
 _RETIRED = {
     "sigma_alpha": "unit_effects= (pair_effects= for flows) with unit_effect_sd=",
     "sigma2": "unit_effects='random' with unit_effect_sd=",
-    "structural": "unit_effects='random'",
+    "structural": "nothing: the SAR logit is the reduced form only",
 }
 _DEFAULT_SD = 0.5
 _NICKELL = (
@@ -250,21 +250,12 @@ def tobit(fn, design, kw):
     return target, _with_N(target, kw)
 
 
-@accepts("unit_effects", "unit_effect_sd")
+@accepts("unit_effects")
 def logit(fn, design, kw):
-    """SAR and SEM logit: the reduced form, or random effects."""
-    name = fn.__name__
+    """The SAR logit: the reduced form, which takes no unit effects."""
     unit, _, _ = _validate(design)
-    if unit == "fixed":
-        raise NotImplementedError(f"{name} takes no fixed unit effects.")
-    if name == "simulate_sem_logit" and unit != "random":
-        raise NotImplementedError(
-            "The latent SEM logit is not implemented; pass unit_effects='random' "
-            "for the SEM logit with random effects."
-        )
-    kw["unit_effect_sd"] = _scale(
-        design, "unit_effect_sd", unit == "random", "unit_effects"
-    )
+    if unit is not None:
+        raise NotImplementedError("The logit simulators take no unit effects.")
     return fn, kw
 
 

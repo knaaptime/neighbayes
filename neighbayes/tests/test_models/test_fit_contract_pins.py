@@ -26,11 +26,8 @@ from neighbayes.models import (
     SLX,
     SARLogit,
     SARNegBin,
-    SEMLogit,
 )
-from neighbayes.models.cross_section.sar_logit_re import SARLogitRE
 from neighbayes.models.cross_section.sar_negbin_re import SARNegBinRE
-from neighbayes.models.cross_section.sem_logit import SEMLogitRE
 from neighbayes.models.panel._fe import (
     OLSPanelFE,
     SARPanelFE,
@@ -259,8 +256,8 @@ def test_gaussian_panel_re_fit_contract(name, ctor, data_fn, expected, sampler):
 # ---------------------------------------------------------------------------
 # Binary (Pólya-Gamma logit) cross-section family
 #
-# SARLogit/SEMLogitRE are Gibbs-only (no NUTS build).  The logit link fixes
-# the noise scale; the random-effects forms also learn the effects' sd.
+# SARLogit is Gibbs-only (no NUTS build).  The logit link fixes the noise
+# scale, so the posterior carries only ρ and β.
 # ---------------------------------------------------------------------------
 
 _N_BINARY = 24
@@ -279,13 +276,9 @@ def _binary_graph():
     return W_to_graph(make_line_W(_N_BINARY))
 
 
-# name -> (ctor, expected_varnames)
-# The canonical SARLogit is reduced-form (auto→jax): the spatial parameter
-# and β.  SARLogitRE and SEMLogitRE carry random effects, and their sd.
+# name -> (ctor, expected_varnames); the reduced-form SARLogit (auto→jax).
 BINARY_XS: dict[str, tuple] = {
     "SARLogit": (SARLogit, {"beta", "rho"}),
-    "SARLogitRE": (SARLogitRE, {"beta", "rho", "unit_effect_sd"}),
-    "SEMLogitRE": (SEMLogitRE, {"beta", "lam", "unit_effect_sd"}),
 }
 
 

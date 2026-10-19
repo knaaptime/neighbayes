@@ -96,18 +96,6 @@ EXPECTED: dict[str, dict[str, float]] = {
         "rho_lower": -0.999,
         "rho_upper": 0.999,
     },
-    "SARLogitREPriors": {
-        "rho_lower": -0.999,
-        "rho_upper": 0.999,
-        "unit_effect_sd_nu": 1.0,
-        "unit_effect_sd_scale": 1.0,
-    },
-    "SEMLogitPriors": {
-        "lam_lower": -0.999,
-        "lam_upper": 0.999,
-        "unit_effect_sd_nu": 1.0,
-        "unit_effect_sd_scale": 1.0,
-    },
     "PanelBasePriors": {"nu": NU, "sigma2_alpha": 2.0},
     "PanelOLSPriors": {"nu": NU, "sigma2_alpha": 2.0},
     "PanelSLXPriors": {"nu": NU, "sigma2_alpha": 2.0},
@@ -254,8 +242,6 @@ _GIBBS_PRIOR_STRUCTS = {
     "FlowReducedGibbsPriors",
     "ZINBGibbsPriors",
     "LogitGibbsPriors",
-    "LogitREGibbsPriors",
-    "SEMLogitGibbsPriors",
     "REGibbsPriors",
 }
 

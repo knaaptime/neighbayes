@@ -38,10 +38,9 @@ Two independent families live here:
 
 * **Internal Gibbs-sampler structs** — resolved-hyperparameter containers
   the numpy/JAX kernels consume (``GibbsBasePriors`` →
-  ``GaussianGibbsPriors`` / ``LogitGibbsPriors`` (→ ``LogitREGibbsPriors``) /
-  ``REGibbsPriors``;
+  ``GaussianGibbsPriors`` / ``LogitGibbsPriors`` / ``REGibbsPriors``;
   standalone ``GibbsPriors``, ``ReducedGibbsPriors``,
-  ``FlowReducedGibbsPriors``, ``ZINBGibbsPriors``, ``SEMLogitGibbsPriors``).  Models build these internally in
+  ``FlowReducedGibbsPriors``, ``ZINBGibbsPriors``).  Models build these internally in
   ``_fit_gibbs``; they are not part of the user-facing ``priors=`` API.
 """
 
@@ -317,8 +316,8 @@ class SARProbitPriors:
 class SARLogitPriors:
     """Priors for :class:`neighbayes.models.SARLogit`.
 
-    Like :class:`SARProbitPriors` but without ``sigma_a_sigma``
-    (the logit model has no regional random effect).  There is no
+    Like :class:`SARProbitPriors` but without ``group_effect_sd_sigma``
+    (the logit model has no group effects).  There is no
     ``sigma`` parameter because the logit link absorbs the noise scale.
     """
 
@@ -332,36 +331,6 @@ class SARLogitPriors:
 LogitPriors = SARLogitPriors
 
 
-@dataclass(frozen=True)
-class SARLogitREPriors(SARLogitPriors):
-    """Priors for the SAR logit with random effects.
-
-    ``unit_effect_sd`` (the sd σ of the random effects ν, on the log-odds
-    scale) gets a half-t(``unit_effect_sd_nu``, ``unit_effect_sd_scale``)
-    prior, half-Cauchy(1) by default — the family of
-    :class:`PanelSARREPriors`, scaled to the link.
-    """
-
-    unit_effect_sd_nu: float = 1.0
-    unit_effect_sd_scale: float = 1.0
-
-
-@dataclass
-class SEMLogitPriors:
-    """Priors for :class:`neighbayes.models.SEMLogitRE`.
-
-    Like :class:`SARLogitREPriors` but with ``lam_lower``/``lam_upper``
-    instead of ``rho_lower``/``rho_upper``.
-    """
-
-    lam_lower: float = -0.999
-    lam_upper: float = 0.999
-    beta_mu: float | Any = None  # Gelman et al. (2008), link scale
-    beta_sigma: float | Any = None
-    unit_effect_sd_nu: float = 1.0
-    unit_effect_sd_scale: float = 1.0
-
-
 # ---------------------------------------------------------------------------
 # Resolution helper
 # ---------------------------------------------------------------------------
@@ -372,7 +341,6 @@ PriorsLike = Union[
     BasePriors,
     "SARProbitPriors",
     "SARLogitPriors",
-    "SEMLogitPriors",
     None,
 ]
 
@@ -897,34 +865,6 @@ class LogitGibbsPriors(GibbsBasePriors):
 
 
 @dataclass
-class LogitREGibbsPriors(LogitGibbsPriors):
-    """:class:`LogitGibbsPriors` for the SAR logit with random effects.
-
-    ``sd_nu`` and ``sd_scale`` set the half-t prior on the sd of the random
-    effects, on the log-odds scale (half-Cauchy(1) by default).
-    """
-
-    sd_nu: float = 1.0
-    sd_scale: float = 1.0
-
-
-@dataclass
-class SEMLogitGibbsPriors:
-    """Prior hyperparameters for the SEM-logit Gibbs sampler.
-
-    ``sd_nu`` and ``sd_scale``: the half-t prior on the random effects' sd, on
-    the log-odds scale (half-Cauchy(1) by default).
-    """
-
-    beta_mu: np.ndarray | float = 0.0
-    beta_sigma: np.ndarray | float = 1e6
-    lam_lower: float = -0.999
-    lam_upper: float = 0.999
-    sd_nu: float = 1.0
-    sd_scale: float = 1.0
-
-
-@dataclass
 class REGibbsPriors(GibbsBasePriors):
     """Prior hyperparameters for RE panel Gibbs sampler.
 
@@ -961,8 +901,6 @@ __all__ = [
     "SDMTobitPriors",
     "SARProbitPriors",
     "SARLogitPriors",
-    "SARLogitREPriors",
-    "SEMLogitPriors",
     "MultilevelPriors",
     "PanelBasePriors",
     "PanelOLSPriors",
@@ -993,8 +931,6 @@ __all__ = [
     "FlowReducedGibbsPriors",
     "ZINBGibbsPriors",
     "LogitGibbsPriors",
-    "LogitREGibbsPriors",
-    "SEMLogitGibbsPriors",
     "REGibbsPriors",
     "PriorsLike",
     "resolve_priors",

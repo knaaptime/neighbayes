@@ -5,7 +5,7 @@
 
 A model class names a **process** (Aspatial, SLX, SAR, SEM, SDM, SDEM) and a
 **family** (Gaussian, Tobit, logit, probit, and the count families), plus `Flow`
-when the outcome is an origin–destination flow: `SAR`, `SEMLogit`,
+when the outcome is an origin–destination flow: `SAR`, `SARLogit`,
 `SARNegBinFlow`. The **design** is a set of arguments to the same class:
 `time_col` (formula mode) or `T` (matrix mode) makes it a panel;
 `unit_effects` (`pair_effects` for flows) is `None`, `"fixed"`, or `"random"`;
@@ -268,8 +268,7 @@ propagates. This is LeSage and Pace's (2009, §10.6) spatially structured
 effects probit (Smith and LeSage 2004), constructed as
 `SEMProbit(..., group_effects="random")`, not the standard SAR probit, which the
 package does not implement. For spatial binary outcomes prefer the
-Pólya–Gamma logit classes (`SARLogit`, with or without random effects, and
-`SEMLogit`), which are conjugate and have a Gibbs sampler.
+Pólya–Gamma `SARLogit`, which is conjugate and has a Gibbs sampler.
 
 ### Tobit (SAR Tobit)
 
@@ -457,42 +456,15 @@ Non-spatial negative binomial baseline.
 
 $$y_i \sim \operatorname{Bernoulli}(p_i), \quad \eta = (I - \rho W)^{-1}X\beta$$
 
-The reduced form: the spatial multiplier acts on the mean of the log-odds, with
-no random effects (for those, `SARLogit(unit_effects="random")` below). Pólya–Gamma
-Gibbs sampler only — no NUTS path.
+The reduced form: the spatial multiplier acts on the mean of the log-odds.
+Pólya–Gamma Gibbs sampler only — no NUTS path. Binary outcomes pin $\rho$
+slowly: expect to need about 900 units or more.
 
-### SARLogit with random effects
-
-$$y_i \sim \operatorname{Bernoulli}(p_i), \quad \eta = \rho W \eta + X\beta + \nu, \quad \nu \sim \mathcal{N}(0, \sigma^2 I)$$
-
-`SARLogit(unit_effects="random")`: unlike the reduced form, the log-odds carry a
-normal random effect per unit $\nu$ that the spatial multiplier also
-propagates. Its sd $\sigma$ (`unit_effect_sd`) is learned under a half-t prior
-(`unit_effect_sd_nu`, `unit_effect_sd_scale`; half-Cauchy(1) on the log-odds
-scale by default). It is identified only because $\nu$ propagates through the
-filter while the logistic noise does not, so in a cross-section it is weakly
-identified, and its posterior leans on the prior; $\beta$ scales with it, as
-logit coefficients do with unobserved heterogeneity. Fixing $\sigma = 1$ would
-instead pin the ratio of the propagated variance to the logistic noise's
-$\pi^2/3$. Pólya–Gamma Gibbs sampler only: $\rho$ and then $\sigma$, each
-with $\eta$ and $\beta$ integrated out, then $\beta$ and $\eta$; then two
-moves on the exact likelihood, free of the Pólya–Gamma weights: one along the
-ridge where the data hold $\beta/\sqrt{1 + \pi\sigma^2/8}$, and a joint
-rescaling of $(\eta, \beta, \sigma)$. Because the likelihood barely tells a
-small $\sigma$ from a large one with a larger $\beta$, $\sigma$'s posterior
-has a long right tail, and its effective sample (and $\beta$'s) runs well
-below $\rho$'s.
-
-### SEMLogit
-
-$$y_i \sim \operatorname{Bernoulli}(p_i), \quad \eta = X\beta + u, \quad u = \lambda W u + \nu, \quad \nu \sim \mathcal{N}(0, \sigma^2 I)$$
-
-`SEMLogit(unit_effects="random")`: the random effects carry the spatial error
-process. Their sd $\sigma$ is learned under the same prior as for the SAR logit
-with random effects, and is as weakly identified. The latent SEM logit,
-whose error process carries the logistic disturbance itself, is not implemented,
-so a bare `SEMLogit(...)` raises. Pólya–Gamma Gibbs sampler only, with the
-SAR logit's sweep.
+There is no spatial logit with random effects. In a cross-section the effects'
+sd trades off against $\beta$ (the logit's attenuation) and against $\rho$ or
+$\lambda$, and binary outcomes barely constrain the trade: on 1,225 units with
+effects of sd 2, the SEM logit's $\lambda$ came out near 0.3 against 0.5 and
+the effects' sd at 6 ± 6, held only by its prior.
 
 ## Flow Models
 
@@ -657,9 +629,8 @@ origin–destination flow models on Kronecker weights $W_d$, $W_o$, $W_w$, under
 otherwise.** For SAR/SEM/SDM/SDEM, the count families, the ZINB model and the
 Gaussian panel families, that means Gibbs unless you ask for something else.
 
-NUTS is not universally available. The Pólya–Gamma logit classes
-(`SARLogit`, with or without random effects, and `SEMLogit`) and the auxiliary-mixture
-Poisson flow classes build no PyMC graph at all, and `fit(sampler="nuts")`
+NUTS is not universally available. The Pólya–Gamma `SARLogit` and the
+auxiliary-mixture Poisson flow classes build no PyMC graph at all, and `fit(sampler="nuts")`
 raises `NotImplementedError`. Robust (Student-t) SAR/SEM/SDM/SDEM and
 Gaussian panel FE models keep Gibbs: the Student-t error is sampled as a
 normal scale mixture with the same fixed `nu` the NUTS path uses. Robust

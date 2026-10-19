@@ -43,8 +43,6 @@ ROUTES = [
     (m.SAR, {"time_col": "year", "unit_col": "id"}, "SARPanelFE", 0),
     # Logit, count, and Tobit families
     (m.SARLogit, {}, "SARLogit", None),
-    (m.SARLogit, {"unit_effects": "random"}, "SARLogitRE", None),
-    (m.SEMLogit, {"unit_effects": "random"}, "SEMLogitRE", None),
     (m.SARNegBin, {}, "SARNegBin", None),
     (m.SARNegBin, {"unit_effects": "random"}, "SARNegBinRE", None),
     (m.SARNegBin, PANEL, "SARNegBinPanelRE", 0),
@@ -103,7 +101,7 @@ def test_routes(cls, kwargs, impl, effects):
 
 
 REFUSALS = [
-    (m.SEMLogit, {}, NotImplementedError, "latent SEM logit"),
+    (m.SARLogit, {"unit_effects": "random"}, NotImplementedError, "random unit"),
     (m.SEMProbit, {"groups": [0, 1]}, NotImplementedError, "latent SEM probit"),
     (m.SEMProbit, {"group_effects": "random"}, ValueError, "group_col"),
     (m.ZINB, {}, NotImplementedError, "panels only"),

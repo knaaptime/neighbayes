@@ -6,15 +6,12 @@ from .ols import OLS as OLS
 from .sar import SAR as SAR
 from .sar_hurdle import SARHurdleNegBin as SARHurdleNegBin
 from .sar_logit import SARLogit as SARLogit
-from .sar_logit_re import SARLogitRE as SARLogitRE
 from .sar_negbin import SARNegBin as SARNegBin
 from .sar_negbin_re import SARNegBinRE as SARNegBinRE
 from .sar_zinb import SARZINB as SARZINB
 from .sdem import SDEM as SDEM
 from .sdm import SDM as SDM
 from .sem import SEM as SEM
-from .sem_logit import SEMLogit as SEMLogit
-from .sem_logit import SEMLogitRE as SEMLogitRE
 from .sem_probit import SEMProbit as SEMProbit
 from .sem_probit import SEMProbitRE as SEMProbitRE
 from .slx import SLX as SLX

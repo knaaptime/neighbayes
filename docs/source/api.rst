@@ -8,7 +8,7 @@ API reference
 Models
 ------
 
-A model class names a process and a family: ``SAR``, ``SEMLogit``,
+A model class names a process and a family: ``SAR``, ``SARLogit``,
 ``SARNegBinFlow``. Panel structure, effects, dynamics, and the flow restriction
 are arguments to the same class:
 
@@ -48,7 +48,6 @@ Censored and binary
    SDMTobit
    Logit
    SARLogit
-   SEMLogit
    SEMProbit
 
 Counts
@@ -103,7 +102,6 @@ Default Gibbs Priors
    FlowReducedGibbsPriors
    ZINBGibbsPriors
    LogitGibbsPriors
-   SEMLogitGibbsPriors
    REGibbsPriors
 
 Default NUTS Priors
@@ -127,7 +125,6 @@ Default NUTS Priors
    SDMTobitPriors
    SARProbitPriors
    SARLogitPriors
-   SEMLogitPriors
    PanelBasePriors
    PanelOLSPriors
    PanelSLXPriors
@@ -350,7 +347,6 @@ Data Generating Processes
    simulate_sdm_tobit
    simulate_logit
    simulate_sar_logit
-   simulate_sem_logit
    simulate_sem_probit
    simulate_negbin
    simulate_sar_negbin

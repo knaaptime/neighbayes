@@ -19,7 +19,7 @@ def test_one_simulator_per_public_class():
     import neighbayes.models as m
 
     classes = {n for n in m.__all__ if n != "Level"}
-    assert len(d.__all__) == len(classes) == 28
+    assert len(d.__all__) == len(classes) == 27
 
 
 def test_signature_shows_design_arguments():
@@ -68,18 +68,10 @@ def test_count_panels_and_cross_section_random_effects():
     assert xs["params_true"]["sigma2"] == pytest.approx(0.09)
 
 
-def test_sar_logit_defaults_to_the_reduced_form():
-    public = d.simulate_sar_logit(n_side=5, seed=3)
-    reduced = d.simulate_sar_logit.__wrapped__(n_side=5, seed=3, unit_effect_sd=0.0)
-    np.testing.assert_array_equal(public["y"], reduced["y"])
-
-
-@pytest.mark.parametrize("fn", ["simulate_sar_logit", "simulate_sem_logit"])
-def test_logit_random_effects_take_their_sd(fn):
-    out = getattr(d, fn)(n_side=5, seed=3, unit_effects="random", unit_effect_sd=0.8)
-    assert out["params_true"]["unit_effect_sd"] == pytest.approx(0.8)
-    with pytest.raises(ValueError, match="unit_effect_sd needs unit_effects"):
-        d.simulate_sar_logit(n_side=5, seed=3, unit_effect_sd=0.8)
+def test_logit_takes_no_unit_effects():
+    for fn in (d.simulate_sar_logit, d.simulate_logit):
+        with pytest.raises(NotImplementedError, match="no unit effects"):
+            fn(n_side=4, seed=3, unit_effects="random")
 
 
 def test_flow_routes():
@@ -108,7 +100,7 @@ REFUSALS = [
         TypeError,
         "unit_effect_sd",
     ),
-    (d.simulate_sar_logit, {"structural": True}, TypeError, "unit_effects='random'"),
+    (d.simulate_sar_logit, {"structural": True}, TypeError, "reduced form only"),
     (d.simulate_sar_negbin, {"sigma2": 0.5}, TypeError, "unit_effect_sd"),
     (d.simulate_sar, {"N": 16}, ValueError, "N and T are required"),
     (d.simulate_sar, {"unit_effects": "fixed"}, NotImplementedError, "only in a panel"),
@@ -130,7 +122,6 @@ REFUSALS = [
         NotImplementedError,
         "restricted",
     ),
-    (d.simulate_sem_logit, {"n_side": 4}, NotImplementedError, "latent SEM logit"),
     (d.simulate_sem_probit, {"n_side": 3}, NotImplementedError, "latent SEM probit"),
     (d.simulate_zinb, {"n_side": 4}, NotImplementedError, "panels only"),
     (d.simulate_negbin, {"rho": 0.3}, TypeError, "no spatial dependence"),

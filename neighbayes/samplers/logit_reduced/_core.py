@@ -17,8 +17,6 @@ adaptive slice sampler), differing only in the Pólya–Gamma augmentation:
 * the working response is :math:`s = \kappa/\omega` with :math:`\kappa = y - \tfrac12`
   (no ``log α`` offset);
 * there is **no dispersion parameter α** (hence no α slice).
-
-Contrast with :mod:`..logit` (the SAR and SEM logit with random effects).
 """
 
 from __future__ import annotations
@@ -69,10 +67,9 @@ class ReducedLogitGibbsState:
     omega: np.ndarray
 
 
-# The pointwise Bernoulli-logit log-likelihood is shared with the structural
-# sampler — re-exported here so this module's own callers (and its tests) keep
-# importing it from where they always have.
-from ..logit._core import _logit_loglik_pointwise  # noqa: E402
+def _logit_loglik_pointwise(y: np.ndarray, eta: np.ndarray) -> np.ndarray:
+    """Pointwise Bernoulli-logit log-likelihood ``y η − log(1 + e^η)``."""
+    return y * eta - np.logaddexp(0.0, eta)
 
 
 def _sample_omega(eta: np.ndarray, *, rng: np.random.Generator) -> np.ndarray:

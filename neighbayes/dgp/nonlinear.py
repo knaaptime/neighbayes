@@ -230,18 +230,14 @@ def simulate_sar_logit(
     contiguity: str = "queen",
     create_gdf: bool = False,
     geometry_type: str = "polygon",
-    unit_effect_sd: float = 0.0,
     **kwargs,
 ) -> dict:
     """Simulate SAR-logit binary outcome data.
 
     DGP
     ---
-    ``eta = (I - rho W)^{-1} (X beta + nu)``, ``nu ~ N(0, unit_effect_sd² I)``,
-    ``y ~ Bernoulli(logit^{-1}(eta))``.  With ``unit_effects="random"`` that is
-    the SAR logit with random effects; without them ``nu = 0`` and
-    ``eta = (I - rho W)^{-1} X beta``, the reduced-form
-    :class:`~neighbayes.models.SARLogit`.
+    ``eta = (I - rho W)^{-1} X beta``, ``y ~ Bernoulli(logit^{-1}(eta))``: the
+    reduced form :class:`~neighbayes.models.SARLogit` fits.
 
     Parameters
     ----------
@@ -266,9 +262,6 @@ def simulate_sar_logit(
     geometry_type : {"point", "polygon"}, default="polygon"
         Geometry to generate when ``create_gdf=True`` and no source
         ``gdf`` is provided.
-    unit_effect_sd : float
-        The random effects' sd, set by the design arguments
-        (``unit_effects="random"``, default 0.5); 0 for the reduced form.
 
     Returns
     -------
@@ -288,10 +281,8 @@ def simulate_sar_logit(
 
     X = make_design_matrix(rng, n_obs, k=max(len(beta) - 1, 0), add_intercept=True)
 
-    # Latent index eta = (I - rho W)^{-1} (X beta + nu); nu = 0 in the reduced form.
-    nu = unit_effect_sd * rng.standard_normal(n_obs) if unit_effect_sd > 0 else 0.0
-    Xbeta = X @ beta
-    eta = spatial_filter_factor(W_sparse, rho)(Xbeta + nu)
+    # Latent index eta = (I - rho W)^{-1} X beta
+    eta = spatial_filter_factor(W_sparse, rho)(X @ beta)
 
     # Binary response: y ~ Bernoulli(logit^{-1}(eta))
     probs = 1.0 / (1.0 + np.exp(-eta))
@@ -306,102 +297,6 @@ def simulate_sar_logit(
         "params_true": {
             "rho": rho,
             "beta": beta,
-            "unit_effect_sd": float(unit_effect_sd),
-        },
-    }
-    return _attach_optional_gdf(
-        out,
-        source_gdf=gdf,
-        create_gdf=create_gdf,
-        geometry_type=geometry_type,
-    )
-
-
-@simulator(logit)
-def simulate_sem_logit(
-    W=None,
-    gdf=None,
-    n_side: int | None = None,
-    lam: float = 0.35,
-    beta: np.ndarray | None = None,
-    rng: np.random.Generator | None = None,
-    seed: int | None = None,
-    contiguity: str = "queen",
-    create_gdf: bool = False,
-    geometry_type: str = "polygon",
-    unit_effect_sd: float = 0.5,
-    **kwargs,
-) -> dict:
-    """Simulate SEM-logit binary outcome data.
-
-    DGP
-    ---
-    ``eta = X beta + (I - lam W)^{-1} nu``, ``nu ~ N(0, unit_effect_sd² I)``,
-    ``y ~ Bernoulli(logit^{-1}(eta))``.
-
-    Parameters
-    ----------
-    W, gdf
-        Spatial unit structure. If ``W`` is provided it takes precedence;
-        otherwise ``gdf`` is used with ``contiguity``.
-    n_side : int, optional
-        Side length of the square rook grid used when neither ``W`` nor
-        ``gdf`` is supplied (``n_side**2`` units).
-    lam : float, default 0.35
-        Spatial error parameter.
-    beta : np.ndarray, optional
-        Coefficients including intercept. Defaults to ``[0.3, 1.0]``.
-    unit_effect_sd : float, default 0.5
-        The random effects' sd (``unit_effect_sd`` of the design arguments).
-    rng, seed
-        Random state controls.
-    contiguity : str, default "queen"
-        GeoDataFrame neighbor rule when ``W`` is omitted.
-    create_gdf : bool, default=False
-        If ``True`` (or a source ``gdf`` is supplied), return a
-        GeoDataFrame carrying ``y`` and ``X_*`` columns instead of the
-        dict, matching the other cross-sectional simulators.
-    geometry_type : {"point", "polygon"}, default="polygon"
-        Geometry to generate when ``create_gdf=True`` and no source
-        ``gdf`` is provided.
-
-    Returns
-    -------
-    dict or geopandas.GeoDataFrame
-        Dict with keys ``y``, ``X``, ``W_sparse``, ``W_graph``,
-        ``eta_true``, ``params_true``.  When ``create_gdf=True`` (or a
-        source ``gdf`` is supplied) a GeoDataFrame with ``y`` and
-        ``X_*`` columns is returned instead.
-    """
-    rng = ensure_rng(rng, seed)
-    W_sparse, Wg = resolve_weights(W=W, gdf=gdf, n_side=n_side, contiguity=contiguity)
-    n_obs = W_sparse.shape[0]
-
-    if beta is None:
-        beta = np.array([0.3, 1.0], dtype=float)
-    beta = np.asarray(beta, dtype=float)
-
-    X = make_design_matrix(rng, n_obs, k=max(len(beta) - 1, 0), add_intercept=True)
-
-    # Latent index: eta = X beta + (I - lam W)^{-1} nu
-    nu = unit_effect_sd * rng.standard_normal(n_obs)
-    Xbeta = X @ beta
-    eta = Xbeta + spatial_filter_factor(W_sparse, lam)(nu)
-
-    # Binary response: y ~ Bernoulli(logit^{-1}(eta))
-    probs = 1.0 / (1.0 + np.exp(-eta))
-    y = rng.binomial(1, probs).astype(float)
-
-    out = {
-        "y": y,
-        "X": X,
-        "W_sparse": W_sparse,
-        "W_graph": Wg,
-        "eta_true": eta,
-        "params_true": {
-            "lam": lam,
-            "beta": beta,
-            "unit_effect_sd": float(unit_effect_sd),
         },
     }
     return _attach_optional_gdf(
@@ -449,6 +344,6 @@ def simulate_sem_probit(
     )
 
 
-@aspatial(simulate_sar_logit, {"rho": 0.0}, xs_random=False)
+@aspatial(simulate_sar_logit, {"rho": 0.0})
 def simulate_logit():
     """Simulate an aspatial logit: :func:`simulate_sar_logit` with ``rho = 0``."""

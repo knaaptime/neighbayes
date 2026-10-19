@@ -31,8 +31,6 @@ from neighbayes.tests.helpers import (
     _as_sparse,
     make_rook_W,
     make_sar_logit_data,
-    make_sar_logit_re_data,
-    make_sem_logit_data,
 )
 
 pytestmark = [pytest.mark.slow, pytest.mark.recovery]
@@ -49,7 +47,6 @@ SIDE_NB = 32
 
 # True parameters — logit (matching test_spatial_logit_recovery.py)
 RHO_LOGIT = 0.4
-LAM_LOGIT = 0.4
 BETA_LOGIT = np.array([0.3, 1.0])
 
 # True parameters — NB (matching test_sar_negbin_re.py)
@@ -73,7 +70,6 @@ CHAINS = 2
 # Tolerances — matching the per-model recovery tests exactly
 TOL_SPATIAL_LOGIT = 0.15
 TOL_BETA_LOGIT = 0.25
-TOL_BETA_INTERCEPT_SEM = 0.50
 
 TOL_SPATIAL_NB = 0.20
 TOL_BETA_NB = 0.40
@@ -132,77 +128,6 @@ def test_sar_logit_backend_recovery(sar_logit_data, backend):
         assert abs(bh - bt) < TOL_BETA_LOGIT, (
             f"SARLogit[{backend}] beta[{j}]: {bh:.3f} vs {bt}"
         )
-
-
-# ======================================================================
-# SARLogitRE (latent-field)
-# ======================================================================
-
-
-@pytest.fixture(scope="module")
-def sar_logit_struct_data():
-    """Structural-form SAR-logit data (with noise) on a 30×30 rook grid."""
-    rng = np.random.default_rng(42)
-    W_dense = make_rook_W(SIDE_LOGIT)
-    y, X = make_sar_logit_re_data(rng, W_dense, rho=RHO_LOGIT, beta=BETA_LOGIT)
-    return y, X, W_to_graph(W_dense)
-
-
-@pytest.mark.parametrize("backend", BACKENDS)
-def test_sar_logit_struct_backend_recovery(sar_logit_struct_data, backend):
-    """SARLogitRE recovers ρ and β on both backends."""
-    from neighbayes.models import SARLogit
-
-    y, X, W = sar_logit_struct_data
-    idata = SARLogit(unit_effects="random", y=y, X=X, W=W).fit(
-        backend=backend, **_fit_kwargs(backend)
-    )
-
-    rho_hat = float(idata.posterior["rho"].mean())
-    beta_hat = idata.posterior["beta"].mean(("chain", "draw")).values
-
-    assert abs(rho_hat - RHO_LOGIT) < TOL_SPATIAL_LOGIT, (
-        f"SARLogitRE[{backend}] rho: {rho_hat:.3f} vs {RHO_LOGIT}"
-    )
-    for j, (bh, bt) in enumerate(zip(beta_hat, BETA_LOGIT)):
-        assert abs(bh - bt) < TOL_BETA_LOGIT, (
-            f"SARLogitRE[{backend}] beta[{j}]: {bh:.3f} vs {bt}"
-        )
-
-
-# ======================================================================
-# SEMLogitRE (spatial error)
-# ======================================================================
-
-
-@pytest.fixture(scope="module")
-def sem_logit_data():
-    """SEM-logit data on a 30×30 rook grid."""
-    rng = np.random.default_rng(42)
-    W_dense = make_rook_W(SIDE_LOGIT)
-    y, X = make_sem_logit_data(rng, W_dense, lam=LAM_LOGIT, beta=BETA_LOGIT)
-    return y, X, W_to_graph(W_dense)
-
-
-@pytest.mark.parametrize("backend", BACKENDS)
-def test_sem_logit_backend_recovery(sem_logit_data, backend):
-    """SEMLogitRE recovers λ and β on both backends."""
-    from neighbayes.models import SEMLogit
-
-    y, X, W = sem_logit_data
-    idata = SEMLogit(unit_effects="random", y=y, X=X, W=W).fit(
-        backend=backend, **_fit_kwargs(backend)
-    )
-
-    lam_hat = float(idata.posterior["lam"].mean())
-    beta_hat = idata.posterior["beta"].mean(("chain", "draw")).values
-
-    assert abs(lam_hat - LAM_LOGIT) < TOL_SPATIAL_LOGIT, (
-        f"SEMLogitRE[{backend}] lam: {lam_hat:.3f} vs {LAM_LOGIT}"
-    )
-    for j, (bh, bt) in enumerate(zip(beta_hat, BETA_LOGIT)):
-        tol = TOL_BETA_INTERCEPT_SEM if j == 0 else TOL_BETA_LOGIT
-        assert abs(bh - bt) < tol, f"SEMLogitRE[{backend}] beta[{j}]: {bh:.3f} vs {bt}"
 
 
 # ======================================================================
@@ -385,8 +310,6 @@ def test_sar_logit_backend_mixing(sar_logit_data, backend):
 # draws, n = 900/1024):
 #
 #     SARLogit             rho 0.0006   beta 0.0060
-#     SARLogitRE   rho 0.0007   beta 0.0098
-#     SEMLogitRE             lam 0.0161   beta 0.0064
 #     SARNegBin            rho 0.0020   beta 0.0029   alpha 0.0054
 #     SARNegBinRE  rho 0.0013   beta 0.0018   alpha 0.0038
 #
@@ -490,8 +413,6 @@ def _assert_backends_agree(posteriors, tols, label):
 # (model name, unit effects, fixture, tolerances)
 _AGREEMENT_CASES = [
     ("SARLogit", None, "sar_logit_data", {"rho": 0.05, "beta": 0.05}),
-    ("SARLogit", "random", "sar_logit_struct_data", {"rho": 0.05, "beta": 0.05}),
-    ("SEMLogit", "random", "sem_logit_data", {"lam": 0.06, "beta": 0.05}),
     (
         "SARNegBin",
         None,

@@ -1,7 +1,7 @@
 """Design dispatch for the public model classes.
 
 A public class names a process and a family (ADR 0002): ``SAR``, ``SARNegBin``,
-``SEMLogit``, ``SARNegBinFlow``.  Panel structure, effects, dynamics, and the
+``SEMProbit``, ``SARNegBinFlow``.  Panel structure, effects, dynamics, and the
 flow restriction are constructor arguments:
 
 ``time_col`` / ``T``
@@ -202,12 +202,7 @@ def gaussian(cls, kw: dict):
 # fixed in the count families.
 _DISCRETE = {
     "Logit": {"xs": True},
-    "SARLogit": {"xs": True, "xs_random": "cross_section.sar_logit_re:SARLogitRE"},
-    "SEMLogit": {
-        "xs": "The latent SEM logit is not implemented; pass unit_effects='random' "
-        "for the SEM logit with random effects",
-        "xs_random": "cross_section.sem_logit:SEMLogitRE",
-    },
+    "SARLogit": {"xs": True},
     "NegBin": {"xs": True, "panel": "panel._count:NegBinPanelRE"},
     "SARNegBin": {
         "xs": True,
