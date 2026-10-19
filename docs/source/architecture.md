@@ -203,7 +203,7 @@ know about it:
 : Which of `{"jax", "numpy"}` the family supports, and which one `"auto"` should prefer.
   Every family with a JAX sampler prefers it. The JAX path solves with sparse
   factorizations (sparsax), compiles once per model structure, and draws Pólya–Gamma
-  variables exactly (pgjax), where the NumPy path's draws carry a known bias in the
+  variables exactly (augax), where the NumPy path's draws carry a known bias in the
   `polyagamma` package and warn. The random-effects, count-panel and hurdle families
   are NumPy-only.
 

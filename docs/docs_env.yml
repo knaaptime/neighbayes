@@ -25,7 +25,7 @@ dependencies:
   - pip
   - pip:
     - sparsax
-    - pgjax
+    - augax
     - blackjax
     - nutpie
     - numpyro

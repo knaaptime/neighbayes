@@ -15,6 +15,7 @@ The probit link is used directly via ``P(y=1) = Phi(X\\beta + \\Delta a)``.
 
 from __future__ import annotations
 
+import inspect
 from typing import Any, Optional, Union
 
 import numpy as np
@@ -29,12 +30,12 @@ from ..._backends.sampler_helpers import (
 )
 from ..._lazy_deps import pm, xr
 from .._base._shared import SharedSpatialMethods
-from .._design import FacadeMeta, sem_probit
+from .._design import _is_panel, _pop_design
 from ..priors import SARProbitPriors, priors_as_dict, resolve_priors
 
 
-class SEMProbitRE(SharedSpatialMethods):
-    """Bayesian spatial probit with regional random effects.
+class SEMProbit(SharedSpatialMethods):
+    """SEM probit with random group effects (LeSage and Pace 2009, §10.6).
 
     A binary-response model in which the latent utility includes a
     spatially autoregressive regional random effect. Each observation
@@ -57,6 +58,10 @@ class SEMProbitRE(SharedSpatialMethods):
     (I_m - \\lambda W)^{-T})`. The marginal choice probability is
     :math:`P(y_i = 1 \\mid \\beta, a) = \\Phi(x_i'\\beta + a_{r(i)})`.
 
+    The group effects are those of Smith and LeSage (2004).  The latent SEM
+    probit, whose error process carries the probit disturbance itself, is not
+    implemented, so the group effects are required.
+
     Parameters
     ----------
     formula : str, optional
@@ -75,6 +80,8 @@ class SEMProbitRE(SharedSpatialMethods):
         object is **not** accepted directly; pass ``w.sparse`` or convert with
         ``libpysal.graph.Graph.from_W(w)``.
         W should be row-standardized; a :class:`UserWarning` is raised if not.
+    group_effects : {"random"}
+        Required: the random group effects.
     group_col : str, optional
         Group identifier column in ``data`` (formula mode).
     groups : array-like, optional
@@ -107,7 +114,7 @@ class SEMProbitRE(SharedSpatialMethods):
 
     **Robust regression**
 
-    ``robust=True`` is not supported for SEMProbitRE. The probit link
+    ``robust=True`` is not supported for SEMProbit. The probit link
     function uses a Normal CDF; a robust version would require a Student-t
     CDF link, which is not yet implemented. Use ``robust=True`` with
     Gaussian models (OLS, SAR, SEM, etc.) instead.
@@ -120,12 +127,24 @@ class SEMProbitRE(SharedSpatialMethods):
         y: Optional[Union[np.ndarray, pd.Series]] = None,
         X: Optional[Union[np.ndarray, pd.DataFrame]] = None,
         W: Optional[Union[Graph, np.ndarray]] = None,
+        *,
+        group_effects: Optional[str] = None,
         group_col: Optional[str] = None,
         groups: Optional[Union[np.ndarray, pd.Series]] = None,
         group_sizes: Optional[Union[np.ndarray, list[int]]] = None,
         priors: Optional[dict] = None,
         robust: bool = False,
+        **design,
     ):
+        self._resolve_design(
+            dict(
+                design,
+                group_effects=group_effects,
+                group_col=group_col,
+                groups=groups,
+                group_sizes=group_sizes,
+            )
+        )
         if W is None:
             raise ValueError("W is required.")
 
@@ -181,6 +200,29 @@ class SEMProbitRE(SharedSpatialMethods):
                 f"Number of observed groups ({len(np.unique(self._region_codes))}) "
                 f"must match W dimension ({self._m})."
             )
+
+    @classmethod
+    def _resolve_design(cls, kw: dict) -> tuple[str, dict]:
+        """The one design: random group effects, in a cross-section."""
+        unit, time, dynamic = _pop_design(kw)
+        group_effects = kw.pop("group_effects", None)
+        if unit is not None or time or dynamic or _is_panel(kw):
+            raise NotImplementedError("SEMProbit takes group effects only.")
+        unknown = set(kw) - {"group_col", "groups", "group_sizes"}
+        if unknown:
+            raise TypeError(f"SEMProbit got unexpected arguments {sorted(unknown)}.")
+        if group_effects != "random":
+            raise NotImplementedError(
+                "The latent SEM probit is not implemented; pass group_col (or "
+                "groups) and group_effects='random' for the SEM probit with "
+                "random group effects."
+            )
+        if all(kw.get(k) is None for k in ("group_col", "groups", "group_sizes")):
+            raise ValueError(
+                "Group effects need group_col (formula mode), or groups or "
+                "group_sizes (matrix mode)."
+            )
+        return "random", kw
 
     @staticmethod
     def _as_dense_region_W(W: Union[Graph, Any, np.ndarray]) -> np.ndarray:
@@ -251,7 +293,7 @@ class SEMProbitRE(SharedSpatialMethods):
         if self.robust:
             raise NotImplementedError(
                 "Robust (Student-t) error distribution is not supported for "
-                "SEMProbitRE. The probit link function uses a Normal CDF; "
+                "SEMProbit. The probit link function uses a Normal CDF; "
                 "a robust version would require a t-link (Student-t CDF) which "
                 "is not yet implemented. Use robust=True with Gaussian models "
                 "(OLS, SAR, SEM, etc.) instead."
@@ -483,35 +525,8 @@ class SEMProbitRE(SharedSpatialMethods):
         return df
 
 
-class SEMProbit(metaclass=FacadeMeta):
-    r"""SEM probit with random group effects (LeSage and Pace 2009, §10.6).
-
-    Observations nest in groups, and the groups' random effects follow a SAR
-    process on the group-level weights (Smith and LeSage 2004):
-
-    .. math::
-
-        y_{ik} = 1[z_{ik} > 0], \quad z = X\beta + \Delta\theta + \varepsilon,
-        \quad \theta = \lambda W \theta + u, \quad u \sim N(0, \sigma_u^2 I).
-
-    The latent SEM probit, whose error process carries the probit disturbance
-    itself, is not implemented, so the group effects are required.
-
-    Parameters
-    ----------
-    group_effects : {"random"}
-        Required.
-    group_col : str, optional
-        Group identifier column in ``data`` (formula mode).
-    groups : array-like, optional
-        Group identifier per observation (matrix mode).
-    group_sizes : array-like, optional
-        Observations per group, in sorted group order (matrix mode, in place of
-        ``groups``).
-    W : libpysal.graph.Graph or scipy.sparse matrix
-        Group-level ``m × m`` weights.
-    **kwargs
-        ``formula``, ``data``, ``y``, ``X``, ``priors``, and ``robust``.
-    """
-
-    _dispatch = classmethod(sem_probit)
+# The facade metaclass's ``__call__`` would otherwise hide the constructor's
+# arguments from :func:`inspect.signature`.
+SEMProbit.__signature__ = inspect.Signature(
+    list(inspect.signature(SEMProbit.__init__).parameters.values())[1:]
+)

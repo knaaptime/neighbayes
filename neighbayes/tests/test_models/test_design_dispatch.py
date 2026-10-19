@@ -1,9 +1,9 @@
 """The public classes resolve their design arguments.
 
 ADR 0002: a public class names a process and a family; panel structure,
-effects, dynamics, and the flow restriction are arguments.  A Gaussian, Tobit
-or count process class implements every design itself; the other families'
-public classes still dispatch to implementation classes.  These tests pin the table from public call
+effects, dynamics, and the flow restriction are arguments.  A Gaussian, Tobit,
+count, logit or probit class implements every design itself; the flow
+families' public classes still dispatch to implementation classes.  These tests pin the table from public call
 to design (or implementation class) and effects code, and the combinations that
 must raise.
 """
@@ -65,10 +65,11 @@ ROUTES = [
     (m.HurdleNegBin, PANEL, "panel", 0),
     (m.SARHurdleNegBin, {**PANEL, "unit_effects": "random"}, "panel", 1),
     # Logit, Tobit and probit families
-    (m.SARLogit, {}, "SARLogit", None),
+    (m.SARLogit, {}, "static", None),
+    (m.Logit, {}, "static", None),
     (m.SARTobit, PANEL, "static", None),
     (m.SEMTobit, PANEL, "static", None),
-    (m.SEMProbit, {"group_effects": "random", "groups": [0, 1]}, "SEMProbitRE", None),
+    (m.SEMProbit, {"group_effects": "random", "groups": [0, 1]}, "random", None),
     # Flows
     (m.SARFlow, {}, "SARFlow", None),
     (m.SARFlow, {"separable": True}, "SARFlowSeparable", None),
@@ -105,7 +106,13 @@ def test_routes(cls, kwargs, impl, effects):
 
 
 REFUSALS = [
-    (m.SARLogit, {"unit_effects": "random"}, NotImplementedError, "random unit"),
+    (m.SARLogit, {"unit_effects": "random"}, NotImplementedError, "no unit effects"),
+    (
+        m.SEMProbit,
+        {"group_effects": "random", "groups": [0], "T": 2},
+        NotImplementedError,
+        "group effects only",
+    ),
     (m.SEMProbit, {"groups": [0, 1]}, NotImplementedError, "latent SEM probit"),
     (m.SEMProbit, {"group_effects": "random"}, ValueError, "group_col"),
     (m.ZINB, {}, NotImplementedError, "panels only"),

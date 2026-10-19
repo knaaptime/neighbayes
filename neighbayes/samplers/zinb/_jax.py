@@ -12,7 +12,7 @@ Composes the two reduced-form jax samplers already built:
   so ``κ = 0`` there);
 
 linked by the latent indicator ``z``.  Both equations use sparsax-LU solves
-(never densified), the on-device Pólya-Gamma draw (pgjax), and run the chains in
+(never densified), the on-device Pólya-Gamma draw (augax), and run the chains in
 parallel threads.
 """
 

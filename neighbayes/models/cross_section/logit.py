@@ -15,12 +15,12 @@ import numpy as np
 import pytensor.tensor as pt
 
 from ..._lazy_deps import pm
-from .._design import discrete
+from .._mixins._designs import BinaryDesigns
 from ..base import SpatialModel
 from ..priors import SARLogitPriors
 
 
-class Logit(SpatialModel):
+class Logit(BinaryDesigns, SpatialModel):
     r"""Bayesian (non-spatial) logistic regression.
 
     .. math::
@@ -56,8 +56,6 @@ class Logit(SpatialModel):
           weakly-informative scale.
     """
 
-    _dispatch = classmethod(discrete)
-
     _priors_cls = SARLogitPriors
     _spatial_params: tuple[str, ...] = ()
     _lag_terms: tuple[str, ...] = ()
@@ -65,16 +63,6 @@ class Logit(SpatialModel):
     _has_wx_in_beta: bool = False
     _gibbs_class: str | None = None
     _model_type: str = "logit"
-    _likelihood: str = "binary"
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        if self.robust:
-            raise NotImplementedError("robust=True is not supported for Logit.")
-
-        if not np.isin(self._y, [0.0, 1.0]).all():
-            raise ValueError("Logit requires binary y with values in {0, 1}.")
 
     def _build_pymc_model(self) -> pm.Model:
         X = self._X

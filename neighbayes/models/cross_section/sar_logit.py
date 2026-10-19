@@ -52,12 +52,12 @@ from ...samplers.negbin_reduced._core import (
     ReducedGibbsCache,
     _make_cholmod_pattern,
 )
-from .._design import discrete
+from .._mixins._designs import BinaryDesigns
 from ..base import SpatialModel
 from ..priors import LogitGibbsPriors, SARLogitPriors
 
 
-class SARLogit(SpatialModel):
+class SARLogit(BinaryDesigns, SpatialModel):
     """Bayesian reduced-form SAR-logit with Pólya–Gamma Gibbs sampler.
 
     Parameters
@@ -125,28 +125,16 @@ class SARLogit(SpatialModel):
     always h = 1 (one trial per observation).
     """
 
-    _dispatch = classmethod(discrete)
-
     _spatial_params: tuple[str, ...] = ("rho",)
     _lag_terms: tuple[str, ...] = ("Wy",)
     _jacobian_param: str | None = "rho"
     _gibbs_class: str | None = None  # Gibbs-only, no NUTS
     _model_type: str = "sar_logit"
-    _likelihood: str = "binary"
     _gibbs_key: tuple[str, str] | None = ("binary", "cross_section")
     _priors_cls = SARLogitPriors
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        if self.robust:
-            raise NotImplementedError("robust=True is not supported for SARLogit.")
-
-        # Validate y is binary
-        if not np.isin(self._y, [0.0, 1.0]).all():
-            raise ValueError("y must be binary with values in {0, 1}.")
-
-        # Precompute logdet callable for the ρ slice sampler.
+    def _init_static(self) -> None:
+        # The ρ slice sampler's log-determinant.
         self._logdet_fn = self._logdet_numpy_fn
 
     def _initialize_from_ols(self, rng):

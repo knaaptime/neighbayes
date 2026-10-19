@@ -8,7 +8,6 @@ from libpysal.graph import Graph
 from scipy import sparse as sp
 
 from neighbayes.models import OLS, SAR, SDEM, SDM, SEM, SLX, SEMProbit
-from neighbayes.models.cross_section.sem_probit import SEMProbitRE
 from neighbayes.models.cross_section.tobit import SARTobit
 from neighbayes.models.priors import (
     BasePriors,

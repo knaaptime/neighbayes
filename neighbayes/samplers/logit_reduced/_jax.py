@@ -141,7 +141,7 @@ def _make_reduced_logit_gibbs_step(
         _series_radius_jax,
     )
 
-    # Pólya-Gamma: pgjax (on-device, exact) or numpy C extension fallback.
+    # Pólya-Gamma: augax (on-device, exact) or numpy C extension fallback.
     _draw_pg = make_pg_draw()
 
     _reuse_threshold = jnp.float64(0.15) if krylov_reuse else jnp.float64(0.0)

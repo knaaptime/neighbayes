@@ -130,7 +130,7 @@ def _simulate_sar_probit(
     seed: int | None = None,
     contiguity: str = "queen",
 ) -> dict:
-    """Simulate SEMProbitRE-style binary outcome data.
+    """Simulate SEMProbit-style binary outcome data.
 
     DGP
     ---

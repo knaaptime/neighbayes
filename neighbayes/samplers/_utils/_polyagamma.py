@@ -21,7 +21,7 @@ Negative-binomial augmentation draws at ``h = y + α``, which usually falls in
 that range, so every NumPy Gibbs sampler for counts is exposed; logit draws
 at ``h = 1`` are exact.  A fix has been submitted upstream.  Until a release
 carries it, :func:`sample_polyagamma` warns when a draw falls in the biased
-range, and the JAX backend, whose sampler (pgjax) is exact, is the remedy.
+range, and the JAX backend, whose sampler (augax) is exact, is the remedy.
 
 If ``polyagamma`` is unavailable, an ``ImportError`` is raised with a
 helpful message.
@@ -42,7 +42,7 @@ BIAS_MESSAGE = (
     "Pólya–Gamma draws on the NumPy backend come from the polyagamma package, "
     "whose sampler is biased for shape h < 8 (mean by up to 1%, variance by up "
     "to 5%); negative-binomial, ZINB and hurdle samplers draw at h = y + α. Use "
-    "backend='jax' with pgjax installed, whose sampler is exact."
+    "backend='jax' with augax installed, whose sampler is exact."
 )
 
 

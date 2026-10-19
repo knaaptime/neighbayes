@@ -319,11 +319,11 @@ def make_pg_draw():
     Cached, so every caller gets the same function — a sweep closing over it
     keeps a stable identity, and its compiled program can be reused.
 
-    Prefers ``pgjax.pg_sample`` (on-device, no host round-trip) when
+    Prefers ``augax.pg_sample`` (on-device, no host round-trip) when
     installed — it dominates every alternative on speed, works inside
     ``jax.lax.scan``, and is exact for any ``h`` (integer or non-integer).
     Falls back to the ``polyagamma`` C extension via ``jax.pure_callback``,
-    which is slower (a host round-trip per call) and, without pgjax, carries
+    which is slower (a host round-trip per call) and, without augax, carries
     polyagamma's bias for ``h < 8`` (see :mod:`._polyagamma`).
 
     Returns
@@ -332,10 +332,10 @@ def make_pg_draw():
         ``draw_pg(h, z, key) -> jnp.ndarray`` — vectorised PG draw.
     """
     try:
-        import pgjax
+        import augax
 
         def _draw_pg(h, z, key):
-            return pgjax.pg_sample(h, z, key)
+            return augax.pg_sample(h, z, key)
 
         return _draw_pg
     except ImportError:

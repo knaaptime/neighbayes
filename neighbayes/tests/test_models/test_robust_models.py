@@ -4,7 +4,7 @@ Each test verifies that:
 1. ``robust=True`` builds and samples without error
 2. ``nu`` (degrees of freedom) is a fixed hyperparameter, not sampled
 3. ``robust=False`` (default) still works (backward compatibility)
-4. SEMProbitRE raises ``NotImplementedError`` when ``robust=True``
+4. SEMProbit raises ``NotImplementedError`` when ``robust=True``
 
 Run with::
 
@@ -282,12 +282,12 @@ class TestRobustTobit:
 
 
 # ---------------------------------------------------------------------------
-# SEMProbitRE — should raise NotImplementedError
+# SEMProbit — should raise NotImplementedError
 # ---------------------------------------------------------------------------
 
 
 class TestRobustSpatialProbit:
-    """SEMProbitRE should raise NotImplementedError when robust=True."""
+    """SEMProbit should raise NotImplementedError when robust=True."""
 
     def test_spatial_probit_raises(self, rng):
         W = make_line_W(6)
@@ -301,7 +301,7 @@ class TestRobustSpatialProbit:
             group_effects="random", y=y, X=X, W=W_graph, groups=region_ids, robust=True
         )
         with pytest.raises(
-            NotImplementedError, match="Robust.*not supported.*SEMProbitRE"
+            NotImplementedError, match="Robust.*not supported.*SEMProbit"
         ):
             model._build_pymc_model()
 

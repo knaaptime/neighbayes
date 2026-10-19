@@ -402,7 +402,7 @@ def make_spatial_probit_data(
     sigma_a: float = 0.8,
     n_per_region: int = 25,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Generate SEMProbitRE data in matrix mode.
+    """Generate SEMProbit data in matrix mode.
 
     Returns
     -------

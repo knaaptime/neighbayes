@@ -25,6 +25,11 @@ SARHurdleNegBin), :class:`CountDesigns`:
 ``"panel"``
     The panel, pooled or with random unit effects and fixed time effects
     (:mod:`..panel._count`, :mod:`..panel._zinb`, :mod:`..panel._hurdle`).
+
+The binary families (Logit, SARLogit), :class:`BinaryDesigns`:
+
+``"static"``
+    The cross-section, the only design they implement.
 """
 
 from __future__ import annotations
@@ -174,6 +179,62 @@ class GaussianDesigns(DesignDispatch):
     fit = _by_design("fit")
     fit.__doc__ = SpatialModel.fit.__doc__
     fit.__wrapped__ = SpatialModel.fit
+
+
+class BinaryDesigns(DesignDispatch):
+    """Design dispatch for the binary families (see the module).
+
+    The response is validated as binary; there is no panel, and a
+    cross-section takes no unit effects.
+    """
+
+    _likelihood: str = "binary"
+
+    def __init__(
+        self,
+        formula=None,
+        data=None,
+        y=None,
+        X=None,
+        W=None,
+        *,
+        unit_effects=None,
+        time_effects=False,
+        dynamic=False,
+        **kwargs,
+    ):
+        design, kwargs = self._resolve_design(
+            dict(
+                kwargs,
+                unit_effects=unit_effects,
+                time_effects=time_effects,
+                dynamic=dynamic,
+            )
+        )
+        if kwargs.get("robust"):
+            raise NotImplementedError(
+                f"robust=True is not supported for {type(self).__name__}."
+            )
+        self._set_design(design)
+        super().__init__(formula, data, y, X, W, **kwargs)
+        if not np.isin(self._y, (0.0, 1.0)).all():
+            raise ValueError("y must be binary with values in {0, 1}.")
+        init = getattr(self, f"_init_{design}", None)
+        if init is not None:
+            init()
+
+    @classmethod
+    def _resolve_design(cls, kw: dict) -> tuple[str, dict]:
+        """The design the arguments describe, and the base class's arguments."""
+        name = cls.__name__
+        unit, time, dynamic = _pop_design(kw)
+        if _is_panel(kw):
+            raise NotImplementedError(f"{name} is not implemented with a panel.")
+        _cross_section_only(name, time, dynamic)
+        if unit is not None:
+            # One draw per observation is a disturbance, not a unit effect.
+            raise NotImplementedError(f"{name} takes no unit effects.")
+        return "static", kw
 
 
 #: The zero part's design and weights, taken by the two-part count families.
@@ -327,4 +388,5 @@ def _constructor_signature(init, extra: tuple[str, ...] = ()) -> inspect.Signatu
 
 
 GaussianDesigns.__signature__ = _constructor_signature(GaussianDesigns.__init__)
+BinaryDesigns.__signature__ = _constructor_signature(BinaryDesigns.__init__)
 CountDesigns.__signature__ = _constructor_signature(CountDesigns.__init__)

@@ -1,4 +1,4 @@
-"""Parameter recovery tests for SEMProbitRE.
+"""Parameter recovery tests for SEMProbit.
 
 Generates binary outcomes from known parameters, fits the model once, and
 verifies that posterior means recover the spatial / regression parameters
@@ -58,12 +58,12 @@ def test_spatialprobit_recovery_and_fitted_probs(rng):
     beta_hat = idata.posterior["beta"].mean(("chain", "draw")).values
     for j, (bhat, btrue) in enumerate(zip(beta_hat, BETA_TRUE)):
         assert abs(bhat - btrue) < ABS_TOL_BETA, (
-            f"SEMProbitRE beta[{j}]: expected ≈{btrue}, got {bhat:.3f}"
+            f"SEMProbit beta[{j}]: expected ≈{btrue}, got {bhat:.3f}"
         )
 
     sa_hat = float(idata.posterior["group_effect_sd"].mean())
     assert abs(sa_hat - SIGMA_A_TRUE) < ABS_TOL_SIGMA_A, (
-        f"SEMProbitRE sigma_a: expected ≈{SIGMA_A_TRUE}, got {sa_hat:.3f}"
+        f"SEMProbit sigma_a: expected ≈{SIGMA_A_TRUE}, got {sa_hat:.3f}"
     )
 
     p_hat = model.fitted_probabilities()

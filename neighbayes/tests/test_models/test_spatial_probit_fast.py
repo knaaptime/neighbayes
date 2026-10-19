@@ -1,4 +1,4 @@
-"""Fast branch and utility tests for SEMProbitRE."""
+"""Fast branch and utility tests for SEMProbit."""
 
 from __future__ import annotations
 
@@ -11,7 +11,6 @@ import scipy.sparse as sp
 import xarray as xr
 
 from neighbayes.models import SEMProbit
-from neighbayes.models.cross_section.sem_probit import SEMProbitRE
 from neighbayes.tests.helpers import W_to_graph, make_line_W
 
 
@@ -23,7 +22,7 @@ class _LegacyW:
         return self
 
 
-def _idata_for_model(m: SEMProbitRE) -> xr.DataTree:
+def _idata_for_model(m: SEMProbit) -> xr.DataTree:
     n = m._X.shape[0]
     r = m._m
     posterior = {
@@ -41,16 +40,16 @@ def _idata_for_model(m: SEMProbitRE) -> xr.DataTree:
 def test_as_dense_region_W_warns_for_non_row_standardized_sparse():
     W = sp.csr_matrix(np.array([[0.0, 2.0], [1.0, 0.0]], dtype=float))
     with pytest.warns(UserWarning, match="row-standardized"):
-        dense = SEMProbitRE._as_dense_region_W(W)
+        dense = SEMProbit._as_dense_region_W(W)
     assert dense.shape == (2, 2)
 
 
 def test_as_dense_region_W_rejects_legacy_and_dense_types():
     with pytest.raises(TypeError, match="legacy libpysal.weights.W"):
-        SEMProbitRE._as_dense_region_W(_LegacyW())
+        SEMProbit._as_dense_region_W(_LegacyW())
 
     with pytest.raises(TypeError, match="Graph or a scipy sparse"):
-        SEMProbitRE._as_dense_region_W(np.eye(2))
+        SEMProbit._as_dense_region_W(np.eye(2))
 
 
 def test_matrix_mode_group_parsing_with_groups_and_sizes():

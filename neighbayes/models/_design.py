@@ -16,11 +16,12 @@ flow restriction are constructor arguments:
 ``separable``
     ``True`` pins :math:`\\rho_w = -\\rho_o\\rho_d` (flows only).
 
-The Gaussian, Tobit and count process classes implement every design
-themselves (see :mod:`._mixins._designs` and :mod:`.cross_section.tobit`).
-The other families are facades: each one's ``_dispatch`` maps those arguments to the
-class that implements the combination and to that class's own keyword
-arguments, and raises for a combination the package does not implement.
+The Gaussian, Tobit, count, logit and probit classes implement every design
+themselves (see :mod:`._mixins._designs`, :mod:`.cross_section.tobit` and
+:mod:`.cross_section.sem_probit`).  The flow families are facades: each one's
+``_dispatch`` maps those arguments to the class that implements the
+combination and to that class's own keyword arguments, and raises for a
+combination the package does not implement.
 :class:`FacadeMeta` runs it when the public class is called and registers the
 implementation as a virtual subclass, so ``isinstance(model, SARFlow)`` holds
 for a SARFlow panel.
@@ -120,46 +121,6 @@ def _cross_section_only(name: str, time: bool, dynamic) -> None:
         raise ValueError(f"{name}: time_effects needs a panel (pass time_col or T).")
     if dynamic:
         raise ValueError(f"{name}: dynamic needs a panel (pass time_col or T).")
-
-
-# ---------------------------------------------------------------------------
-# Logit
-# ---------------------------------------------------------------------------
-
-
-def discrete(cls, kw: dict):
-    """The logits: cross-sections without effects."""
-    name = cls.__name__
-    unit, time, dynamic = _pop_design(kw)
-    if _is_panel(kw):
-        raise NotImplementedError(f"{name} is not implemented with a panel.")
-    _cross_section_only(name, time, dynamic)
-    if unit == "random":
-        raise NotImplementedError(
-            f"{name} is not implemented with random unit effects."
-        )
-    if unit is not None:
-        raise NotImplementedError(f"{name} takes no fixed unit effects.")
-    return cls, kw
-
-
-def sem_probit(cls, kw: dict):
-    """The SEM probit with random group effects (LeSage and Pace 2009, §10.6)."""
-    unit, time, dynamic = _pop_design(kw)
-    group_effects = kw.pop("group_effects", None)
-    if unit is not None or time or dynamic or _is_panel(kw):
-        raise NotImplementedError("SEMProbit takes group effects only.")
-    if group_effects != "random":
-        raise NotImplementedError(
-            "The latent SEM probit is not implemented; pass group_col (or groups) "
-            "and group_effects='random' for the SEM probit with random group effects."
-        )
-    if not {"group_col", "groups", "group_sizes"} & kw.keys():
-        raise ValueError(
-            "Group effects need group_col (formula mode), or groups or group_sizes "
-            "(matrix mode)."
-        )
-    return _load("cross_section.sem_probit:SEMProbitRE"), kw
 
 
 # ---------------------------------------------------------------------------

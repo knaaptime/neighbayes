@@ -396,7 +396,7 @@ class SARZINB(CountDesigns, _ZINBPanel, ZeroPartMixin, ZINBMixin, SpatialModel):
 
         # ── JAX path ──
         # Both equations reduced-form (Krylov-only slice, sparsax-KLU solves,
-        # on-device Pólya-Gamma via pgjax, chains in parallel threads).
+        # on-device Pólya-Gamma via augax, chains in parallel threads).
         # The NumPy path (below) fits the identical reduced-form model.
         if backend == "jax":
             from ...samplers.zinb._jax import run_chains_jax_zinb

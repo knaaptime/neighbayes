@@ -228,7 +228,7 @@ def test_jax_fits_do_not_warn():
     """Starting values drawn in the parent must not raise the NumPy warning."""
     import warnings
 
-    pytest.importorskip("pgjax")
+    pytest.importorskip("augax")
     from neighbayes import dgp
     from neighbayes.models import SARZINB
 

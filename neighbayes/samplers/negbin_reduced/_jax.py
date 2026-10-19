@@ -15,7 +15,7 @@ Architecture
 Each chain runs JIT-compiled chunks of Gibbs sweeps (a ``lax.scan``)
 from its own thread, so chains run in parallel on separate cores (see
 :func:`..._utils._jax_utils.run_chains_chunked`).  PG draws use
-``pgjax.pg_sample`` (on-device) when installed; otherwise the ``polyagamma`` C
+``augax.pg_sample`` (on-device) when installed; otherwise the ``polyagamma`` C
 extension is called via ``jax.pure_callback``.  Both produce exact
 PG(h, z) draws for any h (integer or non-integer), eliminating the
 systematic mean bias of the truncated Gamma-series approximation that
@@ -581,7 +581,7 @@ def _make_reduced_gibbs_step(
 
     ensure_x64()
 
-    # Pólya-Gamma: pgjax (on-device, exact) or numpy C extension fallback.
+    # Pólya-Gamma: augax (on-device, exact) or numpy C extension fallback.
     from .._utils._jax_utils import make_pg_draw
 
     _draw_pg = make_pg_draw()
