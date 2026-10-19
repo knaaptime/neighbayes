@@ -65,6 +65,7 @@ class Logit(SpatialModel):
     _has_wx_in_beta: bool = False
     _gibbs_class: str | None = None
     _model_type: str = "logit"
+    _likelihood: str = "binary"
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

@@ -182,14 +182,18 @@ Bayesian Diagnostics
 GLM Bayesian LM Tests
 ^^^^^^^^^^^^^^^^^^^^^
 
-Pólya-Gamma augmented LM tests for non-Gaussian models (Logit, NegBin).
+LM tests for the logit and NB families: the latent SAR and SEM score tests at the GLM null (Logit, NegBin), the error and WX tests at a reduced-form SAR null (SARLogit, SARNegBin), and a Moran diagnostic on Pólya–Gamma working residuals.
 
 .. autosummary::
    :toctree: generated/
 
    bayesian_glm_lm_lag_test
    bayesian_glm_lm_error_test
+   bayesian_glm_robust_lm_lag_test
+   bayesian_glm_robust_lm_error_test
+   bayesian_glm_lm_sarma_test
    bayesian_glm_lm_wx_test
+   bayesian_glm_moran_working_test
 
 
 Panel Bayesian LM Tests
@@ -266,8 +270,8 @@ and the decision-tree renderers.
    FLOW_PANEL_SUITE
    LOGIT_SUITE
    NEGBIN_SUITE
-   LOGIT_SUITE
-   NEGBIN_SUITE
+   SAR_LOGIT_SUITE
+   SAR_NEGBIN_SUITE
 
 
 Bayesian Model Comparison

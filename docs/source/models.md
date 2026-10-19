@@ -599,6 +599,31 @@ nuisance score:
 
 $$g_\psi^* = g_\psi - J_{\psi\phi \cdot \sigma}\,J_{\phi\phi\cdot\sigma}^{-1}\,g_\phi.$$
 
+### Logit and negative binomial
+
+At the GLM null (`Logit`, `NegBin`) the tests are the score tests of the latent
+SAR, $\eta = S(\rho)(X\beta + \varepsilon)$ with $\varepsilon$ the family's own
+disturbance. Its score at $\rho = 0$ splits into a spillover term
+$s = \tilde e^\top W X\beta$ and an error term $q = \tilde e^\top W h$, with
+$\tilde e$ the score residual and $h = E[\varepsilon \mid y]$ the predicted
+disturbance; the two are uncorrelated, and each is standardized by its own
+information, using the Fisher weights.
+
+| Test | Statistic | Score test of | df |
+|------|-----------|---------------|----|
+| LM-Lag | $(s + q)^2 / (I_s + V_q)$ | latent SAR | 1 |
+| LM-Error | $q^2 / V_q$ | latent SEM, $\eta = X\beta + S(\lambda)\varepsilon$ | 1 |
+| Robust LM-Lag | $s^2 / I_s$ | reduced-form SAR, $\eta = S(\rho)X\beta$ | 1 |
+| Robust LM-Error | $(I_s q - V_q s)^2 / ((I_s + V_q) I_s V_q)$ | error beyond one $\rho$ | 1 |
+| LM-SARMA | $s^2/I_s + q^2/V_q$ | both | 2 |
+
+The suites also carry LM-WX and Moran-Working, a Moran diagnostic on the
+Pólya–Gamma working residuals that is not the score test of a fitted model. At
+a reduced-form SAR null (`SARLogit`, `SARNegBin`) the suites are LM-Error, the
+score of a latent error process added to the fitted model, and LM-WX; both are
+uncorrelated with the other scores there, so their robust forms are the same
+statistics.
+
 The same machinery extends to balanced panels — with a $T$ multiplier on the
 information matrix, under the `bayesian_panel_lm_*` prefix — and to
 origin–destination flow models on Kronecker weights $W_d$, $W_o$, $W_w$, under

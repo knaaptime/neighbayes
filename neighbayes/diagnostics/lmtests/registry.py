@@ -83,6 +83,8 @@ from .suites import (  # noqa: E402
     LOGIT_SUITE,
     NEGBIN_SUITE,
     OLS_SUITE,
+    SAR_LOGIT_SUITE,
+    SAR_NEGBIN_SUITE,
     SAR_SUITE,
     SAR_TOBIT_SUITE,
     SDEM_SUITE,
@@ -106,7 +108,8 @@ _register("neighbayes.models.cross_section.tobit.SEMTobit", SEM_SUITE)
 _register("neighbayes.models.cross_section.tobit.SDMTobit", SDM_TOBIT_SUITE)
 
 # NegBin: the count panels have no suite.
-_register("neighbayes.models.cross_section.sar_negbin.SARNegBin", NEGBIN_SUITE)
+_register("neighbayes.models.cross_section.sar_negbin.SARNegBin", SAR_NEGBIN_SUITE)
+_register("neighbayes.models.cross_section.sar_logit.SARLogit", SAR_LOGIT_SUITE)
 _register("neighbayes.models.cross_section.sar_negbin.SARNegBin", None, variant="panel")
 
 # Non-spatial GLM baselines

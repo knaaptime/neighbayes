@@ -147,23 +147,29 @@ SAR_TOBIT_SUITE = DiagnosticSuite(
     ),
 )
 
-LOGIT_SUITE = DiagnosticSuite(
-    name="Logit",
-    tests=_suite(
-        ("bayesian_glm_lm_lag_test", "LM-Lag"),
-        ("bayesian_glm_lm_error_test", "LM-Error"),
-        ("bayesian_glm_lm_wx_test", "LM-WX"),
-    ),
+# The logit and NB at the GLM null: the latent SAR's and SEM's score tests
+# (``cross_sectional_glm``), the WX score, and the Moran diagnostic on the
+# Pólya–Gamma working residuals.
+_GLM_NULL_TESTS = (
+    ("bayesian_glm_lm_lag_test", "LM-Lag"),
+    ("bayesian_glm_lm_error_test", "LM-Error"),
+    ("bayesian_glm_robust_lm_lag_test", "Robust-LM-Lag"),
+    ("bayesian_glm_robust_lm_error_test", "Robust-LM-Error"),
+    ("bayesian_glm_lm_sarma_test", "LM-SARMA"),
+    ("bayesian_glm_lm_wx_test", "LM-WX"),
+    ("bayesian_glm_moran_working_test", "Moran-Working"),
+)
+# At a reduced-form SAR null the error and WX scores are uncorrelated with
+# every other score, so their robust forms are these.
+_GLM_SAR_TESTS = (
+    ("bayesian_glm_lm_error_test", "LM-Error"),
+    ("bayesian_glm_lm_wx_test", "LM-WX"),
 )
 
-NEGBIN_SUITE = DiagnosticSuite(
-    name="NegBin",
-    tests=_suite(
-        ("bayesian_glm_lm_lag_test", "LM-Lag"),
-        ("bayesian_glm_lm_error_test", "LM-Error"),
-        ("bayesian_glm_lm_wx_test", "LM-WX"),
-    ),
-)
+LOGIT_SUITE = DiagnosticSuite(name="Logit", tests=_suite(*_GLM_NULL_TESTS))
+NEGBIN_SUITE = DiagnosticSuite(name="NegBin", tests=_suite(*_GLM_NULL_TESTS))
+SAR_LOGIT_SUITE = DiagnosticSuite(name="SARLogit", tests=_suite(*_GLM_SAR_TESTS))
+SAR_NEGBIN_SUITE = DiagnosticSuite(name="SARNegBin", tests=_suite(*_GLM_SAR_TESTS))
 
 SDM_TOBIT_SUITE = DiagnosticSuite(
     name="SDMTobit",
@@ -306,6 +312,8 @@ __all__ = [
     "SAR_TOBIT_SUITE",
     "LOGIT_SUITE",
     "NEGBIN_SUITE",
+    "SAR_LOGIT_SUITE",
+    "SAR_NEGBIN_SUITE",
     "SDM_TOBIT_SUITE",
     "FLOW_SUITE",
     "FLOW_INTRA_SUITE",

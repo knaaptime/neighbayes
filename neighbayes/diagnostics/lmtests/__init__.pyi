@@ -125,7 +125,19 @@ from .cross_sectional_glm import (
     bayesian_glm_lm_lag_test as bayesian_glm_lm_lag_test,
 )
 from .cross_sectional_glm import (
+    bayesian_glm_lm_sarma_test as bayesian_glm_lm_sarma_test,
+)
+from .cross_sectional_glm import (
     bayesian_glm_lm_wx_test as bayesian_glm_lm_wx_test,
+)
+from .cross_sectional_glm import (
+    bayesian_glm_moran_working_test as bayesian_glm_moran_working_test,
+)
+from .cross_sectional_glm import (
+    bayesian_glm_robust_lm_error_test as bayesian_glm_robust_lm_error_test,
+)
+from .cross_sectional_glm import (
+    bayesian_glm_robust_lm_lag_test as bayesian_glm_robust_lm_lag_test,
 )
 from .flow import (
     _flow_marginal_lm as _flow_marginal_lm,
@@ -252,6 +264,8 @@ from .suites import (
 from .suites import (
     OLS_SUITE as OLS_SUITE,
 )
+from .suites import SAR_LOGIT_SUITE as SAR_LOGIT_SUITE
+from .suites import SAR_NEGBIN_SUITE as SAR_NEGBIN_SUITE
 from .suites import (
     SAR_PANEL_SUITE as SAR_PANEL_SUITE,
 )
