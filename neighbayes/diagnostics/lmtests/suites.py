@@ -107,15 +107,6 @@ SAR_SUITE = DiagnosticSuite(
     ),
 )
 
-SAR_NEGBIN_SUITE = DiagnosticSuite(
-    name="SAR-NegBin",
-    tests=_suite(
-        ("bayesian_lm_error_test", "LM-Error"),
-        ("bayesian_lm_wx_test", "LM-WX"),
-        ("bayesian_robust_lm_wx_test", "Robust-LM-WX"),
-    ),
-)
-
 SEM_SUITE = DiagnosticSuite(
     name="SEM",
     tests=_suite(
@@ -309,7 +300,6 @@ __all__ = [
     "OLS_SUITE",
     "SLX_SUITE",
     "SAR_SUITE",
-    "SAR_NEGBIN_SUITE",
     "SEM_SUITE",
     "SDM_SUITE",
     "SDEM_SUITE",

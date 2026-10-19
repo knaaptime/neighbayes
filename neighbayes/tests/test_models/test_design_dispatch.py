@@ -1,9 +1,9 @@
 """The public classes resolve their design arguments.
 
 ADR 0002: a public class names a process and a family; panel structure,
-effects, dynamics, and the flow restriction are arguments.  A Gaussian process
-class implements every design itself; the other families' public classes still
-dispatch to implementation classes.  These tests pin the table from public call
+effects, dynamics, and the flow restriction are arguments.  A Gaussian, Tobit
+or count process class implements every design itself; the other families'
+public classes still dispatch to implementation classes.  These tests pin the table from public call
 to design (or implementation class) and effects code, and the combinations that
 must raise.
 """
@@ -50,27 +50,22 @@ ROUTES = [
     (m.SDM, {**PANEL, "dynamic": True}, "dynamic", 0),
     (m.SDM, {**PANEL, "dynamic": "restricted"}, "restricted", 0),
     (m.SAR, {"time_col": "year", "unit_col": "id"}, "static", 0),
-    # Logit, count, and Tobit families
-    (m.SARLogit, {}, "SARLogit", None),
-    (m.SARNegBin, {}, "SARNegBin", None),
-    (m.SARNegBin, {"unit_effects": "random"}, "SARNegBinRE", None),
-    (m.SARNegBin, PANEL, "SARNegBinPanelRE", 0),
+    # Count families: the design
+    (m.SARNegBin, {}, "static", None),
+    (m.SARNegBin, PANEL, "panel", 0),
     (
         m.SARNegBin,
         {**PANEL, "unit_effects": "random", "time_effects": True},
-        "SARNegBinPanelRE",
+        "panel",
         3,
     ),
-    (m.NegBin, {**PANEL, "unit_effects": "random"}, "NegBinPanelRE", 1),
-    (m.ZINB, {**PANEL, "time_effects": True}, "ZINBPanelRE", 2),
-    (m.SARZINB, {**PANEL, "unit_effects": "random"}, "SARZINBPanelRE", 1),
-    (m.HurdleNegBin, PANEL, "HurdleNegBinPanelRE", 0),
-    (
-        m.SARHurdleNegBin,
-        {**PANEL, "unit_effects": "random"},
-        "SARHurdleNegBinPanelRE",
-        1,
-    ),
+    (m.NegBin, {**PANEL, "unit_effects": "random"}, "panel", 1),
+    (m.ZINB, {**PANEL, "time_effects": True}, "panel", 2),
+    (m.SARZINB, {**PANEL, "unit_effects": "random"}, "panel", 1),
+    (m.HurdleNegBin, PANEL, "panel", 0),
+    (m.SARHurdleNegBin, {**PANEL, "unit_effects": "random"}, "panel", 1),
+    # Logit, Tobit and probit families
+    (m.SARLogit, {}, "SARLogit", None),
     (m.SARTobit, PANEL, "static", None),
     (m.SEMTobit, PANEL, "static", None),
     (m.SEMProbit, {"group_effects": "random", "groups": [0, 1]}, "SEMProbitRE", None),
@@ -114,7 +109,11 @@ REFUSALS = [
     (m.SEMProbit, {"groups": [0, 1]}, NotImplementedError, "latent SEM probit"),
     (m.SEMProbit, {"group_effects": "random"}, ValueError, "group_col"),
     (m.ZINB, {}, NotImplementedError, "panels only"),
-    (m.NegBin, {"unit_effects": "random"}, NotImplementedError, "random unit effects"),
+    (m.HurdleNegBin, {}, NotImplementedError, "panels only"),
+    (m.SARZINB, {"unit_effects": "random"}, NotImplementedError, "only in a panel"),
+    (m.SARNegBin, {"unit_effects": "random"}, NotImplementedError, "only in a panel"),
+    (m.SARNegBin, {**PANEL, "dynamic": True}, NotImplementedError, "no dynamic"),
+    (m.NegBin, {"unit_effects": "random"}, NotImplementedError, "only in a panel"),
     (m.SAR, {"unit_effects": "fixed"}, NotImplementedError, "only in a panel"),
     (m.SAR, {"time_effects": True}, ValueError, "needs a panel"),
     (m.SAR, {"dynamic": True}, ValueError, "needs a panel"),
@@ -195,6 +194,23 @@ def test_a_panel_is_the_public_class(panel_data, design, expected):
 
 def test_fixed_effects_panel_records_its_effects(panel_data):
     model = m.SAR(**panel_data, unit_effects="fixed", time_effects=True)
+    assert model.effects == "two_way"
+
+
+def test_a_count_cross_section_is_the_public_class(panel_data):
+    n = panel_data["N"]
+    y = np.random.default_rng(1).poisson(2.0, size=n)
+    model = m.SARNegBin(y=y, X=panel_data["X"][:n], W=panel_data["W"])
+    assert type(model) is m.SARNegBin
+    assert model._design == "static"
+
+
+@pytest.mark.parametrize("cls", [m.SARNegBin, m.ZINB, m.SARHurdleNegBin])
+def test_a_count_panel_is_the_public_class(panel_data, cls):
+    y = np.random.default_rng(1).poisson(2.0, size=panel_data["N"] * panel_data["T"])
+    model = cls(**{**panel_data, "y": y}, unit_effects="random", time_effects=True)
+    assert type(model) is cls
+    assert model._design == "panel"
     assert model.effects == "two_way"
 
 

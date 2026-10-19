@@ -152,6 +152,28 @@ def test_panel_diagnostics_registries_match_expected():
         )
 
 
+def test_count_suites_follow_the_design():
+    """A count cross-section has its GLM suite; the count panels have none."""
+    from neighbayes.diagnostics.lmtests.registry import get_diagnostic_suite
+    from neighbayes.models import NegBin, SARNegBin
+    from neighbayes.tests.helpers import W_to_graph, make_line_W
+
+    rng = np.random.default_rng(0)
+    N, T = 6, 3
+    X = np.column_stack([np.ones(N * T), rng.standard_normal(N * T)])
+    y = rng.poisson(2.0, size=N * T)
+    W = W_to_graph(make_line_W(N))
+    xs = dict(y=y[:N], X=X[:N], W=W)
+
+    def labels(model):
+        return [label for _, label in get_diagnostic_suite(model).tests]
+
+    assert labels(SARNegBin(**xs)) == ["LM-Lag", "LM-Error", "LM-WX"]
+    for cls in (NegBin, SARNegBin):
+        panel = cls(y=y, X=X, W=W, N=N, T=T, unit_effects="random")
+        assert get_diagnostic_suite(panel) is None
+
+
 def test_slx_uses_slx_specific_lm_tests():
     """SLX uses Koley-Bera SLX-specific LM tests, not raw OLS LM tests."""
     from neighbayes.diagnostics.lmtests.registry import get_diagnostic_suite

@@ -18,7 +18,6 @@ from scipy.special import logsumexp
 from neighbayes import dgp
 from neighbayes.dgp.hurdle import truncated_negative_binomial
 from neighbayes.models import HurdleNegBin, SARHurdleNegBin
-from neighbayes.models.panel._hurdle import HurdleNegBinPanelRE, SARHurdleNegBinPanelRE
 from neighbayes.samplers.hurdle._truncated import (
     draw_missed_zeros,
     hurdle_loglik_pointwise,
@@ -218,7 +217,7 @@ class TestSARHurdleNB:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("cls", [SARHurdleNegBinPanelRE, HurdleNegBinPanelRE])
+@pytest.mark.parametrize("cls", [SARHurdleNegBin, HurdleNegBin])
 @pytest.mark.parametrize("effects", [0, 1, 2, 3])
 @pytest.mark.parametrize("sampler", ["gibbs", "nuts"])
 def test_hurdle_panel_api(cls, effects, sampler):
@@ -232,12 +231,12 @@ def test_hurdle_panel_api(cls, effects, sampler):
             W=d["W_sparse"],
             N=25,
             T=4,
-            effects=effects,
+            **effects_kwargs(effects, treatment="random"),
         )
         post = m.fit(sampler=sampler, **QUICK).posterior
     names = set(post.data_vars)
     assert {"beta", "beta_zero", "alpha"} <= names
-    assert ("rho" in names) == (cls is SARHurdleNegBinPanelRE)
+    assert ("rho" in names) == (cls is SARHurdleNegBin)
     for z in ("", "_zero"):
         assert ("unit_effect" + z in names) == (effects in (1, 3))
         assert ("time_effect" + z in names) == (effects in (2, 3))

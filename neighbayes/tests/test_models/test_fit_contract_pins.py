@@ -27,7 +27,6 @@ from neighbayes.models import (
     SARLogit,
     SARNegBin,
 )
-from neighbayes.models.cross_section.sar_negbin_re import SARNegBinRE
 from neighbayes.tests.helpers import (
     PANEL_N,
     PANEL_T,
@@ -342,11 +341,6 @@ COUNT_XS: dict[str, tuple] = {
         SARNegBin,
         False,
         {"gibbs": {"beta", "rho", "alpha"}, "nuts": {"beta", "rho", "alpha", "mu"}},
-    ),
-    "SARNegBinRE": (
-        SARNegBinRE,
-        False,
-        {"gibbs": {"beta", "rho", "alpha", "unit_effect_sd"}},
     ),
     "SARZINB": (
         SARZINB,

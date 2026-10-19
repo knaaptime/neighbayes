@@ -245,7 +245,6 @@ def simulate_sar_negbin(
     rho: float = 0.5,
     beta: np.ndarray | None = None,
     alpha: float = 2.0,
-    sigma2: float = 0.0,
     err_hetero: bool = False,
     rng: np.random.Generator | None = None,
     seed: int | None = None,
@@ -253,25 +252,14 @@ def simulate_sar_negbin(
     create_gdf: bool = False,
     geometry_type: str = "polygon",
 ) -> dict:
-    r"""Simulate data from a SAR-NB2 DGP.
-
-    The latent log-mean follows the SAR structural form:
+    r"""Simulate data from the reduced-form SAR-NB2 that :class:`SARNegBin` fits.
 
     .. math::
 
-        \eta = \rho W \eta + X\beta + \nu, \quad \nu \sim N(0, \sigma^2 I)
+        \eta = (I - \rho W)^{-1} X\beta, \quad \mu = \exp(\eta)
 
-    which in reduced form is:
-
-    .. math::
-
-        \eta = (I - \rho W)^{-1}(X\beta + \nu), \quad \mu = \exp(\eta)
-
-    When ``sigma2 = 0`` (the default), the DGP reduces to the
-    deterministic reduced form :math:`\eta = (I - \rho W)^{-1} X\beta`,
-    matching the :class:`SARNegBin` model specification.
-    When ``sigma2 > 0``, a normal random effect ν per unit is included,
-    matching the :class:`SARNegBinRE` model specification.
+    With ``T`` (and ``N``) it draws the :class:`SARNegBin` panel, whose random
+    unit effects (``unit_effects="random"``) enter inside the filter.
 
     Counts are sampled as NB2:
 
@@ -298,10 +286,6 @@ def simulate_sar_negbin(
         ``[1.0, 0.6]``.
     alpha : float, default 2.0
         NB2 dispersion parameter. Must be strictly positive.
-    sigma2 : float, default 0.0
-        Variance of the random effects ν. When 0, the DGP is
-        deterministic (no random effects in the latent index). When > 0,
-        Gaussian noise is added to the latent log-mean.
     err_hetero : bool, default False
         Heteroskedastic errors (not yet implemented; ignored with a
         warning).
@@ -320,14 +304,11 @@ def simulate_sar_negbin(
     -------
     dict
         Dictionary with keys ``y``, ``X``, ``mu``, ``W_sparse``,
-        ``W_graph``, and ``params_true``. When ``sigma2 > 0``,
-        ``params_true`` also includes ``sigma2``.
+        ``W_graph``, and ``params_true``.
     """
 
     if alpha <= 0:
         raise ValueError("alpha must be strictly positive.")
-    if sigma2 < 0:
-        raise ValueError("sigma2 must be non-negative.")
     if err_hetero:
         warnings.warn(
             "err_hetero is not implemented for simulate_sar_negbin and is ignored.",
@@ -347,13 +328,7 @@ def simulate_sar_negbin(
 
     solve = spatial_filter_factor(Ws, rho)
 
-    # Structural form: (I - rho*W) eta = X beta + nu
-    # When sigma2 > 0, add Gaussian noise nu ~ N(0, sigma2 I)
-    if sigma2 > 0:
-        nu = rng.normal(0, np.sqrt(sigma2), size=nobs)
-        eta = solve(X @ beta + nu)
-    else:
-        eta = solve(X @ beta)
+    eta = solve(X @ beta)
 
     mu = np.exp(np.clip(eta, -30.0, 30.0))
 
@@ -361,8 +336,6 @@ def simulate_sar_negbin(
     y = rng.negative_binomial(alpha, p).astype(np.float64)
 
     params_true = {"rho": rho, "beta": beta, "alpha": alpha}
-    if sigma2 > 0:
-        params_true["sigma2"] = sigma2
 
     out = {
         "y": y,

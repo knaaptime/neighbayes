@@ -9,8 +9,8 @@ microbenchmark makes the basis look like a large win, but only by assuming
 more ρ candidates per slice step than the sampler actually draws: break-even
 is ~10 candidates and a real slice step uses ~8.  End to end the structural
 path measures ~0.78x, because ``jnp.where`` in the JAX log-density evaluates
-the direct solve on every candidate regardless (see
-``samplers/negbin/_jax.py``).  That is why ``krylov_degree`` defaults to 0,
+the direct solve on every candidate regardless (measured on the structural
+NB sampler, since removed).  That is why ``krylov_degree`` defaults to 0,
 and why a benchmark asserting a speedup here would be encoding a claim the
 sampler does not deliver.
 """

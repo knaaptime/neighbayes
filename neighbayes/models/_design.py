@@ -16,14 +16,14 @@ flow restriction are constructor arguments:
 ``separable``
     ``True`` pins :math:`\\rho_w = -\\rho_o\\rho_d` (flows only).
 
-The Gaussian and Tobit process classes implement every design themselves
-(see :mod:`._mixins._designs` and :mod:`.cross_section.tobit`).  The other
-families are facades: each one's ``_dispatch`` maps those arguments to the
+The Gaussian, Tobit and count process classes implement every design
+themselves (see :mod:`._mixins._designs` and :mod:`.cross_section.tobit`).
+The other families are facades: each one's ``_dispatch`` maps those arguments to the
 class that implements the combination and to that class's own keyword
 arguments, and raises for a combination the package does not implement.
 :class:`FacadeMeta` runs it when the public class is called and registers the
-implementation as a virtual subclass, so ``isinstance(model, SARNegBin)`` holds
-for a SARNegBin panel.
+implementation as a virtual subclass, so ``isinstance(model, SARFlow)`` holds
+for a SARFlow panel.
 """
 
 from __future__ import annotations
@@ -122,65 +122,25 @@ def _cross_section_only(name: str, time: bool, dynamic) -> None:
         raise ValueError(f"{name}: dynamic needs a panel (pass time_col or T).")
 
 
-def _need(spec: dict, key: str, name: str, what: str) -> type:
-    path = spec.get(key)
-    if path is None:
-        raise NotImplementedError(f"{name} is not implemented with {what}.")
-    return _load(path)
-
-
 # ---------------------------------------------------------------------------
-# Logit and count families
+# Logit
 # ---------------------------------------------------------------------------
-
-# "xs": the facade implements the cross-section itself (True) or names why it
-# does not (a message); "xs_random": the cross-section SAR (or SEM) with random
-# effects; "panel": the panel, whose unit effects are random and time effects
-# fixed in the count families.
-_DISCRETE = {
-    "Logit": {"xs": True},
-    "SARLogit": {"xs": True},
-    "NegBin": {"xs": True, "panel": "panel._count:NegBinPanelRE"},
-    "SARNegBin": {
-        "xs": True,
-        "xs_random": "cross_section.sar_negbin_re:SARNegBinRE",
-        "panel": "panel._count:SARNegBinPanelRE",
-    },
-    "ZINB": {
-        "xs": "ZINB is implemented for panels only (pass time_col or T)",
-        "panel": "panel._zinb:ZINBPanelRE",
-    },
-    "SARZINB": {"xs": True, "panel": "panel._zinb:SARZINBPanelRE"},
-    "HurdleNegBin": {
-        "xs": "HurdleNegBin is implemented for panels only (pass time_col or T)",
-        "panel": "panel._hurdle:HurdleNegBinPanelRE",
-    },
-    "SARHurdleNegBin": {"xs": True, "panel": "panel._hurdle:SARHurdleNegBinPanelRE"},
-}
 
 
 def discrete(cls, kw: dict):
-    """Logit and count families: random effects in a cross-section, count panels."""
+    """The logits: cross-sections without effects."""
     name = cls.__name__
-    spec = _DISCRETE[name]
     unit, time, dynamic = _pop_design(kw)
-    if not _is_panel(kw):
-        _cross_section_only(name, time, dynamic)
-        if unit == "random":
-            return _need(spec, "xs_random", name, "random unit effects"), kw
-        if unit is not None:
-            raise NotImplementedError(f"{name} takes no fixed unit effects.")
-        if spec["xs"] is not True:
-            raise NotImplementedError(spec["xs"] + ".")
-        return cls, kw
-    if dynamic:
-        raise NotImplementedError(f"{name} has no dynamic panel.")
-    if unit == "fixed":
+    if _is_panel(kw):
+        raise NotImplementedError(f"{name} is not implemented with a panel.")
+    _cross_section_only(name, time, dynamic)
+    if unit == "random":
         raise NotImplementedError(
-            f"{name} panels take random unit effects, not fixed ones."
+            f"{name} is not implemented with random unit effects."
         )
-    kw["effects"] = _effects_code(unit == "random", time)
-    return _need(spec, "panel", name, "a panel"), kw
+    if unit is not None:
+        raise NotImplementedError(f"{name} takes no fixed unit effects.")
+    return cls, kw
 
 
 def sem_probit(cls, kw: dict):

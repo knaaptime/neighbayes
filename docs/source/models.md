@@ -344,13 +344,7 @@ keeps the exact Pólya–Gamma sampler.
 
 $$y_i \sim \operatorname{NegBin}(\mu_i, \alpha), \quad \mu = \exp(\eta), \quad \eta = (I - \rho W)^{-1} X\beta$$
 
-No latent $\sigma$ — spatial dependence enters only through the mean propagator. Supports both NUTS and Pólya–Gamma Gibbs sampling.
-
-### SARNegBin with random effects
-
-$$y_i \sim \operatorname{NegBin}(\mu_i, \alpha), \quad \eta = \rho W \eta + X\beta + \nu, \quad \nu \sim \mathcal{N}(0, \sigma^2 I)$$
-
-`SARNegBin(unit_effects="random")`: the log-mean carries a normal random effect per unit with scale $\sigma$ (`unit_effect_sd`), inside the SAR equation, so this is a different model from `SARNegBin`, not its structural form. Gibbs sampling only (PG augmentation).
+No disturbance propagates — spatial dependence enters only through the mean propagator. Supports both NUTS and Pólya–Gamma Gibbs sampling. Unit effects need a panel (above): in a cross-section one draw per observation is a disturbance, not a unit effect.
 
 ### SARZINB
 

@@ -762,33 +762,10 @@ class GaussianGibbsPriors:
 
 
 @dataclass
-class GibbsPriors:
-    """Prior hyperparameters for the SAR-NB Gibbs sampler.
-
-    All priors are weakly informative by default, matching the
-    ``GaussianGibbsPriors`` convention.
-    """
-
-    beta_mu: np.ndarray | float = 0.0
-    beta_sigma: np.ndarray | float = 1e6
-    sigma2_alpha: float = 2.0  # InverseGamma shape for σ²
-    sigma2_beta: float = 1.0  # InverseGamma scale for σ²
-    alpha_sigma: float = 10.0  # HalfNormal scale for α
-    alpha_nu: float = 3.0  # Half-Student-t degrees of freedom for α
-    alpha_fixed: float | None = None  # hold α here instead of sampling it
-    rho_lower: float = -0.999
-    rho_upper: float = 0.999
-
-
-@dataclass
 class ReducedGibbsPriors:
     """Prior hyperparameters for the reduced-form SAR-NB sampler.
 
-    Notes
-    -----
-    The ``sigma2_*`` fields present on the random-effects
-    :class:`GibbsPriors` are intentionally absent — this sampler has no
-    :math:`\\sigma` parameter.
+    The NB samplers' shared α step reads its ``alpha_*`` fields.
     """
 
     beta_mu: np.ndarray | float = 0.0
@@ -904,7 +881,6 @@ __all__ = [
     # Gibbs sampler prior structs
     "GibbsBasePriors",
     "GaussianGibbsPriors",
-    "GibbsPriors",
     "ReducedGibbsPriors",
     "FlowReducedGibbsPriors",
     "ZINBGibbsPriors",

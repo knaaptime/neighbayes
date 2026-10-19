@@ -218,7 +218,6 @@ def test_default_prior_hyperparams_pinned(name):
 _GIBBS_PRIOR_STRUCTS = {
     "GibbsBasePriors",
     "GaussianGibbsPriors",
-    "GibbsPriors",
     "ReducedGibbsPriors",
     "FlowReducedGibbsPriors",
     "ZINBGibbsPriors",

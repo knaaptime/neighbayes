@@ -97,7 +97,6 @@ Default Gibbs Priors
 
    GibbsBasePriors
    GaussianGibbsPriors
-   GibbsPriors
    ReducedGibbsPriors
    FlowReducedGibbsPriors
    ZINBGibbsPriors
@@ -250,7 +249,6 @@ and the decision-tree renderers.
    OLS_PANEL_SUITE
    SAR_SUITE
    SAR_PANEL_SUITE
-   SAR_NEGBIN_SUITE
    SAR_TOBIT_SUITE
    SEM_SUITE
    SEM_PANEL_SUITE

@@ -8,8 +8,8 @@ r"""NB2 count panel DGP with random unit effects and period effects.
 with the unit effects ``c`` inside the filter, as random effects enter a
 spatial equation,
 
-stacked time-first, matching :class:`~neighbayes.models.SARNegBinPanelRE`
-(``rho = 0`` gives :class:`~neighbayes.models.NegBinPanelRE`).
+stacked time-first, matching the :class:`~neighbayes.models.SARNegBin` panel
+(``rho = 0`` gives the :class:`~neighbayes.models.NegBin` panel).
 """
 
 from __future__ import annotations

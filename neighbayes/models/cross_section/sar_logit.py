@@ -149,12 +149,6 @@ class SARLogit(SpatialModel):
         # Precompute logdet callable for the ρ slice sampler.
         self._logdet_fn = self._logdet_numpy_fn
 
-    # ------------------------------------------------------------------
-    # Auto-selection for Gibbs path
-    # ------------------------------------------------------------------
-
-    _JAX_DENSE_THRESHOLD: int = 10000
-
     def _initialize_from_ols(self, rng):
         """Warm-start the reduced-form Gibbs sampler from a spatial profile.
 

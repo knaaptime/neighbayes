@@ -7,7 +7,6 @@ from .sar import SAR as SAR
 from .sar_hurdle import SARHurdleNegBin as SARHurdleNegBin
 from .sar_logit import SARLogit as SARLogit
 from .sar_negbin import SARNegBin as SARNegBin
-from .sar_negbin_re import SARNegBinRE as SARNegBinRE
 from .sar_zinb import SARZINB as SARZINB
 from .sdem import SDEM as SDEM
 from .sdm import SDM as SDM

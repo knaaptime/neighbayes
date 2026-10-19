@@ -28,16 +28,17 @@ if TYPE_CHECKING:
 # dotted path* so that importing this module does not trigger model imports.
 # ---------------------------------------------------------------------------
 
-_REGISTRY: dict[tuple[str, str | None], DiagnosticSuite] = {}
+_REGISTRY: dict[tuple[str, str | None], DiagnosticSuite | None] = {}
 
 
 def _register(
-    class_path: str, suite: DiagnosticSuite, *, variant: str | None = None
+    class_path: str, suite: DiagnosticSuite | None, *, variant: str | None = None
 ) -> None:
     """Register a model class (by dotted path) to a diagnostic suite.
 
     ``variant`` is ``"panel"`` or ``"dynamic"`` for the suite of a class's
-    panels, where one class serves the cross-section and its panels.
+    panels (see :func:`_variant`); a ``None`` suite records that they have
+    none, rather than the class's.
     """
     _REGISTRY[(class_path, variant)] = suite
 
@@ -82,7 +83,6 @@ from .suites import (  # noqa: E402
     LOGIT_SUITE,
     NEGBIN_SUITE,
     OLS_SUITE,
-    SAR_NEGBIN_SUITE,
     SAR_SUITE,
     SAR_TOBIT_SUITE,
     SDEM_SUITE,
@@ -105,17 +105,14 @@ _register("neighbayes.models.cross_section.tobit.SARTobit", SAR_TOBIT_SUITE)
 _register("neighbayes.models.cross_section.tobit.SEMTobit", SEM_SUITE)
 _register("neighbayes.models.cross_section.tobit.SDMTobit", SDM_TOBIT_SUITE)
 
-# NegBin
+# NegBin: the count panels have no suite.
 _register("neighbayes.models.cross_section.sar_negbin.SARNegBin", NEGBIN_SUITE)
-
-_register(
-    "neighbayes.models.cross_section.sar_negbin_re.SARNegBinRE",
-    SAR_NEGBIN_SUITE,
-)
+_register("neighbayes.models.cross_section.sar_negbin.SARNegBin", None, variant="panel")
 
 # Non-spatial GLM baselines
 _register("neighbayes.models.cross_section.logit.Logit", LOGIT_SUITE)
 _register("neighbayes.models.cross_section.negbin.NegBin", NEGBIN_SUITE)
+_register("neighbayes.models.cross_section.negbin.NegBin", None, variant="panel")
 
 # Flow (cross-sectional)
 _register("neighbayes.models.flow._flow.SARFlow", FLOW_SUITE)

@@ -40,7 +40,7 @@ BACKENDS = ["numpy", "jax"]
 
 # ---------------------------------------------------------------------------
 # Logit models: 30×30 grid (n=900), matching test_spatial_logit_recovery.py
-# NB/ZINB models: 32×32 grid (n=1024), matching test_sar_negbin_re.py
+# NB/ZINB models: 32×32 grid (n=1024)
 # ---------------------------------------------------------------------------
 SIDE_LOGIT = 30
 SIDE_NB = 32
@@ -49,11 +49,10 @@ SIDE_NB = 32
 RHO_LOGIT = 0.4
 BETA_LOGIT = np.array([0.3, 1.0])
 
-# True parameters — NB (matching test_sar_negbin_re.py)
+# True parameters — NB
 RHO_NB = 0.4
 BETA_NB = np.array([0.5, 0.8])
 ALPHA_NB = 2.0
-SIGMA2_NB = 0.5
 
 # True parameters — ZINB (matching test_sar_zinb_recovery.py)
 RHO_ZINB = 0.4
@@ -173,54 +172,6 @@ def test_sar_negbin_backend_recovery(sar_negbin_data, backend):
 
 
 # ======================================================================
-# SARNegBinRE (latent-field, sigma2>0)
-# ======================================================================
-
-
-@pytest.fixture(scope="module")
-def sar_negbin_struct_data():
-    """Structural-form SAR-NB data (with latent noise, sigma2=0.5) on a 32×32 rook grid."""
-    rng = np.random.default_rng(42)
-    W = W_to_graph(make_rook_W(SIDE_NB))
-    return dgp.simulate_sar_negbin(
-        W=_as_sparse(W),
-        rho=RHO_NB,
-        beta=BETA_NB,
-        alpha=ALPHA_NB,
-        rng=rng,
-        unit_effects="random",
-        unit_effect_sd=(SIGMA2_NB) ** 0.5,
-    )
-
-
-@pytest.mark.parametrize("backend", BACKENDS)
-def test_sar_negbin_struct_backend_recovery(sar_negbin_struct_data, backend):
-    """SARNegBinRE recovers ρ, β, α on both backends."""
-    from neighbayes.models import SARNegBin
-
-    d = sar_negbin_struct_data
-    W = W_to_graph(make_rook_W(SIDE_NB))
-    idata = SARNegBin(unit_effects="random", y=d["y"], X=d["X"], W=W).fit(
-        backend=backend, **_fit_kwargs(backend)
-    )
-
-    rho_hat = float(idata.posterior["rho"].mean())
-    beta_hat = idata.posterior["beta"].mean(("chain", "draw")).values
-    alpha_hat = float(idata.posterior["alpha"].mean())
-
-    assert abs(rho_hat - RHO_NB) < TOL_SPATIAL_NB, (
-        f"SARNegBinRE[{backend}] rho: {rho_hat:.3f} vs {RHO_NB}"
-    )
-    for j, (bh, bt) in enumerate(zip(beta_hat, BETA_NB)):
-        assert abs(bh - bt) < TOL_BETA_NB, (
-            f"SARNegBinRE[{backend}] beta[{j}]: {bh:.3f} vs {bt}"
-        )
-    assert abs(alpha_hat - ALPHA_NB) < TOL_ALPHA_NB, (
-        f"SARNegBinRE[{backend}] alpha: {alpha_hat:.3f} vs {ALPHA_NB}"
-    )
-
-
-# ======================================================================
 # SARZINB (zero-inflated NB)
 # ======================================================================
 
@@ -311,7 +262,6 @@ def test_sar_logit_backend_mixing(sar_logit_data, backend):
 #
 #     SARLogit             rho 0.0006   beta 0.0060
 #     SARNegBin            rho 0.0020   beta 0.0029   alpha 0.0054
-#     SARNegBinRE  rho 0.0013   beta 0.0018   alpha 0.0038
 #
 # The tolerances sit ~3-30x above that noise and one to two orders of
 # magnitude below the bugs this class of test exists to catch.
@@ -410,26 +360,15 @@ def _assert_backends_agree(posteriors, tols, label):
         )
 
 
-# (model name, unit effects, fixture, tolerances)
+# (model name, fixture, tolerances)
 _AGREEMENT_CASES = [
-    ("SARLogit", None, "sar_logit_data", {"rho": 0.05, "beta": 0.05}),
-    (
-        "SARNegBin",
-        None,
-        "sar_negbin_data",
-        {"rho": 0.05, "beta": 0.05, "alpha": 0.15},
-    ),
-    (
-        "SARNegBin",
-        "random",
-        "sar_negbin_struct_data",
-        {"rho": 0.05, "beta": 0.05, "alpha": 0.15},
-    ),
+    ("SARLogit", "sar_logit_data", {"rho": 0.05, "beta": 0.05}),
+    ("SARNegBin", "sar_negbin_data", {"rho": 0.05, "beta": 0.05, "alpha": 0.15}),
 ]
 
 
-@pytest.mark.parametrize("model_name,unit_effects,fixture_name,tols", _AGREEMENT_CASES)
-def test_backends_agree(request, model_name, unit_effects, fixture_name, tols):
+@pytest.mark.parametrize("model_name,fixture_name,tols", _AGREEMENT_CASES)
+def test_backends_agree(request, model_name, fixture_name, tols):
     """Every dual-backend family must sample the *same* posterior.
 
     The recovery tests above compare each backend to truth, at tolerances
@@ -449,8 +388,6 @@ def test_backends_agree(request, model_name, unit_effects, fixture_name, tols):
         W = W_to_graph(make_rook_W(SIDE_NB))
         kwargs = dict(y=data["y"], X=data["X"], W=W)
 
-    if unit_effects is not None:
-        kwargs["unit_effects"] = unit_effects
     posteriors = {
         b: cls(**kwargs).fit(backend=b, **_fit_kwargs(b)).posterior for b in BACKENDS
     }

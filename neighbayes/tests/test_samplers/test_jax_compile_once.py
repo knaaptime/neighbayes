@@ -56,12 +56,8 @@ def _cases():
     )
     y, X = make_sar_logit_data(np.random.default_rng(3), Wd, rho=0.4, beta=beta)
     out["SARLogit"] = (y, lambda y, X=X: M.SARLogit(y=y, X=X, W=W))
-    for name, cls, s2 in (
-        ("SARNegBin", M.SARNegBin, 0.0),
-        ("SARNegBinRE", partial(M.SARNegBin, unit_effects="random"), 0.5),
-    ):
-        dn = dgp.simulate_sar_negbin(W=_as_sparse(W), rho=0.4, beta=np.array([0.5, 0.8]), alpha=2.0, rng=np.random.default_rng(4), unit_effects="random", unit_effect_sd=(s2) ** 0.5)  # fmt: skip
-        out[name] = (dn["y"], lambda y, dn=dn, cls=cls: cls(y=y, X=dn["X"], W=W))
+    dn = dgp.simulate_sar_negbin(W=_as_sparse(W), rho=0.4, beta=np.array([0.5, 0.8]), alpha=2.0, rng=np.random.default_rng(4))  # fmt: skip
+    out["SARNegBin"] = (dn["y"], lambda y: M.SARNegBin(y=y, X=dn["X"], W=W))
     dz = dgp.simulate_sar_zinb(n_side=6, seed=6)
     out["SARZINB"] = (dz["y"], lambda y: M.SARZINB(y=y, X=dz["X"], W=dz["W_sparse"]))
     fd = dgp.simulate_sar_negbin_flow(
@@ -128,7 +124,6 @@ _CASES = (
     "SARPanelFE",
     "SARLogit",
     "SARNegBin",
-    "SARNegBinRE",
     "SARZINB",
     "SARNegBinFlow",
     "SARNegBinFlowSeparable",

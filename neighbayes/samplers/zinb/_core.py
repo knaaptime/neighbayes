@@ -60,7 +60,6 @@ from ..logit_reduced._core import (
 from ..logit_reduced._core import (
     _sample_rho as _sample_lam,
 )
-from ..negbin._core import GibbsPriors as _NBGibbsPriors
 from ..negbin._core import GibbsState as _NBGibbsState
 from ..negbin._core import _nb_loglik_pointwise, _sample_alpha
 from ..negbin_reduced._core import (
@@ -620,7 +619,7 @@ def run_zinb_chain(
                 alpha=state.alpha,
                 omega=state.omega_cnt[z1],
             )
-            alpha_priors = _NBGibbsPriors(
+            alpha_priors = ReducedGibbsPriors(
                 alpha_sigma=priors.alpha_sigma,
                 alpha_nu=priors.alpha_nu,
                 alpha_fixed=getattr(priors, "alpha_fixed", None),

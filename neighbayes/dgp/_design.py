@@ -35,7 +35,7 @@ _DESIGN = {
 # Switches the design arguments replace, and what replaces each.
 _RETIRED = {
     "sigma_alpha": "unit_effects= (pair_effects= for flows) with unit_effect_sd=",
-    "sigma2": "unit_effects='random' with unit_effect_sd=",
+    "sigma2": "a panel's unit_effects='random' with unit_effect_sd=",
     "structural": "nothing: the SAR logit is the reduced form only",
 }
 _DEFAULT_SD = 0.5
@@ -268,7 +268,7 @@ _COUNT = {
 
 @accepts("T", "N", "unit_effects", "time_effects", "unit_effect_sd", "time_effect_sd")
 def count(fn, design, kw):
-    """Count families: random effects in a cross-section (NB only), count panels."""
+    """Count families: the cross-section, and panels with random unit effects."""
     name = fn.__name__
     unit, time, _ = _validate(design)
     if unit == "fixed":
@@ -276,14 +276,11 @@ def count(fn, design, kw):
     if not _panel(design, kw):
         _no_panel_only(name, time, False)
         _scale(design, "time_effect_sd", False, "time_effects")
-        if unit == "random":
-            if name != "simulate_sar_negbin":
-                raise NotImplementedError(
-                    f"{name} takes random unit effects only in a panel (pass T)."
-                )
-            kw["sigma2"] = _scale(design, "unit_effect_sd", True, "unit_effects") ** 2
-        else:
-            _scale(design, "unit_effect_sd", False, "unit_effects")
+        if unit is not None:
+            raise NotImplementedError(
+                f"{name} takes random unit effects only in a panel (pass T)."
+            )
+        _scale(design, "unit_effect_sd", False, "unit_effects")
         return fn, kw
     target = _private(*_COUNT[name])
     kw["unit_effect_sd"] = _scale(

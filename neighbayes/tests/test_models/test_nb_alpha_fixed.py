@@ -20,8 +20,7 @@ from neighbayes.models.flow_panel._panel import (
     SARNegBinFlowPanelRE,
     SARNegBinFlowSeparablePanelRE,
 )
-from neighbayes.models.panel._count import NegBinPanelRE, SARNegBinPanelRE
-from neighbayes.tests.helpers import W_to_graph, make_rook_W
+from neighbayes.tests.helpers import W_to_graph, effects_kwargs, make_rook_W
 
 A = 37.0
 SHORT = dict(draws=15, tune=15, chains=1, progressbar=False, random_seed=0)
@@ -51,17 +50,6 @@ def _flow_panel():
 def test_sar_negbin(backend):
     d, W = _cross_section()
     m = SARNegBin(y=d["y"], X=d["X"], W=W, priors={"alpha_fixed": A})
-    assert _held(m.fit(backend=backend, n_jobs=1, **SHORT))
-
-
-@pytest.mark.parametrize(
-    "backend", ["numpy", pytest.param("jax", marks=pytest.mark.requires_jax)]
-)
-def test_sar_negbin_re(backend):
-    d, W = _cross_section()
-    m = SARNegBin(
-        unit_effects="random", y=d["y"], X=d["X"], W=W, priors={"alpha_fixed": A}
-    )
     assert _held(m.fit(backend=backend, n_jobs=1, **SHORT))
 
 
@@ -120,13 +108,13 @@ def test_flow_panels(cls, effects, backend):
     assert _held(idata)
 
 
-@pytest.mark.parametrize("cls", [SARNegBinPanelRE, NegBinPanelRE])
+@pytest.mark.parametrize("cls", [SARNegBin, NegBin])
 @pytest.mark.parametrize("effects", [0, 3])
 def test_panels(cls, effects):
     d = dgp.simulate_sar_negbin(N=16, T=3, n_side=4, seed=4)
     m = cls(
-        y=d["y"], X=d["X"], W=d["W_sparse"], N=16, T=3, effects=effects,
-        priors={"alpha_fixed": A},
+        y=d["y"], X=d["X"], W=d["W_sparse"], N=16, T=3,
+        **effects_kwargs(effects, treatment="random"), priors={"alpha_fixed": A},
     )  # fmt: skip
     assert _held(m.fit(n_jobs=1, **SHORT))
 

@@ -17,7 +17,6 @@ import pytest
 from neighbayes import dgp
 from neighbayes.models import SARZINB, ZINB, SARZINBFlow
 from neighbayes.models.flow_panel._panel import SARZINBFlowSeparable
-from neighbayes.models.panel._zinb import SARZINBPanelRE, ZINBPanelRE
 from neighbayes.tests.helpers import effects_kwargs
 
 QUICK = dict(draws=20, tune=20, chains=1, progressbar=False, random_seed=0)
@@ -232,7 +231,7 @@ class TestSARZINB:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("cls", [SARZINBPanelRE, ZINBPanelRE])
+@pytest.mark.parametrize("cls", [SARZINB, ZINB])
 @pytest.mark.parametrize("effects", [0, 1, 2, 3])
 @pytest.mark.parametrize("sampler", ["gibbs", "nuts"])
 def test_zinb_panel_api(cls, effects, sampler):
@@ -244,7 +243,7 @@ def test_zinb_panel_api(cls, effects, sampler):
         W=d["W_sparse"],
         N=25,
         T=3,
-        effects=effects,
+        **effects_kwargs(effects, treatment="random"),
     )
     kw = dict(QUICK, sampler=sampler)
     if sampler == "gibbs":
@@ -252,7 +251,7 @@ def test_zinb_panel_api(cls, effects, sampler):
     post = m.fit(**kw).posterior
     assert ("unit_effect" in post) == (effects in (1, 3))
     assert ("time_effect" in post) == (effects in (2, 3))
-    assert ("rho_zero" in post) == (cls is SARZINBPanelRE)
+    assert ("rho_zero" in post) == (cls is SARZINB)
     assert post["beta_zero"].shape[-1] == 2
     assert m.posterior_predictive(n_draws=2, random_seed=0).shape == (2, 75)
     assert m.impacts().shape[0] == 1

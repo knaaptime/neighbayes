@@ -28,15 +28,17 @@ import scipy.sparse as sp
 from ..._lazy_deps import xr
 from ...samplers import hurdle as _hurdle  # noqa: F401  (registers the runners)
 from .._base._nb import nb_alpha_rv
-from .._base._shared import _parse_W
-from .._design import discrete
+from .._mixins._designs import CountDesigns
 from .._mixins._hurdle import HurdleMixin
+from .._mixins._zero_part import ZeroPartMixin
 from ..base import SpatialModel
-from ..priors import SARHurdlePriors
-from .sar_zinb import _selection_design
+from ..panel._hurdle import _HurdlePanel
+from ..priors import PanelHurdlePriors, SARHurdlePriors
 
 
-class SARHurdleNegBin(HurdleMixin, SpatialModel):
+class SARHurdleNegBin(
+    CountDesigns, _HurdlePanel, ZeroPartMixin, HurdleMixin, SpatialModel
+):
     """Bayesian reduced-form SAR hurdle NB2 with a Pólya–Gamma Gibbs sampler.
 
     Parameters
@@ -55,7 +57,7 @@ class SARHurdleNegBin(HurdleMixin, SpatialModel):
     formula_zero : str, optional
         Zero-part right-hand side, e.g. ``"~ z1 + z2"`` (formula mode).
     W : libpysal.graph.Graph or scipy.sparse matrix
-        Count-part weights, ``n × n``.
+        Count-part weights, ``n × n`` (``N × N`` in a panel).
     W_zero : libpysal.graph.Graph or scipy.sparse matrix, optional
         Zero-part weights. Default: ``W``.
     priors : dict, optional
@@ -82,6 +84,23 @@ class SARHurdleNegBin(HurdleMixin, SpatialModel):
         ``"lu"`` that the method is implemented on.  Ignored by
         ``"stochastic"``.  A pair with no implementation (``"spline"`` on
         ``"chol"``, ``"exact"`` on ``"lu"``) raises.
+    time_col, unit_col : str, optional
+        Formula-mode panel: the period and unit columns of ``data``.  Given
+        time, the model is a panel (:mod:`neighbayes.models.panel._hurdle`),
+        stacked by period, then unit.  A panel's priors are
+        :class:`~neighbayes.models.priors.PanelHurdlePriors`.
+    N, T : int, optional
+        Matrix-mode panel: the numbers of units and periods.
+    unit_effects : {None, "random"}, default None
+        A panel's random unit effects in **both** parts, each inside its own
+        filter.  In the zero part a unit effect absorbs each unit's baseline
+        chance of a positive count, so ``beta_zero`` is identified from
+        within-unit switches between zero and positive periods.
+    time_effects : bool, default False
+        A panel's fixed time effects in both parts.
+    mundlak : bool, default False
+        Add the unit means of the time-varying columns to both of a panel's
+        designs.  Needs unit effects.
 
     Notes
     -----
@@ -98,78 +117,23 @@ class SARHurdleNegBin(HurdleMixin, SpatialModel):
     ``P(y > 0)``, :meth:`positive_mean` ``E[y | y > 0]``.
     """
 
-    _dispatch = classmethod(discrete)
+    _DESIGNS = {
+        "static": {},
+        "panel": {
+            "_priors_cls": PanelHurdlePriors,
+            "_gibbs_key": ("hurdle", "panel"),
+        },
+    }
+    _zero_part = True
+    _needs_positive = True
 
     _spatial_params: tuple[str, ...] = ("rho", "rho_zero")
-    _lag_terms: tuple[str, ...] = ()
-    _jacobian_param: str | None = None
-    _gibbs_class: str | None = None
     _model_type: str = "hurdle_sar"
-    _likelihood: str = "count"
     _gibbs_key: tuple[str, str] | None = ("hurdle", "cross_section")
     _priors_cls = SARHurdlePriors
 
-    def __init__(
-        self,
-        formula=None,
-        data=None,
-        y=None,
-        X=None,
-        X_zero=None,
-        W=None,
-        formula_zero=None,
-        W_zero=None,
-        priors=None,
-        logdet_method=None,
-        robust=False,
-        **kwargs,
-    ):
-        if robust:
-            raise NotImplementedError(
-                "robust=True is not supported for SARHurdleNegBin."
-            )
-        super().__init__(
-            formula=formula,
-            data=data,
-            y=y,
-            X=X,
-            W=W,
-            priors=priors,
-            logdet_method=logdet_method,
-            robust=False,
-            **kwargs,
-        )
-        if np.any(self._y < 0) or not np.allclose(self._y, np.round(self._y)):
-            raise ValueError(
-                "y must be non-negative integer counts for SARHurdleNegBin."
-            )
-        if not np.any(self._y > 0):
-            raise ValueError("SARHurdleNegBin needs at least one positive count.")
-        self._y_int = np.round(self._y).astype(np.int64)
-        self._Z, self._sel_feature_names = _selection_design(
-            X_zero, formula_zero, data, len(self._y)
-        )
-        if self._Z is None:
-            self._Z = self._X.copy()
-            self._sel_feature_names = list(self._feature_names)
-        if W_zero is not None:
-            self._W_zero_sparse, self._is_sel_row_std = _parse_W(W_zero, len(self._y))
-            self._same_W = False
-        else:
-            self._W_zero_sparse = self._W_sparse
-            self._is_sel_row_std = self._is_row_std
-            self._same_W = True
-
-    def _bounds(self, zero: bool = False) -> tuple[float, float]:
-        """ρ's prior bounds in the count part, or in the zero part (``*_zero`` keys)."""
-        b = self._logdet_bounds
-        z = "_zero" if zero else ""
-        lo = float(self.priors.get(f"rho_lower{z}", b.rho_min))
-        hi = float(self.priors.get(f"rho_upper{z}", b.rho_max))
-        return max(lo, b.rho_min), min(hi, b.rho_max)
-
-    def _model_coords(self, extra: Optional[dict] = None) -> dict:
-        coords = super()._model_coords(extra)
+    def _model_coords_static(self, extra: Optional[dict] = None) -> dict:
+        coords = SpatialModel._model_coords(self, extra)
         coords["coefficient_zero"] = list(self._sel_feature_names)
         return coords
 
@@ -177,7 +141,7 @@ class SARHurdleNegBin(HurdleMixin, SpatialModel):
     # Sampling
     # ------------------------------------------------------------------
 
-    def _fit_gibbs(
+    def _fit_gibbs_static(
         self,
         *,
         draws: int = 2000,
@@ -274,7 +238,7 @@ class SARHurdleNegBin(HurdleMixin, SpatialModel):
         self._idata = idata
         return idata
 
-    def _build_pymc_model(self):
+    def _build_pymc_model_static(self):
         r"""The same reduced-form hurdle and priors as the Gibbs path, in PyMC.
 
         ``y ~ HurdleNB(ψ = π, μ = exp(η_c), α)``, where PyMC's ``ψ`` is
@@ -313,7 +277,7 @@ class SARHurdleNegBin(HurdleMixin, SpatialModel):
             )
         return model
 
-    def _part_etas(self, g: int) -> tuple[np.ndarray, np.ndarray]:
+    def _part_etas_static(self, g: int) -> tuple[np.ndarray, np.ndarray]:
         """``(η_b, η_c)`` at posterior draw ``g``."""
         n = self._X.shape[0]
         lam = float(self._flat_draw("rho_zero")[g])

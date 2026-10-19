@@ -253,9 +253,6 @@ from .suites import (
     OLS_SUITE as OLS_SUITE,
 )
 from .suites import (
-    SAR_NEGBIN_SUITE as SAR_NEGBIN_SUITE,
-)
-from .suites import (
     SAR_PANEL_SUITE as SAR_PANEL_SUITE,
 )
 from .suites import (

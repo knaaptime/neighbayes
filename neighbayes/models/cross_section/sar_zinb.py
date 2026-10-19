@@ -44,7 +44,6 @@ import warnings
 from typing import Optional
 
 import numpy as np
-import pandas as pd
 import scipy.sparse as sp
 
 from ..._lazy_deps import xr
@@ -60,41 +59,15 @@ from ...samplers.zinb import (
     run_zinb_chain,
 )
 from .._base._nb import nb_alpha_fixed, nb_alpha_rv
-from .._base._shared import _parse_W
-from .._design import discrete
+from .._mixins._designs import CountDesigns
+from .._mixins._zero_part import ZeroPartMixin
 from .._mixins._zinb import ZINBMixin
 from ..base import SpatialModel
-from ..priors import SARZINBPriors
+from ..panel._zinb import _ZINBPanel
+from ..priors import PanelZINBPriors, SARZINBPriors
 
 
-def _selection_design(Z, formula_zero, data, n: int):
-    """The selection design and its column names, or ``(None, None)`` for ``Z = X``."""
-    if Z is not None and formula_zero is not None:
-        raise ValueError("Pass Z or formula_zero, not both.")
-    if formula_zero is not None:
-        if data is None:
-            raise ValueError("formula_zero needs data (formula mode).")
-        from formulaic import model_matrix
-
-        rhs = formula_zero.split("~", 1)[-1].strip()
-        mm = model_matrix(rhs, data)
-        names, Z_arr = list(mm.columns), np.asarray(mm, dtype=np.float64)
-    elif Z is not None:
-        if isinstance(Z, pd.DataFrame):
-            names = [str(c) for c in Z.columns]
-        Z_arr = np.asarray(Z, dtype=np.float64)
-        if Z_arr.ndim == 1:
-            Z_arr = Z_arr.reshape(-1, 1)
-        if not isinstance(Z, pd.DataFrame):
-            names = [f"z{j}" for j in range(Z_arr.shape[1])]
-    else:
-        return None, None
-    if Z_arr.shape[0] != n:
-        raise ValueError(f"Z has {Z_arr.shape[0]} rows but y has {n} observations.")
-    return Z_arr, names
-
-
-class SARZINB(ZINBMixin, SpatialModel):
+class SARZINB(CountDesigns, _ZINBPanel, ZeroPartMixin, ZINBMixin, SpatialModel):
     """Bayesian zero-inflated SAR Negative Binomial with PG-Gibbs sampler.
 
     Parameters
@@ -118,7 +91,8 @@ class SARZINB(ZINBMixin, SpatialModel):
         Right-hand side for the **zero** part, e.g. ``"~ z1 + z2"``,
         evaluated on ``data`` (formula mode). Alternative to ``X_zero``.
     W : libpysal.graph.Graph or scipy.sparse matrix
-        Spatial weights for the **count** part, shape ``(n, n)``.
+        Spatial weights for the **count** part, shape ``(n, n)`` (``N × N``
+        in a panel).
     W_zero : libpysal.graph.Graph or scipy.sparse matrix, optional
         Spatial weights for the **zero** part. If ``None``, uses ``W`` (the
         same weights in both parts).
@@ -159,8 +133,24 @@ class SARZINB(ZINBMixin, SpatialModel):
         ``"lu"`` that the method is implemented on.  Ignored by
         ``"stochastic"``.  A pair with no implementation (``"spline"`` on
         ``"chol"``, ``"exact"`` on ``"lu"``) raises.
-    robust : bool, default False
-        Not supported. Raises ``NotImplementedError`` if True.
+    time_col, unit_col : str, optional
+        Formula-mode panel: the period and unit columns of ``data``.  Given
+        time, the model is a panel (:mod:`neighbayes.models.panel._zinb`),
+        stacked by period, then unit, with structural zeros per period;
+        ``X_zero`` may vary over time.  A panel's priors are
+        :class:`~neighbayes.models.priors.PanelZINBPriors`.
+    N, T : int, optional
+        Matrix-mode panel: the numbers of units and periods.
+    unit_effects : {None, "random"}, default None
+        A panel's random unit effects, inside the count filter.  The zero
+        part has none: a unit effect there would compete with the zero
+        process for the same information.
+    time_effects : bool, default False
+        A panel's fixed time effects in the count part (add period dummies to
+        ``X_zero`` for period effects in the zero part).
+    mundlak : bool, default False
+        Add the unit means of the time-varying columns to a panel's count
+        design.  Needs unit effects.
 
     Notes
     -----
@@ -174,78 +164,21 @@ class SARZINB(ZINBMixin, SpatialModel):
     simulates ``d ~ Bern(π)``, ``y = d · NB``.
     """
 
-    _dispatch = classmethod(discrete)
+    _DESIGNS = {
+        "static": {},
+        "panel": {"_priors_cls": PanelZINBPriors, "_gibbs_key": ("zinb", "panel")},
+    }
+    _zero_part = True
 
     _spatial_params: tuple[str, ...] = ("rho", "rho_zero")
-    _lag_terms: tuple[str, ...] = ()
-    _jacobian_param: str | None = "rho"  # count equation Jacobian
-    _gibbs_class: str | None = None
     _model_type: str = "zinb_sar"
-    _likelihood: str = "count"
     _gibbs_key: tuple[str, str] | None = ("zinb", "cross_section")
     _priors_cls = SARZINBPriors
 
-    def __init__(
-        self,
-        formula=None,
-        data=None,
-        y=None,
-        X=None,
-        X_zero=None,
-        W=None,
-        formula_zero=None,
-        W_zero=None,
-        priors=None,
-        logdet_method=None,
-        robust=False,
-        **kwargs,
-    ):
-        if robust:
-            raise NotImplementedError("robust=True is not supported for SARZINB.")
-
-        # Initialize base class with count equation data
-        super().__init__(
-            formula=formula,
-            data=data,
-            y=y,
-            X=X,
-            W=W,
-            priors=priors,
-            logdet_method=logdet_method,
-            robust=False,
-            **kwargs,
-        )
-
-        # Validate y is non-negative integer
-        if np.any(self._y < 0):
-            raise ValueError("y must be non-negative for ZINB models.")
-        if not np.allclose(self._y, np.round(self._y)):
-            raise ValueError("y must be integer-valued for ZINB models.")
-
-        # Store integer y
-        self._y_int = np.round(self._y).astype(np.int64)
-
+    def _init_static(self) -> None:
         # Binary activity indicator: d = 1(y > 0)
         self._d = (self._y > 0).astype(np.float64)
-
-        # Selection covariates Z
-        self._Z, self._sel_feature_names = _selection_design(
-            X_zero, formula_zero, data, len(self._y)
-        )
-        if self._Z is None:
-            self._Z = self._X.copy()
-            self._sel_feature_names = list(self._feature_names)
-
-        # Selection weights W_zero
-        if W_zero is not None:
-            self._W_zero_sparse, self._is_sel_row_std = _parse_W(W_zero, len(self._y))
-            self._same_W = False
-        else:
-            self._W_zero_sparse = self._W_sparse
-            self._is_sel_row_std = self._is_row_std
-            self._same_W = True
-
-        # Precompute logdet callable for the count equation ρ slice sampler
+        # The count equation's ρ slice sampler's log-determinant.
         self._logdet_fn = self._logdet_numpy_fn
 
     def _initialize_from_ols(self, rng):
@@ -404,7 +337,7 @@ class SARZINB(ZINBMixin, SpatialModel):
             alpha_fixed=nb_alpha_fixed(self.priors),
         )
 
-    def _fit_gibbs(
+    def _fit_gibbs_static(
         self,
         *,
         draws: int = 2000,
@@ -670,7 +603,7 @@ class SARZINB(ZINBMixin, SpatialModel):
         self._idata = idata
         return idata
 
-    def _build_pymc_model(self):
+    def _build_pymc_model_static(self):
         r"""Reduced-form ZINB for NUTS: the same model and priors as the Gibbs path.
 
         ``y ~ ZINB(ψ = π, μ = exp(η_cnt), α)`` with
@@ -715,7 +648,7 @@ class SARZINB(ZINBMixin, SpatialModel):
     def _zinb_coords(self) -> dict:
         return {"coefficient_zero": list(self._sel_feature_names)}
 
-    def _part_etas(self, g: int) -> tuple[np.ndarray, np.ndarray]:
+    def _part_etas_static(self, g: int) -> tuple[np.ndarray, np.ndarray]:
         """``(η_sel, η_cnt)`` at posterior draw ``g``."""
         n = self._X.shape[0]
         lam = float(self._flat_draw("rho_zero")[g])

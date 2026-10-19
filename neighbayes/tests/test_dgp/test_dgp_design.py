@@ -57,15 +57,13 @@ def test_dynamic_and_restricted_dynamic():
     assert d.simulate_ols(n_side=4, T=3, seed=1, dynamic=True)["y"].shape == (48,)
 
 
-def test_count_panels_and_cross_section_random_effects():
+def test_count_unit_effects_need_a_panel():
     p = d.simulate_sar_negbin(
         n_side=4, T=3, seed=1, unit_effects="random", time_effects=True
     )
     assert p["y"].shape == (48,)
-    xs = d.simulate_sar_negbin(
-        n_side=5, seed=1, unit_effects="random", unit_effect_sd=0.3
-    )
-    assert xs["params_true"]["sigma2"] == pytest.approx(0.09)
+    with pytest.raises(NotImplementedError, match="only in a panel"):
+        d.simulate_sar_negbin(n_side=5, seed=1, unit_effects="random")
 
 
 def test_logit_takes_no_unit_effects():
