@@ -14,8 +14,7 @@ with the group dummies ``D_g = 1_T ⊗ I_N``, so the working model carries
 ``c̃ = A⁻¹c``, under the prior ``N(μA⁻¹1, σ²(AᵀA)⁻¹)``.  That is a different
 model from independent effects outside the filter: the two coincide only for
 unpooled effects.  Period effects ``τ``, outside the filter, join the
-coefficient block ``θ = (β, τ)``.  (The separable flow filter keeps its
-effects outside for now; see :mod:`._filters`.)
+coefficient block ``θ = (β, τ)``.
 
 **Sweep** (partially collapsed Gibbs), one
 :class:`~neighbayes.samplers._utils._glm_equation.MaterializedEquation`:

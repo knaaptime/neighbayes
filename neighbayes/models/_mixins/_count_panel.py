@@ -16,10 +16,8 @@ raw counts and carry the effects as parameters:
   added after the filter, which it equals only for unpooled effects.  The
   samplers integrate the effects out of every ρ update, draw them jointly with
   β, then draw σ (see :mod:`~neighbayes.samplers._utils._group_effects`); they
-  are stored as a unit (pair) index, never as columns of ``X``.  The separable
-  flow panels still add their pair effects after the filter
-  (:attr:`CountPanelFEMixin._effects_inside`).
-* **Period effects** ``τ``, also outside the filter, join the coefficient
+  are stored as a unit (pair) index, never as columns of ``X``.
+* **Period effects** ``τ``, outside the filter, join the coefficient
   block under a fixed prior (there are too few to learn their sd): ``T − 1`` of
   them (first period the baseline) beside unit effects, all ``T`` without
   (the intercept is then absorbed).
@@ -148,9 +146,6 @@ class CountPanelFEMixin:
     """
 
     _count_spatial: bool = True
-    #: Whether the unit (pair) effects enter inside the filter.  False only for
-    #: the separable flow panels, whose structured kernels still add them after.
-    _effects_inside: bool = True
     # Count likelihoods carry no Jacobian; the Lee & Yu adjustments are Gaussian.
     _lee_yu: bool = False
     #: What the effects index: units here, pairs in the flow panels.
@@ -509,9 +504,8 @@ class CountPanelFEMixin:
         """Inside a ``pm.Model``: the effects' parts of the log-mean, ``(inner, outer)``.
 
         ``inner`` joins the covariates before the filter — the unit (pair)
-        effects, when they enter inside it (:attr:`_effects_inside`); ``outer``
-        is added after it — the period effects, and the unit effects otherwise.
-        Either is 0 when absent.  ``zero`` and ``fe_priors`` (keys as
+        effects; ``outer`` is added after it — the period effects.  Either is 0
+        when absent.  ``zero`` and ``fe_priors`` (keys as
         :meth:`_count_fe_priors`) name and price a second set of effects (the
         hurdle's zero part, ``*_zero``).
         """
@@ -531,10 +525,7 @@ class CountPanelFEMixin:
             c = pm.Deterministic(
                 self._effect_name(zero=zero), fp["effect_mu"] + sd * raw, dims=index
             )
-            if self._effects_inside:
-                inner = c[self._row_group]
-            else:
-                outer = c[self._row_group]
+            inner = c[self._row_group]
         if self._fe_periods:
             tau = pm.Normal(
                 self._time_name(zero=zero),
@@ -561,15 +552,10 @@ class CountPanelFEMixin:
                     "store_effects=True."
                 )
             c = post[name].values.reshape(-1, self._n_groups)[:n_draws]
-            rows = c[:, self._row_group]
-            if self._effects_inside:
-                inner = rows
-            else:
-                outer = rows
+            inner = c[:, self._row_group]
         if self._fe_periods:
             tau = post["time_effect"].values.reshape(-1, self._n_tau)[:n_draws]
-            shift = tau @ self._D_tau.T
-            outer = shift if outer is None else outer + shift
+            outer = tau @ self._D_tau.T
         return inner, outer
 
     def _count_draw(self, rng, eta: np.ndarray, alpha: Optional[float]) -> np.ndarray:

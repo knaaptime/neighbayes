@@ -18,7 +18,11 @@ from __future__ import annotations
 import numpy as np
 
 from ..negbin_reduced._flow_structured import classify_flow_design
-from ..negbin_reduced._flow_structured_fe_jax import make_structured_equation
+from ..negbin_reduced._flow_structured_fe_jax import (
+    make_structured_equation,
+    pair_state,
+    warn_unconverged_cg,
+)
 
 
 def _const_col(M):
@@ -132,8 +136,10 @@ def _hurdle_sweep(
 
     def carrier_log_prior(eq, t, data):
         if carrier == "C":
+            # Shifting the pair effects A C̃ by t: their prior sees A C̃ + t.
             s = eq["s_pair"] if c_learn else data["c_s_pair"]
-            return -0.5 * jnp.sum((eq["C"] + t - data["c_m_pair"]) ** 2) / s**2
+            dev = count.effects(eq, data) + t - data["c_m_pair"]
+            return -0.5 * jnp.sum(dev**2) / s**2
         if carrier == "tau":
             return (
                 -0.5
@@ -146,7 +152,7 @@ def _hurdle_sweep(
     def apply_shift(eq, t, v):
         eq = dict(eq)
         if carrier == "C":
-            eq["C"] = eq["C"] + t
+            eq["C"] = eq["C"] + t * v
         elif carrier == "tau":
             eq["tau"] = eq["tau"] + t
         else:
@@ -228,12 +234,13 @@ def _hurdle_sweep(
         new = dict(state)
         new["bin"] = bin_new
         if move:
-            v = (
-                jnp.ones((n, n))
-                if carrier in ("C", "tau")
-                else data["level_val"]
-                * count.level_vector(cnt_new["rho_d"], cnt_new["rho_o"], data)
-            )
+            if carrier == "tau":
+                v = jnp.ones((n, n))
+            else:
+                # A⁻¹1: a shift of the effects or the constant column, filtered.
+                v = count.level_vector(cnt_new["rho_d"], cnt_new["rho_o"], data)
+                if carrier != "C":
+                    v = data["level_val"] * v
             dirs, widths = state["lv_dirs"], state["lv_widths"]
             th = jnp.array([0.0, jnp.log(alpha)])
             keys = jax.random.split(k_lv, 2)
@@ -284,10 +291,12 @@ def _hurdle_sweep(
         new["cnt"] = cnt_new
         new["alpha"] = alpha
 
+        b_effects = binary.effects(bin_new, data) if b_pairs else None
+        c_effects = count.effects(cnt_new, data) if c_pairs else None
         if b_pairs and not keep_group_draws:
-            new.update(welford(state, "b_", bin_new["C"], tuning))
+            new.update(welford(state, "b_", b_effects, tuning))
         if c_pairs and not keep_group_draws:
-            new.update(welford(state, "c_", cnt_new["C"], tuning))
+            new.update(welford(state, "c_", c_effects, tuning))
         trace = (
             bin_new["rho_d"],
             bin_new["rho_o"],
@@ -304,9 +313,9 @@ def _hurdle_sweep(
                 trace = trace + (new_["s_pair"],)
         if keep_group_draws:
             if b_pairs:
-                trace = trace + (bin_new["C"],)
+                trace = trace + (b_effects,)
             if c_pairs:
-                trace = trace + (cnt_new["C"],)
+                trace = trace + (c_effects,)
         if store_eta:
             trace = trace + (bin_new["eta"], cnt_new["eta"])
         return new, trace
@@ -373,7 +382,7 @@ def run_chains_jax_hurdle_flow_structured(
         cnt = P.sum(axis=0)
         mean_pos = np.where(cnt > 0, (Y * P).sum(axis=0) / np.maximum(cnt, 1), 1.0)
         Cc0 = np.log(mean_pos) - np.log(y_np[pos].mean())
-    w0 = (jnp.float64(slice_width),) * 2
+    w0 = (jnp.float64(slice_width),) * 4
     alpha0 = 1.0 if priors.alpha_fixed is None else float(priors.alpha_fixed)
 
     states = []
@@ -394,6 +403,7 @@ def run_chains_jax_hurdle_flow_structured(
             }
             if eq.learn_sd:
                 st["s_pair"] = jnp.float64(float(pe[1]))
+            st.update(pair_state(eq.has_pairs))
             st["eta"] = init(
                 st["beta"], st["tau"], st["C"], st["rho_d"], st["rho_o"], data
             )
@@ -422,6 +432,9 @@ def run_chains_jax_hurdle_flow_structured(
     final, traces = run_chains_chunked(
         sweep, states, warm_keys, draw_keys, tune=tune, draws=draws, consts=data
     )
+    for name, eq in (("bin", binary), ("cnt", count)):
+        if eq.has_pairs:
+            warn_unconverged_cg(f[name]["cg_resid"] for f in final)
     ld, lo, gam, stau, rd, ro, beta, tau, alpha = traces[:9]
     nxt = 9
     sds = {}

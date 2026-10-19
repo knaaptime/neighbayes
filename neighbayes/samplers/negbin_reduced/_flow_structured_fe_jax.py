@@ -1,15 +1,20 @@
-r"""JAX port of the structured separable NB flow sweep with fixed effects.
+r"""JAX port of the structured separable NB flow sweep with pair and period effects.
 
-Same sweep as :mod:`._flow_structured_fe` (read it first) — ω → ρ_d → ρ_o
-(``β_c``, period and pair effects integrated out) → ``(β, τ)`` jointly → pair
-effects ``C`` → α — compiled into one XLA program per chunk of sweeps and run
-thread-per-chain through :func:`.._utils._jax_utils.run_chains_chunked`, as the
-pooled port :mod:`._flow_structured_jax` is.
+Same sweep as :mod:`._flow_structured_fe` (read it first) — ω → ρ_d → ρ_o,
+centred then non-centred (``β_c`` and the period effects integrated out, the
+pair effects held) → ``(β, τ)`` jointly → the pair effects by conjugate
+gradients → the time-invariant block move → their sd → α — compiled into one
+XLA program per chunk of sweeps and run thread-per-chain through
+:func:`.._utils._jax_utils.run_chains_chunked`, as the pooled port
+:mod:`._flow_structured_jax` is.
 
 Per-period terms run under ``lax.scan``/``lax.map`` so temporaries stay
-``O(k n²)``; the ω-weighted group sums ``S(x) = Σ_t Ω_t ⊙ x_t`` ride the scan
-carry.  When per-draw pair effects would not fit in memory the chain keeps
-their running mean and variance in its state instead (Welford, draws only).
+``O(k n²)``.  ``A X = L_o X L_dᵀ`` uses sparse ``W`` (BCOO) and the effects'
+``log|L_o||L_d|`` the traced log-determinant of
+:func:`neighbayes._logdet._jax.logdet_jax_params`, so no compiled program
+closes over a particular ``W``.  When per-draw pair effects would not fit in
+memory the chain keeps their running mean and variance in its state instead
+(Welford, draws only).
 """
 
 from __future__ import annotations
@@ -18,10 +23,63 @@ import numpy as np
 
 from ._flow_structured import FlowDesignStructure, classify_flow_design
 
+#: Relative residual of the pair-effect CG solve (see ``_flow_structured_fe``).
+_CG_TOL = 1e-10
+_CG_MAXITER = 20_000
+#: A run warns when a CG solve stopped above this relative residual.
+_CG_WARN = 1e-8
+
+
+def pair_state(has_pairs: bool) -> dict:
+    """The initial state a pair-effect equation carries besides its draws: the
+    largest relative CG residual so far, which a compiled sweep cannot warn on."""
+    import jax.numpy as jnp
+
+    return {"cg_resid": jnp.float64(0.0)} if has_pairs else {}
+
+
+def warn_unconverged_cg(residuals) -> None:
+    """Warn on the host when any chain's pair-effect CG stopped short."""
+    import warnings
+
+    worst = max((float(r) for r in residuals), default=0.0)
+    if worst > _CG_WARN:
+        warnings.warn(
+            f"The pair-effect conjugate-gradient solve stopped at a relative "
+            f"residual of {worst:.1e} (tolerance {_CG_TOL:.0e}, at most "
+            f"{_CG_MAXITER} iterations); those draws of the pair effects are "
+            "approximate.",
+            RuntimeWarning,
+            stacklevel=3,
+        )
+
+
+def _time_invariant_columns(struct: FlowDesignStructure):
+    """``(J, recipes, Z)``: the design columns constant over periods.
+
+    A recipe is ``("c", u, v)`` for a rank-one column ``U_u V_vᵀ`` or
+    ``("f", i)`` for the full-rank ``F_i``; ``Z`` stacks them as pair arrays.
+    """
+    J, recipes, Z = [], [], []
+    for j, col in enumerate(struct.cheap_cols):
+        u, v = struct.u_idx[:, j], struct.v_idx[:, j]
+        if np.all(u == u[0]) and np.all(v == v[0]):
+            J.append(int(col))
+            recipes.append(("c", int(u[0]), int(v[0])))
+            Z.append(np.outer(struct.U[:, u[0]], struct.V[:, v[0]]))
+    for j, col in enumerate(struct.full_cols):
+        f = struct.f_idx[:, j]
+        if np.all(f == f[0]):
+            J.append(int(col))
+            recipes.append(("f", int(f[0])))
+            Z.append(np.asarray(struct.F[f[0]], dtype=np.float64))
+    Z = np.stack(Z) if Z else np.zeros((0, struct.n, struct.n))
+    return tuple(J), tuple(recipes), Z
+
 
 def _equation_parts(
     W_csc, struct: FlowDesignStructure, beta_mu, beta_sigma, *, rho_bounds,
-    pair_effects=None, period_effects=None, prefix: str = "", has_mask: bool = False,
+    pair_effects=None, period_effects=None, prefix: str = "",
 ):  # fmt: skip
     """Host side of one structured equation: ``(static, data)``.
 
@@ -53,7 +111,28 @@ def _equation_parts(
     )
     mu_tau, s_tau, n_tau = period_effects if period_effects is not None else (0, 1, 0)
     lu_solve, sar = _sar_solver_parts(W_csc, n)
+    ld_kind, ti_J, ti_recipes = None, (), ()
+    pair_raw = {}
+    if has_pairs:
+        import scipy.sparse as sp
+
+        from ..._logdet._jax import logdet_jax_params
+        from .._utils._jax_utils import build_w_bcoo
+
+        W = sp.csr_matrix(W_csc, dtype=np.float64)
+        ld_kind, ld_params = logdet_jax_params(W, None, *rho_bounds)
+        W_bcoo, Wt_bcoo = build_w_bcoo(W)
+        ti_J, ti_recipes, Z_ti = _time_invariant_columns(struct)
+        pair_raw = {
+            "W": W_bcoo,
+            "Wt": Wt_bcoo,
+            "w_diag": jnp.asarray(W.diagonal()),
+            "w_colsq": jnp.asarray(np.asarray(W.multiply(W).sum(axis=0)).ravel()),
+            "logdet": ld_params,
+            "Z_ti": jnp.asarray(Z_ti),
+        }
     raw = {
+        **pair_raw,
         "F": jnp.asarray(np.stack(struct.F)) if k_e else jnp.zeros((0, n, n)),
         "U": jnp.asarray(struct.U),
         "V": jnp.asarray(struct.V),
@@ -74,19 +153,21 @@ def _equation_parts(
     data = {prefix + name: value for name, value in raw.items()}
     static = (
         n, T, k, tuple(int(c) for c in cc), tuple(int(c) for c in fc), has_pairs,
-        sd_scale is not None, int(n_tau), lu_solve, prefix, has_mask,
+        sd_scale is not None, int(n_tau), lu_solve, prefix, ld_kind, ti_J, ti_recipes,
     )  # fmt: skip
     return static, data
 
 
 def _equation_fns(
-    n, T, k, cc_t, fc_t, has_pairs, learn_sd, n_tau, lu_solve, prefix, has_mask=False
-):
+    n, T, k, cc_t, fc_t, has_pairs, learn_sd, n_tau, lu_solve, prefix, ld_kind,
+    ti_J, ti_recipes,
+):  # fmt: skip
     """One structured equation's kernels for one structure, each taking ``data``."""
     import jax
     import jax.numpy as jnp
     from jax.scipy.linalg import solve_triangular
 
+    from ..._logdet._jax import eval_logdet_params
     from .._utils._jax_slice import adapt_slice_width, jax_slice_sample_1d
     from ._flow_jax import _bind_sar_solver
 
@@ -96,6 +177,7 @@ def _equation_fns(
     order = np.concatenate([cc, fc]).astype(np.int32)
     t0 = T - n_tau
     kF, kU, kV = prefix + "F", prefix + "U", prefix + "V"
+    kW, kWt = prefix + "W", prefix + "Wt"
 
     def bind(data):
         def pre(name):
@@ -134,12 +216,12 @@ def _equation_fns(
         def cheap_arrays(A, B, t):
             return A[:, ui[t]].T[:, :, None] * B[:, vi[t]].T[:, None, :]
 
-        def moments(cols_of, resid_of, kx, prec_x, Om_all, D, OmOm_tau):
-            r"""Collapsed ``(M, v, quad)`` over ``[x-cols, τ]`` (see ``_gram_block``)."""
+        def moments(cols_of, resid_of, kx, prec_x, Om_all):
+            r"""``(M, v, quad)`` over ``[x-cols, τ]`` (see ``_gram_block``)."""
             K = kx + n_tau
 
             def step(carry, t):
-                Mx, vx, quad, SR, S = carry
+                Mx, vx, quad = carry
                 Om, R = Om_all[t], resid_of(t)
                 OmR = Om * R
                 quad = quad + jnp.sum(OmR * R)
@@ -149,24 +231,12 @@ def _equation_fns(
                     Mx = Mx + jnp.tensordot(OmC, C, axes=([1, 2], [1, 2]))
                     vx = vx + jnp.tensordot(OmC, R, axes=2)
                     cross = OmC.sum(axis=(1, 2))
-                    if has_pairs:
-                        S = S + OmC
                 else:
                     cross = jnp.zeros(0)
-                if has_pairs:
-                    SR = SR + OmR
-                return (Mx, vx, quad, SR, S), (cross, Om.sum(), OmR.sum())
+                return (Mx, vx, quad), (cross, Om.sum(), OmR.sum())
 
-            init = (
-                jnp.zeros((kx, kx)),
-                jnp.zeros(kx),
-                jnp.float64(0.0),
-                jnp.zeros((n, n)),
-                jnp.zeros((kx, n, n)) if (has_pairs and kx) else jnp.zeros((0, n, n)),
-            )
-            (Mx, vx, quad, SR, S), (cross, om_sum, omr_sum) = jax.lax.scan(
-                step, init, periods
-            )
+            init = (jnp.zeros((kx, kx)), jnp.zeros(kx), jnp.float64(0.0))
+            (Mx, vx, quad), (cross, om_sum, omr_sum) = jax.lax.scan(step, init, periods)
             M = jnp.zeros((K, K)).at[:kx, :kx].set(Mx)
             v = jnp.zeros(K).at[:kx].set(vx)
             if n_tau:
@@ -175,22 +245,6 @@ def _equation_fns(
                 v = v.at[kx:].add(omr_sum[t0:])
                 if kx:
                     M = M.at[:kx, kx:].add(cross[t0:].T).at[kx:, :kx].add(cross[t0:])
-            if has_pairs:
-                SRd = SR / D
-                quad = quad - jnp.sum(SR * SRd)
-                if kx:
-                    Sd = S / D[None]
-                    M = M.at[:kx, :kx].add(-jnp.tensordot(Sd, S, axes=([1, 2], [1, 2])))
-                    v = v.at[:kx].add(-jnp.tensordot(S, SRd, axes=2))
-                if n_tau:
-                    Om_tau = Om_all[t0:]
-                    M = M.at[kx:, kx:].add(-OmOm_tau)
-                    v = v.at[kx:].add(-jnp.tensordot(Om_tau, SRd, axes=2))
-                    if kx:
-                        cr = jax.lax.map(
-                            lambda Om: jnp.tensordot(Sd, Om, axes=2), Om_tau
-                        )  # (n_tau, kx)
-                        M = M.at[:kx, kx:].add(-cr.T).at[kx:, :kx].add(-cr)
             M = M + jnp.diag(jnp.concatenate([prec_x, prec_tau]))
             return M, v, quad
 
@@ -219,28 +273,42 @@ def _equation_fns(
 
             return jax.lax.map(period, periods)
 
+        def apply_A(X, rd_, ro_, transpose=False):
+            """``A X = L_o X L_dᵀ`` (``Aᵀ X = L_oᵀ X L_d``) for an ``n × n`` X."""
+            W_, Wt_ = (data[kWt], data[kW]) if transpose else (data[kW], data[kWt])
+            Y = X - ro_ * (W_ @ X)
+            return Y - rd_ * (Y @ Wt_)
+
+        def gram_diag(r):
+            """``diag(LᵀL)`` for ``L = I − rW``."""
+            return 1.0 - 2.0 * r * pre("w_diag") + r * r * pre("w_colsq")
+
+        def logdet(r):
+            return eval_logdet_params(ld_kind, pre("logdet"), r)
+
+        def level_vector(rd_, ro_):
+            """The filtered constant column ``A⁻¹1 = (L_o⁻¹1)(L_d⁻¹1)ᵀ``."""
+            ones = jnp.ones((n, 1))
+            return jnp.outer(solve(ro_, ones)[:, 0], solve(rd_, ones)[:, 0])
+
+        def effects(eq):
+            """The pair effects ``C = A C̃`` from the working ``C̃``."""
+            return apply_A(eq["C"], eq["rho_d"], eq["rho_o"])
+
         def update(eq, Om_all, Z_all, key, tuning):
             F, U, V = data[kF], data[kU], data[kV]
             beta, rd, ro = eq["beta"], eq["rho_d"], eq["rho_o"]
-            w_d, w_o = eq["slice_widths"]
-            if learn_sd:
-                k_d, k_o, k_b, k_c_, k_s, k_s2 = jax.random.split(key, 6)
-            else:
-                k_d, k_o, k_b, k_c_ = jax.random.split(key, 4)
+            w_d, w_o, w_dn, w_on = eq["slice_widths"]
+            keys = jax.random.split(key, 10)
             s_cur = eq["s_pair"] if learn_sd else s_pair
-
-            Zc = Z_all - m_pair
-            D = Om_all.sum(axis=0) + 1.0 / s_cur**2 if has_pairs else None
-            OmOm_tau = None
-            if has_pairs and n_tau:
-                OmD = Om_all[t0:].reshape(n_tau, -1) / jnp.sqrt(D).ravel()[None, :]
-                OmOm_tau = OmD @ OmD.T
+            C = eq["C"]
             B_full = key_sum(beta[fc], F)
             tau_shift = jnp.where(in_tau, mu_tau, 0.0)
+            empty = jnp.zeros((0, n, n))
 
-            def rho_density(eta_f, Av, Bv):
+            def rho_density(Zr, eta_f, Av, Bv):
                 def resid(t):
-                    R = Zc[t] - tau_shift[t]
+                    R = Zr[t] - tau_shift[t]
                     if k_e:
                         R = R - eta_f[t]
                     if k_c:
@@ -248,36 +316,73 @@ def _equation_fns(
                     return R
 
                 M, v, quad = moments(
-                    lambda t: cheap_arrays(Av, Bv, t),
-                    resid,
-                    k_c,
-                    prec_c,
-                    Om_all,
-                    D,
-                    OmOm_tau,
+                    lambda t: cheap_arrays(Av, Bv, t), resid, k_c, prec_c, Om_all
                 )
                 return collapsed_density(M, v, quad)
 
-            empty = jnp.zeros((0, n, n))
+            def prior_term(rd_, ro_):
+                """``log p(C̃ | ρ, σ)`` up to a constant: ``n log|L_o||L_d|`` less
+                the deviance of the effects ``A C̃``."""
+                if not has_pairs:
+                    return 0.0
+                dev = apply_A(C, rd_, ro_) - m_pair
+                return (
+                    n * (logdet(ro_) + logdet(rd_)) - 0.5 * jnp.sum(dev**2) / s_cur**2
+                )
+
+            # Centred: C̃ held, its ρ-dependent prior in the density.
+            Zc = Z_all - C[None]
             P, A_fix = solve_left(ro, B_full if k_e else empty, U)
 
             def ld_d(rv):
                 eta_f, Bv = solve_right(rv, P, V)
-                return rho_density(eta_f, A_fix, Bv)
+                return rho_density(Zc, eta_f, A_fix, Bv) + prior_term(rv, ro)
 
             rd, _, sl_d, sr_d = jax_slice_sample_1d(
-                ld_d, rd, rho_lo, rho_hi, key=k_d, w=w_d, return_steps=True
+                ld_d, rd, rho_lo, rho_hi, key=keys[0], w=w_d, return_steps=True
             )
             P, B_fix = solve_right(rd, B_full if k_e else empty, V)
 
             def ld_o(rv):
                 eta_f, Av = solve_left(rv, P, U)
-                return rho_density(eta_f, Av, B_fix)
+                return rho_density(Zc, eta_f, Av, B_fix) + prior_term(rd, rv)
 
             ro, _, sl_o, sr_o = jax_slice_sample_1d(
-                ld_o, ro, rho_lo, rho_hi, key=k_o, w=w_o, return_steps=True
+                ld_o, ro, rho_lo, rho_hi, key=keys[1], w=w_o, return_steps=True
             )
+            widths_nc = (w_dn, w_on)
+            if has_pairs:
+                # Non-centred: the effects held, C̃ = A(ρ)⁻¹C moving with ρ.
+                C_in = apply_A(C, rd, ro)
+                P, A_fix = solve_left(ro, B_full if k_e else empty, U)
+                fixed = solve(ro, C_in)
 
+                def ld_dn(rv):
+                    eta_f, Bv = solve_right(rv, P, V)
+                    Ct = solve(rv, fixed.T).T
+                    return rho_density(Z_all - Ct[None], eta_f, A_fix, Bv)
+
+                rd, _, sl_dn, sr_dn = jax_slice_sample_1d(
+                    ld_dn, rd, rho_lo, rho_hi, key=keys[2], w=w_dn, return_steps=True
+                )
+                P, B_fix = solve_right(rd, B_full if k_e else empty, V)
+                fixed = solve(rd, C_in.T).T
+
+                def ld_on(rv):
+                    eta_f, Av = solve_left(rv, P, U)
+                    Ct = solve(rv, fixed)
+                    return rho_density(Z_all - Ct[None], eta_f, Av, B_fix)
+
+                ro, _, sl_on, sr_on = jax_slice_sample_1d(
+                    ld_on, ro, rho_lo, rho_hi, key=keys[3], w=w_on, return_steps=True
+                )
+                C = solve(rd, solve(ro, C_in).T).T
+                widths_nc = (
+                    adapt_slice_width(w_dn, sl_dn, sr_dn, tuning),
+                    adapt_slice_width(w_on, sl_on, sr_on, tuning),
+                )
+
+            # (β, τ) jointly, then the pair effects
             half, A = solve_left(ro, F, U)
             Ufull, B = solve_right(rd, half, V)
 
@@ -289,25 +394,74 @@ def _equation_fns(
                     parts.append(Ufull[f_idx[t]])
                 return jnp.concatenate(parts) if parts else jnp.zeros((0, n, n))
 
-            M, h, _ = moments(cols, lambda t: Zc[t], k, prec_o, Om_all, D, OmOm_tau)
+            Zc = Z_all - C[None]
+            M, h, _ = moments(cols, lambda t: Zc[t], k, prec_o, Om_all)
             h = h + jnp.concatenate([prec_o * mu_o, prec_tau * mu_tau])
             Lg = jnp.linalg.cholesky(M)
             mean = jax.scipy.linalg.cho_solve((Lg, True), h)
             theta = mean + solve_triangular(
-                Lg.T, jax.random.normal(k_b, mean.shape, dtype=jnp.float64), lower=False
-            )
+                Lg.T, jax.random.normal(keys[4], mean.shape, dtype=jnp.float64),
+                lower=False,
+            )  # fmt: skip
             beta = jnp.zeros(k).at[order].set(theta[:k])
             tau = theta[k:]
-            eta = eta_of(beta, tau, jnp.zeros((n, n)), Ufull, A, B)
-            C = eq["C"]
+            zeros = jnp.zeros((n, n))
             if has_pairs:
-                S = jnp.sum(Om_all * (Zc - eta), axis=0)
-                C = (
-                    m_pair
-                    + S / D
-                    + jax.random.normal(k_c_, (n, n), dtype=jnp.float64) / jnp.sqrt(D)
+                # C̃ | β, τ, ρ: CG on P = Σ_t Ω_t + AᵀA/σ² with a perturbed
+                # right-hand side (exact to the tolerance), from the last draw.
+                R = Z_all - eta_of(beta, tau, zeros, Ufull, A, B)
+                D = Om_all.sum(axis=0)
+                b = (
+                    jnp.sum(Om_all * R, axis=0)
+                    + apply_A(jnp.full((n, n), m_pair), rd, ro, True) / s_cur**2
+                    + jnp.sqrt(D) * jax.random.normal(keys[5], (n, n), dtype=jnp.float64)
+                    + apply_A(
+                        jax.random.normal(keys[6], (n, n), dtype=jnp.float64), rd, ro, True
+                    ) / s_cur
+                )  # fmt: skip
+                diag = D + jnp.outer(gram_diag(ro), gram_diag(rd)) / s_cur**2
+
+                def P_mv(X):
+                    return D * X + apply_A(apply_A(X, rd, ro), rd, ro, True) / s_cur**2
+
+                C, _ = jax.scipy.sparse.linalg.cg(
+                    P_mv, b, x0=C, tol=_CG_TOL, maxiter=_CG_MAXITER,
+                    M=lambda r: r / diag,
+                )  # fmt: skip
+                cg_resid = jnp.maximum(
+                    eq["cg_resid"],
+                    jnp.linalg.norm(P_mv(C) - b) / jnp.linalg.norm(b),
                 )
-                eta = eta + C
+                if ti_recipes:
+                    # β_J + t, C − Z_J t leaves η unchanged: t from the priors.
+                    Zti = pre("Z_ti")
+                    filtered = jnp.stack(
+                        [
+                            jnp.outer(A[:, r[1]], B[:, r[2]])
+                            if r[0] == "c"
+                            else Ufull[r[1]]
+                            for r in ti_recipes
+                        ]
+                    )
+                    J = np.asarray(ti_J, dtype=np.int32)
+                    prec_J = prec0[J]
+                    Q = (
+                        jnp.diag(prec_J)
+                        + jnp.tensordot(Zti, Zti, axes=([1, 2], [1, 2])) / s_cur**2
+                    )
+                    hJ = (
+                        -prec_J * (beta[J] - mu0[J])
+                        + jnp.tensordot(Zti, apply_A(C, rd, ro) - m_pair, axes=2)
+                        / s_cur**2
+                    )
+                    LQ = jnp.linalg.cholesky(Q)
+                    step = jax.scipy.linalg.cho_solve((LQ, True), hJ) + solve_triangular(
+                        LQ.T, jax.random.normal(keys[7], (len(J),), dtype=jnp.float64),
+                        lower=False,
+                    )  # fmt: skip
+                    beta = beta.at[J].add(step)
+                    C = C - jnp.tensordot(step, filtered, axes=1)
+            eta = eta_of(beta, tau, C, Ufull, A, B)
             out = {
                 "beta": beta,
                 "tau": tau,
@@ -318,20 +472,15 @@ def _equation_fns(
                 "slice_widths": (
                     adapt_slice_width(w_d, sl_d, sr_d, tuning),
                     adapt_slice_width(w_o, sl_o, sr_o, tuning),
+                    *widths_nc,
                 ),
             }
+            if has_pairs:
+                out["cg_resid"] = cg_resid
             if learn_sd:
-                # Centred σ | C, then non-centred σ | C̃ (interweaving).  Under a
-                # cell mask, pairs whose every period is masked carry no
-                # likelihood and drop out of the deviance (they stay
-                # prior-only, drawn-then-discarded).
-                if has_mask:
-                    pair_live = data["pair_live"]
-                    dev2 = jnp.sum(pair_live * (C - m_pair) ** 2)
-                    g = data["n_live_pairs"]
-                else:
-                    dev2 = jnp.sum((C - m_pair) ** 2)
-                    g = float(n * n)
+                # Centred σ | C, then non-centred σ | C/σ (interweaving).
+                dev2 = jnp.sum((apply_A(C, rd, ro) - m_pair) ** 2)
+                g = float(n * n)
                 nu = 3.0
 
                 def log_prior(sd):
@@ -346,23 +495,24 @@ def _equation_fns(
                     )
 
                 ls, _ = jax_slice_sample_1d(
-                    sd_density, jnp.log(s_cur), -10.0, 5.0, key=k_s, w=0.5
+                    sd_density, jnp.log(s_cur), -10.0, 5.0, key=keys[8], w=0.5
                 )
-                ct = (C - m_pair) / jnp.exp(ls)
+                mean_c = m_pair * level_vector(rd, ro)
+                ct = (C - mean_c) / jnp.exp(ls)
                 eta_rest = eta - C
                 OmC = Om_all * ct[None]
                 P = jnp.sum(OmC * ct[None])
-                hh = jnp.sum(OmC * (Zc - eta_rest))
+                hh = jnp.sum(OmC * (Z_all - eta_rest - mean_c))
 
                 def nc_density(ls2):
                     sd = jnp.exp(ls2)
                     return -0.5 * P * sd * sd + hh * sd + log_prior(sd) + ls2
 
                 ls2, _ = jax_slice_sample_1d(
-                    nc_density, ls, -10.0, 5.0, key=k_s2, w=0.5
+                    nc_density, ls, -10.0, 5.0, key=keys[9], w=0.5
                 )
                 sd = jnp.exp(ls2)
-                C = m_pair + sd * ct
+                C = mean_c + sd * ct
                 out["C"] = C
                 out["eta"] = eta_rest + C
                 out["s_pair"] = sd
@@ -376,14 +526,15 @@ def _equation_fns(
         def exact_sd_move(eq, loglik, key):
             """Non-centred pair-effect sd on the exact likelihood ``loglik(eta)``.
 
-            ``C̃ = (C − m)/σ`` held; returns ``eq`` unchanged unless the sd is
+            ``(C̃ − μA⁻¹1)/σ`` held; returns ``eq`` unchanged unless the sd is
             learned.  See :func:`.._utils._group_effects.exact_noncentered_sd`.
             """
             if not learn_sd:
                 return eq
             s = eq["s_pair"]
-            ct = (eq["C"] - m_pair) / s
-            rest = eq["eta"] - eq["C"][None] + m_pair
+            mean_c = m_pair * level_vector(eq["rho_d"], eq["rho_o"])
+            ct = (eq["C"] - mean_c) / s
+            rest = eq["eta"] - (eq["C"] - mean_c)[None]
             nu = 3.0
 
             def density(ls):
@@ -398,19 +549,15 @@ def _equation_fns(
             ls, _ = jax_slice_sample_1d(density, jnp.log(s), -10.0, 5.0, key=key, w=0.3)
             sd = jnp.exp(ls)
             out = dict(eq)
-            out.update(s_pair=sd, C=m_pair + sd * ct, eta=rest + sd * ct[None])
+            out.update(s_pair=sd, C=mean_c + sd * ct, eta=rest + sd * ct[None])
             return out
-
-        def level_vector(rd, ro):
-            """The filtered constant column ``(L_o⁻¹1)(L_d⁻¹1)ᵀ``, ``(n, n)``."""
-            ones = jnp.ones((n, 1))
-            return jnp.outer(solve(ro, ones)[:, 0], solve(rd, ones)[:, 0])
 
         return {
             "update": update,
             "initial_eta": initial_eta,
             "exact_sd_move": exact_sd_move,
             "level_vector": level_vector,
+            "effects": effects,
             "moments": moments,
         }
 
@@ -426,6 +573,9 @@ def _equation_fns(
     def level_vector(rd, ro, data):
         return bind(data)["level_vector"](rd, ro)
 
+    def effects(eq, data):
+        return bind(data)["effects"](eq)
+
     from types import SimpleNamespace
 
     return SimpleNamespace(
@@ -434,6 +584,7 @@ def _equation_fns(
         initial_eta_jit=jax.jit(initial_eta),
         exact_sd_move=exact_sd_move,
         level_vector=level_vector,
+        effects=effects,
         bind=bind,
     )
 
@@ -448,7 +599,6 @@ def make_structured_equation(
     pair_effects=None,
     period_effects=None,
     prefix: str = "",
-    has_mask: bool = False,
 ):
     """One separable flow equation for the compiled sweeps.
 
@@ -459,11 +609,13 @@ def make_structured_equation(
     * ``data`` — the equation's data-dependent arrays and scalars (each key
       prefixed by ``prefix``), to merge into the sweep's ``consts``;
     * ``update(eq, Om_all, Z_all, key, tuning, data) -> eq`` — draw ρ_d, ρ_o,
-      then ``(β, τ)``, then ``C`` from ``(T, n, n)`` working data, where ``eq``
-      holds ``beta, tau, C, rho_d, rho_o, eta, slice_widths``;
+      then ``(β, τ)``, then the working pair effects ``C`` (``A⁻¹`` of the
+      effects) from ``(T, n, n)`` working data, where ``eq`` holds ``beta, tau,
+      C, rho_d, rho_o, eta, slice_widths`` (four widths: centred and
+      non-centred ρ_d, ρ_o);
     * ``initial_eta(beta, tau, C, rd, ro, data)`` (compiled),
-      ``exact_sd_move(eq, loglik, key, data)`` and
-      ``level_vector(rd, ro, data)``;
+      ``exact_sd_move(eq, loglik, key, data)``, ``level_vector(rd, ro, data)``
+      and ``effects(eq, data)``, the pair effects ``A C``;
     * ``moments`` (bound to this data, for tests), ``static`` (the cache key of
       the kernels) and the host-side prior values.
 
@@ -476,7 +628,6 @@ def make_structured_equation(
     static, data = _equation_parts(
         W_csc, struct, beta_mu, beta_sigma, rho_bounds=rho_bounds,
         pair_effects=pair_effects, period_effects=period_effects, prefix=prefix,
-        has_mask=has_mask,
     )  # fmt: skip
     fns = cached_sweep(("flow_equation", *static), lambda: _equation_fns(*static))
     k = struct.k
@@ -495,6 +646,7 @@ def make_structured_equation(
         update=fns.update,
         initial_eta=fns.initial_eta_jit,
         level_vector=fns.level_vector,
+        effects=fns.effects,
         exact_sd_move=fns.exact_sd_move,
         moments=fns.bind(data)["moments"],
         static=static,
@@ -595,9 +747,9 @@ def _fe_sweep(eq_static, has_alpha_fixed, keep_group_draws, store_eta, n_obs, ha
         Om_all = omega.reshape(T, n, n)
         Z_all = z_flat.reshape(T, n, n)
         eq_keys = ("beta", "tau", "C", "rho_d", "rho_o", "eta", "slice_widths")
-        eq_state = {
-            key_: state[key_] for key_ in eq_keys + (("s_pair",) if learn_sd else ())
-        }
+        eq_keys = eq_keys + (("s_pair",) if learn_sd else ())
+        eq_keys = eq_keys + (("cg_resid",) if has_pairs else ())
+        eq_state = {key_: state[key_] for key_ in eq_keys}
         new = eq.update(eq_state, Om_all, Z_all, k_eq, tuning, data)
         if learn_sd:
             y3 = y_j.reshape(T, n, n)
@@ -639,13 +791,15 @@ def _fe_sweep(eq_static, has_alpha_fixed, keep_group_draws, store_eta, n_obs, ha
         else:
             alpha = data["alpha_fixed"]
         new["alpha"] = alpha
+        if has_pairs:
+            effects = eq.effects(new, data)
         if has_pairs and not keep_group_draws:
-            new.update(welford_update(state, new["C"], tuning))
+            new.update(welford_update(state, effects, tuning))
         trace = (new["rho_d"], new["rho_o"], new["beta"], new["tau"], alpha)
         if learn_sd:
             trace = trace + (new["s_pair"],)
         if has_pairs and keep_group_draws:
-            trace = trace + (new["C"],)
+            trace = trace + (effects,)
         if store_eta:
             trace = trace + (new["eta"],)
         return new, trace
@@ -708,7 +862,6 @@ def _fe_parts(
         rho_bounds=(priors.rho_lower, priors.rho_upper),
         pair_effects=pair_effects,
         period_effects=period_effects,
-        has_mask=has_mask,
     )
     alpha_fixed = getattr(priors, "alpha_fixed", None)
     y_live = y_np[cell_mask] if has_mask else y_np
@@ -724,10 +877,7 @@ def _fe_parts(
         **eq.data,
     }
     if has_mask:
-        pair_live = cell_mask.reshape(struct.T, struct.n, struct.n).any(axis=0)
         data["mask_f"] = jnp.asarray(cell_mask.astype(np.float64))
-        data["pair_live"] = jnp.asarray(pair_live.astype(np.float64))
-        data["n_live_pairs"] = jnp.float64(float(pair_live.sum()))
     static = (
         eq.static, alpha_fixed is not None, bool(keep_group_draws), bool(store_eta),
         float(y_live.size), has_mask,
@@ -826,10 +976,11 @@ def run_chains_jax_flow_structured_fe(
             "rho_o": ro,
             "alpha": jnp.float64(float(i.alpha)),
             "eta": initial_eta(beta, tau, C0, rd, ro, data),
-            "slice_widths": (jnp.float64(slice_width),) * 2,
+            "slice_widths": (jnp.float64(slice_width),) * 4,
         }
         if learn_sd:
             st["s_pair"] = jnp.float64(float(pair_effects[1]))
+        st.update(pair_state(has_pairs))
         if has_pairs and not keep_group_draws:
             st.update(
                 c_count=jnp.float64(0.0),
@@ -842,6 +993,8 @@ def run_chains_jax_flow_structured_fe(
     final, traces = run_chains_chunked(
         sweep, states, warm_keys, draw_keys, tune=tune, draws=draws, consts=data
     )
+    if has_pairs:
+        warn_unconverged_cg(f["cg_resid"] for f in final)
 
     rd_all, ro_all, beta_all, tau_all, alpha_all = traces[:5]
     nxt = 5

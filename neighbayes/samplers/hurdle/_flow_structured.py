@@ -217,9 +217,9 @@ def run_chain_hurdle_flow_structured(
                     if eq.pair_sd_scale is not None:
                         out[key][j] = eq.s_pair
                 if store_b is not None:
-                    store_b.add(j, binary.C.ravel().copy())
+                    store_b.add(j, binary.effects().ravel())
                 if store_c is not None:
-                    store_c.add(j, count.C.ravel().copy())
+                    store_c.add(j, count.effects().ravel())
                 if store_log_lik:
                     out["log_lik"][j] = hurdle_loglik_pointwise(
                         y, binary.eta.ravel(), count.eta.ravel(), alpha

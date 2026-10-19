@@ -546,10 +546,12 @@ pooled,
 $\log \boldsymbol{\mu}_t = A(\boldsymbol{\rho})^{-1} (X_t\beta + c) + \tau_t$,
 with one effect per origin-destination pair held as an index, never as $n^2$
 dummy columns; see the panel count models above. The separable panels (NB,
-ZINB, hurdle) keep their structured $n \times n$ sweep, and for now still add
-the pair effects after the filter, $A^{-1} X_t\beta + c + \tau_t$: inside it
-their effect block is $n^2 \times n^2$ and needs an iterative solve, which is
-not yet in place.
+ZINB, hurdle) keep their structured $n \times n$ sweep. Their $n^2 \times n^2$
+effect block cannot be integrated out at scale, so the sweep holds the effects
+while $\rho$ moves (interweaving steps with the effects and with their
+propagated values held), draws them by conjugate gradients, and moves the
+time-invariant coefficients (intercept, distance, intraunit indicators)
+jointly with the effects they trade off against.
 
 ### OLSFlow panel
 

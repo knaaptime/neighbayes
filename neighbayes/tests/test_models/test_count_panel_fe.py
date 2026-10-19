@@ -506,32 +506,26 @@ def test_place_dgp_draws_unit_effects_inside_the_filter():
     np.testing.assert_allclose(np.log(d["mu"]), eta, atol=1e-10)
 
 
-def test_flow_dgp_draws_pair_effects_inside_the_unrestricted_filter():
-    from neighbayes.dgp.flows import _flow_system, _simulate_sar_negbin_flow_panel_re
+@pytest.mark.parametrize("separable", [False, True])
+def test_flow_dgp_draws_pair_effects_inside_the_filter(separable):
+    from neighbayes.dgp.flows import _flow_system
 
     T = 3
-    kw = dict(n=4, T=T, seed=0, pair_effect_sd=0.5, time_effect_sd=0.3)
+    d = simulate_sar_negbin_flow(n=4, T=T, seed=0, separable=separable, pair_effects="random", pair_effect_sd=0.5, time_effects=True, time_effect_sd=0.3)  # fmt: skip
+    A = _flow_system(d["G"], d["rho_d"], d["rho_o"], d["rho_w"])
+    c = d["pair_effect"]
+    eta = np.log(d["lambda"]).reshape(T, c.size) - d["time_effect"][:, None]
 
-    def unexplained(d):
-        """What ``A(log λ_t − τ_t) − c`` leaves outside the span of ``X``:
-        nothing when the pair effects pass through the filter."""
-        A = _flow_system(d["G"], d["rho_d"], d["rho_o"], d["rho_w"])
-        N = d["pair_effect"].size
-        eta = np.log(d["lambda"]).reshape(T, N) - d["time_effect"][:, None]
-        lhs = np.concatenate([A.matvec(e) - d["pair_effect"] for e in eta])
+    def unexplained(eta):
+        """What ``A(η_t − τ_t) − c`` leaves outside the span of ``X``: nothing
+        when the pair effects pass through the filter."""
+        lhs = np.concatenate([A.matvec(e) - c for e in eta])
         coef = np.linalg.lstsq(d["X"], lhs, rcond=None)[0]
         return np.abs(lhs - d["X"] @ coef).max()
 
-    assert unexplained(_simulate_sar_negbin_flow_panel_re(**kw)) < 1e-10
-    # The check has power: effects added after the filter fail it.
-    outside = _simulate_sar_negbin_flow_panel_re(effects_inside=False, **kw)
-    assert unexplained(outside) > 1e-3
-
-
-def test_effects_placement_per_class():
-    assert SARNegBinPanelRE._effects_inside and SARNegBinFlowPanelRE._effects_inside
-    # The structured separable kernels still add their pair effects after the filter.
-    assert not SARNegBinFlowSeparablePanelRE._effects_inside
+    assert unexplained(eta) < 1e-10
+    # The check has power: the same effects added after the filter fail it.
+    assert unexplained(eta - A.solve(c) + c) > 1e-3
 
 
 def test_fitted_mean_puts_unit_effects_inside_the_filter():
@@ -600,3 +594,28 @@ def test_unit_effects_gibbs_matches_nuts(alpha_fixed):
         b = nuts.posterior[var].values.reshape(-1, nuts.posterior[var].shape[-1])
         assert np.all(np.abs(a.mean(0) - b.mean(0)) < 0.2 * b.std(0)), var
         np.testing.assert_allclose(a.std(0), b.std(0), rtol=0.15)
+
+
+def test_cg_diagnostic_warns_only_above_its_threshold():
+    from neighbayes.samplers.negbin_reduced._flow_structured_fe_jax import (
+        _CG_WARN,
+        warn_unconverged_cg,
+    )
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        warn_unconverged_cg([0.0, _CG_WARN / 10])
+    with pytest.warns(RuntimeWarning, match="conjugate-gradient"):
+        warn_unconverged_cg([0.0, _CG_WARN * 10])
+
+
+@pytest.mark.requires_jax
+def test_separable_jax_pair_effects_cg_converges():
+    data = _flow(
+        pair_effects="random", pair_effect_sd=0.5, separable=True, time_effects=True
+    )
+    m = _flow_model(SARNegBinFlowSeparablePanelRE, data, 3, effects=3)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        m.fit(backend="jax", **QUICK)
+    assert not [w for w in caught if "conjugate-gradient" in str(w.message)]

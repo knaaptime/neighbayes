@@ -482,6 +482,8 @@ def cg_solve(
     tol: float = 1e-8,
     maxiter: int | None = None,
     preconditioner: str = "jacobi",
+    diagonal: np.ndarray | None = None,
+    x0: np.ndarray | None = None,
 ) -> np.ndarray:
     """Solve P x = rhs for sparse SPD P via preconditioned CG.
 
@@ -501,8 +503,12 @@ def cg_solve(
     preconditioner : {"jacobi", "none"}, default "jacobi"
         Preconditioner type.  "jacobi" uses M = diag(P), which
         is cheap and effective for diagonally-dominant spatial
-        precision matrices.  Not available when ``precision`` is a
-        ``LinearOperator`` (use "none" instead).
+        precision matrices.  For a ``LinearOperator``, which has no diagonal to
+        read, pass it as ``diagonal``; without one the solve is unpreconditioned.
+    diagonal : ndarray of shape (n,), optional
+        ``diag(P)`` for the Jacobi preconditioner of a ``LinearOperator``.
+    x0 : ndarray of shape (n,), optional
+        Starting iterate (a warm start); zero by default.
 
     Returns
     -------
@@ -524,8 +530,10 @@ def cg_solve(
     # Accept both sparse matrices and LinearOperator
     if isinstance(precision, spla.LinearOperator):
         P_op = precision
-        # No Jacobi preconditioner for LinearOperator (no diagonal access)
         M_op = None
+        if diagonal is not None and preconditioner == "jacobi":
+            inv = 1.0 / np.asarray(diagonal, dtype=np.float64)
+            M_op = spla.LinearOperator((n, n), matvec=lambda v: inv * v)
     else:
         P_csr = sp.csr_matrix(precision)
         P_op = P_csr
@@ -546,6 +554,7 @@ def cg_solve(
     x, info = spla.cg(
         P_op,
         rhs,
+        x0=x0,
         rtol=tol,
         maxiter=maxiter,
         M=M_op,

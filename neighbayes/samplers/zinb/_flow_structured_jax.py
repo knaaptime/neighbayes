@@ -15,6 +15,8 @@ import numpy as np
 from ..negbin_reduced._flow_structured import classify_flow_design
 from ..negbin_reduced._flow_structured_fe_jax import (
     make_structured_equation,
+    pair_state,
+    warn_unconverged_cg,
     welford_update,
 )
 
@@ -185,8 +187,9 @@ def _zinb_sweep(s_static, c_static, has_alpha_fixed, keep_group_draws, store_eta
             alpha = data["alpha_fixed"]
 
         new = {"sel": sel_new, "cnt": cnt_new, "alpha": alpha, "z": z}
+        c_effects = cnt.effects(cnt_new, data) if c_pairs else None
         if c_pairs and not keep_group_draws:
-            new.update(welford_update(state, cnt_new["C"], tuning))
+            new.update(welford_update(state, c_effects, tuning))
         trace = (
             sel_new["rho_d"],
             sel_new["rho_o"],
@@ -200,7 +203,7 @@ def _zinb_sweep(s_static, c_static, has_alpha_fixed, keep_group_draws, store_eta
         if c_learn:
             trace = trace + (cnt_new["s_pair"],)
         if c_pairs and keep_group_draws:
-            trace = trace + (cnt_new["C"],)
+            trace = trace + (c_effects,)
         if store_eta:
             trace = trace + (sel_new["eta"], cnt_new["eta"])
         return new, trace
@@ -269,7 +272,7 @@ def run_chains_jax_zinb_flow_structured(
     if cnt.has_pairs:
         Y = y_np.reshape(T, n, n)
         C0 = np.log(Y.mean(axis=0) + 0.5) - np.log(Y.mean() + 0.5)
-    w0 = (jnp.float64(slice_width),) * 2
+    w0 = (jnp.float64(slice_width),) * 4
 
     states = []
     for s in jax_seeds:
@@ -299,6 +302,7 @@ def run_chains_jax_zinb_flow_structured(
         }
         if cnt.learn_sd:
             eq_c["s_pair"] = jnp.float64(float(pair_effects[1]))
+        eq_c.update(pair_state(cnt.has_pairs))
         eq_c["eta"] = init_cnt(
             eq_c["beta"], eq_c["tau"], eq_c["C"], eq_c["rho_d"], eq_c["rho_o"], data
         )
@@ -323,6 +327,8 @@ def run_chains_jax_zinb_flow_structured(
     final, traces = run_chains_chunked(
         sweep, states, warm_keys, draw_keys, tune=tune, draws=draws, consts=data
     )
+    if cnt.has_pairs:
+        warn_unconverged_cg(f["cnt"]["cg_resid"] for f in final)
     ld, lo, gam, rd, ro, beta, tau, alpha = traces[:8]
     nxt = 8
     sd_all = None

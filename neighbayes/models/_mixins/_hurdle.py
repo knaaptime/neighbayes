@@ -184,8 +184,7 @@ class HurdleMixin(TwoPartMixin):
 
     def _effects_at(self, g: int, zero: bool) -> tuple[np.ndarray, np.ndarray]:
         """One part's effects at draw ``g``, ``(inner, outer)`` (summary mean if
-        not stored): ``D_g c`` before the filter when the effects enter inside
-        it, and ``D_τ τ`` (with ``D_g c`` otherwise) after it."""
+        not stored): ``D_g c`` before the filter and ``D_τ τ`` after it."""
         post = self._idata.posterior
         inner = np.zeros(self._n_groups * self._T_count)
         outer = np.zeros_like(inner)
@@ -195,9 +194,7 @@ class HurdleMixin(TwoPartMixin):
                 c = self._flat_draw(name)[g]
             else:
                 c = self._idata[self._effect_name("_summary", zero)]["mean"].values
-            (inner if self._effects_inside else outer)[:] += np.asarray(c)[
-                self._row_group
-            ]
+            inner += np.asarray(c)[self._row_group]
         if self._fe_periods:
             outer += self._D_tau @ self._flat_draw(self._time_name(zero=zero))[g]
         return inner, outer

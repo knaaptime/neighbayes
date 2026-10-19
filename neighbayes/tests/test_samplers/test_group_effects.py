@@ -123,10 +123,9 @@ def test_spec_validation():
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("pairs", [True, False])
 @pytest.mark.parametrize("n_tau_full", [True, False])
-def test_structured_gram_block_matches_projector(pairs, n_tau_full):
-    """``_gram_block`` on ``n × n`` arrays equals the row-level collapsed moments."""
+def test_structured_gram_block_matches_materialized(n_tau_full):
+    """``_gram_block`` on ``n × n`` arrays equals the row-level moments."""
     from neighbayes.samplers._utils._group_effects import _weighted_moments
     from neighbayes.samplers.negbin_reduced._flow_structured_fe import _gram_block
 
@@ -140,15 +139,7 @@ def test_structured_gram_block_matches_projector(pairs, n_tau_full):
     n_tau = T if n_tau_full else T - 1
     t0 = T - n_tau
     prec_tau = np.full(n_tau, 0.2)
-    s = 1.4
-    D = Oms.sum(axis=0) + 1.0 / s**2 if pairs else None
-    OmOm = None
-    if pairs:
-        flat = Oms[t0:].reshape(n_tau, -1)
-        OmOm = (flat / D.ravel()) @ flat.T
-    M, v, quad = _gram_block(
-        list(Oms), list(Rs), lambda t: cols[t], prec, prec_tau, D, OmOm
-    )
+    M, v, quad = _gram_block(list(Oms), list(Rs), lambda t: cols[t], prec, prec_tau)
 
     # Materialize: rows time-first, columns [x-cols, period dummies].
     U = np.zeros((T * N, k + n_tau))
@@ -156,11 +147,7 @@ def test_structured_gram_block_matches_projector(pairs, n_tau_full):
         U[t * N : (t + 1) * N, :k] = cols[t].reshape(k, N).T
         if t >= t0:
             U[t * N : (t + 1) * N, k + t - t0] = 1.0
-    proj = None
-    if pairs:
-        spec = GroupEffects(np.tile(np.arange(N), T), N, mu=0.0, sigma=s)
-        proj = GroupProjector(spec, Oms.ravel())
-    M_ref, v_ref, quad_ref = _weighted_moments(U, Rs.ravel(), Oms.ravel(), proj)
+    M_ref, v_ref, quad_ref = _weighted_moments(U, Rs.ravel(), Oms.ravel(), None)
     M_ref[np.diag_indices_from(M_ref)] += np.concatenate([prec, prec_tau])
     np.testing.assert_allclose(M, M_ref, atol=1e-10)
     np.testing.assert_allclose(v, v_ref, atol=1e-10)
@@ -171,6 +158,8 @@ def test_structured_gram_block_matches_projector(pairs, n_tau_full):
 @pytest.mark.parametrize("pairs", [True, False])
 @pytest.mark.parametrize("n_tau_full", [True, False])
 def test_structured_jax_moments_match_numpy(pairs, n_tau_full):
+    # With pair effects the sweep holds them (they are no longer integrated
+    # out), so the moment block is the same either way; both sweeps build it.
     """The JAX moment block against the NumPy ``_gram_block``."""
     from types import SimpleNamespace
 
@@ -214,13 +203,8 @@ def test_structured_jax_moments_match_numpy(pairs, n_tau_full):
     Rs = rng.normal(size=(T, n, n))
     cols = rng.normal(size=(T, k, n, n))
     prec = np.array([0.4, 0.9])
-    D = Oms.sum(axis=0) + 1.0 / s**2 if pairs else None
-    OmOm = None
-    if pairs:
-        flat = Oms[T - n_tau :].reshape(n_tau, -1)
-        OmOm = (flat / D.ravel()) @ flat.T
     ref = _gram_block(
-        list(Oms), list(Rs), lambda t: cols[t], prec, np.full(n_tau, 0.25), D, OmOm
+        list(Oms), list(Rs), lambda t: cols[t], prec, np.full(n_tau, 0.25)
     )
     got = sweep.kernels["moments"](
         lambda t: jnp.asarray(cols)[t],
@@ -228,8 +212,6 @@ def test_structured_jax_moments_match_numpy(pairs, n_tau_full):
         k,
         jnp.asarray(prec),
         jnp.asarray(Oms),
-        None if D is None else jnp.asarray(D),
-        None if OmOm is None else jnp.asarray(OmOm),
     )
     for a, b in zip(got, ref):
         np.testing.assert_allclose(np.asarray(a), b, atol=1e-10)
@@ -248,13 +230,8 @@ def test_masked_cells_drop_out_of_structured_moments():
     Oms = Oms * mask
     Rs = rng.normal(size=(T, n, n))
     cols = rng.normal(size=(T, k, n, n))
-    prec, prec_tau, s = np.array([0.3, 0.7]), np.full(T - 1, 0.2), 1.4
-    D = Oms.sum(axis=0) + 1.0 / s**2
-    flat = Oms[1:].reshape(T - 1, -1)
-    OmOm = (flat / D.ravel()) @ flat.T
-    M, v, quad = _gram_block(
-        list(Oms), list(Rs), lambda t: cols[t], prec, prec_tau, D, OmOm
-    )
+    prec, prec_tau = np.array([0.3, 0.7]), np.full(T - 1, 0.2)
+    M, v, quad = _gram_block(list(Oms), list(Rs), lambda t: cols[t], prec, prec_tau)
 
     keep = mask.ravel()
     U = np.zeros((T * N, k + T - 1))
@@ -262,10 +239,8 @@ def test_masked_cells_drop_out_of_structured_moments():
         U[t * N : (t + 1) * N, :k] = cols[t].reshape(k, N).T
         if t >= 1:
             U[t * N : (t + 1) * N, k + t - 1] = 1.0
-    spec = GroupEffects(np.tile(np.arange(N), T)[keep], N, mu=0.0, sigma=s)
-    proj = GroupProjector(spec, Oms.ravel()[keep])
     M_ref, v_ref, quad_ref = _weighted_moments(
-        U[keep], Rs.ravel()[keep], Oms.ravel()[keep], proj
+        U[keep], Rs.ravel()[keep], Oms.ravel()[keep], None
     )
     M_ref[np.diag_indices_from(M_ref)] += np.concatenate([prec, prec_tau])
     np.testing.assert_allclose(M, M_ref, atol=1e-10)

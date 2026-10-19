@@ -1304,12 +1304,14 @@ _COUNT_FE_DOC = """
     or ``3`` both.  The within transform of the Gaussian panels does not carry to
     a log link, so the effects are parameters: pair effects (one per
     origin–destination pair), integrated out of every ρ update and drawn
-    jointly with β, held as a pair index rather than ``n²`` dummy columns.  In
-    the unrestricted panel they enter inside the spatial filter, with the
-    covariates, ``η_t = A⁻¹(X_tβ + C) + τ_t``: random effects propagate as ``X``
-    does.  The separable panel still adds them after the filter,
-    ``η_t = A⁻¹X_tβ + C + τ_t``; under pooling that is a different prior, not a
-    reparameterization (inside, ``A⁻¹C`` has covariance ``σ²(AᵀA)⁻¹``).
+    jointly with β, held as a pair index rather than ``n²`` dummy columns.  They
+    enter inside the spatial filter, with the covariates,
+    ``η_t = A⁻¹(X_tβ + C) + τ_t``: random effects propagate as ``X`` does.
+    Under pooling that is a different prior from effects added after the
+    filter, not a reparameterization (inside, ``A⁻¹C`` has covariance
+    ``σ²(AᵀA)⁻¹``).  The separable panel's structured sweep cannot integrate
+    them out at scale, so it holds them while ρ moves and draws them by
+    conjugate gradients.
 
     Pair effects are **partially pooled**: ``C_ij ~ N(μ, σ²)`` with σ learned
     (half-t(3, ``pair_effect_sd_scale``) prior, default scale 1).  A pair seen
@@ -1472,10 +1474,6 @@ class _UnrestrictedCountFlowPanel(_FlowCountPanelMixin):
 
 class _SeparableCountFlowPanel(_FlowCountPanelMixin):
     """Kronecker-filter pieces of the separable NB flow panel."""
-
-    # The structured separable kernels still add the pair effects after the
-    # filter; they move inside with those kernels.
-    _effects_inside = False
 
     def _eta_reduced(self, rho: dict, beta: np.ndarray, inner=None) -> np.ndarray:
         n, N, T = self._n, self._N_flow, self._T
@@ -2494,14 +2492,14 @@ class SARZINBFlowSeparablePanelRE(
         """``(η_sel, η_cnt)`` at draw ``g`` (pair-effect posterior mean if summarized)."""
         f = self._flat_draw
         post = self._idata.posterior
-        inner = outer = 0.0
+        inner = 0.0
         if self._fe_groups:
+            # The pair effects enter inside the count filter.
             if self._effect_name() in post.data_vars:
                 c = f(self._effect_name())[g]
             else:
                 c = self._idata[self._effect_name("_summary")]["mean"].values
-            rows = np.asarray(c)[self._row_group]
-            inner, outer = (rows, 0.0) if self._effects_inside else (0.0, rows)
+            inner = np.asarray(c)[self._row_group]
         eta_sel = self._kron_eta(
             self._W_zero_sparse,
             float(f("rho_d_zero")[g]),
@@ -2514,7 +2512,6 @@ class SARZINBFlowSeparablePanelRE(
             float(f("rho_o")[g]),
             self._X @ f("beta")[g] + inner,
         )
-        eta_cnt = eta_cnt + outer
         if self._fe_periods:
             eta_cnt = eta_cnt + self._D_tau @ f("time_effect")[g]
         return eta_sel, eta_cnt

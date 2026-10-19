@@ -936,7 +936,6 @@ def _simulate_sar_negbin_flow_panel_re(
     pair_effect_sd: float = 0.0,
     time_effect_sd: float = 0.0,
     fe_x_corr: float = 0.0,
-    effects_inside: bool = True,
 ) -> dict:
     r"""Generate panel NB2 flow counts from a spatial autoregressive DGP.
 
@@ -1005,9 +1004,6 @@ def _simulate_sar_negbin_flow_panel_re(
         unit-level component of this weight, and ``c_od`` loads on the
         persistent components of origin ``o`` and destination ``d``.  Makes a
         pooled fit biased, so fixed-effects recovery tests have power.
-    effects_inside : bool, default True
-        Pass the pair effects through the filter; ``False`` adds them after it,
-        as the separable flow panels still model them.
 
     Returns
     -------
@@ -1100,10 +1096,7 @@ def _simulate_sar_negbin_flow_panel_re(
         Xbeta = design.combined @ beta_full  # (N,)
 
         # Solve A eta = Xbeta + c  (reduced form: no sigma, no noise)
-        if effects_inside:
-            eta_t = solve_A(Xbeta + pair_effect) + time_effect[t]
-        else:
-            eta_t = solve_A(Xbeta) + pair_effect + time_effect[t]
+        eta_t = solve_A(Xbeta + pair_effect) + time_effect[t]
         lambda_t = np.exp(eta_t)
         p_nb = alpha / (alpha + lambda_t)
         y_t = rng.negative_binomial(alpha, p_nb).astype(np.int64)
@@ -1264,11 +1257,7 @@ def _simulate_sar_negbin_flow_separable_panel_re(
     rho_o: float = 0.2,
     **kwargs,
 ) -> dict:
-    """Panel NB2 flow DGP with separability constraint ``rho_w=-rho_d*rho_o``.
-
-    The pair effects are added after the filter, as the separable flow panels
-    still model them.
-    """
+    """Panel NB2 flow DGP with separability constraint ``rho_w=-rho_d*rho_o``."""
     rho_w = -rho_d * rho_o
     return _simulate_sar_negbin_flow_panel_re(
         n=n,
@@ -1277,7 +1266,6 @@ def _simulate_sar_negbin_flow_separable_panel_re(
         rho_d=rho_d,
         rho_o=rho_o,
         rho_w=rho_w,
-        effects_inside=False,
         **kwargs,
     )
 
@@ -1417,8 +1405,8 @@ def _simulate_sar_hurdle_negbin_flow_separable(
 
     .. math::
 
-        \eta_{z,t} = (L_{z,o} \otimes L_{z,d})^{-1} X_t\beta_z
-        + \tau_{z,t} + C_z,
+        \eta_{z,t} = (L_{z,o} \otimes L_{z,d})^{-1} (X_t\beta_z + C_z)
+        + \tau_{z,t},
         \qquad d \sim \mathrm{Bernoulli}(\mathrm{logit}^{-1}(\eta_z)),
         \qquad y = d \cdot \mathrm{tNB}(\mu, \alpha).
 
@@ -1482,7 +1470,7 @@ def _simulate_sar_hurdle_negbin_flow_separable(
     sel_time = np.zeros(T)
     if T > 1:
         sel_time[1:] = time_effect_sd_zero * rng.standard_normal(T - 1)
-    eta_bin = filt(X @ beta_zero) + np.tile(sel_pair, T) + np.repeat(sel_time, nn * nn)
+    eta_bin = filt(X @ beta_zero + np.tile(sel_pair, T)) + np.repeat(sel_time, nn * nn)
     if target_pi is not None:
         icpt = [j for j, nm in enumerate(names) if nm.lower() == "intercept"]
         if not icpt:

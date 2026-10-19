@@ -197,7 +197,7 @@ def run_chain_zinb_flow_structured(
                 if cnt.pair_sd_scale is not None:
                     out["group_sd"][j] = cnt.s_pair
                 if gstore is not None:
-                    gstore.add(j, cnt.C.ravel().copy())
+                    gstore.add(j, cnt.effects().ravel())
                 if store_log_lik:
                     out["log_lik"][j] = _zinb_loglik_pointwise(
                         y, sel.eta.ravel(), cnt.eta.ravel(), alpha
