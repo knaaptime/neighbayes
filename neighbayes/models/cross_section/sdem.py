@@ -12,13 +12,22 @@ from __future__ import annotations
 
 import numpy as np
 
-from .._design import gaussian
 from .._mixins import GaussianLikelihoodMixin, GaussianPredictionMixin
+from .._mixins._designs import GaussianDesigns
 from ..base import SpatialModel
-from ..priors import SDEMPriors
+from ..panel._dynamic import _SDEMDynamic
+from ..panel._re import _SDEMRandomEffects
+from ..priors import PanelSDEMDynamicPriors, PanelSDEMREPriors, SDEMPriors
 
 
-class SDEM(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
+class SDEM(
+    GaussianDesigns,
+    _SDEMRandomEffects,
+    _SDEMDynamic,
+    GaussianPredictionMixin,
+    GaussianLikelihoodMixin,
+    SpatialModel,
+):
     """Bayesian Spatial Durbin Error Model.
 
     Combines spatial lags of the regressors :math:`X` with a spatial
@@ -107,6 +116,29 @@ class SDEM(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
         which variables receive a spatial lag, e.g.
         ``durbin_vars=["income", "density"]``.
 
+    time_col, unit_col : str, optional
+        Formula-mode panel: the period and unit columns of ``data``.  Given
+        time, the model is a panel, stacked by period, then unit.
+    N, T : int, optional
+        Matrix-mode panel: the numbers of units and periods; ``T=1`` is the
+        cross-section.
+    unit_effects : {None, "fixed", "random"}, default None
+        Panel unit effects: ``"fixed"`` applies the within transformation
+        (with Lee and Yu's 2010 likelihood dimensions), ``"random"`` adds a normal
+        effect per unit, ``unit_effect`` with sd ``unit_effect_sd`` (priors
+        ``unit_effect_sd_nu`` and ``unit_effect_sd_scale``, half-Cauchy on ``sd(y)``
+        by default).
+    time_effects : bool, default False
+        Fixed time effects (panels).
+    dynamic : bool, default False
+        Add the time lag :math:`\\phi y_{t-1}` (priors ``phi_lower``,
+        ``phi_upper``; the ``lam`` bounds default to ``±0.95``).  A dynamic
+        panel takes no unit effects (Nickell 1981).
+    centered : bool, default False
+        With random unit effects, sample them centered under NUTS rather than
+        as :math:`\\alpha_i = \\sigma_\\alpha z_i`; better when every unit has
+        many observations.
+
     Notes
     -----
     Because the spatial autoregression enters only through the
@@ -128,7 +160,22 @@ class SDEM(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     must exceed 2 so the variance exists.
     """
 
-    _dispatch = classmethod(gaussian)
+    _DESIGNS = {
+        "static": {},
+        "random": {
+            "_priors_cls": PanelSDEMREPriors,
+            "_gibbs_class": None,
+            "_gibbs_key": None,
+        },
+        "dynamic": {
+            "_priors_cls": PanelSDEMDynamicPriors,
+            "_jacobian_param": None,
+            "_gibbs_class": None,
+            "_gibbs_key": None,
+            "_likelihood": "",
+            "_lee_yu": False,
+        },
+    }
 
     _priors_cls = SDEMPriors
     _spatial_params: tuple[str, ...] = ("lam",)
@@ -140,7 +187,7 @@ class SDEM(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     _likelihood: str = "gaussian"
     _gibbs_key: tuple[str, str] | None = ("gaussian", "cross_section")
 
-    def _compute_impacts_posterior(
+    def _compute_impacts_posterior_static(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute direct, indirect, and total effects for each posterior draw.

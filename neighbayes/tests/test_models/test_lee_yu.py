@@ -14,7 +14,6 @@ import numpy as np
 import pytest
 
 from neighbayes.models import SAR, SEM
-from neighbayes.models.panel._fe import SARPanelFE, SEMPanelFE
 from neighbayes.tests.helpers import W_to_graph, make_line_W, make_panel_sar_data
 
 
@@ -31,21 +30,21 @@ def _fit_sigma2(model, sampler):
 
 
 @pytest.mark.parametrize(
-    "effects, jac_T, shift, n_eff",
+    "unit, time, jac_T, shift, n_eff",
     [
         # (units, T) = (20, 4); n = 80.
-        (0, 4, 0.0, 80),
-        (1, 3, 0.0, 60),
-        (2, 4, 4.0, 76),
-        (3, 3, 3.0, 57),
+        (None, False, 4, 0.0, 80),
+        ("fixed", False, 3, 0.0, 60),
+        (None, True, 4, 4.0, 76),
+        ("fixed", True, 3, 3.0, 57),
     ],
 )
-@pytest.mark.parametrize("cls", [SARPanelFE, SEMPanelFE])
-def test_fe_dimensions(cls, effects, jac_T, shift, n_eff):
+@pytest.mark.parametrize("cls", [SAR, SEM])
+def test_fe_dimensions(cls, unit, time, jac_T, shift, n_eff):
     N, T = 20, 4
     W = make_line_W(N)
     y, X, _ = make_panel_sar_data(np.random.default_rng(0), W, N, T, rho=0.3)
-    m = cls(y=y, X=X, W=W_to_graph(W), N=N, T=T, effects=effects)
+    m = cls(y=y, X=X, W=W_to_graph(W), N=N, T=T, unit_effects=unit, time_effects=time)
     assert m._jacobian_T == jac_T
     assert m._jacobian_shift == shift
     assert m._n_effective == n_eff

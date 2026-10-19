@@ -160,7 +160,7 @@ def _simulate_ols_panel_fe(
     geometry_type: str = "polygon",
     wide: bool = False,
 ) -> dict:
-    """Simulate pooled data compatible with OLSPanelFE model assumptions.
+    """Simulate pooled data compatible with the OLS panel's assumptions.
 
     Equivalent to :func:`_simulate_sdm_panel_fe` with ``rho=0`` and ``beta2=[]``;
     the spatial weights matrix is required for shape validation but does not

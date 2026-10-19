@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import numpy as np
+
 from neighbayes.models import OLS, SAR, SDEM, SDM, SEM, SLX
-from neighbayes.models.panel._fe import OLSPanelFE, SARPanelFE, SEMPanelFE
-from neighbayes.models.panel._re import OLSPanelRE, SARPanelRE, SEMPanelRE
 
 
 def test_cross_sectional_models_no_frequentist_spec_tests():
@@ -31,7 +31,7 @@ def test_cross_sectional_models_no_frequentist_spec_tests():
 
 def test_panel_models_no_frequentist_diagnostics():
     """Panel models should not expose frequentist diagnostic methods."""
-    for cls in [OLSPanelFE, OLSPanelRE, SARPanelFE, SARPanelRE, SEMPanelFE, SEMPanelRE]:
+    for cls in [OLS, SAR, SEM]:
         assert not hasattr(cls, "diagnostics")
         assert not hasattr(cls, "regression_diagnostics")
         assert not hasattr(cls, "heteroskedasticity_diagnostics")
@@ -44,8 +44,6 @@ def test_panel_models_no_frequentist_diagnostics():
 from neighbayes.models import SDEM, SDM, SLX
 from neighbayes.models.flow import OLSFlow, SARFlow
 from neighbayes.models.flow_panel import OLSFlowPanelFE
-from neighbayes.models.panel._fe import SDEMPanelFE, SDMPanelFE, SLXPanelFE
-from neighbayes.models.panel._re import SDEMPanelRE
 
 EXPECTED_REGISTRIES = {
     OLS: [
@@ -61,35 +59,6 @@ EXPECTED_REGISTRIES = {
     SLX: ["LM-Lag", "LM-Error", "Robust-LM-Lag-SDM", "Robust-LM-Error-SDEM"],
     SDM: ["LM-Error-SDM", "Robust-LM-Error-SDM"],
     SDEM: ["LM-Lag-SDEM", "Robust-LM-Lag-SDEM"],
-    OLSPanelFE: [
-        "Panel-LM-Lag",
-        "Panel-LM-Error",
-        "Panel-LM-SDM-Joint",
-        "Panel-LM-SLX-Error-Joint",
-        "Panel-Robust-LM-Lag",
-        "Panel-Robust-LM-Error",
-    ],
-    SARPanelFE: ["Panel-LM-Error", "Panel-LM-WX", "Panel-Robust-LM-WX"],
-    SEMPanelFE: ["Panel-LM-Lag", "Panel-LM-WX"],
-    SLXPanelFE: [
-        "Panel-LM-Lag",
-        "Panel-LM-Error",
-        "Panel-Robust-LM-Lag-SDM",
-        "Panel-Robust-LM-Error-SDEM",
-    ],
-    SDMPanelFE: ["Panel-LM-Error-SDM"],
-    SDEMPanelFE: ["Panel-LM-Lag-SDEM"],
-    OLSPanelRE: [
-        "Panel-LM-Lag",
-        "Panel-LM-Error",
-        "Panel-LM-SDM-Joint",
-        "Panel-LM-SLX-Error-Joint",
-        "Panel-Robust-LM-Lag",
-        "Panel-Robust-LM-Error",
-    ],
-    SARPanelRE: ["Panel-LM-Error", "Panel-LM-WX", "Panel-Robust-LM-WX"],
-    SEMPanelRE: ["Panel-LM-Lag", "Panel-LM-WX"],
-    SDEMPanelRE: ["Panel-LM-Lag-SDEM"],
     OLSFlow: [
         "LM-Flow-Destination",
         "LM-Flow-Origin",
@@ -123,6 +92,63 @@ def test_spatial_diagnostics_registries_match_expected():
         actual_labels = [label for _, label in suite.tests]
         assert actual_labels == expected_labels, (
             f"{cls.__name__}: expected {expected_labels}, got {actual_labels}"
+        )
+
+
+def _panel(cls, **design):
+    """A small panel instance of ``cls``: a panel's suite depends on its design."""
+    from neighbayes.tests.helpers import W_to_graph, make_line_W
+
+    rng = np.random.default_rng(0)
+    N, T = 6, 3
+    X = np.column_stack([np.ones(N * T), rng.standard_normal(N * T)])
+    W = W_to_graph(make_line_W(N))
+    return cls(y=rng.standard_normal(N * T), X=X, W=W, N=N, T=T, **design)
+
+
+_OLS_PANEL = [
+    "Panel-LM-Lag",
+    "Panel-LM-Error",
+    "Panel-LM-SDM-Joint",
+    "Panel-LM-SLX-Error-Joint",
+    "Panel-Robust-LM-Lag",
+    "Panel-Robust-LM-Error",
+]
+_FE = {"unit_effects": "fixed"}
+_RE = {"unit_effects": "random"}
+EXPECTED_PANEL_REGISTRIES = [
+    (OLS, _FE, _OLS_PANEL),
+    (SAR, _FE, ["Panel-LM-Error", "Panel-LM-WX", "Panel-Robust-LM-WX"]),
+    (SEM, _FE, ["Panel-LM-Lag", "Panel-LM-WX"]),
+    (
+        SLX,
+        _FE,
+        [
+            "Panel-LM-Lag",
+            "Panel-LM-Error",
+            "Panel-Robust-LM-Lag-SDM",
+            "Panel-Robust-LM-Error-SDEM",
+        ],
+    ),
+    (SDM, _FE, ["Panel-LM-Error-SDM"]),
+    (SDEM, _FE, ["Panel-LM-Lag-SDEM"]),
+    (OLS, _RE, _OLS_PANEL),
+    (SAR, _RE, ["Panel-LM-Error", "Panel-LM-WX", "Panel-Robust-LM-WX"]),
+    (SEM, _RE, ["Panel-LM-Lag", "Panel-LM-WX"]),
+    (SDEM, _RE, ["Panel-LM-Lag-SDEM"]),
+]
+
+
+def test_panel_diagnostics_registries_match_expected():
+    """A panel's suite follows its design, not the cross-section's."""
+    from neighbayes.diagnostics.lmtests.registry import get_diagnostic_suite
+
+    for cls, design, expected_labels in EXPECTED_PANEL_REGISTRIES:
+        suite = get_diagnostic_suite(_panel(cls, **design))
+        assert suite is not None, f"No suite registered for a {cls.__name__} panel"
+        actual_labels = [label for _, label in suite.tests]
+        assert actual_labels == expected_labels, (
+            f"{cls.__name__} {design}: expected {expected_labels}, got {actual_labels}"
         )
 
 

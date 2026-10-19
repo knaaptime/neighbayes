@@ -113,8 +113,6 @@ def test_non_aaa_methods_are_untouched(mid):
 
 def test_panel_fe_runs_refit_and_check():
     """Gaussian FE panels share the sampler, so both adaptations reach them."""
-    from neighbayes.models.panel._fe import SARPanelFE
-
     N, T = 144, 4
     W = _rook(12)
     rng = np.random.default_rng(3)

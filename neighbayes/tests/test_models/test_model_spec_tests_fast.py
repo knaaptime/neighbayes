@@ -8,7 +8,6 @@ have been removed in favor of the Bayesian LM tests in ``diagnostics.bayesian_di
 from __future__ import annotations
 
 from neighbayes.models import OLS, SAR, SDEM, SDM, SEM, SLX
-from neighbayes.models.panel._fe import OLSPanelFE, SARPanelFE, SEMPanelFE
 
 
 def test_cross_sectional_models_no_longer_expose_frequentist_spec_tests():
@@ -34,15 +33,15 @@ def test_cross_sectional_models_no_longer_expose_frequentist_spec_tests():
 
 def test_panel_models_no_longer_expose_frequentist_spec_tests():
     """Panel models should not expose frequentist spatial spec tests."""
-    for cls in [OLSPanelFE, SARPanelFE, SEMPanelFE]:
+    for cls in [OLS, SAR, SEM]:
         assert not hasattr(cls, "spatial_specification_tests"), (
             f"{cls.__name__} still has spatial_specification_tests"
         )
 
-    assert not hasattr(OLSPanelFE, "lm_error_test")
-    assert not hasattr(OLSPanelFE, "lm_sar_test")
-    assert not hasattr(OLSPanelFE, "lm_joint_test")
-    assert not hasattr(SARPanelFE, "lm_error_conditional_test")
-    assert not hasattr(SARPanelFE, "lr_sar_test")
-    assert not hasattr(SEMPanelFE, "lm_sar_conditional_test")
-    assert not hasattr(SEMPanelFE, "lr_error_test")
+    assert not hasattr(OLS, "lm_error_test")
+    assert not hasattr(OLS, "lm_sar_test")
+    assert not hasattr(OLS, "lm_joint_test")
+    assert not hasattr(SAR, "lm_error_conditional_test")
+    assert not hasattr(SAR, "lr_sar_test")
+    assert not hasattr(SEM, "lm_sar_conditional_test")
+    assert not hasattr(SEM, "lr_error_test")

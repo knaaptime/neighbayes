@@ -964,12 +964,12 @@ def _panel_sdem_spec() -> TreeNode:
 # Static and dynamic panels share these trees: a leaf names the process, and
 # the panel design comes from the model the diagnostics were run on.
 _PANEL_SPECS: dict[str, Callable[[], TreeNode]] = {
-    "OLSPanel": _panel_ols_spec,
-    "SARPanel": _panel_sar_spec,
-    "SEMPanel": _panel_sem_spec,
-    "SLXPanel": _panel_slx_spec,
-    "SDMPanel": _panel_sdm_spec,
-    "SDEMPanel": _panel_sdem_spec,
+    "OLS": _panel_ols_spec,
+    "SAR": _panel_sar_spec,
+    "SEM": _panel_sem_spec,
+    "SLX": _panel_slx_spec,
+    "SDM": _panel_sdm_spec,
+    "SDEM": _panel_sdem_spec,
 }
 
 
@@ -1026,9 +1026,9 @@ _PANEL_TOBIT_SPECS: dict[str, Callable[[], TreeNode]] = {
 def get_panel_spec(model_type: str) -> TreeNode | str:
     """Return the panel decision tree for ``model_type``.
 
-    The model type is expected to be ``<Family>Panel<Suffix>`` where
-    ``Suffix`` is ``FE``, ``RE``, ``Dynamic``, or ``Tobit``.
-    Falls back to a leaf if not found.
+    The model type is the class name: a Gaussian process (``"SAR"``, for its
+    fixed-effects, random-effects and dynamic panels alike) or a panel Tobit
+    (``"SARTobitPanel"``).  Falls back to a leaf if not found.
     """
     # Panel Tobit (e.g. SARTobitPanel, SEMTobitPanel)
     if "Tobit" in model_type:
@@ -1037,10 +1037,8 @@ def get_panel_spec(model_type: str) -> TreeNode | str:
             return factory()
         return model_type
 
-    for prefix, factory in _PANEL_SPECS.items():
-        if model_type.startswith(prefix):
-            return factory()
-    return model_type
+    factory = _PANEL_SPECS.get(model_type)
+    return model_type if factory is None else factory()
 
 
 # ---------------------------------------------------------------------------

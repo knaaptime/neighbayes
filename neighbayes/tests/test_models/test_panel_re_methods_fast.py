@@ -8,7 +8,6 @@ import pymc as pm
 import xarray as xr
 
 from neighbayes.models import OLS, SAR, SDEM, SEM
-from neighbayes.models.panel._re import OLSPanelRE, SARPanelRE, SEMPanelRE
 from neighbayes.tests.helpers import W_to_graph, make_line_W
 
 
@@ -31,8 +30,8 @@ def _panel_data(seed: int = 70):
 def test_panel_re_build_pymc_models_and_force_model_zero():
     y, X, W, N, T = _panel_data()
 
-    for cls in [OLSPanelRE, SARPanelRE, SEMPanelRE]:
-        model = cls(y=y, X=X, W=W, N=N, T=T, effects=1)
+    for cls in [OLS, SAR, SEM]:
+        model = cls(y=y, X=X, W=W, N=N, T=T, unit_effects="random")
         assert model.model == 0
         assert model._unit_idx.shape[0] == N * T
 

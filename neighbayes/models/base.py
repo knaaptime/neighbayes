@@ -200,8 +200,9 @@ class SpatialModel(SharedSpatialMethods, ABC):
         self._panel_diagnostics = panel
 
         # Resolve typed priors (dataclass) and dict view.
+        # A design may set its own priors class on the instance.
         default_priors = PanelBasePriors if panel else BasePriors
-        _priors_cls = getattr(self.__class__, "_priors_cls", default_priors)
+        _priors_cls = getattr(self, "_priors_cls", default_priors)
         self.priors_obj = resolve_priors(priors, _priors_cls)
         self.priors = priors_as_dict(self.priors_obj)
         self.logdet_method = logdet_method

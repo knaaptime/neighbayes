@@ -10,13 +10,22 @@ from __future__ import annotations
 
 import numpy as np
 
-from .._design import gaussian
 from .._mixins import GaussianLikelihoodMixin, GaussianPredictionMixin
+from .._mixins._designs import GaussianDesigns
 from ..base import SpatialModel
-from ..priors import SARPriors
+from ..panel._dynamic import _SARDynamic
+from ..panel._re import _SARRandomEffects
+from ..priors import PanelSARDynamicPriors, PanelSARREPriors, SARPriors
 
 
-class SAR(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
+class SAR(
+    GaussianDesigns,
+    _SARRandomEffects,
+    _SARDynamic,
+    GaussianPredictionMixin,
+    GaussianLikelihoodMixin,
+    SpatialModel,
+):
     """Bayesian Spatial Autoregressive (Spatial Lag) model.
 
     Models a contemporaneous spatial dependence in the dependent
@@ -102,6 +111,29 @@ class SAR(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
         (SAR has no ``WX`` term). If supplied without effect on this
         model.
 
+    time_col, unit_col : str, optional
+        Formula-mode panel: the period and unit columns of ``data``.  Given
+        time, the model is a panel, stacked by period, then unit.
+    N, T : int, optional
+        Matrix-mode panel: the numbers of units and periods; ``T=1`` is the
+        cross-section.
+    unit_effects : {None, "fixed", "random"}, default None
+        Panel unit effects: ``"fixed"`` applies the within transformation
+        (with Lee and Yu's 2010 likelihood dimensions), ``"random"`` adds a normal
+        effect per unit, ``unit_effect`` with sd ``unit_effect_sd`` (priors
+        ``unit_effect_sd_nu`` and ``unit_effect_sd_scale``, half-Cauchy on ``sd(y)``
+        by default).
+    time_effects : bool, default False
+        Fixed time effects (panels).
+    dynamic : bool, default False
+        Add the time lag :math:`\\phi y_{t-1}` (priors ``phi_lower``,
+        ``phi_upper``; the ``rho`` bounds default to ``±0.95``).  A dynamic
+        panel takes no unit effects (Nickell 1981).
+    centered : bool, default False
+        With random unit effects, sample them centered under NUTS rather than
+        as :math:`\\alpha_i = \\sigma_\\alpha z_i`; better when every unit has
+        many observations.
+
     Notes
     -----
     Direct, indirect and total effects of :math:`X` on :math:`y` are
@@ -122,7 +154,22 @@ class SAR(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     must exceed 2 so the variance exists.
     """
 
-    _dispatch = classmethod(gaussian)
+    _DESIGNS = {
+        "static": {},
+        "random": {
+            "_priors_cls": PanelSARREPriors,
+            "_gibbs_class": None,
+            "_gibbs_key": ("gaussian", "panel_re"),
+        },
+        "dynamic": {
+            "_priors_cls": PanelSARDynamicPriors,
+            "_jacobian_param": None,
+            "_gibbs_class": None,
+            "_gibbs_key": None,
+            "_likelihood": "",
+            "_lee_yu": False,
+        },
+    }
 
     _priors_cls = SARPriors
     _spatial_params: tuple[str, ...] = ("rho",)
@@ -134,7 +181,7 @@ class SAR(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     _likelihood: str = "gaussian"
     _gibbs_key: tuple[str, str] | None = ("gaussian", "cross_section")
 
-    def _compute_impacts_posterior(
+    def _compute_impacts_posterior_static(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute direct, indirect, and total effects for each posterior draw.

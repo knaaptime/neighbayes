@@ -13,7 +13,6 @@ import pytest
 
 from neighbayes import dgp
 from neighbayes.models import SAR, SEM
-from neighbayes.models.panel._re import SARPanelRE, SEMPanelRE
 
 
 def _weak_effects(sim, seed):
@@ -46,13 +45,13 @@ def test_sigma_alpha_mixes_with_weak_effects():
 @pytest.mark.parametrize(
     "cls, sim, spatial",
     [
-        (SARPanelRE, dgp.simulate_sar, "rho"),
-        (SEMPanelRE, dgp.simulate_sem, "lam"),
+        (SAR, dgp.simulate_sar, "rho"),
+        (SEM, dgp.simulate_sem, "lam"),
     ],
 )
 def test_re_gibbs_matches_nuts_with_weak_effects(cls, sim, spatial):
     d = _weak_effects(sim, 7)
-    m = cls(y=d["y"], X=d["X"], W=d["W_sparse"], N=400, T=3)
+    m = cls(unit_effects="random", y=d["y"], X=d["X"], W=d["W_sparse"], N=400, T=3)
     g = m.fit(
         sampler="gibbs", draws=4000, tune=1000, chains=4, progressbar=False,
         random_seed=1,

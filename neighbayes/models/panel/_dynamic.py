@@ -1,4 +1,4 @@
-"""Dynamic spatial panel model classes inspired by legacy dynamic panel routines.
+"""The dynamic-panel design of the Gaussian process classes.
 
 This module provides Bayesian dynamic spatial panel models that include a
 lagged dependent variable :math:`\\phi y_{i,t-1}` alongside the spatial lag.
@@ -15,8 +15,8 @@ demeaned error of order :math:`O(1/T)`, biasing the OLS / quasi-MLE
 estimator of :math:`\\phi` toward zero.  Bayesian inference suffers
 from the same identification pathology because the *likelihood* (not
 the estimator) is the source of the bias.  This package therefore
-forbids unit effects (``effects="unit"`` or ``"two_way"``) for dynamic
-specifications and the constructor raises ``ValueError``.  Users who require unit FE with a
+forbids unit effects for dynamic specifications (``dynamic=True`` with
+``unit_effects=...`` raises ``ValueError``).  Users who require unit FE with a
 lagged dependent variable should use a GMM package (e.g. ``linearmodels``).
 
 References
@@ -28,7 +28,6 @@ Nickell, S. (1981). Biases in dynamic models with fixed effects.
 from __future__ import annotations
 
 from functools import cached_property
-from typing import Union
 
 import numpy as np
 import pytensor.tensor as pt
@@ -37,21 +36,10 @@ from pytensor import sparse as pts
 from ..._backends.sampler_helpers import select_backend, use_jax_likelihood
 from ..._lazy_deps import pm
 from ..._logdet import get_cached_logdet_fn
-from .._base._panel import _resolve_effects
 from .._base._shared import (
     _pointwise_gaussian_loglik,
     _write_log_likelihood_to_idata,
     gelman_default_beta_prior,
-)
-from ..base import SpatialModel
-from ..priors import (
-    PanelOLSDynamicPriors,
-    PanelSARDynamicPriors,
-    PanelSDEMDynamicPriors,
-    PanelSDMRDynamicPriors,
-    PanelSDMUDynamicPriors,
-    PanelSEMDynamicPriors,
-    PanelSLXDynamicPriors,
 )
 
 
@@ -66,12 +54,10 @@ class _DynamicPanelMixin:
     **dynamic panel bias**.
 
     To avoid this, dynamic panel models in this package take no effects or
-    time effects only; ``effects="unit"`` and ``effects="two_way"`` raise a
-    ValueError at construction time.
+    time effects only; unit effects raise a ValueError at construction time.
+    The class's design table sets ``_lee_yu = False``: the fixed-T bias here
+    is Nickell's, not Lee and Yu's.
     """
-
-    # Fixed-T bias here is Nickell's, not Lee & Yu's; see SpatialModel.
-    _lee_yu = False
 
     _y_dyn: np.ndarray
     _y_lag: np.ndarray
@@ -88,7 +74,7 @@ class _DynamicPanelMixin:
         mu, sd = gelman_default_beta_prior(self._y_dyn, design, names)
         return self.priors.get("beta_mu", mu), self.priors.get("beta_sigma", sd)
 
-    def _compute_impacts_posterior(
+    def _compute_impacts_posterior_dynamic(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute posterior samples of direct, indirect, and total effects."""
@@ -96,7 +82,7 @@ class _DynamicPanelMixin:
 
         idata = self.inference_data
 
-        if isinstance(self, SARPanelDynamic):
+        if self._model_type == "sar":
             rho_draws = _get_posterior_draws(idata, "rho")
             beta_draws = _get_posterior_draws(idata, "beta")
             mean_diag = self._batch_mean_diag(rho_draws)
@@ -106,14 +92,14 @@ class _DynamicPanelMixin:
             total_samples = mean_row_sum[:, None] * beta_draws[:, ni]
             indirect_samples = total_samples - direct_samples
 
-        elif isinstance(self, SEMPanelDynamic):
+        elif self._model_type == "sem":
             beta_draws = _get_posterior_draws(idata, "beta")
             ni = self._nonintercept_indices
             direct_samples = beta_draws[:, ni].copy()
             indirect_samples = np.zeros_like(direct_samples)
             total_samples = direct_samples.copy()
 
-        elif isinstance(self, (SDMPanelDynamicRestricted, SDMPanelDynamic)):
+        elif self._model_type == "sdm":
             self._prepare_dynamic_design()
             rho_draws = _get_posterior_draws(idata, "rho")
             beta_draws = _get_posterior_draws(idata, "beta")
@@ -157,24 +143,6 @@ class _DynamicPanelMixin:
                 indirect_samples = total_samples - direct_samples
 
         return direct_samples, indirect_samples, total_samples
-
-    def __init__(self, *args, effects: Union[str, int] = 0, **kwargs):
-        effects_int = _resolve_effects(effects) if isinstance(effects, str) else effects
-        if effects_int in (1, 3):
-            raise ValueError(
-                f"effects={effects!r} (unit fixed effects) is not supported for "
-                "dynamic panel models due to the Nickell bias (Nickell, 1981).  "
-                "When unit fixed effects are removed via within-demeaning, "
-                "alone or in two-way effects, the demeaned lagged dependent "
-                "variable (y_{i,t-1} - ȳ_{i}) becomes mechanically correlated "
-                "with the demeaned error (ε_{i,t} - ε̄_{i}), because ȳ_{i} "
-                "contains ε_{i,t-1}.  This correlation biases the autoregressive "
-                "coefficient φ toward zero, and the bias only vanishes as "
-                "T → ∞.  Use effects='pooled' or effects='time' instead.  For "
-                "unit-specific heterogeneity with a lagged dependent variable, "
-                "consider the Arellano-Bond GMM estimator (e.g. linearmodels)."
-            )
-        super().__init__(*args, effects=effects, **kwargs)
 
     def _prepare_dynamic_design(self) -> None:
         if hasattr(self, "_Z_dyn"):
@@ -357,7 +325,7 @@ class _DynamicPanelMixin:
             ll_total.reshape(n_chains, n_draws_per_chain, n_obs),
         )
 
-    def _fit_dynamic(
+    def _fit_dynamic_nuts(
         self,
         spatial_param: str,
         *,
@@ -410,11 +378,8 @@ class _DynamicPanelMixin:
         return self._idata
 
 
-class OLSPanelDynamic(_DynamicPanelMixin, SpatialModel):
-    _priors_cls = PanelOLSDynamicPriors
-    _has_wx_in_beta = True
-
-    """Dynamic panel regression without contemporaneous spatial dependence.
+class _OLSDynamic(_DynamicPanelMixin):
+    """The dynamic-panel design of :class:`~neighbayes.models.OLS`.
 
     Implements
 
@@ -425,96 +390,12 @@ class OLSPanelDynamic(_DynamicPanelMixin, SpatialModel):
         \\qquad \\varepsilon_{it} \\sim \\mathcal{N}(0, \\sigma^2),
 
     where the :math:`(\\sum_j w_{ij} x_{jt})'\\theta` block is present
-    only when the base design marks covariates as laggable. The admissible
-    panel transformations are pooled, time effects, and two-way effects;
-    ``model=1`` is rejected by :class:`_DynamicPanelMixin` because unit
-    fixed effects with a lagged dependent variable induce Nickell bias.
-
-    Parameters
-    ----------
-    formula : str, optional
-        Wilkinson-style formula, e.g. ``"y ~ x1 + x2"``. Requires
-        ``data``, ``unit_col``, and ``time_col``.
-    data : pandas.DataFrame, optional
-        Long-format panel data when using formula mode.
-    y : array-like, optional
-        Stacked response of shape ``(N*T,)`` in unit-major order.
-        Required in matrix mode.
-    X : array-like or pandas.DataFrame, optional
-        Stacked design matrix. Required in matrix mode.
-    W : libpysal.graph.Graph or scipy.sparse matrix
-        Spatial weights of shape ``(N, N)``. Used to construct the
-        ``WX`` block. Should be row-standardized.
-    unit_col : str, optional
-        Column in ``data`` identifying the cross-sectional unit.
-        Required in formula mode.
-    time_col : str, optional
-        Column in ``data`` identifying the time period. Required in
-        formula mode.
-    N : int, optional
-        Number of cross-sectional units. Required in matrix mode.
-    T : int, optional
-        Number of time periods. Required in matrix mode; must be
-        ``>= 2``.
-    model : int, default 0
-        Fixed-effects specification: ``0`` pooled, ``2`` time FE,
-        ``3`` two-way FE. ``1`` (unit FE) is rejected because it
-        induces Nickell bias.
-    priors : dict, optional
-        Override default priors. Supported keys:
-
-        - ``phi_lower`` (float, default -0.95): Lower bound of
-          Uniform prior on :math:`\\phi`.
-        - ``phi_upper`` (float, default 0.95): Upper bound of Uniform
-          prior on :math:`\\phi`.
-        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal
-          prior on :math:`[\\beta, \\theta]`, scaled to ``sd(y)`` and each column's sd.
-        - ``sigma2_alpha`` (float, default 2.0): InverseGamma prior alpha for sigma2
-        - ``sigma2_beta`` (float, default var(y)): InverseGamma prior beta for sigma2
-          for :math:`\\sigma`.
-        - ``nu`` (float, default 4.0): Fixed Student-t degrees of
-          freedom (only used when ``robust=True``).
-
-    logdet_method : {"exact", "cheb", "aaa", "spline", "stochastic"}, optional
-        How ``log|I - rho*W|`` is approximated over rho: evaluated exactly at
-        every rho, interpolated (Chebyshev, AAA rational, or cubic spline)
-        through exact values, or expanded stochastically with no
-        factorization.  ``None`` (default) selects from the size and symmetry
-        of ``W``: ``"exact"`` for ``n <= 500``; ``"aaa"`` up to
-        ``n = 60000`` (``NEIGHBAYES_LOGDET_FACTOR_MAX_N``) unless the
-        factorization's fill-in would dominate; ``"stochastic"`` beyond.
-    logdet_decomp : {"auto", "eig", "chol", "lu"}, default "auto"
-        What supplies the exact values: a dense eigendecomposition, a sparse
-        Cholesky (undirected ``W``; scikit-sparse CHOLMOD) or a sparse LU.
-        ``"auto"`` takes the first of ``"eig"`` (``n <= 500``,
-        ``NEIGHBAYES_LOGDET_EIGEN_MAX_N``), ``"chol"`` (undirected ``W``) and
-        ``"lu"`` that the method is implemented on.  Ignored by
-        ``"stochastic"``.  A pair with no implementation (``"spline"`` on
-        ``"chol"``, ``"exact"`` on ``"lu"``) raises.
-    robust : bool, default False
-        If True, replace the Normal error with Student-t. See
-        *Robust regression* below.
-    durbin_vars : list of str, optional
-        Names of X columns to spatially lag. By default all
-        non-constant columns are lagged.
-
-    Notes
-    -----
-    **Robust regression**
-
-    When ``robust=True``, the error distribution is changed from Normal
-    to Student-t, yielding a model that is robust to heavy-tailed outliers:
-
-    .. math::
-
-        \\varepsilon_t \\sim t_\\nu(0, \\sigma^2)
-
-    where :math:`\\nu` is a **fixed** hyperparameter set by ``priors={"nu": value}``
-    (default 4, LeSage's ``rval``); larger values approach the Normal.  Values
-    must exceed 2 so the variance exists.
+    only when the base design marks covariates as laggable. Time effects are
+    admissible; unit effects with a lagged dependent variable induce Nickell
+    bias and are rejected.
     """
 
-    def _build_pymc_model(self) -> pm.Model:
+    def _build_pymc_model_dynamic(self) -> pm.Model:
         self._prepare_dynamic_design()
 
         phi_lower = self.priors.get("phi_lower", -0.95)
@@ -537,18 +418,15 @@ class OLSPanelDynamic(_DynamicPanelMixin, SpatialModel):
 
         return model
 
-    def _fitted_mean_from_posterior(self) -> np.ndarray:
+    def _fitted_mean_from_posterior_dynamic(self) -> np.ndarray:
         self._prepare_dynamic_design()
         phi = float(self._posterior_mean("phi"))
         beta = self._posterior_mean("beta")
         return phi * self._y_lag + self._Z_dyn @ beta
 
 
-class SDMPanelDynamicRestricted(_DynamicPanelMixin, SpatialModel):
-    _priors_cls = PanelSDMRDynamicPriors
-    _has_wx_in_beta = True
-
-    """Dynamic restricted spatial Durbin panel regression.
+class _SDMRestrictedDynamic(_DynamicPanelMixin):
+    """The restricted dynamic-panel design of :class:`~neighbayes.models.SDM`.
 
     Implements
 
@@ -561,7 +439,7 @@ class SDMPanelDynamicRestricted(_DynamicPanelMixin, SpatialModel):
         + \\varepsilon_{it},
 
     where the restriction ties the lagged spatial spillover term to
-    :math:`-\\rho \\phi`. As with all dynamic classes here, ``model=1`` is
+    :math:`-\\rho \\phi`. As with every dynamic design here, unit effects are
     disallowed because of Nickell bias.
 
     **Robust regression**
@@ -578,7 +456,7 @@ class SDMPanelDynamicRestricted(_DynamicPanelMixin, SpatialModel):
     must exceed 2 so the variance exists.
     """
 
-    def _build_pymc_model(self) -> pm.Model:
+    def _build_pymc_model_restricted(self) -> pm.Model:
         self._prepare_dynamic_design()
 
         rho_lower = self.priors.get("rho_lower", -0.95)
@@ -613,7 +491,7 @@ class SDMPanelDynamicRestricted(_DynamicPanelMixin, SpatialModel):
 
         return model
 
-    def fit(
+    def _fit_restricted(
         self,
         draws: int = 2000,
         tune: int = 1000,
@@ -626,7 +504,7 @@ class SDMPanelDynamicRestricted(_DynamicPanelMixin, SpatialModel):
         **sample_kwargs,
     ):
         """Sample posterior and attach Jacobian-corrected log-likelihood."""
-        return self._fit_dynamic(
+        return self._fit_dynamic_nuts(
             "rho",
             draws=draws,
             tune=tune,
@@ -639,7 +517,7 @@ class SDMPanelDynamicRestricted(_DynamicPanelMixin, SpatialModel):
             **sample_kwargs,
         )
 
-    def _fitted_mean_from_posterior(self) -> np.ndarray:
+    def _fitted_mean_from_posterior_restricted(self) -> np.ndarray:
         self._prepare_dynamic_design()
         rho = float(self._posterior_mean("rho"))
         phi = float(self._posterior_mean("phi"))
@@ -652,11 +530,8 @@ class SDMPanelDynamicRestricted(_DynamicPanelMixin, SpatialModel):
         )
 
 
-class SDMPanelDynamic(_DynamicPanelMixin, SpatialModel):
-    _priors_cls = PanelSDMUDynamicPriors
-    _has_wx_in_beta = True
-
-    """Dynamic unrestricted spatial Durbin panel regression.
+class _SDMDynamic(_DynamicPanelMixin):
+    """The dynamic-panel design of :class:`~neighbayes.models.SDM`.
 
     Implements
 
@@ -668,94 +543,11 @@ class SDMPanelDynamic(_DynamicPanelMixin, SpatialModel):
         + \\varepsilon_{it},
 
     where :math:`\\psi` is an unrestricted coefficient on the lagged
-    spatial outcome. As with the other dynamic specifications, admissible
-    panel transforms are pooled, time effects, and two-way effects.
-
-    Parameters
-    ----------
-    formula : str, optional
-        Wilkinson-style formula. Requires ``data``, ``unit_col``,
-        ``time_col``.
-    data : pandas.DataFrame, optional
-        Long-format panel data when using formula mode.
-    y : array-like, optional
-        Stacked response of shape ``(N*T,)``. Required in matrix mode.
-    X : array-like or pandas.DataFrame, optional
-        Stacked design matrix. Required in matrix mode.
-    W : libpysal.graph.Graph or scipy.sparse matrix
-        Spatial weights of shape ``(N, N)``. Should be
-        row-standardized.
-    unit_col, time_col : str, optional
-        Column names identifying the unit and time period in ``data``.
-        Required in formula mode.
-    N, T : int, optional
-        Cross-sectional and time dimensions. Required in matrix mode;
-        ``T >= 2`` is required.
-    model : int, default 0
-        Fixed-effects specification: ``0`` pooled, ``2`` time FE,
-        ``3`` two-way FE. ``1`` (unit FE) is rejected (Nickell bias).
-    priors : dict, optional
-        Override default priors. Supported keys:
-
-        - ``rho_lower`` (float, default -0.95): Lower bound of
-          Uniform prior on :math:`\\rho`.
-        - ``rho_upper`` (float, default 0.95): Upper bound of Uniform
-          prior on :math:`\\rho`.
-        - ``phi_lower`` (float, default -0.95): Lower bound of
-          Uniform prior on :math:`\\phi`.
-        - ``phi_upper`` (float, default 0.95): Upper bound of Uniform
-          prior on :math:`\\phi`.
-        - ``theta_lower`` (float, default -0.95): Lower bound of
-          Uniform prior on :math:`\\psi` (lagged-spatial coefficient).
-        - ``theta_upper`` (float, default 0.95): Upper bound of
-          Uniform prior on :math:`\\psi`.
-        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal
-          prior on :math:`[\\beta, \\theta]`, scaled to ``sd(y)`` and each column's sd.
-        - ``sigma2_alpha`` (float, default 2.0): InverseGamma prior alpha for sigma2
-        - ``sigma2_beta`` (float, default var(y)): InverseGamma prior beta for sigma2
-          for :math:`\\sigma`.
-        - ``nu`` (float, default 4.0): Fixed Student-t degrees of
-          freedom (only used when ``robust=True``).
-
-    logdet_method : {"exact", "cheb", "aaa", "spline", "stochastic"}, optional
-        How ``log|I - rho*W|`` is approximated over rho: evaluated exactly at
-        every rho, interpolated (Chebyshev, AAA rational, or cubic spline)
-        through exact values, or expanded stochastically with no
-        factorization.  ``None`` (default) selects from the size and symmetry
-        of ``W``: ``"exact"`` for ``n <= 500``; ``"aaa"`` up to
-        ``n = 60000`` (``NEIGHBAYES_LOGDET_FACTOR_MAX_N``) unless the
-        factorization's fill-in would dominate; ``"stochastic"`` beyond.
-    logdet_decomp : {"auto", "eig", "chol", "lu"}, default "auto"
-        What supplies the exact values: a dense eigendecomposition, a sparse
-        Cholesky (undirected ``W``; scikit-sparse CHOLMOD) or a sparse LU.
-        ``"auto"`` takes the first of ``"eig"`` (``n <= 500``,
-        ``NEIGHBAYES_LOGDET_EIGEN_MAX_N``), ``"chol"`` (undirected ``W``) and
-        ``"lu"`` that the method is implemented on.  Ignored by
-        ``"stochastic"``.  A pair with no implementation (``"spline"`` on
-        ``"chol"``, ``"exact"`` on ``"lu"``) raises.
-    robust : bool, default False
-        If True, replace the Normal error with Student-t.
-    durbin_vars : list of str, optional
-        Names of X columns to spatially lag. By default all
-        non-constant columns are lagged.
-
-    Notes
-    -----
-    **Robust regression**
-
-    When ``robust=True``, the error distribution is changed from Normal
-    to Student-t, yielding a model that is robust to heavy-tailed outliers:
-
-    .. math::
-
-        \\varepsilon_t \\sim t_\\nu(0, \\sigma^2)
-
-    where :math:`\\nu` is a **fixed** hyperparameter set by ``priors={"nu": value}``
-    (default 4, LeSage's ``rval``); larger values approach the Normal.  Values
-    must exceed 2 so the variance exists.
+    spatial outcome. As with the other dynamic specifications, time effects
+    are admissible and unit effects are not.
     """
 
-    def _build_pymc_model(self) -> pm.Model:
+    def _build_pymc_model_dynamic(self) -> pm.Model:
         self._prepare_dynamic_design()
 
         bounds = self._logdet_bounds
@@ -794,7 +586,7 @@ class SDMPanelDynamic(_DynamicPanelMixin, SpatialModel):
 
         return model
 
-    def fit(
+    def _fit_dynamic(
         self,
         draws: int = 2000,
         tune: int = 1000,
@@ -807,7 +599,7 @@ class SDMPanelDynamic(_DynamicPanelMixin, SpatialModel):
         **sample_kwargs,
     ):
         """Sample posterior and attach Jacobian-corrected log-likelihood."""
-        return self._fit_dynamic(
+        return self._fit_dynamic_nuts(
             "rho",
             draws=draws,
             tune=tune,
@@ -820,7 +612,7 @@ class SDMPanelDynamic(_DynamicPanelMixin, SpatialModel):
             **sample_kwargs,
         )
 
-    def _fitted_mean_from_posterior(self) -> np.ndarray:
+    def _fitted_mean_from_posterior_dynamic(self) -> np.ndarray:
         self._prepare_dynamic_design()
         rho = float(self._posterior_mean("rho"))
         phi = float(self._posterior_mean("phi"))
@@ -834,10 +626,8 @@ class SDMPanelDynamic(_DynamicPanelMixin, SpatialModel):
         )
 
 
-class SARPanelDynamic(_DynamicPanelMixin, SpatialModel):
-    _priors_cls = PanelSARDynamicPriors
-
-    """Dynamic spatial-lag panel regression.
+class _SARDynamic(_DynamicPanelMixin):
+    """The dynamic-panel design of :class:`~neighbayes.models.SAR`.
 
     Implements
 
@@ -847,89 +637,13 @@ class SARPanelDynamic(_DynamicPanelMixin, SpatialModel):
         + x_{it}'\\beta + \\varepsilon_{it},
         \\qquad \\varepsilon_{it} \\sim \\mathcal{N}(0, \\sigma^2).
 
-    This is the dynamic analogue of :class:`SARPanelFE`: it adds a lagged
+    This is the dynamic analogue of the static SAR panel: it adds a lagged
     dependent variable but no Durbin block. The Jacobian contribution is
     based on :math:`|I - \\rho W|^{T-1}` for the contemporaneous spatial
     lag.
-
-    Parameters
-    ----------
-    formula : str, optional
-        Wilkinson-style formula. Requires ``data``, ``unit_col``,
-        ``time_col``.
-    data : pandas.DataFrame, optional
-        Long-format panel data when using formula mode.
-    y : array-like, optional
-        Stacked response of shape ``(N*T,)``. Required in matrix mode.
-    X : array-like or pandas.DataFrame, optional
-        Stacked design matrix. Required in matrix mode.
-    W : libpysal.graph.Graph or scipy.sparse matrix
-        Spatial weights of shape ``(N, N)``. Should be
-        row-standardized.
-    unit_col, time_col : str, optional
-        Column names identifying the unit and time period in ``data``.
-        Required in formula mode.
-    N, T : int, optional
-        Cross-sectional and time dimensions. Required in matrix mode;
-        ``T >= 2`` is required.
-    model : int, default 0
-        Fixed-effects specification: ``0`` pooled, ``2`` time FE,
-        ``3`` two-way FE. ``1`` (unit FE) is rejected (Nickell bias).
-    priors : dict, optional
-        Override default priors. Supported keys:
-
-        - ``rho_lower`` (float, default -0.95): Lower bound of
-          Uniform prior on :math:`\\rho`.
-        - ``rho_upper`` (float, default 0.95): Upper bound of Uniform
-          prior on :math:`\\rho`.
-        - ``phi_lower`` (float, default -0.95): Lower bound of
-          Uniform prior on :math:`\\phi`.
-        - ``phi_upper`` (float, default 0.95): Upper bound of Uniform
-          prior on :math:`\\phi`.
-        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal
-          prior on :math:`\\beta`, scaled to ``sd(y)`` and each column's sd.
-        - ``sigma2_alpha`` (float, default 2.0): InverseGamma prior alpha for sigma2
-        - ``sigma2_beta`` (float, default var(y)): InverseGamma prior beta for sigma2
-          for :math:`\\sigma`.
-        - ``nu`` (float, default 4.0): Fixed Student-t degrees of
-          freedom (only used when ``robust=True``).
-
-    logdet_method : {"exact", "cheb", "aaa", "spline", "stochastic"}, optional
-        How ``log|I - rho*W|`` is approximated over rho: evaluated exactly at
-        every rho, interpolated (Chebyshev, AAA rational, or cubic spline)
-        through exact values, or expanded stochastically with no
-        factorization.  ``None`` (default) selects from the size and symmetry
-        of ``W``: ``"exact"`` for ``n <= 500``; ``"aaa"`` up to
-        ``n = 60000`` (``NEIGHBAYES_LOGDET_FACTOR_MAX_N``) unless the
-        factorization's fill-in would dominate; ``"stochastic"`` beyond.
-    logdet_decomp : {"auto", "eig", "chol", "lu"}, default "auto"
-        What supplies the exact values: a dense eigendecomposition, a sparse
-        Cholesky (undirected ``W``; scikit-sparse CHOLMOD) or a sparse LU.
-        ``"auto"`` takes the first of ``"eig"`` (``n <= 500``,
-        ``NEIGHBAYES_LOGDET_EIGEN_MAX_N``), ``"chol"`` (undirected ``W``) and
-        ``"lu"`` that the method is implemented on.  Ignored by
-        ``"stochastic"``.  A pair with no implementation (``"spline"`` on
-        ``"chol"``, ``"exact"`` on ``"lu"``) raises.
-    robust : bool, default False
-        If True, replace the Normal error with Student-t.
-
-    Notes
-    -----
-    **Robust regression**
-
-    When ``robust=True``, the error distribution is changed from Normal
-    to Student-t, yielding a model that is robust to heavy-tailed outliers:
-
-    .. math::
-
-        \\varepsilon_t \\sim t_\\nu(0, \\sigma^2)
-
-    where :math:`\\nu` is a **fixed** hyperparameter set by ``priors={"nu": value}``
-    (default 4, LeSage's ``rval``); larger values approach the Normal.  Values
-    must exceed 2 so the variance exists.
     """
 
-    def _build_pymc_model(self) -> pm.Model:
+    def _build_pymc_model_dynamic(self) -> pm.Model:
         self._prepare_dynamic_design()
 
         rho_lower = self.priors.get("rho_lower", -0.95)
@@ -959,7 +673,7 @@ class SARPanelDynamic(_DynamicPanelMixin, SpatialModel):
 
         return model
 
-    def fit(
+    def _fit_dynamic(
         self,
         draws: int = 2000,
         tune: int = 1000,
@@ -972,7 +686,7 @@ class SARPanelDynamic(_DynamicPanelMixin, SpatialModel):
         **sample_kwargs,
     ):
         """Sample posterior and attach Jacobian-corrected log-likelihood."""
-        return self._fit_dynamic(
+        return self._fit_dynamic_nuts(
             "rho",
             draws=draws,
             tune=tune,
@@ -985,7 +699,7 @@ class SARPanelDynamic(_DynamicPanelMixin, SpatialModel):
             **sample_kwargs,
         )
 
-    def _fitted_mean_from_posterior(self) -> np.ndarray:
+    def _fitted_mean_from_posterior_dynamic(self) -> np.ndarray:
         self._prepare_dynamic_design()
         rho = float(self._posterior_mean("rho"))
         phi = float(self._posterior_mean("phi"))
@@ -993,10 +707,8 @@ class SARPanelDynamic(_DynamicPanelMixin, SpatialModel):
         return phi * self._y_lag + rho * self._Wy_dyn + self._X_dyn @ beta
 
 
-class SEMPanelDynamic(_DynamicPanelMixin, SpatialModel):
-    _priors_cls = PanelSEMDynamicPriors
-
-    """Dynamic spatial-error panel regression.
+class _SEMDynamic(_DynamicPanelMixin):
+    """The dynamic-panel design of :class:`~neighbayes.models.SEM`.
 
     Implements
 
@@ -1009,86 +721,9 @@ class SEMPanelDynamic(_DynamicPanelMixin, SpatialModel):
     The likelihood uses the filtered residuals
     :math:`(I - \\lambda W)(y_t - \\phi y_{t-1} - X_t \\beta)` and the
     associated Jacobian :math:`|I - \\lambda W|^{T-1}`.
-
-    Parameters
-    ----------
-    formula : str, optional
-        Wilkinson-style formula. Requires ``data``, ``unit_col``,
-        ``time_col``.
-    data : pandas.DataFrame, optional
-        Long-format panel data when using formula mode.
-    y : array-like, optional
-        Stacked response of shape ``(N*T,)``. Required in matrix mode.
-    X : array-like or pandas.DataFrame, optional
-        Stacked design matrix. Required in matrix mode.
-    W : libpysal.graph.Graph or scipy.sparse matrix
-        Spatial weights of shape ``(N, N)``. Should be
-        row-standardized.
-    unit_col, time_col : str, optional
-        Column names identifying the unit and time period in ``data``.
-        Required in formula mode.
-    N, T : int, optional
-        Cross-sectional and time dimensions. Required in matrix mode;
-        ``T >= 2`` is required.
-    model : int, default 0
-        Fixed-effects specification: ``0`` pooled, ``2`` time FE,
-        ``3`` two-way FE. ``1`` (unit FE) is rejected (Nickell bias).
-    priors : dict, optional
-        Override default priors. Supported keys:
-
-        - ``lam_lower`` (float, default -0.95): Lower bound of
-          Uniform prior on :math:`\\lambda`.
-        - ``lam_upper`` (float, default 0.95): Upper bound of Uniform
-          prior on :math:`\\lambda`.
-        - ``phi_lower`` (float, default -0.95): Lower bound of
-          Uniform prior on :math:`\\phi`.
-        - ``phi_upper`` (float, default 0.95): Upper bound of Uniform
-          prior on :math:`\\phi`.
-        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal
-          prior on :math:`\\beta`, scaled to ``sd(y)`` and each column's sd.
-        - ``sigma2_alpha`` (float, default 2.0): InverseGamma prior alpha for sigma2
-        - ``sigma2_beta`` (float, default var(y)): InverseGamma prior beta for sigma2
-          for :math:`\\sigma`.
-        - ``nu`` (float, default 4.0): Fixed Student-t degrees of
-          freedom (only used when ``robust=True``).
-
-    logdet_method : {"exact", "cheb", "aaa", "spline", "stochastic"}, optional
-        How ``log|I - rho*W|`` is approximated over rho: evaluated exactly at
-        every rho, interpolated (Chebyshev, AAA rational, or cubic spline)
-        through exact values, or expanded stochastically with no
-        factorization.  ``None`` (default) selects from the size and symmetry
-        of ``W``: ``"exact"`` for ``n <= 500``; ``"aaa"`` up to
-        ``n = 60000`` (``NEIGHBAYES_LOGDET_FACTOR_MAX_N``) unless the
-        factorization's fill-in would dominate; ``"stochastic"`` beyond.
-    logdet_decomp : {"auto", "eig", "chol", "lu"}, default "auto"
-        What supplies the exact values: a dense eigendecomposition, a sparse
-        Cholesky (undirected ``W``; scikit-sparse CHOLMOD) or a sparse LU.
-        ``"auto"`` takes the first of ``"eig"`` (``n <= 500``,
-        ``NEIGHBAYES_LOGDET_EIGEN_MAX_N``), ``"chol"`` (undirected ``W``) and
-        ``"lu"`` that the method is implemented on.  Ignored by
-        ``"stochastic"``.  A pair with no implementation (``"spline"`` on
-        ``"chol"``, ``"exact"`` on ``"lu"``) raises.
-    robust : bool, default False
-        If True, replace the Normal innovation with Student-t.
-
-    Notes
-    -----
-    **Robust regression**
-
-    When ``robust=True``, the spatially filtered error distribution is
-    changed from Normal to Student-t, yielding a model that is robust to
-    heavy-tailed outliers:
-
-    .. math::
-
-        \\varepsilon_t = (I - \\lambda W)(y_t - \\phi y_{t-1} - X_t \\beta) \\sim t_\\nu(0, \\sigma^2)
-
-    where :math:`\\nu` is a **fixed** hyperparameter set by ``priors={"nu": value}``
-    (default 4, LeSage's ``rval``); larger values approach the Normal.  Values
-    must exceed 2 so the variance exists.
     """
 
-    def _build_pymc_model(self, nuts_sampler: str = "pymc") -> pm.Model:
+    def _build_pymc_model_dynamic(self, nuts_sampler: str = "pymc") -> pm.Model:
         self._prepare_dynamic_design()
 
         lam_lower = self.priors.get("lam_lower", -0.95)
@@ -1177,7 +812,7 @@ class SEMPanelDynamic(_DynamicPanelMixin, SpatialModel):
 
         return model
 
-    def fit(
+    def _fit_dynamic(
         self,
         draws: int = 2000,
         tune: int = 1000,
@@ -1190,7 +825,7 @@ class SEMPanelDynamic(_DynamicPanelMixin, SpatialModel):
         **sample_kwargs,
     ):
         """Sample posterior and attach pointwise log-likelihood for IC metrics."""
-        return self._fit_dynamic(
+        return self._fit_dynamic_nuts(
             "lam",
             draws=draws,
             tune=tune,
@@ -1203,18 +838,15 @@ class SEMPanelDynamic(_DynamicPanelMixin, SpatialModel):
             **sample_kwargs,
         )
 
-    def _fitted_mean_from_posterior(self) -> np.ndarray:
+    def _fitted_mean_from_posterior_dynamic(self) -> np.ndarray:
         self._prepare_dynamic_design()
         phi = float(self._posterior_mean("phi"))
         beta = self._posterior_mean("beta")
         return phi * self._y_lag + self._X_dyn @ beta
 
 
-class SDEMPanelDynamic(_DynamicPanelMixin, SpatialModel):
-    _priors_cls = PanelSDEMDynamicPriors
-    _has_wx_in_beta = True
-
-    """Dynamic spatial Durbin error panel regression.
+class _SDEMDynamic(_DynamicPanelMixin):
+    """The dynamic-panel design of :class:`~neighbayes.models.SDEM`.
 
     Implements
 
@@ -1225,99 +857,19 @@ class SDEMPanelDynamic(_DynamicPanelMixin, SpatialModel):
         \\qquad u_{it} = \\lambda \\sum_j w_{ij} u_{jt} + \\varepsilon_{it},
         \\qquad \\varepsilon_{it} \\sim \\mathcal{N}(0, \\sigma^2).
 
-    This is the dynamic analogue of :class:`SDEMPanelFE`: lagged outcome
+    This is the dynamic analogue of the static SDEM panel: lagged outcome
     persistence enters through :math:`\\phi`, while spatial dependence
     remains in the disturbance.
-
-    Parameters
-    ----------
-    formula : str, optional
-        Wilkinson-style formula. Requires ``data``, ``unit_col``,
-        ``time_col``.
-    data : pandas.DataFrame, optional
-        Long-format panel data when using formula mode.
-    y : array-like, optional
-        Stacked response of shape ``(N*T,)``. Required in matrix mode.
-    X : array-like or pandas.DataFrame, optional
-        Stacked design matrix. Required in matrix mode.
-    W : libpysal.graph.Graph or scipy.sparse matrix
-        Spatial weights of shape ``(N, N)``. Should be
-        row-standardized.
-    unit_col, time_col : str, optional
-        Column names identifying the unit and time period in ``data``.
-        Required in formula mode.
-    N, T : int, optional
-        Cross-sectional and time dimensions. Required in matrix mode;
-        ``T >= 2`` is required.
-    model : int, default 0
-        Fixed-effects specification: ``0`` pooled, ``2`` time FE,
-        ``3`` two-way FE. ``1`` (unit FE) is rejected (Nickell bias).
-    priors : dict, optional
-        Override default priors. Supported keys:
-
-        - ``lam_lower`` (float, default -0.95): Lower bound of
-          Uniform prior on :math:`\\lambda`.
-        - ``lam_upper`` (float, default 0.95): Upper bound of Uniform
-          prior on :math:`\\lambda`.
-        - ``phi_lower`` (float, default -0.95): Lower bound of
-          Uniform prior on :math:`\\phi`.
-        - ``phi_upper`` (float, default 0.95): Upper bound of Uniform
-          prior on :math:`\\phi`.
-        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal
-          prior on :math:`[\\beta, \\theta]`, scaled to ``sd(y)`` and each column's sd.
-        - ``sigma2_alpha`` (float, default 2.0): InverseGamma prior alpha for sigma2
-        - ``sigma2_beta`` (float, default var(y)): InverseGamma prior beta for sigma2
-          for :math:`\\sigma`.
-        - ``nu`` (float, default 4.0): Fixed Student-t degrees of
-          freedom (only used when ``robust=True``).
-
-    logdet_method : {"exact", "cheb", "aaa", "spline", "stochastic"}, optional
-        How ``log|I - rho*W|`` is approximated over rho: evaluated exactly at
-        every rho, interpolated (Chebyshev, AAA rational, or cubic spline)
-        through exact values, or expanded stochastically with no
-        factorization.  ``None`` (default) selects from the size and symmetry
-        of ``W``: ``"exact"`` for ``n <= 500``; ``"aaa"`` up to
-        ``n = 60000`` (``NEIGHBAYES_LOGDET_FACTOR_MAX_N``) unless the
-        factorization's fill-in would dominate; ``"stochastic"`` beyond.
-    logdet_decomp : {"auto", "eig", "chol", "lu"}, default "auto"
-        What supplies the exact values: a dense eigendecomposition, a sparse
-        Cholesky (undirected ``W``; scikit-sparse CHOLMOD) or a sparse LU.
-        ``"auto"`` takes the first of ``"eig"`` (``n <= 500``,
-        ``NEIGHBAYES_LOGDET_EIGEN_MAX_N``), ``"chol"`` (undirected ``W``) and
-        ``"lu"`` that the method is implemented on.  Ignored by
-        ``"stochastic"``.  A pair with no implementation (``"spline"`` on
-        ``"chol"``, ``"exact"`` on ``"lu"``) raises.
-    robust : bool, default False
-        If True, replace the Normal innovation with Student-t.
-    durbin_vars : list of str, optional
-        Names of X columns to spatially lag. By default all
-        non-constant columns are lagged.
-
-    Notes
-    -----
-    **Robust regression**
-
-    When ``robust=True``, the spatially filtered error distribution is
-    changed from Normal to Student-t, yielding a model that is robust to
-    heavy-tailed outliers:
-
-    .. math::
-
-        \\varepsilon_t = (I - \\lambda W)\\bigl(y_t - \\phi y_{t-1} - X_t \\beta - (W X_t)\\theta\\bigr) \\sim t_\\nu(0, \\sigma^2)
-
-    where :math:`\\nu` is a **fixed** hyperparameter set by ``priors={"nu": value}``
-    (default 4, LeSage's ``rval``); larger values approach the Normal.  Values
-    must exceed 2 so the variance exists.
     """
 
-    def _beta_names(self) -> list[str]:
+    def _beta_names_dynamic(self) -> list[str]:
         if self._wx_feature_names:
             return self._feature_names + [
                 f"W*{name}" for name in self._wx_feature_names
             ]
         return self._feature_names
 
-    def _build_pymc_model(self, nuts_sampler: str = "pymc") -> pm.Model:
+    def _build_pymc_model_dynamic(self, nuts_sampler: str = "pymc") -> pm.Model:
         self._prepare_dynamic_design()
 
         Z = np.hstack([self._X_dyn, self._WX_dyn])
@@ -1406,7 +958,7 @@ class SDEMPanelDynamic(_DynamicPanelMixin, SpatialModel):
 
         return model
 
-    def fit(
+    def _fit_dynamic(
         self,
         draws: int = 2000,
         tune: int = 1000,
@@ -1419,7 +971,7 @@ class SDEMPanelDynamic(_DynamicPanelMixin, SpatialModel):
         **sample_kwargs,
     ):
         """Sample posterior and attach pointwise log-likelihood for IC metrics."""
-        return self._fit_dynamic(
+        return self._fit_dynamic_nuts(
             "lam",
             draws=draws,
             tune=tune,
@@ -1432,7 +984,7 @@ class SDEMPanelDynamic(_DynamicPanelMixin, SpatialModel):
             **sample_kwargs,
         )
 
-    def _fitted_mean_from_posterior(self) -> np.ndarray:
+    def _fitted_mean_from_posterior_dynamic(self) -> np.ndarray:
         self._prepare_dynamic_design()
         phi = float(self._posterior_mean("phi"))
         beta = self._posterior_mean("beta")
@@ -1440,11 +992,8 @@ class SDEMPanelDynamic(_DynamicPanelMixin, SpatialModel):
         return phi * self._y_lag + Z @ beta
 
 
-class SLXPanelDynamic(_DynamicPanelMixin, SpatialModel):
-    _priors_cls = PanelSLXDynamicPriors
-    _has_wx_in_beta = True
-
-    """Dynamic SLX panel regression.
+class _SLXDynamic(_DynamicPanelMixin):
+    """The dynamic-panel design of :class:`~neighbayes.models.SLX`.
 
     Implements
 
@@ -1454,94 +1003,19 @@ class SLXPanelDynamic(_DynamicPanelMixin, SpatialModel):
         + \\Bigl(\\sum_j w_{ij} x_{jt}\\Bigr)'\\theta + \\varepsilon_{it},
         \\qquad \\varepsilon_{it} \\sim \\mathcal{N}(0, \\sigma^2).
 
-    This is the dynamic analogue of :class:`SLXPanelFE`. There is no
+    This is the dynamic analogue of the static SLX panel. There is no
     contemporaneous spatial lag on :math:`y`, so no Jacobian adjustment is
     required.
-
-    Parameters
-    ----------
-    formula : str, optional
-        Wilkinson-style formula. Requires ``data``, ``unit_col``,
-        ``time_col``.
-    data : pandas.DataFrame, optional
-        Long-format panel data when using formula mode.
-    y : array-like, optional
-        Stacked response of shape ``(N*T,)``. Required in matrix mode.
-    X : array-like or pandas.DataFrame, optional
-        Stacked design matrix. Required in matrix mode.
-    W : libpysal.graph.Graph or scipy.sparse matrix
-        Spatial weights of shape ``(N, N)``. Used to construct the
-        ``WX`` block. Should be row-standardized.
-    unit_col, time_col : str, optional
-        Column names identifying the unit and time period in ``data``.
-        Required in formula mode.
-    N, T : int, optional
-        Cross-sectional and time dimensions. Required in matrix mode;
-        ``T >= 2`` is required.
-    model : int, default 0
-        Fixed-effects specification: ``0`` pooled, ``2`` time FE,
-        ``3`` two-way FE. ``1`` (unit FE) is rejected (Nickell bias).
-    priors : dict, optional
-        Override default priors. Supported keys:
-
-        - ``phi_lower`` (float, default -0.95): Lower bound of
-          Uniform prior on :math:`\\phi`.
-        - ``phi_upper`` (float, default 0.95): Upper bound of Uniform
-          prior on :math:`\\phi`.
-        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal
-          prior on :math:`[\\beta, \\theta]`, scaled to ``sd(y)`` and each column's sd.
-        - ``sigma2_alpha`` (float, default 2.0): InverseGamma prior alpha for sigma2
-        - ``sigma2_beta`` (float, default var(y)): InverseGamma prior beta for sigma2
-          for :math:`\\sigma`.
-        - ``nu`` (float, default 4.0): Fixed Student-t degrees of
-          freedom (only used when ``robust=True``).
-
-    logdet_method : {"exact", "cheb", "aaa", "spline", "stochastic"}, optional
-        How ``log|I - rho*W|`` is approximated over rho: evaluated exactly at
-        every rho, interpolated (Chebyshev, AAA rational, or cubic spline)
-        through exact values, or expanded stochastically with no
-        factorization.  ``None`` (default) selects from the size and symmetry
-        of ``W``: ``"exact"`` for ``n <= 500``; ``"aaa"`` up to
-        ``n = 60000`` (``NEIGHBAYES_LOGDET_FACTOR_MAX_N``) unless the
-        factorization's fill-in would dominate; ``"stochastic"`` beyond.
-    logdet_decomp : {"auto", "eig", "chol", "lu"}, default "auto"
-        What supplies the exact values: a dense eigendecomposition, a sparse
-        Cholesky (undirected ``W``; scikit-sparse CHOLMOD) or a sparse LU.
-        ``"auto"`` takes the first of ``"eig"`` (``n <= 500``,
-        ``NEIGHBAYES_LOGDET_EIGEN_MAX_N``), ``"chol"`` (undirected ``W``) and
-        ``"lu"`` that the method is implemented on.  Ignored by
-        ``"stochastic"``.  A pair with no implementation (``"spline"`` on
-        ``"chol"``, ``"exact"`` on ``"lu"``) raises.
-    robust : bool, default False
-        If True, replace the Normal error with Student-t.
-    durbin_vars : list of str, optional
-        Names of X columns to spatially lag. By default all
-        non-constant columns are lagged.
-
-    Notes
-    -----
-    **Robust regression**
-
-    When ``robust=True``, the error distribution is changed from Normal
-    to Student-t, yielding a model that is robust to heavy-tailed outliers:
-
-    .. math::
-
-        \\varepsilon_t \\sim t_\\nu(0, \\sigma^2)
-
-    where :math:`\\nu` is a **fixed** hyperparameter set by ``priors={"nu": value}``
-    (default 4, LeSage's ``rval``); larger values approach the Normal.  Values
-    must exceed 2 so the variance exists.
     """
 
-    def _beta_names(self) -> list[str]:
+    def _beta_names_dynamic(self) -> list[str]:
         if self._wx_feature_names:
             return self._feature_names + [
                 f"W*{name}" for name in self._wx_feature_names
             ]
         return self._feature_names
 
-    def _build_pymc_model(self) -> pm.Model:
+    def _build_pymc_model_dynamic(self) -> pm.Model:
         self._prepare_dynamic_design()
 
         Z = np.hstack([self._X_dyn, self._WX_dyn])
@@ -1567,7 +1041,7 @@ class SLXPanelDynamic(_DynamicPanelMixin, SpatialModel):
 
         return model
 
-    def _fitted_mean_from_posterior(self) -> np.ndarray:
+    def _fitted_mean_from_posterior_dynamic(self) -> np.ndarray:
         self._prepare_dynamic_design()
         phi = float(self._posterior_mean("phi"))
         beta = self._posterior_mean("beta")

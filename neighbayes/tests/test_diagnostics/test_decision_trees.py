@@ -346,31 +346,31 @@ class TestGetSpec:
 
 class TestGetPanelSpec:
     def test_ols_fe_spec(self):
-        tree = get_panel_spec("OLSPanelFE")
+        tree = get_panel_spec("OLS")
         assert isinstance(tree, TreeNode)
 
     def test_sar_fe_spec(self):
-        tree = get_panel_spec("SARPanelFE")
+        tree = get_panel_spec("SAR")
         assert isinstance(tree, TreeNode)
 
     def test_sem_fe_spec(self):
-        tree = get_panel_spec("SEMPanelFE")
+        tree = get_panel_spec("SEM")
         assert isinstance(tree, TreeNode)
 
     def test_slx_fe_spec(self):
-        tree = get_panel_spec("SLXPanelFE")
+        tree = get_panel_spec("SLX")
         assert isinstance(tree, TreeNode)
 
     def test_sdm_fe_spec(self):
-        tree = get_panel_spec("SDMPanelFE")
+        tree = get_panel_spec("SDM")
         assert isinstance(tree, TreeNode)
 
     def test_sdem_fe_spec(self):
-        tree = get_panel_spec("SDEMPanelFE")
+        tree = get_panel_spec("SDEM")
         assert isinstance(tree, TreeNode)
 
     def test_ols_re_spec(self):
-        tree = get_panel_spec("OLSPanelRE")
+        tree = get_panel_spec("OLS")
         assert isinstance(tree, TreeNode)
 
     def test_unknown_returns_string(self):
@@ -381,7 +381,7 @@ class TestGetPanelSpec:
         # All naive + robust significant: route via the robust p-value
         # tie-break to the dominant single-channel panel model.  SARAR is
         # intentionally unreachable from a panel-OLS fit.
-        tree = get_panel_spec("OLSPanelFE")
+        tree = get_panel_spec("OLS")
         result, path = evaluate(
             tree,
             sig_lookup=lambda _: True,
@@ -393,7 +393,7 @@ class TestGetPanelSpec:
         assert result == "SAR"
 
     def test_panel_ols_none_sig(self):
-        tree = get_panel_spec("OLSPanelFE")
+        tree = get_panel_spec("OLS")
         result, path = evaluate(tree, sig_lookup=lambda _: False)
         assert "OLS" in result
 
@@ -402,31 +402,31 @@ class TestGetPanelDynamicSpec:
     """Dynamic panel decision trees reuse static panel structure with 'Dynamic' suffix."""
 
     def test_ols_dynamic_spec(self):
-        tree = get_panel_spec("OLSPanelDynamic")
+        tree = get_panel_spec("OLS")
         assert isinstance(tree, TreeNode)
 
     def test_sar_dynamic_spec(self):
-        tree = get_panel_spec("SARPanelDynamic")
+        tree = get_panel_spec("SAR")
         assert isinstance(tree, TreeNode)
 
     def test_sem_dynamic_spec(self):
-        tree = get_panel_spec("SEMPanelDynamic")
+        tree = get_panel_spec("SEM")
         assert isinstance(tree, TreeNode)
 
     def test_slx_dynamic_spec(self):
-        tree = get_panel_spec("SLXPanelDynamic")
+        tree = get_panel_spec("SLX")
         assert isinstance(tree, TreeNode)
 
     def test_sdm_dynamic_spec(self):
-        tree = get_panel_spec("SDMPanelDynamic")
+        tree = get_panel_spec("SDM")
         assert isinstance(tree, TreeNode)
 
     def test_sdem_dynamic_spec(self):
-        tree = get_panel_spec("SDEMPanelDynamic")
+        tree = get_panel_spec("SDEM")
         assert isinstance(tree, TreeNode)
 
     def test_dynamic_ols_all_sig(self):
-        tree = get_panel_spec("OLSPanelDynamic")
+        tree = get_panel_spec("OLS")
         result, path = evaluate(
             tree,
             sig_lookup=lambda _: True,
@@ -438,7 +438,7 @@ class TestGetPanelDynamicSpec:
         assert result == "SAR"
 
     def test_dynamic_ols_none_sig(self):
-        tree = get_panel_spec("OLSPanelDynamic")
+        tree = get_panel_spec("OLS")
         result, path = evaluate(tree, sig_lookup=lambda _: False)
         assert result == "OLS"
 

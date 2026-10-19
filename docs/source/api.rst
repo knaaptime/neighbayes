@@ -127,10 +127,8 @@ Default NUTS Priors
    SARLogitPriors
    PanelBasePriors
    PanelOLSPriors
-   PanelSLXPriors
    PanelSARPriors
    PanelSEMPriors
-   PanelSDMPriors
    PanelSDEMPriors
    PanelOLSREPriors
    PanelSARREPriors

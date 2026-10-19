@@ -9,15 +9,6 @@ import pytest
 import xarray as xr
 
 from neighbayes.models import OLS, SAR, SDEM, SDM, SEM, SLX
-from neighbayes.models.panel._dynamic import (
-    OLSPanelDynamic,
-    SARPanelDynamic,
-    SDEMPanelDynamic,
-    SDMPanelDynamic,
-    SDMPanelDynamicRestricted,
-    SEMPanelDynamic,
-    SLXPanelDynamic,
-)
 from neighbayes.tests.helpers import W_to_graph, make_line_W
 
 
@@ -242,16 +233,16 @@ def test_dynamic_slx_panel_fitted_values_and_effects():
 @pytest.mark.parametrize(
     "cls,expected_present,expected_absent",
     [
-        (SARPanelDynamic, ("rho", "phi"), ()),
-        (SEMPanelDynamic, ("lam", "phi"), ()),
-        (SDEMPanelDynamic, ("lam", "phi"), ()),
-        (SLXPanelDynamic, ("phi",), ("rho", "lam")),
+        (SAR, ("rho", "phi"), ()),
+        (SEM, ("lam", "phi"), ()),
+        (SDEM, ("lam", "phi"), ()),
+        (SLX, ("phi",), ("rho", "lam")),
     ],
     ids=lambda v: getattr(v, "__name__", str(v)),
 )
 def test_dynamic_panel_builds_pymc_model(cls, expected_present, expected_absent):
     y, X, W, N, T = _panel_data()
-    model = cls(y=y, X=X, W=W, N=N, T=T, effects=0)
+    model = cls(y=y, X=X, W=W, N=N, T=T, dynamic=True)
     pymc_model = model._build_pymc_model()
     rv_names = [v.name for v in pymc_model.free_RVs]
     for name in expected_present:
@@ -264,20 +255,24 @@ def test_dynamic_panel_builds_pymc_model(cls, expected_present, expected_absent)
 # Nickell bias guard: unit effects must raise ValueError for all dynamic models
 # ---------------------------------------------------------------------------
 
-_DYNAMIC_CLASSES = [
-    OLSPanelDynamic,
-    SDMPanelDynamicRestricted,
-    SDMPanelDynamic,
-    SARPanelDynamic,
-    SEMPanelDynamic,
-    SDEMPanelDynamic,
-    SLXPanelDynamic,
+_DYNAMIC_DESIGNS = [
+    (OLS, True),
+    (SDM, "restricted"),
+    (SDM, True),
+    (SAR, True),
+    (SEM, True),
+    (SDEM, True),
+    (SLX, True),
 ]
 
 
-@pytest.mark.parametrize("effects", [1, "unit", 3, "two_way"])
-@pytest.mark.parametrize("cls", _DYNAMIC_CLASSES, ids=lambda c: c.__name__)
-def test_dynamic_panel_unit_effects_raise_nickell_bias(cls, effects):
+@pytest.mark.parametrize(
+    "unit,time", [("fixed", False), ("fixed", True), ("random", False)]
+)
+@pytest.mark.parametrize(
+    "cls,dynamic", _DYNAMIC_DESIGNS, ids=lambda v: getattr(v, "__name__", str(v))
+)
+def test_dynamic_panel_unit_effects_raise_nickell_bias(cls, dynamic, unit, time):
     """Unit effects, alone or two-way, must raise for dynamic panel models.
 
     The within-transformation creates correlation between the demeaned
@@ -286,7 +281,10 @@ def test_dynamic_panel_unit_effects_raise_nickell_bias(cls, effects):
     """
     y, X, W, N, T = _panel_data()
     with pytest.raises(ValueError, match="Nickell"):
-        cls(y=y, X=X, W=W, N=N, T=T, effects=effects)
+        cls(
+            y=y, X=X, W=W, N=N, T=T, dynamic=dynamic, unit_effects=unit,
+            time_effects=time,
+        )  # fmt: skip
 
 
 # ---------------------------------------------------------------------------

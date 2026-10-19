@@ -453,6 +453,10 @@ class SharedSpatialMethods(metaclass=FacadeMeta):
 
     _structure = None
 
+    def _implementation(self, name: str):
+        """The bound method that method ``name`` runs (see ``GaussianDesigns``)."""
+        return getattr(self, name)
+
     # Panel decision trees use "Panel-"-prefixed test names, "panel_"-prefixed
     # predicate keys, and the panel spec registry; a panel SpatialModel sets it.
     _panel_diagnostics = False
@@ -817,7 +821,7 @@ class SharedSpatialMethods(metaclass=FacadeMeta):
         idata_kwargs = dict(idata_kwargs or {})
 
         build_kwargs: dict[str, Any] = {}
-        build_sig = inspect.signature(self._build_pymc_model)
+        build_sig = inspect.signature(self._implementation("_build_pymc_model"))
         if "compute_log_likelihood" in build_sig.parameters:
             build_kwargs["compute_log_likelihood"] = compute_log_likelihood
         if "nuts_sampler" in build_sig.parameters:

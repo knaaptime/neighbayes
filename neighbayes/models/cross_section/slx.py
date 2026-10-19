@@ -10,13 +10,21 @@ from __future__ import annotations
 
 import numpy as np
 
-from .._design import gaussian
+from .._base._shared import SharedSpatialMethods
 from .._mixins import GaussianLikelihoodMixin, GaussianPredictionMixin
+from .._mixins._designs import GaussianDesigns
 from ..base import SpatialModel
-from ..priors import SLXPriors
+from ..panel._dynamic import _SLXDynamic
+from ..priors import PanelSLXDynamicPriors, SLXPriors
 
 
-class SLX(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
+class SLX(
+    GaussianDesigns,
+    _SLXDynamic,
+    GaussianPredictionMixin,
+    GaussianLikelihoodMixin,
+    SpatialModel,
+):
     """Bayesian SLX (Spatial Lag X) model.
 
     Adds spatial lags of the regressors :math:`X` to a standard linear
@@ -94,6 +102,22 @@ class SLX(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
         WX column; if filtering eliminates all of them a ValueError is
         raised.
 
+    time_col, unit_col : str, optional
+        Formula-mode panel: the period and unit columns of ``data``.  Given
+        time, the model is a panel, stacked by period, then unit.
+    N, T : int, optional
+        Matrix-mode panel: the numbers of units and periods; ``T=1`` is the
+        cross-section.
+    unit_effects : {None, "fixed"}, default None
+        Panel unit effects: ``"fixed"`` applies the within transformation
+        (with Lee and Yu's 2010 likelihood dimensions).
+    time_effects : bool, default False
+        Fixed time effects (panels).
+    dynamic : bool, default False
+        Add the time lag :math:`\\phi y_{t-1}` (priors ``phi_lower``,
+        ``phi_upper``).  A dynamic panel takes no unit effects (Nickell
+        1981).
+
     Notes
     -----
     Direct effects equal :math:`\\beta` and indirect effects equal
@@ -114,7 +138,14 @@ class SLX(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     must exceed 2 so the variance exists.
     """
 
-    _dispatch = classmethod(gaussian)
+    _DESIGNS = {
+        "static": {},
+        "dynamic": {
+            "_priors_cls": PanelSLXDynamicPriors,
+            "_likelihood": "",
+            "_lee_yu": False,
+        },
+    }
 
     _priors_cls = SLXPriors
     _spatial_params: tuple[str, ...] = ()
@@ -125,7 +156,7 @@ class SLX(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     _model_type: str = "slx"
     _likelihood: str = "gaussian"  # NUTS-only (no _gibbs_key)
 
-    def _compute_impacts_posterior(
+    def _compute_impacts_posterior_static(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute direct, indirect, and total effects for each posterior draw.
@@ -144,7 +175,7 @@ class SLX(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
         """
         return self._slx_effects()
 
-    def _fitted_mean_from_posterior(self) -> np.ndarray:
+    def _fitted_mean_from_posterior_static(self) -> np.ndarray:
         """Compute fitted values at posterior mean coefficients.
 
         Returns
@@ -152,6 +183,9 @@ class SLX(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
         np.ndarray
             Posterior-mean fitted values.
         """
+        if self._is_panel:
+            # A fixed-effects panel may have dropped its intercept.
+            return SharedSpatialMethods._fitted_mean_from_posterior(self)
         k = self._X.shape[1]
         beta = self._posterior_mean("beta")
         Z = np.hstack([self._X, self._WX])

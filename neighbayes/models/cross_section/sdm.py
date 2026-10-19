@@ -10,13 +10,21 @@ from __future__ import annotations
 
 import numpy as np
 
-from .._design import gaussian
 from .._mixins import GaussianLikelihoodMixin, GaussianPredictionMixin
+from .._mixins._designs import GaussianDesigns
 from ..base import SpatialModel
-from ..priors import SDMPriors
+from ..panel._dynamic import _SDMDynamic, _SDMRestrictedDynamic
+from ..priors import PanelSDMRDynamicPriors, PanelSDMUDynamicPriors, SDMPriors
 
 
-class SDM(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
+class SDM(
+    GaussianDesigns,
+    _SDMDynamic,
+    _SDMRestrictedDynamic,
+    GaussianPredictionMixin,
+    GaussianLikelihoodMixin,
+    SpatialModel,
+):
     """Bayesian Spatial Durbin Model.
 
     Combines a spatial lag of :math:`y` with spatial lags of the
@@ -107,6 +115,25 @@ class SDM(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
         WX column; if filtering eliminates all of them a ValueError is
         raised.
 
+    time_col, unit_col : str, optional
+        Formula-mode panel: the period and unit columns of ``data``.  Given
+        time, the model is a panel, stacked by period, then unit.
+    N, T : int, optional
+        Matrix-mode panel: the numbers of units and periods; ``T=1`` is the
+        cross-section.
+    unit_effects : {None, "fixed"}, default None
+        Panel unit effects: ``"fixed"`` applies the within transformation
+        (with Lee and Yu's 2010 likelihood dimensions).
+    time_effects : bool, default False
+        Fixed time effects (panels).
+    dynamic : {False, True, "restricted"}, default False
+        Add the time lag :math:`\\phi y_{t-1}` (priors ``phi_lower``,
+        ``phi_upper``; the ``rho`` bounds default to ``±0.95``).  ``True`` adds
+        the lagged spatial outcome with its own coefficient (priors
+        ``theta_lower``, ``theta_upper``); ``"restricted"`` pins it to
+        :math:`-\\rho\\phi`.  A dynamic panel takes no unit effects
+        (Nickell 1981).
+
     Notes
     -----
     Direct, indirect and total effects of :math:`X` on :math:`y`
@@ -128,7 +155,25 @@ class SDM(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     must exceed 2 so the variance exists.
     """
 
-    _dispatch = classmethod(gaussian)
+    _DESIGNS = {
+        "static": {},
+        "dynamic": {
+            "_priors_cls": PanelSDMUDynamicPriors,
+            "_jacobian_param": None,
+            "_gibbs_class": None,
+            "_gibbs_key": None,
+            "_likelihood": "",
+            "_lee_yu": False,
+        },
+        "restricted": {
+            "_priors_cls": PanelSDMRDynamicPriors,
+            "_jacobian_param": None,
+            "_gibbs_class": None,
+            "_gibbs_key": None,
+            "_likelihood": "",
+            "_lee_yu": False,
+        },
+    }
 
     _priors_cls = SDMPriors
     _spatial_params: tuple[str, ...] = ("rho",)
@@ -140,7 +185,7 @@ class SDM(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     _likelihood: str = "gaussian"
     _gibbs_key: tuple[str, str] | None = ("gaussian", "cross_section")
 
-    def _compute_impacts_posterior(
+    def _compute_impacts_posterior_static(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute direct, indirect, and total effects for each posterior draw.

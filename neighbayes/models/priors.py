@@ -437,17 +437,13 @@ class PanelBasePriors:
 
 @dataclass(frozen=True)
 class PanelOLSPriors(PanelBasePriors):
-    """Priors for :class:`neighbayes.models.OLSPanelFE`."""
-
-
-@dataclass(frozen=True)
-class PanelSLXPriors(PanelBasePriors):
-    """Priors for :class:`neighbayes.models.SLXPanelFE`."""
+    """The base of :class:`PanelOLSREPriors`: the panel keys with no spatial bounds."""
 
 
 @dataclass(frozen=True)
 class PanelSARPriors(PanelBasePriors):
-    """Priors for :class:`neighbayes.models.SARPanelFE` (adds rho bounds)."""
+    """Panel priors with ``rho`` bounds: the base of the SAR random-effects, Tobit
+    and count panel priors."""
 
     rho_lower: float = -1.0
     rho_upper: float = 1.0
@@ -581,20 +577,16 @@ class FlowPanelHurdlePriors(_PanelCountBasePriors):
 
 @dataclass(frozen=True)
 class PanelSEMPriors(PanelBasePriors):
-    """Priors for :class:`neighbayes.models.SEMPanelFE` (adds lam bounds)."""
+    """Panel priors with ``lam`` bounds: the base of the SEM and SDEM
+    random-effects and Tobit priors."""
 
     lam_lower: float = -1.0
     lam_upper: float = 1.0
 
 
 @dataclass(frozen=True)
-class PanelSDMPriors(PanelSARPriors):
-    """Priors for :class:`neighbayes.models.SDMPanelFE`."""
-
-
-@dataclass(frozen=True)
 class PanelSDEMPriors(PanelSEMPriors):
-    """Priors for :class:`neighbayes.models.SDEMPanelFE`."""
+    """The base of :class:`PanelSDEMREPriors`."""
 
 
 # -- Panel random-effects ----------------------------------------------------
@@ -627,22 +619,22 @@ class PanelREMixinPriors:
 
 @dataclass(frozen=True)
 class PanelOLSREPriors(PanelOLSPriors, PanelREMixinPriors):
-    """Priors for :class:`neighbayes.models.OLSPanelRE`."""
+    """Priors for :class:`neighbayes.models.OLS` with random unit effects."""
 
 
 @dataclass(frozen=True)
 class PanelSARREPriors(PanelSARPriors, PanelREMixinPriors):
-    """Priors for :class:`neighbayes.models.SARPanelRE`."""
+    """Priors for :class:`neighbayes.models.SAR` with random unit effects."""
 
 
 @dataclass(frozen=True)
 class PanelSEMREPriors(PanelSEMPriors, PanelREMixinPriors):
-    """Priors for :class:`neighbayes.models.SEMPanelRE`."""
+    """Priors for :class:`neighbayes.models.SEM` with random unit effects."""
 
 
 @dataclass(frozen=True)
 class PanelSDEMREPriors(PanelSDEMPriors, PanelREMixinPriors):
-    """Priors for :class:`neighbayes.models.SDEMPanelRE`."""
+    """Priors for :class:`neighbayes.models.SDEM` with random unit effects."""
 
 
 # -- Panel Tobit -------------------------------------------------------------
@@ -675,17 +667,17 @@ class PanelDynamicBasePriors(PanelBasePriors):
 
 @dataclass(frozen=True)
 class PanelOLSDynamicPriors(PanelDynamicBasePriors):
-    """Priors for :class:`neighbayes.models.OLSPanelDynamic`."""
+    """Priors for the dynamic panel of :class:`neighbayes.models.OLS`."""
 
 
 @dataclass(frozen=True)
 class PanelSLXDynamicPriors(PanelDynamicBasePriors):
-    """Priors for :class:`neighbayes.models.SLXPanelDynamic`."""
+    """Priors for the dynamic panel of :class:`neighbayes.models.SLX`."""
 
 
 @dataclass(frozen=True)
 class PanelSARDynamicPriors(PanelDynamicBasePriors):
-    """Priors for :class:`neighbayes.models.SARPanelDynamic`."""
+    """Priors for the dynamic panel of :class:`neighbayes.models.SAR`."""
 
     rho_lower: float = -0.95
     rho_upper: float = 0.95
@@ -693,7 +685,7 @@ class PanelSARDynamicPriors(PanelDynamicBasePriors):
 
 @dataclass(frozen=True)
 class PanelSEMDynamicPriors(PanelDynamicBasePriors):
-    """Priors for :class:`neighbayes.models.SEMPanelDynamic`."""
+    """Priors for the dynamic panel of :class:`neighbayes.models.SEM`."""
 
     lam_lower: float = -0.95
     lam_upper: float = 0.95
@@ -701,12 +693,12 @@ class PanelSEMDynamicPriors(PanelDynamicBasePriors):
 
 @dataclass(frozen=True)
 class PanelSDMRDynamicPriors(PanelSARDynamicPriors):
-    """Priors for :class:`neighbayes.models.SDMPanelDynamicRestricted`."""
+    """Priors for the restricted dynamic panel of :class:`neighbayes.models.SDM`."""
 
 
 @dataclass(frozen=True)
 class PanelSDMUDynamicPriors(PanelSARDynamicPriors):
-    """Priors for :class:`neighbayes.models.SDMPanelDynamic`.
+    """Priors for the dynamic panel of :class:`neighbayes.models.SDM`.
 
     Adds bounds on the time-space cross-term coefficient ``theta``.
     """
@@ -717,7 +709,7 @@ class PanelSDMUDynamicPriors(PanelSARDynamicPriors):
 
 @dataclass(frozen=True)
 class PanelSDEMDynamicPriors(PanelSEMDynamicPriors):
-    """Priors for :class:`neighbayes.models.SDEMPanelDynamic`."""
+    """Priors for the dynamic panel of :class:`neighbayes.models.SDEM`."""
 
 
 # ---------------------------------------------------------------------------
@@ -904,10 +896,8 @@ __all__ = [
     "MultilevelPriors",
     "PanelBasePriors",
     "PanelOLSPriors",
-    "PanelSLXPriors",
     "PanelSARPriors",
     "PanelSEMPriors",
-    "PanelSDMPriors",
     "PanelSDEMPriors",
     "PanelOLSREPriors",
     "PanelSARREPriors",

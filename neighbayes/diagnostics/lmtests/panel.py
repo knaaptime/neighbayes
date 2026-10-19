@@ -58,8 +58,8 @@ def bayesian_panel_lm_wx_sem_test(
 
     Parameters
     ----------
-    model : SEMPanelFE or SEMPanelRE
-        Fitted SEM panel model instance with ``inference_data`` attribute
+    model : SEM
+        Fitted SEM panel (fixed or random unit effects) with ``inference_data`` attribute
         containing posterior draws for ``beta``, ``lambda``, and ``sigma``.
 
     Returns
@@ -282,7 +282,7 @@ def bayesian_panel_lm_lag_test(
     Parameters
     ----------
     model : SpatialModel
-        Fitted panel model (e.g. ``OLSPanelFE``, ``OLSPanelRE``) with
+        Fitted panel model (e.g. an ``OLS`` panel) with
         ``inference_data`` attribute containing posterior draws for
         ``beta`` and ``sigma``.
 
@@ -375,7 +375,7 @@ def bayesian_panel_lm_error_test(
     Parameters
     ----------
     model : SpatialModel
-        Fitted panel model (e.g. ``OLSPanelFE``, ``OLSPanelRE``) with
+        Fitted panel model (e.g. an ``OLS`` panel) with
         ``inference_data`` attribute containing posterior draws for
         ``beta`` and ``sigma``.
 
@@ -450,7 +450,7 @@ def bayesian_panel_robust_lm_lag_test(
     Parameters
     ----------
     model : SpatialModel
-        Fitted panel model (e.g. ``OLSPanelFE``) with ``inference_data``
+        Fitted panel model (e.g. an ``OLS`` panel) with ``inference_data``
         attribute containing posterior draws for ``beta`` and ``sigma``.
 
     Returns
@@ -545,7 +545,7 @@ def bayesian_panel_robust_lm_error_test(
     Parameters
     ----------
     model : SpatialModel
-        Fitted panel model (e.g. ``OLSPanelFE``) with ``inference_data``
+        Fitted panel model (e.g. an ``OLS`` panel) with ``inference_data``
         attribute containing posterior draws for ``beta`` and ``sigma``.
 
     Returns
@@ -647,8 +647,8 @@ def bayesian_panel_lm_wx_test(
 
     Parameters
     ----------
-    model : SARPanelFE or SARPanelRE
-        Fitted SAR panel model with ``inference_data`` containing
+    model : SAR
+        Fitted SAR panel (fixed or random unit effects) with ``inference_data`` containing
         posterior draws for ``beta``, ``rho``, and ``sigma``.
 
     Returns
@@ -930,8 +930,8 @@ def bayesian_panel_robust_lm_lag_sdm_test(
 
     Parameters
     ----------
-    model : SLXPanelFE or SLX-like panel model
-        Fitted SLX panel model with ``inference_data`` containing
+    model : SLX
+        Fitted SLX panel, or an SLX-like panel model, with ``inference_data`` containing
         posterior draws for ``beta`` and ``sigma`` (``beta`` covers the
         full SLX design ``[X, WX]``).
 
@@ -1042,8 +1042,8 @@ def bayesian_panel_robust_lm_wx_test(
 
     Parameters
     ----------
-    model : SARPanelFE or SARPanelRE
-        Fitted SAR panel model with ``inference_data`` containing
+    model : SAR
+        Fitted SAR panel (fixed or random unit effects) with ``inference_data`` containing
         posterior draws for ``beta``, ``rho``, ``sigma``.
 
     Returns
@@ -1147,8 +1147,8 @@ def bayesian_panel_robust_lm_error_sdem_test(
 
     Parameters
     ----------
-    model : SLXPanelFE or SLX-like panel model
-        Fitted SLX panel model with ``inference_data`` containing
+    model : SLX
+        Fitted SLX panel, or an SLX-like panel model, with ``inference_data`` containing
         posterior draws for ``beta`` and ``sigma``.
 
     Returns

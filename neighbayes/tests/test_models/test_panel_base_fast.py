@@ -238,20 +238,14 @@ class TestPanelInit:
         return _W_to_graph(_rook_W(4))
 
     def test_W_required(self, W_graph):
-        from neighbayes.models.panel._fe import OLSPanelFE
-
         with pytest.raises(ValueError, match="W is required"):
             OLS(y=np.ones(12), X=np.ones((12, 2)), W=None, N=4, T=3)
 
     def test_formula_mode_requires_data(self, W_graph):
-        from neighbayes.models.panel._fe import OLSPanelFE
-
         with pytest.raises(ValueError, match="data is required"):
             OLS(formula="y ~ x1", data=None, W=W_graph, unit_col="u", time_col="t")
 
     def test_chebyshev_init_does_not_eagerly_compute_eigs(self, W_graph, monkeypatch):
-        from neighbayes.models.panel._fe import OLSPanelFE
-
         rng = np.random.default_rng(0)
 
         def _boom(*args, **kwargs):
@@ -271,8 +265,6 @@ class TestPanelInit:
         assert "_W_eigs" not in model.__dict__
 
     def test_sparse_grid_init_does_not_eagerly_compute_eigs(self, W_graph, monkeypatch):
-        from neighbayes.models.panel._fe import OLSPanelFE
-
         rng = np.random.default_rng(0)
 
         def _boom(*args, **kwargs):
@@ -292,8 +284,6 @@ class TestPanelInit:
         assert "_W_eigs" not in model.__dict__
 
     def test_formula_mode_requires_unit_and_time_cols(self, W_graph):
-        from neighbayes.models.panel._fe import OLSPanelFE
-
         df = pd.DataFrame(
             {
                 "y": [1, 2, 3, 4],
@@ -306,22 +296,16 @@ class TestPanelInit:
             OLS(formula="y ~ x1", data=df, W=W_graph, time_col="t")
 
     def test_matrix_mode_requires_N_and_T(self, W_graph):
-        from neighbayes.models.panel._fe import OLSPanelFE
-
         with pytest.raises(ValueError, match="N and T are required"):
             OLS(y=np.ones(12), X=np.ones((12, 2)), W=W_graph, N=4)
         with pytest.raises(ValueError, match="N and T are required"):
             OLS(y=np.ones(12), X=np.ones((12, 2)), W=W_graph, T=3)
 
     def test_matrix_mode_NT_mismatch(self, W_graph):
-        from neighbayes.models.panel._fe import OLSPanelFE
-
         with pytest.raises(ValueError, match="N\\*T must equal"):
             OLS(y=np.ones(12), X=np.ones((12, 2)), W=W_graph, N=5, T=3)
 
     def test_formula_mode_balanced_panel_check(self, W_graph):
-        from neighbayes.models.panel._fe import OLSPanelFE
-
         # 3 rows but N=2, T=2 => 4 expected
         df = pd.DataFrame(
             {"y": [1, 2, 3], "x1": [4, 5, 6], "u": [1, 1, 2], "t": [1, 2, 1]}
@@ -330,8 +314,6 @@ class TestPanelInit:
             OLS(formula="y ~ x1", data=df, W=W_graph, unit_col="u", time_col="t")
 
     def test_matrix_mode_creates_model(self, W_graph):
-        from neighbayes.models.panel._fe import OLSPanelFE
-
         model = OLS(
             y=np.random.default_rng(0).standard_normal(12),
             X=np.random.default_rng(1).standard_normal((12, 2)),
@@ -344,8 +326,6 @@ class TestPanelInit:
         assert model._y.shape == (12,)
 
     def test_formula_mode_creates_model(self, W_graph):
-        from neighbayes.models.panel._fe import OLSPanelFE
-
         rng = np.random.default_rng(42)
         df = pd.DataFrame(
             {
@@ -364,8 +344,6 @@ class TestPanelInit:
         assert model._panel_index is not None
 
     def test_durbin_vars_subsets_lagged_columns(self, W_graph):
-        from neighbayes.models.panel._fe import SDMPanelFE
-
         rng = np.random.default_rng(2)
         df = pd.DataFrame(
             {
@@ -398,8 +376,6 @@ class TestPanelInit:
         assert subset._WX.shape == (12, 1)
 
     def test_durbin_vars_unknown_raises(self, W_graph):
-        from neighbayes.models.panel._fe import SDMPanelFE
-
         rng = np.random.default_rng(3)
         with pytest.raises(ValueError, match="durbin_vars contains names not found"):
             SDM(
@@ -421,8 +397,6 @@ class TestPanelDiagnosticsDecision:
 
     @pytest.fixture
     def panel_model(self, W_graph):
-        from neighbayes.models.panel._fe import OLSPanelFE
-
         rng = np.random.default_rng(0)
         return OLS(
             y=rng.standard_normal(12),
@@ -528,8 +502,6 @@ class TestPanelDiagnosticsDecision:
         )
 
     def test_sdm_panel_fe_error_sdm(self, W_graph, monkeypatch):
-        from neighbayes.models.panel._fe import SDMPanelFE
-
         rng = np.random.default_rng(0)
         model = SDM(
             y=rng.standard_normal(12),
@@ -545,8 +517,6 @@ class TestPanelDiagnosticsDecision:
         assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "GNS"
 
     def test_sdem_panel_fe_lag_sdem(self, W_graph, monkeypatch):
-        from neighbayes.models.panel._fe import SDEMPanelFE
-
         rng = np.random.default_rng(0)
         model = SDEM(
             y=rng.standard_normal(12),
@@ -562,8 +532,6 @@ class TestPanelDiagnosticsDecision:
         assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "GNS"
 
     def test_slx_panel_fe_robust_lag_sdm(self, W_graph, monkeypatch):
-        from neighbayes.models.panel._fe import SLXPanelFE
-
         rng = np.random.default_rng(0)
         model = SLX(
             y=rng.standard_normal(12),
@@ -587,8 +555,6 @@ class TestPanelDiagnosticsDecision:
         assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SDM"
 
     def test_slx_panel_fe_robust_error_sdem(self, W_graph, monkeypatch):
-        from neighbayes.models.panel._fe import SLXPanelFE
-
         rng = np.random.default_rng(0)
         model = SLX(
             y=rng.standard_normal(12),
@@ -613,8 +579,6 @@ class TestPanelDiagnosticsDecision:
 
     def test_slx_panel_fe_robust_both_lag_wins(self, W_graph, monkeypatch):
         """When both robust tests fire, the smaller-p side wins (Lag-SDM here)."""
-        from neighbayes.models.panel._fe import SLXPanelFE
-
         rng = np.random.default_rng(0)
         model = SLX(
             y=rng.standard_normal(12),
@@ -639,8 +603,6 @@ class TestPanelDiagnosticsDecision:
 
     def test_slx_panel_fe_robust_both_error_wins(self, W_graph, monkeypatch):
         """When both robust tests fire, the smaller-p side wins (Error-SDEM here)."""
-        from neighbayes.models.panel._fe import SLXPanelFE
-
         rng = np.random.default_rng(0)
         model = SLX(
             y=rng.standard_normal(12),
@@ -665,8 +627,6 @@ class TestPanelDiagnosticsDecision:
 
     def test_slx_panel_fe_neither_robust(self, W_graph, monkeypatch):
         """When neither robust test fires, SLX is the terminal model."""
-        from neighbayes.models.panel._fe import SLXPanelFE
-
         rng = np.random.default_rng(0)
         model = SLX(
             y=rng.standard_normal(12),
@@ -686,8 +646,6 @@ class TestPanelDiagnosticsDecision:
 
     def test_sar_panel_fe_error_and_wx(self, W_graph, monkeypatch):
         """SAR panel: LM-Error significant, Robust-LM-WX significant → SDM."""
-        from neighbayes.models.panel._fe import SARPanelFE
-
         rng = np.random.default_rng(0)
         model = SAR(
             y=rng.standard_normal(12),
@@ -707,8 +665,6 @@ class TestPanelDiagnosticsDecision:
 
     def test_sem_panel_fe_lag_and_wx(self, W_graph, monkeypatch):
         """SEM panel: LM-Lag significant, LM-WX significant → SDEM."""
-        from neighbayes.models.panel._fe import SEMPanelFE
-
         rng = np.random.default_rng(0)
         model = SEM(
             y=rng.standard_normal(12),
@@ -745,8 +701,6 @@ class TestBatchSparseLag:
 
     @pytest.fixture
     def model(self, W_graph):
-        from neighbayes.models.panel._fe import OLSPanelFE
-
         rng = np.random.default_rng(7)
         return OLS(
             y=rng.standard_normal(12),
@@ -810,8 +764,6 @@ class TestWDenseMemoryWarning:
         import warnings
 
         W_graph = _W_to_graph(_rook_W(4))
-        from neighbayes.models.panel._fe import OLSPanelFE
-
         rng = np.random.default_rng(0)
         model = OLS(
             y=rng.standard_normal(12),
@@ -831,8 +783,6 @@ class TestWDenseMemoryWarning:
 
         W_graph = _W_to_graph(_rook_W(4))
         from neighbayes.models.base import SpatialModel
-        from neighbayes.models.panel._fe import OLSPanelFE
-
         rng = np.random.default_rng(0)
         model = OLS(
             y=rng.standard_normal(12),

@@ -3,13 +3,11 @@
 from __future__ import annotations
 
 from neighbayes.models import OLS, SAR, SLX
-from neighbayes.models.panel._fe import OLSPanelFE, SARPanelFE, SLXPanelFE
-from neighbayes.models.panel._re import OLSPanelRE
 
 
 def test_panel_models_no_longer_expose_frequentist_diagnostics():
     """Panel models should not expose frequentist diagnostic methods."""
-    for cls in [OLSPanelFE, OLSPanelRE, SARPanelFE, SLXPanelFE]:
+    for cls in [OLS, SAR, SLX]:
         assert not hasattr(cls, "diagnostics"), (
             f"{cls.__name__} still has diagnostics()"
         )
@@ -29,6 +27,4 @@ def test_panel_models_no_longer_expose_frequentist_diagnostics():
             f"{cls.__name__} still has panel_diagnostics()"
         )
 
-    assert not hasattr(OLSPanelFE, "hausman_test"), (
-        "OLSPanelFE still has hausman_test()"
-    )
+    assert not hasattr(OLS, "hausman_test"), "OLS still has hausman_test()"

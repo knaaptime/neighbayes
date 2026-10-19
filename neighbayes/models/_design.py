@@ -16,11 +16,13 @@ flow restriction are constructor arguments:
 ``separable``
     ``True`` pins :math:`\\rho_w = -\\rho_o\\rho_d` (flows only).
 
-Each facade's ``_dispatch`` maps those arguments to the class that implements
-the combination and to that class's own keyword arguments, and raises for a
-combination the package does not implement.  :class:`FacadeMeta` runs it when
-the public class is called and registers the implementation as a virtual
-subclass, so ``isinstance(model, SAR)`` holds for a SAR panel.
+The Gaussian process classes implement every design themselves (see
+:mod:`._mixins._designs`).  The other families are facades: each one's
+``_dispatch`` maps those arguments to the class that implements the combination
+and to that class's own keyword arguments, and raises for a combination the
+package does not implement.  :class:`FacadeMeta` runs it when the public class
+is called and registers the implementation as a virtual subclass, so
+``isinstance(model, SARNegBin)`` holds for a SARNegBin panel.
 """
 
 from __future__ import annotations
@@ -124,72 +126,6 @@ def _need(spec: dict, key: str, name: str, what: str) -> type:
     if path is None:
         raise NotImplementedError(f"{name} is not implemented with {what}.")
     return _load(path)
-
-
-# ---------------------------------------------------------------------------
-# Gaussian processes: OLS, SLX, SAR, SEM, SDM, SDEM
-# ---------------------------------------------------------------------------
-
-_GAUSSIAN = {
-    "OLS": {
-        "fe": "panel._fe:OLSPanelFE",
-        "re": "panel._re:OLSPanelRE",
-        "dynamic": "panel._dynamic:OLSPanelDynamic",
-    },
-    "SLX": {
-        "fe": "panel._fe:SLXPanelFE",
-        "dynamic": "panel._dynamic:SLXPanelDynamic",
-    },
-    "SAR": {
-        "fe": "panel._fe:SARPanelFE",
-        "re": "panel._re:SARPanelRE",
-        "dynamic": "panel._dynamic:SARPanelDynamic",
-    },
-    "SEM": {
-        "fe": "panel._fe:SEMPanelFE",
-        "re": "panel._re:SEMPanelRE",
-        "dynamic": "panel._dynamic:SEMPanelDynamic",
-    },
-    "SDM": {
-        "fe": "panel._fe:SDMPanelFE",
-        "dynamic": "panel._dynamic:SDMPanelDynamic",
-        "restricted": "panel._dynamic:SDMPanelDynamicRestricted",
-    },
-    "SDEM": {
-        "fe": "panel._fe:SDEMPanelFE",
-        "re": "panel._re:SDEMPanelRE",
-        "dynamic": "panel._dynamic:SDEMPanelDynamic",
-    },
-}
-
-
-def gaussian(cls, kw: dict):
-    """Gaussian processes: fixed- or random-effects and dynamic panels."""
-    name = cls.__name__
-    spec = _GAUSSIAN[name]
-    unit, time, dynamic = _pop_design(kw)
-    if not _is_panel(kw):
-        _cross_section_only(name, time, dynamic)
-        if unit is not None:
-            raise NotImplementedError(
-                f"{name} takes unit effects only in a panel (pass time_col or T)."
-            )
-        return cls, kw
-    if dynamic:
-        if unit is not None:
-            raise ValueError(_NICKELL)
-        key = "restricted" if dynamic == "restricted" else "dynamic"
-        impl = _need(spec, key, name, f"dynamic={dynamic!r}")
-        kw["effects"] = _effects_code(False, time)
-        return impl, kw
-    if unit == "random":
-        if time:
-            raise NotImplementedError(
-                f"{name} with random unit effects takes no time effects."
-            )
-        return _need(spec, "re", name, "random unit effects"), kw
-    kw["effects"] = _effects_code(unit == "fixed", time)
-    return _need(spec, "fe", name, "a panel"), kw
 
 
 # ---------------------------------------------------------------------------

@@ -1,9 +1,11 @@
-"""The public classes dispatch their design arguments to the implementations.
+"""The public classes resolve their design arguments.
 
 ADR 0002: a public class names a process and a family; panel structure,
-effects, dynamics, and the flow restriction are arguments.  These tests pin the
-table from public call to implementation class and effects code, and the
-combinations that must raise.
+effects, dynamics, and the flow restriction are arguments.  A Gaussian process
+class implements every design itself; the other families' public classes still
+dispatch to implementation classes.  These tests pin the table from public call
+to design (or implementation class) and effects code, and the combinations that
+must raise.
 """
 
 from __future__ import annotations
@@ -16,31 +18,38 @@ from neighbayes.dgp.utils import rook_grid_weights
 
 
 def _route(cls, **kwargs):
-    """The implementation class and its keyword arguments, without constructing."""
-    impl, kw = cls.__dict__["_dispatch"].__func__(cls, dict(kwargs))
-    return impl.__name__, kw.get("effects")
+    """Where a call goes, without constructing, and its effects code.
+
+    The implementation class for a dispatching public class, else the design
+    the class resolves.
+    """
+    if "_dispatch" in cls.__dict__:
+        impl, kw = cls.__dict__["_dispatch"].__func__(cls, dict(kwargs))
+        return impl.__name__, kw.get("effects")
+    design, kw = cls._resolve_design(dict(kwargs))
+    return design, kw.get("effects")
 
 
 PANEL = {"N": 16, "T": 3}
 
 ROUTES = [
-    # Gaussian processes
-    (m.SAR, {}, "SAR", None),
-    (m.SAR, {"T": 1}, "SAR", None),
-    (m.SAR, PANEL, "SARPanelFE", 0),
-    (m.SAR, {**PANEL, "unit_effects": "fixed"}, "SARPanelFE", 1),
-    (m.SAR, {**PANEL, "time_effects": True}, "SARPanelFE", 2),
-    (m.SAR, {**PANEL, "unit_effects": "fixed", "time_effects": True}, "SARPanelFE", 3),
-    (m.SAR, {**PANEL, "unit_effects": "random"}, "SARPanelRE", None),
-    (m.SAR, {**PANEL, "dynamic": True}, "SARPanelDynamic", 0),
-    (m.SAR, {**PANEL, "dynamic": True, "time_effects": True}, "SARPanelDynamic", 2),
-    (m.OLS, {**PANEL, "unit_effects": "random"}, "OLSPanelRE", None),
-    (m.SEM, {**PANEL, "unit_effects": "random"}, "SEMPanelRE", None),
-    (m.SDEM, {**PANEL, "unit_effects": "random"}, "SDEMPanelRE", None),
-    (m.SLX, {**PANEL, "unit_effects": "fixed"}, "SLXPanelFE", 1),
-    (m.SDM, {**PANEL, "dynamic": True}, "SDMPanelDynamic", 0),
-    (m.SDM, {**PANEL, "dynamic": "restricted"}, "SDMPanelDynamicRestricted", 0),
-    (m.SAR, {"time_col": "year", "unit_col": "id"}, "SARPanelFE", 0),
+    # Gaussian processes: the design
+    (m.SAR, {}, "static", None),
+    (m.SAR, {"T": 1}, "static", None),
+    (m.SAR, PANEL, "static", 0),
+    (m.SAR, {**PANEL, "unit_effects": "fixed"}, "static", 1),
+    (m.SAR, {**PANEL, "time_effects": True}, "static", 2),
+    (m.SAR, {**PANEL, "unit_effects": "fixed", "time_effects": True}, "static", 3),
+    (m.SAR, {**PANEL, "unit_effects": "random"}, "random", None),
+    (m.SAR, {**PANEL, "dynamic": True}, "dynamic", 0),
+    (m.SAR, {**PANEL, "dynamic": True, "time_effects": True}, "dynamic", 2),
+    (m.OLS, {**PANEL, "unit_effects": "random"}, "random", None),
+    (m.SEM, {**PANEL, "unit_effects": "random"}, "random", None),
+    (m.SDEM, {**PANEL, "unit_effects": "random"}, "random", None),
+    (m.SLX, {**PANEL, "unit_effects": "fixed"}, "static", 1),
+    (m.SDM, {**PANEL, "dynamic": True}, "dynamic", 0),
+    (m.SDM, {**PANEL, "dynamic": "restricted"}, "restricted", 0),
+    (m.SAR, {"time_col": "year", "unit_col": "id"}, "static", 0),
     # Logit, count, and Tobit families
     (m.SARLogit, {}, "SARLogit", None),
     (m.SARNegBin, {}, "SARNegBin", None),
@@ -168,13 +177,25 @@ def panel_data():
     return {"y": rng.normal(size=n * T), "X": X, "W": G, "N": n, "T": T}
 
 
-def test_construction_returns_registered_implementation(panel_data):
-    """Calling the public class builds the implementation, an instance of it."""
-    model = m.SAR(**panel_data, unit_effects="fixed", time_effects=True)
-    assert type(model).__name__ == "SARPanelFE"
-    assert model.effects == "two_way"
-    assert isinstance(model, m.SAR)
+@pytest.mark.parametrize(
+    "design, expected",
+    [
+        ({"unit_effects": "fixed", "time_effects": True}, "static"),
+        ({"unit_effects": "random"}, "random"),
+        ({"dynamic": True}, "dynamic"),
+    ],
+)
+def test_a_panel_is_the_public_class(panel_data, design, expected):
+    """One class serves every design: a panel is an instance of it, not of a variant."""
+    model = m.SAR(**panel_data, **design)
+    assert type(model) is m.SAR
+    assert model._design == expected
     assert not isinstance(model, m.SEM)
+
+
+def test_fixed_effects_panel_records_its_effects(panel_data):
+    model = m.SAR(**panel_data, unit_effects="fixed", time_effects=True)
+    assert model.effects == "two_way"
 
 
 def test_cross_section_is_the_public_class(panel_data):

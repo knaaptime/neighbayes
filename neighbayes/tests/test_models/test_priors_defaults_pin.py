@@ -98,7 +98,6 @@ EXPECTED: dict[str, dict[str, float]] = {
     },
     "PanelBasePriors": {"nu": NU, "sigma2_alpha": 2.0},
     "PanelOLSPriors": {"nu": NU, "sigma2_alpha": 2.0},
-    "PanelSLXPriors": {"nu": NU, "sigma2_alpha": 2.0},
     "PanelSARPriors": {
         "nu": NU,
         "sigma2_alpha": 2.0,
@@ -110,12 +109,6 @@ EXPECTED: dict[str, dict[str, float]] = {
         "sigma2_alpha": 2.0,
         "lam_lower": -1.0,
         "lam_upper": 1.0,
-    },
-    "PanelSDMPriors": {
-        "nu": NU,
-        "sigma2_alpha": 2.0,
-        "rho_lower": -1.0,
-        "rho_upper": 1.0,
     },
     "PanelSDEMPriors": {
         "nu": NU,

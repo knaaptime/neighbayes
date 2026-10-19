@@ -194,8 +194,6 @@ class TestSEMPanelFEModelConstruction:
         self.y, self.X, self.W, self.W_dense, self.N, self.T, self.n = _panel_data()
 
     def _make_model(self, robust: bool = False, nuts_sampler: str = "pymc"):
-        from neighbayes.models.panel._fe import SEMPanelFE
-
         return SEM(
             unit_effects="fixed",
             y=self.y,
@@ -237,8 +235,6 @@ class TestSDEMPanelFEModelConstruction:
         self.y, self.X, self.W, self.W_dense, self.N, self.T, self.n = _panel_data()
 
     def _make_model(self, robust: bool = False, nuts_sampler: str = "pymc"):
-        from neighbayes.models.panel._fe import SDEMPanelFE
-
         return SDEM(
             unit_effects="fixed",
             y=self.y,
@@ -281,8 +277,6 @@ class TestSEMPanelREModelConstruction:
         self.y, self.X, self.W, self.W_dense, self.N, self.T, self.n = _panel_data()
 
     def _make_model(self, robust: bool = False, nuts_sampler: str = "pymc"):
-        from neighbayes.models.panel._re import SEMPanelRE
-
         return SEM(
             unit_effects="random",
             y=self.y,
@@ -324,8 +318,6 @@ class TestSDEMPanelREModelConstruction:
         self.y, self.X, self.W, self.W_dense, self.N, self.T, self.n = _panel_data()
 
     def _make_model(self, robust: bool = False, nuts_sampler: str = "pymc"):
-        from neighbayes.models.panel._re import SDEMPanelRE
-
         return SDEM(
             unit_effects="random",
             y=self.y,
@@ -368,8 +360,6 @@ class TestSEMPanelDynamicModelConstruction:
         self.y, self.X, self.W, self.W_dense, self.N, self.T, self.n = _panel_data()
 
     def _make_model(self, robust: bool = False, nuts_sampler: str = "pymc"):
-        from neighbayes.models.panel._dynamic import SEMPanelDynamic
-
         return SEM(
             dynamic=True,
             y=self.y,
@@ -411,8 +401,6 @@ class TestSDEMPanelDynamicModelConstruction:
         self.y, self.X, self.W, self.W_dense, self.N, self.T, self.n = _panel_data()
 
     def _make_model(self, robust: bool = False, nuts_sampler: str = "pymc"):
-        from neighbayes.models.panel._dynamic import SDEMPanelDynamic
-
         return SDEM(
             dynamic=True,
             y=self.y,

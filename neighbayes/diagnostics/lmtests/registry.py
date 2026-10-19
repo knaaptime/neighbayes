@@ -28,28 +28,46 @@ if TYPE_CHECKING:
 # dotted path* so that importing this module does not trigger model imports.
 # ---------------------------------------------------------------------------
 
-_REGISTRY: dict[str, DiagnosticSuite] = {}
+_REGISTRY: dict[tuple[str, str | None], DiagnosticSuite] = {}
 
 
-def _register(class_path: str, suite: DiagnosticSuite) -> None:
-    """Register a model class (by dotted path) to a diagnostic suite."""
-    _REGISTRY[class_path] = suite
+def _register(
+    class_path: str, suite: DiagnosticSuite, *, variant: str | None = None
+) -> None:
+    """Register a model class (by dotted path) to a diagnostic suite.
+
+    ``variant`` is ``"panel"`` or ``"dynamic"`` for the suite of a class's
+    panels, where one class serves the cross-section and its panels.
+    """
+    _REGISTRY[(class_path, variant)] = suite
+
+
+def _variant(model) -> str | None:
+    """A model instance's suite variant: ``None``, ``"panel"`` or ``"dynamic"``."""
+    if isinstance(model, type) or not getattr(model, "_is_panel", False):
+        return None
+    if getattr(model, "_design", None) in ("dynamic", "restricted"):
+        return "dynamic"
+    return "panel"
 
 
 def get_diagnostic_suite(model: "SpatialModel | type") -> DiagnosticSuite | None:
     """Return the :class:`DiagnosticSuite` for *model*, or ``None``.
 
-    Looks up the model class in the registry.  If *model* is an instance,
-    uses ``type(model)``; if it is already a class, uses it directly.
-    If the exact class is not found, walks the MRO to find the first
-    registered ancestor.  Returns ``None`` when no suite is registered
-    for any class in the MRO.
+    Looks up the model class in the registry: for an instance, under its
+    design's variant first (a panel's suite), then under the class itself.
+    A class passed directly gets its cross-sectional suite.  If the exact class
+    is not found, walks the MRO to find the first registered ancestor.  Returns
+    ``None`` when no suite is registered for any class in the MRO.
     """
     cls = model if isinstance(model, type) else type(model)
+    variant = _variant(model)
+    keys = (variant, None) if variant is not None else (None,)
     for klass in cls.__mro__:
         fqn = f"{klass.__module__}.{klass.__qualname__}"
-        if fqn in _REGISTRY:
-            return _REGISTRY[fqn]
+        for v in keys:
+            if (fqn, v) in _REGISTRY:
+                return _REGISTRY[(fqn, v)]
     return None
 
 
@@ -124,28 +142,18 @@ from .suites import (  # noqa: E402
     SLX_PANEL_SUITE,
 )
 
-# Panel FE
-_register("neighbayes.models.panel._fe.OLSPanelFE", OLS_PANEL_SUITE)
-_register("neighbayes.models.panel._fe.SARPanelFE", SAR_PANEL_SUITE)
-_register("neighbayes.models.panel._fe.SEMPanelFE", SEM_PANEL_SUITE)
-_register("neighbayes.models.panel._fe.SDMPanelFE", SDM_PANEL_SUITE)
-_register("neighbayes.models.panel._fe.SDEMPanelFE", SDEM_PANEL_SUITE)
-_register("neighbayes.models.panel._fe.SLXPanelFE", SLX_PANEL_SUITE)
-
-# Panel RE
-_register("neighbayes.models.panel._re.OLSPanelRE", OLS_PANEL_SUITE)
-_register("neighbayes.models.panel._re.SARPanelRE", SAR_PANEL_SUITE)
-_register("neighbayes.models.panel._re.SEMPanelRE", SEM_PANEL_SUITE)
-_register("neighbayes.models.panel._re.SDEMPanelRE", SDEM_PANEL_SUITE)
-
-# Panel Dynamic
-_register("neighbayes.models.panel._dynamic.OLSPanelDynamic", OLS_PANEL_SUITE)
-_register("neighbayes.models.panel._dynamic.SDMPanelDynamicRestricted", SDM_PANEL_SUITE)
-_register("neighbayes.models.panel._dynamic.SDMPanelDynamic", SDM_PANEL_SUITE)
-_register("neighbayes.models.panel._dynamic.SARPanelDynamic", SAR_PANEL_SUITE)
-_register("neighbayes.models.panel._dynamic.SEMPanelDynamic", SEM_PANEL_DYNAMIC_SUITE)
-_register("neighbayes.models.panel._dynamic.SDEMPanelDynamic", SDEM_PANEL_SUITE)
-_register("neighbayes.models.panel._dynamic.SLXPanelDynamic", SLX_PANEL_DYNAMIC_SUITE)
+# The Gaussian processes' panels: static and random effects, then dynamic
+_CS = "neighbayes.models.cross_section"
+for _path, _panel, _dynamic in (
+    (f"{_CS}.ols.OLS", OLS_PANEL_SUITE, OLS_PANEL_SUITE),
+    (f"{_CS}.sar.SAR", SAR_PANEL_SUITE, SAR_PANEL_SUITE),
+    (f"{_CS}.sem.SEM", SEM_PANEL_SUITE, SEM_PANEL_DYNAMIC_SUITE),
+    (f"{_CS}.sdm.SDM", SDM_PANEL_SUITE, SDM_PANEL_SUITE),
+    (f"{_CS}.sdem.SDEM", SDEM_PANEL_SUITE, SDEM_PANEL_SUITE),
+    (f"{_CS}.slx.SLX", SLX_PANEL_SUITE, SLX_PANEL_DYNAMIC_SUITE),
+):
+    _register(_path, _panel, variant="panel")
+    _register(_path, _dynamic, variant="dynamic")
 
 # Panel Tobit
 _register("neighbayes.models.panel._tobit.SARTobitPanel", SAR_PANEL_SUITE)

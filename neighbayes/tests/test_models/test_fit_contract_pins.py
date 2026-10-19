@@ -28,20 +28,6 @@ from neighbayes.models import (
     SARNegBin,
 )
 from neighbayes.models.cross_section.sar_negbin_re import SARNegBinRE
-from neighbayes.models.panel._fe import (
-    OLSPanelFE,
-    SARPanelFE,
-    SDEMPanelFE,
-    SDMPanelFE,
-    SEMPanelFE,
-    SLXPanelFE,
-)
-from neighbayes.models.panel._re import (
-    OLSPanelRE,
-    SARPanelRE,
-    SDEMPanelRE,
-    SEMPanelRE,
-)
 from neighbayes.tests.helpers import (
     PANEL_N,
     PANEL_T,
@@ -136,33 +122,33 @@ def _panel_graph():
 # name -> (ctor, data_fn, expected_varnames, samplers)
 GAUSSIAN_PANEL_FE: dict[str, tuple] = {
     "SAR": (
-        SARPanelFE,
+        SAR,
         make_panel_sar_data,
         {"beta", "rho", "sigma", "sigma2"},
         ("gibbs", "nuts"),
     ),
     "SEM": (
-        SEMPanelFE,
+        SEM,
         make_panel_sem_data,
         {"beta", "lam", "sigma", "sigma2"},
         ("gibbs", "nuts"),
     ),
     "SDM": (
-        SDMPanelFE,
+        SDM,
         make_panel_sdm_fe_data,
         {"beta", "rho", "sigma", "sigma2"},
         ("gibbs", "nuts"),
     ),
     "SDEM": (
-        SDEMPanelFE,
+        SDEM,
         make_panel_sdem_fe_data,
         {"beta", "lam", "sigma", "sigma2"},
         ("gibbs", "nuts"),
     ),
-    "OLS": (OLSPanelFE, make_panel_ols_data, {"beta", "sigma", "sigma2"}, ("nuts",)),
+    "OLS": (OLS, make_panel_ols_data, {"beta", "sigma", "sigma2"}, ("nuts",)),
     # SLX has no closed-form panel DGP helper; the SDM generator supplies WX
     # signal and SLX ignores the ρ lag.
-    "SLX": (SLXPanelFE, make_panel_sdm_fe_data, {"beta", "sigma", "sigma2"}, ("nuts",)),
+    "SLX": (SLX, make_panel_sdm_fe_data, {"beta", "sigma", "sigma2"}, ("nuts",)),
 }
 
 
@@ -177,7 +163,7 @@ def _panel_fe_cases():
 @pytest.mark.parametrize("name,ctor,data_fn,expected,sampler", list(_panel_fe_cases()))
 def test_gaussian_panel_fe_fit_contract(name, ctor, data_fn, expected, sampler):
     y, X, _ = data_fn(np.random.default_rng(1), _W_PANEL, PANEL_N, PANEL_T)
-    model = ctor(y=y, X=X, W=_panel_graph(), N=PANEL_N, T=PANEL_T, effects=1)
+    model = ctor(y=y, X=X, W=_panel_graph(), N=PANEL_N, T=PANEL_T, unit_effects="fixed")
     kwargs = dict(
         sampler=sampler, draws=6, tune=6, chains=1, progressbar=False, random_seed=1
     )
@@ -208,19 +194,19 @@ _RE_NUTS = _RE_BASE | {"sigma2", "unit_effect_raw"}
 
 # name -> (ctor, data_fn, {sampler: expected_varnames})
 GAUSSIAN_PANEL_RE: dict[str, tuple] = {
-    "OLS": (OLSPanelRE, make_panel_ols_data, {"nuts": _RE_NUTS}),
+    "OLS": (OLS, make_panel_ols_data, {"nuts": _RE_NUTS}),
     "SAR": (
-        SARPanelRE,
+        SAR,
         make_panel_sar_data,
         {"gibbs": _RE_BASE | {"rho"}, "nuts": _RE_NUTS | {"rho"}},
     ),
     "SEM": (
-        SEMPanelRE,
+        SEM,
         make_panel_sem_data,
         {"gibbs": _RE_BASE | {"lam"}, "nuts": _RE_NUTS | {"lam"}},
     ),
     "SDEM": (
-        SDEMPanelRE,
+        SDEM,
         make_panel_sdem_fe_data,
         {"nuts": _RE_NUTS | {"lam"}},
     ),
@@ -238,7 +224,9 @@ def _panel_re_cases():
 @pytest.mark.parametrize("name,ctor,data_fn,expected,sampler", list(_panel_re_cases()))
 def test_gaussian_panel_re_fit_contract(name, ctor, data_fn, expected, sampler):
     y, X, _ = data_fn(np.random.default_rng(1), _W_PANEL, PANEL_N, PANEL_T)
-    model = ctor(y=y, X=X, W=_panel_graph(), N=PANEL_N, T=PANEL_T)
+    model = ctor(
+        y=y, X=X, W=_panel_graph(), N=PANEL_N, T=PANEL_T, unit_effects="random"
+    )
     kwargs = dict(
         sampler=sampler, draws=6, tune=6, chains=1, progressbar=False, random_seed=1
     )

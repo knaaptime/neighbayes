@@ -45,8 +45,6 @@ class TestPanelGibbsDispatch:
 
     def test_sar_panel_fe_gibbs_produces_idata(self):
         """SARPanelFE.fit(sampler='gibbs') returns valid InferenceData."""
-        from neighbayes.models.panel._fe import SARPanelFE
-
         rng = np.random.default_rng(42)
         W_dense, W_graph = _make_panel_W()
         y, X, _ = make_panel_sar_data(
@@ -79,8 +77,6 @@ class TestPanelGibbsDispatch:
 
     def test_sem_panel_fe_gibbs_produces_idata(self):
         """SEMPanelFE.fit(sampler='gibbs') returns valid InferenceData."""
-        from neighbayes.models.panel._fe import SEMPanelFE
-
         rng = np.random.default_rng(42)
         W_dense, W_graph = _make_panel_W()
         y, X, _ = make_panel_sem_data(
@@ -112,8 +108,6 @@ class TestPanelGibbsDispatch:
 
     def test_sar_panel_fe_gibbs_multiple_chains(self):
         """SARPanelFE Gibbs works with multiple chains."""
-        from neighbayes.models.panel._fe import SARPanelFE
-
         rng = np.random.default_rng(42)
         W_dense, W_graph = _make_panel_W()
         y, X, _ = make_panel_sar_data(
@@ -139,8 +133,6 @@ class TestPanelGibbsDispatch:
 
     def test_sem_panel_fe_gibbs_multiple_chains(self):
         """SEMPanelFE Gibbs works with multiple chains."""
-        from neighbayes.models.panel._fe import SEMPanelFE
-
         rng = np.random.default_rng(42)
         W_dense, W_graph = _make_panel_W()
         y, X, _ = make_panel_sem_data(
@@ -170,8 +162,6 @@ class TestPanelGibbsEdgeCases:
 
     def test_sar_panel_fe_robust_gibbs_runs(self):
         """Robust (Student-t) SARPanelFE samples with Gibbs."""
-        from neighbayes.models.panel._fe import SARPanelFE
-
         rng = np.random.default_rng(42)
         W_dense, W_graph = _make_panel_W()
         y, X, _ = make_panel_sar_data(
@@ -199,8 +189,6 @@ class TestPanelGibbsEdgeCases:
 
     def test_sem_panel_fe_robust_gibbs_runs(self):
         """Robust (Student-t) SEMPanelFE samples with Gibbs."""
-        from neighbayes.models.panel._fe import SEMPanelFE
-
         rng = np.random.default_rng(42)
         W_dense, W_graph = _make_panel_W()
         y, X, _ = make_panel_sem_data(
@@ -228,8 +216,6 @@ class TestPanelGibbsEdgeCases:
 
     def test_sar_panel_fe_gibbs_thinning(self):
         """Thinning should reduce kept draws."""
-        from neighbayes.models.panel._fe import SARPanelFE
-
         rng = np.random.default_rng(42)
         W_dense, W_graph = _make_panel_W()
         y, X, _ = make_panel_sar_data(
@@ -257,8 +243,6 @@ class TestPanelGibbsEdgeCases:
 
     def test_sem_panel_fe_gibbs_thinning(self):
         """Thinning should reduce kept draws."""
-        from neighbayes.models.panel._fe import SEMPanelFE
-
         rng = np.random.default_rng(42)
         W_dense, W_graph = _make_panel_W()
         y, X, _ = make_panel_sem_data(
@@ -295,8 +279,6 @@ class TestPanelGibbsRecovery:
 
     def test_sar_panel_fe_gibbs_recovers_rho(self):
         """SARPanelFE Gibbs posterior mean of rho near true value."""
-        from neighbayes.models.panel._fe import SARPanelFE
-
         rng = np.random.default_rng(42)
         W_dense, W_graph = _make_panel_W()
         rho_true = 0.4
@@ -326,8 +308,6 @@ class TestPanelGibbsRecovery:
 
     def test_sem_panel_fe_gibbs_recovers_lam(self):
         """SEMPanelFE Gibbs posterior mean of lam near true value."""
-        from neighbayes.models.panel._fe import SEMPanelFE
-
         rng = np.random.default_rng(42)
         W_dense, W_graph = _make_panel_W()
         lam_true = 0.3
@@ -362,8 +342,6 @@ class TestPanelGibbsVsNUTS:
 
     def test_sar_panel_fe_gibbs_vs_nuts(self):
         """SARPanelFE Gibbs and NUTS means should be close."""
-        from neighbayes.models.panel._fe import SARPanelFE
-
         rng = np.random.default_rng(42)
         W_dense, W_graph = _make_panel_W()
         y, X, _ = make_panel_sar_data(
@@ -417,8 +395,6 @@ class TestPanelGibbsVsNUTS:
 
     def test_sem_panel_fe_gibbs_vs_nuts(self):
         """SEMPanelFE Gibbs and NUTS means should be close."""
-        from neighbayes.models.panel._fe import SEMPanelFE
-
         rng = np.random.default_rng(42)
         W_dense, W_graph = _make_panel_W()
         y, X, _ = make_panel_sem_data(
@@ -482,8 +458,6 @@ class TestPanelGibbsJAX:
     def test_sar_panel_fe_jax_produces_idata(self):
         """SARPanelFE Gibbs with backend='jax' returns valid InferenceData."""
         pytest.importorskip("jax")
-        from neighbayes.models.panel._fe import SARPanelFE
-
         rng = np.random.default_rng(42)
         W_dense, W_graph = _make_panel_W()
         y, X, _ = make_panel_sar_data(
@@ -515,8 +489,6 @@ class TestPanelGibbsJAX:
     def test_sem_panel_fe_jax_produces_idata(self):
         """SEMPanelFE Gibbs with backend='jax' returns valid InferenceData."""
         pytest.importorskip("jax")
-        from neighbayes.models.panel._fe import SEMPanelFE
-
         rng = np.random.default_rng(42)
         W_dense, W_graph = _make_panel_W()
         y, X, _ = make_panel_sem_data(
@@ -548,8 +520,6 @@ class TestPanelGibbsJAX:
     def test_sar_panel_fe_jax_vectorized_chains(self):
         """SARPanelFE JAX Gibbs with vectorized chains."""
         pytest.importorskip("jax")
-        from neighbayes.models.panel._fe import SARPanelFE
-
         rng = np.random.default_rng(42)
         W_dense, W_graph = _make_panel_W()
         y, X, _ = make_panel_sar_data(
@@ -577,8 +547,6 @@ class TestPanelGibbsJAX:
     def test_sem_panel_fe_jax_vectorized_chains(self):
         """SEMPanelFE JAX Gibbs with vectorized chains."""
         pytest.importorskip("jax")
-        from neighbayes.models.panel._fe import SEMPanelFE
-
         rng = np.random.default_rng(42)
         W_dense, W_graph = _make_panel_W()
         y, X, _ = make_panel_sem_data(
