@@ -290,6 +290,11 @@ $$y_{it} = \max(c, y_{it}^*), \quad y_t^* = \rho W y_t^* + X_t\beta + \varepsilo
 
 $$y_{it} = \max(c, y_{it}^*), \quad y_t^* = X_t\beta + u_t, \quad u_t = \lambda W u_t + \varepsilon_t$$
 
+`SARTobit` and `SEMTobit` given time (`time_col`, or `T`) fit the pooled panel. It
+takes no unit or time effects, because a within transformation would mix censored
+and uncensored values in the likelihood. Impacts are on the latent scale, through
+the spatial multiplier within each period.
+
 ### Panel count models (`SARNegBin`, `NegBin`)
 
 $$y_{it} \sim \operatorname{NegBin}(\mu_{it}, \alpha), \quad \log \boldsymbol{\mu}_t = (I - \rho W)^{-1} (X_t\beta + c) + \tau_t$$

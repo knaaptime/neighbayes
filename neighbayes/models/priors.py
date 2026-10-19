@@ -442,8 +442,8 @@ class PanelOLSPriors(PanelBasePriors):
 
 @dataclass(frozen=True)
 class PanelSARPriors(PanelBasePriors):
-    """Panel priors with ``rho`` bounds: the base of the SAR random-effects, Tobit
-    and count panel priors."""
+    """Panel priors with ``rho`` bounds: the base of the SAR random-effects and
+    count panel priors."""
 
     rho_lower: float = -1.0
     rho_upper: float = 1.0
@@ -578,7 +578,7 @@ class FlowPanelHurdlePriors(_PanelCountBasePriors):
 @dataclass(frozen=True)
 class PanelSEMPriors(PanelBasePriors):
     """Panel priors with ``lam`` bounds: the base of the SEM and SDEM
-    random-effects and Tobit priors."""
+    random-effects priors."""
 
     lam_lower: float = -1.0
     lam_upper: float = 1.0
@@ -638,16 +638,6 @@ class PanelSDEMREPriors(PanelSDEMPriors, PanelREMixinPriors):
 
 
 # -- Panel Tobit -------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class PanelSARTobitPriors(PanelSARPriors):
-    """Priors for :class:`neighbayes.models.SARTobitPanel`."""
-
-
-@dataclass(frozen=True)
-class PanelSEMTobitPriors(PanelSEMPriors):
-    """Priors for :class:`neighbayes.models.SEMTobitPanel`."""
 
 
 # -- Panel dynamic (tighter [-0.95, 0.95] bounds; adds phi) -----------------
@@ -903,8 +893,6 @@ __all__ = [
     "PanelSARREPriors",
     "PanelSEMREPriors",
     "PanelSDEMREPriors",
-    "PanelSARTobitPriors",
-    "PanelSEMTobitPriors",
     "PanelDynamicBasePriors",
     "PanelOLSDynamicPriors",
     "PanelSLXDynamicPriors",

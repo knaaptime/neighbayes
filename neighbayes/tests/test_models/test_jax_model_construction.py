@@ -436,7 +436,7 @@ class TestSDEMPanelDynamicModelConstruction:
 
 
 class TestSEMPanelTobitModelConstruction:
-    """Test SEMTobitPanel._build_pymc_model with different nuts_sampler values."""
+    """Test a panel SEMTobit's _build_pymc_model with different nuts_sampler values."""
 
     @pytest.fixture(autouse=True)
     def setup_data(self):
@@ -445,8 +445,6 @@ class TestSEMPanelTobitModelConstruction:
         self.y = np.where(self.y > 0, self.y, 0.0)
 
     def _make_model(self, robust: bool = False, nuts_sampler: str = "pymc"):
-        from neighbayes.models.panel._tobit import SEMTobitPanel
-
         return SEMTobit(
             y=self.y,
             X=self.X,

@@ -155,8 +155,7 @@ def prepare_idata_kwargs(
     only models, the request is then stripped as a defensive fallback to avoid
     the PyMC JAX crash described above.
 
-    Most spatial-error models (SEM, SDEM, all panel SEM/SDEM variants,
-    SEMTobitPanel) now expose a dual-path ``_build_pymc_model``: when the
+    Most spatial-error models (SEM, SDEM, their panels, SEMTobit) now expose a dual-path ``_build_pymc_model``: when the
     selected sampler is ``"blackjax"`` or ``"numpyro"`` they register the
     likelihood via ``pm.CustomDist("obs", ..., observed=y)`` so PyMC captures
     ``log_likelihood["obs"]`` natively. Flow models (SEMFlow, SEMFlowPanelFE,

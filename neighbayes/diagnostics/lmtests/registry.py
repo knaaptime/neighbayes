@@ -155,9 +155,9 @@ for _path, _panel, _dynamic in (
     _register(_path, _panel, variant="panel")
     _register(_path, _dynamic, variant="dynamic")
 
-# Panel Tobit
-_register("neighbayes.models.panel._tobit.SARTobitPanel", SAR_PANEL_SUITE)
-_register("neighbayes.models.panel._tobit.SEMTobitPanel", SEM_PANEL_DYNAMIC_SUITE)
+# Pooled Tobit panels
+_register(f"{_CS}.tobit.SARTobit", SAR_PANEL_SUITE, variant="panel")
+_register(f"{_CS}.tobit.SEMTobit", SEM_PANEL_DYNAMIC_SUITE, variant="panel")
 
 # Flow Panel
 _register("neighbayes.models.flow_panel._panel.SARFlowPanelFE", FLOW_PANEL_SUITE)

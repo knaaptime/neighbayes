@@ -71,8 +71,8 @@ ROUTES = [
         "SARHurdleNegBinPanelRE",
         1,
     ),
-    (m.SARTobit, PANEL, "SARTobitPanel", None),
-    (m.SEMTobit, PANEL, "SEMTobitPanel", None),
+    (m.SARTobit, PANEL, "static", None),
+    (m.SEMTobit, PANEL, "static", None),
     (m.SEMProbit, {"group_effects": "random", "groups": [0, 1]}, "SEMProbitRE", None),
     # Flows
     (m.SARFlow, {}, "SARFlow", None),

@@ -16,13 +16,14 @@ flow restriction are constructor arguments:
 ``separable``
     ``True`` pins :math:`\\rho_w = -\\rho_o\\rho_d` (flows only).
 
-The Gaussian process classes implement every design themselves (see
-:mod:`._mixins._designs`).  The other families are facades: each one's
-``_dispatch`` maps those arguments to the class that implements the combination
-and to that class's own keyword arguments, and raises for a combination the
-package does not implement.  :class:`FacadeMeta` runs it when the public class
-is called and registers the implementation as a virtual subclass, so
-``isinstance(model, SARNegBin)`` holds for a SARNegBin panel.
+The Gaussian and Tobit process classes implement every design themselves
+(see :mod:`._mixins._designs` and :mod:`.cross_section.tobit`).  The other
+families are facades: each one's ``_dispatch`` maps those arguments to the
+class that implements the combination and to that class's own keyword
+arguments, and raises for a combination the package does not implement.
+:class:`FacadeMeta` runs it when the public class is called and registers the
+implementation as a virtual subclass, so ``isinstance(model, SARNegBin)`` holds
+for a SARNegBin panel.
 """
 
 from __future__ import annotations
@@ -129,7 +130,7 @@ def _need(spec: dict, key: str, name: str, what: str) -> type:
 
 
 # ---------------------------------------------------------------------------
-# Logit, count, and Tobit families
+# Logit and count families
 # ---------------------------------------------------------------------------
 
 # "xs": the facade implements the cross-section itself (True) or names why it
@@ -180,24 +181,6 @@ def discrete(cls, kw: dict):
         )
     kw["effects"] = _effects_code(unit == "random", time)
     return _need(spec, "panel", name, "a panel"), kw
-
-
-_TOBIT = {
-    "SARTobit": "panel._tobit:SARTobitPanel",
-    "SEMTobit": "panel._tobit:SEMTobitPanel",
-    "SDMTobit": None,
-}
-
-
-def tobit(cls, kw: dict):
-    """Tobit processes: a panel without effects."""
-    name = cls.__name__
-    unit, time, dynamic = _pop_design(kw)
-    if unit is not None or time or dynamic:
-        raise NotImplementedError(f"{name} takes no effects and no dynamics.")
-    if not _is_panel(kw):
-        return cls, kw
-    return _need({"panel": _TOBIT[name]}, "panel", name, "a panel"), kw
 
 
 def sem_probit(cls, kw: dict):

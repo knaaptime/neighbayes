@@ -33,7 +33,6 @@ from neighbayes.models import (
 )
 from neighbayes.models.base import SpatialModel
 from neighbayes.models.cross_section.tobit import _SpatialTobitBase
-from neighbayes.models.panel._tobit import _PanelTobitBase
 from neighbayes.tests.helpers import W_to_graph, make_line_W
 
 # ---------------------------------------------------------------------------

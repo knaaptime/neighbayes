@@ -447,29 +447,29 @@ class TestGetPanelTobitSpec:
     """Panel Tobit decision trees mirror cross-sectional Tobit specs."""
 
     def test_sar_tobit_spec(self):
-        tree = get_panel_spec("SARTobitPanel")
+        tree = get_panel_spec("SARTobit")
         assert isinstance(tree, TreeNode)
 
     def test_sem_tobit_spec(self):
-        tree = get_panel_spec("SEMTobitPanel")
+        tree = get_panel_spec("SEMTobit")
         assert isinstance(tree, TreeNode)
 
     def test_sar_tobit_all_sig(self):
-        tree = get_panel_spec("SARTobitPanel")
+        tree = get_panel_spec("SARTobit")
         result, path = evaluate(tree, sig_lookup=lambda _: True)
         assert result == "SDMTobit"
 
     def test_sar_tobit_none_sig(self):
-        tree = get_panel_spec("SARTobitPanel")
+        tree = get_panel_spec("SARTobit")
         result, path = evaluate(tree, sig_lookup=lambda _: False)
         assert result == "SARTobit"
 
     def test_sem_tobit_all_sig(self):
-        tree = get_panel_spec("SEMTobitPanel")
+        tree = get_panel_spec("SEMTobit")
         result, path = evaluate(tree, sig_lookup=lambda _: True)
         assert result == "SDEMTobit"
 
     def test_sem_tobit_none_sig(self):
-        tree = get_panel_spec("SEMTobitPanel")
+        tree = get_panel_spec("SEMTobit")
         result, path = evaluate(tree, sig_lookup=lambda _: False)
         assert result == "SEMTobit"

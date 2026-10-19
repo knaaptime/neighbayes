@@ -134,7 +134,6 @@ Default NUTS Priors
    PanelSARREPriors
    PanelSEMREPriors
    PanelSDEMREPriors
-   PanelSARTobitPriors
    PanelCountPriors
    PanelZINBPriors
    SARZINBPriors
@@ -142,7 +141,6 @@ Default NUTS Priors
    FlowPanelHurdlePriors
    SARHurdlePriors
    MultilevelPriors
-   PanelSEMTobitPriors
    PanelDynamicBasePriors
    PanelOLSDynamicPriors
    PanelSLXDynamicPriors

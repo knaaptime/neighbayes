@@ -1018,8 +1018,8 @@ def _panel_tobit_sem_spec() -> TreeNode:
 
 
 _PANEL_TOBIT_SPECS: dict[str, Callable[[], TreeNode]] = {
-    "SARTobitPanel": _panel_tobit_sar_spec,
-    "SEMTobitPanel": _panel_tobit_sem_spec,
+    "SARTobit": _panel_tobit_sar_spec,
+    "SEMTobit": _panel_tobit_sem_spec,
 }
 
 
@@ -1027,10 +1027,10 @@ def get_panel_spec(model_type: str) -> TreeNode | str:
     """Return the panel decision tree for ``model_type``.
 
     The model type is the class name: a Gaussian process (``"SAR"``, for its
-    fixed-effects, random-effects and dynamic panels alike) or a panel Tobit
-    (``"SARTobitPanel"``).  Falls back to a leaf if not found.
+    fixed-effects, random-effects and dynamic panels alike) or a Tobit
+    (``"SARTobit"``, for its pooled panel).  Falls back to a leaf if not found.
     """
-    # Panel Tobit (e.g. SARTobitPanel, SEMTobitPanel)
+    # Pooled Tobit panels (SARTobit, SEMTobit)
     if "Tobit" in model_type:
         factory = _PANEL_TOBIT_SPECS.get(model_type)
         if factory is not None:

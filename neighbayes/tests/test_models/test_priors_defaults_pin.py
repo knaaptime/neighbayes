@@ -142,18 +142,6 @@ EXPECTED: dict[str, dict[str, float]] = {
         "lam_lower": -1.0,
         "lam_upper": 1.0,
     },
-    "PanelSARTobitPriors": {
-        "nu": NU,
-        "sigma2_alpha": 2.0,
-        "rho_lower": -1.0,
-        "rho_upper": 1.0,
-    },
-    "PanelSEMTobitPriors": {
-        "nu": NU,
-        "sigma2_alpha": 2.0,
-        "lam_lower": -1.0,
-        "lam_upper": 1.0,
-    },
     "PanelDynamicBasePriors": {
         "nu": NU,
         "sigma2_alpha": 2.0,
