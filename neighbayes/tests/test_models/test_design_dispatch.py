@@ -68,6 +68,7 @@ ROUTES = [
     (m.SARLogit, {}, "static", None),
     (m.SARLogit, {"latent": True}, "latent", None),
     (m.SEMLogit, {}, "static", None),
+    (m.SDEMLogit, {}, "static", None),
     (m.Logit, {}, "static", None),
     (m.SARTobit, PANEL, "static", None),
     (m.SEMTobit, PANEL, "static", None),

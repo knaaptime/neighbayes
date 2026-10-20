@@ -26,11 +26,12 @@ SARHurdleNegBin), :class:`CountDesigns`:
     The panel, pooled or with random unit effects and fixed time effects
     (:mod:`..panel._count`, :mod:`..panel._zinb`, :mod:`..panel._hurdle`).
 
-The binary families (Logit, SARLogit, SEMLogit), :class:`BinaryDesigns`:
+The binary families (Logit, SARLogit, SEMLogit, SDEMLogit),
+:class:`BinaryDesigns`:
 
 ``"static"``
-    The cross-section: SARLogit's reduced form, and SEMLogit's latent SEM
-    (a SEM has no reduced form to distinguish, ADR 0003).
+    The cross-section: SARLogit's reduced form, and the latent SEM of SEMLogit
+    and SDEMLogit (a SEM has no reduced form to distinguish, ADR 0003).
 ``"latent"``
     ``SARLogit(latent=True)``, the latent SAR, which propagates the logistic
     disturbance (:mod:`..cross_section._latent_logit`).
@@ -248,8 +249,8 @@ class BinaryDesigns(DesignDispatch):
             raise NotImplementedError(
                 f"{name} has no latent=True design"
                 + (
-                    " (it is the latent SEM already)."
-                    if name.startswith("SEM")
+                    f" (it is the latent {name.removesuffix('Logit')} already)."
+                    if hasattr(cls, "_latent_process")
                     else "."
                 )
             )

@@ -343,6 +343,22 @@ class TestGetSpec:
         )
         assert result == "SEM"
 
+    @pytest.mark.parametrize(
+        "significant, leaf",
+        [
+            ((), "Logit"),
+            (("Robust-LM-Lag",), "SARLogit"),
+            (("Robust-LM-Lag", "LM-Error"), "SARLogit(latent=True)"),
+            (("Robust-LM-Lag", "LM-Error", "Robust-LM-Error"), "SDEMLogit"),
+            (("LM-Error", "Robust-LM-Error"), "SEMLogit"),
+            (("LM-Error",), "SEMLogit or SARLogit(latent=True)"),
+        ],
+    )
+    def test_logit_tree_reads_the_tests_as_a_pair(self, significant, leaf):
+        """The spillover and error tests, read jointly, name the logit's form."""
+        result, _ = evaluate(get_spec("Logit"), sig_lookup=lambda n: n in significant)
+        assert result == leaf
+
 
 class TestGetPanelSpec:
     def test_ols_fe_spec(self):

@@ -490,6 +490,15 @@ the GLM suite's LM-Error is its score test. A SEM whose error process carried no
 disturbance would be the aspatial logit, so the SEM logit takes no `latent`
 switch.
 
+### SDEMLogit
+
+$$y_i = \mathbf 1\{y^*_i > 0\}, \quad y^* = X\beta + WX\theta + (I - \lambda W)^{-1}\varepsilon, \quad \varepsilon_i \sim \operatorname{Logistic}(0, 1)$$
+
+`SEMLogit` on the design $[X, WX]$, sampled the same way: $\theta$ carries the
+covariates' spillover and $\lambda$ the clustering of the disturbance, which a
+latent SAR ties together through one $\rho$. Impacts are on the latent index,
+direct $\beta$ and indirect $\theta$ (times the mean row sum of $W$).
+
 ## Flow Models
 
 Vectorize the origin-destination flow matrix to $y \in \mathbb{R}^{N}$ with $N = n^2$, and define destination, origin, and origin–destination weight matrices as $W_d$, $W_o$, and $W_w$.
@@ -649,6 +658,23 @@ score of a latent error process added to the fitted model, and LM-WX; both are
 uncorrelated with the other scores there, so their robust forms are the same
 statistics.
 
+`Logit.spatial_diagnostics_decision()` reads the tests as a pair. A latent SAR
+moves both terms, in the proportion its one $\rho$ implies; Robust LM-Error
+measures the departure from that proportion.
+
+| Robust LM-Lag | LM-Error | Robust LM-Error | Recommendation |
+|---|---|---|---|
+| significant | not | — | `SARLogit` (reduced form) |
+| significant | significant | not | `SARLogit(latent=True)` |
+| significant | significant | significant | `SDEMLogit` |
+| not | significant | significant | `SEMLogit` |
+| not | significant | not | `SEMLogit` or `SARLogit(latent=True)` |
+| not | not | — | `Logit` |
+
+The last but one row is ambiguous by construction: without a spillover term to
+compare it against, an error term alone cannot say whether one $\rho$ moved it.
+The `NegBin` tree is not yet built; its latent forms await an NB latent sampler.
+
 The same machinery extends to balanced panels — with a $T$ multiplier on the
 information matrix, under the `bayesian_panel_lm_*` prefix — and to
 origin–destination flow models on Kronecker weights $W_d$, $W_o$, $W_w$, under
@@ -678,8 +704,8 @@ origin–destination flow models on Kronecker weights $W_d$, $W_o$, $W_w$, under
 otherwise.** For SAR/SEM/SDM/SDEM, the count families, the ZINB model and the
 Gaussian panel families, that means Gibbs unless you ask for something else.
 
-NUTS is not universally available. `SARLogit` (in both forms), `SEMLogit` and the
-auxiliary-mixture Poisson flow classes build no PyMC graph at all, and `fit(sampler="nuts")`
+NUTS is not universally available. `SARLogit` (in both forms), `SEMLogit`,
+`SDEMLogit` and the auxiliary-mixture Poisson flow classes build no PyMC graph at all, and `fit(sampler="nuts")`
 raises `NotImplementedError`. Robust (Student-t) SAR/SEM/SDM/SDEM and
 Gaussian panel FE models keep Gibbs: the Student-t error is sampled as a
 normal scale mixture with the same fixed `nu` the NUTS path uses. Robust

@@ -9,6 +9,7 @@ from .cross_section.sar_logit import SARLogit as SARLogit
 from .cross_section.sar_negbin import SARNegBin as SARNegBin
 from .cross_section.sar_zinb import SARZINB as SARZINB
 from .cross_section.sdem import SDEM as SDEM
+from .cross_section.sdem_logit import SDEMLogit as SDEMLogit
 from .cross_section.sdm import SDM as SDM
 from .cross_section.sem import SEM as SEM
 from .cross_section.sem_logit import SEMLogit as SEMLogit

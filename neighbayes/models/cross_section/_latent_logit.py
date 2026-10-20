@@ -33,6 +33,16 @@ class LatentLogitMixin:
     def _latent_param(self) -> str:
         return "rho" if self._latent_process == "sar" else "lam"
 
+    @property
+    def _latent_design(self) -> tuple[np.ndarray, list[str]]:
+        """The design and coefficient names: ``[X, WX]`` for a Durbin model."""
+        X = np.ascontiguousarray(self._X, dtype=np.float64)
+        if getattr(self, "_has_wx_in_beta", False):
+            return np.hstack([X, np.asarray(self._WX, dtype=np.float64)]), list(
+                self._beta_names()
+            )
+        return X, list(self._feature_names)
+
     def _fit_gibbs_latent(
         self,
         *,
@@ -56,9 +66,11 @@ class LatentLogitMixin:
         probability with no closed form, so none is stored.
         """
         y = np.asarray(self._y, dtype=np.float64)
-        X = np.ascontiguousarray(self._X, dtype=np.float64)
+        X, names = self._latent_design
         bounds = self._logdet_bounds
-        beta_mu, beta_sigma = self._resolved_beta_prior(link="logit")
+        beta_mu, beta_sigma = self._resolved_beta_prior(
+            design=X, feature_names=names, link="logit"
+        )
         priors = LogitGibbsPriors(
             beta_mu=beta_mu,
             beta_sigma=beta_sigma,
@@ -141,7 +153,7 @@ class LatentLogitMixin:
                 "beta": np.stack([r["beta"] for r in results], axis=0),
             },
             observed_data={"obs": np.asarray(self._y, dtype=np.float64)},
-            coords={"coefficient": list(self._feature_names)},
+            coords={"coefficient": self._latent_design[1]},
             dims={"beta": ["coefficient"]},
         )
         self._idata = idata
@@ -166,7 +178,7 @@ class LatentLogitMixin:
         """
         self._require_fit()
         par = float(self._posterior_mean(self._latent_param))
-        Xb = self._X @ self._posterior_mean("beta")
+        Xb = self._latent_design[0] @ self._posterior_mean("beta")
         n = Xb.shape[0]
         eps = np.random.default_rng(random_seed).logistic(size=(n, n_sims))
         lu = sp.linalg.splu(

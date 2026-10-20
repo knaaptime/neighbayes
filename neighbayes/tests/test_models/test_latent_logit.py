@@ -1,9 +1,10 @@
-"""The latent SAR logit (``SARLogit(latent=True)``) and the latent SEM logit.
+"""The latent SAR logit (``SARLogit(latent=True)``), SEM logit and SDEM logit.
 
 The sampler is exact, so at ``n = 3`` its posterior must match the exact one,
 computed by product Gauss–Legendre quadrature over the latent utilities (the
 esda_triad harness); at ``n = 900`` it recovers the DGP and concentrates on
-zero dependence when there is none.
+zero dependence when there is none, and the logit's decision tree names the
+form that generated the data.
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from scipy.special import expit
 
 from neighbayes import dgp
 from neighbayes.diagnostics.lmtests.registry import get_diagnostic_suite
-from neighbayes.models import SARLogit, SEMLogit
+from neighbayes.models import Logit, SARLogit, SDEMLogit, SEMLogit
 
 pytest.importorskip("augax")
 
@@ -38,6 +39,14 @@ def sem_fit():
     return m
 
 
+@pytest.fixture(scope="module")
+def sdem_fit():
+    d = dgp.simulate_sdem_logit(n_side=8, lam=0.4, seed=3)
+    m = SDEMLogit(y=d["y"], X=d["X"], W=d["W_sparse"])
+    m.fit(**QUICK)
+    return m
+
+
 def test_designs():
     d = dgp.simulate_sar_logit(n_side=4, seed=0)
     latent = SARLogit(y=d["y"], X=d["X"], W=d["W_sparse"], latent=True)
@@ -48,6 +57,11 @@ def test_designs():
     assert sem._gibbs_key == ("binary_latent", "cross_section")
     with pytest.raises(NotImplementedError, match="latent SEM already"):
         SEMLogit(y=d["y"], X=d["X"], W=d["W_sparse"], latent=True)
+    sdem = SDEMLogit(y=d["y"], X=d["X"], W=d["W_sparse"])
+    assert sdem._gibbs_key == ("binary_latent", "cross_section")
+    assert sdem._latent_design[0].shape == (16, 3)
+    with pytest.raises(NotImplementedError, match="latent SDEM already"):
+        SDEMLogit(y=d["y"], X=d["X"], W=d["W_sparse"], latent=True)
     with pytest.raises(ValueError, match="latent must be True or False"):
         SARLogit(y=d["y"], X=d["X"], W=d["W_sparse"], latent="yes")
     with pytest.raises(NotImplementedError, match="a panel"):
@@ -63,13 +77,20 @@ def test_simulators_draw_the_latent_forms():
     e = dgp.simulate_sem_logit(n_side=5, seed=3)
     np.testing.assert_array_equal(e["y"], (e["eta_true"] > 0).astype(float))
     assert e["params_true"]["lam"] == 0.35
+    s = dgp.simulate_sdem_logit(n_side=5, seed=3)
+    np.testing.assert_array_equal(s["y"], (s["eta_true"] > 0).astype(float))
+    np.testing.assert_array_equal(s["params_true"]["theta"], [0.5])
 
 
-@pytest.mark.parametrize("fit, name", [("sar_fit", "rho"), ("sem_fit", "lam")])
-def test_fit_summaries(request, fit, name):
+@pytest.mark.parametrize(
+    "fit, name, k",
+    [("sar_fit", "rho", 2), ("sem_fit", "lam", 2), ("sdem_fit", "lam", 3)],
+)
+def test_fit_summaries(request, fit, name, k):
     m = request.getfixturevalue(fit)
     post = m.inference_data.posterior
     assert {name, "beta"} <= set(post.data_vars)
+    assert post["beta"].shape[-1] == k
     assert "log_likelihood" not in m.inference_data.children
     p = m.fitted_probabilities()
     assert p.shape == (64,) and np.all((p >= 0) & (p <= 1))
@@ -79,6 +100,14 @@ def test_fit_summaries(request, fit, name):
 def test_sem_impacts_have_no_spillover(sem_fit):
     df = sem_fit.impacts()
     assert float(df["indirect"].iloc[0]) == 0.0
+
+
+def test_sdem_impacts_are_the_durbin_coefficients(sdem_fit):
+    """Direct ``beta``, indirect ``theta`` (row-standardized ``W``)."""
+    df = sdem_fit.impacts()
+    beta = sdem_fit.inference_data.posterior["beta"].values.reshape(-1, 3)
+    assert float(df["direct"].iloc[0]) == pytest.approx(beta[:, 1].mean())
+    assert float(df["indirect"].iloc[0]) == pytest.approx(beta[:, 2].mean())
 
 
 def test_refusals(sar_fit):
@@ -91,7 +120,9 @@ def test_refusals(sar_fit):
 
 
 @pytest.mark.requires_jax
-@pytest.mark.parametrize("cls, kw", [(SARLogit, {"latent": True}), (SEMLogit, {})])
+@pytest.mark.parametrize(
+    "cls, kw", [(SARLogit, {"latent": True}), (SEMLogit, {}), (SDEMLogit, {})]
+)
 def test_jax_backend_runs(cls, kw):
     d = dgp.simulate_sar_logit(n_side=8, rho=0.4, seed=4, latent=True)
     post = (
@@ -138,9 +169,10 @@ def test_truncated_normal_draws(a):
     assert z.std() == pytest.approx(ref.std(), rel=0.02)
 
 
-def test_no_suite_for_the_latent_designs(sar_fit, sem_fit):
+def test_no_suite_for_the_latent_designs(sar_fit, sem_fit, sdem_fit):
     assert get_diagnostic_suite(sar_fit) is None
     assert get_diagnostic_suite(sem_fit) is None
+    assert get_diagnostic_suite(sdem_fit) is None
 
 
 # ---------------------------------------------------------------------------
@@ -240,21 +272,65 @@ BETA = np.array([0.3, 1.0])
 
 @pytest.mark.slow
 @pytest.mark.parametrize(
-    "process, truth", [("sar", 0.4), ("sem", 0.4), ("sar", 0.0)], ids=str
+    "process, truth",
+    [("sar", 0.4), ("sem", 0.4), ("sdem", 0.4), ("sar", 0.0)],
+    ids=str,
 )
 def test_recovery(process, truth):
+    coef = BETA
     if process == "sar":
         d = dgp.simulate_sar_logit(
             n_side=30, rho=truth, beta=BETA, seed=101, latent=True
         )
         model, name = SARLogit(y=d["y"], X=d["X"], W=d["W_sparse"], latent=True), "rho"
-    else:
+    elif process == "sem":
         d = dgp.simulate_sem_logit(n_side=30, lam=truth, beta=BETA, seed=205)
         model, name = SEMLogit(y=d["y"], X=d["X"], W=d["W_sparse"]), "lam"
+    else:
+        d = dgp.simulate_sdem_logit(n_side=30, lam=truth, beta=BETA, seed=307)
+        model, name = SDEMLogit(y=d["y"], X=d["X"], W=d["W_sparse"]), "lam"
+        coef = np.r_[BETA, d["params_true"]["theta"]]
     post = model.fit(
         draws=1500, tune=750, chains=2, progressbar=False, random_seed=0, n_jobs=2
     ).posterior
     par = post[name].values
     assert abs(par.mean() - truth) < 3 * par.std()
-    beta = post["beta"].values.reshape(-1, 2)
-    assert np.all(np.abs(beta.mean(0) - BETA) < 3 * beta.std(0))
+    beta = post["beta"].values.reshape(-1, coef.size)
+    assert np.all(np.abs(beta.mean(0) - coef) < 3 * beta.std(0))
+
+
+# ---------------------------------------------------------------------------
+# The decision tree, from fitted logits
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "simulate, leaf",
+    [
+        (
+            lambda: dgp.simulate_sar_logit(n_side=30, rho=0.0, beta=BETA, seed=10),
+            "Logit",
+        ),
+        (
+            lambda: dgp.simulate_sar_logit(n_side=30, rho=0.6, beta=BETA, seed=10),
+            "SARLogit",
+        ),
+        (
+            lambda: dgp.simulate_sem_logit(n_side=30, lam=0.6, beta=BETA, seed=10),
+            "SEMLogit",
+        ),
+        (
+            lambda: dgp.simulate_sdem_logit(
+                n_side=30, lam=0.6, beta=BETA, theta=np.array([-1.0]), seed=10
+            ),
+            "SDEMLogit",
+        ),
+    ],
+    ids=["null", "reduced SAR", "latent SEM", "SDEM"],
+)
+def test_decision_tree_names_the_generating_form(simulate, leaf):
+    d = simulate()
+    m = Logit(y=d["y"], X=d["X"], W=d["W_sparse"])
+    m.fit(draws=500, tune=500, chains=2, progressbar=False, random_seed=0, cores=1)
+    assert m.spatial_diagnostics_decision(format="model") == leaf

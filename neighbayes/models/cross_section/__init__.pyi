@@ -9,6 +9,7 @@ from .sar_logit import SARLogit as SARLogit
 from .sar_negbin import SARNegBin as SARNegBin
 from .sar_zinb import SARZINB as SARZINB
 from .sdem import SDEM as SDEM
+from .sdem_logit import SDEMLogit as SDEMLogit
 from .sdm import SDM as SDM
 from .sem import SEM as SEM
 from .sem_logit import SEMLogit as SEMLogit

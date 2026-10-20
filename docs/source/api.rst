@@ -49,6 +49,7 @@ Censored and binary
    Logit
    SARLogit
    SEMLogit
+   SDEMLogit
    SEMProbit
 
 Counts
@@ -348,6 +349,7 @@ Data Generating Processes
    simulate_logit
    simulate_sar_logit
    simulate_sem_logit
+   simulate_sdem_logit
    simulate_sem_probit
    simulate_negbin
    simulate_sar_negbin

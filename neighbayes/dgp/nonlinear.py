@@ -387,6 +387,72 @@ def simulate_sem_logit(
     )
 
 
+@simulator(logit)
+def simulate_sdem_logit(
+    W=None,
+    gdf=None,
+    n_side: int | None = None,
+    lam: float = 0.35,
+    beta: np.ndarray | None = None,
+    theta: np.ndarray | None = None,
+    err_hetero: bool = False,
+    rng: np.random.Generator | None = None,
+    seed: int | None = None,
+    contiguity: str = "queen",
+    create_gdf: bool = False,
+    geometry_type: str = "polygon",
+) -> dict:
+    """Simulate the latent SDEM logit that :class:`~neighbayes.models.SDEMLogit` fits.
+
+    DGP
+    ---
+    ``y* = X beta + WX theta + (I - lam W)^{-1} eps``, ``eps`` iid standard
+    logistic, ``y = 1(y* > 0)``; ``WX`` lags every covariate but the intercept.
+
+    Parameters
+    ----------
+    W, gdf, n_side, contiguity, lam, err_hetero, rng, seed, create_gdf, geometry_type
+        As for :func:`simulate_sem_logit`.
+    beta : np.ndarray, optional
+        Coefficients including intercept. Defaults to ``[0.3, 1.0]``.
+    theta : np.ndarray, optional
+        Coefficients of the lagged covariates. Defaults to ``0.5`` each.
+
+    Returns
+    -------
+    dict or geopandas.GeoDataFrame
+        Dict with keys ``y``, ``X``, ``W_sparse``, ``W_graph``, ``eta_true``
+        (the latent utility ``y*``) and ``params_true``.
+    """
+    rng = ensure_rng(rng, seed)
+    W_sparse, Wg = resolve_weights(W=W, gdf=gdf, n_side=n_side, contiguity=contiguity)
+    n_obs = W_sparse.shape[0]
+    if beta is None:
+        beta = np.array([0.3, 1.0], dtype=float)
+    beta = np.asarray(beta, dtype=float)
+    theta = np.full(len(beta) - 1, 0.5) if theta is None else np.asarray(theta, float)
+    X = make_design_matrix(rng, n_obs, k=max(len(beta) - 1, 0), add_intercept=True)
+    eps = rng.logistic(size=n_obs)
+    if err_hetero:
+        eps = eps * _hetero_scale(X, 1.0)
+    WX = np.asarray(W_sparse @ X[:, 1:])
+    eta = X @ beta + WX @ theta + spatial_filter_factor(W_sparse, lam)(eps)
+    out = {
+        "y": (eta > 0).astype(float),
+        "X": X,
+        "W_sparse": W_sparse,
+        "W_graph": Wg,
+        "eta_true": eta,
+        "params_true": {"lam": lam, "beta": beta, "theta": theta},
+    }
+    return _attach_optional_gdf(
+        out,
+        source_gdf=gdf,
+        create_gdf=create_gdf,
+        geometry_type=geometry_type,
+    )
+
+
 @simulator(sem_probit)
 def simulate_sem_probit(
     W=None,

@@ -759,7 +759,55 @@ def _sdm_tobit_spec() -> TreeNode:
     )
 
 
+def _logit_spec() -> TreeNode:
+    """The logit's tests, read as a pair (:mod:`.lmtests.cross_sectional_glm`).
+
+    At the GLM null the latent SAR's score splits into the spillover term
+    (``Robust-LM-Lag``, the reduced-form SAR's score) and the error term
+    (``LM-Error``, the latent SEM's), and ``Robust-LM-Error`` tests whether
+    they move in the proportion one :math:`\rho` implies:
+
+    - spillover alone → the reduced-form ``SARLogit``;
+    - both, in proportion → the latent SAR;
+    - both, out of proportion (opposite signs among them) → ``SDEMLogit``,
+      separate parameters for the covariates' spillover and the clustering;
+    - error alone, out of proportion → ``SEMLogit``; in proportion, the data
+      cannot tell the latent SEM from the latent SAR, whose spillover would
+      have stayed undetectable.
+
+    The full test (``LM-Lag``) and ``LM-SARMA`` are reported beside the tree.
+    """
+    latent_sar = "SARLogit(latent=True)"
+    return TreeNode(
+        kind="test",
+        name="Robust-LM-Lag",
+        if_true=TreeNode(
+            kind="test",
+            name="LM-Error",
+            if_true=TreeNode(
+                kind="test",
+                name="Robust-LM-Error",
+                if_true="SDEMLogit",
+                if_false=latent_sar,
+            ),
+            if_false="SARLogit",
+        ),
+        if_false=TreeNode(
+            kind="test",
+            name="LM-Error",
+            if_true=TreeNode(
+                kind="test",
+                name="Robust-LM-Error",
+                if_true="SEMLogit",
+                if_false=f"SEMLogit or {latent_sar}",
+            ),
+            if_false="Logit",
+        ),
+    )
+
+
 _CROSS_SECTIONAL_SPECS: dict[str, Callable[[], TreeNode]] = {
+    "Logit": _logit_spec,
     "OLS": _ols_spec,
     "SAR": _sar_spec,
     "SEM": _sem_spec,
