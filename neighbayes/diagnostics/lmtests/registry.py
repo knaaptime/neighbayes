@@ -36,20 +36,26 @@ def _register(
 ) -> None:
     """Register a model class (by dotted path) to a diagnostic suite.
 
-    ``variant`` is ``"panel"`` or ``"dynamic"`` for the suite of a class's
-    panels (see :func:`_variant`); a ``None`` suite records that they have
-    none, rather than the class's.
+    ``variant`` is ``"panel"``, ``"dynamic"`` or ``"latent"`` for the suite of
+    one of a class's designs (see :func:`_variant`); a ``None`` suite records
+    that the design has none, rather than the class's.
     """
     _REGISTRY[(class_path, variant)] = suite
 
 
 def _variant(model) -> str | None:
-    """A model instance's suite variant: ``None``, ``"panel"`` or ``"dynamic"``."""
-    if isinstance(model, type) or not getattr(model, "_is_panel", False):
+    """A model instance's suite variant.
+
+    ``"dynamic"`` for a dynamic panel, ``"panel"`` for another panel, a
+    cross-section's design when it is not the static one (``"latent"``), else
+    ``None``.
+    """
+    if isinstance(model, type):
         return None
-    if getattr(model, "_design", None) in ("dynamic", "restricted"):
-        return "dynamic"
-    return "panel"
+    design = getattr(model, "_design", "static")
+    if getattr(model, "_is_panel", False):
+        return "dynamic" if design in ("dynamic", "restricted") else "panel"
+    return None if design == "static" else design
 
 
 def get_diagnostic_suite(model: "SpatialModel | type") -> DiagnosticSuite | None:
@@ -110,6 +116,8 @@ _register("neighbayes.models.cross_section.tobit.SDMTobit", SDM_TOBIT_SUITE)
 # NegBin: the count panels have no suite.
 _register("neighbayes.models.cross_section.sar_negbin.SARNegBin", SAR_NEGBIN_SUITE)
 _register("neighbayes.models.cross_section.sar_logit.SARLogit", SAR_LOGIT_SUITE)
+# The latent SAR logit's tests at its own null are not derived.
+_register("neighbayes.models.cross_section.sar_logit.SARLogit", None, variant="latent")
 _register("neighbayes.models.cross_section.sar_negbin.SARNegBin", None, variant="panel")
 
 # Non-spatial GLM baselines

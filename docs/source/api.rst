@@ -48,6 +48,7 @@ Censored and binary
    SDMTobit
    Logit
    SARLogit
+   SEMLogit
    SEMProbit
 
 Counts
@@ -124,6 +125,7 @@ Default NUTS Priors
    SDMTobitPriors
    SARProbitPriors
    SARLogitPriors
+   SEMLogitPriors
    PanelBasePriors
    PanelOLSPriors
    PanelSARPriors
@@ -345,6 +347,7 @@ Data Generating Processes
    simulate_sdm_tobit
    simulate_logit
    simulate_sar_logit
+   simulate_sem_logit
    simulate_sem_probit
    simulate_negbin
    simulate_sar_negbin

@@ -331,6 +331,20 @@ class SARLogitPriors:
 LogitPriors = SARLogitPriors
 
 
+@dataclass(frozen=True)
+class SEMLogitPriors:
+    """Priors for :class:`neighbayes.models.SEMLogit`, the latent SEM logit.
+
+    :class:`SARLogitPriors` with the bounds on the spatial error parameter
+    ``lam`` in place of ``rho``'s.
+    """
+
+    lam_lower: float = -0.999
+    lam_upper: float = 0.999
+    beta_mu: float | Any = None  # Gelman et al. (2008), link scale
+    beta_sigma: float | Any = None
+
+
 # ---------------------------------------------------------------------------
 # Resolution helper
 # ---------------------------------------------------------------------------
@@ -341,6 +355,7 @@ PriorsLike = Union[
     BasePriors,
     "SARProbitPriors",
     "SARLogitPriors",
+    "SEMLogitPriors",
     None,
 ]
 
@@ -860,6 +875,7 @@ __all__ = [
     "SDMTobitPriors",
     "SARProbitPriors",
     "SARLogitPriors",
+    "SEMLogitPriors",
     "MultilevelPriors",
     "PanelBasePriors",
     "PanelOLSPriors",

@@ -230,6 +230,7 @@ def simulate_sar_logit(
     contiguity: str = "queen",
     create_gdf: bool = False,
     geometry_type: str = "polygon",
+    latent: bool = False,
     **kwargs,
 ) -> dict:
     """Simulate SAR-logit binary outcome data.
@@ -237,7 +238,10 @@ def simulate_sar_logit(
     DGP
     ---
     ``eta = (I - rho W)^{-1} X beta``, ``y ~ Bernoulli(logit^{-1}(eta))``: the
-    reduced form :class:`~neighbayes.models.SARLogit` fits.
+    reduced form :class:`~neighbayes.models.SARLogit` fits.  With
+    ``latent=True``, the latent SAR ``SARLogit(latent=True)`` fits:
+    ``y* = (I - rho W)^{-1} (X beta + eps)``, ``eps`` iid standard logistic,
+    ``y = 1(y* > 0)``.
 
     Parameters
     ----------
@@ -262,6 +266,9 @@ def simulate_sar_logit(
     geometry_type : {"point", "polygon"}, default="polygon"
         Geometry to generate when ``create_gdf=True`` and no source
         ``gdf`` is provided.
+    latent : bool, default=False
+        Draw the latent SAR instead of the reduced form; ``eta_true`` is then
+        the latent utility ``y*``.
 
     Returns
     -------
@@ -281,12 +288,15 @@ def simulate_sar_logit(
 
     X = make_design_matrix(rng, n_obs, k=max(len(beta) - 1, 0), add_intercept=True)
 
-    # Latent index eta = (I - rho W)^{-1} X beta
-    eta = spatial_filter_factor(W_sparse, rho)(X @ beta)
-
-    # Binary response: y ~ Bernoulli(logit^{-1}(eta))
-    probs = 1.0 / (1.0 + np.exp(-eta))
-    y = rng.binomial(1, probs).astype(float)
+    solve = spatial_filter_factor(W_sparse, rho)
+    if latent:
+        # The latent SAR: the multiplier propagates the logistic disturbance.
+        eta = solve(X @ beta + rng.logistic(size=n_obs))
+        y = (eta > 0).astype(float)
+    else:
+        # The reduced form: eta = (I - rho W)^{-1} X beta, y ~ Bernoulli.
+        eta = solve(X @ beta)
+        y = rng.binomial(1, 1.0 / (1.0 + np.exp(-eta))).astype(float)
 
     out = {
         "y": y,
@@ -298,6 +308,76 @@ def simulate_sar_logit(
             "rho": rho,
             "beta": beta,
         },
+    }
+    return _attach_optional_gdf(
+        out,
+        source_gdf=gdf,
+        create_gdf=create_gdf,
+        geometry_type=geometry_type,
+    )
+
+
+@simulator(logit)
+def simulate_sem_logit(
+    W=None,
+    gdf=None,
+    n_side: int | None = None,
+    lam: float = 0.35,
+    beta: np.ndarray | None = None,
+    err_hetero: bool = False,
+    rng: np.random.Generator | None = None,
+    seed: int | None = None,
+    contiguity: str = "queen",
+    create_gdf: bool = False,
+    geometry_type: str = "polygon",
+) -> dict:
+    """Simulate the latent SEM logit that :class:`~neighbayes.models.SEMLogit` fits.
+
+    DGP
+    ---
+    ``y* = X beta + (I - lam W)^{-1} eps``, ``eps`` iid standard logistic,
+    ``y = 1(y* > 0)``.
+
+    Parameters
+    ----------
+    W, gdf, n_side, contiguity
+        Spatial unit structure, as for :func:`simulate_sar_logit`.
+    lam : float, default=0.35
+        Spatial error parameter.
+    beta : np.ndarray, optional
+        Coefficients including intercept. Defaults to ``[0.3, 1.0]``.
+    err_hetero : bool, default False
+        Scale each logistic disturbance by ``sqrt(1 + ||x_i||^2)``, a
+        heteroskedastic departure from the model.
+    rng, seed
+        Random state controls.
+    create_gdf, geometry_type
+        As for :func:`simulate_sar_logit`.
+
+    Returns
+    -------
+    dict or geopandas.GeoDataFrame
+        Dict with keys ``y``, ``X``, ``W_sparse``, ``W_graph``, ``eta_true``
+        (the latent utility ``y*``) and ``params_true``.
+    """
+    rng = ensure_rng(rng, seed)
+    W_sparse, Wg = resolve_weights(W=W, gdf=gdf, n_side=n_side, contiguity=contiguity)
+    n_obs = W_sparse.shape[0]
+    if beta is None:
+        beta = np.array([0.3, 1.0], dtype=float)
+    beta = np.asarray(beta, dtype=float)
+    X = make_design_matrix(rng, n_obs, k=max(len(beta) - 1, 0), add_intercept=True)
+    eps = rng.logistic(size=n_obs)
+    if err_hetero:
+        eps = eps * _hetero_scale(X, 1.0)
+    eta = X @ beta + spatial_filter_factor(W_sparse, lam)(eps)
+    out = {
+        "y": (eta > 0).astype(float),
+        "X": X,
+        "W_sparse": W_sparse,
+        "W_graph": Wg,
+        "eta_true": eta,
+        "params_true": {"lam": lam, "beta": beta},
     }
     return _attach_optional_gdf(
         out,

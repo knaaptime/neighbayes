@@ -96,6 +96,10 @@ EXPECTED: dict[str, dict[str, float]] = {
         "rho_lower": -0.999,
         "rho_upper": 0.999,
     },
+    "SEMLogitPriors": {
+        "lam_lower": -0.999,
+        "lam_upper": 0.999,
+    },
     "PanelBasePriors": {"nu": NU, "sigma2_alpha": 2.0},
     "PanelOLSPriors": {"nu": NU, "sigma2_alpha": 2.0},
     "PanelSARPriors": {

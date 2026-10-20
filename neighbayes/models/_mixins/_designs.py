@@ -26,10 +26,14 @@ SARHurdleNegBin), :class:`CountDesigns`:
     The panel, pooled or with random unit effects and fixed time effects
     (:mod:`..panel._count`, :mod:`..panel._zinb`, :mod:`..panel._hurdle`).
 
-The binary families (Logit, SARLogit), :class:`BinaryDesigns`:
+The binary families (Logit, SARLogit, SEMLogit), :class:`BinaryDesigns`:
 
 ``"static"``
-    The cross-section, the only design they implement.
+    The cross-section: SARLogit's reduced form, and SEMLogit's latent SEM
+    (a SEM has no reduced form to distinguish, ADR 0003).
+``"latent"``
+    ``SARLogit(latent=True)``, the latent SAR, which propagates the logistic
+    disturbance (:mod:`..cross_section._latent_logit`).
 """
 
 from __future__ import annotations
@@ -185,7 +189,8 @@ class BinaryDesigns(DesignDispatch):
     """Design dispatch for the binary families (see the module).
 
     The response is validated as binary; there is no panel, and a
-    cross-section takes no unit effects.
+    cross-section takes no unit effects.  ``latent=True`` selects the latent
+    SAR where the class implements it.
     """
 
     _likelihood: str = "binary"
@@ -201,6 +206,7 @@ class BinaryDesigns(DesignDispatch):
         unit_effects=None,
         time_effects=False,
         dynamic=False,
+        latent=False,
         **kwargs,
     ):
         design, kwargs = self._resolve_design(
@@ -209,6 +215,7 @@ class BinaryDesigns(DesignDispatch):
                 unit_effects=unit_effects,
                 time_effects=time_effects,
                 dynamic=dynamic,
+                latent=latent,
             )
         )
         if kwargs.get("robust"):
@@ -228,13 +235,33 @@ class BinaryDesigns(DesignDispatch):
         """The design the arguments describe, and the base class's arguments."""
         name = cls.__name__
         unit, time, dynamic = _pop_design(kw)
+        latent = kw.pop("latent", False)
+        if not isinstance(latent, bool):
+            raise ValueError(f"latent must be True or False; got {latent!r}.")
         if _is_panel(kw):
             raise NotImplementedError(f"{name} is not implemented with a panel.")
         _cross_section_only(name, time, dynamic)
         if unit is not None:
             # One draw per observation is a disturbance, not a unit effect.
             raise NotImplementedError(f"{name} takes no unit effects.")
-        return "static", kw
+        if latent and "latent" not in cls._DESIGNS:
+            raise NotImplementedError(
+                f"{name} has no latent=True design"
+                + (
+                    " (it is the latent SEM already)."
+                    if name.startswith("SEM")
+                    else "."
+                )
+            )
+        return ("latent" if latent else "static"), kw
+
+    _build_pymc_model = _by_design("_build_pymc_model")
+    _fit_gibbs = _by_design("_fit_gibbs")
+    _fitted_mean_from_posterior = _by_design("_fitted_mean_from_posterior")
+    fitted_probabilities = _by_design("fitted_probabilities")
+    fitted_probabilities.__doc__ = (
+        """Fitted ``P(y = 1)`` at the posterior-mean parameters."""
+    )
 
 
 #: The zero part's design and weights, taken by the two-part count families.

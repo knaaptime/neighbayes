@@ -66,6 +66,8 @@ ROUTES = [
     (m.SARHurdleNegBin, {**PANEL, "unit_effects": "random"}, "panel", 1),
     # Logit, Tobit and probit families
     (m.SARLogit, {}, "static", None),
+    (m.SARLogit, {"latent": True}, "latent", None),
+    (m.SEMLogit, {}, "static", None),
     (m.Logit, {}, "static", None),
     (m.SARTobit, PANEL, "static", None),
     (m.SEMTobit, PANEL, "static", None),

@@ -462,8 +462,33 @@ slowly: expect to need about 900 units or more.
 There is no spatial logit with random effects. In a cross-section the effects'
 sd trades off against $\beta$ (the logit's attenuation) and against $\rho$ or
 $\lambda$, and binary outcomes barely constrain the trade: on 1,225 units with
-effects of sd 2, the SEM logit's $\lambda$ came out near 0.3 against 0.5 and
-the effects' sd at 6 ± 6, held only by its prior.
+effects of sd 2, an SEM logit with such effects had its $\lambda$ near 0.3
+against 0.5 and the effects' sd at 6 ± 6, held only by its prior.
+
+### SARLogit, latent (`latent=True`)
+
+$$y_i = \mathbf 1\{y^*_i > 0\}, \quad (I - \rho W) y^* = X\beta + \varepsilon, \quad \varepsilon_i \sim \operatorname{Logistic}(0, 1)$$
+
+The latent SAR: the multiplier propagates the logit's own disturbance, so
+$\rho = 0$ is the logit and the GLM suite's LM-Lag is its score test. It has no
+variance parameter, which is why it is identified where the random-effects
+logits were not. The Gibbs sampler is exact: it draws the latent utilities
+(Albert and Chib 1993), the Kolmogorov scales that make the logistic a normal
+scale mixture (Holmes and Held 2006, through `augax`), $\rho$ with $\beta$
+integrated out, then $\beta$. It runs on JAX by default, drawing the
+utilities a colour class at a time (classes of utilities that share no row of
+$I - \rho W$ are conditionally independent), and on NumPy one at a time. There
+is no NUTS path (the likelihood is an orthant probability) and no pointwise
+log-likelihood. Impacts are on the latent index.
+
+### SEMLogit
+
+$$y_i = \mathbf 1\{y^*_i > 0\}, \quad y^* = X\beta + (I - \lambda W)^{-1}\varepsilon, \quad \varepsilon_i \sim \operatorname{Logistic}(0, 1)$$
+
+The latent SEM, sampled as the latent SAR is; $\lambda = 0$ is the logit and
+the GLM suite's LM-Error is its score test. A SEM whose error process carried no
+disturbance would be the aspatial logit, so the SEM logit takes no `latent`
+switch.
 
 ## Flow Models
 
@@ -653,7 +678,7 @@ origin–destination flow models on Kronecker weights $W_d$, $W_o$, $W_w$, under
 otherwise.** For SAR/SEM/SDM/SDEM, the count families, the ZINB model and the
 Gaussian panel families, that means Gibbs unless you ask for something else.
 
-NUTS is not universally available. The Pólya–Gamma `SARLogit` and the
+NUTS is not universally available. `SARLogit` (in both forms), `SEMLogit` and the
 auxiliary-mixture Poisson flow classes build no PyMC graph at all, and `fit(sampler="nuts")`
 raises `NotImplementedError`. Robust (Student-t) SAR/SEM/SDM/SDEM and
 Gaussian panel FE models keep Gibbs: the Student-t error is sampled as a

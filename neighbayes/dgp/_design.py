@@ -36,7 +36,7 @@ _DESIGN = {
 _RETIRED = {
     "sigma_alpha": "unit_effects= (pair_effects= for flows) with unit_effect_sd=",
     "sigma2": "a panel's unit_effects='random' with unit_effect_sd=",
-    "structural": "nothing: the SAR logit is the reduced form only",
+    "structural": "latent=True",
 }
 _DEFAULT_SD = 0.5
 _NICKELL = (

@@ -11,6 +11,7 @@ from .sar_zinb import SARZINB as SARZINB
 from .sdem import SDEM as SDEM
 from .sdm import SDM as SDM
 from .sem import SEM as SEM
+from .sem_logit import SEMLogit as SEMLogit
 from .sem_probit import SEMProbit as SEMProbit
 from .slx import SLX as SLX
 from .tobit import SARTobit as SARTobit

@@ -18,6 +18,10 @@ Both backends fit the same model: ``backend="jax"`` (the default via
 random effects: in a cross-section their sd and ρ are barely identified from
 binary outcomes.
 
+``latent=True`` selects the latent SAR, which propagates the logit's own
+disturbance, ``y = 1{(I - ρW)⁻¹(Xβ + ε) > 0}`` with ε standard logistic
+(:mod:`._latent_logit`).
+
 Use this model when:
 - The response is binary (0/1).
 - You need spatial autocorrelation in the log-odds.
@@ -55,10 +59,11 @@ from ...samplers.negbin_reduced._core import (
 from .._mixins._designs import BinaryDesigns
 from ..base import SpatialModel
 from ..priors import LogitGibbsPriors, SARLogitPriors
+from ._latent_logit import LatentLogitMixin
 
 
-class SARLogit(BinaryDesigns, SpatialModel):
-    """Bayesian reduced-form SAR-logit with Pólya–Gamma Gibbs sampler.
+class SARLogit(BinaryDesigns, LatentLogitMixin, SpatialModel):
+    """Bayesian SAR logit: the reduced form, or the latent SAR with ``latent=True``.
 
     Parameters
     ----------
@@ -103,6 +108,20 @@ class SARLogit(BinaryDesigns, SpatialModel):
         ``"chol"``, ``"exact"`` on ``"lu"``) raises.
     robust : bool, default False
         Not supported. Raises ``NotImplementedError`` if True.
+    latent : bool, default False
+        Fit the latent SAR instead of the reduced form:
+
+        .. math::
+            y_i = \\mathbb 1\\{y^*_i > 0\\}, \\qquad
+            (I - \\rho W) y^* = X\\beta + \\varepsilon, \\qquad
+            \\varepsilon_i \\sim \\mathrm{Logistic}(0, 1),
+
+        whose ρ = 0 member is the logit.  It is sampled by an exact Gibbs sweep
+        over the latent utilities and the Kolmogorov scales of the logistic
+        (Albert & Chib 1993; Holmes & Held 2006), which needs ``augax``: on
+        JAX by default, the utilities by colour class, or with
+        ``backend="numpy"`` one at a time.  Its impacts are on the latent
+        index, ``scale="logodds"``.
 
     Notes
     -----
@@ -132,6 +151,11 @@ class SARLogit(BinaryDesigns, SpatialModel):
     _model_type: str = "sar_logit"
     _gibbs_key: tuple[str, str] | None = ("binary", "cross_section")
     _priors_cls = SARLogitPriors
+    _DESIGNS = {
+        "static": {},
+        "latent": {"_gibbs_key": ("binary_latent", "cross_section")},
+    }
+    _latent_process = "sar"
 
     def _init_static(self) -> None:
         # The ρ slice sampler's log-determinant.
@@ -186,7 +210,7 @@ class SARLogit(BinaryDesigns, SpatialModel):
             omega=omega_init,
         )
 
-    def _fit_gibbs(
+    def _fit_gibbs_static(
         self,
         *,
         draws: int = 2000,
@@ -375,14 +399,14 @@ class SARLogit(BinaryDesigns, SpatialModel):
         self._idata = idata
         return idata
 
-    def _build_pymc_model(self):
+    def _build_pymc_model_static(self):
         """Not supported — SARLogit uses a Gibbs sampler, not NUTS."""
         raise NotImplementedError(
             "SARLogit does not build a PyMC model. "
             "Use the fit() method for Gibbs sampling."
         )
 
-    def fitted_probabilities(self) -> np.ndarray:
+    def _fitted_probabilities_static(self) -> np.ndarray:
         """Compute fitted probabilities at posterior mean parameters.
 
         Returns the probability P(y=1) = logit⁻¹(η) where η is computed
@@ -403,12 +427,12 @@ class SARLogit(BinaryDesigns, SpatialModel):
         )
         return 1.0 / (1.0 + np.exp(-A_rho_inv))
 
-    def _fitted_mean_from_posterior(self) -> np.ndarray:
+    def _fitted_mean_from_posterior_static(self) -> np.ndarray:
         """Compute fitted values at posterior mean parameters.
 
         For the logit model, the fitted mean is the fitted probability.
         """
-        return self.fitted_probabilities()
+        return self._fitted_probabilities_static()
 
     def _compute_impacts_posterior(
         self,
@@ -659,6 +683,11 @@ class SARLogit(BinaryDesigns, SpatialModel):
             return super().impacts(return_posterior_samples=return_posterior_samples)
         if scale != "probability":
             raise ValueError("scale must be either 'logodds' or 'probability'.")
+        if self._design == "latent":
+            raise NotImplementedError(
+                "Probability-scale impacts of the latent SAR logit are not "
+                "implemented; scale='logodds' reports them on the latent index."
+            )
 
         self._require_fit()
         direct_samples, indirect_samples, total_samples = (

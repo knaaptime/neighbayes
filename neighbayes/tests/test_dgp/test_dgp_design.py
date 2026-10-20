@@ -19,7 +19,7 @@ def test_one_simulator_per_public_class():
     import neighbayes.models as m
 
     classes = {n for n in m.__all__ if n != "Level"}
-    assert len(d.__all__) == len(classes) == 27
+    assert len(d.__all__) == len(classes) == 28
 
 
 def test_signature_shows_design_arguments():
@@ -98,7 +98,7 @@ REFUSALS = [
         TypeError,
         "unit_effect_sd",
     ),
-    (d.simulate_sar_logit, {"structural": True}, TypeError, "reduced form only"),
+    (d.simulate_sar_logit, {"structural": True}, TypeError, "latent=True"),
     (d.simulate_sar_negbin, {"sigma2": 0.5}, TypeError, "unit_effect_sd"),
     (d.simulate_sar, {"N": 16}, ValueError, "N and T are required"),
     (d.simulate_sar, {"unit_effects": "fixed"}, NotImplementedError, "only in a panel"),
