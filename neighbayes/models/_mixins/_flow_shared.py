@@ -1,8 +1,4 @@
-r"""Shared methods for cross-sectional and panel flow models.
-
-Centralises the verbatim-duplicate methods that were previously copy-pasted
-between :class:`~neighbayes.models.flow.FlowModel` and
-:class:`~neighbayes.models.flow_panel.FlowPanelModel`:
+r"""Shared methods of the flow models (:class:`~neighbayes.models.flow.FlowModel`):
 
 * ``fit`` — NUTS sampling dispatch
 * ``_posterior_var_names`` — filter free_RVs / deterministics
@@ -13,13 +9,8 @@ between :class:`~neighbayes.models.flow.FlowModel` and
 * ``_compute_jacobian_log_det`` — default ``None`` (subclasses override)
 * ``_fitted_mean_from_posterior`` — default ``NotImplementedError``
 
-The only cross-section vs panel difference is:
-
-1. **System size**: cross-section uses ``self._N`` (= n²), panel uses
-   ``self._N_flow`` (= n²).  The ``_flow_system_size`` property unifies these.
-2. **Decision-tree spec lookup**: cross-section uses ``get_flow_spec``,
-   panel uses ``get_panel_flow_spec``.  The ``_flow_spec_fn`` property
-   returns the appropriate callable.
+The decision tree differs between a cross-section (``get_flow_spec``) and a
+panel (``get_panel_flow_spec``); ``_flow_spec_fn`` returns the one that applies.
 """
 
 from __future__ import annotations
@@ -41,13 +32,11 @@ from ..._lazy_deps import pm, xr
 
 
 class FlowSharedMethods:
-    """Mixin with shared methods for flow and flow-panel models.
+    """Mixin with the flow models' shared methods.
 
-    Both :class:`FlowModel` and :class:`FlowPanelModel` inherit from this
-    mixin.  Subclasses are expected to set ``self._W_sparse`` (the ``n × n``
-    weights; the ``N × N`` flow weights are derived lazily) and either
-    ``self._N`` (cross-section)
-    or ``self._N_flow`` (panel) before calling any mixin method.
+    The model sets ``self._W_sparse`` (the ``n × n`` weights; the ``N × N``
+    flow weights are derived lazily) and ``self._N`` (the ``n²`` pairs) before
+    calling any mixin method.
     """
 
     # True on the separable classes, whose filter A = L_o ⊗ L_d has a closed-form
@@ -85,9 +74,6 @@ class FlowSharedMethods:
 
         backends = {"jax", "numpy"} if jax else {"numpy"}
         return resolve_backend_for(requested, backends, jax_ok=jax_available())
-
-    # Subclasses override these as needed.
-    _panel_diagnostics: bool = False
 
     # ------------------------------------------------------------------
     # Properties that abstract cross-section vs panel differences
@@ -137,20 +123,11 @@ class FlowSharedMethods:
         return _compute_flow_effects(sums, beta_d, beta_o, beta_intra)
 
     @property
-    def _flow_system_size(self) -> int:
-        """Return the flow system dimension n².
-
-        Cross-section models store this as ``self._N``; panel models
-        store it as ``self._N_flow``.
-        """
-        return getattr(self, "_N_flow", getattr(self, "_N", 0))
-
-    @property
     def _flow_spec_fn(self):
         """Return the decision-tree spec lookup function for this model."""
         from ...diagnostics import _decision_trees as _dt
 
-        if self._panel_diagnostics:
+        if self._is_panel:
             return _dt.get_panel_flow_spec
         return _dt.get_flow_spec
 
@@ -488,7 +465,7 @@ class FlowSharedMethods:
         rho_w: float,
     ) -> sp.csr_matrix:
         """Assemble ``A = I - ρ_d W_d - ρ_o W_o - ρ_w W_w`` (sparse n²×n²)."""
-        I_N = sp.eye(self._flow_system_size, format="csr", dtype=np.float64)
+        I_N = sp.eye(self._N, format="csr", dtype=np.float64)
         return I_N - rho_d * self._Wd - rho_o * self._Wo - rho_w * self._Ww
 
     @property
@@ -506,9 +483,7 @@ class FlowSharedMethods:
         if cached is None:
             from ...samplers._utils._sparsax_utils import CachedSparseSolver
 
-            cached = CachedSparseSolver(
-                [self._Wd, self._Wo, self._Ww], self._flow_system_size
-            )
+            cached = CachedSparseSolver([self._Wd, self._Wo, self._Ww], self._N)
             self._cached_A_solver = cached
         return cached
 

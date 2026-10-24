@@ -39,7 +39,7 @@ def run_negbin_flow_gibbs(
 
     Parameters
     ----------
-    model : FlowModel or FlowPanelModel
+    model : FlowModel
         NB flow model instance providing ``_X``, ``_y_int_vec``,
         ``_W_sparse``, ``_Wd``/``_Wo``/``_Ww``, ``_n``, ``priors``, and
         (unrestricted only) ``nonnegative_dependence``.

@@ -1,7 +1,7 @@
 """Tests for panel flow models.
 
 This file targets the first implementation slice:
-- FlowPanelModel behavior through SARFlowPanelFE
+- FlowModel panel behavior through SARFlowPanelFE
 - SARFlowPanelFE construction and demeaning
 - SARFlowSeparablePanelFE model build
 - Parameter recovery tests for all 4 panel flow variants
@@ -47,7 +47,7 @@ def _panel_flow_stack(n: int, T: int, k: int, seed: int = 0):
     return out["y"], out["X"], out["col_names"]
 
 
-class TestFlowPanelModelConstruction:
+class TestFlowPanelConstruction:
     def test_sar_flow_panel_builds(self):
         n = 4
         T = 3
@@ -64,7 +64,7 @@ class TestFlowPanelModelConstruction:
 
         assert model._n == n
         assert model._T == T
-        assert model._N_flow == n * n
+        assert model._N == n * n
         assert model._y.shape == (n * n * T,)
         assert model._X.shape[0] == n * n * T
         assert model._Wd_y.shape == (n * n * T,)

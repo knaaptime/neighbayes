@@ -1,7 +1,7 @@
 """Shared helper functions for Bayesian spatial regression models.
 
-These utilities are used by the base classes (SpatialModel, FlowModel,
-FlowPanelModel) and are collected here to avoid circular imports and code
+These utilities are used by the base classes (SpatialModel, FlowModel)
+and are collected here to avoid circular imports and code
 duplication.
 """
 

@@ -204,14 +204,10 @@ def test_slx_uses_slx_specific_lm_tests():
 
 
 def test_flow_models_expose_decision_api():
-    """FlowModel and FlowPanelModel must expose spatial_diagnostics_decision."""
+    """FlowModel, cross-section and panel alike, exposes spatial_diagnostics_decision."""
     from neighbayes.models.flow import FlowModel
-    from neighbayes.models.flow_panel import FlowPanelModel
 
-    assert hasattr(FlowModel, "spatial_diagnostics_decision")
     assert callable(FlowModel.spatial_diagnostics_decision)
-    assert hasattr(FlowPanelModel, "spatial_diagnostics_decision")
-    assert callable(FlowPanelModel.spatial_diagnostics_decision)
 
 
 def test_flow_decision_tree_dispatch():

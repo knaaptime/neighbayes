@@ -34,9 +34,9 @@ from .._base._nb import nb_alpha_rv
 from .._design import FacadeMeta, flow
 from .._mixins._count_panel import pop_mundlak, require_counts
 from .._mixins._hurdle import HurdleMixin
+from ..flow import FlowModel
 from ..priors import FlowPanelHurdlePriors
 from ._panel import (
-    FlowPanelModel,
     SARFlowSeparablePanelFE,
     _pop_effects,
     _SeparableCountFlowPanel,
@@ -104,9 +104,9 @@ class SARHurdleNegBinFlowSeparablePanelRE(
         else:
             Z_arr = np.asarray(X_zero, dtype=np.float64)
             Z_arr = Z_arr[:, None] if Z_arr.ndim == 1 else Z_arr
-            if Z_arr.shape[0] != self._N_flow * self._T:
+            if Z_arr.shape[0] != self._N * self._T:
                 raise ValueError(
-                    f"Z must have n²·T = {self._N_flow * self._T} rows, "
+                    f"Z must have n²·T = {self._N * self._T} rows, "
                     f"got {Z_arr.shape[0]}."
                 )
             self._sel_feature_names = (
@@ -124,7 +124,7 @@ class SARHurdleNegBinFlowSeparablePanelRE(
         self._is_sel_row_std = True
         self._effects_equation = "count"
         self._finish_count_init(y_arr, effects, mundlak)
-        self._binary_effects_design(self._N_flow, self._T)
+        self._binary_effects_design(self._N, self._T)
 
     def _model_coords(self, extra: Optional[dict] = None) -> dict:
         coords = super()._model_coords(extra)
@@ -200,7 +200,7 @@ class SARHurdleNegBinFlowSeparablePanelRE(
         """
         backend = select_backend(sampler, backend, sample_kwargs)
         if sampler == "nuts":
-            return FlowPanelModel.fit(
+            return FlowModel.fit(
                 self,
                 draws=draws,
                 tune=tune,
@@ -309,7 +309,7 @@ class SARHurdleNegBinFlowSeparablePanelRE(
         from ..._ops import KroneckerFlowSolveMatrixOp
 
         pr = self._hurdle_flow_priors()
-        n, N, T = self._n, self._N_flow, self._T
+        n, N, T = self._n, self._N, self._T
         X_t = pt.as_tensor_variable(self._X.astype(np.float64))
         Z_t = pt.as_tensor_variable(self._Z.astype(np.float64))
         with pm.Model(coords=self._model_coords()) as model:
@@ -357,7 +357,7 @@ class SARHurdleNegBinFlowSeparablePanelRE(
     # ------------------------------------------------------------------
 
     def _kron_eta(self, W, rd: float, ro: float, b: np.ndarray) -> np.ndarray:
-        n, N, T = self._n, self._N_flow, self._T
+        n, N, T = self._n, self._N, self._T
         I_n = sp.eye(n, format="csr", dtype=np.float64)
         Ld = (I_n - rd * W).tocsr()
         Lo = (I_n - ro * W).tocsr()
@@ -426,7 +426,7 @@ class SARHurdleNegBinFlowSeparablePanelRE(
         ``ρ``; ``"zero"`` on the zero part's log-odds of any flow through
         ``rho_zero`` and ``beta_zero``, available when the zero part's design
         is the flow design (``X_zero=None``).  Other arguments as
-        :meth:`FlowPanelModel.impacts`.
+        :meth:`FlowModel.impacts`.
         """
         if equation not in ("count", "zero"):
             raise ValueError(f"equation must be 'count' or 'zero', got {equation!r}")
@@ -437,7 +437,7 @@ class SARHurdleNegBinFlowSeparablePanelRE(
             )
         self._effects_equation = equation
         try:
-            return FlowPanelModel.impacts(
+            return FlowModel.impacts(
                 self,
                 draws=draws,
                 return_posterior_samples=return_posterior_samples,

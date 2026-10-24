@@ -60,7 +60,7 @@ class TestFlowModelConstruction:
             self.G,
             col_names=self.col_names,
         )
-        np.testing.assert_allclose(model._y_vec, self.y_vec, atol=1e-12)
+        np.testing.assert_allclose(model._y, self.y_vec, atol=1e-12)
 
     def test_sar_flow_separable_builds(self):
         from neighbayes.models.flow import SARFlowSeparable
@@ -73,7 +73,7 @@ class TestFlowModelConstruction:
     def test_wrong_y_length_raises(self):
         from neighbayes.models.flow import SARFlow
 
-        with pytest.raises(ValueError, match="N="):
+        with pytest.raises(ValueError, match="y must have shape"):
             SARFlow(np.zeros(self.N + 1), self.X, self.G)
 
     def test_asymmetric_beta_shapes_work_in_dgp(self):
@@ -1017,7 +1017,7 @@ class TestFlowEffectsLeSageDecomposition:
 
 
 class TestFlowPanelSpatialEffectsAndPPC:
-    """Smoke + correctness tests for the new FlowPanelModel public API."""
+    """Smoke + correctness tests for the flow panels' public API."""
 
     @pytest.fixture(scope="class")
     def fitted_panel(self):
@@ -1068,7 +1068,7 @@ class TestFlowPanelSpatialEffectsAndPPC:
 
     def test_panel_posterior_predictive(self, fitted_panel):
         y_rep = fitted_panel.posterior_predictive(n_draws=5, random_seed=11)
-        assert y_rep.shape == (5, fitted_panel._N_flow * fitted_panel._T)
+        assert y_rep.shape == (5, fitted_panel._N * fitted_panel._T)
         assert np.all(np.isfinite(y_rep))
 
 
