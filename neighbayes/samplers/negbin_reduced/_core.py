@@ -1384,7 +1384,6 @@ def run_chain(
         alpha_state = _StructuralState(
             eta=eta,
             beta=state.beta,
-            sigma2=1.0,  # unused by _sample_alpha
             rho=state.rho,
             alpha=state.alpha,
             omega=state.omega,

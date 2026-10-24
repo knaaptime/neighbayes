@@ -214,9 +214,7 @@ def run_chain(
         eq.exact_sd_move(lambda e: nb_eta_loglik(y, e, alpha), rng)
 
         # --- 4. dispersion (held when alpha_fixed) ---
-        st = _AlphaState(
-            eta=eq.eta, beta=eq.theta, sigma2=1.0, rho=0.0, alpha=alpha, omega=omega
-        )
+        st = _AlphaState(eta=eq.eta, beta=eq.theta, rho=0.0, alpha=alpha, omega=omega)
         alpha = _sample_alpha(st, y, alpha_priors, rng=rng)
 
         if not tuning and (it - tune) % thin == 0:

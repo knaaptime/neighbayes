@@ -759,25 +759,28 @@ def _sdm_tobit_spec() -> TreeNode:
     )
 
 
-def _logit_spec() -> TreeNode:
-    """The logit's tests, read as a pair (:mod:`.lmtests.cross_sectional_glm`).
+def _glm_spec(family: str) -> TreeNode:
+    """A GLM's tests, read as a pair (:mod:`.lmtests.cross_sectional_glm`).
 
-    At the GLM null the latent SAR's score splits into the spillover term
-    (``Robust-LM-Lag``, the reduced-form SAR's score) and the error term
-    (``LM-Error``, the latent SEM's), and ``Robust-LM-Error`` tests whether
-    they move in the proportion one :math:`\rho` implies:
+    ``family`` is the aspatial class (``"Logit"``, ``"NegBin"``), whose SAR,
+    SEM and SDEM classes the leaves name.  At the GLM null the latent SAR's
+    score splits into the spillover term (``Robust-LM-Lag``, the reduced-form
+    SAR's score) and the error term (``LM-Error``, the latent SEM's), and
+    ``Robust-LM-Error`` tests whether they move in the proportion one
+    :math:`\rho` implies:
 
-    - spillover alone → the reduced-form ``SARLogit``;
+    - spillover alone → the reduced-form SAR;
     - both, in proportion → the latent SAR;
-    - both, out of proportion (opposite signs among them) → ``SDEMLogit``,
+    - both, out of proportion (opposite signs among them) → the SDEM,
       separate parameters for the covariates' spillover and the clustering;
-    - error alone, out of proportion → ``SEMLogit``; in proportion, the data
+    - error alone, out of proportion → the latent SEM; in proportion, the data
       cannot tell the latent SEM from the latent SAR, whose spillover would
       have stayed undetectable.
 
     The full test (``LM-Lag``) and ``LM-SARMA`` are reported beside the tree.
     """
-    latent_sar = "SARLogit(latent=True)"
+    sar, sem, sdem = f"SAR{family}", f"SEM{family}", f"SDEM{family}"
+    latent_sar = f"{sar}(latent=True)"
     return TreeNode(
         kind="test",
         name="Robust-LM-Lag",
@@ -787,10 +790,10 @@ def _logit_spec() -> TreeNode:
             if_true=TreeNode(
                 kind="test",
                 name="Robust-LM-Error",
-                if_true="SDEMLogit",
+                if_true=sdem,
                 if_false=latent_sar,
             ),
-            if_false="SARLogit",
+            if_false=sar,
         ),
         if_false=TreeNode(
             kind="test",
@@ -798,16 +801,17 @@ def _logit_spec() -> TreeNode:
             if_true=TreeNode(
                 kind="test",
                 name="Robust-LM-Error",
-                if_true="SEMLogit",
-                if_false=f"SEMLogit or {latent_sar}",
+                if_true=sem,
+                if_false=f"{sem} or {latent_sar}",
             ),
-            if_false="Logit",
+            if_false=family,
         ),
     )
 
 
 _CROSS_SECTIONAL_SPECS: dict[str, Callable[[], TreeNode]] = {
-    "Logit": _logit_spec,
+    "Logit": lambda: _glm_spec("Logit"),
+    "NegBin": lambda: _glm_spec("NegBin"),
     "OLS": _ols_spec,
     "SAR": _sar_spec,
     "SEM": _sem_spec,
@@ -1109,32 +1113,6 @@ def _ols_flow_spec() -> TreeNode:
     )
 
 
-def _sar_flow_spec() -> TreeNode:
-    """SARFlow decision tree (Neyman-orthogonalized robust marginals).
-
-    Robust marginals are queried in sequence (destination → origin →
-    network); each is tested only once the previous has been checked.  Any
-    significant direction confirms the SARFlow fit is warranted.  If none
-    survive the orthogonalization the simpler OLSFlow is preferred.
-    """
-    return TreeNode(
-        kind="test",
-        name="Robust-LM-Flow-Destination",
-        if_true="SARFlow",
-        if_false=TreeNode(
-            kind="test",
-            name="Robust-LM-Flow-Origin",
-            if_true="SARFlow",
-            if_false=TreeNode(
-                kind="test",
-                name="Robust-LM-Flow-OD",
-                if_true="SARFlow",
-                if_false="OLSFlow",
-            ),
-        ),
-    )
-
-
 def _panel_ols_flow_spec() -> TreeNode:
     """OLSFlowPanelFE decision tree (panel mirror of ``_ols_flow_spec``)."""
     return TreeNode(
@@ -1145,34 +1123,12 @@ def _panel_ols_flow_spec() -> TreeNode:
     )
 
 
-def _panel_sar_flow_spec() -> TreeNode:
-    """SARFlowPanelFE decision tree (panel mirror of ``_sar_flow_spec``)."""
-    return TreeNode(
-        kind="test",
-        name="Panel-Robust-LM-Flow-Destination",
-        if_true="SARFlow",
-        if_false=TreeNode(
-            kind="test",
-            name="Panel-Robust-LM-Flow-Origin",
-            if_true="SARFlow",
-            if_false=TreeNode(
-                kind="test",
-                name="Panel-Robust-LM-Flow-OD",
-                if_true="SARFlow",
-                if_false="OLSFlow",
-            ),
-        ),
-    )
-
-
 _FLOW_SPECS: dict[str, Callable[[], TreeNode]] = {
     "OLSFlow": _ols_flow_spec,
-    "SARFlow": _sar_flow_spec,
 }
 
 _PANEL_FLOW_SPECS: dict[str, Callable[[], TreeNode]] = {
     "OLSFlowPanelFE": _panel_ols_flow_spec,
-    "SARFlowPanelFE": _panel_sar_flow_spec,
 }
 
 

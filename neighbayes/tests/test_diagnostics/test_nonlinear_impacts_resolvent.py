@@ -2,7 +2,7 @@
 
 The log-odds / log-mean / count-equation direct-effect trace
 ``(1/n) tr((I − ρW)⁻¹)`` is the logdet gradient in disguise, so the
-SAR-GLMs (logit, neg-bin, structural neg-bin, ZINB) share the same
+SAR-GLMs (logit, neg-bin, ZINB) share the same
 resolvent route as the Gaussian SAR and must never trigger the O(n³)
 eigendecomposition on a row-standardized, surrogate-logdet model.
 """

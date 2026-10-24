@@ -47,7 +47,9 @@ def _fit_neighbayes(model_cls, dataset):
     sigma^2 = 1e6.  The rho priors already coincide: uniform on (-1, 1).
     """
     model = model_cls(
-        y=dataset["y"], X=dataset["X"], W=sp.csr_matrix(dataset["W"]),
+        y=dataset["y"],
+        X=dataset["X"],
+        W=sp.csr_matrix(dataset["W"]),
         priors={
             "beta_mu": 0.0,
             "beta_sigma": 1e12,
@@ -86,9 +88,7 @@ def _assert_sd_matches(label, nb_draws, tb_draws, multiplier=4.0):
     mcse_tb = _mcse.mcse_sd(tb_draws)
     tol = multiplier * np.hypot(mcse_nb, mcse_tb)
     diff = abs(float(np.std(nb_draws)) - float(np.std(tb_draws)))
-    assert diff <= tol, (
-        f"{label}: |Δ posterior sd| = {diff:.4f} > {tol:.4f}"
-    )
+    assert diff <= tol, f"{label}: |Δ posterior sd| = {diff:.4f} > {tol:.4f}"
 
 
 def _assert_truth_sanity(dataset, idata, spatial_name, abs_tol):
@@ -131,12 +131,16 @@ def _compare(dataset, idata, draws, spatial_name):
     _assert_truth_sanity(dataset, idata, spatial_name, abs_tol=0.25)
 
 
-def test_sar_g_posterior_matches_neighbayes(sar_dataset, octave_run, toolbox,
-                                            tmp_path):
+def test_sar_g_posterior_matches_neighbayes(sar_dataset, octave_run, toolbox, tmp_path):
     idata = _fit_neighbayes(SAR, sar_dataset)
     text = _octave.gauss_driver(
-        "sar_g", toolbox, tmp_path, ndraw=setup.TB_DRAWS, nomit=setup.TB_OMIT,
-        seed=11, prefix="tb"
+        "sar_g",
+        toolbox,
+        tmp_path,
+        ndraw=setup.TB_DRAWS,
+        nomit=setup.TB_OMIT,
+        seed=11,
+        prefix="tb",
     )
     stdout, draws = octave_run(text, dataset=sar_dataset, prefix="tb")
     assert "METH sar_g" in stdout
@@ -145,12 +149,16 @@ def test_sar_g_posterior_matches_neighbayes(sar_dataset, octave_run, toolbox,
     _compare(sar_dataset, idata, draws, "rho")
 
 
-def test_sem_g_posterior_matches_neighbayes(sem_dataset, octave_run, toolbox,
-                                            tmp_path):
+def test_sem_g_posterior_matches_neighbayes(sem_dataset, octave_run, toolbox, tmp_path):
     idata = _fit_neighbayes(SEM, sem_dataset)
     text = _octave.gauss_driver(
-        "sem_g", toolbox, tmp_path, ndraw=setup.TB_DRAWS, nomit=setup.TB_OMIT,
-        seed=12, prefix="tb"
+        "sem_g",
+        toolbox,
+        tmp_path,
+        ndraw=setup.TB_DRAWS,
+        nomit=setup.TB_OMIT,
+        seed=12,
+        prefix="tb",
     )
     stdout, draws = octave_run(text, dataset=sem_dataset, prefix="tb")
     assert "METH sem_g" in stdout

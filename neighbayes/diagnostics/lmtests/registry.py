@@ -83,7 +83,6 @@ def get_diagnostic_suite(model: "SpatialModel | type") -> DiagnosticSuite | None
 # ---------------------------------------------------------------------------
 
 from .suites import (  # noqa: E402
-    FLOW_INTRA_SUITE,
     FLOW_PANEL_SUITE,
     FLOW_SUITE,
     LOGIT_SUITE,
@@ -116,8 +115,11 @@ _register("neighbayes.models.cross_section.tobit.SDMTobit", SDM_TOBIT_SUITE)
 # NegBin: the count panels have no suite.
 _register("neighbayes.models.cross_section.sar_negbin.SARNegBin", SAR_NEGBIN_SUITE)
 _register("neighbayes.models.cross_section.sar_logit.SARLogit", SAR_LOGIT_SUITE)
-# The latent SAR logit's tests at its own null are not derived.
+# The latent SARs' tests at their own nulls are not derived.
 _register("neighbayes.models.cross_section.sar_logit.SARLogit", None, variant="latent")
+_register(
+    "neighbayes.models.cross_section.sar_negbin.SARNegBin", None, variant="latent"
+)
 _register("neighbayes.models.cross_section.sar_negbin.SARNegBin", None, variant="panel")
 
 # Non-spatial GLM baselines
@@ -125,15 +127,11 @@ _register("neighbayes.models.cross_section.logit.Logit", LOGIT_SUITE)
 _register("neighbayes.models.cross_section.negbin.NegBin", NEGBIN_SUITE)
 _register("neighbayes.models.cross_section.negbin.NegBin", None, variant="panel")
 
-# Flow (cross-sectional)
-_register("neighbayes.models.flow._flow.SARFlow", FLOW_SUITE)
-_register("neighbayes.models.flow._flow.SARFlowSeparable", FLOW_SUITE)
-_register("neighbayes.models.flow._flow.SARNegBinFlow", FLOW_SUITE)
-_register("neighbayes.models.flow._flow.SARNegBinFlowSeparable", FLOW_SUITE)
-_register("neighbayes.models.flow._flow.OLSFlow", FLOW_INTRA_SUITE)
-_register("neighbayes.models.flow._flow.NegBinFlow", FLOW_INTRA_SUITE)
-_register("neighbayes.models.flow._flow.SEMFlow", FLOW_SUITE)
-_register("neighbayes.models.flow._flow.SEMFlowSeparable", FLOW_SUITE)
+# Flow (cross-sectional).  The flow tests are the Gaussian lag-flow model's
+# score tests at its OLSFlow null; the count flows (NegBinFlow subclasses
+# OLSFlow) and the fitted spatial flows have none.
+_register("neighbayes.models.flow._flow.OLSFlow", FLOW_SUITE)
+_register("neighbayes.models.flow._flow.NegBinFlow", None)
 
 # ---------------------------------------------------------------------------
 # Panel models
@@ -167,13 +165,6 @@ for _path, _panel, _dynamic in (
 _register(f"{_CS}.tobit.SARTobit", SAR_PANEL_SUITE, variant="panel")
 _register(f"{_CS}.tobit.SEMTobit", SEM_PANEL_DYNAMIC_SUITE, variant="panel")
 
-# Flow Panel
-_register("neighbayes.models.flow_panel._panel.SARFlowPanelFE", FLOW_PANEL_SUITE)
-_register(
-    "neighbayes.models.flow_panel._panel.SARFlowSeparablePanelFE", FLOW_PANEL_SUITE
-)
+# Flow Panel: as the cross-section, at the OLSFlowPanelFE null
 _register("neighbayes.models.flow_panel._panel.OLSFlowPanelFE", FLOW_PANEL_SUITE)
-_register("neighbayes.models.flow_panel._panel.SEMFlowPanelFE", FLOW_PANEL_SUITE)
-_register(
-    "neighbayes.models.flow_panel._panel.SEMFlowSeparablePanelFE", FLOW_PANEL_SUITE
-)
+_register("neighbayes.models.flow_panel._panel.NegBinFlowPanelRE", None)

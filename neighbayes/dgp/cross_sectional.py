@@ -251,6 +251,7 @@ def simulate_sar_negbin(
     contiguity: str = "queen",
     create_gdf: bool = False,
     geometry_type: str = "polygon",
+    latent: bool = False,
 ) -> dict:
     r"""Simulate data from the reduced-form SAR-NB2 that :class:`SARNegBin` fits.
 
@@ -259,7 +260,15 @@ def simulate_sar_negbin(
         \eta = (I - \rho W)^{-1} X\beta, \quad \mu = \exp(\eta)
 
     With ``T`` (and ``N``) it draws the :class:`SARNegBin` panel, whose random
-    unit effects (``unit_effects="random"``) enter inside the filter.
+    unit effects (``unit_effects="random"``) enter inside the filter.  With
+    ``latent=True`` it draws the latent SAR that ``SARNegBin(latent=True)``
+    fits, whose filter propagates the negative binomial's gamma disturbance:
+
+    .. math::
+
+        \eta = (I - \rho W)^{-1}(X\beta + \varepsilon), \quad
+        \varepsilon_i = \log\gamma_i,\; \gamma_i \sim \mathrm{Gamma}(\alpha,
+        \alpha), \quad y_i \sim \mathrm{Poisson}(e^{\eta_i}).
 
     Counts are sampled as NB2:
 
@@ -287,8 +296,9 @@ def simulate_sar_negbin(
     alpha : float, default 2.0
         NB2 dispersion parameter. Must be strictly positive.
     err_hetero : bool, default False
-        Heteroskedastic errors (not yet implemented; ignored with a
-        warning).
+        Scale the latent SAR's disturbances by the norm of each row of ``X``.
+        The reduced form has no disturbance, so it ignores the flag with a
+        warning.
     rng : numpy.random.Generator, optional
         Random number generator.
     seed : int, optional
@@ -299,19 +309,27 @@ def simulate_sar_negbin(
         Whether to attach a GeoDataFrame to the output.
     geometry_type : str, default "polygon"
         Type of geometry for the GeoDataFrame.
+    latent : bool, default False
+        Draw the latent SAR instead of the reduced form; ``eta_true`` is then
+        the log-mean.
 
     Returns
     -------
     dict
         Dictionary with keys ``y``, ``X``, ``mu``, ``W_sparse``,
-        ``W_graph``, and ``params_true``.
+        ``W_graph``, and ``params_true`` (and ``eta_true`` when latent).
     """
 
     if alpha <= 0:
         raise ValueError("alpha must be strictly positive.")
+    if latent:
+        return _simulate_latent_negbin(
+            "sar", n_side, W, gdf, rho, beta, None, alpha, err_hetero, rng, seed,
+            contiguity, create_gdf, geometry_type,
+        )  # fmt: skip
     if err_hetero:
         warnings.warn(
-            "err_hetero is not implemented for simulate_sar_negbin and is ignored.",
+            "err_hetero is ignored by the reduced form, which has no disturbance.",
             stacklevel=2,
         )
 
@@ -351,6 +369,114 @@ def simulate_sar_negbin(
         create_gdf=create_gdf,
         geometry_type=geometry_type,
     )
+
+
+def _simulate_latent_negbin(
+    process, n_side, W, gdf, par, beta, theta, alpha, err_hetero, rng, seed,
+    contiguity, create_gdf, geometry_type,
+) -> dict:  # fmt: skip
+    """The latent SAR, SEM or SDEM negative binomial: one gamma disturbance each."""
+    if alpha <= 0:
+        raise ValueError("alpha must be strictly positive.")
+    rng = ensure_rng(rng, seed)
+    Ws, Wg = resolve_weights(W=W, gdf=gdf, n_side=n_side, contiguity=contiguity)
+    nobs = Ws.shape[0]
+    beta = np.array([1.0, 0.6]) if beta is None else np.asarray(beta, dtype=float)
+    X = make_design_matrix(rng, nobs, k=max(len(beta) - 1, 0), add_intercept=True)
+    name = "rho" if process == "sar" else "lam"
+    _check_rho_stability(par, name=name)
+    eps = np.log(rng.gamma(alpha, 1.0 / alpha, size=nobs))
+    if err_hetero:
+        eps = eps * _hetero_scale(X, 1.0)
+    solve = spatial_filter_factor(Ws, par)
+    params_true = {name: par, "beta": beta, "alpha": alpha}
+    if process == "sar":
+        eta = solve(X @ beta + eps)
+    else:
+        mean = X @ beta
+        if theta is not None:
+            mean = mean + np.asarray(Ws @ X[:, 1:]) @ theta
+            params_true["theta"] = theta
+        eta = mean + solve(eps)
+    mu = np.exp(np.clip(eta, -30.0, 30.0))
+    out = {
+        "y": rng.poisson(mu).astype(np.float64),
+        "X": X,
+        "mu": mu,
+        "eta_true": eta,
+        "W_sparse": Ws,
+        "W_graph": Wg,
+        "params_true": params_true,
+    }
+    return _attach_optional_gdf(
+        out, source_gdf=gdf, create_gdf=create_gdf, geometry_type=geometry_type
+    )
+
+
+@simulator(count)
+def simulate_sem_negbin(
+    n_side: int | None = None,
+    W=None,
+    gdf=None,
+    lam: float = 0.5,
+    beta: np.ndarray | None = None,
+    alpha: float = 2.0,
+    err_hetero: bool = False,
+    rng: np.random.Generator | None = None,
+    seed: int | None = None,
+    contiguity: str = "queen",
+    create_gdf: bool = False,
+    geometry_type: str = "polygon",
+) -> dict:
+    r"""Simulate the latent SEM negative binomial that :class:`SEMNegBin` fits.
+
+    .. math::
+
+        \eta = X\beta + (I - \lambda W)^{-1}\varepsilon, \quad
+        \varepsilon_i = \log\gamma_i,\; \gamma_i \sim \mathrm{Gamma}(\alpha,
+        \alpha), \quad y_i \sim \mathrm{Poisson}(e^{\eta_i})
+
+    so that ``lam = 0`` draws the NB2 of :class:`NegBin`.  Parameters as for
+    :func:`simulate_sar_negbin` with ``latent=True``, the spatial parameter
+    being ``lam``; ``eta_true`` is the log-mean.
+    """
+    return _simulate_latent_negbin(
+        "sem", n_side, W, gdf, lam, beta, None, alpha, err_hetero, rng, seed,
+        contiguity, create_gdf, geometry_type,
+    )  # fmt: skip
+
+
+@simulator(count)
+def simulate_sdem_negbin(
+    n_side: int | None = None,
+    W=None,
+    gdf=None,
+    lam: float = 0.5,
+    beta: np.ndarray | None = None,
+    theta: np.ndarray | None = None,
+    alpha: float = 2.0,
+    err_hetero: bool = False,
+    rng: np.random.Generator | None = None,
+    seed: int | None = None,
+    contiguity: str = "queen",
+    create_gdf: bool = False,
+    geometry_type: str = "polygon",
+) -> dict:
+    r"""Simulate the latent SDEM negative binomial that :class:`SDEMNegBin` fits.
+
+    .. math::
+
+        \eta = X\beta + WX\theta + (I - \lambda W)^{-1}\varepsilon
+
+    with the disturbances of :func:`simulate_sem_negbin`; ``theta`` (default
+    0.5 for each covariate) multiplies the lags of the non-intercept columns.
+    """
+    beta_ = np.array([1.0, 0.6]) if beta is None else np.asarray(beta, dtype=float)
+    theta = np.full(len(beta_) - 1, 0.5) if theta is None else np.asarray(theta, float)
+    return _simulate_latent_negbin(
+        "sem", n_side, W, gdf, lam, beta_, theta, alpha, err_hetero, rng, seed,
+        contiguity, create_gdf, geometry_type,
+    )  # fmt: skip
 
 
 @simulator(gaussian)

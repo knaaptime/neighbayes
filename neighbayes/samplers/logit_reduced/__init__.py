@@ -84,7 +84,6 @@ register(
     "cross_section",
     run=_run_binary_reduced_gibbs,
     backends={"jax", "numpy"},
-    auto_backend="jax",
     options={
         "init_jitter",
         "slice_width",

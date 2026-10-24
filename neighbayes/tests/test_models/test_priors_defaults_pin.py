@@ -69,6 +69,14 @@ EXPECTED: dict[str, dict[str, float]] = {
         "rho_lower": -1.0,
         "rho_upper": 1.0,
     },
+    "SEMNegBinPriors": {
+        "nu": NU,
+        "sigma2_alpha": 2.0,
+        "alpha_sigma": 2.5,
+        "alpha_nu": 3.0,
+        "lam_lower": -1.0,
+        "lam_upper": 1.0,
+    },
     "SARTobitPriors": {
         "nu": NU,
         "sigma2_alpha": 2.0,

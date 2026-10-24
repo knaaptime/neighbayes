@@ -13,13 +13,12 @@ from neighbayes.samplers.negbin._core import GibbsState, _sample_alpha
 # ---------------------------------------------------------------------------
 
 
-def _make_state(eta, alpha=2.0, beta=None, sigma2=0.5, rho=0.3):
+def _make_state(eta, alpha=2.0, beta=None, rho=0.3):
     """Create a minimal GibbsState for unit tests."""
     n = len(eta)
     return GibbsState(
         eta=eta,
         beta=beta if beta is not None else np.zeros(2),
-        sigma2=sigma2,
         rho=rho,
         alpha=alpha,
         omega=np.ones(n),

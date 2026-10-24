@@ -199,9 +199,9 @@ know about it:
   `run_chains` + `gibbs_to_inference_data`. The registry unifies dispatch, not sampler
   internals.
 
-`backends` / `auto_backend`
-: Which of `{"jax", "numpy"}` the family supports, and which one `"auto"` should prefer.
-  Every family with a JAX sampler prefers it. The JAX path solves with sparse
+`backends`
+: Which of `{"jax", "numpy"}` the family supports; `"auto"` takes JAX when the family
+  supports it and JAX is installed. The JAX path solves with sparse
   factorizations (sparsax), compiles once per model structure, and draws Pólya–Gamma
   variables exactly (augax), where the NumPy path's draws carry a known bias in the
   `polyagamma` package and warn. The random-effects, count-panel and hurdle families

@@ -2,8 +2,8 @@
 
 Tests bayesian_robust_lm_lag_test, bayesian_robust_lm_error_test,
 bayesian_lm_error_sdm_test, bayesian_lm_lag_sdem_test,
-bayesian_panel_lm_error_sdm_test, bayesian_panel_lm_lag_sdem_test,
-and _ols_lag_information using mock models with synthetic posteriors.
+bayesian_panel_lm_error_sdm_test and bayesian_panel_lm_lag_sdem_test using
+mock models with synthetic posteriors.
 """
 
 from __future__ import annotations
@@ -12,7 +12,6 @@ import numpy as np
 import pytest
 
 from neighbayes.diagnostics.lmtests import (
-    _ols_lag_information,
     bayesian_lm_error_sdm_test,
     bayesian_lm_lag_sdem_test,
     bayesian_panel_lm_error_sdm_test,
@@ -20,6 +19,7 @@ from neighbayes.diagnostics.lmtests import (
     bayesian_robust_lm_error_test,
     bayesian_robust_lm_lag_test,
 )
+from neighbayes.tests.test_diagnostics._lm_mocks import exact_logdet_grad
 
 # ---------------------------------------------------------------------------
 # Helpers: mock models with synthetic posteriors
@@ -94,6 +94,7 @@ def _make_ols_mock(n: int = 20, k: int = 2, draws: int = 50):
     model._W_sparse = W_sp
     model._T_ww = T_ww
     model._nonintercept_indices = list(range(X.shape[1]))
+    model._logdet_grad_numpy_vec_fn = exact_logdet_grad(W_sp)
     model.inference_data = idata
 
     return model
@@ -151,6 +152,7 @@ def _make_sdm_mock(n: int = 20, k: int = 2, draws: int = 50):
     model._W_sparse = W_sp
     model._T_ww = T_ww
     model._nonintercept_indices = list(range(X.shape[1]))
+    model._logdet_grad_numpy_vec_fn = exact_logdet_grad(W_sp)
     model.inference_data = idata
 
     return model
@@ -208,6 +210,7 @@ def _make_sdem_mock(n: int = 20, k: int = 2, draws: int = 50):
     model._W_dense = W
     model._T_ww = T_ww
     model._nonintercept_indices = list(range(X.shape[1]))
+    model._logdet_grad_numpy_vec_fn = exact_logdet_grad(W_sp)
     model.inference_data = idata
 
     return model
@@ -266,7 +269,11 @@ def _make_panel_sdm_mock(N: int = 5, T: int = 4, k: int = 2, draws: int = 50):
     model._T_ww = T_ww
     model._N = N
     model._T = T
+    model._is_panel = True
+    model._design = "static"
+    model._jacobian_T, model._jacobian_shift, model._n_effective = T, 0.0, N * T
     model._nonintercept_indices = list(range(X.shape[1]))
+    model._logdet_grad_numpy_vec_fn = exact_logdet_grad(W_sp)
     model.inference_data = idata
 
     return model
@@ -326,35 +333,14 @@ def _make_panel_sdem_mock(N: int = 5, T: int = 4, k: int = 2, draws: int = 50):
     model._T_ww = T_ww
     model._N = N
     model._T = T
+    model._is_panel = True
+    model._design = "static"
+    model._jacobian_T, model._jacobian_shift, model._n_effective = T, 0.0, N * T
     model._nonintercept_indices = list(range(X.shape[1]))
+    model._logdet_grad_numpy_vec_fn = exact_logdet_grad(W_sp)
     model.inference_data = idata
 
     return model
-
-
-# ---------------------------------------------------------------------------
-# _ols_lag_information
-# ---------------------------------------------------------------------------
-
-
-class TestOlsLagInformation:
-    def test_returns_positive_float(self):
-        model = _make_ols_mock()
-        beta_draws = model.inference_data.posterior["beta"].values.squeeze()
-        beta_mean = np.mean(beta_draws, axis=0)
-        sigma2_mean = float(
-            np.mean(model.inference_data.posterior["sigma"].values.squeeze() ** 2)
-        )
-        result = _ols_lag_information(
-            model, beta_mean[: model._X.shape[1]], sigma2_mean
-        )
-        assert isinstance(result, float)
-        assert result > 0
-
-
-# ---------------------------------------------------------------------------
-# bayesian_robust_lm_lag_test
-# ---------------------------------------------------------------------------
 
 
 class TestRobustLmLag:

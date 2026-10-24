@@ -343,21 +343,22 @@ class TestGetSpec:
         )
         assert result == "SEM"
 
+    @pytest.mark.parametrize("family", ["Logit", "NegBin"])
     @pytest.mark.parametrize(
         "significant, leaf",
         [
-            ((), "Logit"),
-            (("Robust-LM-Lag",), "SARLogit"),
-            (("Robust-LM-Lag", "LM-Error"), "SARLogit(latent=True)"),
-            (("Robust-LM-Lag", "LM-Error", "Robust-LM-Error"), "SDEMLogit"),
-            (("LM-Error", "Robust-LM-Error"), "SEMLogit"),
-            (("LM-Error",), "SEMLogit or SARLogit(latent=True)"),
+            ((), "{f}"),
+            (("Robust-LM-Lag",), "SAR{f}"),
+            (("Robust-LM-Lag", "LM-Error"), "SAR{f}(latent=True)"),
+            (("Robust-LM-Lag", "LM-Error", "Robust-LM-Error"), "SDEM{f}"),
+            (("LM-Error", "Robust-LM-Error"), "SEM{f}"),
+            (("LM-Error",), "SEM{f} or SAR{f}(latent=True)"),
         ],
     )
-    def test_logit_tree_reads_the_tests_as_a_pair(self, significant, leaf):
-        """The spillover and error tests, read jointly, name the logit's form."""
-        result, _ = evaluate(get_spec("Logit"), sig_lookup=lambda n: n in significant)
-        assert result == leaf
+    def test_glm_tree_reads_the_tests_as_a_pair(self, family, significant, leaf):
+        """The spillover and error tests, read jointly, name the GLM's form."""
+        result, _ = evaluate(get_spec(family), sig_lookup=lambda n: n in significant)
+        assert result == leaf.format(f=family)
 
 
 class TestGetPanelSpec:

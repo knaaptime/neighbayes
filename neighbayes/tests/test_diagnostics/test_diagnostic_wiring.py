@@ -64,22 +64,32 @@ EXPECTED_REGISTRIES = {
         "LM-Flow-Origin",
         "LM-Flow-OD",
         "LM-Flow-Joint",
-        "LM-Flow-Intraunit",
-    ],
-    SARFlow: [
         "Robust-LM-Flow-Destination",
         "Robust-LM-Flow-Origin",
         "Robust-LM-Flow-OD",
-        "LM-Flow-Intraunit",
     ],
     OLSFlowPanelFE: [
         "Panel-LM-Flow-Destination",
         "Panel-LM-Flow-Origin",
         "Panel-LM-Flow-OD",
         "Panel-LM-Flow-Joint",
-        "Panel-LM-Flow-Intraunit",
+        "Panel-Robust-LM-Flow-Destination",
+        "Panel-Robust-LM-Flow-Origin",
+        "Panel-Robust-LM-Flow-OD",
     ],
 }
+
+
+def test_fitted_spatial_and_count_flows_have_no_suite():
+    """The flow tests take the Gaussian aspatial null; no other flow has a suite."""
+    from neighbayes.diagnostics.lmtests.registry import get_diagnostic_suite
+    from neighbayes.models.flow import NegBinFlow, SARNegBinFlow, SEMFlow
+    from neighbayes.models.flow_panel import NegBinFlowPanelRE, SARFlowPanelFE
+
+    for cls in (SARFlow, SEMFlow, NegBinFlow, SARNegBinFlow):
+        assert get_diagnostic_suite(cls) is None, cls.__name__
+    for cls in (SARFlowPanelFE, NegBinFlowPanelRE):
+        assert get_diagnostic_suite(cls) is None, cls.__name__
 
 
 def test_spatial_diagnostics_registries_match_expected():
@@ -223,20 +233,7 @@ def test_flow_decision_tree_dispatch():
     d2, _ = _dt.evaluate(spec, lambda name: False)
     assert d2 == "OLSFlow"
 
-    # SARFlow: dest robust sig -> SARFlow
-    spec_sar = _dt.get_flow_spec("SARFlow")
-    d3, _ = _dt.evaluate(spec_sar, lambda name: name == "Robust-LM-Flow-Destination")
-    assert d3 == "SARFlow"
-
-    # SARFlow: no robust sig -> OLSFlow
-    d4, _ = _dt.evaluate(spec_sar, lambda name: False)
-    assert d4 == "OLSFlow"
-
     # Panel variants
     spec_p = _dt.get_panel_flow_spec("OLSFlowPanelFE")
     dp, _ = _dt.evaluate(spec_p, lambda name: name == "Panel-LM-Flow-Joint")
     assert dp == "SARFlow"
-
-    spec_sp = _dt.get_panel_flow_spec("SARFlowPanelFE")
-    dp2, _ = _dt.evaluate(spec_sp, lambda name: False)
-    assert dp2 == "OLSFlow"

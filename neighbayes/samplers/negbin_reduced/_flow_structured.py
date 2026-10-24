@@ -469,7 +469,6 @@ def run_chain_separable_structured(
         st = _StructuralState(
             eta=eta.ravel(),
             beta=beta,
-            sigma2=1.0,
             rho=rho["rho_d"],
             alpha=alpha,
             omega=omega,

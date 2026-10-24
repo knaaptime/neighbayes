@@ -783,6 +783,7 @@ class TestWDenseMemoryWarning:
 
         W_graph = _W_to_graph(_rook_W(4))
         from neighbayes.models.base import SpatialModel
+
         rng = np.random.default_rng(0)
         model = OLS(
             y=rng.standard_normal(12),

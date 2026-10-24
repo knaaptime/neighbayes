@@ -29,10 +29,12 @@ pytestmark = pytest.mark.octave
 QUAL_SEED = 3
 
 
-def test_octave_reproduces_the_documented_columbus_example(octave_run, toolbox,
-                                                           tmp_path):
-    text = _octave.qualification_driver(toolbox, tmp_path, ndraw=3000, nomit=1000,
-                                        seed=QUAL_SEED)
+def test_octave_reproduces_the_documented_columbus_example(
+    octave_run, toolbox, tmp_path
+):
+    text = _octave.qualification_driver(
+        toolbox, tmp_path, ndraw=3000, nomit=1000, seed=QUAL_SEED
+    )
     stdout, draws = octave_run(text, prefix="tbq")
 
     # the documented data load worked and the driver reached the end

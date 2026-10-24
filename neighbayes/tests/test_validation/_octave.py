@@ -109,7 +109,7 @@ def _dump_matrix(varname: str, out: str) -> str:
 
 TOOLBOX_PATHS = (
     "addpath(genpath('{toolbox}'));\n"
-    "addpath('{shims}');\n"      # shims shadow Octave core on purpose (see below)
+    "addpath('{shims}');\n"  # shims shadow Octave core on purpose (see below)
 )
 
 FMINBND_SHIM = """function [x, fval, exitflag, output] = fminbnd(fcn, x1, x2, options, varargin)
@@ -183,20 +183,32 @@ GAUSS_DRIVER = (
 )
 
 
-def gauss_driver(routine: str, toolbox: Path, workdir: Path, ndraw: int, nomit: int,
-                 seed: int, prefix: str) -> str:
+def gauss_driver(
+    routine: str,
+    toolbox: Path,
+    workdir: Path,
+    ndraw: int,
+    nomit: int,
+    seed: int,
+    prefix: str,
+) -> str:
     """Driver text for ``sar_g``/``sem_g``/``sdm_g`` on the exported dataset."""
     return GAUSS_DRIVER.format(
-        toolbox=toolbox, shims=write_shims(workdir), routine=routine,
-        ndraw=ndraw, nomit=nomit, seed=seed, prefix=prefix,
+        toolbox=toolbox,
+        shims=write_shims(workdir),
+        routine=routine,
+        ndraw=ndraw,
+        nomit=nomit,
+        seed=seed,
+        prefix=prefix,
     )
 
 
 QUALIFICATION_DRIVER = (
     TOOLBOX_PATHS
-    + # The toolbox's own documented Columbus example: data/anselin.txt gives
-      # the call pattern, data/wmat.txt the row-standardized weights.
-      "load(fullfile('{toolbox}', 'data', 'anselin.dat'));\n"
+    +  # The toolbox's own documented Columbus example: data/anselin.txt gives
+    # the call pattern, data/wmat.txt the row-standardized weights.
+    "load(fullfile('{toolbox}', 'data', 'anselin.dat'));\n"
     + "load(fullfile('{toolbox}', 'data', 'wmat.dat'));\n"
     + "W = sparse(wmat(:,1), wmat(:,2), wmat(:,3));\n"
     + "n = length(anselin);\n"
@@ -221,10 +233,14 @@ QUALIFICATION_DRIVER = (
 )
 
 
-def qualification_driver(toolbox: Path, workdir: Path, ndraw: int, nomit: int,
-                         seed: int) -> str:
+def qualification_driver(
+    toolbox: Path, workdir: Path, ndraw: int, nomit: int, seed: int
+) -> str:
     return QUALIFICATION_DRIVER.format(
-        toolbox=toolbox, shims=write_shims(workdir), ndraw=ndraw, nomit=nomit,
+        toolbox=toolbox,
+        shims=write_shims(workdir),
+        ndraw=ndraw,
+        nomit=nomit,
         seed=seed,
     )
 
@@ -245,9 +261,11 @@ def write_ascii(dataset: dict, workdir: Path) -> None:
 def load_draws(workdir: Path, prefix: str) -> dict:
     """Read back the toolbox's posterior draws as flat arrays."""
     out = {}
-    for key, name in (("rho", f"{prefix}_rho.txt"),
-                      ("beta", f"{prefix}_beta.txt"),
-                      ("sige", f"{prefix}_sige.txt")):
+    for key, name in (
+        ("rho", f"{prefix}_rho.txt"),
+        ("beta", f"{prefix}_beta.txt"),
+        ("sige", f"{prefix}_sige.txt"),
+    ):
         arr = np.atleast_2d(np.loadtxt(workdir / name))
         out[key] = arr[0] if arr.shape[0] == 1 and key != "beta" else arr
     return out

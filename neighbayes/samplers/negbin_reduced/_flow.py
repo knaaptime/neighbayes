@@ -948,7 +948,6 @@ def run_chain_unrestricted(
         alpha_state = _StructuralState(
             eta=eta,
             beta=state.beta,
-            sigma2=1.0,
             rho=state.rho_d,
             alpha=state.alpha,
             omega=state.omega,
@@ -1172,7 +1171,6 @@ def run_chain_separable(
         alpha_state = _StructuralState(
             eta=eta,
             beta=state.beta,
-            sigma2=1.0,
             rho=state.rho_d,
             alpha=state.alpha,
             omega=state.omega,

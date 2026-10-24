@@ -9,16 +9,14 @@ This sampler targets the canonical spatial-econometric SAR-NB model
 
 — that is, spatial dependence enters only through the *mean propagator*
 :math:`(I - \\rho W)^{-1}` and overdispersion is handled entirely by the
-NB dispersion parameter :math:`\\alpha`.  There is **no** latent spatial
-random effect (no :math:`\\sigma`).  Contrast with
-:mod:`neighbayes.samplers.negbin`, which samples the structural-form
-model :math:`\\eta = \\rho W \\eta + X\\beta + \\nu,\\; \\nu \\sim N(0,
-\\sigma^2 I)`.
+NB dispersion parameter :math:`\\alpha`.  No disturbance propagates.  Contrast
+:mod:`neighbayes.samplers.negbin_latent`, which samples the latent SAR,
+whose filter propagates the negative binomial's own gamma disturbance.
 
 The reduced form is the form most commonly written down in the spatial
 econometrics literature (LeSage & Pace 2009), and is the preferred
-default when you do not have substantive reason to model a normal random
-effect per unit inside the SAR equation.
+default when you do not have substantive reason to propagate the
+disturbance.
 """
 
 from .._registry import register
@@ -107,7 +105,6 @@ register(
     "cross_section",
     run=_run_count_reduced_gibbs,
     backends={"jax", "numpy"},
-    auto_backend="jax",
     options={
         "init_jitter",
         "slice_width",

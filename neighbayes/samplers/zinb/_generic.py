@@ -194,7 +194,6 @@ def run_chain(
             st = _AlphaState(
                 eta=cnt.eta[act],
                 beta=cnt.theta,
-                sigma2=1.0,
                 rho=0.0,
                 alpha=alpha,
                 omega=om_c,

@@ -173,7 +173,6 @@ def run_chain_zinb_flow_structured(
             st = _AlphaState(
                 eta=eta_c[act],
                 beta=cnt.beta,
-                sigma2=1.0,
                 rho=0.0,
                 alpha=alpha,
                 omega=om_c[act],

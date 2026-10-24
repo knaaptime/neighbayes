@@ -346,6 +346,38 @@ $$y_i \sim \operatorname{NegBin}(\mu_i, \alpha), \quad \mu = \exp(\eta), \quad \
 
 No disturbance propagates — spatial dependence enters only through the mean propagator. Supports both NUTS and Pólya–Gamma Gibbs sampling. Unit effects need a panel (above): in a cross-section one draw per observation is a disturbance, not a unit effect.
 
+### SARNegBin, latent (`latent=True`)
+
+$$y_i \sim \operatorname{Poisson}(e^{\eta_i}), \quad (I - \rho W)\eta = X\beta + \varepsilon, \quad \varepsilon_i = \log\gamma_i,\ \gamma_i \sim \operatorname{Gamma}(\alpha, \alpha)$$
+
+The latent SAR: the multiplier propagates the negative binomial's own gamma
+disturbance, so $\rho = 0$ is `NegBin` and the GLM suite's LM-Lag is its score
+test. The Gibbs sampler carries the log-means $\eta$, given which the
+disturbances are a sparse linear map and every conditional is log-concave: the
+log-means are drawn one at a time by slice on NumPy and a colour class at a time
+by independence Metropolis–Hastings on JAX (the default), then $\rho$ with
+$\beta$ shifted along the least-squares fit of $W\eta$ on $X$, $\beta$ from a
+*t* at its Laplace approximation, and $\alpha$. Small counts pin $\eta$ only
+loosely, so two moves interweave the parametrization that holds the
+disturbances instead (Yu & Meng 2011): $\alpha$ with the standardized
+disturbances held, and $\rho$ with the disturbances held. There is no NUTS path
+and no pointwise log-likelihood; impacts are on the log-mean.
+
+### SEMNegBin
+
+$$y_i \sim \operatorname{Poisson}(e^{\eta_i}), \quad \eta = X\beta + (I - \lambda W)^{-1}\varepsilon, \quad \varepsilon_i = \log\gamma_i,\ \gamma_i \sim \operatorname{Gamma}(\alpha, \alpha)$$
+
+The latent SEM, sampled as the latent SAR is, with $\beta$ shifted so that the
+disturbances keep their level as $\lambda$ moves; $\lambda = 0$ is `NegBin` and
+the GLM suite's LM-Error is its score test. It takes no `latent` switch.
+
+### SDEMNegBin
+
+$$y_i \sim \operatorname{Poisson}(e^{\eta_i}), \quad \eta = X\beta + WX\theta + (I - \lambda W)^{-1}\varepsilon$$
+
+`SEMNegBin` on the design $[X, WX]$. Impacts are on the log-mean, direct
+$\beta$ and indirect $\theta$ (times the mean row sum of $W$).
+
 ### SARZINB
 
 $$y_i \sim \operatorname{ZINB}(\mu_i, \alpha, \pi_i), \quad \log \boldsymbol{\mu} = (I - \rho W)^{-1} X\beta, \quad \operatorname{logit} \boldsymbol{\pi} = (I - \rho_z W_z)^{-1} X_z\beta_z$$
@@ -605,33 +637,59 @@ $$y_t = X_t\beta + u_t, \quad u_t = \lambda_d W_d u_t + \lambda_o W_o u_t - \lam
 
 ## Specification Tests
 
-Lagrange-Multiplier tests for choosing a spatial specification. Each statistic
-is evaluated at every posterior draw, giving a posterior distribution rather
-than a point estimate. Call them directly from
-`neighbayes.diagnostics.lmtests`, or through `spatial_diagnostics()` and
+Lagrange-multiplier tests for choosing a spatial specification, called directly
+from `neighbayes.diagnostics.lmtests` or through `spatial_diagnostics()` and
 `spatial_diagnostics_decision()` on any fitted model.
 
-| Test | $H_0$ | Alternative | df | Null model |
-|------|-------|-------------|----|----|
-| LM-Lag | $\rho = 0$ | SAR | 1 | OLS |
-| LM-Error | $\lambda = 0$ | SEM | 1 | OLS |
-| LM-WX | $\gamma = 0$ | SLX | $k_{wx}$ | SAR |
-| LM-SDM (joint) | $\rho = \gamma = 0$ | SDM | $1 + k_{wx}$ | OLS |
-| LM-SLX-Error (joint) | $\lambda = \gamma = 0$ | SDEM | $1 + k_{wx}$ | OLS |
-| LM-WX-SEM | $\gamma = 0$ in SEM | SDEM | $k_{wx}$ | SEM |
-| LM-Error-SDM | $\lambda = 0$ in SDM | SDARAR | 1 | SDM |
-| LM-Lag-SDEM | $\rho = 0$ in SDEM | SDARAR | 1 | SDEM |
-| Robust LM-Lag | $\rho = 0$, robust to $\lambda$ | SAR vs SEM | 1 | OLS |
-| Robust LM-Error | $\lambda = 0$, robust to $\rho$ | SEM vs SAR | 1 | OLS |
-| Robust LM-Lag-SDM | $\rho = 0$, robust to $\gamma$ | SDM | 1 | SLX |
-| Robust LM-WX | $\gamma = 0$, robust to $\rho$ | SDM | $k_{wx}$ | SAR |
-| Robust LM-Error-SDEM | $\lambda = 0$, robust to $\gamma$ | SDEM | 1 | SLX |
+Each Gaussian test is the score test of the general nesting model,
+$(I - \rho W)y = X\beta + WX\theta + u$, $(I - \lambda W)u = \varepsilon$, at the
+fitted null. The score of the tested parameters is evaluated at every posterior
+draw, Neyman-orthogonal to everything the null estimates (Doğan, Taşpınar &
+Bera 2021),
 
-The robust variants use the **Neyman orthogonal score** of Doğan, Taşpınar &
-Bera (2021), which removes the correlation between the test score and the
-nuisance score:
+$$g^*_T = g_T - J_{TF}J_{FF}^{-1}g_F,$$
 
-$$g_\psi^* = g_\psi - J_{\psi\phi \cdot \sigma}\,J_{\phi\phi\cdot\sigma}^{-1}\,g_\phi.$$
+with the efficient information $J_{TT} - J_{TF}J_{FF}^{-1}J_{FT}$ at the
+posterior mean. At a draw the scores $g_F$ of the null's own parameters are not
+zero, as they are at the restricted maximum, so a raw score correlated with them
+would carry their posterior spread: the lag score does, through the part of
+$WX\beta$ in the span of $X$ (for a row-standardized $W$, the intercept's
+$\beta_0 W\mathbf 1 = \beta_0\mathbf 1$). The reported statistic and p-value are
+the test at the posterior-mean parameters, the counterpart of the score test at
+the estimate; the per-draw values give the posterior distribution behind the
+credible interval. A robust test also removes the directions its alternative
+leaves at zero (Bera & Yoon 1993), so a test robust only to parameters the null
+estimates is the plain test.
+
+| Test | $H_0$ | Null | Robust to | df |
+|------|-------|------|-----------|----|
+| LM-Lag | $\rho = 0$ | OLS, SLX, SEM | | 1 |
+| LM-Error | $\lambda = 0$ | OLS, SLX, SAR | | 1 |
+| LM-SDM (joint) | $\rho = \theta = 0$ | OLS | | $1 + k_{wx}$ |
+| LM-SLX-Error (joint) | $\lambda = \theta = 0$ | OLS | | $1 + k_{wx}$ |
+| Robust LM-Lag | $\rho = 0$ | OLS | $\lambda$ | 1 |
+| Robust LM-Error | $\lambda = 0$ | OLS | $\rho$ | 1 |
+| Robust LM-Lag-SDM | $\rho = 0$ | SLX | $\lambda$ | 1 |
+| Robust LM-Error-SDEM | $\lambda = 0$ | SLX | $\rho$ | 1 |
+| LM-WX | $\theta = 0$ | SAR, SEM | | $k_{wx}$ |
+| Robust LM-WX | $\theta = 0$ | SAR | $\lambda$ | $k_{wx}$ |
+| Robust LM-Error | $\lambda = 0$ | SAR | $\theta$ | 1 |
+| Robust LM-Lag | $\rho = 0$ | SEM | $\theta$ | 1 |
+| Robust LM-WX | $\theta = 0$ | SEM | $\rho$ | $k_{wx}$ |
+| LM-Error-SDM | $\lambda = 0$ | SDM | | 1 |
+| LM-Lag-SDEM | $\rho = 0$ | SDEM | | 1 |
+
+At a degenerate posterior on the OLS estimate the tests are the classical ones:
+Anselin et al. (1996)'s LM-lag, LM-error and their robust pair, and the WX and
+joint tests of Koley & Bera (2024).
+
+The same tests serve the panels: pooled panels stack their periods, fixed
+effects use the transformed likelihood of Lee & Yu (2010) that the demeaned
+data give (traces counted $T - 1$ times under unit effects, the direction
+$\mathbf 1$ removed under time effects), random unit effects enter as
+coefficients carrying their prior, and a dynamic panel conditions on its first
+period with the lagged outcome as a regressor; the functions carry the
+`bayesian_panel_lm_*` prefix.
 
 ### Logit and negative binomial
 
@@ -658,7 +716,9 @@ score of a latent error process added to the fitted model, and LM-WX; both are
 uncorrelated with the other scores there, so their robust forms are the same
 statistics.
 
-`Logit.spatial_diagnostics_decision()` reads the tests as a pair. A latent SAR
+`Logit.spatial_diagnostics_decision()` and `NegBin.spatial_diagnostics_decision()`
+read the tests as a pair (the table names the logit's classes; the negative
+binomial's are `SARNegBin`, `SEMNegBin` and `SDEMNegBin`). A latent SAR
 moves both terms, in the proportion its one $\rho$ implies; Robust LM-Error
 measures the departure from that proportion.
 
@@ -673,12 +733,29 @@ measures the departure from that proportion.
 
 The last but one row is ambiguous by construction: without a spillover term to
 compare it against, an error term alone cannot say whether one $\rho$ moved it.
-The `NegBin` tree is not yet built; its latent forms await an NB latent sampler.
 
-The same machinery extends to balanced panels — with a $T$ multiplier on the
-information matrix, under the `bayesian_panel_lm_*` prefix — and to
-origin–destination flow models on Kronecker weights $W_d$, $W_o$, $W_w$, under
-`bayesian_lm_flow_*`.
+The GLM scores are orthogonalized and the statistic taken at the
+posterior-mean parameters as for the Gaussian tests.
+
+### Origin–destination flows
+
+The flow tests are the score tests of the lag-flow model
+$y = \rho_d W_d y + \rho_o W_o y + \rho_w W_w y + X\beta + \varepsilon$ at a
+fitted `OLSFlow` (or `OLSFlowPanelFE`, on the Lee and Yu transformed
+likelihood), built as the Gaussian tests are. With
+$W_d = I_n \otimes W$, $W_o = W \otimes I_n$ and $W_w = W \otimes W$, every
+trace in the information factors into traces of $W$, so the $n^2$ pairs never
+form a Kronecker product.
+
+| Test | H₀ | df |
+|---|---|---|
+| LM-Flow-Destination, -Origin, -OD | one of $\rho_d$, $\rho_o$, $\rho_w$ is 0 | 1 |
+| LM-Flow-Joint | $\rho_d = \rho_o = \rho_w = 0$ | 3 |
+| Robust-LM-Flow-Destination, -Origin, -OD | one $\rho$ is 0, robust to the other two | 1 |
+
+The decision tree reads the joint test: `SARFlow` if it rejects, `OLSFlow`
+if not. A fitted `SARFlow` estimates the lags these tests test, so it has no
+suite; neither, yet, do the count flows.
 
 ### Sources
 
@@ -694,6 +771,8 @@ origin–destination flow models on Kronecker weights $W_d$, $W_o$, $W_w$, under
   77–104.
 - LeSage, J.P., Pace, R.K. (2008). "Spatial Econometric Modeling of
   Origin–Destination Flows." *Journal of Regional Science*, 48(5), 941–967.
+- Lee, L.-F., Yu, J. (2010). "Estimation of spatial autoregressive panel data
+  models with fixed effects." *Journal of Econometrics*, 154(2), 165–185.
 
 ## Sampling Backends
 
@@ -705,8 +784,9 @@ otherwise.** For SAR/SEM/SDM/SDEM, the count families, the ZINB model and the
 Gaussian panel families, that means Gibbs unless you ask for something else.
 
 NUTS is not universally available. `SARLogit` (in both forms), `SEMLogit`,
-`SDEMLogit` and the auxiliary-mixture Poisson flow classes build no PyMC graph at all, and `fit(sampler="nuts")`
-raises `NotImplementedError`. Robust (Student-t) SAR/SEM/SDM/SDEM and
+`SDEMLogit`, the latent `SARNegBin`, `SEMNegBin`, `SDEMNegBin` and the
+auxiliary-mixture Poisson flow classes build no PyMC graph at all, and
+`fit(sampler="nuts")` raises `NotImplementedError`. Robust (Student-t) SAR/SEM/SDM/SDEM and
 Gaussian panel FE models keep Gibbs: the Student-t error is sampled as a
 normal scale mixture with the same fixed `nu` the NUTS path uses. Robust
 random-effects and Tobit models still require NUTS.

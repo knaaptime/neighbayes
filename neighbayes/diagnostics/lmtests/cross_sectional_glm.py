@@ -38,6 +38,18 @@ LM-SARMA            :math:`s^2/I_s + q^2/V_q`                                   
 In the Gaussian family the five are Anselin's LM-lag, LM-error, the robust
 pair and the SARMA test; ``LM-Lag + Robust-LM-Error = LM-SARMA``.
 
+The scores are evaluated at every posterior draw, where the score of
+:math:`\beta`, :math:`X^\top e`, is not zero as it is at the restricted
+maximum.  A score correlated with it then carries the posterior spread of
+:math:`\beta`, which the partialled information leaves out: :math:`s` does,
+through the part of :math:`WX\beta` in the span of :math:`X` (the intercept's
+:math:`\beta_0 W\mathbf 1`, for a row-standardized :math:`W`).  Each such score
+is therefore the Neyman-orthogonal one (Doğan, Taşpınar and Bera 2021),
+:math:`s - J_{s\beta}J_{\beta\beta}^{-1}X^\top e` with the information at the
+posterior mean, which equals :math:`s` at the maximum and is insensitive to
+:math:`\beta` to first order.  :math:`q` needs no adjustment: its cross
+information with :math:`\beta` and the NB dispersion is zero.
+
 At a reduced-form SAR null (:class:`~neighbayes.models.SARLogit`,
 :class:`~neighbayes.models.SARNegBin`) the restricted linear predictor is
 :math:`\eta = S(\rho)X\beta`, and the units are again independent given it.
@@ -96,7 +108,11 @@ def _has_lag(model) -> bool:
 
 @dataclass
 class _Scores:
-    """Per-draw scores and posterior-mean information of one restricted fit."""
+    """Per-draw scores and posterior-mean information of one restricted fit.
+
+    The score arrays carry one row per draw and a last row at the
+    posterior-mean parameters, at which each statistic is evaluated.
+    """
 
     family: str
     lag: bool
@@ -110,6 +126,7 @@ class _Scores:
     SWX: np.ndarray | None = None  # (draws, n, k_wx) S(rho) W X (SAR null)
     S_bar_WX: np.ndarray | None = None
     S_bar_X: np.ndarray | None = None  # S X at the posterior mean
+    g_beta: np.ndarray | None = None  # (draws, k) the score of beta per draw
 
 
 # The scores of one fit serve every test in its suite.
@@ -120,6 +137,18 @@ def _error_variance(W, omega, tau, kappa) -> float:
     """``V_q``: the null variance of ``e'Wh`` for independent units."""
     W = sp.csr_matrix(W)
     return float(omega @ (W.multiply(W) @ tau) + kappa @ (W.multiply(W.T) @ kappa))
+
+
+def _orthogonal(g, g_beta, B, U, omega):
+    """The Neyman-orthogonal score ``g - J_{g beta} J_{beta beta}^{-1} g_beta``.
+
+    ``B`` is the derivative of the linear predictor in ``beta`` and ``U`` in
+    the tested parameters, both at the posterior mean; the information is
+    their ``omega``-weighted cross products.
+    """
+    J_bb = B.T @ (omega[:, None] * B)
+    J_bu = B.T @ (omega[:, None] * U) if U.ndim == 2 else B.T @ (omega * U)
+    return g - g_beta @ np.linalg.solve(J_bb, J_bu)
 
 
 def _scores(model) -> _Scores:
@@ -134,24 +163,29 @@ def _scores(model) -> _Scores:
     X = np.asarray(model._X, dtype=np.float64)
     W = sp.csr_matrix(model._W_sparse)
     beta = _get_posterior_draws(idata, "beta")
-    n_draws = beta.shape[0]
     r = r_bar = None
     if family == "negbin":
-        r_draws = nb_dispersion_draws(model, idata, n_draws)
-        r, r_bar = r_draws[:, None], float(r_draws.mean())
+        r_draws = nb_dispersion_draws(model, idata, beta.shape[0])
+        r_bar = float(r_draws.mean())
+        r = np.r_[r_draws, r_bar][:, None]
     beta_bar = beta.mean(axis=0)
+    beta = np.vstack([beta, beta_bar])
+    n_draws = beta.shape[0]
     lag = _has_lag(model)
 
     if lag:
         rho = _get_posterior_draws(idata, "rho").reshape(-1)
         rho_bar = float(rho.mean())
+        rho = np.r_[rho, rho_bar]
         WX = np.asarray(model._WX, dtype=np.float64)
         eye = sp.identity(W.shape[0], format="csc")
         eta = np.empty((n_draws, X.shape[0]))
+        SX = np.empty((n_draws,) + X.shape)
         SWX = np.empty((n_draws, X.shape[0], WX.shape[1]))
         for d in range(n_draws):
             lu = sp.linalg.splu((eye - rho[d] * W).tocsc())
-            eta[d] = lu.solve(X @ beta[d])
+            SX[d] = lu.solve(X)
+            eta[d] = SX[d] @ beta[d]
             if WX.shape[1]:
                 SWX[d] = lu.solve(WX)
         lu_bar = sp.linalg.splu((eye - rho_bar * W).tocsc())
@@ -176,9 +210,13 @@ def _scores(model) -> _Scores:
     )
     if lag:
         out.SWX, out.S_bar_WX, out.S_bar_X = SWX, S_bar_WX, S_bar_X
+        out.g_beta = np.einsum("dij,di->dj", SX, e)
     else:
+        out.g_beta = e @ X
         a = (W @ eta.T).T  # W X beta per draw
-        out.s = np.einsum("di,di->d", e, a)
+        out.s = _orthogonal(
+            np.einsum("di,di->d", e, a), out.g_beta, X, W @ eta_bar, omega
+        )
         out.I_s = _weighted_mx_quadratic(X, W @ eta_bar, omega)
     _CACHE[model] = (idata, out)
     return out
@@ -219,14 +257,14 @@ def bayesian_glm_lm_lag_test(model) -> BayesianLMTestResult:
         Per-draw LM samples, summary statistics, ``df = 1``.
     """
     sc = _null_scores(model, "bayesian_glm_lm_lag_test")
+    score = sc.s + sc.q
     return _lm_scalar(
-        sc.s + sc.q,
+        score[:-1],
         sc.I_s + sc.V_q,
         test_type="bayesian_glm_lm_lag",
         df=1,
-        details=_details(
-            model, sc, s_mean=float(sc.s.mean()), q_mean=float(sc.q.mean())
-        ),
+        details=_details(model, sc, s_mean=float(sc.s[-1]), q_mean=float(sc.q[-1])),
+        score_bar=score[-1],
     )
 
 
@@ -246,11 +284,12 @@ def bayesian_glm_lm_error_test(model) -> BayesianLMTestResult:
     _require_W(model, "bayesian_glm_lm_error_test")
     sc = _scores(model)
     return _lm_scalar(
-        sc.q,
+        sc.q[:-1],
         sc.V_q,
         test_type="bayesian_glm_lm_error",
         df=1,
-        details=_details(model, sc, q_mean=float(sc.q.mean())),
+        details=_details(model, sc, q_mean=float(sc.q[-1])),
+        score_bar=sc.q[-1],
     )
 
 
@@ -269,11 +308,12 @@ def bayesian_glm_robust_lm_lag_test(model) -> BayesianLMTestResult:
     """
     sc = _null_scores(model, "bayesian_glm_robust_lm_lag_test")
     return _lm_scalar(
-        sc.s,
+        sc.s[:-1],
         sc.I_s,
         test_type="bayesian_glm_robust_lm_lag",
         df=1,
-        details=_details(model, sc, s_mean=float(sc.s.mean())),
+        details=_details(model, sc, s_mean=float(sc.s[-1])),
+        score_bar=sc.s[-1],
     )
 
 
@@ -291,12 +331,14 @@ def bayesian_glm_robust_lm_error_test(model) -> BayesianLMTestResult:
     """
     sc = _null_scores(model, "bayesian_glm_robust_lm_error_test")
     I_s, V_q = sc.I_s, sc.V_q
-    LM = (I_s * sc.q - V_q * sc.s) ** 2 / ((I_s + V_q) * I_s * V_q + 1e-12)
+    norm = (I_s + V_q) * I_s * V_q + 1e-12
+    LM = (I_s * sc.q - V_q * sc.s) ** 2 / norm
     return _finalize_lm(
-        LM,
+        LM[:-1],
         test_type="bayesian_glm_robust_lm_error",
         df=1,
         details=_details(model, sc),
+        statistic=LM[-1],
     )
 
 
@@ -313,22 +355,23 @@ def bayesian_glm_lm_sarma_test(model) -> BayesianLMTestResult:
     sc = _null_scores(model, "bayesian_glm_lm_sarma_test")
     LM = sc.s**2 / (sc.I_s + 1e-12) + sc.q**2 / (sc.V_q + 1e-12)
     return _finalize_lm(
-        LM,
+        LM[:-1],
         test_type="bayesian_glm_lm_sarma",
         df=2,
         details=_details(model, sc),
+        statistic=LM[-1],
     )
 
 
 def bayesian_glm_lm_wx_test(model) -> BayesianLMTestResult:
     r"""LM test for omitted :math:`WX` (H₀: θ = 0).
 
-    At the GLM null the score is :math:`(WX)^\top e`, partialled against
-    :math:`\beta`; at a reduced-form SAR null, :math:`WX` enters inside the
-    multiplier, :math:`\eta = S(\rho)(X\beta + WX\theta)`, and the score
-    :math:`(S(\rho)WX)^\top e` is partialled against :math:`\beta` (see the
-    module on :math:`\rho`).  The information uses the Fisher weights at the
-    posterior mean.
+    At the GLM null the score is :math:`(WX)^\top e`; at a reduced-form SAR
+    null, :math:`WX` enters inside the multiplier, :math:`\eta =
+    S(\rho)(X\beta + WX\theta)`, and the score is :math:`(S(\rho)WX)^\top e`.
+    Either is the Neyman-orthogonal score against :math:`\beta`, its
+    information partialled likewise (see the module, also on :math:`\rho`),
+    with the Fisher weights at the posterior mean.
 
     Returns
     -------
@@ -345,14 +388,17 @@ def bayesian_glm_lm_wx_test(model) -> BayesianLMTestResult:
         )
     sc = _scores(model)
     if sc.lag:
+        B, U = sc.S_bar_X, sc.S_bar_WX
         g = np.einsum("dij,di->dj", sc.SWX, sc.e)
-        V = _weighted_mx_cross(sc.S_bar_X, sc.S_bar_WX, sc.S_bar_WX, sc.omega_bar)
     else:
+        B, U = np.asarray(model._X, dtype=np.float64), WX
         g = sc.e @ WX
-        V = _weighted_mx_cross(np.asarray(model._X), WX, WX, sc.omega_bar)
+    g = _orthogonal(g, sc.g_beta, B, U, sc.omega_bar)
+    V = _weighted_mx_cross(B, U, U, sc.omega_bar)
     return _lm_vector(
-        g,
+        g[:-1],
         V,
+        score_bar=g[-1],
         test_type="bayesian_glm_lm_wx",
         df=k_wx,
         details=_details(model, sc, k_wx=k_wx),

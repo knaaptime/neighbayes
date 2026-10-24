@@ -800,7 +800,6 @@ def run_chain_separable_structured_fe(
         st = _StructuralState(
             eta=eq.eta.ravel(),
             beta=eq.beta,
-            sigma2=1.0,
             rho=eq.rho["rho_d"],
             alpha=alpha,
             omega=omega,

@@ -11,9 +11,9 @@ Covered:
   replaced by broadcast ``np.logaddexp`` calls.
 * ``_compute_ess`` — the dense O(n^2) ``np.correlate`` autocovariance is
   replaced by an FFT (O(n log n)).
-* ``_sar_null_lambda_info`` — the O(n^3) ``G @ G`` / ``W_dense @ G`` products
-  taken only for their trace are replaced by the O(n^2) identity
-  ``tr(BC) = sum(B * C.T)``.
+* ``resolvent_traces`` — the O(n^3) ``G @ G`` / ``W_dense @ G`` products
+  taken only for their trace are replaced by chunked column solves and the
+  O(n^2) identity ``tr(BC) = sum(B * C.T)``.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ from neighbayes.diagnostics.bayesfactor import (
     _compute_ess,
     _run_iterative_scheme,
 )
-from neighbayes.diagnostics.lmtests.cross_sectional import _sar_null_lambda_info
+from neighbayes.diagnostics.lmtests._gaussian import resolvent_traces
 
 
 def _reference_iterative_scheme(
@@ -250,36 +250,27 @@ class TestComputeEssFFT:
         )
 
 
-class TestSarNullTraceIdentity:
-    def _reference_info(self, W_sparse, W_dense, X_design, beta, rho, sigma2, T_ww):
-        """Old dense form: explicit G @ G and W_dense @ G matmuls."""
-        n = W_sparse.shape[0]
-        A = np.eye(n) - rho * W_dense
-        G = np.linalg.solve(A, W_dense)
-        T_GG = float(np.sum(G * G) + np.trace(G @ G))
-        T_WG = float(np.sum(W_dense * G) + np.trace(W_dense @ G))
-        return T_GG, T_WG
-
-    def test_trace_identity_matches_dense(self):
+class TestResolventTraces:
+    def test_traces_match_dense(self):
         rng = np.random.default_rng(3)
         # n > 512 so the chunked column-solve path crosses a chunk boundary.
-        n, k = 600, 3
+        n = 600
         # Row-standardized ring lattice -> asymmetric weighted W.
         row = np.concatenate([np.arange(n), np.arange(n)])
         col = np.concatenate([(np.arange(n) - 1) % n, (np.arange(n) + 1) % n])
         W = sp.csr_matrix((rng.uniform(0.5, 1.5, 2 * n), (row, col)), shape=(n, n))
         d = np.asarray(W.sum(axis=1)).ravel()
         W = (sp.diags(1.0 / d) @ W).tocsr()
-        W_dense = W.toarray()
-        X = rng.normal(size=(n, k))
-        beta = rng.normal(size=k)
-        rho, sigma2, T_ww = (
-            0.4,
-            1.3,
-            float((W_dense.T @ W_dense).trace() + (W_dense @ W_dense).trace()),
-        )
-
-        info = _sar_null_lambda_info(W, X, beta, rho, sigma2, T_ww)
-        ref_GG, ref_WG = self._reference_info(W, W_dense, X, beta, rho, sigma2, T_ww)
-        np.testing.assert_allclose(info["T_GG"], ref_GG, rtol=0, atol=1e-9)
-        np.testing.assert_allclose(info["T_WG"], ref_WG, rtol=0, atol=1e-9)
+        Wd = W.toarray()
+        r = 0.4
+        G = np.linalg.solve(np.eye(n) - r * Wd, Wd)
+        ref = {
+            "tr_G": np.trace(G),
+            "tr_G2": np.trace(G @ G),
+            "tr_GtG": np.sum(G * G),
+            "tr_WG": np.trace(Wd @ G),
+            "tr_WtG": np.sum(Wd * G),
+        }
+        out = resolvent_traces(W, r)
+        for key, value in ref.items():
+            np.testing.assert_allclose(out[key], value, rtol=1e-10, err_msg=key)

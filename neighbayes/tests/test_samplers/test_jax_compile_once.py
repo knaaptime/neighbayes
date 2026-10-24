@@ -67,6 +67,16 @@ def _cases():
     )
     de = dgp.simulate_sem_logit(n_side=6, seed=8)
     out["SEMLogit"] = (de["y"], lambda y: M.SEMLogit(y=y, X=de["X"], W=de["W_sparse"]))
+    dnl = dgp.simulate_sar_negbin(n_side=6, seed=9, latent=True)
+    out["SARNegBinLatent"] = (
+        dnl["y"],
+        lambda y: M.SARNegBin(y=y, X=dnl["X"], W=dnl["W_sparse"], latent=True),
+    )
+    dne = dgp.simulate_sem_negbin(n_side=6, seed=10)
+    out["SEMNegBin"] = (
+        dne["y"],
+        lambda y: M.SEMNegBin(y=y, X=dne["X"], W=dne["W_sparse"]),
+    )
     fd = dgp.simulate_sar_negbin_flow(
         n=5, k=2, rho_d=0.1, rho_o=0.1, rho_w=0.0, alpha=5.0, seed=42
     )
@@ -134,6 +144,8 @@ _CASES = (
     "SARZINB",
     "SARLogitLatent",
     "SEMLogit",
+    "SARNegBinLatent",
+    "SEMNegBin",
     "SARNegBinFlow",
     "SARNegBinFlowSeparable",
     "SARNegBinFlowSeparablePanelRE",

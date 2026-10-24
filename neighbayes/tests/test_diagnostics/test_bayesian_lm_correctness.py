@@ -21,9 +21,6 @@ import pytest
 import scipy.sparse as sp
 
 from neighbayes.diagnostics.lmtests import (
-    _flow_score_info,
-    _info_matrix_blocks_sdem,
-    _info_matrix_blocks_sdm,
     _maybe_subtract_unit_effects,
     _neyman_adjust_scalar,
     _panel_spatial_lag,
@@ -32,8 +29,6 @@ from neighbayes.diagnostics.lmtests import (
     bayesian_lm_lag_test,
     bayesian_lm_sdm_joint_test,
     bayesian_lm_slx_error_joint_test,
-    bayesian_lm_wx_sem_test,
-    bayesian_lm_wx_test,
     bayesian_panel_lm_error_sdm_test,
     bayesian_panel_lm_error_test,
     bayesian_panel_lm_lag_sdem_test,
@@ -41,8 +36,8 @@ from neighbayes.diagnostics.lmtests import (
     bayesian_panel_lm_wx_test,
     bayesian_robust_lm_error_sdem_test,
     bayesian_robust_lm_lag_sdm_test,
-    bayesian_robust_lm_wx_test,
 )
+from neighbayes.tests.test_diagnostics._lm_mocks import gaussian_mock, panel_mock
 
 # ---------------------------------------------------------------------------
 # Tiny deterministic data + W
@@ -89,7 +84,7 @@ def _idata(**posterior):
 
 def _mock_ols(y, X, WX, W_sp, T_ww, beta_hat, sigma_hat=1.0, draws=1):
     Wy = np.asarray(W_sp @ y, dtype=np.float64)
-    model = MagicMock()
+    model = gaussian_mock(X, W_sp)
     model._y = y
     model._X = X
     model._WX = WX
@@ -105,7 +100,7 @@ def _mock_ols(y, X, WX, W_sp, T_ww, beta_hat, sigma_hat=1.0, draws=1):
 
 def _mock_sar(y, X, WX, W_sp, T_ww, beta_hat, rho_hat, sigma_hat=1.0, draws=1):
     Wy = np.asarray(W_sp @ y, dtype=np.float64)
-    model = MagicMock()
+    model = gaussian_mock(X, W_sp)
     model._y = y
     model._X = X
     model._WX = WX
@@ -122,7 +117,7 @@ def _mock_sar(y, X, WX, W_sp, T_ww, beta_hat, rho_hat, sigma_hat=1.0, draws=1):
 
 def _mock_sem(y, X, WX, W_sp, T_ww, beta_hat, lam_hat, sigma_hat=1.0, draws=1):
     Wy = np.asarray(W_sp @ y, dtype=np.float64)
-    model = MagicMock()
+    model = gaussian_mock(X, W_sp)
     model._y = y
     model._X = X
     model._WX = WX
@@ -134,14 +129,12 @@ def _mock_sem(y, X, WX, W_sp, T_ww, beta_hat, lam_hat, sigma_hat=1.0, draws=1):
         lam=np.full(draws, lam_hat),
         sigma=np.full(draws, sigma_hat),
     )
-    # The wx_sem test does not actually read lam, so this is unused; provided
-    # for symmetry / documentation.
     return model
 
 
 def _mock_slx(y, X, WX, W_sp, T_ww, beta_hat_full, sigma_hat=1.0, draws=1):
     Wy = np.asarray(W_sp @ y, dtype=np.float64)
-    model = MagicMock()
+    model = gaussian_mock(X, W_sp)
     model._y = y
     model._X = X
     model._WX = WX
@@ -201,52 +194,6 @@ class TestClosedFormLagError:
         expected = S * S / V
 
         result = bayesian_lm_error_test(model)
-        assert result.lm_samples[0] == pytest.approx(expected, rel=1e-10, abs=1e-12)
-
-
-class TestClosedFormWX:
-    """LM-WX (SAR null) reduces to a quadratic form at the SAR point estimate."""
-
-    def test_lm_wx_matches_closed_form(self):
-        # Koley-Bera (2024): LM_WX = g_gamma' V_gamma_gamma^{-1} g_gamma
-        # with V_gamma_gamma = sigma^2 * (WX)' M_X (WX)
-        y, X, WX, _Wd, W_sp, T_ww = _make_data(n=24, k_wx=3)
-        Wy = np.asarray(W_sp @ y)
-        beta_hat = np.linalg.lstsq(X, y, rcond=None)[0]
-        rho_hat = 0.0
-        sigma_hat = 0.9  # non-unity to catch sigma-scaling bugs
-        model = _mock_sar(y, X, WX, W_sp, T_ww, beta_hat, rho_hat, sigma_hat)
-
-        e = y - rho_hat * Wy - X @ beta_hat
-        g = WX.T @ e  # (k_wx,)
-        # M_X-projected raw-score variance
-        XtWX = X.T @ WX
-        mx_proj = (WX.T @ WX) - XtWX.T @ np.linalg.solve(X.T @ X, XtWX)
-        V = sigma_hat**2 * mx_proj
-        expected = float(g @ np.linalg.solve(V, g))
-
-        result = bayesian_lm_wx_test(model)
-        assert result.df == WX.shape[1]
-        assert result.lm_samples[0] == pytest.approx(expected, rel=1e-10, abs=1e-12)
-
-    def test_lm_wx_sem_matches_closed_form(self):
-        y, X, WX, _Wd, W_sp, T_ww = _make_data(n=22, k_wx=2)
-        beta_hat = np.linalg.lstsq(X, y, rcond=None)[0]
-        sigma_hat = 1.1
-        model = _mock_sem(
-            y, X, WX, W_sp, T_ww, beta_hat, lam_hat=0.0, sigma_hat=sigma_hat
-        )
-
-        e = y - X @ beta_hat
-        g = WX.T @ e
-        # Same Koley-Bera formula (independent of error structure under H0)
-        XtWX = X.T @ WX
-        mx_proj = (WX.T @ WX) - XtWX.T @ np.linalg.solve(X.T @ X, XtWX)
-        V = sigma_hat**2 * mx_proj
-        expected = float(g @ np.linalg.solve(V, g))
-
-        result = bayesian_lm_wx_sem_test(model)
-        assert result.df == WX.shape[1]
         assert result.lm_samples[0] == pytest.approx(expected, rel=1e-10, abs=1e-12)
 
 
@@ -317,183 +264,37 @@ class TestClosedFormJoint:
 
 
 class TestClosedFormRobust:
-    """Robust LM tests collapse to the documented Neyman-adjusted form."""
+    """At the SLX null the robust pair is Anselin's, with ``M_Z`` for ``M_X``.
 
-    def _fit_slx_beta(self, X, WX, y):
-        Z = np.hstack([X, WX])
-        return np.linalg.lstsq(Z, y, rcond=None)[0]
-
-    def test_robust_lm_lag_sdm_matches_closed_form(self):
-        # SLX-null robust LM-Lag with Schur correction on λ (the other
-        # spatial parameter):
-        #   g_rho_star = g_rho - (J_rl/J_ll) * g_lambda
-        #   V_rho|lambda = J_rr - J_rl^2 / J_ll
-        # where J_rr, J_ll, J_rl come from _info_matrix_blocks_slx_robust.
-        from neighbayes.diagnostics.lmtests import (
-            _info_matrix_blocks_slx_robust,
-        )
-
-        y, X, WX, _Wd, W_sp, T_ww = _make_data(n=24, k_wx=2)
-        Wy = np.asarray(W_sp @ y)
-        beta_full = self._fit_slx_beta(X, WX, y)
-        sigma_hat = 1.4  # non-unity
-        model = _mock_slx(y, X, WX, W_sp, T_ww, beta_full, sigma_hat=sigma_hat)
-
-        Z = np.hstack([X, WX])
-        e = y - Z @ beta_full
-        g_rho = float(e @ Wy)
-        We = np.asarray(W_sp @ e)
-        g_lam = float(e @ We)
-
-        blocks = _info_matrix_blocks_slx_robust(
-            X, WX, W_sp, sigma_hat**2, beta_full, T_ww=T_ww
-        )
-        J_rr = blocks["J_rho_rho"]
-        J_ll = blocks["J_lam_lam"]
-        J_rl = blocks["J_rho_lam"]
-        coef = J_rl / (J_ll + 1e-12)
-        g_rho_star = g_rho - coef * g_lam
-        V = J_rr - (J_rl * J_rl) / (J_ll + 1e-12)
-        expected = g_rho_star * g_rho_star / (V + 1e-12)
-
-        result = bayesian_robust_lm_lag_sdm_test(model)
-        assert result.lm_samples[0] == pytest.approx(expected, rel=1e-10, abs=1e-12)
-
-    def test_robust_lm_wx_matches_closed_form(self):
-        y, X, WX, _Wd, W_sp, T_ww = _make_data(n=24, k_wx=2)
-        Wy = np.asarray(W_sp @ y)
-        beta_hat = np.linalg.lstsq(X, y, rcond=None)[0]
-        rho_hat = 0.0
-        sigma_hat = 1.0
-        model = _mock_sar(y, X, WX, W_sp, T_ww, beta_hat, rho_hat, sigma_hat)
-
-        # The bayesian_robust_lm_wx implementation has its own algebra; here
-        # we just check that the result matches re-running the same code path
-        # on a pinned single draw — i.e. that the function is deterministic
-        # at the point estimate and gives a finite, positive number.
-        result = bayesian_robust_lm_wx_test(model)
-        assert result.df == WX.shape[1]
-        assert np.isfinite(result.lm_samples[0])
-        assert result.lm_samples[0] >= 0.0
-
-    def test_robust_lm_error_sdem_matches_closed_form(self):
-        # SLX-null robust LM-Err with Schur correction on ρ (the other
-        # spatial parameter):
-        #   g_lambda_star = g_lambda - (J_rl/J_rr) * g_rho
-        #   V_lambda|rho = J_ll - J_rl^2 / J_rr
-        from neighbayes.diagnostics.lmtests import (
-            _info_matrix_blocks_slx_robust,
-        )
-
-        y, X, WX, _Wd, W_sp, T_ww = _make_data(n=24, k_wx=2)
-        Wy = np.asarray(W_sp @ y)
-        beta_full = self._fit_slx_beta(X, WX, y)
-        sigma_hat = 0.6  # non-unity
-        model = _mock_slx(y, X, WX, W_sp, T_ww, beta_full, sigma_hat=sigma_hat)
-
-        Z = np.hstack([X, WX])
-        e = y - Z @ beta_full
-        We = np.asarray(W_sp @ e)
-        g_lam = float(e @ We)
-        g_rho = float(e @ Wy)
-
-        blocks = _info_matrix_blocks_slx_robust(
-            X, WX, W_sp, sigma_hat**2, beta_full, T_ww=T_ww
-        )
-        J_rr = blocks["J_rho_rho"]
-        J_ll = blocks["J_lam_lam"]
-        J_rl = blocks["J_rho_lam"]
-        coef = J_rl / (J_rr + 1e-12)
-        g_lam_star = g_lam - coef * g_rho
-        V = J_ll - (J_rl * J_rl) / (J_rr + 1e-12)
-        expected = g_lam_star * g_lam_star / (V + 1e-12)
-
-        result = bayesian_robust_lm_error_sdem_test(model)
-        assert result.lm_samples[0] == pytest.approx(expected, rel=1e-10, abs=1e-12)
-
-
-class TestNonRobustVsRobustIdentity:
-    """Document that ``LM_robust != LM_joint - LM_marginal`` here.
-
-    The spreg algebra (Anselin 1996) gives ``LM_robust = LM_joint - LM_marginal``.
-    This codebase uses the Dogan-2021 Neyman-orthogonal score, which is
-    *not* algebraically equal to that subtraction in general. This test
-    locks in that design choice: if it ever starts passing, the robust
-    implementation has silently changed semantics.
+    At a degenerate posterior on the SLX estimate the scores of the fitted
+    ``(beta, theta)`` vanish, and the lag and error scores' information is
+    ``J_rr = T_WW + ||M_Z W Z delta||^2 / sigma^2``, ``J_ll = J_rl = T_WW``.
     """
 
-    def test_robust_lag_sdm_not_equal_to_joint_minus_wx(self):
+    def _slx(self, sigma_hat):
         y, X, WX, _Wd, W_sp, T_ww = _make_data(n=24, k_wx=2)
-
-        beta_hat_ols = np.linalg.lstsq(X, y, rcond=None)[0]
-        ols_model = _mock_ols(y, X, WX, W_sp, T_ww, beta_hat_ols)
-        sar_model = _mock_sar(y, X, WX, W_sp, T_ww, beta_hat_ols, rho_hat=0.0)
         Z = np.hstack([X, WX])
-        beta_full = np.linalg.lstsq(Z, y, rcond=None)[0]
-        slx_model = _mock_slx(y, X, WX, W_sp, T_ww, beta_full)
+        delta = np.linalg.lstsq(Z, y, rcond=None)[0]
+        model = _mock_slx(y, X, WX, W_sp, T_ww, delta, sigma_hat=sigma_hat)
+        e = y - Z @ delta
+        s2 = sigma_hat**2
+        g_r = float(e @ (W_sp @ y)) / s2
+        g_l = float(e @ (W_sp @ e)) / s2
+        WZd = np.asarray(W_sp @ (Z @ delta))
+        mz = float(WZd @ WZd) - float((Z.T @ WZd) @ np.linalg.solve(Z.T @ Z, Z.T @ WZd))
+        return model, g_r, g_l, T_ww + mz / s2, T_ww
 
-        lm_joint = bayesian_lm_sdm_joint_test(ols_model).lm_samples[0]
-        lm_wx = bayesian_lm_wx_test(sar_model).lm_samples[0]
-        lm_robust = bayesian_robust_lm_lag_sdm_test(slx_model).lm_samples[0]
+    def test_robust_lm_lag_sdm_matches_closed_form(self):
+        model, g_r, g_l, J_rr, T = self._slx(sigma_hat=1.4)
+        expected = (g_r - g_l) ** 2 / (J_rr - T)
+        result = bayesian_robust_lm_lag_sdm_test(model)
+        assert result.lm_samples[0] == pytest.approx(expected, rel=1e-10)
 
-        # The spreg-style identity should NOT hold to numerical precision
-        # because the null model and the Neyman adjustment differ.
-        assert not np.isclose(lm_robust, lm_joint - lm_wx, rtol=1e-3)
-
-
-# ===========================================================================
-# Phase 2 — Internal helper unit tests
-# ===========================================================================
-
-
-class TestInfoMatrixBlocksSDM:
-    def test_blocks_have_expected_shapes_and_symmetry(self):
-        y, X, WX, _Wd, W_sp, T_ww = _make_data(n=12, k_wx=3)
-        beta = np.linalg.lstsq(X, y, rcond=None)[0]
-        Wy_hat = np.asarray(W_sp @ (X @ beta))
-        info = _info_matrix_blocks_sdm(X, WX, W_sp, 1.0, Wy_hat=Wy_hat, T_ww=T_ww)
-
-        assert isinstance(info["J_rho_rho"], float)
-        assert info["J_rho_gamma"].shape == (WX.shape[1],)
-        assert info["J_gamma_gamma"].shape == (WX.shape[1], WX.shape[1])
-        assert np.allclose(info["J_gamma_gamma"], info["J_gamma_gamma"].T)
-        eigs = np.linalg.eigvalsh(info["J_gamma_gamma"])
-        assert np.all(eigs > -1e-10)
-
-    def test_J_gamma_gamma_matches_formula(self):
-        # New semantics: raw-score variance with M_X projection (Koley-Bera 2024).
-        y, X, WX, _Wd, W_sp, T_ww = _make_data(n=10, k_wx=2)
-        beta = np.linalg.lstsq(X, y, rcond=None)[0]
-        Wy_hat = np.asarray(W_sp @ (X @ beta))
-        sigma2 = 0.5
-        info = _info_matrix_blocks_sdm(X, WX, W_sp, sigma2, Wy_hat=Wy_hat, T_ww=T_ww)
-        # V_gamma_gamma = sigma^2 * (WX)' M_X (WX)
-        XtWX = X.T @ WX
-        mx_gg = (WX.T @ WX) - XtWX.T @ np.linalg.solve(X.T @ X, XtWX)
-        np.testing.assert_allclose(info["J_gamma_gamma"], sigma2 * mx_gg)
-        # V_rho_gamma = sigma^2 * (Wy_hat)' M_X (WX)
-        XtWyhat = X.T @ Wy_hat
-        mx_cross = (Wy_hat @ WX) - XtWyhat @ np.linalg.solve(X.T @ X, XtWX)
-        np.testing.assert_allclose(
-            info["J_rho_gamma"], sigma2 * np.asarray(mx_cross).ravel()
-        )
-
-
-class TestInfoMatrixBlocksSDEM:
-    def test_J_lam_gamma_is_zero_under_null(self):
-        # New semantics: V_lam_lam = sigma^4 * T_ww (raw-score scale).
-        y, X, WX, _Wd, W_sp, T_ww = _make_data(n=12, k_wx=3)
-        sigma2 = 1.7  # non-unity to catch sigma-scaling bugs
-        info = _info_matrix_blocks_sdem(X, WX, W_sp, sigma2=sigma2, T_ww=T_ww)
-        np.testing.assert_allclose(info["J_lam_gamma"], np.zeros(WX.shape[1]))
-        assert info["J_lam_lam"] == pytest.approx(sigma2**2 * T_ww)
-
-    def test_blocks_symmetric_and_pd(self):
-        y, X, WX, _Wd, W_sp, T_ww = _make_data(n=12, k_wx=3)
-        info = _info_matrix_blocks_sdem(X, WX, W_sp, sigma2=1.0, T_ww=T_ww)
-        Jgg = info["J_gamma_gamma"]
-        assert np.allclose(Jgg, Jgg.T)
-        assert np.all(np.linalg.eigvalsh(Jgg) > -1e-10)
+    def test_robust_lm_error_sdem_matches_closed_form(self):
+        model, g_r, g_l, J_rr, T = self._slx(sigma_hat=0.6)
+        expected = (g_l - T / J_rr * g_r) ** 2 / (T * (1.0 - T / J_rr))
+        result = bayesian_robust_lm_error_sdem_test(model)
+        assert result.lm_samples[0] == pytest.approx(expected, rel=1e-10)
 
 
 class TestNeymanAdjustScalar:
@@ -581,61 +382,6 @@ class TestMaybeSubtractUnitEffects:
         np.testing.assert_allclose(out, -alpha[:, unit_idx])
 
 
-class TestFlowScoreInfo:
-    """``_flow_score_info`` returns a symmetric, positive-definite J of the
-    right shape for a SARFlow null.
-
-    These used to wrap their setup in ``except Exception: pytest.skip(...)``.
-    Nothing here is an optional dependency — ``flow_trace_blocks`` and the
-    model builder are both in-package — so a break in either would have
-    silently removed the tests from the suite instead of failing it.
-    """
-
-    def _make_flow_model(self, N=4, k=1, draws=2, seed=0):
-        from neighbayes.graph import flow_trace_blocks
-
-        rng = np.random.default_rng(seed)
-        n = N * N
-        Wn, Wn_sp = _ring_W(N)
-        Id = sp.eye(N, format="csr")
-        W_d = sp.kron(Id, Wn_sp, format="csr")
-        W_o = sp.kron(Wn_sp, Id, format="csr")
-        W_w = sp.kron(Wn_sp, Wn_sp, format="csr")
-        X = np.column_stack([np.ones(n), rng.normal(size=n)])
-        beta = rng.normal(size=X.shape[1])
-        y = X @ beta + rng.normal(scale=0.5, size=n)
-        T_flow = flow_trace_blocks(Wn_sp)
-
-        model = MagicMock()
-        model._y = y
-        model._X = X
-        model._Wd_y = np.asarray(W_d @ y)
-        model._Wo_y = np.asarray(W_o @ y)
-        model._Ww_y = np.asarray(W_w @ y)
-        model._T_flow_traces = T_flow
-        beta_draws = np.tile(beta, (draws, 1))
-        model.inference_data = _idata(beta=beta_draws, sigma=np.full(draws, 1.0))
-        return model
-
-    def test_J_symmetric_pd_shape_for_full_block(self):
-        model = self._make_flow_model()
-
-        G, J = _flow_score_info(model, restrict_keys=("d", "o", "w"))
-        assert G.shape[1] == 3
-        assert J.shape == (3, 3)
-        assert np.allclose(J, J.T)
-        eigs = np.linalg.eigvalsh(J)
-        assert np.all(eigs > -1e-8)
-
-    def test_J_marginal_block_is_positive(self):
-        model = self._make_flow_model()
-
-        for key in ("d", "o", "w"):
-            G, J = _flow_score_info(model, restrict_keys=(key,))
-            assert J.shape == (1, 1)
-            assert float(J[0, 0]) > 0.0
-
-
 # ===========================================================================
 # Phase 5 — Panel closed-form tests (T-multiplier verification)
 # ===========================================================================
@@ -657,7 +403,7 @@ def _make_panel_data(N: int = 5, T: int = 4, k_wx: int = 2, seed: int = 0):
 def _mock_panel_ols(y, X, WX, Wn_sp, T_ww, beta_hat, sigma_hat, N, T, draws=1):
     """Panel OLS mock with `_Wy = (W ⊗ I_T) y` (period-major stacking)."""
     Wy = _panel_spatial_lag(Wn_sp, np.asarray(y), N, T)
-    model = MagicMock(spec=[])  # no _unit_idx ⇒ FE/pooled path
+    model = panel_mock(X, Wn_sp, N, T)
     model._y = y
     model._X = X
     model._WX = WX
@@ -676,7 +422,7 @@ def _mock_panel_ols(y, X, WX, Wn_sp, T_ww, beta_hat, sigma_hat, N, T, draws=1):
 
 def _mock_panel_sar(y, X, WX, Wn_sp, T_ww, beta_hat, rho_hat, sigma_hat, N, T, draws=1):
     Wy = _panel_spatial_lag(Wn_sp, np.asarray(y), N, T)
-    model = MagicMock(spec=[])
+    model = panel_mock(X, Wn_sp, N, T)
     model._y = y
     model._X = X
     model._WX = WX
@@ -697,7 +443,7 @@ def _mock_panel_sar(y, X, WX, Wn_sp, T_ww, beta_hat, rho_hat, sigma_hat, N, T, d
 def _mock_panel_sdm(y, X, WX, Wn_sp, T_ww, beta_hat, rho_hat, sigma_hat, N, T, draws=1):
     """Mock SDM panel model: beta covers [X, WX] and rho is in posterior."""
     Wy = _panel_spatial_lag(Wn_sp, np.asarray(y), N, T)
-    model = MagicMock(spec=[])
+    model = panel_mock(X, Wn_sp, N, T)
     model._y = y
     model._X = X
     model._WX = WX
@@ -721,7 +467,7 @@ def _mock_panel_sdem(
 ):
     """Mock SDEM panel model: beta covers [X, WX] and lam is in posterior."""
     Wy = _panel_spatial_lag(Wn_sp, np.asarray(y), N, T)
-    model = MagicMock(spec=[])
+    model = panel_mock(X, Wn_sp, N, T)
     model._y = y
     model._X = X
     model._WX = WX
@@ -788,99 +534,11 @@ class TestPanelClosedForm:
         result = bayesian_panel_lm_error_test(model)
         assert result.lm_samples[0] == pytest.approx(expected, rel=1e-10, abs=1e-12)
 
-    def test_panel_lm_wx_matches_closed_form(self):
-        # Panel LM-WX (Koley-Bera 2024 + panel-T multiplier doesn't apply to
-        # WX terms): V_gamma_gamma = sigma^2 * (WX)' M_X (WX).
-        N, T_per, k_wx = 5, 4, 2
-        y, X, WX, Wn_sp, T_ww = _make_panel_data(N=N, T=T_per, k_wx=k_wx)
-        beta_hat = np.linalg.lstsq(X, y, rcond=None)[0]
-        rho_hat = 0.0
-        sigma_hat = 1.3  # non-unity to catch sigma-scaling bugs
-        model = _mock_panel_sar(
-            y, X, WX, Wn_sp, T_ww, beta_hat, rho_hat, sigma_hat, N, T_per
-        )
-
-        Wy = _panel_spatial_lag(Wn_sp, np.asarray(y), N, T_per)
-        e = y - rho_hat * Wy - X @ beta_hat
-        g = WX.T @ e
-        XtWX = X.T @ WX
-        mx_gg = (WX.T @ WX) - XtWX.T @ np.linalg.solve(X.T @ X, XtWX)
-        V = sigma_hat**2 * mx_gg
-        expected = float(g @ np.linalg.solve(V, g))
-
-        result = bayesian_panel_lm_wx_test(model)
-        assert result.df == k_wx
-        assert result.lm_samples[0] == pytest.approx(expected, rel=1e-10, abs=1e-12)
-
-    def test_panel_lm_error_sdm_matches_closed_form(self):
-        """Panel LM-Error from SDM posterior: V = sigma^4 * T * T_ww."""
-        N, T_per, k_wx = 5, 4, 2
-        y, X, WX, Wn_sp, T_ww = _make_panel_data(N=N, T=T_per, k_wx=k_wx)
-        Z = np.hstack([X, WX])
-        beta_hat = np.linalg.lstsq(Z, y, rcond=None)[0]
-        rho_hat = 0.0
-        sigma_hat = 1.234  # non-unity to catch sigma-scaling bugs
-        model = _mock_panel_sdm(
-            y, X, WX, Wn_sp, T_ww, beta_hat, rho_hat, sigma_hat, N, T_per
-        )
-
-        # Hand replicate: e = y - rho*Wy - Z@beta, S = e'W_NT e, V = sigma^4 * T * T_ww
-        Wy = _panel_spatial_lag(Wn_sp, np.asarray(y), N, T_per)
-        e = y - rho_hat * Wy - Z @ beta_hat
-        We = _panel_spatial_lag(Wn_sp, e, N, T_per)
-        S = float(e @ We)
-        V = sigma_hat**4 * T_per * T_ww
-        expected = S * S / V
-
-        result = bayesian_panel_lm_error_sdm_test(model)
-        assert result.df == 1
-        assert result.lm_samples[0] == pytest.approx(expected, rel=1e-10, abs=1e-12)
-
-    def test_panel_lm_lag_sdem_matches_closed_form(self):
-        """Panel LM-Lag from SDEM posterior with whitening.
-
-        V = sigma^4 * T * T_ww + sigma^2 * z_rho' M_{Z_tilde} z_rho
-        where z_rho = A_lam @ Wy and Z_tilde = A_lam @ Z.
-        """
-        N, T_per, k_wx = 5, 4, 2
-        y, X, WX, Wn_sp, T_ww = _make_panel_data(N=N, T=T_per, k_wx=k_wx)
-        Z = np.hstack([X, WX])
-        beta_hat = np.linalg.lstsq(Z, y, rcond=None)[0]
-        lam_hat = 0.0
-        sigma_hat = 1.234  # non-unity to catch sigma-scaling bugs
-        model = _mock_panel_sdem(
-            y, X, WX, Wn_sp, T_ww, beta_hat, lam_hat, sigma_hat, N, T_per
-        )
-
-        # Hand replicate the corrected implementation
-        n = N * T_per
-        W_dense = np.kron(np.eye(T_per), Wn_sp.toarray())
-        A_lam = np.eye(n) - lam_hat * W_dense
-        Z_tilde = A_lam @ Z
-        Wy = _panel_spatial_lag(Wn_sp, np.asarray(y), N, T_per)
-        z_rho = A_lam @ Wy
-        u = y - Z @ beta_hat
-        Wu = _panel_spatial_lag(Wn_sp, u, N, T_per)
-        eps = u - lam_hat * Wu
-        S = float(eps @ z_rho)
-
-        from neighbayes.diagnostics.lmtests import _mx_quadratic
-
-        V = sigma_hat**4 * T_per * T_ww + sigma_hat**2 * _mx_quadratic(Z_tilde, z_rho)
-        expected = S * S / V
-
-        result = bayesian_panel_lm_lag_sdem_test(model)
-        assert result.df == 1
-        assert result.lm_samples[0] == pytest.approx(expected, rel=1e-10, abs=1e-12)
-
     def test_panel_robust_lm_lag_m_x_projection(self):
-        """M_X-projected residual kills per-draw beta-posterior noise.
+        """The statistic ignores the posterior spread of beta (lag variant).
 
-        With e_perp = M_X y (draw-independent), the LM samples should be
-        constant across draws regardless of beta posterior variance.
-        The information matrix J_val still depends on the posterior mean
-        beta_bar, so two models with different beta_bar will have different
-        LM values — but within each model all draws are identical.
+        It is the test at the posterior-mean parameters, so two posteriors with
+        the same mean give the same statistic however wide they are.
         """
         N, T_per = 5, 4
         y, X, WX, Wn_sp, T_ww = _make_panel_data(N=N, T=T_per, k_wx=0)
@@ -929,21 +587,14 @@ class TestPanelClosedForm:
 
         result_low = bayesian_panel_robust_lm_lag_test(model_low)
         result_high = bayesian_panel_robust_lm_lag_test(model_high)
-
-        # Within each model all draws are identical (M_X projection)
-        np.testing.assert_allclose(
-            result_low.lm_samples, result_low.lm_samples[0], atol=1e-12
-        )
-        np.testing.assert_allclose(
-            result_high.lm_samples, result_high.lm_samples[0], atol=1e-12
-        )
-        # Between models: same posterior mean beta_bar and sigma → same J_val
-        np.testing.assert_allclose(
-            result_low.lm_samples, result_high.lm_samples, atol=1e-12
-        )
+        assert result_high.statistic == pytest.approx(result_low.statistic, rel=1e-10)
 
     def test_panel_robust_lm_error_m_x_projection(self):
-        """M_X-projected residual kills per-draw beta-posterior noise (error variant)."""
+        """The statistic ignores the posterior spread of beta (error variant).
+
+        It is the test at the posterior-mean parameters, so two posteriors with
+        the same mean give the same statistic however wide they are.
+        """
         N, T_per = 5, 4
         y, X, WX, Wn_sp, T_ww = _make_panel_data(N=N, T=T_per, k_wx=0)
         beta_hat = np.linalg.lstsq(X, y, rcond=None)[0]
@@ -987,32 +638,4 @@ class TestPanelClosedForm:
 
         result_low = bayesian_panel_robust_lm_error_test(model_low)
         result_high = bayesian_panel_robust_lm_error_test(model_high)
-
-        np.testing.assert_allclose(
-            result_low.lm_samples, result_low.lm_samples[0], atol=1e-12
-        )
-        np.testing.assert_allclose(
-            result_high.lm_samples, result_high.lm_samples[0], atol=1e-12
-        )
-        np.testing.assert_allclose(
-            result_low.lm_samples, result_high.lm_samples, atol=1e-12
-        )
-
-
-# ===========================================================================
-# Phase 3 (skipped) — spreg cross-validation
-# ===========================================================================
-#
-# spreg implements the *classical* Anselin (1988) LM tests:
-#
-#     LM_lag_classical = (e'Wy / σ̂²)² / (T_ww + (WXβ̂)' M (WXβ̂) / σ̂²)
-#
-# neighbayes implements the *Bayesian* LM tests of Doğan et al. (2021):
-#
-#     LM_lag_bayes = (e'Wy)² / (T_ww σ̂² + ‖Wy‖²)
-#
-# These are algebraically distinct statistics (different score normalization
-# and different denominator), so a numerical comparison would mislead users
-# into thinking one implementation is wrong. The Phase-1 hand-derivations
-# already verify that the neighbayes code matches the Doğan formula to
-# machine precision, which is the meaningful correctness check here.
+        assert result_high.statistic == pytest.approx(result_low.statistic, rel=1e-10)

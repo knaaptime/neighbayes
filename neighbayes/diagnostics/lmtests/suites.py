@@ -187,21 +187,13 @@ SDM_TOBIT_SUITE = DiagnosticSuite(
 FLOW_SUITE = DiagnosticSuite(
     name="Flow",
     tests=_suite(
-        ("bayesian_robust_lm_flow_destination_test", "Robust-LM-Flow-Destination"),
-        ("bayesian_robust_lm_flow_origin_test", "Robust-LM-Flow-Origin"),
-        ("bayesian_robust_lm_flow_od_test", "Robust-LM-Flow-OD"),
-        ("bayesian_lm_flow_intraunit_test", "LM-Flow-Intraunit"),
-    ),
-)
-
-FLOW_INTRA_SUITE = DiagnosticSuite(
-    name="Flow-Intra",
-    tests=_suite(
         ("bayesian_lm_flow_destination_test", "LM-Flow-Destination"),
         ("bayesian_lm_flow_origin_test", "LM-Flow-Origin"),
         ("bayesian_lm_flow_od_test", "LM-Flow-OD"),
         ("bayesian_lm_flow_joint_test", "LM-Flow-Joint"),
-        ("bayesian_lm_flow_intraunit_test", "LM-Flow-Intraunit"),
+        ("bayesian_robust_lm_flow_destination_test", "Robust-LM-Flow-Destination"),
+        ("bayesian_robust_lm_flow_origin_test", "Robust-LM-Flow-Origin"),
+        ("bayesian_robust_lm_flow_od_test", "Robust-LM-Flow-OD"),
     ),
 )
 
@@ -296,7 +288,12 @@ FLOW_PANEL_SUITE = DiagnosticSuite(
         ("bayesian_panel_lm_flow_origin_test", "Panel-LM-Flow-Origin"),
         ("bayesian_panel_lm_flow_od_test", "Panel-LM-Flow-OD"),
         ("bayesian_panel_lm_flow_joint_test", "Panel-LM-Flow-Joint"),
-        ("bayesian_panel_lm_flow_intraunit_test", "Panel-LM-Flow-Intraunit"),
+        (
+            "bayesian_panel_robust_lm_flow_destination_test",
+            "Panel-Robust-LM-Flow-Destination",
+        ),
+        ("bayesian_panel_robust_lm_flow_origin_test", "Panel-Robust-LM-Flow-Origin"),
+        ("bayesian_panel_robust_lm_flow_od_test", "Panel-Robust-LM-Flow-OD"),
     ),
 )
 
@@ -316,7 +313,6 @@ __all__ = [
     "SAR_NEGBIN_SUITE",
     "SDM_TOBIT_SUITE",
     "FLOW_SUITE",
-    "FLOW_INTRA_SUITE",
     "OLS_PANEL_SUITE",
     "SAR_PANEL_SUITE",
     "SEM_PANEL_SUITE",

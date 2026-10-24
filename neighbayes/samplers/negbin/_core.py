@@ -35,7 +35,6 @@ class GibbsState:
 
     eta: np.ndarray  # (n,) latent index
     beta: np.ndarray  # (k,) regression coefficients
-    sigma2: float  # residual variance σ²
     rho: float  # spatial autoregressive parameter
     alpha: float  # NB dispersion parameter
     omega: np.ndarray  # (n,) PG auxiliary variables

@@ -384,9 +384,9 @@ def test_count_xs_fit_contract(name, ctor, zi, expected, sampler):
 def test_zinb_jax_backend_fit_contract():
     """SARZINB's opt-in JAX backend yields the same posterior contract.
 
-    The JAX path is a *reduced-form* selection variant (vs the structural
-    NumPy default), but exposes the identical parameter set and attaches a
-    pointwise log-likelihood, so downstream tooling is backend-agnostic.
+    Both backends fit the same reduced-form ZINB, so the JAX path exposes the
+    identical parameter set and attaches a pointwise log-likelihood, and
+    downstream tooling is backend-agnostic.
     """
     y, X = _count_xy(zero_inflate=True)
     model = SARZINB(y=y, X=X, W=_count_graph())

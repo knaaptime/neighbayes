@@ -46,7 +46,7 @@ from ..._logdet import (
     make_flow_separable_logdet_numpy,
 )
 from ..._ops import kron_solve_vec
-from ...graph import _weights_to_csr, flow_lags, flow_trace_blocks
+from ...graph import _weights_to_csr, flow_lags
 from .._base._nb import nb_alpha_rv
 from .._design import flow
 from .._mixins._flow_shared import FlowSharedMethods
@@ -481,11 +481,6 @@ class FlowModel(FlowSharedMethods, SpatialModel):
         # Aliases used by some downstream code and tests
         self._y_vec = self._y
         self._spatial_lag = self._Wd_y
-
-        # Cache the symmetric 3x3 Kronecker trace matrix used by Bayesian
-        # LM diagnostics: T[i,j] = tr(W_i' W_j) + tr(W_i W_j) for
-        # (W_d, W_o, W_w).  Computed in O(nnz) from the base n x n graph.
-        self._T_flow_traces: np.ndarray = flow_trace_blocks(self._W_sparse)
 
         # The unrestricted 3-parameter flow log-determinant is handled by the
         # resolvent-Kronecker gradient sampler; the old "traces" value method was
@@ -1914,7 +1909,6 @@ class NegBinFlow(_NegBinFlowMixin, OLSFlow):
                 state = GibbsState(
                     eta=eta,
                     beta=beta,
-                    sigma2=1.0,
                     rho=0.0,
                     alpha=alpha,
                     omega=omega,

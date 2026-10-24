@@ -10,9 +10,11 @@ from .sar_negbin import SARNegBin as SARNegBin
 from .sar_zinb import SARZINB as SARZINB
 from .sdem import SDEM as SDEM
 from .sdem_logit import SDEMLogit as SDEMLogit
+from .sdem_negbin import SDEMNegBin as SDEMNegBin
 from .sdm import SDM as SDM
 from .sem import SEM as SEM
 from .sem_logit import SEMLogit as SEMLogit
+from .sem_negbin import SEMNegBin as SEMNegBin
 from .sem_probit import SEMProbit as SEMProbit
 from .slx import SLX as SLX
 from .tobit import SARTobit as SARTobit

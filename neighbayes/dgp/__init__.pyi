@@ -3,8 +3,10 @@ from .cross_sectional import simulate_ols as simulate_ols
 from .cross_sectional import simulate_sar as simulate_sar
 from .cross_sectional import simulate_sar_negbin as simulate_sar_negbin
 from .cross_sectional import simulate_sdem as simulate_sdem
+from .cross_sectional import simulate_sdem_negbin as simulate_sdem_negbin
 from .cross_sectional import simulate_sdm as simulate_sdm
 from .cross_sectional import simulate_sem as simulate_sem
+from .cross_sectional import simulate_sem_negbin as simulate_sem_negbin
 from .cross_sectional import simulate_slx as simulate_slx
 from .flows import simulate_negbin_flow as simulate_negbin_flow
 from .flows import simulate_ols_flow as simulate_ols_flow

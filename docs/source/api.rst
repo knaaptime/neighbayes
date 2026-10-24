@@ -60,6 +60,8 @@ Counts
 
    NegBin
    SARNegBin
+   SEMNegBin
+   SDEMNegBin
    ZINB
    SARZINB
    HurdleNegBin
@@ -121,6 +123,7 @@ Default NUTS Priors
    SDEMPriors
    NegBinPriors
    SARNegBinPriors
+   SEMNegBinPriors
    SARTobitPriors
    SEMTobitPriors
    SDMTobitPriors
@@ -214,6 +217,7 @@ Panel Bayesian LM Tests
    bayesian_panel_lm_slx_error_joint_test
    bayesian_panel_lm_error_sdm_test
    bayesian_panel_lm_lag_sdem_test
+   bayesian_panel_robust_lm_lag_sdem_test
    bayesian_panel_lm_wx_sem_test
    bayesian_panel_robust_lm_lag_sdm_test
    bayesian_panel_robust_lm_wx_test
@@ -229,7 +233,6 @@ Flow Bayesian LM Tests
    bayesian_lm_flow_destination_test
    bayesian_lm_flow_origin_test
    bayesian_lm_flow_od_test
-   bayesian_lm_flow_intraunit_test
    bayesian_lm_flow_joint_test
    bayesian_robust_lm_flow_destination_test
    bayesian_robust_lm_flow_origin_test
@@ -237,8 +240,10 @@ Flow Bayesian LM Tests
    bayesian_panel_lm_flow_destination_test
    bayesian_panel_lm_flow_origin_test
    bayesian_panel_lm_flow_od_test
-   bayesian_panel_lm_flow_intraunit_test
    bayesian_panel_lm_flow_joint_test
+   bayesian_panel_robust_lm_flow_destination_test
+   bayesian_panel_robust_lm_flow_origin_test
+   bayesian_panel_robust_lm_flow_od_test
 
 
 Diagnostic Test Suites
@@ -269,7 +274,6 @@ and the decision-tree renderers.
    SDEM_SUITE
    SDEM_PANEL_SUITE
    FLOW_SUITE
-   FLOW_INTRA_SUITE
    FLOW_PANEL_SUITE
    LOGIT_SUITE
    NEGBIN_SUITE
@@ -353,6 +357,8 @@ Data Generating Processes
    simulate_sem_probit
    simulate_negbin
    simulate_sar_negbin
+   simulate_sem_negbin
+   simulate_sdem_negbin
    simulate_zinb
    simulate_sar_zinb
    simulate_hurdle_negbin

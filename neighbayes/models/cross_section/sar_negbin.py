@@ -11,7 +11,9 @@ Binomial dispersion parameter :math:`\alpha`; no disturbance propagates.
     \eta = (I - \rho W)^{-1} X \beta.
 
 This is the field's spatial lag model of counts (Lambert, Brown and Florax
-2010).
+2010).  ``latent=True`` is the latent SAR instead, which propagates the
+negative binomial's own gamma disturbance
+(:mod:`._latent_negbin`).
 
 Sampling
 --------
@@ -59,9 +61,10 @@ from .._mixins._designs import CountDesigns
 from ..base import SpatialModel
 from ..panel._count import _CountPanel
 from ..priors import PanelCountPriors, SARNegBinPriors
+from ._latent_negbin import LatentNegBinMixin
 
 
-class SARNegBin(CountDesigns, _CountPanel, SpatialModel):
+class SARNegBin(CountDesigns, LatentNegBinMixin, _CountPanel, SpatialModel):
     r"""Bayesian reduced-form spatial autoregressive negative binomial (SAR-NB).
 
     .. math::
@@ -74,6 +77,21 @@ class SARNegBin(CountDesigns, _CountPanel, SpatialModel):
     likelihood carries no :math:`\log|I - \rho W|` Jacobian.  ``fit()``
     defaults to Pólya–Gamma Gibbs; ``sampler="nuts"`` fits the same model in
     PyMC.
+
+    With ``latent=True`` it is the latent SAR, whose multiplier propagates the
+    negative binomial's own disturbance as well as the covariates:
+
+    .. math::
+
+        y_i \sim \mathrm{Poisson}(e^{\eta_i}), \qquad
+        (I - \rho W)\eta = X\beta + \varepsilon, \qquad
+        \varepsilon_i = \log\gamma_i,\;
+        \gamma_i \sim \mathrm{Gamma}(\alpha, \alpha),
+
+    so that :math:`\rho = 0` is :class:`NegBin`.  It is sampled by an exact
+    Gibbs sweep over the log-means (:mod:`neighbayes.samplers.negbin_latent`),
+    on JAX by default; there is no NUTS path and no pointwise
+    log-likelihood, and its impacts are on the log-mean.
 
     Parameters
     ----------
@@ -129,12 +147,17 @@ class SARNegBin(CountDesigns, _CountPanel, SpatialModel):
         Add the unit means of the time-varying columns to a panel's design
         (inside the filter), absorbing a correlation between the unit effects
         and ``X``.  Needs unit effects.
+    latent : bool, default False
+        The latent SAR instead of the reduced form (a cross-section only).
     """
 
     _DESIGNS = {
         "static": {},
+        "latent": {"_gibbs_key": ("count_latent", "cross_section")},
         "panel": {"_priors_cls": PanelCountPriors, "_gibbs_key": ("count", "panel")},
     }
+    # The latent SAR's log-mean impacts and coordinates are the reduced form's.
+    _FALLBACK = {"latent": "static"}
 
     _priors_cls = SARNegBinPriors
     _gibbs_key: tuple[str, str] | None = ("count", "cross_section")
@@ -926,6 +949,12 @@ class SARNegBin(CountDesigns, _CountPanel, SpatialModel):
             return super().impacts(return_posterior_samples=return_posterior_samples)
         if scale != "count":
             raise ValueError("scale must be either 'logmean' or 'count'.")
+        if self._design == "latent":
+            raise NotImplementedError(
+                "The latent SAR's impacts are on the log-mean (latent index): its "
+                "expected counts mix the propagated disturbances, so the count "
+                "scale has no closed form."
+            )
         if self._design != "static":
             raise NotImplementedError(
                 "Count-scale impacts are implemented for the cross-section only."

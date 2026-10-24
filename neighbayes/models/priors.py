@@ -175,6 +175,14 @@ class SARNegBinPriors(SARPriors, NegBinPriors):
 
 
 @dataclass(frozen=True)
+class SEMNegBinPriors(SEMPriors, NegBinPriors):
+    """Priors for :class:`neighbayes.models.SEMNegBin` and :class:`SDEMNegBin`.
+
+    Combines SEM spatial bounds with NB overdispersion parameters.
+    """
+
+
+@dataclass(frozen=True)
 class SARZINBPriors(NegBinPriors):
     """Priors for :class:`neighbayes.models.SARZINB` and the ZINB panels.
 
@@ -870,6 +878,7 @@ __all__ = [
     "SDEMPriors",
     "NegBinPriors",
     "SARNegBinPriors",
+    "SEMNegBinPriors",
     "SARTobitPriors",
     "SEMTobitPriors",
     "SDMTobitPriors",

@@ -55,8 +55,12 @@ def _rook_dataset(simulator, spatial_true, seed):
         sigma=SIGMA_TRUE,
         seed=seed,
     )
-    return {"y": np.asarray(data["y"]).ravel(), "X": np.asarray(data["X"]),
-            "W": W_std, "params_true": data["params_true"]}
+    return {
+        "y": np.asarray(data["y"]).ravel(),
+        "X": np.asarray(data["X"]),
+        "W": W_std,
+        "params_true": data["params_true"],
+    }
 
 
 @pytest.fixture(scope="module")
@@ -73,8 +77,7 @@ def sem_dataset():
 def octave_run(tmp_path, octave, toolbox):
     """Write driver text (and optionally the dataset), run Octave in tmp_path."""
 
-    def run(script_text: str, dataset: dict | None = None,
-            prefix: str | None = None):
+    def run(script_text: str, dataset: dict | None = None, prefix: str | None = None):
         if dataset is not None:
             _octave.write_ascii(dataset, tmp_path)
         _octave.write_shims(tmp_path)

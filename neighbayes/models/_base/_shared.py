@@ -1642,7 +1642,7 @@ class SharedSpatialMethods(metaclass=FacadeMeta):
             try:
                 result = test_fn(model)
                 rows[label] = {
-                    "statistic": result.mean,
+                    "statistic": result.statistic,
                     "median": result.median,
                     "df": result.df,
                     "p_value": result.bayes_pvalue,

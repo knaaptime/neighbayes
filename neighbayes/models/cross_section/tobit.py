@@ -387,7 +387,7 @@ class SARTobit(_SpatialTobitBase):
     def _fitted_mean_from_posterior(self) -> np.ndarray:
         """Reported fitted mean: ``max(c, E[y* | X, params])``.
 
-        The structural latent mean for SARTobit is
+        The latent mean for SARTobit is
         :math:`E[y^* \\mid X] = (I - \\rho W)^{-1} X \\beta`, evaluated at the
         posterior mean of :math:`(\\rho, \\beta)`. Censored observations are
         reported at the censoring point ``c`` (consistent with the
@@ -401,8 +401,8 @@ class SARTobit(_SpatialTobitBase):
             return rho * self._sparse_panel_lag(y_lat) + self._X @ beta
         n = self._y.shape[0]
         A = sp.eye(n, format="csc") - rho * sp.csc_matrix(self._W_sparse)
-        structural = spla.spsolve(A, self._X @ beta)
-        return np.maximum(self.censoring, structural)
+        mean = spla.spsolve(A, self._X @ beta)
+        return np.maximum(self.censoring, mean)
 
     def _postprocess_idata(self, idata: xr.DataTree) -> xr.DataTree:
         """Attach the complete pointwise Tobit log-likelihood for IC metrics.
@@ -411,8 +411,8 @@ class SARTobit(_SpatialTobitBase):
         Jacobian via ``pm.Potential``, so PyMC captures no pointwise
         ``log_likelihood``.  We rebuild it here from the Tobit censoring
         formula (Normal or Student-t density for uncensored observations, the
-        matching left-tail log-CDF for censored ones) with the structural
-        latent mean :math:`\\mu = (I - \\rho W)^{-1} X\\beta`; a panel's uses the
+        matching left-tail log-CDF for censored ones) with the latent
+        mean :math:`\\mu = (I - \\rho W)^{-1} X\\beta`; a panel's uses the
         mean given the latent outcome, :math:`\\rho W y^* + X\\beta`, and its
         Jacobian applies once per period.
         """
@@ -684,7 +684,7 @@ class SEMTobit(_SpatialTobitBase):
     def _fitted_mean_from_posterior(self) -> np.ndarray:
         """Reported fitted mean: ``max(c, E[y* | X, params])``.
 
-        For SEMTobit the structural latent mean is
+        For SEMTobit the latent mean is
         :math:`E[y^* \\mid X] = X\\beta` (the spatial filter operates on the
         error term and integrates out). Censored entries are reported at
         the censoring point; a panel reports :math:`X\\beta` unclipped.
@@ -701,7 +701,7 @@ class SEMTobit(_SpatialTobitBase):
         Jacobian via ``pm.Potential``, so PyMC captures no pointwise
         ``log_likelihood`` (on JAX backends the ``obs`` CustomDist already
         carries it, and we return early).  We rebuild it here from the Tobit
-        censoring formula with structural latent mean :math:`\\mu = X\\beta` (the
+        censoring formula with latent mean :math:`\\mu = X\\beta` (the
         spatial filter operates on the error term and is absorbed into the
         Jacobian, once per period in a panel).
         """
@@ -847,7 +847,7 @@ class SDMTobit(_SpatialTobitBase):
     def _fitted_mean_from_posterior(self) -> np.ndarray:
         """Reported fitted mean: ``max(c, E[y* | X, params])``.
 
-        The structural latent mean for SDMTobit is
+        The latent mean for SDMTobit is
         :math:`E[y^* \\mid X] = (I - \\rho W)^{-1} (X\\beta + WX\\theta)`,
         evaluated at posterior means; censored entries are reported at
         the censoring point.
@@ -857,8 +857,8 @@ class SDMTobit(_SpatialTobitBase):
         Z = np.hstack([self._X, self._WX])
         n = self._y.shape[0]
         A = sp.eye(n, format="csc") - rho * sp.csc_matrix(self._W_sparse)
-        structural = spla.spsolve(A, Z @ beta)
-        return np.maximum(self.censoring, structural)
+        mean = spla.spsolve(A, Z @ beta)
+        return np.maximum(self.censoring, mean)
 
     def _postprocess_idata(self, idata: xr.DataTree) -> xr.DataTree:
         """Attach the complete pointwise Tobit log-likelihood for IC metrics.
@@ -866,7 +866,7 @@ class SDMTobit(_SpatialTobitBase):
         The SDM Tobit model expresses both the residual log-likelihood and the
         Jacobian via ``pm.Potential``, so PyMC captures no pointwise
         ``log_likelihood``.  We rebuild it here from the Tobit censoring
-        formula with structural latent mean
+        formula with latent mean
         :math:`\\mu = (I - \\rho W)^{-1} (X\\beta + WX\\theta)`, where the
         stacked design ``Z = [X, WX]`` carries the Durbin lags.
         """

@@ -28,10 +28,17 @@ from neighbayes.diagnostics.lmtests import (
     bayesian_panel_robust_lm_lag_test,
     bayesian_panel_robust_lm_wx_test,
     bayesian_robust_lm_error_sdem_test,
+    bayesian_robust_lm_error_sdm_test,
+    bayesian_robust_lm_lag_sdem_test,
     bayesian_robust_lm_lag_sdm_test,
     bayesian_robust_lm_wx_test,
 )
 from neighbayes.models import OLSFlow
+from neighbayes.tests.test_diagnostics._lm_mocks import (
+    exact_logdet_grad,
+    gaussian_mock,
+    panel_mock,
+)
 
 
 def make_sar_sem_data(n=20, seed=42):
@@ -71,7 +78,7 @@ def _make_mock_model(y, X, W_sparse, beta_noise=0.1, draws=100):
         }
     )
 
-    model = MagicMock()
+    model = gaussian_mock(X, W_sparse)
     model._y = y
     model._X = X
     model._WX = np.empty((n, 0), dtype=float)
@@ -148,7 +155,7 @@ def _make_mock_ols_model_with_wx(y, X, WX, W_sparse, beta_noise=0.1, draws=100):
         }
     )
 
-    model = MagicMock()
+    model = gaussian_mock(X, W_sparse)
     model._y = y
     model._X = X
     model._WX = WX
@@ -181,7 +188,7 @@ def _make_mock_sar_model(y, X, WX, W_sparse, beta_noise=0.1, rho_noise=0.05, dra
         }
     )
 
-    model = MagicMock()
+    model = gaussian_mock(X, W_sparse)
     model._y = y
     model._X = X
     model._WX = WX
@@ -214,7 +221,7 @@ def _make_mock_slx_model(y, X, WX, W_sparse, beta_noise=0.1, draws=100):
         }
     )
 
-    model = MagicMock()
+    model = gaussian_mock(X, W_sparse)
     model._y = y
     model._X = X
     model._WX = WX
@@ -445,7 +452,7 @@ def _make_mock_sdm_model(
         }
     )
 
-    model = MagicMock()
+    model = gaussian_mock(X, W_sparse)
     model._y = y
     model._X = X
     model._WX = WX
@@ -480,7 +487,7 @@ def _make_mock_sdem_model(
         }
     )
 
-    model = MagicMock()
+    model = gaussian_mock(X, W_sparse)
     model._y = y
     model._X = X
     model._WX = WX
@@ -504,25 +511,23 @@ class TestBayesianLMErrorSDMTest:
         assert 0.0 <= result.bayes_pvalue <= 1.0
         assert np.all(result.lm_samples >= 0)
 
-    def test_sigma_scaling_matches_standard_lm_error(self):
-        """At rho=0, k_wx=0 the SDM-error test should reduce to LM-Error.
 
-        Regression test for the sigma^2 vs sigma^4 scaling bug: previously
-        V was sigma^2 * T_ww (wrong); now it must be sigma^4 * T_ww.
-        """
-        y, X, W_dense, W_sparse = make_sar_sem_data(n=20)
-        WX = np.empty((X.shape[0], 0), dtype=float)
-        model = _make_mock_sdm_model(
-            y, X, WX, W_sparse, draws=300, beta_noise=0.0, rho_noise=0.0
-        )
-        result_sdm = bayesian_lm_error_sdm_test(model)
+class TestEstimatedDirectionsAreOrthogonalizedAway:
+    """A test robust only to a parameter its null estimates is the plain one."""
 
-        # Compare with standard LM-Error using the same OLS-style residuals
-        ols_model = _make_mock_model(y, X, W_sparse, beta_noise=0.0, draws=300)
-        result_ols = bayesian_lm_error_test(ols_model)
+    def test_sdm_robust_lm_error_is_lm_error_sdm(self):
+        y, X, WX, W_dense, W_sparse = _make_data_with_wx(n=20, k_wx=2)
+        model = _make_mock_sdm_model(y, X, WX, W_sparse, draws=200)
+        plain = bayesian_lm_error_sdm_test(model)
+        robust = bayesian_robust_lm_error_sdm_test(model)
+        np.testing.assert_allclose(robust.lm_samples, plain.lm_samples)
 
-        # With rho=0 and no WX, the two tests should agree to numerical precision
-        assert np.isclose(result_sdm.mean, result_ols.mean, rtol=1e-6)
+    def test_sdem_robust_lm_lag_is_lm_lag_sdem(self):
+        y, X, WX, W_dense, W_sparse = _make_data_with_wx(n=20, k_wx=2)
+        model = _make_mock_sdem_model(y, X, WX, W_sparse, draws=200)
+        plain = bayesian_lm_lag_sdem_test(model)
+        robust = bayesian_robust_lm_lag_sdem_test(model)
+        np.testing.assert_allclose(robust.lm_samples, plain.lm_samples)
 
 
 class TestBayesianLMLagSDEMTest:
@@ -536,69 +541,6 @@ class TestBayesianLMLagSDEMTest:
         assert result.test_type == "bayesian_lm_lag_sdem"
         assert 0.0 <= result.bayes_pvalue <= 1.0
         assert np.all(result.lm_samples >= 0)
-
-    def test_variance_uses_sigma4_term(self):
-        """Regression test: V must include sigma^4 * T_ww (not sigma^2 * T_ww).
-
-        Construct a model with sigma=2 (so sigma^2=4, sigma^4=16). Verify
-        that the LM denominator uses the whitened SDEM-filtered formula
-        V = sigma^4 * T_ww + sigma^2 * z_rho' M_{Z_tilde} z_rho,
-        where z_rho = A_lambda * W y and Z_tilde = A_lambda * [X, WX].
-        """
-        y, X, WX, W_dense, W_sparse = _make_data_with_wx(n=16, k_wx=1)
-        model = _make_mock_sdem_model(
-            y, X, WX, W_sparse, draws=200, beta_noise=0.0, lam_noise=0.0
-        )
-        # Override sigma to be a fixed value of 2.0
-        sigma_val = 2.0
-        model.inference_data.posterior["sigma"][:] = sigma_val
-        T_ww = model._T_ww
-        Wy = model._Wy
-
-        result = bayesian_lm_lag_sdem_test(model)
-
-        # Recompute the score using the same residual logic to back out V
-        idata = model.inference_data
-        beta_draws = np.asarray(idata.posterior["beta"]).reshape(
-            -1, X.shape[1] + WX.shape[1]
-        )
-        lam_draws = np.asarray(idata.posterior["lam"]).reshape(-1)
-        Z = np.hstack([X, WX])
-        u = y[None, :] - beta_draws @ Z.T
-        Wu = (W_sparse @ u.T).T
-        eps = u - lam_draws[:, None] * Wu
-
-        # Whitened quantities (matching the corrected implementation)
-        lam_mean = float(np.mean(lam_draws))
-        n = W_sparse.shape[0]
-        A_lam = np.eye(n) - lam_mean * W_dense
-        Z_tilde = A_lam @ Z
-        z_rho = A_lam @ Wy
-        S = np.dot(eps, z_rho)
-
-        # Expected V using the corrected whitened formula
-        from neighbayes.diagnostics.lmtests import _mx_quadratic
-
-        expected_V = sigma_val**4 * T_ww + sigma_val**2 * _mx_quadratic(Z_tilde, z_rho)
-        V_implied = float(np.mean(S**2 / (result.lm_samples + 1e-15)))
-
-        # The implied V should match the expected sigma^4 formula, not the
-        # old buggy sigma^2 formula
-        old_buggy_V = sigma_val**2 * T_ww + float(np.dot(Wy, Wy))
-        assert np.isclose(V_implied, expected_V, rtol=1e-3), (
-            f"Implied V={V_implied:.3f} should match new sigma^4 formula "
-            f"{expected_V:.3f} (old buggy was {old_buggy_V:.3f})"
-        )
-
-
-# ---------------------------------------------------------------------------
-# Cross-cutting tests
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# Tests that robust tests differ from non-robust tests (cross-term fix)
-# ---------------------------------------------------------------------------
 
 
 class TestRobustVsNonRobust:
@@ -710,7 +652,7 @@ def _make_mock_panel_ols_model(N=6, T=3, k_wx=0, beta_noise=0.1, draws=100, seed
         }
     )
 
-    model = MagicMock()
+    model = panel_mock(X, W_sparse, N, T)
     model._y = y
     model._X = X
     model._WX = WX
@@ -747,7 +689,7 @@ def _make_mock_panel_sar_model(
         }
     )
 
-    model = MagicMock()
+    model = panel_mock(X, W_sparse, N, T)
     model._y = y
     model._X = X
     model._WX = WX
@@ -781,7 +723,7 @@ def _make_mock_panel_slx_model(N=6, T=3, k_wx=2, beta_noise=0.1, draws=100, seed
         }
     )
 
-    model = MagicMock()
+    model = panel_mock(X, W_sparse, N, T)
     model._y = y
     model._X = X
     model._WX = WX
@@ -1056,6 +998,7 @@ class TestSpatialDiagnosticsMethod:
         obj.__dict__["_T_ww"] = float(
             np.sum(W_dense_arr * W_dense_arr) + np.trace(W_dense_arr @ W_dense_arr)
         )
+        obj.__dict__["_logdet_grad_numpy_vec_fn"] = exact_logdet_grad(W_sparse)
         obj._idata = idata
         return obj
 
@@ -1343,34 +1286,6 @@ def fitted_olsflow(_flow_ring_graph):
     return ols
 
 
-@pytest.fixture(scope="module")
-def fitted_sarflow(_flow_ring_graph):
-    from neighbayes.dgp import simulate_sar_flow
-    from neighbayes.models.flow._flow import SARFlow
-
-    n, G = _flow_ring_graph
-    data = simulate_sar_flow(
-        n=n,
-        G=G,
-        rho_d=0.3,
-        rho_o=0.1,
-        rho_w=0.0,
-        beta_d=[1.0],
-        beta_o=[0.5],
-        sigma=0.3,
-        seed=0,
-    )
-    sar = SARFlow(
-        data["y_vec"],
-        data["X"],
-        data["G"],
-        col_names=data["col_names"],
-        nonnegative_dependence=False,
-    )
-    sar.fit(draws=150, tune=150, chains=2, progressbar=False, random_seed=0)
-    return sar
-
-
 class TestFlowLMTests:
     def test_marginal_dest(self, fitted_olsflow):
         from neighbayes.diagnostics.lmtests import bayesian_lm_flow_destination_test
@@ -1408,36 +1323,28 @@ class TestFlowLMTests:
         assert np.all(r.lm_samples >= 0)
         assert 0.0 <= r.bayes_pvalue <= 1.0
 
-    def test_intra(self, fitted_olsflow):
-        from neighbayes.diagnostics.lmtests import bayesian_lm_flow_intraunit_test
-
-        r = bayesian_lm_flow_intraunit_test(fitted_olsflow)
-        assert r.df >= 1
-        assert r.test_type == "bayesian_lm_flow_intraunit"
-        assert 0.0 <= r.bayes_pvalue <= 1.0
-
-    def test_robust_dest(self, fitted_sarflow):
+    def test_robust_dest(self, fitted_olsflow):
         from neighbayes.diagnostics.lmtests import (
             bayesian_robust_lm_flow_destination_test,
         )
 
-        r = bayesian_robust_lm_flow_destination_test(fitted_sarflow)
+        r = bayesian_robust_lm_flow_destination_test(fitted_olsflow)
         assert r.df == 1
         assert r.test_type == "bayesian_robust_lm_flow_destination"
         assert 0.0 <= r.bayes_pvalue <= 1.0
 
-    def test_robust_orig(self, fitted_sarflow):
+    def test_robust_orig(self, fitted_olsflow):
         from neighbayes.diagnostics.lmtests import bayesian_robust_lm_flow_origin_test
 
-        r = bayesian_robust_lm_flow_origin_test(fitted_sarflow)
+        r = bayesian_robust_lm_flow_origin_test(fitted_olsflow)
         assert r.df == 1
         assert r.test_type == "bayesian_robust_lm_flow_origin"
         assert 0.0 <= r.bayes_pvalue <= 1.0
 
-    def test_robust_network(self, fitted_sarflow):
+    def test_robust_network(self, fitted_olsflow):
         from neighbayes.diagnostics.lmtests import bayesian_robust_lm_flow_od_test
 
-        r = bayesian_robust_lm_flow_od_test(fitted_sarflow)
+        r = bayesian_robust_lm_flow_od_test(fitted_olsflow)
         assert r.df == 1
         assert r.test_type == "bayesian_robust_lm_flow_od"
         assert 0.0 <= r.bayes_pvalue <= 1.0
@@ -1519,10 +1426,19 @@ class TestFlowPanelLMTests:
         assert r.test_type == "bayesian_panel_lm_flow_joint"
         assert 0.0 <= r.bayes_pvalue <= 1.0
 
-    def test_intra(self, fitted_olsflow_panel):
-        from neighbayes.diagnostics.lmtests import bayesian_panel_lm_flow_intraunit_test
+    def test_robust(self, fitted_olsflow_panel):
+        from neighbayes.diagnostics.lmtests import (
+            bayesian_panel_robust_lm_flow_destination_test,
+            bayesian_panel_robust_lm_flow_od_test,
+            bayesian_panel_robust_lm_flow_origin_test,
+        )
 
-        r = bayesian_panel_lm_flow_intraunit_test(fitted_olsflow_panel)
-        assert r.df >= 1
-        assert r.test_type == "bayesian_panel_lm_flow_intraunit"
-        assert 0.0 <= r.bayes_pvalue <= 1.0
+        for fn, d in (
+            (bayesian_panel_robust_lm_flow_destination_test, "d"),
+            (bayesian_panel_robust_lm_flow_origin_test, "o"),
+            (bayesian_panel_robust_lm_flow_od_test, "w"),
+        ):
+            r = fn(fitted_olsflow_panel)
+            assert r.df == 1
+            assert (r.details["T"], r.details["direction"]) == (3, d)
+            assert 0.0 <= r.bayes_pvalue <= 1.0

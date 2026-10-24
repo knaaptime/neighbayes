@@ -17,11 +17,15 @@ The Gaussian processes (OLS, SLX, SAR, SEM, SDM, SDEM), :class:`GaussianDesigns`
     The dynamic panel (:mod:`..panel._dynamic`); ``"restricted"`` is the
     restricted dynamic SDM and otherwise reuses the dynamic implementations.
 
-The count families (NegBin, SARNegBin, ZINB, SARZINB, HurdleNegBin,
-SARHurdleNegBin), :class:`CountDesigns`:
+The count families (NegBin, SARNegBin, SEMNegBin, SDEMNegBin, ZINB, SARZINB,
+HurdleNegBin, SARHurdleNegBin), :class:`CountDesigns`:
 
 ``"static"``
-    The cross-section.
+    The cross-section: SARNegBin's reduced form, and the latent SEM of
+    SEMNegBin and SDEMNegBin.
+``"latent"``
+    ``SARNegBin(latent=True)``, the latent SAR, which propagates the negative
+    binomial's gamma disturbance (:mod:`..cross_section._latent_negbin`).
 ``"panel"``
     The panel, pooled or with random unit effects and fixed time effects
     (:mod:`..panel._count`, :mod:`..panel._zinb`, :mod:`..panel._hurdle`).
@@ -51,6 +55,23 @@ from .._design import (
     _pop_design,
 )
 from ..base import SpatialModel
+
+
+def _latent_flag(cls, latent, suffix: str) -> bool:
+    """Validate ``latent=``: ``True`` only where the class implements the design."""
+    if not isinstance(latent, bool):
+        raise ValueError(f"latent must be True or False; got {latent!r}.")
+    if latent and "latent" not in cls._DESIGNS:
+        name = cls.__name__
+        raise NotImplementedError(
+            f"{name} has no latent=True design"
+            + (
+                f" (it is the latent {name.removesuffix(suffix)} already)."
+                if hasattr(cls, "_latent_process")
+                else "."
+            )
+        )
+    return latent
 
 
 def _by_design(name: str):
@@ -237,23 +258,13 @@ class BinaryDesigns(DesignDispatch):
         name = cls.__name__
         unit, time, dynamic = _pop_design(kw)
         latent = kw.pop("latent", False)
-        if not isinstance(latent, bool):
-            raise ValueError(f"latent must be True or False; got {latent!r}.")
         if _is_panel(kw):
             raise NotImplementedError(f"{name} is not implemented with a panel.")
         _cross_section_only(name, time, dynamic)
         if unit is not None:
             # One draw per observation is a disturbance, not a unit effect.
             raise NotImplementedError(f"{name} takes no unit effects.")
-        if latent and "latent" not in cls._DESIGNS:
-            raise NotImplementedError(
-                f"{name} has no latent=True design"
-                + (
-                    f" (it is the latent {name.removesuffix('Logit')} already)."
-                    if hasattr(cls, "_latent_process")
-                    else "."
-                )
-            )
+        latent = _latent_flag(cls, latent, "Logit")
         return ("latent" if latent else "static"), kw
 
     _build_pymc_model = _by_design("_build_pymc_model")
@@ -275,6 +286,8 @@ class CountDesigns(DesignDispatch):
     The response is validated as counts for every design; a two-part family
     (``_zero_part``) also takes the zero part's design and weights, which it
     builds before the panel's effects drop the columns they absorb.
+    ``latent=True`` selects the latent SAR of a cross-section where the class
+    implements it.
     """
 
     _likelihood: str = "count"
@@ -295,6 +308,7 @@ class CountDesigns(DesignDispatch):
         time_effects=False,
         dynamic=False,
         mundlak=False,
+        latent=False,
         **kwargs,
     ):
         zero = (
@@ -308,6 +322,7 @@ class CountDesigns(DesignDispatch):
                 unit_effects=unit_effects,
                 time_effects=time_effects,
                 dynamic=dynamic,
+                latent=latent,
             )
         )
         effects = kwargs.pop("effects", 0)
@@ -346,6 +361,11 @@ class CountDesigns(DesignDispatch):
         """The design the arguments describe, and the base class's arguments."""
         name = cls.__name__
         unit, time, dynamic = _pop_design(kw)
+        latent = _latent_flag(cls, kw.pop("latent", False), "NegBin")
+        if latent and _is_panel(kw):
+            raise NotImplementedError(
+                f"{name}(latent=True) is implemented for the cross-section only."
+            )
         if not _is_panel(kw):
             _cross_section_only(name, time, dynamic)
             if unit is not None:
@@ -357,7 +377,7 @@ class CountDesigns(DesignDispatch):
                 raise NotImplementedError(
                     f"{name} is implemented for panels only (pass time_col or T)."
                 )
-            return "static", kw
+            return ("latent" if latent else "static"), kw
         if dynamic:
             raise NotImplementedError(f"{name} has no dynamic panel.")
         if unit == "fixed":

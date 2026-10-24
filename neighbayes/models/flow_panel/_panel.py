@@ -27,7 +27,7 @@ from ..._logdet import (
     make_flow_separable_logdet_numpy,
 )
 from ..._ops import kron_solve_matrix
-from ...graph import _weights_to_csr, flow_lags, flow_trace_blocks
+from ...graph import _weights_to_csr, flow_lags
 from .._base._nb import nb_alpha_rv
 from .._base._panel import _absorbed_columns, _demean_panel
 from .._design import FacadeMeta, flow
@@ -262,13 +262,6 @@ class FlowPanelModel(FlowSharedMethods, SpatialModel):
                         UserWarning,
                         stacklevel=2,
                     )
-
-        # Build flow weight matrices on N_flow = n^2 system
-
-        # Cache the symmetric 3x3 Kronecker trace matrix used by Bayesian
-        # LM diagnostics on flow models: T[i,j] = tr(W_i' W_j) + tr(W_i W_j)
-        # for (W_d, W_o, W_w).  Computed in O(nnz) from the n x n base graph.
-        self._T_flow_traces: np.ndarray = flow_trace_blocks(self._W_sparse)
 
         # Spatial lags on demeaned/stationary panel stack
         # Matrix-free: W⊗W alone would hold nnz(W)² entries.

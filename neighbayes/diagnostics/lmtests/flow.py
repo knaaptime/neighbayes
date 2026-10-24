@@ -1,345 +1,261 @@
-"""Bayesian LM diagnostic tests — flow variants.
+r"""Bayesian LM diagnostic tests — flow variants.
+
+The flow tests are the score tests of the spatial-lag flow model
+
+.. math::
+    y = \rho_d W_d y + \rho_o W_o y + \rho_w W_w y + X\beta + \varepsilon,
+    \qquad \varepsilon \sim N(0, \sigma^2 I),
+
+at a fitted :class:`~neighbayes.models.OLSFlow` (or ``OLSFlowPanelFE``), on the
+construction of :mod:`._gaussian`: the score of the tested directions at every
+posterior draw, Neyman-orthogonal to :math:`(\beta, \sigma^2)`, the efficient
+information at the posterior mean, and the statistic at the posterior-mean
+parameters.  At :math:`\rho = 0` the scores are
+
+.. math::
+    g_{\rho_k} = -\mathrm{tr}\,W_k + (W_k y)^\top e/\sigma^2, \qquad
+    J_{\rho_i\rho_j} = \mathrm{tr}(W_i^\top W_j + W_iW_j)
+        + (W_iX\beta)^\top W_jX\beta/\sigma^2,
+
+and with :math:`W_d = I \otimes W`, :math:`W_o = W \otimes I` and
+:math:`W_w = W \otimes W` every trace factors, :math:`\mathrm{tr}(A \otimes B) =
+\mathrm{tr}A\,\mathrm{tr}B`, so nothing of the size of the :math:`n^2` pairs is
+formed.  A robust test removes the other two directions (Bera and Yoon 1993).
+A panel uses the Lee and Yu (2010) transformed likelihood its demeaned data
+give: traces are counted by the Jacobian multiplier, and time effects remove the
+direction :math:`\mathbf 1`, which every :math:`W_k` of a row-standardized
+:math:`W` maps to itself.
 
 All public test functions return :class:`BayesianLMTestResult`.
 """
 
-import numpy as np
+import weakref
 
+import numpy as np
+import scipy.sparse as sp
+
+from neighbayes.diagnostics.lmtests._gaussian import efficient_lm
 from neighbayes.diagnostics.lmtests.core import (
     BayesianLMTestResult,
-    _compute_residuals,
     _finalize_lm,
     _get_posterior_draws,
-    _lm_vector,
-    _neyman_adjust_scalar,
-    _posterior_mean_sigma2,
-    _safe_inv,
 )
 
+#: The flow directions, in the order of the scores.
+_DIRECTIONS = ("d", "o", "w")
+#: Each direction's Kronecker factors, (origin, destination): I or W.
+_FACTORS = {"d": ("I", "W"), "o": ("W", "I"), "w": ("W", "W")}
 
-def _flow_score_info(model, *, restrict_keys=("d", "o", "w"), T: int | None = None):
-    """Return per-draw score matrix and the (3,3) information matrix.
+_CACHE: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
 
-    Parameters
-    ----------
-    model : OLSFlow or OLSFlowPanelFE
-        Fitted flow model providing ``inference_data`` (with ``beta`` and
-        ``sigma`` posterior draws), the cached spatial lags
-        ``_Wd_y``/``_Wo_y``/``_Ww_y``, the cached trace matrix
-        ``_T_flow_traces``, and the design matrix ``_X``.
-    restrict_keys : tuple of {"d","o","w"}
-        Subset of the three spatial-lag directions to keep (in order).
-        Mainly for test readability — the joint test uses the full triple.
-    T : int, optional
-        Number of panel periods.  When ``None`` (default), inferred from
-        ``getattr(model, "_T", 1)``.  The information matrix scales the
-        Kronecker trace block by ``T`` to reflect i.i.d. within-period
-        contributions under :math:`H_0`.
 
-    Returns
-    -------
-    G : np.ndarray, shape (n_draws, k)
-        Score draws, ``G[g, i] = (W_i y)^T e_g``.
-    J : np.ndarray, shape (k, k)
-        Information matrix
-        ``J = T * T_flow_traces[K, K] * sigma2_bar + Q[K, K]``
-        with ``Q[i, j] = (W_i y)^T (W_j y)``.
+def _flow_traces(W, time_fe: bool) -> tuple[np.ndarray, np.ndarray]:
+    r"""Per-period ``tr(J W_k)`` and ``tr(J W_i' J W_j) + tr(J W_i J W_j)``.
+
+    Without time effects :math:`J = I`; with them :math:`J` removes the mean
+    across pairs, and :math:`\mathrm{tr}(JAJB) = \mathrm{tr}(AB) - (\mathbf
+    1^\top AB\mathbf 1 + \mathbf 1^\top BA\mathbf 1)/N + (\mathbf 1^\top
+    A\mathbf 1)(\mathbf 1^\top B\mathbf 1)/N^2`.
     """
-    if T is None:
-        T = int(getattr(model, "_T", 1))
-    np.asarray(model._y, dtype=np.float64)
-    np.asarray(model._X, dtype=np.float64)
-    Wy_all = np.column_stack(
-        [
-            np.asarray(model._Wd_y, dtype=np.float64),
-            np.asarray(model._Wo_y, dtype=np.float64),
-            np.asarray(model._Ww_y, dtype=np.float64),
-        ]
-    )  # (N, 3)
-    idx = {"d": 0, "o": 1, "w": 2}
-    cols = np.array([idx[k] for k in restrict_keys], dtype=int)
-    Wy = Wy_all[:, cols]  # (N, k)
+    from neighbayes.graph import flow_lags
 
+    W = sp.csr_matrix(W)
+    n = W.shape[0]
+    t1 = float(W.diagonal().sum())
+    t2 = float(W.multiply(W.T).sum())
+    t3 = float(W.multiply(W).sum())
+    prod = {("I", "I"): n, ("I", "W"): t1, ("W", "I"): t1, ("W", "W"): t2}
+    tprod = {("I", "I"): n, ("I", "W"): t1, ("W", "I"): t1, ("W", "W"): t3}
+    single = {"I": n, "W": t1}
+    tr = np.array(
+        [single[_FACTORS[k][0]] * single[_FACTORS[k][1]] for k in _DIRECTIONS]
+    )
+    TS = np.empty((3, 3))
+    TT = np.empty((3, 3))
+    for i, a in enumerate(_DIRECTIONS):
+        for j, b in enumerate(_DIRECTIONS):
+            (ao, ad), (bo, bd) = _FACTORS[a], _FACTORS[b]
+            TS[i, j] = prod[ao, bo] * prod[ad, bd]
+            TT[i, j] = tprod[ao, bo] * tprod[ad, bd]
+    if time_fe:
+        N = n * n
+        one = np.ones(N)
+        r1 = np.column_stack(flow_lags(W, one))  # W_k 1
+        c1 = np.column_stack(flow_lags(W.T.tocsr(), one))  # W_k' 1
+        s = r1.sum(axis=0)
+        tr = tr - s / N
+        # tr(J W_i J W_j): a = W_i, b = W_j;  tr(J W_i' J W_j): a = W_i'.
+        TS = TS - (c1.T @ r1 + r1.T @ c1) / N + np.outer(s, s) / N**2
+        TT = TT - (r1.T @ r1 + c1.T @ c1) / N + np.outer(s, s) / N**2
+    return tr, TT + TS
+
+
+def _flow_scores(model):
+    """Scores (a last row at the posterior mean), information and free indices.
+
+    The parameters are ``beta``, then ``rho_d``, ``rho_o``, ``rho_w`` and
+    ``sigma2``; the null estimates ``beta`` and ``sigma2``.
+    """
     idata = model.inference_data
-    beta_draws = _get_posterior_draws(idata, "beta")  # (n_draws, p)
-    _, sigma2_mean = _posterior_mean_sigma2(idata)
+    cached = _CACHE.get(model)
+    if cached is not None and cached[0] is idata:
+        return cached[1]
+    from neighbayes.graph import flow_lags
 
-    resid = _compute_residuals(model, beta_draws)
+    post = idata.posterior
+    spatial = [v for v in post if str(v).startswith(("rho", "lam"))]
+    if spatial or "sigma" not in post:
+        raise ValueError(
+            "The flow LM tests take a Gaussian aspatial null (OLSFlow); "
+            f"{type(model).__name__} "
+            + (
+                f"estimates {', '.join(map(str, spatial))}."
+                if spatial
+                else "is not Gaussian."
+            )
+        )
+    y = np.asarray(model._y, dtype=np.float64)
+    X = np.asarray(model._X, dtype=np.float64)
+    W = sp.csr_matrix(model._W_sparse, dtype=np.float64)
+    T = int(getattr(model, "_T", 1))
+    m = float(model._jacobian_T)
+    # Time effects drop log(1 - rho) from the Jacobian only for a row-standardized
+    # W, where tr(J W_k) = tr(W_k) - 1 accounts for it.
+    time_fe = float(getattr(model, "_flow_jacobian_shift", 0.0)) != 0.0
+    n_eff = float(model._n_effective)
+    N = y.size // T
 
-    G = resid @ Wy  # (n_draws, k)
+    def lag(v):
+        out = np.stack(flow_lags(W, v, T=T))  # (3, ...) like v
+        if time_fe:
+            r = out.reshape(3, T, N, -1)
+            out = (r - r.mean(axis=2, keepdims=True)).reshape(out.shape)
+        return out
 
-    Q = Wy.T @ Wy  # (k, k)
-    T_blk = model._T_flow_traces[np.ix_(cols, cols)]
-    J = T * T_blk * sigma2_mean + Q  # (k, k)
+    beta = _get_posterior_draws(idata, "beta")
+    if beta.shape[1] != X.shape[1]:
+        raise NotImplementedError(
+            f"The flow LM tests need beta over the design; {type(model).__name__}'s "
+            f"posterior has {beta.shape[1]} coefficients for {X.shape[1]} columns."
+        )
+    sigma2 = _get_posterior_draws(idata, "sigma").reshape(-1) ** 2
+    beta = np.vstack([beta, beta.mean(axis=0)])
+    sigma2 = np.r_[sigma2, sigma2.mean()]
+    tr, T_blk = _flow_traces(W, time_fe)
 
-    return G, J
+    e = y[None, :] - beta @ X.T
+    Wy = lag(y)  # (3, n)
+    g = np.column_stack(
+        [
+            e @ X / sigma2[:, None],
+            -m * tr[None, :] + (e @ Wy.T) / sigma2[:, None],
+            -n_eff / (2.0 * sigma2) + np.sum(e * e, axis=1) / (2.0 * sigma2**2),
+        ]
+    )
+    k = X.shape[1]
+    s2 = sigma2[-1]
+    WXb = lag(X @ beta[-1])  # (3, n)
+    J = np.zeros((k + 4, k + 4))
+    J[:k, :k] = X.T @ X / s2
+    J[:k, k : k + 3] = X.T @ WXb.T / s2
+    J[k : k + 3, :k] = J[:k, k : k + 3].T
+    J[k : k + 3, k : k + 3] = m * T_blk + WXb @ WXb.T / s2
+    J[k : k + 3, k + 3] = J[k + 3, k : k + 3] = m * tr / s2
+    J[k + 3, k + 3] = n_eff / (2.0 * s2**2)
+    out = (g, J, list(range(k)) + [k + 3], k)
+    _CACHE[model] = (idata, out)
+    return out
 
 
-def _flow_marginal_lm(model, key: str, test_type: str) -> BayesianLMTestResult:
-    """Helper for the three marginal LM tests (dest / orig / network)."""
-    G, J = _flow_score_info(model, restrict_keys=(key,))
-    s = G[:, 0]
-    v = float(J[0, 0])
-    LM = s**2 / (v + 1e-12)
+def _flow_test(
+    model, tested, robust=(), *, test_type: str, details=None
+) -> BayesianLMTestResult:
+    g, J, free, k = _flow_scores(model)
+    T = [k + _DIRECTIONS.index(d) for d in tested]
+    R = [k + _DIRECTIONS.index(d) for d in robust]
+    LM, statistic = efficient_lm(g, J, free, T, R, test_name=test_type)
     return _finalize_lm(
-        LM,
-        test_type=test_type,
-        df=1,
-        details={"direction": key},
+        LM, test_type=test_type, df=len(T), details=details, statistic=statistic
     )
 
 
 def bayesian_lm_flow_destination_test(model) -> BayesianLMTestResult:
-    r"""Bayesian LM test for an omitted destination-side spatial lag.
+    r"""LM test for an omitted destination lag at an OLSFlow fit (H₀: ρ_d = 0).
 
-    Tests :math:`H_0\colon \rho_d = 0` against the SARFlow alternative,
-    using a fitted :class:`~neighbayes.models.flow.OLSFlow` as the null
-    model.  For each posterior draw :math:`g` the residual is
-    :math:`e_g = y - X \beta_g`; the score is
-    :math:`s_g = (W_d y)^\top e_g` and the information-matrix denominator
-    is
+    The score of :math:`\rho_d`, orthogonal to :math:`(\beta, \sigma^2)`
+    (:cite:t:`lesage2008SpatialEconometric`; :cite:t:`dogan2021BayesianRobust`).
 
-    .. math::
-
-        V = \operatorname{tr}(W_d^\top W_d + W_d^2)\,\bar\sigma^{2}
-            + \|W_d y\|^{2},
-
-    with :math:`\bar\sigma^{2}` the posterior mean of :math:`\sigma^{2}`.
-    The Bayesian p-value is :math:`1 - F_{\chi^{2}_{1}}(\overline{LM})`.
-
-    The score / information construction follows the gravity-flow
-    spatial-econometrics framework of :cite:t:`lesage2008SpatialEconometric`
-    and :cite:t:`lesage2009IntroductionSpatial`. The Bayesian LM statistic
-    is computed per posterior draw following :cite:t:`dogan2021BayesianRobust`.
+    Returns
+    -------
+    BayesianLMTestResult
+        Per-draw LM samples, summary statistics and ``df = 1``.
     """
-    return _flow_marginal_lm(model, "d", "bayesian_lm_flow_destination")
+    return _flow_test(
+        model, ("d",), test_type="bayesian_lm_flow_destination",
+        details={"direction": "d"},
+    )  # fmt: skip
 
 
 def bayesian_lm_flow_origin_test(model) -> BayesianLMTestResult:
-    r"""Bayesian LM test for an omitted origin-side spatial lag
-    (:math:`H_0\colon \rho_o = 0`).  See :func:`bayesian_lm_flow_destination_test`
-    for details and references (:cite:p:`lesage2008SpatialEconometric`,
-    :cite:p:`dogan2021BayesianRobust`)."""
-    return _flow_marginal_lm(model, "o", "bayesian_lm_flow_origin")
+    r"""LM test for an omitted origin lag at an OLSFlow fit (H₀: ρ_o = 0).
+
+    See :func:`bayesian_lm_flow_destination_test`.
+    """
+    return _flow_test(
+        model, ("o",), test_type="bayesian_lm_flow_origin", details={"direction": "o"}
+    )
 
 
 def bayesian_lm_flow_od_test(model) -> BayesianLMTestResult:
-    r"""Bayesian LM test for an omitted network spatial lag
-    (:math:`H_0\colon \rho_w = 0`).  See :func:`bayesian_lm_flow_destination_test`
-    for details and references (:cite:p:`lesage2008SpatialEconometric`,
-    :cite:p:`dogan2021BayesianRobust`)."""
-    return _flow_marginal_lm(model, "w", "bayesian_lm_flow_od")
+    r"""LM test for an omitted network lag at an OLSFlow fit (H₀: ρ_w = 0).
+
+    See :func:`bayesian_lm_flow_destination_test`.
+    """
+    return _flow_test(
+        model, ("w",), test_type="bayesian_lm_flow_od", details={"direction": "w"}
+    )
 
 
 def bayesian_lm_flow_joint_test(model) -> BayesianLMTestResult:
-    r"""Joint Bayesian LM test for the SARFlow filter
-    (:math:`H_0\colon \rho_d = \rho_o = \rho_w = 0`).
+    r"""Joint LM test at an OLSFlow fit (H₀: ρ_d = ρ_o = ρ_w = 0).
 
-    For each posterior draw :math:`g` of the :class:`OLSFlow` null,
-    builds the score vector
-    :math:`g_g = ((W_d y)^\top e_g, (W_o y)^\top e_g, (W_w y)^\top e_g)^\top`
-    and the information matrix
-
-    .. math::
-
-        J = T_{\text{flow}}\,\bar\sigma^{2} + Q, \qquad
-        Q_{ij} = (W_i y)^\top (W_j y),
-
-    where :math:`T_{\text{flow}}` is the cached :math:`3\times 3` Kronecker
-    trace matrix from :func:`neighbayes.graph.flow_trace_blocks`.  The
-    statistic is :math:`LM_g = g_g^\top J^{-1} g_g`, distributed
-    :math:`\chi^{2}_3` under :math:`H_0`. The construction follows the
-    gravity-flow spatial-econometrics framework of
-    :cite:t:`lesage2008SpatialEconometric` and
-    :cite:t:`lesage2009IntroductionSpatial`; the Bayesian LM statistic is
-    computed per posterior draw following :cite:t:`dogan2021BayesianRobust`.
+    The three lag scores together, ``df = 3``.
     """
-    G, J = _flow_score_info(model, restrict_keys=("d", "o", "w"))
-    J_inv = _safe_inv(J, "J (flow joint LM)")
-    LM = np.einsum("di,ij,dj->d", G, J_inv, G)
-    return _finalize_lm(LM, test_type="bayesian_lm_flow_joint", df=3)
+    return _flow_test(model, _DIRECTIONS, test_type="bayesian_lm_flow_joint")
 
 
-# ---------------------------------------------------------------------
-# Robust (Neyman-orthogonal) variants — alternative model is a fitted
-# SARFlow.  For each posterior draw g of (rho_d, rho_o, rho_w, beta,
-# sigma) we build the spatially-filtered residual
-#     e_g = y - rho_d^g W_d y - rho_o^g W_o y - rho_w^g W_w y - X beta_g
-# and form the full 3-vector score g_g = (W_d y, W_o y, W_w y)^T e_g.
-# The information matrix uses the SARFlow posterior mean of sigma^2.
-# Marginal robust tests then apply the Neyman adjustment with respect to
-# the two nuisance directions.
-# ---------------------------------------------------------------------
+def bayesian_robust_lm_flow_destination_test(model) -> BayesianLMTestResult:
+    r"""Robust LM test for the destination lag at an OLSFlow fit.
 
-
-def _flow_robust_score_info(sarflow_model):
-    """Return per-draw 3-vector score and the (3,3) information matrix
-    for a fitted :class:`SARFlow`.
-
-    The score is evaluated at the SARFlow posterior draws of
-    ``(rho_d, rho_o, rho_w, beta)``; the information matrix uses the
-    SARFlow posterior mean of :math:`\\sigma^{2}`.
-    """
-    y = np.asarray(sarflow_model._y, dtype=np.float64)
-    X = np.asarray(sarflow_model._X, dtype=np.float64)
-    Wd_y = np.asarray(sarflow_model._Wd_y, dtype=np.float64)
-    Wo_y = np.asarray(sarflow_model._Wo_y, dtype=np.float64)
-    Ww_y = np.asarray(sarflow_model._Ww_y, dtype=np.float64)
-    Wy = np.column_stack([Wd_y, Wo_y, Ww_y])  # (N, 3)
-
-    idata = sarflow_model.inference_data
-    beta_draws = _get_posterior_draws(idata, "beta")
-    rho_d_draws = _get_posterior_draws(idata, "rho_d").reshape(-1)
-    rho_o_draws = _get_posterior_draws(idata, "rho_o").reshape(-1)
-    rho_w_draws = _get_posterior_draws(idata, "rho_w").reshape(-1)
-    _, sigma2_mean = _posterior_mean_sigma2(idata)
-
-    fitted = beta_draws @ X.T  # (n_draws, N)
-    rho_stack = np.column_stack([rho_d_draws, rho_o_draws, rho_w_draws])  # (n,3)
-    spatial = rho_stack @ Wy.T  # (n_draws, N)
-    resid = y[None, :] - spatial - fitted
-
-    G = resid @ Wy  # (n_draws, 3)
-
-    Q = Wy.T @ Wy
-    J = sarflow_model._T_flow_traces * sigma2_mean + Q
-
-    return G, J
-
-
-def _flow_robust_marginal_lm(
-    sarflow_model, target: int, test_type: str
-) -> BayesianLMTestResult:
-    """Neyman-orthogonal LM for a single direction with two nuisances."""
-    G, J = _flow_robust_score_info(sarflow_model)
-    nuisance = [i for i in (0, 1, 2) if i != target]
-    g_t = G[:, target]
-    g_n = G[:, nuisance]  # (n_draws, 2)
-    J_tt = float(J[target, target])
-    J_tn = J[target, nuisance]  # (2,)
-    J_nn = J[np.ix_(nuisance, nuisance)]  # (2, 2)
-
-    # adjusted score: g_t* = g_t - J_{t,n} J_{n,n}^{-1} g_n
-    g_star, V_star = _neyman_adjust_scalar(
-        g_t,
-        g_n,
-        J_tt,
-        J_tn,
-        J_nn,
-        label=f"J_nuisance (flow robust {test_type})",
-    )
-    LM = g_star**2 / (V_star + 1e-12)
-
-    direction = {0: "d", 1: "o", 2: "w"}[target]
-    return _finalize_lm(
-        LM,
-        test_type=test_type,
-        df=1,
-        details={"direction": direction},
-    )
-
-
-def bayesian_robust_lm_flow_destination_test(sarflow_model) -> BayesianLMTestResult:
-    r"""Robust Bayesian LM test for :math:`\rho_d` adjusting for
-    :math:`(\rho_o, \rho_w)` nuisance via the Neyman-orthogonal score
+    H₀: :math:`\rho_d = 0`, robust to local origin and network lags
     (:cite:t:`bera1993SpecificationTesting`, :cite:t:`anselin1996SimpleDiagnostic`,
-    :cite:t:`dogan2021BayesianRobust`).  Requires a fitted
-    :class:`~neighbayes.models.flow.SARFlow`."""
-    return _flow_robust_marginal_lm(
-        sarflow_model, 0, "bayesian_robust_lm_flow_destination"
-    )
-
-
-def bayesian_robust_lm_flow_origin_test(sarflow_model) -> BayesianLMTestResult:
-    r"""Robust Bayesian LM test for :math:`\rho_o` adjusting for
-    :math:`(\rho_d, \rho_w)` nuisance.  See
-    :func:`bayesian_robust_lm_flow_destination_test` for details and references
-    (:cite:p:`bera1993SpecificationTesting`,
-    :cite:p:`anselin1996SimpleDiagnostic`,
-    :cite:p:`dogan2021BayesianRobust`)."""
-    return _flow_robust_marginal_lm(sarflow_model, 1, "bayesian_robust_lm_flow_origin")
-
-
-def bayesian_robust_lm_flow_od_test(sarflow_model) -> BayesianLMTestResult:
-    r"""Robust Bayesian LM test for :math:`\rho_w` adjusting for
-    :math:`(\rho_d, \rho_o)` nuisance.  See
-    :func:`bayesian_robust_lm_flow_destination_test` for details and references
-    (:cite:p:`bera1993SpecificationTesting`,
-    :cite:p:`anselin1996SimpleDiagnostic`,
-    :cite:p:`dogan2021BayesianRobust`)."""
-    return _flow_robust_marginal_lm(sarflow_model, 2, "bayesian_robust_lm_flow_od")
-
-
-# ---------------------------------------------------------------------
-# Phase 5 — WX-style test for the intra-block in OLSFlow.
-# ---------------------------------------------------------------------
-
-
-def bayesian_lm_flow_intraunit_test(model) -> BayesianLMTestResult:
-    r"""Bayesian LM (WX-style) test for the intra block in an OLSFlow null.
-
-    Tests :math:`H_0\colon \beta_{\text{intra}} = 0` in the gravity model
-
-    .. math::
-
-        y = \alpha + g \gamma + X_d \beta_d + X_o \beta_o
-            + X_{\text{intra}} \beta_{\text{intra}} + \varepsilon,
-
-    using a fitted :class:`OLSFlow` whose design already contains the
-    intra block (the standard layout from
-    :func:`neighbayes.graph.flow_design_matrix`).  Per posterior draw the
-    intra-block score is :math:`g_g = X_{\text{intra}}^\top e_g` with
-    :math:`e_g = y - X \beta_g` (full-design residual) and the variance
-    is :math:`V = X_{\text{intra}}^\top X_{\text{intra}} / \bar\sigma^{2}`,
-    matching the SDM-style WX information block of
-    :cite:t:`dogan2021BayesianRobust`.  The statistic is
-    :math:`LM_g = g_g^\top V^{-1} g_g`, df :math:`= k_{\text{intra}}`.
-
-    Notes
-    -----
-    The test treats the intra block as the "WX" addition relative to a
-    null with the same dest/orig coefficients but no intra columns.  The
-    score is evaluated at the OLSFlow draws — this is asymptotically
-    equivalent to refitting an "OLSFlow without intra" null when the
-    intra block is orthogonal to ``X_dest``/``X_orig`` (typically the
-    case for the diagonal-mask layout used by ``flow_design_matrix``).
+    :cite:t:`dogan2021BayesianRobust`).
     """
-    intra_idx = getattr(model, "_intra_idx", None)
-    if intra_idx is None or len(intra_idx) == 0:
-        raise ValueError(
-            "Model has no intra columns to test.  Build the design with "
-            "flow_design_matrix(..., include_intra=True) before fitting."
-        )
-    intra_idx = np.asarray(intra_idx, dtype=int)
-
-    np.asarray(model._y, dtype=np.float64)
-    X = np.asarray(model._X, dtype=np.float64)
-    Xi = X[:, intra_idx]  # (N, k_intra)
-    k_intra = Xi.shape[1]
-
-    idata = model.inference_data
-    beta_draws = _get_posterior_draws(idata, "beta")  # (n_draws, p)
-
-    resid = _compute_residuals(model, beta_draws)
-    G = resid @ Xi  # (n_draws, k_intra)
-
-    _, sigma2_mean = _posterior_mean_sigma2(idata)
-    V = (Xi.T @ Xi) / sigma2_mean
-
-    return _lm_vector(
-        G,
-        V,
-        test_type="bayesian_lm_flow_intraunit",
-        df=k_intra,
-        details={"k_intra": k_intra},
-        label="V_intra (flow intra LM)",
-    )
+    return _flow_test(
+        model, ("d",), ("o", "w"), test_type="bayesian_robust_lm_flow_destination",
+        details={"direction": "d"},
+    )  # fmt: skip
 
 
-# ---------------------------------------------------------------------
-# Phase 6 — Panel analogues.  Operate on demeaned (_y, _X) panel stacks
-# of length N_flow * T from FlowPanelModel.  The information matrix
-# stays additive in T because Q[i,j] = (W_i y)^T (W_j y) is computed on
-# the full stacked panel lags (already cached as _Wd_y/_Wo_y/_Ww_y on
-# the demeaned panel).
-# ---------------------------------------------------------------------
+def bayesian_robust_lm_flow_origin_test(model) -> BayesianLMTestResult:
+    r"""Robust LM test for the origin lag at an OLSFlow fit.
+
+    H₀: :math:`\rho_o = 0`, robust to local destination and network lags; see
+    :func:`bayesian_robust_lm_flow_destination_test`.
+    """
+    return _flow_test(
+        model, ("o",), ("d", "w"), test_type="bayesian_robust_lm_flow_origin",
+        details={"direction": "o"},
+    )  # fmt: skip
+
+
+def bayesian_robust_lm_flow_od_test(model) -> BayesianLMTestResult:
+    r"""Robust LM test for the network lag at an OLSFlow fit.
+
+    H₀: :math:`\rho_w = 0`, robust to local destination and origin lags; see
+    :func:`bayesian_robust_lm_flow_destination_test`.
+    """
+    return _flow_test(
+        model, ("w",), ("d", "o"), test_type="bayesian_robust_lm_flow_od",
+        details={"direction": "w"},
+    )  # fmt: skip

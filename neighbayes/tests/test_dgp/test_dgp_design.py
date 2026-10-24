@@ -19,7 +19,7 @@ def test_one_simulator_per_public_class():
     import neighbayes.models as m
 
     classes = {n for n in m.__all__ if n != "Level"}
-    assert len(d.__all__) == len(classes) == 29
+    assert len(d.__all__) == len(classes) == 31
 
 
 def test_signature_shows_design_arguments():

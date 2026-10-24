@@ -614,7 +614,6 @@ def run_zinb_chain(
             alpha_state = _NBGibbsState(
                 eta=eta_cnt[z1],
                 beta=state.beta,
-                sigma2=1.0,  # unused by _sample_alpha
                 rho=state.rho,
                 alpha=state.alpha,
                 omega=state.omega_cnt[z1],
