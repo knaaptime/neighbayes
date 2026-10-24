@@ -24,6 +24,7 @@ from .utils import (
     resolve_weights,
     spatial_filter_factor,
 )
+from .zinb import _latent_parts
 
 
 def truncated_negative_binomial(rng, mu, alpha: float) -> np.ndarray:
@@ -77,6 +78,7 @@ def simulate_sar_hurdle_negbin(
     err_hetero: bool = False,
     create_gdf: bool = False,
     geometry_type: str = "polygon",
+    latent: bool = False,
 ) -> dict:
     r"""Simulate a reduced-form SAR hurdle NB cross-section.
 
@@ -86,6 +88,13 @@ def simulate_sar_hurdle_negbin(
         \eta^{\mathrm{c}} = (I - \rho W)^{-1} X\beta,
 
     ``d ~ Bernoulli(logit⁻¹(η_z))`` and ``y = d · tNB(e^{η^c}, α)``.
+
+    With ``latent=True`` it draws the latent hurdle ``SARHurdleNegBin(latent=True)``
+    fits, each part's own disturbance propagated: ``d = 1(u > 0)``,
+    ``u = (I − ρ_z W_z)⁻¹(X_z β_z + ε_z)`` with ``ε_z`` logistic, and
+    ``y | d = 1`` Poisson(``e^η``) truncated at zero, ``η = (I − ρW)⁻¹(Xβ + ε)``
+    with ``ε = log γ``, ``γ ~ Gamma(α, α)``; ``eta_zero`` and ``eta_cnt`` are
+    then the drawn ``u`` and ``η``.
 
     Parameters
     ----------
@@ -142,6 +151,21 @@ def simulate_sar_hurdle_negbin(
     _check_rho_stability(rho, name="rho")
     _check_rho_stability(rho_zero, name="rho_zero")
 
+    if latent:
+        eta_bin, eta_cnt, beta_zero = _latent_parts(
+            rng, Ws, W_zero_s, X, X_zero, beta, beta_zero, rho, rho_zero, alpha,
+            target_pi,
+        )  # fmt: skip
+        d = (eta_bin > 0).astype(np.int64)
+        lam = np.maximum(np.exp(np.clip(eta_cnt, -30.0, 30.0)), 1e-300)
+        # The first event's time given one by time 1, then the rest: exact.
+        t = -np.log1p(rng.random(n) * np.expm1(-lam)) / lam
+        y = np.where(d == 1, 1 + rng.poisson(lam * np.clip(1.0 - t, 0.0, 1.0)), 0)
+        return _hurdle_output(
+            y, d, X, X_zero, eta_bin, eta_cnt, Ws, Wg, W_zero_s, W_zero_g,
+            rho, rho_zero, beta, beta_zero, alpha, gdf, create_gdf, geometry_type,
+        )  # fmt: skip
+
     solve_b = spatial_filter_factor(W_zero_s, rho_zero)
     eta_bin = solve_b(X_zero @ beta_zero)
     if target_pi is not None:
@@ -160,6 +184,16 @@ def simulate_sar_hurdle_negbin(
         y[pos] = truncated_negative_binomial(
             rng, np.exp(np.clip(eta_cnt[pos], -30.0, 30.0)), alpha
         )
+    return _hurdle_output(
+        y, d, X, X_zero, eta_bin, eta_cnt, Ws, Wg, W_zero_s, W_zero_g,
+        rho, rho_zero, beta, beta_zero, alpha, gdf, create_gdf, geometry_type,
+    )  # fmt: skip
+
+
+def _hurdle_output(
+    y, d, X, X_zero, eta_bin, eta_cnt, Ws, Wg, W_zero_s, W_zero_g,
+    rho, rho_zero, beta, beta_zero, alpha, gdf, create_gdf, geometry_type,
+) -> dict:  # fmt: skip
     out = {
         "y": y.astype(np.float64),
         "d": d.astype(np.float64),

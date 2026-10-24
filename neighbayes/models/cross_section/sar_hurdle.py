@@ -34,10 +34,16 @@ from .._mixins._zero_part import ZeroPartMixin
 from ..base import SpatialModel
 from ..panel._hurdle import _HurdlePanel
 from ..priors import PanelHurdlePriors, SARHurdlePriors
+from ._latent_two_part import LatentHurdleMixin
 
 
 class SARHurdleNegBin(
-    CountDesigns, _HurdlePanel, ZeroPartMixin, HurdleMixin, SpatialModel
+    CountDesigns,
+    _HurdlePanel,
+    ZeroPartMixin,
+    LatentHurdleMixin,
+    HurdleMixin,
+    SpatialModel,
 ):
     """Bayesian reduced-form SAR hurdle NB2 with a Pólya–Gamma Gibbs sampler.
 
@@ -101,6 +107,11 @@ class SARHurdleNegBin(
     mundlak : bool, default False
         Add the unit means of the time-varying columns to both of a panel's
         designs.  Needs unit effects.
+    latent : bool, default False
+        The latent model instead of the reduced form: each part a latent SAR
+        propagating its own disturbance, a count positive when its logistic
+        utility is, and then Poisson given the log-mean, truncated at zero
+        (:mod:`neighbayes.samplers.two_part_latent`).  A cross-section only.
 
     Notes
     -----
@@ -119,6 +130,7 @@ class SARHurdleNegBin(
 
     _DESIGNS = {
         "static": {},
+        "latent": {"_gibbs_key": ("hurdle_latent", "cross_section")},
         "panel": {
             "_priors_cls": PanelHurdlePriors,
             "_gibbs_key": ("hurdle", "panel"),

@@ -19,34 +19,15 @@ import numpy as np
 import scipy.sparse as sp
 
 from .._utils._jax_utils import cached_sweep, run_chains_chunked
-from ..logit_latent._jax import colour_classes
+from .._utils._latent_loglik import POISSON, TRUNCATED, UNOBSERVED
+from ..logit_latent._jax import class_table, colour_classes, column_table
 from ._core import (
     _BETA_DF,
     _PAR_ACCEPT,
     _SOLVE_MAXITER,
     _SOLVE_RTOL,
-    filter_columns,
     initial_state,
 )
-
-
-def _column_table(W):
-    """Column ``i`` of ``A``'s pattern as row ``i`` of padded tables.
-
-    Returns ``(rows, ones, w)`` of shape ``(n, m)``, ``m`` the largest column
-    count; padding has ``rows = 0`` and zero values, so it contributes a
-    constant to every conditional and nothing to an update.
-    """
-    indptr, rows, ones, wvals = filter_columns(W)
-    n = W.shape[0]
-    counts = np.diff(indptr)
-    col = np.repeat(np.arange(n), counts)
-    pos = np.arange(rows.size) - np.repeat(indptr[:-1], counts)
-    shape = (n, int(counts.max()))
-    R = np.zeros(shape, np.int32)
-    O, V = np.zeros(shape), np.zeros(shape)
-    R[col, pos], O[col, pos], V[col, pos] = rows, ones, wvals
-    return R, O, V
 
 
 def _row_table(W):
@@ -62,22 +43,16 @@ def _row_table(W):
     return C, V
 
 
-def _class_table(colour):
-    """The members of each colour class, padded with the out-of-range index ``n``."""
-    n = colour.size
-    sizes = np.bincount(colour)
-    order = np.argsort(colour, kind="stable")
-    start = np.r_[0, np.cumsum(sizes)[:-1]]
-    pos = np.arange(n) - np.repeat(start, sizes)
-    table = np.full((sizes.size, int(sizes.max())), n, np.int32)
-    table[colour[order], pos] = order
-    return table
+def _latent_data(
+    y, X, W, priors, ld_params, sparse_arrays, T=1, unit_effects=None, kind=None
+):
+    """The read-only arrays every chain's sweep takes (``consts``).
 
-
-def _latent_data(y, X, W, priors, ld_params, sparse_arrays, T=1, unit_effects=None):
-    """The read-only arrays every chain's sweep takes (``consts``)."""
+    ``kind`` is what each count observes, :data:`POISSON` by default.
+    """
     import jax.numpy as jnp
 
+    from ..negbin_reduced._core import _symmetrizing_diagonal
     from ._core import _lag
 
     W = sp.csr_matrix(W, dtype=np.float64)
@@ -95,11 +70,23 @@ def _latent_data(y, X, W, priors, ld_params, sparse_arrays, T=1, unit_effects=No
         else {}
     )
     beta_sigma = np.broadcast_to(np.asarray(priors.beta_sigma, float), (k,))
-    R, O, V = _column_table(W)
+    R, O, V = column_table(W)
     Wc, Wv = _row_table(W)
+    # A W similar to a symmetric matrix by D^{1/2} gets that matrix's values
+    # on its own pattern, for the filter solves (see ``_make_sweep``).
+    dsym = _symmetrizing_diagonal(sp.csc_matrix(W))
+    if dsym is not None:
+        sq = np.sqrt(dsym)
+        sym = {"sqd": jnp.asarray(sq), "Wsym": jnp.asarray(sq[:, None] * Wv / sq[Wc])}
+    else:
+        sym = {}
     return {
         **effects,
+        **sym,
         "y": jnp.asarray(y, dtype=jnp.float64).reshape(T, n),
+        "kind": jnp.asarray(
+            np.full(nT, POISSON) if kind is None else kind, dtype=jnp.int32
+        ).reshape(T, n),
         "X": jnp.asarray(X, dtype=jnp.float64),
         "WX": jnp.asarray(WX),
         "XtXiXt": jnp.asarray(np.linalg.solve(X.T @ X, X.T)),
@@ -111,7 +98,7 @@ def _latent_data(y, X, W, priors, ld_params, sparse_arrays, T=1, unit_effects=No
         "colrows": jnp.asarray(R),
         "colones": jnp.asarray(O),
         "colw": jnp.asarray(V),
-        "classes": jnp.asarray(_class_table(colour_classes(W))),
+        "classes": jnp.asarray(class_table(colour_classes(W))),
         "b0": jnp.asarray(np.broadcast_to(np.asarray(priors.beta_mu, float), (k,))),
         "B0inv": jnp.asarray(np.diag(1.0 / beta_sigma**2)),
         "lo": jnp.float64(priors.rho_lower),
@@ -128,7 +115,36 @@ _ETA_NEWTON = 3
 _ETA_NEWTON_MAX_STEP = 5.0
 
 
-def _eta_mh(x0, yi, e, Av, alpha, key, active):
+def _obs_terms(t, y, kind):
+    """``log p(y | eta = t) + log y!``, its score and negative Hessian, by kind.
+
+    The truncated count's score is ``y - g``, ``g = λ / (1 - e^{-λ})`` its
+    mean, and its negative Hessian ``λ g'(λ)``, by series at small ``λ``.
+    """
+    import jax.numpy as jnp
+
+    et = jnp.exp(t)
+    small = et < 1e-2
+    q = -jnp.expm1(-et)
+    qs = jnp.where(small, 1.0, q)
+    g = jnp.where(small, 1.0 + et / 2.0 + et * et / 12.0, et / qs)
+    dg = jnp.where(
+        small, et * (0.5 + et / 6.0), et * (qs - et * jnp.exp(-et)) / (qs * qs)
+    )
+    far = t < -30.0
+    log_pos = jnp.where(far, t - 0.5 * et, jnp.log(jnp.where(far, 1.0, q)))
+    trunc, on = kind == TRUNCATED, kind != UNOBSERVED
+    value = y * t - et - jnp.where(trunc, log_pos, 0.0)
+    score = y - jnp.where(trunc, g, et)
+    info = jnp.where(trunc, dg, et)
+    return (
+        jnp.where(on, value, 0.0),
+        jnp.where(on, score, 0.0),
+        jnp.where(on, info, 0.0),
+    )
+
+
+def _eta_mh(x0, yi, ki, e, Av, alpha, key, active):
     """Independence MH for the log-means of one colour class.
 
     ``e`` are the disturbances in the rows of each lane's column of ``A`` and
@@ -147,19 +163,21 @@ def _eta_mh(x0, yi, e, Av, alpha, key, active):
 
     def f(t):
         ee = rest + Av * t[:, None]
-        return yi * t - jnp.exp(t) + alpha * jnp.sum(ee - jnp.exp(ee), axis=1)
+        return _obs_terms(t, yi, ki)[0] + alpha * jnp.sum(ee - jnp.exp(ee), axis=1)
 
     def grad_hess(t):
         ee = jnp.exp(rest + Av * t[:, None])
-        et = jnp.exp(t)
+        _, score, info = _obs_terms(t, yi, ki)
         return (
-            yi - et + alpha * jnp.sum(Av * (1.0 - ee), axis=1),
-            et + alpha * jnp.sum(Av * Av * ee, axis=1),
+            score + alpha * jnp.sum(Av * (1.0 - ee), axis=1),
+            info + alpha * jnp.sum(Av * Av * ee, axis=1),
         )
 
+    # An unobserved count's term carries no weight.
     yp = yi + 0.5
-    t = (yp * jnp.log(yp) - alpha * jnp.sum(Av * rest, axis=1)) / (
-        yp + alpha * jnp.sum(Av * Av, axis=1)
+    wp = jnp.where(ki != UNOBSERVED, yp, 0.0)
+    t = (wp * jnp.log(yp) - alpha * jnp.sum(Av * rest, axis=1)) / (
+        wp + alpha * jnp.sum(Av * Av, axis=1)
     )
     for _ in range(_ETA_NEWTON):
         g, h = grad_hess(t)
@@ -193,7 +211,7 @@ def _make_sweep(
 ):
     import jax
     import jax.numpy as jnp
-    from jax.scipy.sparse.linalg import bicgstab
+    from jax.scipy.sparse.linalg import bicgstab, cg
     from jax.scipy.special import digamma, gammaln, polygamma
 
     from .._utils._jax_slice import adapt_slice_width, jax_slice_sample_1d
@@ -215,13 +233,35 @@ def _make_sweep(
             return jnp.sum(d["Wvals"] * v[..., d["Wcols"]], axis=-1)
 
         def solve(r, b, x0):
-            """``A(r)^{-1}`` applied to each period of ``b`` (``(T, n)``)."""
+            """``A(r)^{-1}`` applied to each period of ``b`` (``(T, n)``).
 
-            def A(v):
-                return v - r * W(v)
+            A ``W`` with a symmetric ``D^{1/2} W D^{-1/2}`` is solved by CG on
+            ``D^{1/2} A D^{-1/2}``, positive definite inside the stationary
+            interval: a quarter cheaper than BiCGSTAB per solve, which tells
+            as ``|rho|`` and the iteration count grow.  Any other ``W`` by
+            BiCGSTAB.  A solve that misses its tolerance falls back
+            on the sparse LU.
+            """
+            if "sqd" in d:
+                sq = d["sqd"]
 
-            x, _ = bicgstab(A, b, x0=x0, tol=_SOLVE_RTOL, maxiter=_SOLVE_MAXITER)
-            ok = jnp.linalg.norm(b - A(x)) <= 100.0 * _SOLVE_RTOL * jnp.linalg.norm(b)
+                def A(v):
+                    return v - r * jnp.sum(d["Wsym"] * v[..., d["Wcols"]], axis=-1)
+
+                rhs = sq * b
+                v, _ = cg(A, rhs, x0=sq * x0, tol=_SOLVE_RTOL, maxiter=_SOLVE_MAXITER)
+                x = v / sq
+            else:
+
+                def A(v):
+                    return v - r * W(v)
+
+                rhs = b
+                v, _ = bicgstab(A, b, x0=x0, tol=_SOLVE_RTOL, maxiter=_SOLVE_MAXITER)
+                x = v
+            ok = jnp.linalg.norm(rhs - A(v)) <= 100.0 * _SOLVE_RTOL * jnp.linalg.norm(
+                rhs
+            )
             vals = sparse["eye"] - r * sparse["w"]
             return jax.lax.cond(
                 ok,
@@ -232,7 +272,8 @@ def _make_sweep(
             )
 
         def poisson(eta):
-            return jnp.sum(y * eta - jnp.exp(eta))
+            """The counts' log-likelihood at ``eta``, each by its kind."""
+            return jnp.sum(_obs_terms(eta, y, d["kind"])[0])
 
         def gamma_stat(e):
             return jnp.sum(e - jnp.exp(e))
@@ -276,7 +317,7 @@ def _make_sweep(
                 # The padding index ``n`` is out of range: clip, then mask.
                 return jnp.take(a, idx, axis=-1 if a.ndim == 2 else 0, mode="clip")
 
-            x0, yi = take(eta), take(y)
+            x0, yi, ki = take(eta), take(y), take(d["kind"])
             R, Av = (
                 jnp.take(d["colrows"], idx, axis=0, mode="clip"),
                 jnp.take(aval, idx, axis=0, mode="clip"),
@@ -286,6 +327,7 @@ def _make_sweep(
             x1 = _eta_mh(
                 x0.reshape(-1),
                 yi.reshape(-1),
+                ki.reshape(-1),
                 e.reshape(-1, R.shape[1]),
                 Avt.reshape(-1, R.shape[1]),
                 alpha,

@@ -65,9 +65,12 @@ from .._mixins._zinb import ZINBMixin
 from ..base import SpatialModel
 from ..panel._zinb import _ZINBPanel
 from ..priors import PanelZINBPriors, SARZINBPriors
+from ._latent_two_part import LatentZINBMixin
 
 
-class SARZINB(CountDesigns, _ZINBPanel, ZeroPartMixin, ZINBMixin, SpatialModel):
+class SARZINB(
+    CountDesigns, _ZINBPanel, ZeroPartMixin, LatentZINBMixin, ZINBMixin, SpatialModel
+):
     """Bayesian zero-inflated SAR Negative Binomial with PG-Gibbs sampler.
 
     Parameters
@@ -151,6 +154,11 @@ class SARZINB(CountDesigns, _ZINBPanel, ZeroPartMixin, ZINBMixin, SpatialModel):
     mundlak : bool, default False
         Add the unit means of the time-varying columns to a panel's count
         design.  Needs unit effects.
+    latent : bool, default False
+        The latent model instead of the reduced form: each part a latent SAR
+        propagating its own disturbance, a unit active when its logistic
+        utility is positive and its count then Poisson given the log-mean
+        (:mod:`neighbayes.samplers.two_part_latent`).  A cross-section only.
 
     Notes
     -----
@@ -166,6 +174,7 @@ class SARZINB(CountDesigns, _ZINBPanel, ZeroPartMixin, ZINBMixin, SpatialModel):
 
     _DESIGNS = {
         "static": {},
+        "latent": {"_gibbs_key": ("zinb_latent", "cross_section")},
         "panel": {"_priors_cls": PanelZINBPriors, "_gibbs_key": ("zinb", "panel")},
     }
     _zero_part = True

@@ -78,6 +78,17 @@ def _cases():
         dpn["y"],
         lambda y: M.SARNegBin(y=y, X=dpn["X"], W=dpn["W_sparse"], N=25, T=3, **panel),
     )
+    for name, sim, cls in (
+        ("SARZINBLatent", dgp.simulate_sar_zinb, M.SARZINB),
+        ("SARHurdleNegBinLatent", dgp.simulate_sar_hurdle_negbin, M.SARHurdleNegBin),
+    ):
+        dt = sim(n_side=6, seed=12, latent=True)
+        out[name] = (
+            dt["y"],
+            lambda y, dt=dt, cls=cls: cls(
+                y=y, X=dt["X"], X_zero=dt["X_zero"], W=dt["W_sparse"], latent=True
+            ),
+        )
     dne = dgp.simulate_sem_negbin(n_side=6, seed=10)
     out["SEMNegBin"] = (
         dne["y"],
@@ -152,6 +163,8 @@ _CASES = (
     "SEMLogit",
     "SARNegBinLatent",
     "SARNegBinLatentPanel",
+    "SARZINBLatent",
+    "SARHurdleNegBinLatent",
     "SEMNegBin",
     "SARNegBinFlow",
     "SARNegBinFlow(separable)",

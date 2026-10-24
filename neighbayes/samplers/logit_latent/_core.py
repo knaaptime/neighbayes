@@ -28,11 +28,16 @@ the latent utilities, Holmes & Held 2006 for the scales):
 There is no Pólya–Gamma step: ``y`` is a threshold of :math:`y^*`, not a
 Bernoulli draw given it, and a PG layer would add a second, local logistic
 disturbance, whose :math:`\rho = 0` member is not the logit.
+
+A zero-inflated count's zero leaves its activation unknown: its utility's
+side of zero is drawn with it, the positive side weighted by the probability
+:math:`q_i` that an active unit counts zero (``sign`` 0, ``logq``).
 """
 
 from __future__ import annotations
 
-from typing import Callable, Literal
+import math
+from typing import Callable, Literal, Optional
 
 import numba
 import numpy as np
@@ -40,6 +45,7 @@ import scipy.sparse as sp
 
 from ...models.priors import LogitGibbsPriors
 from .._utils._slice import SliceWidthState, slice_sample_1d_adaptive
+from .._utils._sweeps import run_sweeps
 
 
 @numba.njit(cache=True)
@@ -58,12 +64,28 @@ def _rtnorm_lower(a, rng):
 
 
 @numba.njit(cache=True)
-def _orthant_sweep(ystar, sign, indptr, indices, data, b, rng):
+def _log_ndtr(x):
+    """``log Phi(x)``, by its asymptotic series far in the lower tail."""
+    if x > -20.0:
+        return np.log(0.5 * math.erfc(-x / np.sqrt(2.0)))
+    r = 1.0 / (x * x)
+    return (
+        -0.5 * x * x
+        - np.log(-x)
+        - 0.5 * np.log(2.0 * np.pi)
+        + np.log1p(-r + 3.0 * r * r - 15.0 * r * r * r)
+    )
+
+
+@numba.njit(cache=True)
+def _orthant_sweep(ystar, sign, logq, pneg, indptr, indices, data, b, rng):
     """One Gibbs pass over the latent utilities.
 
     ``ystar | rest`` has density proportional to
     ``exp(-ystar' Q ystar / 2 + b' ystar)`` on the orthant ``sign * ystar > 0``;
-    ``Q`` is the CSR triple ``(indptr, indices, data)``.
+    ``Q`` is the CSR triple ``(indptr, indices, data)``.  Where ``sign`` is 0
+    the positive side is weighted by ``exp(logq)`` and the side drawn first;
+    ``pneg`` receives its probability of the negative side.
     """
     for i in range(ystar.size):
         qii = 0.0
@@ -76,7 +98,12 @@ def _orthant_sweep(ystar, sign, indptr, indices, data, b, rng):
                 acc -= data[p] * ystar[j]
         sd = 1.0 / np.sqrt(qii)
         mean = acc / qii
-        if sign[i] > 0:
+        side = sign[i]
+        if side == 0:
+            log_odds = _log_ndtr(mean / sd) + logq[i] - _log_ndtr(-mean / sd)
+            pneg[i] = 1.0 / (1.0 + np.exp(log_odds))
+            side = -1 if rng.random() < pneg[i] else 1
+        if side > 0:
             ystar[i] = mean + sd * _rtnorm_lower(-mean / sd, rng)
         else:
             ystar[i] = mean - sd * _rtnorm_lower(mean / sd, rng)
@@ -86,69 +113,83 @@ def _chol_solve(L: np.ndarray, v: np.ndarray) -> np.ndarray:
     return np.linalg.solve(L.T, np.linalg.solve(L, v))
 
 
-def run_chain(
-    *,
-    y: np.ndarray,
-    X: np.ndarray,
-    W: sp.csr_matrix,
-    process: Literal["sar", "sem"],
-    priors: LogitGibbsPriors,
-    logdet_fn: Callable[[float], float],
-    draws: int,
-    tune: int,
-    thin: int = 1,
-    rng: np.random.Generator,
-    chain_id: int = 0,
-    progress_manager=None,
-    slice_width: float = 0.4,
-    store_latent: bool = False,
-) -> dict:
-    """One chain; returns ``{"rho" | "lam": (n_keep,), "beta": (n_keep, k)}``.
+class LatentLogitChain:
+    """One chain's state and sweep (see the module).
 
-    ``store_latent`` adds the utilities at every kept draw, ``"latent"``.
+    ``sign`` is each utility's side of zero (``+1``, ``-1``, or ``0`` for
+    unknown, which needs ``logq`` set before each sweep); by default it is
+    that of ``y``.  :func:`run_chain` runs one alone.
     """
-    from augax import ks_sample_numpy
 
-    n, k = X.shape
-    sign = np.where(y > 0, 1, -1).astype(np.int8)
-    W = sp.csr_matrix(W)
-    eye = sp.identity(n, format="csr")
-    b0 = np.broadcast_to(np.asarray(priors.beta_mu, dtype=np.float64), (k,))
-    B0inv = np.diag(
-        1.0 / np.broadcast_to(np.asarray(priors.beta_sigma, float), (k,)) ** 2
-    )
-    B0inv_b0 = B0inv @ b0
-    lo, hi = float(priors.rho_lower), float(priors.rho_upper)
-    WX = np.asarray(W @ X)
-    width = SliceWidthState(w=slice_width)
+    def __init__(
+        self,
+        *,
+        y: np.ndarray,
+        X: np.ndarray,
+        W: sp.csr_matrix,
+        process: Literal["sar", "sem"],
+        priors: LogitGibbsPriors,
+        logdet_fn: Callable[[float], float],
+        rng: np.random.Generator,
+        slice_width: float = 0.4,
+        sign: Optional[np.ndarray] = None,
+    ):
+        n, k = X.shape
+        self.sar = process == "sar"
+        self.n, self.k, self.rng = n, k, rng
+        self.sign = (
+            np.where(y > 0, 1, -1).astype(np.int8)
+            if sign is None
+            else np.asarray(sign, dtype=np.int8)
+        )
+        self.logq = np.zeros(n)
+        self.pneg = np.zeros(n)
+        self.X = X
+        self.W = sp.csr_matrix(W)
+        self.eye = sp.identity(n, format="csr")
+        self.logdet_fn = logdet_fn
+        self.b0 = np.broadcast_to(np.asarray(priors.beta_mu, dtype=np.float64), (k,))
+        self.B0inv = np.diag(
+            1.0 / np.broadcast_to(np.asarray(priors.beta_sigma, float), (k,)) ** 2
+        )
+        self.B0inv_b0 = self.B0inv @ self.b0
+        self.lo, self.hi = float(priors.rho_lower), float(priors.rho_upper)
+        self.WX = np.asarray(self.W @ X)
+        self.width = SliceWidthState(w=slice_width)
 
-    # Logit start: the utilities on their side of zero, the prior mean of the
-    # scales (E[2K] = sqrt(2 pi) log 2), no dependence.
-    par = 0.0
-    beta = b0.copy()
-    ystar = 0.5 * sign.astype(np.float64)
-    m = np.full(n, np.sqrt(2.0 * np.pi) * np.log(2.0))
+        # Logit start: the utilities on their side of zero, the prior mean of
+        # the scales (E[2K] = sqrt(2 pi) log 2), no dependence.
+        self.par = 0.0
+        self.beta = self.b0.copy()
+        self.ystar = 0.5 * np.where(self.sign != 0, self.sign, 1).astype(np.float64)
+        self.m = np.full(n, np.sqrt(2.0 * np.pi) * np.log(2.0))
 
-    n_keep = draws // thin
-    par_draws = np.empty(n_keep)
-    beta_draws = np.empty((n_keep, k))
-    latent_draws = np.empty((n_keep, n)) if store_latent else None
-    for it in range(tune + draws):
-        A = (eye - par * W).tocsr()
+    def sweep(self, tuning: bool) -> None:
+        """One Gibbs sweep."""
+        from augax import ks_sample_numpy
+
+        X, W, rng, k = self.X, self.W, self.rng, self.k
+        par, beta, ystar, m = self.par, self.beta, self.ystar, self.m
+        logdet_fn, B0inv, B0inv_b0 = self.logdet_fn, self.B0inv, self.B0inv_b0
+        lo, hi = self.lo, self.hi
+
+        A = (self.eye - par * W).tocsr()
         p = 1.0 / (m * m)
         Q = (A.T @ sp.diags(p) @ A).tocsr()
         Q.sort_indices()
         Xb = X @ beta
-        b = A.T @ (p * Xb) if process == "sar" else Q @ Xb
-        _orthant_sweep(ystar, sign, Q.indptr, Q.indices, Q.data, b, rng)
+        b = A.T @ (p * Xb) if self.sar else Q @ Xb
+        _orthant_sweep(
+            ystar, self.sign, self.logq, self.pneg, Q.indptr, Q.indices, Q.data, b, rng
+        )
 
-        eps = A @ ystar - Xb if process == "sar" else A @ (ystar - Xb)
+        eps = A @ ystar - Xb if self.sar else A @ (ystar - Xb)
         m = ks_sample_numpy(eps, rng)
         p = 1.0 / (m * m)
         z = W @ ystar
         py, pz = p * ystar, p * z
 
-        if process == "sar":
+        if self.sar:
             # r = y* - rho z; m(rho) = X'P r + B0^-1 b0 = c0 - rho c1.
             Binv = X.T @ (p[:, None] * X) + B0inv
             L = np.linalg.cholesky(Binv)
@@ -166,11 +207,12 @@ def run_chain(
                 )
 
             par, _, _, _ = slice_sample_1d_adaptive(
-                logp, par, lo, hi, width_state=width, rng=rng
+                logp, par, lo, hi, width_state=self.width, rng=rng
             )
             mean = Bc0 - par * Bc1
         else:
             # X~ = X - lam WX, r = y* - lam z: every term is quadratic in lam.
+            WX = self.WX
             G0 = X.T @ (p[:, None] * X)
             G1 = X.T @ (p[:, None] * WX)
             G1 = G1 + G1.T
@@ -195,25 +237,60 @@ def run_chain(
                 )
 
             par, _, _, _ = slice_sample_1d_adaptive(
-                logp, par, lo, hi, width_state=width, rng=rng
+                logp, par, lo, hi, width_state=self.width, rng=rng
             )
             L, mm = blocks(par)
             mean = _chol_solve(L, mm)
 
         # beta ~ N(mean, Binv^-1): mean + L^-T z.
-        beta = mean + np.linalg.solve(L.T, rng.standard_normal(k))
+        self.beta = mean + np.linalg.solve(L.T, rng.standard_normal(k))
+        self.par, self.m = par, m
 
-        if it >= tune and (it - tune) % thin == 0:
-            idx = (it - tune) // thin
-            if idx < n_keep:
-                par_draws[idx] = par
-                beta_draws[idx] = beta
-                if store_latent:
-                    latent_draws[idx] = ystar
-        if progress_manager is not None:
-            progress_manager.update(chain_id, it, tuning=it < tune)
+    def draw(self, store_latent: bool) -> dict:
+        """The current values, named as :func:`run_chain` returns them."""
+        out = {"rho" if self.sar else "lam": self.par, "beta": self.beta}
+        if store_latent:
+            out["latent"] = self.ystar
+        return out
 
-    out = {"rho" if process == "sar" else "lam": par_draws, "beta": beta_draws}
-    if store_latent:
-        out["latent"] = latent_draws
-    return out
+
+def run_chain(
+    *,
+    y: np.ndarray,
+    X: np.ndarray,
+    W: sp.csr_matrix,
+    process: Literal["sar", "sem"],
+    priors: LogitGibbsPriors,
+    logdet_fn: Callable[[float], float],
+    draws: int,
+    tune: int,
+    thin: int = 1,
+    rng: np.random.Generator,
+    chain_id: int = 0,
+    progress_manager=None,
+    slice_width: float = 0.4,
+    store_latent: bool = False,
+) -> dict:
+    """One chain; returns ``{"rho" | "lam": (n_keep,), "beta": (n_keep, k)}``.
+
+    ``store_latent`` adds the utilities at every kept draw, ``"latent"``.
+    """
+    chain = LatentLogitChain(
+        y=y,
+        X=X,
+        W=W,
+        process=process,
+        priors=priors,
+        logdet_fn=logdet_fn,
+        rng=rng,
+        slice_width=slice_width,
+    )
+    return run_sweeps(
+        chain,
+        draws=draws,
+        tune=tune,
+        thin=thin,
+        chain_id=chain_id,
+        progress_manager=progress_manager,
+        store_latent=store_latent,
+    )

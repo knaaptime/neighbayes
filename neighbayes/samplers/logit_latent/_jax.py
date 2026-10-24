@@ -12,8 +12,13 @@ conditionally independent: a class is drawn at once, exactly, from
     \text{ on the side of } 0 \text{ that } y_i \text{ fixes},
     \qquad g = A^\top P \varepsilon,
 
-and the classes are swept in turn.  The Kolmogorov scales come from
-:func:`augax.ks_sample`, on the device.
+and the classes are swept in turn.  A class reads :math:`\varepsilon` on its
+members' columns of :math:`A` only and its draws move it there only, so a
+sweep is one pass over the nonzeros of :math:`A` whatever the number of
+colours.  The Kolmogorov scales come from
+:func:`augax.ks_sample`, on the device.  A zero-inflated count's zero (``sign``
+0, ``mixed``) has its side of zero drawn first, the positive side weighted by
+``exp(logq)``, as in :func:`._core._orthant_sweep`.
 """
 
 from __future__ import annotations
@@ -23,6 +28,7 @@ import numpy as np
 import scipy.sparse as sp
 
 from .._utils._jax_utils import cached_sweep, run_chains_chunked
+from ..negbin_latent._core import filter_columns
 
 
 @numba.njit(cache=True)
@@ -55,8 +61,42 @@ def colour_classes(W) -> np.ndarray:
     return _greedy_colour(C.indptr.astype(np.int64), C.indices.astype(np.int64), n)
 
 
-def _latent_data(y, X, W, colour, priors, ld_params):
-    """The read-only arrays every chain's sweep takes (``consts``)."""
+def class_table(colour):
+    """The members of each colour class, padded with the out-of-range index ``n``."""
+    n = colour.size
+    sizes = np.bincount(colour)
+    order = np.argsort(colour, kind="stable")
+    start = np.r_[0, np.cumsum(sizes)[:-1]]
+    pos = np.arange(n) - np.repeat(start, sizes)
+    table = np.full((sizes.size, int(sizes.max())), n, np.int32)
+    table[colour[order], pos] = order
+    return table
+
+
+def column_table(W):
+    """Column ``i`` of ``A``'s pattern as row ``i`` of padded tables.
+
+    Returns ``(rows, ones, w)`` of shape ``(n, m)``, ``m`` the largest column
+    count; padding has ``rows = 0`` and zero values, so it contributes a
+    constant to every conditional and nothing to an update.
+    """
+    indptr, rows, ones, wvals = filter_columns(W)
+    n = W.shape[0]
+    counts = np.diff(indptr)
+    col = np.repeat(np.arange(n), counts)
+    pos = np.arange(rows.size) - np.repeat(indptr[:-1], counts)
+    shape = (n, int(counts.max()))
+    R = np.zeros(shape, np.int32)
+    O, V = np.zeros(shape), np.zeros(shape)
+    R[col, pos], O[col, pos], V[col, pos] = rows, ones, wvals
+    return R, O, V
+
+
+def _latent_data(y, X, W, priors, ld_params, sign=None):
+    """The read-only arrays every chain's sweep takes (``consts``).
+
+    ``sign`` is each utility's side of zero, that of ``y`` by default.
+    """
     import jax.numpy as jnp
 
     W = sp.csr_matrix(W)
@@ -65,16 +105,20 @@ def _latent_data(y, X, W, colour, priors, ld_params):
     beta_sigma = np.broadcast_to(np.asarray(priors.beta_sigma, float), (k,))
     B0inv = np.diag(1.0 / beta_sigma**2)
     b0 = np.broadcast_to(np.asarray(priors.beta_mu, float), (k,))
-    diag = W.diagonal()
+    if sign is None:
+        sign = np.where(np.asarray(y) > 0, 1.0, -1.0)
+    R, O, V = column_table(W)
     return {
-        "sign": jnp.asarray(np.where(np.asarray(y) > 0, 1.0, -1.0)),
+        "sign": jnp.asarray(sign, dtype=jnp.float64),
         "X": jnp.asarray(X, dtype=jnp.float64),
         "WX": jnp.asarray(W @ X, dtype=jnp.float64),
         "rows": jnp.asarray(coo.row, dtype=jnp.int32),
         "cols": jnp.asarray(coo.col, dtype=jnp.int32),
         "vals": jnp.asarray(coo.data, dtype=jnp.float64),
-        "Wdiag": jnp.asarray(diag),
-        "colour": jnp.asarray(colour, dtype=jnp.int32),
+        "colrows": jnp.asarray(R),
+        "colones": jnp.asarray(O),
+        "colw": jnp.asarray(V),
+        "classes": jnp.asarray(class_table(colour_classes(W))),
         "b0": jnp.asarray(b0),
         "B0inv": jnp.asarray(B0inv),
         "B0inv_b0": jnp.asarray(B0inv @ b0),
@@ -128,10 +172,16 @@ def _tn_beyond(key, a, active):
     return z
 
 
-def _make_sweep(n, k, process, n_colours, logdet_eval, store_latent):
+def _make_sweep(n, k, process, n_colours, logdet_eval, store_latent, mixed=False):
+    """One chain's sweep; ``mixed`` draws the unknown sides (``sign`` 0) too.
+
+    A mixed sweep reads ``logq`` from the consts and keeps each utility's
+    probability of the negative side in the state's ``"pneg"``.
+    """
     import augax
     import jax
     import jax.numpy as jnp
+    from jax.scipy.special import log_ndtr
 
     from .._utils._jax_slice import adapt_slice_width, jax_slice_sample_1d
 
@@ -144,36 +194,57 @@ def _make_sweep(n, k, process, n_colours, logdet_eval, store_latent):
         def W(v):
             return jnp.zeros(n).at[rows].add(vals * v[cols])
 
-        def Wt(v):
-            return jnp.zeros(n).at[cols].add(vals * v[rows])
-
         par, beta, ystar, m = st["par"], st["beta"], st["ystar"], st["m"]
         X, WX = d["X"], d["WX"]
         Xb = X @ beta
         p = 1.0 / (m * m)
-        qdiag = (
-            p
-            - 2.0 * par * d["Wdiag"] * p
-            + par * par * jnp.zeros(n).at[cols].add(vals * vals * p[rows])
-        )
-
-        def eps_of(ys):
-            return ys - par * W(ys) - Xb if sar else (ys - Xb) - par * W(ys - Xb)
+        if sar:
+            eps = ystar - par * W(ystar) - Xb
+        else:
+            r0 = ystar - Xb
+            eps = r0 - par * W(r0)
+        aval = d["colones"] - par * d["colw"]
 
         key, k_y, k_tail, k_m, k_par, k_beta = jax.random.split(key, 6)
         # Each utility is drawn once per sweep, so one uniform each suffices.
         u_all = jax.random.uniform(k_y, (n,))
+        if mixed:
+            u_side = jax.random.uniform(jax.random.fold_in(k_y, 1), (n,))
 
-        def colour_step(c, ys):
-            pe = p * eps_of(ys)
-            g = pe - par * Wt(pe)
-            mean = ys - g / qdiag
+        def colour_step(c, carry):
+            # A class's members read and move eps only on their columns of
+            # A, which no other member's touch.
+            ys, eps, pneg = carry
+            idx = d["classes"][c]
+            active = idx < n
+
+            def take(a):
+                # The padding index ``n`` is out of range: clip, then mask.
+                return jnp.take(a, idx, axis=0, mode="clip")
+
+            R, Av = take(d["colrows"]), take(aval)
+            pAv = p[R] * Av
+            qdiag = jnp.sum(pAv * Av, axis=1)
+            x0 = take(ys)
+            mean = x0 - jnp.sum(pAv * eps[R], axis=1) / qdiag
             sd = 1.0 / jnp.sqrt(qdiag)
-            active = d["colour"] == c
+            side = take(d["sign"])
+            if mixed:
+                log_odds = log_ndtr(mean / sd) + take(d["logq"]) - log_ndtr(-mean / sd)
+                p_neg = jax.nn.sigmoid(-log_odds)
+                unknown = side == 0
+                pneg = pneg.at[idx].set(
+                    jnp.where(unknown, p_neg, take(pneg)), mode="drop"
+                )
+                side = jnp.where(
+                    unknown, jnp.where(take(u_side) < p_neg, -1.0, 1.0), side
+                )
             # Standardized bound on the side of 0 that y fixes.
-            a = -d["sign"] * mean / sd
+            a = -side * mean / sd
             far = active & (a > _TN_INVERT_MAX)
-            z = jnp.where(far, 0.0, _tn_invert(jnp.minimum(a, _TN_INVERT_MAX), u_all))
+            z = jnp.where(
+                far, 0.0, _tn_invert(jnp.minimum(a, _TN_INVERT_MAX), take(u_all))
+            )
             z = jax.lax.cond(
                 jnp.any(far),
                 lambda zz: jnp.where(
@@ -182,10 +253,15 @@ def _make_sweep(n, k, process, n_colours, logdet_eval, store_latent):
                 lambda zz: zz,
                 z,
             )
-            return jnp.where(active, mean + d["sign"] * sd * z, ys)
+            x1 = mean + side * sd * z
+            delta = jnp.where(active, x1 - x0, 0.0)
+            eps = eps.at[R].add(Av * delta[:, None])
+            return ys.at[idx].set(x1, mode="drop"), eps, pneg
 
-        ystar = jax.lax.fori_loop(0, n_colours, colour_step, ystar)
-        m = augax.ks_sample(eps_of(ystar), k_m)
+        ystar, eps, pneg = jax.lax.fori_loop(
+            0, n_colours, colour_step, (ystar, eps, st.get("pneg", jnp.zeros(n)))
+        )
+        m = augax.ks_sample(eps, k_m)
         p = 1.0 / (m * m)
         z = W(ystar)
         py, pz = p * ystar, p * z
@@ -248,6 +324,8 @@ def _make_sweep(n, k, process, n_colours, logdet_eval, store_latent):
             L.T, jax.random.normal(k_beta, (k,)), lower=False
         )
         new = {"par": par, "beta": beta, "ystar": ystar, "m": m, "slice_width": width}
+        if mixed:
+            new["pneg"] = pneg
         return new, (par, beta, ystar) if store_latent else (par, beta)
 
     return sweep
@@ -281,8 +359,6 @@ def run_chains_jax_latent_logit(
 
     ensure_x64()
     n, k = X.shape
-    colour = colour_classes(W)
-    n_colours = int(colour.max()) + 1
     if logdet_kind == "closure":
         fn = logdet_params
 
@@ -293,7 +369,8 @@ def run_chains_jax_latent_logit(
     else:
         logdet_eval = logdet_param_evaluator(logdet_kind)
         ld_params, ld_key = logdet_params, (logdet_kind,)
-    data = _latent_data(y, X, W, colour, priors, ld_params)
+    data = _latent_data(y, X, W, priors, ld_params)
+    n_colours = int(data["classes"].shape[0])
 
     static = (n, k, process, n_colours, store_latent, *ld_key)
     sweep = cached_sweep(

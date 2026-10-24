@@ -16,7 +16,14 @@ from scipy.special import gammaln
 import neighbayes.models as M
 from neighbayes import dgp
 from neighbayes.dgp.utils import rook_grid_weights
-from neighbayes.samplers._utils._latent_loglik import LOGIT, NEGBIN, integrated_loglik
+from neighbayes.samplers._utils._latent_loglik import (
+    LOGIT,
+    NEGBIN,
+    POISSON,
+    TRUNCATED,
+    UNOBSERVED,
+    integrated_loglik,
+)
 from neighbayes.samplers.negbin_latent._core import filter_columns
 
 W = sp.csr_matrix(rook_grid_weights(4)[0])
@@ -24,13 +31,15 @@ N = W.shape[0]
 GRID = np.linspace(-60.0, 25.0, 1_000_001)
 
 
-def _brute(fam, eta, c, par, alpha, y, i):
+def _brute(fam, eta, c, par, alpha, y, i, kind=POISSON):
     """The integral on a fine grid; the logit's threshold at a grid node."""
     A = (sp.eye(N) - par * W).toarray()
     E = (A @ eta - c)[:, None] + A[:, i][:, None] * (GRID[None, :] - eta[i])
     if fam == NEGBIN:
         logf = (alpha * E - alpha * np.exp(E)).sum(0)
         obs = y[i] * GRID - np.exp(GRID) - gammaln(y[i] + 1)
+        if kind == TRUNCATED:
+            obs -= np.log(-np.expm1(-np.exp(GRID)))
     else:
         a = np.abs(E)
         logf = (-a - 2 * np.log1p(np.exp(-a))).sum(0)
@@ -43,23 +52,33 @@ def _brute(fam, eta, c, par, alpha, y, i):
     return log_trapz(logf + obs) - log_trapz(logf)
 
 
-@pytest.mark.parametrize("fam", [NEGBIN, LOGIT], ids=["negbin", "logit"])
+@pytest.mark.parametrize(
+    "fam, kind",
+    [(NEGBIN, POISSON), (NEGBIN, TRUNCATED), (LOGIT, POISSON)],
+    ids=["negbin", "negbin-truncated", "logit"],
+)
 @pytest.mark.parametrize("par, alpha", [(0.7, 0.3), (-0.4, 5.0)])
-def test_matches_the_integral(fam, par, alpha):
+def test_matches_the_integral(fam, kind, par, alpha):
     rng = np.random.default_rng(3)
     eta = rng.normal(1.0 if fam == NEGBIN else 0.0, 2.0, N)
     c = rng.normal(0.0, 1.0, N)
     if fam == NEGBIN:
         y = rng.poisson(np.exp(np.clip(eta, -5, 3.7))).astype(float)
+        if kind == TRUNCATED:
+            y = np.maximum(y, 1.0)
     else:
         y = (rng.random(N) < 0.5).astype(float)
+    kinds = np.full(N, kind, dtype=np.int8)
+    kinds[0] = UNOBSERVED
     e = ((sp.eye(N) - par * W) @ eta - c)[None, :]
     indptr, rows, ones, wvals = filter_columns(W)
     got = integrated_loglik(
         eta[None, :], e, y, indptr, rows, ones, wvals,
-        np.array([par]), np.array([alpha]), fam, gammaln(y + 1),
+        np.array([par]), np.array([alpha]), fam, gammaln(y + 1), kinds,
     )[0]  # fmt: skip
-    want = np.array([_brute(fam, eta, c, par, alpha, y, i) for i in range(N)])
+    want = np.array([_brute(fam, eta, c, par, alpha, y, i, kind) for i in range(N)])
+    if fam == NEGBIN:
+        want[0] = 0.0  # an unobserved count contributes nothing
     np.testing.assert_allclose(got, want, atol=2e-4)
 
 

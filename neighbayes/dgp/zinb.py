@@ -37,6 +37,7 @@ def simulate_sar_zinb(
     err_hetero: bool = False,
     create_gdf: bool = False,
     geometry_type: str = "polygon",
+    latent: bool = False,
 ) -> dict:
     r"""Simulate data from a zero-inflated SAR-NB DGP.
 
@@ -66,6 +67,15 @@ def simulate_sar_zinb(
 
         y_i = 0 \text{ if } d_i = 0, \quad
         y_i \sim \text{NegBin}(\cdot) \text{ if } d_i = 1
+
+    With ``latent=True`` it draws the latent model ``SARZINB(latent=True)``
+    fits, each part's own disturbance propagated: :math:`d_i = \mathbf 1(u_i >
+    0)`, :math:`u = (I - \rho_z W_z)^{-1}(X_z\beta_z + \varepsilon_z)` with
+    :math:`\varepsilon_z` logistic, and :math:`y_i \mid d_i = 1 \sim
+    \mathrm{Poisson}(e^{\eta_i})`, :math:`\eta = (I - \rho W)^{-1}(X\beta +
+    \varepsilon)` with :math:`\varepsilon_i = \log\gamma_i`,
+    :math:`\gamma_i \sim \mathrm{Gamma}(\alpha, \alpha)`; ``eta_zero`` and
+    ``eta_cnt`` are then the drawn ``u`` and ``eta``.
 
     Parameters
     ----------
@@ -170,6 +180,19 @@ def simulate_sar_zinb(
     _check_rho_stability(rho, name="rho")
     _check_rho_stability(rho_zero, name="rho_zero")
 
+    if latent:
+        eta_sel, eta_cnt, beta_zero = _latent_parts(
+            rng, Ws, W_zero_s, X, X_zero, beta, beta_zero, rho, rho_zero, alpha,
+            target_pi,
+        )  # fmt: skip
+        d = (eta_sel > 0).astype(np.float64)
+        mu = np.exp(np.clip(eta_cnt, -30.0, 30.0))
+        y = np.where(d == 1, rng.poisson(mu), 0).astype(np.float64)
+        return _zinb_output(
+            y, d, X, X_zero, eta_cnt, eta_sel, Ws, Wg, W_zero_s, W_zero_g,
+            rho, rho_zero, beta, beta_zero, alpha, gdf, create_gdf, geometry_type,
+        )  # fmt: skip
+
     # --- Selection equation: SAR-logit ---
     # Reduced form, as the model: eta_sel = (I - lam * W_zero)^{-1} Z gamma.
     solve_sel = spatial_filter_factor(W_zero_s, rho_zero)
@@ -212,7 +235,16 @@ def simulate_sar_zinb(
 
     # Combine: y = 0 where d=0, y = NB draw where d=1
     y = np.where(d == 1, y_nb, 0.0)
+    return _zinb_output(
+        y, d, X, X_zero, eta_cnt, eta_sel, Ws, Wg, W_zero_s, W_zero_g,
+        rho, rho_zero, beta, beta_zero, alpha, gdf, create_gdf, geometry_type,
+    )  # fmt: skip
 
+
+def _zinb_output(
+    y, d, X, X_zero, eta_cnt, eta_sel, Ws, Wg, W_zero_s, W_zero_g,
+    rho, rho_zero, beta, beta_zero, alpha, gdf, create_gdf, geometry_type,
+) -> dict:  # fmt: skip
     params_true = {
         "rho": rho,
         "rho_zero": rho_zero,
@@ -240,6 +272,42 @@ def simulate_sar_zinb(
         create_gdf=create_gdf,
         geometry_type=geometry_type,
     )
+
+
+def _latent_parts(
+    rng, Ws, W_zero_s, X, X_zero, beta, beta_zero, rho, rho_zero, alpha, target_pi
+):
+    """The latent two-part utilities and log-means, each disturbance propagated.
+
+    ``u = (I - rho_zero W_zero)^{-1}(X_zero beta_zero + eps_z)``, ``eps_z``
+    logistic, and ``eta = (I - rho W)^{-1}(X beta + eps)``, ``eps = log g``,
+    ``g ~ Gamma(alpha, alpha)``.  ``target_pi`` shifts the zero part's intercept
+    so the mean of ``P(u > 0)`` (over 256 disturbance draws) is the target.
+    Returns ``(u, eta, beta_zero)``.
+    """
+    n = X.shape[0]
+    solve_z = spatial_filter_factor(W_zero_s, rho_zero)
+    beta_zero = np.array(beta_zero, dtype=float)
+    if target_pi is not None:
+        if not 0.0 < float(target_pi) < 1.0:
+            raise ValueError(f"target_pi must lie in (0, 1); got {target_pi!r}")
+        m = solve_z(X_zero @ beta_zero)
+        a0 = np.asarray(solve_z(np.ascontiguousarray(X_zero[:, 0])), dtype=float)
+        noise = np.asarray(solve_z(rng.logistic(size=(n, 256))))
+        lo, hi = -50.0, 50.0
+        for _ in range(60):
+            mid = 0.5 * (lo + hi)
+            if np.mean(m[:, None] + mid * a0[:, None] + noise > 0) < target_pi:
+                lo = mid
+            else:
+                hi = mid
+        beta_zero[0] += 0.5 * (lo + hi)
+    u = solve_z(X_zero @ beta_zero + rng.logistic(size=n))
+    # log g by log Gamma(alpha + 1) + log(U) / alpha, which does not underflow.
+    eps = np.log(rng.gamma(alpha + 1.0, 1.0 / alpha, size=n))
+    eps += np.log(rng.random(n)) / alpha
+    eta = spatial_filter_factor(Ws, rho)(X @ beta + eps)
+    return u, eta, beta_zero
 
 
 @aspatial(simulate_sar_zinb, {"rho": 0.0, "rho_zero": 0.0}, panel_only=True)

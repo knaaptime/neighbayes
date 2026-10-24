@@ -21,6 +21,8 @@ import numpy as np
 
 #: Draws averaged by the posterior summaries unless the caller asks otherwise.
 _SUMMARY_DRAWS = 200
+#: Each equation's link scale and outcome scale.
+PART_SCALES = {"zero": ("logodds", "probability"), "count": ("logmean", "count")}
 
 
 def _expit(x: np.ndarray) -> np.ndarray:
@@ -154,10 +156,21 @@ class TwoPartMixin:
             raise ValueError(f"equation must be 'count' or 'zero', got {equation!r}")
         return direct, total - direct, total
 
+    def _two_part_effects(self, equation: str, scale: Optional[str]):
+        """Per-draw effects of one equation on ``scale``: the link scale here."""
+        link = PART_SCALES[equation][0]
+        if scale not in (None, link):
+            raise NotImplementedError(
+                f"{type(self).__name__} reports impacts on each equation's link "
+                f"scale ({link!r} for equation {equation!r})."
+            )
+        return self._compute_impacts_posterior(equation=equation)
+
     def impacts(
         self,
         equation: str = "count",
         return_posterior_samples: bool = False,
+        scale: Optional[str] = None,
     ):
         """Direct, indirect and total impacts for one equation.
 
@@ -169,11 +182,18 @@ class TwoPartMixin:
             part's log-odds, through ``(I − ρ_zero W_zero)⁻¹ X_zero β_zero``.
         return_posterior_samples : bool, default False
             Also return the per-draw impacts.
+        scale : str, optional
+            The equation's link scale (``"logmean"``, ``"logodds"``, the
+            default) or, for a latent model, its outcome scale: ``"count"``,
+            the expected count of an active unit (ZINB) or of a positive count
+            (hurdle), and ``"probability"``, of the zero part's ``u > 0``.
         """
         from ...diagnostics.impacts import _build_effects_dataframe
 
         self._require_fit()
-        direct, indirect, total = self._compute_impacts_posterior(equation=equation)
+        if equation not in PART_SCALES:
+            raise ValueError(f"equation must be 'count' or 'zero', got {equation!r}")
+        direct, indirect, total = self._two_part_effects(equation, scale)
         k = direct.shape[1]
         if equation == "zero":
             names = self._sel_nonintercept_feature_names
@@ -191,6 +211,7 @@ class TwoPartMixin:
             feature_names=feature_names,
             model_type=f"{type(self).__name__} ({equation})",
         )
+        df.attrs["scale"] = PART_SCALES[equation][0] if scale is None else scale
         if return_posterior_samples:
             return df, {"direct": direct, "indirect": indirect, "total": total}
         return df

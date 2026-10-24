@@ -433,6 +433,26 @@ versus none" questions on sparse counts, use a hurdle model
 ({ref}`below <hurdle-models>`), whose zero part is fit to the observed
 zeros.
 
+### SARZINB, latent (`latent=True`)
+
+$$y_i = 0 \text{ if } u_i \le 0, \quad y_i \mid u_i > 0 \sim \operatorname{Poisson}(e^{\eta_i}), \quad (I - \rho_z W_z)u = X_z\beta_z + \varepsilon_z, \quad (I - \rho W)\eta = X\beta + \varepsilon$$
+
+Each part is a latent SAR with its own disturbance: the zero part is the
+latent SAR logit ($\varepsilon_z$ logistic; a unit is active when its utility
+is positive), the count part the latent SAR negative binomial
+($\varepsilon_i = \log\gamma_i$, $\gamma_i \sim \operatorname{Gamma}(\alpha,
+\alpha)$). The sweep is the two latent samplers in turn, coupled through the
+zero counts: a zero leaves its unit's activation unknown, so its utility's
+side of zero is drawn given the count part, the active side weighted by
+$P(y_i = 0 \mid \text{active}) = e^{-e^{\eta_i}}$, and the count part then
+observes the active units only. `zero_attribution` is the sampler's
+Rao–Blackwellized probability that each zero is structural.
+`log_likelihood` integrates both latent values out of each observation, for
+LOO. `impacts(equation, scale=...)` reports each part on its link scale (the
+default) or its outcome scale: `"probability"` of activation, and `"count"`,
+the expected count of an active unit. The identification caveat above applies
+unchanged. Cross-section only; NumPy or `backend="jax"`.
+
 ### ZINB panels (`SARZINB`, `ZINB`)
 
 The same two parts per period, $T$ periods stacked time-first, with
@@ -501,6 +521,19 @@ a ridge, so they are drawn jointly by a slice sampler that moves along it.
 
 The halves share no parameters, so the posterior factorizes. Linking them
 through correlated unit (pair) effects is a planned extension.
+
+**Latent (`SARHurdleNegBin(latent=True)`).** Each part is a latent SAR with its
+own disturbance: a count is positive when the utility
+$u = (I - \rho_z W_z)^{-1}(X_z\beta_z + \varepsilon_z)$, $\varepsilon_z$
+logistic, is positive, and is then $\operatorname{Poisson}(e^{\eta_i})$
+truncated at zero, $\eta = (I - \rho W)^{-1}(X\beta + \varepsilon)$,
+$\varepsilon_i = \log\gamma_i$. The truncation conditions on $\eta_i$, as in
+hurdle models with random effects. The parts still share nothing: the zero
+part is `SARLogit(latent=True)` fitted to $\mathbf 1(y > 0)$, the count part
+the latent SAR NB observing the positive counts only, and a sweep is one sweep
+of each. LOO and impacts work as for the latent SARZINB, the count part's
+outcome being the expected positive count. Cross-section only; NumPy or
+`backend="jax"`.
 
 ### Logit
 
