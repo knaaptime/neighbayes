@@ -39,10 +39,6 @@ class FlowSharedMethods:
     calling any mixin method.
     """
 
-    # True on the separable classes, whose filter A = L_o ⊗ L_d has a closed-form
-    # log-determinant (see :meth:`_attach_flow_log_abs_det`).
-    _separable_filter: bool = False
-
     def _flow_logdet_choice(self, backend: str | None, sample_kwargs: dict) -> str:
         """The unrestricted flow log-determinant the resolvent sampler runs.
 
@@ -428,7 +424,10 @@ class FlowSharedMethods:
         import xarray as xr
 
         T = int(getattr(self, "_T", 1))
-        if self._separable_filter and self._separable_logdet_numpy_fn is not None:
+        if (
+            self._flow_filter == "separable"
+            and self._separable_logdet_numpy_fn is not None
+        ):
             # log|L_o ⊗ L_d| = n log|L_o| + n log|L_d|: n × n work, exact up to
             # the single-W logdet method.  The resolvent route below would
             # factor the N × N system, which runs out of memory at metro scale.

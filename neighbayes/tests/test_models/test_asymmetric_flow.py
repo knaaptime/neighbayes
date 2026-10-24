@@ -301,7 +301,7 @@ class TestModelAsymmetric:
     def test_model_infers_kd_ko_from_colnames(self):
         """FlowModel infers k_d and k_o from dest_*/orig_* column names."""
         from neighbayes.dgp import simulate_sar_flow
-        from neighbayes.models.flow._flow import SARFlow
+        from neighbayes.models import SARFlow
 
         data = simulate_sar_flow(
             n=5,
@@ -326,7 +326,7 @@ class TestModelAsymmetric:
     def test_effects_asymmetric_shape(self):
         """Impacts have correct shapes when k_d ≠ k_o."""
         from neighbayes.dgp import simulate_sar_flow
-        from neighbayes.models.flow._flow import OLSFlow
+        from neighbayes.models import OLSFlow
 
         data = simulate_sar_flow(
             n=5,
@@ -355,7 +355,7 @@ class TestModelAsymmetric:
     def test_effects_symmetric_shape(self):
         """Impacts have correct shapes when k_d == k_o (symmetric)."""
         from neighbayes.dgp import simulate_sar_flow
-        from neighbayes.models.flow._flow import OLSFlow
+        from neighbayes.models import OLSFlow
 
         data = simulate_sar_flow(
             n=5,

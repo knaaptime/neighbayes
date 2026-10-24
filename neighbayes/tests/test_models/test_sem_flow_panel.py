@@ -71,8 +71,6 @@ class TestSemFlowPanelConstruction:
         )
 
     def test_sem_flow_panel_builds(self):
-        from neighbayes.models.flow_panel._panel import SEMFlowPanelFE
-
         model = SEMFlow(
             self.data["y"],
             self.data["X"],
@@ -84,8 +82,6 @@ class TestSemFlowPanelConstruction:
         assert model._T == self.T
 
     def test_sem_flow_separable_panel_builds(self):
-        from neighbayes.models.flow_panel._panel import SEMFlowSeparablePanelFE
-
         model = SEMFlow(
             self.data["y"],
             self.data["X"],
@@ -98,8 +94,6 @@ class TestSemFlowPanelConstruction:
 
     def test_pymc_model_builds(self):
         """SEMFlowPanelFE samples via the resolvent sampler; the PyMC path was removed."""
-        from neighbayes.models.flow_panel._panel import SEMFlowPanelFE
-
         model = SEMFlow(
             self.data["y"],
             self.data["X"],
@@ -115,7 +109,6 @@ class TestSemFlowPanelRecovery:
     def test_rho_recovery(self):
         """Panel SEM should recover lam_d, lam_o reasonably (lam_w is noisier)."""
         from neighbayes.dgp import simulate_sem_flow
-        from neighbayes.models.flow_panel._panel import SEMFlowPanelFE
 
         rho_d_true, rho_o_true, rho_w_true = 0.25, 0.20, 0.10
         data = simulate_sem_flow(
@@ -157,7 +150,6 @@ class TestSemFlowPanelRecovery:
 
     def test_separable_constraint_panel(self):
         from neighbayes.dgp import simulate_sem_flow
-        from neighbayes.models.flow_panel._panel import SEMFlowSeparablePanelFE
 
         data = simulate_sem_flow(
             n=8,
@@ -196,7 +188,6 @@ class TestSemFlowPanelRecovery:
     def test_separable_panel_recovery_normal(self):
         """SEMFlowSeparablePanelFE should recover lam_d, lam_o from DGP data."""
         from neighbayes.dgp import simulate_sem_flow
-        from neighbayes.models.flow_panel._panel import SEMFlowSeparablePanelFE
 
         lam_d_true, lam_o_true = 0.25, 0.20
         beta_d_true = [1.0, -0.5]

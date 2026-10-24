@@ -21,11 +21,11 @@ from .cross_section.tobit import SARTobit as SARTobit
 from .cross_section.tobit import SDMTobit as SDMTobit
 from .cross_section.tobit import SEMTobit as SEMTobit
 from .flow._flow import NegBinFlow as NegBinFlow
-from .flow._flow import OLSFlow as OLSFlow
-from .flow._flow import SARFlow as SARFlow
 from .flow._flow import SARNegBinFlow as SARNegBinFlow
 from .flow._flow import SARPoissonFlow as SARPoissonFlow
-from .flow._flow import SEMFlow as SEMFlow
+from .flow._gaussian import OLSFlow as OLSFlow
+from .flow._gaussian import SARFlow as SARFlow
+from .flow._gaussian import SEMFlow as SEMFlow
 from .flow_panel._hurdle import SARHurdleNegBinFlow as SARHurdleNegBinFlow
 from .flow_panel._panel import SARZINBFlow as SARZINBFlow
 from .panel._hurdle import HurdleNegBin as HurdleNegBin

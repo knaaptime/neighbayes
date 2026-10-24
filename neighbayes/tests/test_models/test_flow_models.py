@@ -63,8 +63,6 @@ class TestFlowModelConstruction:
         np.testing.assert_allclose(model._y, self.y_vec, atol=1e-12)
 
     def test_sar_flow_separable_builds(self):
-        from neighbayes.models.flow import SARFlowSeparable
-
         model = SARFlow(
             self.y_vec, self.X, self.G, separable=True, col_names=self.col_names
         )
@@ -96,8 +94,8 @@ class TestFlowModelConstruction:
         assert data["beta_d"].shape == (1,)
         assert data["beta_o"].shape == (2,)
 
-    def test_pymc_model_raises_not_implemented(self):
-        """SARFlow samples via the resolvent sampler; the PyMC path was removed."""
+    def test_unrestricted_pymc_model_has_the_jacobian(self):
+        """The unrestricted SARFlow's NUTS model carries the trace-series Jacobian."""
         from neighbayes.models.flow import SARFlow
 
         model = SARFlow(
@@ -106,12 +104,9 @@ class TestFlowModelConstruction:
             self.G,
             col_names=self.col_names,
         )
-        with pytest.raises(NotImplementedError, match="resolvent"):
-            model._build_pymc_model()
+        assert "jacobian" in [p.name for p in model._build_pymc_model().potentials]
 
     def test_pymc_model_separable_builds_without_error(self):
-        from neighbayes.models.flow import SARFlowSeparable
-
         model = SARFlow(
             self.y_vec, self.X, self.G, separable=True, col_names=self.col_names
         )
@@ -338,8 +333,6 @@ class TestSARFlowFitSmoke:
         assert "sigma" in posterior
 
     def test_sar_flow_separable_fit_posterior_keys(self):
-        from neighbayes.models.flow import SARFlowSeparable
-
         model = SARFlow(
             self.y, self.X, self.G, separable=True, col_names=self.col_names
         )
@@ -392,7 +385,6 @@ class TestEffectsAccountingIdentity:
 
     def test_effects_sum_to_total(self):
         from neighbayes.dgp import simulate_sar_flow
-        from neighbayes.models.flow import SARFlowSeparable
 
         n = 4
         out = simulate_sar_flow(
@@ -566,7 +558,6 @@ class TestSARFlowSeparableLogdetMethods:
     @pytest.fixture(params=[("exact", "eig"), ("cheb", "eig")], scope="class")
     def fitted_model(self, request):
         from neighbayes.dgp import simulate_sar_flow
-        from neighbayes.models.flow import SARFlowSeparable
 
         out = simulate_sar_flow(
             n=5,
@@ -611,7 +602,6 @@ class TestSARFlowSeparableLogdetMethods:
         import pytest
 
         from neighbayes.dgp import simulate_sar_flow
-        from neighbayes.models.flow import SARFlowSeparable
 
         out = simulate_sar_flow(
             n=4,
@@ -699,7 +689,6 @@ class TestSARFlowSeparableRecovery:
     @pytest.fixture(scope="class")
     def fitted_separable(self):
         from neighbayes.dgp import simulate_sar_flow
-        from neighbayes.models.flow import SARFlowSeparable
 
         out = simulate_sar_flow(
             n=FLOW_N_SEP,
@@ -1023,7 +1012,6 @@ class TestFlowPanelSpatialEffectsAndPPC:
     def fitted_panel(self):
         from neighbayes.dgp import simulate_sar_flow
         from neighbayes.graph import flow_design_matrix
-        from neighbayes.models.flow_panel import SARFlowPanelFE
 
         n = 4
         T = 3
@@ -1316,8 +1304,6 @@ class TestFlowLogLikelihood:
         self._check_loo(idata)
 
     def test_sar_flow_separable_loglik(self):
-        from neighbayes.models.flow import SARFlowSeparable
-
         m = SARFlow(
             self.gauss["y_vec"],
             self.gauss["X"],
@@ -1358,7 +1344,7 @@ class TestFlowLogLikelihood:
         """az.compare runs across SARFlow/SARFlowSeparable/OLSFlow."""
         import arviz as az
 
-        from neighbayes.models.flow import OLSFlow, SARFlow, SARFlowSeparable
+        from neighbayes.models.flow import OLSFlow, SARFlow
 
         m_sar = SARFlow(
             self.gauss["y_vec"],

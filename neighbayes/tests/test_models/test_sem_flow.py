@@ -105,7 +105,7 @@ class TestSemFlowConstruction:
         self.y_vec = out["y_vec"]
 
     def test_sem_flow_builds(self):
-        from neighbayes.models.flow._flow import SEMFlow
+        from neighbayes.models import SEMFlow
 
         model = SEMFlow(
             self.y_vec,
@@ -121,8 +121,6 @@ class TestSemFlowConstruction:
         assert model._Ww_X.shape == self.X.shape
 
     def test_sem_flow_separable_builds(self):
-        from neighbayes.models.flow._flow import SEMFlowSeparable
-
         model = SEMFlow(
             self.y_vec,
             self.X,
@@ -134,7 +132,7 @@ class TestSemFlowConstruction:
 
     def test_pymc_model_builds(self):
         """SEMFlow samples via the resolvent sampler; the PyMC path was removed."""
-        from neighbayes.models.flow._flow import SEMFlow
+        from neighbayes.models import SEMFlow
 
         model = SEMFlow(
             self.y_vec,
@@ -146,8 +144,6 @@ class TestSemFlowConstruction:
             model._build_pymc_model()
 
     def test_pymc_model_separable_builds(self):
-        from neighbayes.models.flow._flow import SEMFlowSeparable
-
         model = SEMFlow(
             self.y_vec,
             self.X,
@@ -167,7 +163,7 @@ class TestSemFlowConstruction:
 class TestSemFlowRecovery:
     def test_parameter_recovery_normal(self):
         from neighbayes.dgp import simulate_sem_flow
-        from neighbayes.models.flow._flow import SEMFlow
+        from neighbayes.models import SEMFlow
 
         rho_d_true, rho_o_true, rho_w_true = 0.25, 0.20, 0.10
         beta_d_true = [1.0, -0.5]
@@ -228,7 +224,6 @@ class TestSemFlowRecovery:
     def test_separable_constraint_holds(self):
         """SEMFlowSeparable should impose lam_w = -lam_d * lam_o exactly."""
         from neighbayes.dgp import simulate_sem_flow
-        from neighbayes.models.flow._flow import SEMFlowSeparable
 
         data = simulate_sem_flow(
             n=10,
@@ -265,7 +260,6 @@ class TestSemFlowRecovery:
     def test_separable_recovery_normal(self):
         """SEMFlowSeparable should recover lam_d, lam_o from DGP data."""
         from neighbayes.dgp import simulate_sem_flow
-        from neighbayes.models.flow._flow import SEMFlowSeparable
 
         lam_d_true, lam_o_true = 0.25, 0.20
         beta_d_true = [1.0, -0.5]

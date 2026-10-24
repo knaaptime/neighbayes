@@ -277,9 +277,8 @@ def simulate_sar_flow(
     Gaussian-on-y behavior).
 
     To recover the SAR parameters with the existing
-    :class:`~neighbayes.models.flow.SARFlow` /
-    :class:`~neighbayes.models.flow.SARFlowSeparable`, fit on
-    ``np.log(y_vec)`` (which by construction equals ``eta_vec``).
+    :class:`~neighbayes.models.SARFlow` (unrestricted or ``separable=True``),
+    fit on ``np.log(y_vec)`` (which by construction equals ``eta_vec``).
 
     Parameters
     ----------
@@ -744,10 +743,8 @@ def _simulate_sar_flow_panel_fe(
     observation at index :math:`t \cdot n^2 + k` is O-D pair :math:`k`
     at time :math:`t`.
 
-    To recover the SAR parameters with the existing
-    :class:`~neighbayes.models.flow_panel.SARFlowPanelFE` /
-    :class:`~neighbayes.models.flow_panel.SARFlowSeparablePanelFE`,
-    fit on ``np.log(y)``.
+    To recover the SAR parameters with a :class:`~neighbayes.models.SARFlow`
+    panel, fit on ``np.log(y)``.
 
     Parameters
     ----------
@@ -1153,7 +1150,7 @@ def _simulate_sar_flow_separable(
     derived from the separability constraint
     :math:`\\rho_w = -\\rho_d \\rho_o`, so it is **not** a free argument.
     Use this function to generate training data for
-    :class:`~neighbayes.models.flow.SARFlowSeparable`.
+    :class:`~neighbayes.models.SARFlow` with ``separable=True``.
 
     Parameters
     ----------
@@ -1207,7 +1204,7 @@ def _simulate_sar_flow_separable_panel_fe(
     Identical to :func:`_simulate_sar_flow_panel_fe` except the network parameter
     is derived as :math:`\\rho_w = -\\rho_d \\rho_o`.  Use this function to
     generate training data for
-    :class:`~neighbayes.models.flow_panel.SARFlowSeparablePanelFE`.
+    a :class:`~neighbayes.models.SARFlow` panel with ``separable=True``.
 
     Parameters
     ----------
@@ -1722,7 +1719,7 @@ def _simulate_sem_flow_panel_fe(
 
     Panel analogue of :func:`_simulate_sar_flow_panel_fe` for SEM.  Use to
     generate training data for
-    :class:`~neighbayes.models.flow_panel.SEMFlowPanelFE`.
+    a :class:`~neighbayes.models.SEMFlow` panel.
     """
     rng = np.random.default_rng(seed)
 

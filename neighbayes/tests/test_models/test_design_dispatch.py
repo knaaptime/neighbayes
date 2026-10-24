@@ -2,8 +2,9 @@
 
 ADR 0002: a public class names a process and a family; panel structure,
 effects, dynamics, and the flow restriction are arguments.  A Gaussian, Tobit,
-count, logit or probit class implements every design itself; the flow
-families' public classes still dispatch to implementation classes.  These tests pin the table from public call
+count, logit, probit and Gaussian flow class implements every design itself;
+the count flow families' public classes still dispatch to implementation
+classes.  These tests pin the table from public call
 to design (or implementation class) and effects code, and the combinations that
 must raise.
 """
@@ -77,17 +78,12 @@ ROUTES = [
     (m.SEMTobit, PANEL, "static", None),
     (m.SEMProbit, {"group_effects": "random", "groups": [0, 1]}, "random", None),
     # Flows
-    (m.SARFlow, {}, "SARFlow", None),
-    (m.SARFlow, {"separable": True}, "SARFlowSeparable", None),
-    (m.SARFlow, {"T": 2, "pair_effects": "fixed"}, "SARFlowPanelFE", 1),
-    (
-        m.SARFlow,
-        {"T": 2, "separable": True, "time_effects": True},
-        "SARFlowSeparablePanelFE",
-        2,
-    ),
-    (m.SEMFlow, {"separable": True}, "SEMFlowSeparable", None),
-    (m.OLSFlow, {"T": 2}, "OLSFlowPanelFE", 0),
+    (m.SARFlow, {}, "static", None),
+    (m.SARFlow, {"separable": True}, "separable", None),
+    (m.SARFlow, {"T": 2, "pair_effects": "fixed"}, "static", 1),
+    (m.SARFlow, {"T": 2, "separable": True, "time_effects": True}, "separable", 2),
+    (m.SEMFlow, {"separable": True}, "separable", None),
+    (m.OLSFlow, {"T": 2}, "static", 0),
     (m.NegBinFlow, {"T": 2, "pair_effects": "random"}, "NegBinFlowPanelRE", 1),
     (m.SARNegBinFlow, {"separable": True}, "SARNegBinFlowSeparable", None),
     (m.SARNegBinFlow, {"T": 2, "pair_effects": "random"}, "SARNegBinFlowPanelRE", 1),

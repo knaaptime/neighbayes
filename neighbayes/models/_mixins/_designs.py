@@ -39,6 +39,16 @@ The binary families (Logit, SARLogit, SEMLogit, SDEMLogit),
 ``"latent"``
     ``SARLogit(latent=True)``, the latent SAR, which propagates the logistic
     disturbance (:mod:`..cross_section._latent_logit`).
+
+The flow families (OLSFlow, SARFlow, SEMFlow), :class:`FlowDesigns`; each
+design is a cross-section (``T=1``) or a panel with pair and time effects:
+
+``"static"``
+    The unrestricted filter, three free spatial parameters (none for the
+    aspatial OLSFlow).
+``"separable"``
+    ``separable=True``: ``ρ_w = -ρ_d ρ_o``, so the filter factors as
+    ``L_o ⊗ L_d``.
 """
 
 from __future__ import annotations
@@ -55,6 +65,7 @@ from .._design import (
     _pop_design,
 )
 from ..base import SpatialModel
+from ._flow_shared import FlowSharedMethods
 
 
 def _latent_flag(cls, latent, suffix: str) -> bool:
@@ -413,14 +424,102 @@ class CountDesigns(DesignDispatch):
         """
 
 
-def _constructor_signature(init, extra: tuple[str, ...] = ()) -> inspect.Signature:
+class FlowDesigns(DesignDispatch):
+    """Design dispatch for the flow families (see the module).
+
+    ``separable=True`` selects the separable design.  ``T`` makes a panel, the
+    cross-section being one period, with ``pair_effects`` (the family's
+    ``_pair_effects`` treatment) and ``time_effects``.
+    """
+
+    #: The pair effects the family's panels take.
+    _pair_effects: str = "fixed"
+
+    def __init__(
+        self,
+        y,
+        X,
+        W,
+        *,
+        pair_effects=None,
+        time_effects=False,
+        dynamic=False,
+        separable=False,
+        **kwargs,
+    ):
+        design, kwargs = self._resolve_design(
+            dict(
+                kwargs,
+                pair_effects=pair_effects,
+                time_effects=time_effects,
+                dynamic=dynamic,
+                separable=separable,
+            )
+        )
+        self._set_design(design)
+        super().__init__(y, X, W, **kwargs)
+        init = getattr(self, f"_init_{design}", None)
+        if init is not None:
+            init()
+
+    @classmethod
+    def _resolve_design(cls, kw: dict) -> tuple[str, dict]:
+        """The design the arguments describe, and the base class's arguments."""
+        name = cls.__name__
+        pair, time, dynamic = _pop_design(kw, pair=True)
+        separable = kw.pop("separable", False)
+        if not isinstance(separable, bool):
+            raise ValueError(f"separable must be True or False; got {separable!r}.")
+        if dynamic:
+            raise NotImplementedError(f"{name} has no dynamic panel.")
+        design = "separable" if separable else "static"
+        if design not in cls._DESIGNS:
+            if separable:
+                raise ValueError(f"{name} has no spatial dependence to restrict.")
+            raise NotImplementedError(
+                f"{name} is implemented as the separable flow only "
+                "(pass separable=True)."
+            )
+        if not _is_panel(kw):
+            _cross_section_only(name, time, dynamic)
+            if pair is not None:
+                raise NotImplementedError(
+                    f"{name} takes pair effects only in a panel (pass T)."
+                )
+            return design, kw
+        if pair is not None and pair != cls._pair_effects:
+            raise NotImplementedError(f"{name} panels take no {pair} pair effects.")
+        kw["effects"] = _effects_code(pair is not None, time)
+        return design, kw
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        from ..flow._flow import FlowModel
+
+        cls.__signature__ = _constructor_signature(
+            FlowDesigns.__init__, base=FlowModel.__init__
+        )
+
+    _build_pymc_model = _by_design("_build_pymc_model")
+    _compute_impacts_posterior = _by_design("_compute_impacts_posterior")
+    _compute_jacobian_log_det = _by_design("_compute_jacobian_log_det")
+    _simulate_y_rep = _by_design("_simulate_y_rep")
+    fit = _by_design("fit")
+    fit.__doc__ = FlowSharedMethods.fit.__doc__
+    fit.__wrapped__ = FlowSharedMethods.fit
+
+
+def _constructor_signature(
+    init, extra: tuple[str, ...] = (), base=None
+) -> inspect.Signature:
     """The design arguments, ``extra``, then the base class's: what ``**kwargs`` takes.
 
+    ``base`` is the base class's ``__init__`` (``SpatialModel``'s by default).
     Set on the class: the facade metaclass's ``__call__`` would otherwise hide
     the constructor's arguments from :func:`inspect.signature`.
     """
     own = list(inspect.signature(init).parameters.values())[1:]
-    base = inspect.signature(SpatialModel.__init__).parameters
+    base = inspect.signature(base or SpatialModel.__init__).parameters
     params = [p for p in own if p.kind is not p.VAR_KEYWORD]
     params += [
         inspect.Parameter(name, inspect.Parameter.KEYWORD_ONLY, default=None)

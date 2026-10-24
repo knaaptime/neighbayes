@@ -13,11 +13,6 @@ import numpy as np
 import pytest
 
 from neighbayes.models import OLSFlow, SARFlow
-from neighbayes.models.flow_panel import (
-    OLSFlowPanelFE,
-    SARFlowPanelFE,
-    SARFlowSeparablePanelFE,
-)
 from neighbayes.tests.helpers import effects_kwargs
 
 

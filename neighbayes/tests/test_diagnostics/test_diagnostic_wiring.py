@@ -43,7 +43,6 @@ def test_panel_models_no_frequentist_diagnostics():
 
 from neighbayes.models import SDEM, SDM, SLX
 from neighbayes.models.flow import OLSFlow, SARFlow
-from neighbayes.models.flow_panel import OLSFlowPanelFE
 
 EXPECTED_REGISTRIES = {
     OLS: [
@@ -68,28 +67,29 @@ EXPECTED_REGISTRIES = {
         "Robust-LM-Flow-Origin",
         "Robust-LM-Flow-OD",
     ],
-    OLSFlowPanelFE: [
-        "Panel-LM-Flow-Destination",
-        "Panel-LM-Flow-Origin",
-        "Panel-LM-Flow-OD",
-        "Panel-LM-Flow-Joint",
-        "Panel-Robust-LM-Flow-Destination",
-        "Panel-Robust-LM-Flow-Origin",
-        "Panel-Robust-LM-Flow-OD",
-    ],
 }
+
+
+def test_a_flow_panel_takes_the_panel_flow_suite():
+    from neighbayes.dgp import simulate_sar_flow
+    from neighbayes.diagnostics.lmtests.registry import get_diagnostic_suite
+
+    d = simulate_sar_flow(n=3, seed=0, distribution="normal")
+    y, X = np.tile(d["y_vec"], 2), np.tile(d["X"], (2, 1))
+    panel = OLSFlow(y, X, d["G"], T=2, col_names=d["col_names"])
+    labels = [label for _, label in get_diagnostic_suite(panel).tests]
+    assert labels == [f"Panel-{x}" for x in EXPECTED_REGISTRIES[OLSFlow]]
 
 
 def test_fitted_spatial_and_count_flows_have_no_suite():
     """The flow tests take the Gaussian aspatial null; no other flow has a suite."""
     from neighbayes.diagnostics.lmtests.registry import get_diagnostic_suite
     from neighbayes.models.flow import NegBinFlow, SARNegBinFlow, SEMFlow
-    from neighbayes.models.flow_panel import NegBinFlowPanelRE, SARFlowPanelFE
+    from neighbayes.models.flow_panel import NegBinFlowPanelRE
 
     for cls in (SARFlow, SEMFlow, NegBinFlow, SARNegBinFlow):
         assert get_diagnostic_suite(cls) is None, cls.__name__
-    for cls in (SARFlowPanelFE, NegBinFlowPanelRE):
-        assert get_diagnostic_suite(cls) is None, cls.__name__
+    assert get_diagnostic_suite(NegBinFlowPanelRE) is None
 
 
 def test_spatial_diagnostics_registries_match_expected():
@@ -230,6 +230,6 @@ def test_flow_decision_tree_dispatch():
     assert d2 == "OLSFlow"
 
     # Panel variants
-    spec_p = _dt.get_panel_flow_spec("OLSFlowPanelFE")
+    spec_p = _dt.get_panel_flow_spec("OLSFlow")
     dp, _ = _dt.evaluate(spec_p, lambda name: name == "Panel-LM-Flow-Joint")
     assert dp == "SARFlow"

@@ -1267,7 +1267,7 @@ def _flow_ring_graph():
 @pytest.fixture(scope="module")
 def fitted_olsflow(_flow_ring_graph):
     from neighbayes.dgp import simulate_sar_flow
-    from neighbayes.models.flow._flow import OLSFlow
+    from neighbayes.models import OLSFlow
 
     n, G = _flow_ring_graph
     data = simulate_sar_flow(
@@ -1353,7 +1353,6 @@ class TestFlowLMTests:
 @pytest.fixture(scope="module")
 def fitted_olsflow_panel(_flow_ring_graph):
     from neighbayes.dgp import simulate_sar_flow
-    from neighbayes.models.flow_panel._panel import OLSFlowPanelFE
 
     n, G = _flow_ring_graph
     T_periods = 3

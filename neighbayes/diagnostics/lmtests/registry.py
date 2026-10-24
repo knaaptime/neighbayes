@@ -127,11 +127,10 @@ _register("neighbayes.models.cross_section.logit.Logit", LOGIT_SUITE)
 _register("neighbayes.models.cross_section.negbin.NegBin", NEGBIN_SUITE)
 _register("neighbayes.models.cross_section.negbin.NegBin", None, variant="panel")
 
-# Flow (cross-sectional).  The flow tests are the Gaussian lag-flow model's
-# score tests at its OLSFlow null; the count flows (NegBinFlow subclasses
-# OLSFlow) and the fitted spatial flows have none.
-_register("neighbayes.models.flow._flow.OLSFlow", FLOW_SUITE)
-_register("neighbayes.models.flow._flow.NegBinFlow", None)
+# Flows.  The flow tests are the Gaussian lag-flow model's score tests at its
+# OLSFlow null, cross-section and panel; the count flows and the fitted
+# spatial flows have none.
+_register("neighbayes.models.flow._gaussian.OLSFlow", FLOW_SUITE)
 
 # ---------------------------------------------------------------------------
 # Panel models
@@ -165,6 +164,4 @@ for _path, _panel, _dynamic in (
 _register(f"{_CS}.tobit.SARTobit", SAR_PANEL_SUITE, variant="panel")
 _register(f"{_CS}.tobit.SEMTobit", SEM_PANEL_DYNAMIC_SUITE, variant="panel")
 
-# Flow Panel: as the cross-section, at the OLSFlowPanelFE null
-_register("neighbayes.models.flow_panel._panel.OLSFlowPanelFE", FLOW_PANEL_SUITE)
-_register("neighbayes.models.flow_panel._panel.NegBinFlowPanelRE", None)
+_register("neighbayes.models.flow._gaussian.OLSFlow", FLOW_PANEL_SUITE, variant="panel")

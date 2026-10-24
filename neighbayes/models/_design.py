@@ -130,23 +130,6 @@ def _cross_section_only(name: str, time: bool, dynamic) -> None:
 # Per family: the pair-effects treatment its panels take, and the implementations
 # indexed by (separable, panel).  A missing entry is not implemented.
 _FLOW = {
-    "OLSFlow": {
-        "pairs": "fixed",
-        "aspatial": True,
-        (False, True): "flow_panel._panel:OLSFlowPanelFE",
-    },
-    "SARFlow": {
-        "pairs": "fixed",
-        (True, False): "flow._flow:SARFlowSeparable",
-        (False, True): "flow_panel._panel:SARFlowPanelFE",
-        (True, True): "flow_panel._panel:SARFlowSeparablePanelFE",
-    },
-    "SEMFlow": {
-        "pairs": "fixed",
-        (True, False): "flow._flow:SEMFlowSeparable",
-        (False, True): "flow_panel._panel:SEMFlowPanelFE",
-        (True, True): "flow_panel._panel:SEMFlowSeparablePanelFE",
-    },
     "NegBinFlow": {
         "pairs": "random",
         "aspatial": True,

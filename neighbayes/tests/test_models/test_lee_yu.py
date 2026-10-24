@@ -85,15 +85,18 @@ def _flow_panel(n, T, rho_d, rho_o, seed):
 
 @pytest.mark.slow
 @pytest.mark.parametrize(
-    "name", ["OLSFlowPanelFE", "SARFlowSeparablePanelFE", "SARFlowPanelFE"]
+    "name, separable",
+    [("OLSFlow", False), ("SARFlow", True), ("SARFlow", False)],
+    ids=["OLSFlow", "SARFlow separable", "SARFlow"],
 )
-def test_flow_pair_fe_recovers_sigma2_at_short_T(name):
-    import neighbayes.models.flow_panel as fp
+def test_flow_pair_fe_recovers_sigma2_at_short_T(name, separable):
+    import neighbayes.models as M
 
-    cls = getattr(fp, name)
-    rho = (0.0, 0.0) if name == "OLSFlowPanelFE" else (0.3, 0.2)
+    cls = getattr(M, name)
+    kw = {"separable": True} if separable else {}
+    rho = (0.0, 0.0) if name == "OLSFlow" else (0.3, 0.2)
     y, X, G, names = _flow_panel(12, 3, *rho, seed=3)
-    m = cls(y=y, X=X, W=G, T=3, col_names=names, effects=1)
+    m = cls(y=y, X=X, W=G, T=3, col_names=names, pair_effects="fixed", **kw)
     assert m._jacobian_T == 2 and m._n_effective == 2 * 144
     idata = m.fit(draws=800, tune=500, chains=1, random_seed=0, progressbar=False)
     sigma2 = float((idata.posterior["sigma"] ** 2).mean())

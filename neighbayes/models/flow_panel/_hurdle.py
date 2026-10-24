@@ -34,17 +34,16 @@ from .._base._nb import nb_alpha_rv
 from .._design import FacadeMeta, flow
 from .._mixins._count_panel import pop_mundlak, require_counts
 from .._mixins._hurdle import HurdleMixin
-from ..flow import FlowModel
+from ..flow._flow import FlowModel, _Separable
 from ..priors import FlowPanelHurdlePriors
 from ._panel import (
-    SARFlowSeparablePanelFE,
     _pop_effects,
     _SeparableCountFlowPanel,
 )
 
 
 class SARHurdleNegBinFlowSeparablePanelRE(
-    HurdleMixin, _SeparableCountFlowPanel, SARFlowSeparablePanelFE
+    HurdleMixin, _SeparableCountFlowPanel, _Separable, FlowModel
 ):
     r"""Reduced-form separable SAR hurdle NB flow panel.
 

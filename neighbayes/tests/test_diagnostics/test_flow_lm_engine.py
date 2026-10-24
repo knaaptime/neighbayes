@@ -160,7 +160,6 @@ def test_suites_hold_their_size_at_their_null(effects):
     from neighbayes.dgp import simulate_sar_flow
     from neighbayes.dgp.flows import _simulate_sar_flow_panel_fe
     from neighbayes.models.flow import OLSFlow
-    from neighbayes.models.flow_panel import OLSFlowPanelFE
 
     stats = []
     for seed in range(12):
@@ -176,9 +175,11 @@ def test_suites_hold_their_size_at_their_null(effects):
                 sigma_alpha=0.5 if effects in (1, 3) else 0.0,
                 time_effect_sd=1.0 if effects in (2, 3) else 0.0, seed=seed,
             )  # fmt: skip
-            m = OLSFlowPanelFE(
-                d["y"], d["X"], d["G"], T=4, effects=effects, col_names=d["col_names"]
-            )
+            m = OLSFlow(
+                d["y"], d["X"], d["G"], T=4, col_names=d["col_names"],
+                pair_effects="fixed" if effects in (1, 3) else None,
+                time_effects=effects in (2, 3),
+            )  # fmt: skip
         m.fit(
             draws=400, tune=400, chains=1, progressbar=False, random_seed=seed, cores=1
         )

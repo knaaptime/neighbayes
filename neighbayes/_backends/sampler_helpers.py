@@ -158,8 +158,7 @@ def prepare_idata_kwargs(
     Most spatial-error models (SEM, SDEM, their panels, SEMTobit) now expose a dual-path ``_build_pymc_model``: when the
     selected sampler is ``"blackjax"`` or ``"numpyro"`` they register the
     likelihood via ``pm.CustomDist("obs", ..., observed=y)`` so PyMC captures
-    ``log_likelihood["obs"]`` natively. Flow models (SEMFlow, SEMFlowPanelFE,
-    SEMFlowSeparablePanelFE) achieve the same result via the mean-form
+    ``log_likelihood["obs"]`` natively. The separable SEMFlow achieves the same result via the mean-form
     ``pm.Normal/StudentT("obs", mu=..., observed=y)`` pattern combined with a
     Jacobian ``pm.Potential`` that is folded back into ``log_likelihood["obs"]``
     after sampling.

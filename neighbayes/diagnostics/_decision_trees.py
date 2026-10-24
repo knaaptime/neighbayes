@@ -1114,7 +1114,7 @@ def _ols_flow_spec() -> TreeNode:
 
 
 def _panel_ols_flow_spec() -> TreeNode:
-    """OLSFlowPanelFE decision tree (panel mirror of ``_ols_flow_spec``)."""
+    """OLSFlow panel decision tree (panel mirror of ``_ols_flow_spec``)."""
     return TreeNode(
         kind="test",
         name="Panel-LM-Flow-Joint",
@@ -1128,7 +1128,7 @@ _FLOW_SPECS: dict[str, Callable[[], TreeNode]] = {
 }
 
 _PANEL_FLOW_SPECS: dict[str, Callable[[], TreeNode]] = {
-    "OLSFlowPanelFE": _panel_ols_flow_spec,
+    "OLSFlow": _panel_ols_flow_spec,
 }
 
 

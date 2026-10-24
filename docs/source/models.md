@@ -547,6 +547,11 @@ $$y_{ij} \sim \operatorname{NegBin}(\mu_{ij}, \alpha), \quad \log \boldsymbol{\m
 
 $$y = \rho_d W_d y + \rho_o W_o y + \rho_w W_w y + X\beta + \varepsilon$$
 
+One class: `separable=True` gives the separable form below, and `T` a panel.
+The unrestricted flow's `fit()` runs the resolvent-gradient sampler and
+`sampler="nuts"` PyMC with the exact trace-series Jacobian; the separable flow
+samples by NUTS. `robust=True` (Student-t errors, fixed $\nu$) needs NUTS.
+
 ### SARFlow, separable
 
 $$y = \rho_d W_d y + \rho_o W_o y - \rho_d \rho_o W_w y + X\beta + \varepsilon$$
@@ -583,6 +588,9 @@ weakly-identified $\rho$ ridge of the unrestricted variant.
 ### SEMFlow
 
 $$y = X\beta + u, \quad u = \lambda_d W_d u + \lambda_o W_o u + \lambda_w W_w u + \varepsilon, \quad \varepsilon \sim \mathcal{N}(0, \sigma^2 I)$$
+
+Designs and samplers as `SARFlow`, except that the unrestricted SEM flow has
+no PyMC model, so only the separable one takes `robust=True`.
 
 ### SEMFlow, separable
 
@@ -741,8 +749,8 @@ posterior-mean parameters as for the Gaussian tests.
 
 The flow tests are the score tests of the lag-flow model
 $y = \rho_d W_d y + \rho_o W_o y + \rho_w W_w y + X\beta + \varepsilon$ at a
-fitted `OLSFlow` (or `OLSFlowPanelFE`, on the Lee and Yu transformed
-likelihood), built as the Gaussian tests are. With
+fitted `OLSFlow`, cross-section or panel (the panel on the Lee and Yu
+transformed likelihood), built as the Gaussian tests are. With
 $W_d = I_n \otimes W$, $W_o = W \otimes I_n$ and $W_w = W \otimes W$, every
 trace in the information factors into traces of $W$, so the $n^2$ pairs never
 form a Kronecker product.

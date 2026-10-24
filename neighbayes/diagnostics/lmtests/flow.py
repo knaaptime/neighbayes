@@ -6,7 +6,7 @@ The flow tests are the score tests of the spatial-lag flow model
     y = \rho_d W_d y + \rho_o W_o y + \rho_w W_w y + X\beta + \varepsilon,
     \qquad \varepsilon \sim N(0, \sigma^2 I),
 
-at a fitted :class:`~neighbayes.models.OLSFlow` (or ``OLSFlowPanelFE``), on the
+at a fitted :class:`~neighbayes.models.OLSFlow`, cross-section or panel, on the
 construction of :mod:`._gaussian`: the score of the tested directions at every
 posterior draw, Neyman-orthogonal to :math:`(\beta, \sigma^2)`, the efficient
 information at the posterior mean, and the statistic at the posterior-mean

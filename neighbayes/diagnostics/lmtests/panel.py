@@ -239,7 +239,7 @@ def _flow_panel_test(model, tested, robust=(), *, test_type: str):
 
 
 def bayesian_panel_lm_flow_destination_test(model) -> BayesianLMTestResult:
-    r"""LM test for an omitted destination lag at an ``OLSFlowPanelFE`` fit.
+    r"""LM test for an omitted destination lag at an ``OLSFlow`` panel fit.
 
     H₀: :math:`\rho_d = 0`.  The test of
     :func:`~neighbayes.diagnostics.lmtests.bayesian_lm_flow_destination_test`
@@ -256,7 +256,7 @@ def bayesian_panel_lm_flow_destination_test(model) -> BayesianLMTestResult:
 
 
 def bayesian_panel_lm_flow_origin_test(model) -> BayesianLMTestResult:
-    r"""LM test for an omitted origin lag at an ``OLSFlowPanelFE`` fit (H₀: ρ_o = 0).
+    r"""LM test for an omitted origin lag at an ``OLSFlow`` panel fit (H₀: ρ_o = 0).
 
     See :func:`bayesian_panel_lm_flow_destination_test`.
     """
@@ -264,7 +264,7 @@ def bayesian_panel_lm_flow_origin_test(model) -> BayesianLMTestResult:
 
 
 def bayesian_panel_lm_flow_od_test(model) -> BayesianLMTestResult:
-    r"""LM test for an omitted network lag at an ``OLSFlowPanelFE`` fit (H₀: ρ_w = 0).
+    r"""LM test for an omitted network lag at an ``OLSFlow`` panel fit (H₀: ρ_w = 0).
 
     See :func:`bayesian_panel_lm_flow_destination_test`.
     """
@@ -272,7 +272,7 @@ def bayesian_panel_lm_flow_od_test(model) -> BayesianLMTestResult:
 
 
 def bayesian_panel_lm_flow_joint_test(model) -> BayesianLMTestResult:
-    r"""Joint LM test at an ``OLSFlowPanelFE`` fit (H₀: ρ_d = ρ_o = ρ_w = 0), df 3.
+    r"""Joint LM test at an ``OLSFlow`` panel fit (H₀: ρ_d = ρ_o = ρ_w = 0), df 3.
 
     See :func:`bayesian_panel_lm_flow_destination_test`.
     """
@@ -282,7 +282,7 @@ def bayesian_panel_lm_flow_joint_test(model) -> BayesianLMTestResult:
 
 
 def bayesian_panel_robust_lm_flow_destination_test(model) -> BayesianLMTestResult:
-    r"""Robust LM test for the destination lag at an ``OLSFlowPanelFE`` fit.
+    r"""Robust LM test for the destination lag at an ``OLSFlow`` panel fit.
 
     H₀: :math:`\rho_d = 0`, robust to local origin and network lags; see
     :func:`~neighbayes.diagnostics.lmtests.bayesian_robust_lm_flow_destination_test`.
@@ -294,7 +294,7 @@ def bayesian_panel_robust_lm_flow_destination_test(model) -> BayesianLMTestResul
 
 
 def bayesian_panel_robust_lm_flow_origin_test(model) -> BayesianLMTestResult:
-    r"""Robust LM test for the origin lag at an ``OLSFlowPanelFE`` fit.
+    r"""Robust LM test for the origin lag at an ``OLSFlow`` panel fit.
 
     See :func:`bayesian_panel_robust_lm_flow_destination_test`.
     """
@@ -304,7 +304,7 @@ def bayesian_panel_robust_lm_flow_origin_test(model) -> BayesianLMTestResult:
 
 
 def bayesian_panel_robust_lm_flow_od_test(model) -> BayesianLMTestResult:
-    r"""Robust LM test for the network lag at an ``OLSFlowPanelFE`` fit.
+    r"""Robust LM test for the network lag at an ``OLSFlow`` panel fit.
 
     See :func:`bayesian_panel_robust_lm_flow_destination_test`.
     """
