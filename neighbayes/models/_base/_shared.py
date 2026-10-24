@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import inspect
 import warnings
+from abc import ABCMeta
 from functools import cached_property, partial
 from typing import Any, Optional, Union
 
@@ -30,7 +31,6 @@ from ..._logdet import (
     make_logdet_numpy_fn,
     make_logdet_numpy_vec_fn,
 )
-from .._design import FacadeMeta
 
 
 def gelman_default_beta_prior(
@@ -437,7 +437,7 @@ _DECISION_PREDICATE_PAIRS: dict[str, tuple[str, str]] = {
 }
 
 
-class SharedSpatialMethods(metaclass=FacadeMeta):
+class SharedSpatialMethods(metaclass=ABCMeta):
     """Methods shared by every model: :class:`SpatialModel` (cross-section or
     panel) and the flow bases.
 

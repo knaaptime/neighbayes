@@ -15,7 +15,6 @@ The probit link is used directly via ``P(y=1) = Phi(X\\beta + \\Delta a)``.
 
 from __future__ import annotations
 
-import inspect
 from typing import Any, Optional, Union
 
 import numpy as np
@@ -523,10 +522,3 @@ class SEMProbit(SharedSpatialMethods):
             }
             return df, samples_dict
         return df
-
-
-# The facade metaclass's ``__call__`` would otherwise hide the constructor's
-# arguments from :func:`inspect.signature`.
-SEMProbit.__signature__ = inspect.Signature(
-    list(inspect.signature(SEMProbit.__init__).parameters.values())[1:]
-)

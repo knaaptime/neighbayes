@@ -619,13 +619,21 @@ def _constructor_signature(
 ) -> inspect.Signature:
     """The design arguments, ``extra``, then the base class's: what ``**kwargs`` takes.
 
-    ``base`` is the base class's ``__init__`` (``SpatialModel``'s by default).
-    Set on the class: the facade metaclass's ``__call__`` would otherwise hide
-    the constructor's arguments from :func:`inspect.signature`.
+    ``base`` is the base class's ``__init__`` (``SpatialModel``'s by default);
+    a ``*args`` in ``init`` stands for its positional arguments.  Set on the
+    class, so that :func:`inspect.signature` (and the API docs) show every
+    argument the class takes rather than the design layer's ``**kwargs``.
     """
     own = list(inspect.signature(init).parameters.values())[1:]
     base = inspect.signature(base or SpatialModel.__init__).parameters
-    params = [p for p in own if p.kind is not p.VAR_KEYWORD]
+    params = []
+    for p in own:
+        if p.kind is p.VAR_POSITIONAL:
+            params += [
+                q for q in list(base.values())[1:] if q.kind is q.POSITIONAL_OR_KEYWORD
+            ]
+        elif p.kind is not p.VAR_KEYWORD:
+            params.append(p)
     params += [
         inspect.Parameter(name, inspect.Parameter.KEYWORD_ONLY, default=None)
         for name in extra

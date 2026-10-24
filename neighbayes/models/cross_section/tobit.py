@@ -111,6 +111,12 @@ class _SpatialTobitBase(SpatialModel):
     #: Whether the class has a panel (``SDMTobit`` does not).
     _has_panel = True
 
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        from .._mixins._designs import _constructor_signature
+
+        cls.__signature__ = _constructor_signature(_SpatialTobitBase.__init__)
+
     def __init__(
         self,
         *args,

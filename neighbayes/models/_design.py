@@ -18,13 +18,10 @@ flow restriction are constructor arguments:
 
 Every class implements its designs itself (see :mod:`._mixins._designs`,
 :mod:`.cross_section.tobit` and :mod:`.cross_section.sem_probit`); this module
-holds the argument validation they share.  :class:`FacadeMeta` routes a
-class's construction through a ``_dispatch`` table where one is defined.
+holds the argument validation they share.
 """
 
 from __future__ import annotations
-
-from abc import ABCMeta
 
 _UNIT_VALUES = (None, "fixed", "random")
 _DYNAMIC_VALUES = (False, True, "restricted")
@@ -33,24 +30,6 @@ _NICKELL = (
     "Dynamic panels take no unit effects: within-demeaning correlates the "
     "demeaned time lag with the demeaned disturbance (Nickell 1981)."
 )
-
-
-class FacadeMeta(ABCMeta):
-    """Metaclass that routes a public class's construction through ``_dispatch``.
-
-    Only a class whose own namespace defines ``_dispatch`` dispatches; its
-    subclasses and the implementation classes construct normally.
-    """
-
-    def __call__(cls, *args, **kwargs):
-        dispatch = cls.__dict__.get("_dispatch")
-        if dispatch is None:
-            return super().__call__(*args, **kwargs)
-        impl, kwargs = dispatch.__func__(cls, dict(kwargs))
-        if impl is cls:
-            return super().__call__(*args, **kwargs)
-        cls.register(impl)
-        return impl(*args, **kwargs)
 
 
 def _pop_design(kw: dict, *, pair: bool = False) -> tuple:
