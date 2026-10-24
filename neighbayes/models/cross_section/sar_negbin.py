@@ -90,8 +90,10 @@ class SARNegBin(CountDesigns, LatentNegBinMixin, _CountPanel, SpatialModel):
 
     so that :math:`\rho = 0` is :class:`NegBin`.  It is sampled by an exact
     Gibbs sweep over the log-means (:mod:`neighbayes.samplers.negbin_latent`),
-    on JAX by default; there is no NUTS path and no pointwise
-    log-likelihood, and its impacts are on the log-mean.
+    on JAX by default; there is no NUTS path.  Its pointwise
+    log-likelihood integrates each log-mean out given the rest, and its
+    impacts are on the log-mean or, ``impacts(scale="count")``, the expected
+    count.
 
     Parameters
     ----------
@@ -943,56 +945,20 @@ class SARNegBin(CountDesigns, LatentNegBinMixin, _CountPanel, SpatialModel):
             when :math:`n` exceeds
             :attr:`_COUNT_EFFECTS_EIGEN_MAX_N` (default 2000).
         """
-        from ...diagnostics.impacts import _build_effects_dataframe
-
         if scale == "logmean":
             return super().impacts(return_posterior_samples=return_posterior_samples)
         if scale != "count":
             raise ValueError("scale must be either 'logmean' or 'count'.")
         if self._design == "latent":
-            raise NotImplementedError(
-                "The latent SAR's impacts are on the log-mean (latent index): its "
-                "expected counts mix the propagated disturbances, so the count "
-                "scale has no closed form."
-            )
+            return self._latent_impacts(scale, return_posterior_samples)
         if self._design != "static":
             raise NotImplementedError(
                 "Count-scale impacts are implemented for the cross-section only."
             )
 
         self._require_fit()
-        direct_samples, indirect_samples, total_samples = (
-            self._compute_count_scale_impacts_posterior(method=method)
+        return self._effects_frame(
+            *self._compute_count_scale_impacts_posterior(method=method),
+            return_posterior_samples=return_posterior_samples,
+            scale=scale,
         )
-
-        k_effects = direct_samples.shape[1]
-        if (
-            hasattr(self, "_wx_feature_names")
-            and len(self._wx_feature_names) == k_effects
-        ):
-            feature_names = list(self._wx_feature_names)
-        elif (
-            hasattr(self, "_nonintercept_feature_names")
-            and len(self._nonintercept_feature_names) == k_effects
-        ):
-            feature_names = list(self._nonintercept_feature_names)
-        else:
-            feature_names = list(self._feature_names[:k_effects])
-
-        df = _build_effects_dataframe(
-            direct_samples=direct_samples,
-            indirect_samples=indirect_samples,
-            total_samples=total_samples,
-            feature_names=feature_names,
-            model_type=self.__class__.__name__,
-        )
-        df.attrs["scale"] = scale
-
-        if return_posterior_samples:
-            posterior_samples = {
-                "direct": direct_samples,
-                "indirect": indirect_samples,
-                "total": total_samples,
-            }
-            return df, posterior_samples
-        return df

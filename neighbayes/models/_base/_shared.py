@@ -1191,17 +1191,29 @@ class SharedSpatialMethods(metaclass=ABCMeta):
             ``"direct"``, ``"indirect"``, ``"total"``, each mapping
             to a ``(G, k)`` array of posterior draws.
         """
-        from ...diagnostics.impacts import _build_effects_dataframe
-
         self._require_fit()
-        direct_samples, indirect_samples, total_samples = (
-            self._compute_impacts_posterior()
+        return self._effects_frame(
+            *self._compute_impacts_posterior(),
+            return_posterior_samples=return_posterior_samples,
         )
 
-        # Determine feature names based on the shape of the posterior samples.
-        # Models with WX terms (SDM, SLX, SDEM) report effects only for
-        # lagged covariates (k_wx columns), while models without WX terms
-        # (SAR, SEM) report effects for non-intercept covariates.
+    def _effects_frame(
+        self,
+        direct_samples: np.ndarray,
+        indirect_samples: np.ndarray,
+        total_samples: np.ndarray,
+        *,
+        return_posterior_samples: bool = False,
+        scale: Optional[str] = None,
+    ) -> pd.DataFrame | tuple[pd.DataFrame, dict[str, np.ndarray]]:
+        """The impacts summary of posterior draws ``(G, k)`` of each effect.
+
+        Models with WX terms (SDM, SLX, SDEM) report effects only for the
+        lagged covariates, models without them (SAR, SEM) for the
+        non-intercept covariates.
+        """
+        from ...diagnostics.impacts import _build_effects_dataframe
+
         k_effects = direct_samples.shape[1]
         if (
             hasattr(self, "_wx_feature_names")
@@ -1215,18 +1227,15 @@ class SharedSpatialMethods(metaclass=ABCMeta):
             feature_names = list(self._nonintercept_feature_names)
         else:
             feature_names = list(self._feature_names[:k_effects])
-
-        # Determine model type label
-        model_type = self.__class__.__name__
-
         df = _build_effects_dataframe(
             direct_samples=direct_samples,
             indirect_samples=indirect_samples,
             total_samples=total_samples,
             feature_names=feature_names,
-            model_type=model_type,
+            model_type=type(self).__name__,
         )
-
+        if scale is not None:
+            df.attrs["scale"] = scale
         if return_posterior_samples:
             posterior_samples = {
                 "direct": direct_samples,

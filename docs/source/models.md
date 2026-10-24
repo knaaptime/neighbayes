@@ -360,8 +360,30 @@ $\beta$ shifted along the least-squares fit of $W\eta$ on $X$, $\beta$ from a
 *t* at its Laplace approximation, and $\alpha$. Small counts pin $\eta$ only
 loosely, so two moves interweave the parametrization that holds the
 disturbances instead (Yu & Meng 2011): $\alpha$ with the standardized
-disturbances held, and $\rho$ with the disturbances held. There is no NUTS path
-and no pointwise log-likelihood; impacts are on the log-mean.
+disturbances held, and $\rho$ with the disturbances held. There is no NUTS path.
+The pointwise log-likelihood
+(`idata_kwargs={"log_likelihood": True}`) integrates each observation's latent
+value out given the others, $p(y_i \mid \theta, \eta_{-i}) = \int p(y_i \mid
+\eta_i)\, p(\eta_i \mid \eta_{-i}, \theta)\, d\eta_i$, a one-dimensional
+integral over the equations the column of $I - \rho W$ touches. That is the
+integrated importance sampling of Li, Qiu, Zhang and Feng (2016), whose weights
+PSIS-LOO handles; the likelihood conditional on $\eta_i$ would give degenerate
+ones (Merkle, Furr and Rabe-Hesketh 2019). It is comparable with the reduced
+form's: both estimate $\sum_i \log p(y_i \mid y_{-i})$.
+
+Impacts are on the log-mean by default; `impacts(scale="count")` gives them on
+the expected count, which averages over the propagated heterogeneity. With $u =
+S(\rho)\varepsilon$ and $m = S(\rho)X\beta$,
+
+$$\mathbb{E}\,y_i = e^{m_i}\prod_j \frac{\Gamma(\alpha + S_{ij})}{\Gamma(\alpha)\,\alpha^{S_{ij}}}, \qquad \frac{\partial\,\mathbb{E}\,y_i}{\partial x_{jk}} = \mathbb{E}\,y_i\,S_{ij}\beta_k,$$
+
+the reduced form's count-scale impact with each row scaled by the mean of the
+propagated heterogeneity. The product needs every entry of $S$, so each
+posterior draw estimates it by Monte Carlo over fresh disturbances (one batched
+sparse solve), taking the unit's own factor in closed form where the
+multiplier's diagonal is exact. The same holds, with $S$ replaced by $(I -
+\lambda W)^{-1}$ and no spillover through the mean, for `SEMNegBin` and
+`SDEMNegBin`.
 
 ### SEMNegBin
 
@@ -376,7 +398,8 @@ the GLM suite's LM-Error is its score test. It takes no `latent` switch.
 $$y_i \sim \operatorname{Poisson}(e^{\eta_i}), \quad \eta = X\beta + WX\theta + (I - \lambda W)^{-1}\varepsilon$$
 
 `SEMNegBin` on the design $[X, WX]$. Impacts are on the log-mean, direct
-$\beta$ and indirect $\theta$ (times the mean row sum of $W$).
+$\beta$ and indirect $\theta$ (times the mean row sum of $W$), or with
+`scale="count"` on the expected count.
 
 ### SARZINB
 
@@ -510,8 +533,19 @@ scale mixture (Holmes and Held 2006, through `augax`), $\rho$ with $\beta$
 integrated out, then $\beta$. It runs on JAX by default, drawing the
 utilities a colour class at a time (classes of utilities that share no row of
 $I - \rho W$ are conditionally independent), and on NumPy one at a time. There
-is no NUTS path (the likelihood is an orthant probability) and no pointwise
-log-likelihood. Impacts are on the latent index.
+is no NUTS path (the likelihood is an orthant probability). Its pointwise
+log-likelihood integrates each utility out as the negative binomial's does, the
+observation's term being the probability that the utility falls on the observed
+side of zero.
+
+Impacts are on the latent index by default; `impacts(scale="probability")` gives
+them on $P(y_i = 1) = P(u_i > -m_i)$, with $u = S(\rho)\varepsilon$ and $m =
+S(\rho)X\beta$: $\partial P(y_i = 1)/\partial x_{jk} = f_{u_i}(-m_i)\,S_{ij}\beta_k$,
+the logistic counterpart of the SAR probit's $\phi$ term in LeSage and Pace
+(2009). The density of the weighted sum of logistics $f_{u_i}$ is estimated per
+posterior draw by Monte Carlo, conditioning on every disturbance but the unit's
+own, whose logistic density then enters exactly. `SEMLogit` and `SDEMLogit` take
+the same scale.
 
 ### SEMLogit
 
@@ -529,7 +563,8 @@ $$y_i = \mathbf 1\{y^*_i > 0\}, \quad y^* = X\beta + WX\theta + (I - \lambda W)^
 `SEMLogit` on the design $[X, WX]$, sampled the same way: $\theta$ carries the
 covariates' spillover and $\lambda$ the clustering of the disturbance, which a
 latent SAR ties together through one $\rho$. Impacts are on the latent index,
-direct $\beta$ and indirect $\theta$ (times the mean row sum of $W$).
+direct $\beta$ and indirect $\theta$ (times the mean row sum of $W$), or with
+`scale="probability"` on the probability.
 
 ## Flow Models
 

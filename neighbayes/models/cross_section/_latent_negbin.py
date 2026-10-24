@@ -56,6 +56,47 @@ class LatentNegBinMixin(LatentMixin):
     def _latent_observed(self) -> np.ndarray:
         return self._y_int
 
+    _index_scale = "logmean"
+    _outcome_scale = "count"
+    _latent_family = 0  # integrated_loglik's NEGBIN
+
+    def impacts(self, return_posterior_samples: bool = False, scale: str = "logmean"):
+        r"""Direct, indirect and total impacts on the log-mean or the count scale.
+
+        ``scale="count"`` gives the effects on the expected count
+        :math:`\mathbb{E}\,y_i = \mathbb{E}\,e^{\eta_i}`, which averages over the
+        propagated gamma heterogeneity (estimated by Monte Carlo per posterior
+        draw); ``"logmean"`` the effects on the latent log-mean.
+        """
+        return self._latent_impacts(scale, return_posterior_samples)
+
+    def _latent_noise(self, rng, size, params) -> np.ndarray:
+        """Log-gamma disturbances at one posterior draw's ``alpha``."""
+        alpha = float(params["alpha"])
+        return np.log(rng.gamma(alpha, 1.0 / alpha, size=size))
+
+    @staticmethod
+    def _latent_outcome_weight(m, U, E, d, params, exact) -> np.ndarray:
+        r"""``E exp(m_i + u_i)``, the expected count.
+
+        With an exact multiplier diagonal ``d`` the unit's own factor is taken in
+        closed form, :math:`\mathbb{E}\,\gamma_i^{d_i} = \Gamma(\alpha + d_i) /
+        (\Gamma(\alpha)\,\alpha^{d_i})`, and only the rest averaged, which
+        halves the Monte Carlo spread; with an estimated one the whole average
+        is taken, which needs no diagonal and stays unbiased.
+        """
+        from scipy.special import gammaln
+
+        if exact:
+            a = float(params["alpha"])
+            own = gammaln(a + d) - gammaln(a) - d * np.log(a)
+            U = U - d[:, None] * E
+        else:
+            own = 0.0
+        top = U.max(axis=1, keepdims=True)
+        log_mean = top[:, 0] + np.log(np.mean(np.exp(U - top), axis=1))
+        return np.exp(np.clip(m + own + log_mean, -50.0, 50.0))
+
     def _latent_disturbances(self, rng, size):
         alpha = float(self._posterior_mean("alpha"))
         return np.log(rng.gamma(alpha, 1.0 / alpha, size=size))

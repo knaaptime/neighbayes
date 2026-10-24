@@ -27,11 +27,6 @@ def _run_latent_logit(
     log_likelihood=False,
 ):
     """Registry runner: a thin adapter over the model's ``_fit_gibbs``."""
-    if log_likelihood:
-        raise NotImplementedError(
-            "The latent logit's pointwise likelihood is an orthant probability "
-            "of the correlated utilities, with no closed form; it stores none."
-        )
     return model._fit_gibbs(
         draws=draws,
         tune=tune,
@@ -42,6 +37,7 @@ def _run_latent_logit(
         progressbar=progressbar,
         backend=backend,
         slice_width=slice_width,
+        log_likelihood=log_likelihood,
     )
 
 

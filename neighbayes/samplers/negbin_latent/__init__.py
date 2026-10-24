@@ -27,11 +27,6 @@ def _run_latent_negbin(
     log_likelihood=False,
 ):
     """Registry runner: a thin adapter over the model's ``_fit_gibbs``."""
-    if log_likelihood:
-        raise NotImplementedError(
-            "The latent negative binomial's pointwise likelihood integrates the "
-            "propagated gamma disturbances, with no closed form; it stores none."
-        )
     return model._fit_gibbs(
         draws=draws,
         tune=tune,
@@ -42,6 +37,7 @@ def _run_latent_negbin(
         progressbar=progressbar,
         backend=backend,
         slice_width=slice_width,
+        log_likelihood=log_likelihood,
     )
 
 

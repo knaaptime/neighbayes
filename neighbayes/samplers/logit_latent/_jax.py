@@ -128,7 +128,7 @@ def _tn_beyond(key, a, active):
     return z
 
 
-def _make_sweep(n, k, process, n_colours, logdet_eval):
+def _make_sweep(n, k, process, n_colours, logdet_eval, store_latent):
     import augax
     import jax
     import jax.numpy as jnp
@@ -248,7 +248,7 @@ def _make_sweep(n, k, process, n_colours, logdet_eval):
             L.T, jax.random.normal(k_beta, (k,)), lower=False
         )
         new = {"par": par, "beta": beta, "ystar": ystar, "m": m, "slice_width": width}
-        return new, (par, beta)
+        return new, (par, beta, ystar) if store_latent else (par, beta)
 
     return sweep
 
@@ -267,8 +267,12 @@ def run_chains_jax_latent_logit(
     thin=1,
     seeds,
     slice_width=0.4,
+    store_latent=False,
 ):
-    """Run the latent-logit chains in parallel threads; one dict per chain."""
+    """Run the latent-logit chains in parallel threads; one dict per chain.
+
+    ``store_latent`` adds the utilities at every kept draw, ``"latent"``.
+    """
     import jax
     import jax.numpy as jnp
 
@@ -291,10 +295,10 @@ def run_chains_jax_latent_logit(
         ld_params, ld_key = logdet_params, (logdet_kind,)
     data = _latent_data(y, X, W, colour, priors, ld_params)
 
-    static = (n, k, process, n_colours, *ld_key)
+    static = (n, k, process, n_colours, store_latent, *ld_key)
     sweep = cached_sweep(
         ("logit_latent", *static),
-        lambda: _make_sweep(n, k, process, n_colours, logdet_eval),
+        lambda: _make_sweep(n, k, process, n_colours, logdet_eval, store_latent),
     )
     sign = np.asarray(data["sign"])
     m0 = np.sqrt(2.0 * np.pi) * np.log(2.0)
@@ -310,9 +314,12 @@ def run_chains_jax_latent_logit(
     ]
     warm = [jax.random.PRNGKey(int(s)) for s in seeds]
     draw = [jax.random.fold_in(jax.random.PRNGKey(int(s)), 1) for s in seeds]
-    _, (par_all, beta_all) = run_chains_chunked(
+    _, kept = run_chains_chunked(
         sweep, states, warm, draw, tune=tune, draws=draws, consts=data
     )
     name = "rho" if process == "sar" else "lam"
     sl = slice(None, None, thin) if thin > 1 else slice(None)
-    return [{name: par_all[c, sl], "beta": beta_all[c, sl]} for c in range(len(seeds))]
+    keys = (name, "beta", "latent")
+    return [
+        {key: arr[c, sl] for key, arr in zip(keys, kept)} for c in range(len(seeds))
+    ]

@@ -111,12 +111,8 @@ def test_sdem_impacts_are_the_durbin_coefficients(sdem_fit):
 
 
 def test_refusals(sar_fit):
-    with pytest.raises(NotImplementedError, match="orthant probability"):
-        sar_fit.fit(idata_kwargs={"log_likelihood": True}, **QUICK)
     with pytest.raises(NotImplementedError, match="Gibbs sampling"):
         sar_fit.fit(sampler="nuts", draws=5, tune=5, chains=1, progressbar=False)
-    with pytest.raises(NotImplementedError, match="latent index"):
-        sar_fit.impacts(scale="probability")
 
 
 @pytest.mark.requires_jax

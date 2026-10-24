@@ -164,7 +164,9 @@ def _eta_mh(x0, yi, e, Av, alpha, key, active):
     return jnp.where(accept, prop, x0)
 
 
-def _make_sweep(n, k, process, n_colours, alpha_fixed, row_std, logdet_eval, lu_solve):
+def _make_sweep(
+    n, k, process, n_colours, alpha_fixed, row_std, logdet_eval, lu_solve, store_latent
+):
     import jax
     import jax.numpy as jnp
     from jax.scipy.sparse.linalg import bicgstab
@@ -426,7 +428,8 @@ def _make_sweep(n, k, process, n_colours, alpha_fixed, row_std, logdet_eval, lu_
             "slice_width": width,
             "it": it + 1.0,
         }
-        return out, (par, beta, alpha)
+        draws = (par, beta, alpha, eta) if store_latent else (par, beta, alpha)
+        return out, draws
 
     return sweep
 
@@ -445,8 +448,12 @@ def run_chains_jax_latent_negbin(
     thin=1,
     seeds,
     slice_width=0.4,
+    store_latent=False,
 ):
-    """Run the latent-NB chains in parallel threads; one dict per chain."""
+    """Run the latent-NB chains in parallel threads; one dict per chain.
+
+    ``store_latent`` adds the log-means at every kept draw, ``"latent"``.
+    """
     import jax
     import jax.numpy as jnp
 
@@ -474,11 +481,19 @@ def run_chains_jax_latent_negbin(
     alpha_fixed = priors.alpha_fixed is not None
     row_std = bool(np.allclose(np.asarray(W.sum(axis=1)).ravel(), 1.0))
 
-    static = (n, k, process, n_colours, alpha_fixed, row_std, lu_solve, *ld_key)
+    static = (n, k, process, n_colours, alpha_fixed, row_std, lu_solve, store_latent)
     sweep = cached_sweep(
-        ("negbin_latent", *static),
+        ("negbin_latent", *static, *ld_key),
         lambda: _make_sweep(
-            n, k, process, n_colours, alpha_fixed, row_std, logdet_eval, lu_solve
+            n,
+            k,
+            process,
+            n_colours,
+            alpha_fixed,
+            row_std,
+            logdet_eval,
+            lu_solve,
+            store_latent,
         ),
     )
     eta0, beta0, alpha0 = initial_state(np.asarray(y, dtype=np.float64), X)
@@ -500,12 +515,12 @@ def run_chains_jax_latent_negbin(
     ]
     warm = [jax.random.PRNGKey(int(s)) for s in seeds]
     draw = [jax.random.fold_in(jax.random.PRNGKey(int(s)), 1) for s in seeds]
-    _, (par_all, beta_all, alpha_all) = run_chains_chunked(
+    _, kept = run_chains_chunked(
         sweep, states, warm, draw, tune=tune, draws=draws, consts=data
     )
     name = "rho" if process == "sar" else "lam"
     sl = slice(None, None, thin) if thin > 1 else slice(None)
+    keys = (name, "beta", "alpha", "latent")
     return [
-        {name: par_all[c, sl], "beta": beta_all[c, sl], "alpha": alpha_all[c, sl]}
-        for c in range(len(seeds))
+        {key: arr[c, sl] for key, arr in zip(keys, kept)} for c in range(len(seeds))
     ]

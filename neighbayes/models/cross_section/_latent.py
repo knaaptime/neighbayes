@@ -7,6 +7,17 @@ filter, :math:`A\eta = X\beta + \varepsilon` (SAR) or :math:`A(\eta - X\beta)
 (:mod:`._latent_negbin`).  The family supplies its Gibbs priors, samplers,
 disturbance draws and summaries; :class:`LatentMixin` runs the chains, builds
 the posterior and simulates the index.
+
+Impacts on the outcome scale (expected counts, probabilities) integrate over
+the propagated disturbances.  With :math:`u = M\varepsilon` the propagated
+disturbance (:math:`M = A^{-1}` for SAR, :math:`(I - \lambda W)^{-1}` for SEM)
+and :math:`m` the mean index, the outcome mean is
+:math:`\mathbb{E}\,g(m_i + u_i)`, and the derivative with respect to
+:math:`x_{jk}` is :math:`w_i\,\partial m_i/\partial x_{jk}` with a weight
+:math:`w_i` the family gives: :math:`\mathbb{E}\,e^{m_i + u_i}` for the negative
+binomial and the density of :math:`u_i` at :math:`-m_i` for the logit.
+:meth:`LatentMixin._latent_outcome_effects` estimates :math:`w` by Monte Carlo
+over fresh disturbances, one batched sparse solve per posterior draw.
 """
 
 from __future__ import annotations
@@ -34,6 +45,11 @@ class LatentMixin:
     _latent_extra: tuple[str, ...] = ()
     #: Why the family's latent model has no NUTS path.
     _latent_no_nuts: str = ""
+    #: The scales impacts are reported on: the latent index and the outcome.
+    _index_scale: str
+    _outcome_scale: str
+    #: Largest ``n`` whose multiplier diagonal comes from the eigendecomposition.
+    _LATENT_EFFECTS_EIGEN_MAX_N: int = 2000
 
     @property
     def _latent_param(self) -> str:
@@ -61,14 +77,17 @@ class LatentMixin:
         progressbar: bool = True,
         backend: str = "numpy",
         slice_width: float = 0.4,
+        log_likelihood: bool = False,
     ) -> xr.DataTree:
         """Sample by the family's latent Gibbs sweep.
 
         ``backend="numpy"`` updates the latent index one coordinate at a time
         (a compiled loop); ``"jax"`` updates it by colour class, on the device.
         ``slice_width`` is the initial width of the spatial parameter's slice,
-        adapted in warmup.  The pointwise log-likelihood integrates the
-        propagated disturbances and has no closed form, so none is stored.
+        adapted in warmup.  ``log_likelihood`` stores each observation's
+        likelihood with its latent value integrated out,
+        :math:`p(y_i \\mid \\theta, \\eta_{-i})` (see
+        :mod:`neighbayes.samplers._utils._latent_loglik`), for ``az.loo``.
         """
         y = np.asarray(self._y, dtype=np.float64)
         X, names = self._latent_design
@@ -98,7 +117,9 @@ class LatentMixin:
                     thin=thin,
                     seeds=seeds,
                     slice_width=slice_width,
-                )
+                    store_latent=log_likelihood,
+                ),
+                log_likelihood,
             )
         logdet = self._logdet_numpy_fn
         process = self._latent_process
@@ -119,6 +140,7 @@ class LatentMixin:
                 chain_id=chain_id_kw if chain_id_kw is not None else chain_id,
                 progress_manager=progress_manager,
                 slice_width=slice_width,
+                store_latent=log_likelihood,
             )
 
         results = run_chains(
@@ -133,20 +155,64 @@ class LatentMixin:
             model_type=type(self).__name__,
             timeout=None,
         )
-        return self._latent_idata(results)
+        return self._latent_idata(results, log_likelihood)
 
-    def _latent_idata(self, results) -> xr.DataTree:
+    def _latent_idata(self, results, log_likelihood: bool = False) -> xr.DataTree:
         names = (self._latent_param, "beta", *self._latent_extra)
         idata = gibbs_to_inference_data(
             posterior_samples={
                 name: np.stack([r[name] for r in results], axis=0) for name in names
             },
+            log_likelihood=(
+                {"obs": self._latent_log_likelihood(results)}
+                if log_likelihood
+                else None
+            ),
             observed_data={"obs": self._latent_observed},
             coords={"coefficient": self._latent_design[1]},
             dims={"beta": ["coefficient"]},
         )
         self._idata = idata
         return idata
+
+    def _latent_log_likelihood(self, results) -> np.ndarray:
+        """``(chains, draws, n)``: each observation's latent value integrated out."""
+        from scipy.special import gammaln
+
+        from ...samplers._utils._latent_loglik import integrated_loglik
+        from ...samplers.negbin_latent._core import filter_columns
+
+        X, _ = self._latent_design
+        W = self._W_sparse.tocsr()
+        indptr, rows, ones, wvals = filter_columns(W)
+        y = np.asarray(self._latent_observed, dtype=np.float64)
+        out = []
+        for r in results:
+            latent = np.ascontiguousarray(r["latent"], dtype=np.float64)
+            par = np.asarray(r[self._latent_param], dtype=np.float64)
+            beta = np.asarray(r["beta"], dtype=np.float64)
+            # e = A η - c: the disturbances, c = Xβ (SAR) or A Xβ (SEM).
+            dev = latent - beta @ X.T if self._latent_process == "sem" else latent
+            e = dev - par[:, None] * np.asarray(W @ dev.T).T
+            if self._latent_process == "sar":
+                e -= beta @ X.T
+            alpha = np.asarray(r.get("alpha", np.ones_like(par)), dtype=np.float64)
+            out.append(
+                integrated_loglik(
+                    latent,
+                    np.ascontiguousarray(e),
+                    y,
+                    indptr,
+                    rows,
+                    ones,
+                    wvals,
+                    par,
+                    alpha,
+                    self._latent_family,
+                    gammaln(y + 1.0),
+                )  # fmt: skip
+            )
+        return np.stack(out)
 
     @property
     def _latent_observed(self) -> np.ndarray:
@@ -158,6 +224,109 @@ class LatentMixin:
             f"{type(self).__name__}'s latent model is fitted by Gibbs sampling: "
             + self._latent_no_nuts
         )
+
+    def _latent_impacts(self, scale: str, return_posterior_samples: bool):
+        """Impacts on the latent index (``_index_scale``) or the outcome scale."""
+        if scale == self._index_scale:
+            self._require_fit()
+            return self._effects_frame(
+                *self._compute_impacts_posterior(),
+                return_posterior_samples=return_posterior_samples,
+                scale=scale,
+            )
+        if scale != self._outcome_scale:
+            raise ValueError(
+                f"scale must be {self._index_scale!r} or {self._outcome_scale!r}."
+            )
+        self._require_fit()
+        return self._effects_frame(
+            *self._latent_outcome_effects(),
+            return_posterior_samples=return_posterior_samples,
+            scale=scale,
+        )
+
+    def _latent_outcome_effects(
+        self, n_mc: int = 128, n_probes: int = 64, seed: int = 0
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        r"""Posterior draws of the outcome-scale direct, indirect and total effects.
+
+        For each posterior draw, ``n_mc`` fresh disturbances give the weights
+        :math:`w` (see the module); the effects are then the SAR's average
+        diagonal and row sum of :math:`\operatorname{diag}(w)\,S`, the SEM's
+        :math:`\bar w\beta`, and the SDEM's :math:`\bar w\beta` plus
+        :math:`\overline{w\,W\mathbf 1}\,\theta` indirect.  The multiplier's
+        diagonal is exact from the eigendecomposition up to
+        ``_LATENT_EFFECTS_EIGEN_MAX_N`` units and a Hutchinson estimate
+        (``n_probes`` probes) beyond.
+        """
+        from ..._ops import _make_cached_sparse_solver
+
+        post = self.inference_data.posterior
+        par = post[self._latent_param].values.reshape(-1)
+        G = par.size
+        X, _ = self._latent_design
+        beta = post["beta"].values.reshape(G, X.shape[1])
+        extra = {k: post[k].values.reshape(-1) for k in self._latent_extra}
+        n = X.shape[0]
+        W = self._W_sparse.tocsr()
+        I_n = sp.identity(n, format="csc")
+        rng = np.random.default_rng(seed)
+        sar = self._latent_process == "sar"
+        durbin = getattr(self, "_has_wx_in_beta", False)
+        eigen = n <= self._LATENT_EFFECTS_EIGEN_MAX_N
+        if eigen:
+            eigs, V, Vinv = self._W_eigendecomposition
+            VVinv = V * Vinv.T
+        else:
+            Z = rng.choice(np.array([-1.0, 1.0]), size=(n, n_probes))
+        row_std = sar and self._is_row_std
+        if durbin:
+            k = self._X.shape[1]
+            wx_idx = list(self._beta_wx_column_indices)
+            w_rows = np.asarray(W.sum(axis=1)).ravel()
+            w_diag = W.diagonal()
+        else:
+            ni = list(self._beta_nonintercept_indices)
+
+        n_eff = len(wx_idx) if durbin else len(ni)
+        direct = np.empty((G, n_eff))
+        total = np.empty((G, n_eff))
+        for g in range(G):
+            r = float(par[g])
+            A = (I_n - r * W).tocsc()
+            solver = _make_cached_sparse_solver(A) or sp.linalg.splu(A)
+            E = self._latent_noise(
+                rng, (n, n_mc), {k_: v[g] for k_, v in extra.items()}
+            )
+            Xb = X @ beta[g]
+            rhs = [E]
+            if sar:
+                rhs.append(Xb[:, None])
+                if not row_std:
+                    rhs.append(np.ones((n, 1)))
+            if not eigen:
+                rhs.append(Z)
+            sol = np.asarray(solver.solve(np.hstack(rhs)), dtype=np.float64)
+            U = sol[:, :n_mc]
+            if eigen:
+                d = (VVinv @ (1.0 / (1.0 - r * eigs))).real
+            else:
+                d = np.mean(Z * sol[:, -n_probes:], axis=1)
+            m = sol[:, n_mc] if sar else Xb
+            w = self._latent_outcome_weight(
+                m, U, E, d, {k_: v[g] for k_, v in extra.items()}, exact=eigen
+            )
+            if sar:
+                rows = self._multiplier_row_sums(r) if row_std else sol[:, n_mc + 1]
+                direct[g] = np.mean(w * d) * beta[g, ni]
+                total[g] = np.mean(w * rows) * beta[g, ni]
+            elif durbin:
+                b1, b2 = beta[g, :k][wx_idx], beta[g, k:]
+                direct[g] = np.mean(w) * b1 + np.mean(w * w_diag) * b2
+                total[g] = np.mean(w) * b1 + np.mean(w * w_rows) * b2
+            else:
+                direct[g] = total[g] = np.mean(w) * beta[g, ni]
+        return direct, total - direct, total
 
     def _latent_index_draws(
         self, n_sims: int, random_seed: Optional[int]

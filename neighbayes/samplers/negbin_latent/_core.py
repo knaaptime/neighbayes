@@ -375,8 +375,12 @@ def run_chain(
     chain_id: int = 0,
     progress_manager=None,
     slice_width: float = 0.4,
+    store_latent: bool = False,
 ) -> dict:
-    """One chain; returns ``{"rho" | "lam": ..., "beta": ..., "alpha": ...}``."""
+    """One chain; returns ``{"rho" | "lam": ..., "beta": ..., "alpha": ...}``.
+
+    ``store_latent`` adds the log-means at every kept draw, ``"latent"``.
+    """
     n, k = X.shape
     y = np.asarray(y, dtype=np.float64)
     W = sp.csr_matrix(W, dtype=np.float64)
@@ -407,6 +411,7 @@ def run_chain(
     par_draws = np.empty(n_keep)
     beta_draws = np.empty((n_keep, k))
     alpha_draws = np.empty(n_keep)
+    latent_draws = np.empty((n_keep, n)) if store_latent else None
     for it in range(tune + draws):
         # 1. The log-means, given the disturbances' map.
         if sar:
@@ -505,11 +510,12 @@ def run_chain(
                 par_draws[idx] = par
                 beta_draws[idx] = beta
                 alpha_draws[idx] = alpha
+                if store_latent:
+                    latent_draws[idx] = eta
         if progress_manager is not None:
             progress_manager.update(chain_id, it, tuning=it < tune)
 
-    return {
-        "rho" if sar else "lam": par_draws,
-        "beta": beta_draws,
-        "alpha": alpha_draws,
-    }
+    out = {"rho" if sar else "lam": par_draws, "beta": beta_draws, "alpha": alpha_draws}
+    if store_latent:
+        out["latent"] = latent_draws
+    return out

@@ -101,8 +101,12 @@ def run_chain(
     chain_id: int = 0,
     progress_manager=None,
     slice_width: float = 0.4,
+    store_latent: bool = False,
 ) -> dict:
-    """One chain; returns ``{"rho" | "lam": (n_keep,), "beta": (n_keep, k)}``."""
+    """One chain; returns ``{"rho" | "lam": (n_keep,), "beta": (n_keep, k)}``.
+
+    ``store_latent`` adds the utilities at every kept draw, ``"latent"``.
+    """
     from augax import ks_sample_numpy
 
     n, k = X.shape
@@ -128,6 +132,7 @@ def run_chain(
     n_keep = draws // thin
     par_draws = np.empty(n_keep)
     beta_draws = np.empty((n_keep, k))
+    latent_draws = np.empty((n_keep, n)) if store_latent else None
     for it in range(tune + draws):
         A = (eye - par * W).tocsr()
         p = 1.0 / (m * m)
@@ -203,7 +208,12 @@ def run_chain(
             if idx < n_keep:
                 par_draws[idx] = par
                 beta_draws[idx] = beta
+                if store_latent:
+                    latent_draws[idx] = ystar
         if progress_manager is not None:
             progress_manager.update(chain_id, it, tuning=it < tune)
 
-    return {"rho" if process == "sar" else "lam": par_draws, "beta": beta_draws}
+    out = {"rho" if process == "sar" else "lam": par_draws, "beta": beta_draws}
+    if store_latent:
+        out["latent"] = latent_draws
+    return out

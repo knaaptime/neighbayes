@@ -677,51 +677,16 @@ class SARLogit(BinaryDesigns, LatentLogitMixin, SpatialModel):
             :math:`n` exceeds :attr:`_PROBABILITY_EFFECTS_EIGEN_MAX_N`
             (default 2000).
         """
-        from ...diagnostics.impacts import _build_effects_dataframe
-
         if scale == "logodds":
             return super().impacts(return_posterior_samples=return_posterior_samples)
         if scale != "probability":
             raise ValueError("scale must be either 'logodds' or 'probability'.")
         if self._design == "latent":
-            raise NotImplementedError(
-                "Probability-scale impacts of the latent SAR logit are not "
-                "implemented; scale='logodds' reports them on the latent index."
-            )
+            return self._latent_impacts(scale, return_posterior_samples)
 
         self._require_fit()
-        direct_samples, indirect_samples, total_samples = (
-            self._compute_probability_scale_impacts_posterior(method=method)
+        return self._effects_frame(
+            *self._compute_probability_scale_impacts_posterior(method=method),
+            return_posterior_samples=return_posterior_samples,
+            scale=scale,
         )
-
-        k_effects = direct_samples.shape[1]
-        if (
-            hasattr(self, "_wx_feature_names")
-            and len(self._wx_feature_names) == k_effects
-        ):
-            feature_names = list(self._wx_feature_names)
-        elif (
-            hasattr(self, "_nonintercept_feature_names")
-            and len(self._nonintercept_feature_names) == k_effects
-        ):
-            feature_names = list(self._nonintercept_feature_names)
-        else:
-            feature_names = list(self._feature_names[:k_effects])
-
-        df = _build_effects_dataframe(
-            direct_samples=direct_samples,
-            indirect_samples=indirect_samples,
-            total_samples=total_samples,
-            feature_names=feature_names,
-            model_type=self.__class__.__name__,
-        )
-        df.attrs["scale"] = scale
-
-        if return_posterior_samples:
-            posterior_samples = {
-                "direct": direct_samples,
-                "indirect": indirect_samples,
-                "total": total_samples,
-            }
-            return df, posterior_samples
-        return df

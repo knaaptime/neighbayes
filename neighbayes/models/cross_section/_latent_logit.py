@@ -45,6 +45,36 @@ class LatentLogitMixin(LatentMixin):
             rho_upper=float(bounds.rho_max),
         )
 
+    _index_scale = "logodds"
+    _outcome_scale = "probability"
+    _latent_family = 1  # integrated_loglik's LOGIT
+
+    def impacts(self, return_posterior_samples: bool = False, scale: str = "logodds"):
+        r"""Direct, indirect and total impacts on the log-odds or probability scale.
+
+        ``scale="probability"`` gives the effects on :math:`P(y_i = 1)`, whose
+        derivative carries the density of the propagated logistic disturbance
+        at the threshold (estimated per posterior draw by Monte Carlo,
+        conditioning on all but the unit's own disturbance); ``"logodds"`` the
+        effects on the latent index.
+        """
+        return self._latent_impacts(scale, return_posterior_samples)
+
+    @staticmethod
+    def _latent_noise(rng, size, params) -> np.ndarray:
+        return rng.logistic(size=size)
+
+    @staticmethod
+    def _latent_outcome_weight(m, U, E, d, params, exact) -> np.ndarray:
+        """The density of ``u_i`` at ``-m_i``, Rao-Blackwellized over ``ε_i``.
+
+        ``u_i = d_i ε_i + v_i``; given ``v_i`` the density is the logistic's,
+        scaled by ``d_i``, at ``(-m_i - v_i) / d_i``.
+        """
+        t = np.abs((-m[:, None] - (U - d[:, None] * E)) / d[:, None])
+        e = np.exp(-t)
+        return np.mean(e / (1.0 + e) ** 2, axis=1) / d
+
     @staticmethod
     def _latent_disturbances(rng, size):
         return rng.logistic(size=size)
