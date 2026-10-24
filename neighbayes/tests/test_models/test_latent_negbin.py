@@ -62,8 +62,15 @@ def test_designs():
     with pytest.raises(ValueError, match="latent must be True or False"):
         SARNegBin(y=d["y"], X=d["X"], W=d["W_sparse"], latent="yes")
     panel = dict(y=np.r_[d["y"], d["y"]], X=np.r_[d["X"], d["X"]], W=d["W_sparse"])
-    with pytest.raises(NotImplementedError, match="cross-section only"):
-        SARNegBin(**panel, N=16, T=2, latent=True)
+    m = SARNegBin(**panel, N=16, T=2, latent=True, unit_effects="random")
+    assert (m._design, m._is_panel, m._latent_units, m._latent_periods) == (
+        "latent",
+        True,
+        True,
+        False,
+    )
+    with pytest.raises(NotImplementedError, match="random unit effects, not fixed"):
+        SARNegBin(**panel, N=16, T=2, latent=True, unit_effects="fixed")
     with pytest.raises(NotImplementedError, match="a panel"):
         SEMNegBin(**panel, N=16, T=2)
 
@@ -76,8 +83,10 @@ def test_simulators_draw_the_latent_forms():
     assert e["params_true"]["lam"] == 0.5
     s = dgp.simulate_sdem_negbin(n_side=5, seed=3)
     np.testing.assert_array_equal(s["params_true"]["theta"], [0.5])
+    p = dgp.simulate_sar_negbin(n_side=4, T=3, latent=True, rho=0.5, seed=3)
+    assert p["y"].shape == (48,) and p["params_true"]["rho"] == 0.5
     with pytest.raises(NotImplementedError, match="latent=True"):
-        dgp.simulate_sar_negbin(n_side=4, T=2, latent=True)
+        dgp.simulate_sar_zinb(n_side=4, T=2, latent=True)
     with pytest.raises(NotImplementedError, match="as a panel"):
         dgp.simulate_sem_negbin(n_side=4, T=2)
 
@@ -319,3 +328,76 @@ def test_decision_tree_names_the_generating_form(simulate, leaf):
     m = NegBin(y=d["y"], X=d["X"], W=d["W_sparse"])
     m.fit(draws=500, tune=500, chains=2, progressbar=False, random_seed=0, cores=1)
     assert m.spatial_diagnostics_decision(format="model") == leaf
+
+
+# ---------------------------------------------------------------------------
+# The latent panel: unit and period effects inside the filter
+# ---------------------------------------------------------------------------
+
+PANEL_KW = dict(latent=True, unit_effects="random", time_effects=True)
+
+
+def _panel(n_side=5, T=3, seed=1, **kw):
+    d = dgp.simulate_sar_negbin(n_side=n_side, T=T, seed=seed, **PANEL_KW, **kw)
+    m = SARNegBin(y=d["y"], X=d["X"], W=d["W_sparse"], N=n_side**2, T=T, **PANEL_KW)
+    return d, m
+
+
+@pytest.mark.parametrize(
+    "backend", ["numpy", pytest.param("jax", marks=pytest.mark.requires_jax)]
+)
+def test_panel_fit(backend):
+    d, m = _panel()
+    idata = m.fit(
+        **{**QUICK, "chains": 2}, backend=backend, idata_kwargs={"log_likelihood": True}
+    )
+    post = idata.posterior
+    assert {
+        "rho",
+        "beta",
+        "alpha",
+        "time_effect",
+        "unit_effect",
+        "unit_effect_sd",
+    } <= set(post.data_vars)
+    assert post["beta"].shape[-1] == 2 and post["time_effect"].shape[-1] == 2
+    assert post["unit_effect"].shape[-1] == 25
+    ll = idata.log_likelihood["obs"].values
+    assert ll.shape == (2, 40, 75) and np.all(np.isfinite(ll))
+    assert m.fitted_values().shape == (75,)
+    for scale in ("logmean", "count"):
+        assert np.isfinite(m.impacts(scale=scale).to_numpy(float)).all()
+
+
+def test_panel_logdet_counts_each_period_once():
+    """The sampler multiplies one period's log|A| by T (not the effects' T - 1)."""
+    _, m = _panel(T=4)
+    ld = np.linalg.slogdet(np.eye(25) - 0.4 * m._W_sparse.toarray())[1]
+    assert m._latent_logdet_fn(0.4) == pytest.approx(ld, rel=1e-6)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    "backend", ["numpy", pytest.param("jax", marks=pytest.mark.requires_jax)]
+)
+def test_panel_recovery(backend):
+    d, m = _panel(n_side=15, T=5, seed=4, rho=0.5, alpha=3.0, unit_effect_sd=0.5)
+    m.fit(
+        draws=1000,
+        tune=800,
+        chains=2,
+        progressbar=False,
+        random_seed=0,
+        backend=backend,
+    )
+    post = m.inference_data.posterior
+    truth = d["params_true"]
+    for name, value in (("rho", 0.5), ("alpha", 3.0)):
+        v = post[name].values.ravel()
+        assert abs(v.mean() - value) < 3 * v.std(), name
+    sd = post["unit_effect_sd"].values.ravel()
+    assert abs(sd.mean() - truth["unit_effect"].std()) < 3 * sd.std()
+    tau = post["time_effect"].values.reshape(-1, 4)
+    np.testing.assert_array_less(
+        np.abs(tau.mean(0) - truth["time_effect"][1:]), 3 * tau.std(0) + 1e-9
+    )

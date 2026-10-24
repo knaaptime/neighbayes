@@ -72,6 +72,12 @@ def _cases():
         dnl["y"],
         lambda y: M.SARNegBin(y=y, X=dnl["X"], W=dnl["W_sparse"], latent=True),
     )
+    panel = dict(latent=True, unit_effects="random", time_effects=True)
+    dpn = dgp.simulate_sar_negbin(n_side=5, T=3, seed=11, **panel)
+    out["SARNegBinLatentPanel"] = (
+        dpn["y"],
+        lambda y: M.SARNegBin(y=y, X=dpn["X"], W=dpn["W_sparse"], N=25, T=3, **panel),
+    )
     dne = dgp.simulate_sem_negbin(n_side=6, seed=10)
     out["SEMNegBin"] = (
         dne["y"],
@@ -145,6 +151,7 @@ _CASES = (
     "SARLogitLatent",
     "SEMLogit",
     "SARNegBinLatent",
+    "SARNegBinLatentPanel",
     "SEMNegBin",
     "SARNegBinFlow",
     "SARNegBinFlow(separable)",

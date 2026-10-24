@@ -61,6 +61,7 @@ ROUTES = [
     (m.SEMLogit, {}, "static", None),
     (m.SDEMLogit, {}, "static", None),
     (m.SARNegBin, {"latent": True}, "latent", None),
+    (m.SARNegBin, {**PANEL, "latent": True, "unit_effects": "random"}, "latent", 1),
     (m.SEMNegBin, {}, "static", None),
     (m.SDEMNegBin, {}, "static", None),
     (m.Logit, {}, "static", None),

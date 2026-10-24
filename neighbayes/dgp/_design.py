@@ -282,7 +282,7 @@ def count(fn, design, kw):
             )
         _scale(design, "unit_effect_sd", False, "unit_effects")
         return fn, kw
-    if name not in _COUNT or kw.get("latent"):
+    if name not in _COUNT or (kw.get("latent") and name != "simulate_sar_negbin"):
         raise NotImplementedError(
             f"{name} is not implemented as a panel"
             + (" with latent=True." if kw.get("latent") else ".")

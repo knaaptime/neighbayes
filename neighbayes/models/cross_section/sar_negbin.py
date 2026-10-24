@@ -150,7 +150,9 @@ class SARNegBin(CountDesigns, LatentNegBinMixin, _CountPanel, SpatialModel):
         (inside the filter), absorbing a correlation between the unit effects
         and ``X``.  Needs unit effects.
     latent : bool, default False
-        The latent SAR instead of the reduced form (a cross-section only).
+        The latent SAR instead of the reduced form.  As a panel it takes random
+        unit effects and period effects, both inside the filter with the
+        covariates and each period's gamma disturbance.
     """
 
     _DESIGNS = {
@@ -160,6 +162,7 @@ class SARNegBin(CountDesigns, LatentNegBinMixin, _CountPanel, SpatialModel):
     }
     # The latent SAR's log-mean impacts and coordinates are the reduced form's.
     _FALLBACK = {"latent": "static"}
+    _latent_panel = True
 
     _priors_cls = SARNegBinPriors
     _gibbs_key: tuple[str, str] | None = ("count", "cross_section")

@@ -371,6 +371,14 @@ PSIS-LOO handles; the likelihood conditional on $\eta_i$ would give degenerate
 ones (Merkle, Furr and Rabe-Hesketh 2019). It is comparable with the reduced
 form's: both estimate $\sum_i \log p(y_i \mid y_{-i})$.
 
+As a panel (`T`), it takes random unit effects and period effects, both
+inside the filter as in the Gaussian SAR with random effects,
+$(I - \rho W)\eta_t = X_t\beta + \tau_t + c + \varepsilon_t$, $c_i \sim
+N(\mu, \sigma_c^2)$ with $\sigma_c$ learned; each period's gamma disturbance
+propagates through the same filter, so the Jacobian is $T\log|I - \rho W|$.
+The sweep runs over the stacked periods, and a unit effect, entering only its
+own unit's equations, is drawn from a *t* at its conditional mode.
+
 Impacts are on the log-mean by default; `impacts(scale="count")` gives them on
 the expected count, which averages over the propagated heterogeneity. With $u =
 S(\rho)\varepsilon$ and $m = S(\rho)X\beta$,

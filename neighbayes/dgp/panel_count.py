@@ -38,6 +38,7 @@ def _simulate_panel_count(
     gdf,
     n_side,
     contiguity,
+    latent: bool = False,
 ) -> dict:
     if not 0.0 <= fe_x_corr < 1.0:
         raise ValueError("fe_x_corr must lie in [0, 1).")
@@ -70,9 +71,16 @@ def _simulate_panel_count(
     for t in range(T):
         Z = fe_x_corr * u[:, :k] + keep * rng.standard_normal((N, k))
         X_t = np.column_stack([np.ones(N), Z])
-        eta = solve(X_t @ beta + unit_effect) + time_effect[t]
-        mu = np.exp(np.clip(eta, -30.0, 30.0))
-        y_t = rng.negative_binomial(alpha, alpha / (alpha + mu))
+        if latent:
+            # Each period's gamma disturbance, and the period effect, propagate.
+            eps = np.log(rng.gamma(alpha, 1.0 / alpha, size=N))
+            eta = solve(X_t @ beta + unit_effect + time_effect[t] + eps)
+            mu = np.exp(np.clip(eta, -30.0, 30.0))
+            y_t = rng.poisson(mu)
+        else:
+            eta = solve(X_t @ beta + unit_effect) + time_effect[t]
+            mu = np.exp(np.clip(eta, -30.0, 30.0))
+            y_t = rng.negative_binomial(alpha, alpha / (alpha + mu))
         y_list.append(y_t.astype(np.int64))
         X_list.append(X_t)
         mu_list.append(mu)
@@ -112,8 +120,15 @@ def _simulate_sar_negbin_panel_re(
     gdf=None,
     n_side: int | None = None,
     contiguity: str = "queen",
+    latent: bool = False,
 ) -> dict:
     r"""Simulate a spatial-lag NB2 count panel, stacked time-first.
+
+    The reduced form, :math:`\eta_t = A^{-1}(X_t\beta + c) + \tau_t` with NB2
+    counts, or with ``latent=True`` the latent SAR that
+    ``SARNegBin(latent=True)`` fits, :math:`A\eta_t = X_t\beta + \tau_t + c +
+    \varepsilon_t`, :math:`\varepsilon_{it} = \log\gamma_{it}`, and Poisson
+    counts given :math:`\eta`.
 
     Parameters
     ----------
@@ -127,7 +142,8 @@ def _simulate_sar_negbin_panel_re(
         NB2 dispersion.
     unit_effect_sd, time_effect_sd : float, default 0.0
         Standard deviations of the unit effects ``c_i``, inside the filter,
-        and the period effects ``τ_t`` (``τ_0 = 0``), outside it.
+        and the period effects ``τ_t`` (``τ_0 = 0``), outside it (inside it
+        for the latent SAR).
     fe_x_corr : float, default 0.0
         Correlation, in ``[0, 1)``, between the unit effects and the persistent
         part of the first regressor.
@@ -147,7 +163,7 @@ def _simulate_sar_negbin_panel_re(
         raise ValueError("alpha must be strictly positive.")
     return _simulate_panel_count(
         N, T, rho, beta, alpha, unit_effect_sd, time_effect_sd,
-        fe_x_corr, err_hetero, rng, seed, W, gdf, n_side, contiguity,
+        fe_x_corr, err_hetero, rng, seed, W, gdf, n_side, contiguity, latent,
     )  # fmt: skip
 
 

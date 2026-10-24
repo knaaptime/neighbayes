@@ -304,6 +304,8 @@ class CountDesigns(DesignDispatch):
     """
 
     _likelihood: str = "count"
+    #: Whether the class's latent design is implemented as a panel too.
+    _latent_panel: bool = False
     #: Whether the family has a zero part (ZINB, hurdle).
     _zero_part: bool = False
     #: Whether the family needs a positive count (the hurdle's count part).
@@ -338,8 +340,9 @@ class CountDesigns(DesignDispatch):
                 latent=latent,
             )
         )
+        panel = "effects" in kwargs
         effects = kwargs.pop("effects", 0)
-        if mundlak and design != "panel":
+        if mundlak and not panel:
             raise ValueError("mundlak=True needs a panel with unit effects.")
         if kwargs.get("robust"):
             raise NotImplementedError(
@@ -350,7 +353,8 @@ class CountDesigns(DesignDispatch):
         self._init_counts()
         if zero is not None:
             self._init_zero_part(data, **zero)
-        if design == "panel":
+        if panel:
+            # The count effects' bookkeeping, shared by the latent panel.
             self._init_panel(effects, mundlak)
         else:
             init = getattr(self, f"_init_{design}", None)
@@ -375,7 +379,7 @@ class CountDesigns(DesignDispatch):
         name = cls.__name__
         unit, time, dynamic = _pop_design(kw)
         latent = _latent_flag(cls, kw.pop("latent", False), "NegBin")
-        if latent and _is_panel(kw):
+        if latent and _is_panel(kw) and not cls._latent_panel:
             raise NotImplementedError(
                 f"{name}(latent=True) is implemented for the cross-section only."
             )
@@ -397,10 +401,10 @@ class CountDesigns(DesignDispatch):
             raise NotImplementedError(
                 f"{name} panels take random unit effects, not fixed ones."
             )
-        if "panel" not in cls._DESIGNS:
+        if not latent and "panel" not in cls._DESIGNS:
             raise NotImplementedError(f"{name} is not implemented with a panel.")
         kw["effects"] = _effects_code(unit == "random", time)
-        return "panel", kw
+        return ("latent" if latent else "panel"), kw
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)

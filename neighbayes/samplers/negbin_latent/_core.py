@@ -53,11 +53,24 @@ instead (Yu and Meng 2011), each exact:
 The solves are BiCGSTAB from the nearby solution at hand.  There is no
 Pólya–Gamma step and no added scale: the only disturbance is the negative
 binomial's own.
+
+A panel stacks ``T`` periods time-first, each with its own disturbances and the
+same filter, :math:`A\eta_t = Z_t\beta + c + \varepsilon_t` (SAR), so the
+Jacobian is :math:`T\log|A|` and every step runs over the stack.  Period
+effects are columns of :math:`Z` with their own prior.  Random unit effects
+:math:`c_g \sim N(\mu, \sigma_c^2)` join the systematic part inside the
+filter, as in the Gaussian SAR with random effects; each enters only its own
+unit's equations, so
+
+7. :math:`c_g \mid \cdot` is one-dimensional and log-concave: independence
+   Metropolis–Hastings from a *t* at its mode, all units at once, and
+   :math:`\sigma_c` a slice on :math:`\log\sigma_c` under a half-*t*(3) prior.
 """
 
 from __future__ import annotations
 
-from typing import Callable, Literal
+from dataclasses import dataclass
+from typing import Callable, Literal, Optional
 
 import numba
 import numpy as np
@@ -224,6 +237,79 @@ def _filter_solve(
     return sp.linalg.spsolve(A, b)
 
 
+def _lag(W: sp.csr_matrix, v: np.ndarray) -> np.ndarray:
+    """``(I_T ⊗ W) v`` for a time-first stack ``v`` of shape ``(T, n)`` or ``(T, n, k)``."""
+    T, n = v.shape[:2]
+    flat = np.moveaxis(v, 0, 1).reshape(n, -1)
+    return np.moveaxis(np.asarray(W @ flat).reshape((n, T) + v.shape[2:]), 0, 1)
+
+
+def _solve_periods(W, par, B, X0):
+    """``(I_T ⊗ A)^{-1}`` applied to each period's row of ``B`` (``(T, n)``)."""
+    return np.stack([_filter_solve(W, par, B[t], X0[t]) for t in range(B.shape[0])])
+
+
+@dataclass(frozen=True)
+class UnitEffects:
+    """Random unit effects ``c_g ~ N(mu, sigma^2)``, ``sigma ~ half-t(3, scale)``.
+
+    ``group`` maps each row of the time-first stack to its unit.
+    """
+
+    group: np.ndarray
+    n_groups: int
+    mu: float
+    sd_scale: float
+
+
+def _unit_effect_step(c, base, alpha, fx: UnitEffects, sigma, rng):
+    """``c | base``, ``base = eps + c[group]``: independence MH from a *t* at the mode.
+
+    Each ``c_g`` has the log-concave conditional
+    ``sum_r alpha (b_r - c - e^{b_r - c}) - (c - mu)^2 / (2 sigma^2)``.
+    """
+    G = fx.n_groups
+    n_obs = np.bincount(fx.group, minlength=G).astype(np.float64)
+    S = np.bincount(fx.group, weights=np.exp(base), minlength=G)
+    B = np.bincount(fx.group, weights=base, minlength=G)
+    prec = 1.0 / sigma**2
+
+    def logp(x):
+        return alpha * (B - n_obs * x - np.exp(-x) * S) - 0.5 * prec * (x - fx.mu) ** 2
+
+    mode = c.copy()
+    for _ in range(30):
+        grad = alpha * (np.exp(-mode) * S - n_obs) - prec * (mode - fx.mu)
+        hess = alpha * np.exp(-mode) * S + prec
+        step = np.clip(grad / hess, -2.0, 2.0)
+        mode += step
+        if np.max(np.abs(step)) < 1e-10:
+            break
+    sd = 1.0 / np.sqrt(alpha * np.exp(-mode) * S + prec)
+
+    def logq(x):
+        z = (x - mode) / sd
+        return -0.5 * (_BETA_DF + 1.0) * np.log1p(z * z / _BETA_DF)
+
+    prop = mode + sd * rng.standard_t(_BETA_DF, size=G)
+    log_ratio = logp(prop) - logp(c) + logq(c) - logq(prop)
+    return np.where(np.log(rng.random(G)) < log_ratio, prop, c)
+
+
+def _unit_sd_step(sigma, c, fx: UnitEffects, rng):
+    """``sigma_c | c``: slice on ``log sigma`` under the half-t(3, scale) prior."""
+    ss, G = float(np.sum((c - fx.mu) ** 2)), c.size
+
+    def logp(ls):
+        s2 = np.exp(2.0 * ls)
+        return (
+            -G * ls - 0.5 * ss / s2 - 2.0 * np.log1p(s2 / (3.0 * fx.sd_scale**2)) + ls
+        )
+
+    ls, _ = slice_sample_1d(logp, np.log(sigma), -10.0, 10.0, w=0.5, rng=rng)
+    return float(np.exp(ls))
+
+
 def _gamma_loglik(e: np.ndarray, alpha: float) -> float:
     """``sum alpha (e - e^e)``: the disturbances' log density, less its constant."""
     return alpha * float(np.sum(e - np.exp(e)))
@@ -376,13 +462,22 @@ def run_chain(
     progress_manager=None,
     slice_width: float = 0.4,
     store_latent: bool = False,
+    T: int = 1,
+    unit_effects: Optional[UnitEffects] = None,
 ) -> dict:
     """One chain; returns ``{"rho" | "lam": ..., "beta": ..., "alpha": ...}``.
 
-    ``store_latent`` adds the log-means at every kept draw, ``"latent"``.
+    ``y`` and ``X`` stack ``T`` periods of ``n`` units time-first, ``W`` being
+    the ``n x n`` weights; ``unit_effects`` (SAR only) adds ``"unit_effect"``
+    and ``"unit_effect_sd"``.  ``store_latent`` adds the log-means at every
+    kept draw, ``"latent"``, flattened time-first.
     """
-    n, k = X.shape
-    y = np.asarray(y, dtype=np.float64)
+    nT, k = X.shape
+    n = nT // T
+    sar = process == "sar"
+    if unit_effects is not None and not sar:
+        raise NotImplementedError("Random unit effects are implemented for the SAR.")
+    y = np.asarray(y, dtype=np.float64).reshape(T, n)
     W = sp.csr_matrix(W, dtype=np.float64)
     W.sort_indices()
     indptr, rows, ones, wvals = filter_columns(W)
@@ -392,18 +487,29 @@ def run_chain(
     )
     lo, hi = float(priors.rho_lower), float(priors.rho_upper)
     fixed = priors.alpha_fixed
-    WX = np.asarray(W @ X)
+    WX = _lag(W, X.reshape(T, n, k)).reshape(nT, k)
     XtX_inv_Xt = np.linalg.solve(X.T @ X, X.T)
     row_std = bool(np.allclose(np.asarray(W.sum(axis=1)).ravel(), 1.0))
-    ones_n = np.ones(n)
+    ones_n = np.ones((T, n))
     width = SliceWidthState(w=slice_width)
-    sar = process == "sar"
+
+    def lag(v):
+        return _lag(W, v)
 
     par = 0.0
-    eta, beta, alpha = initial_state(y, X)
+    eta, beta, alpha = initial_state(y.reshape(-1), X)
+    eta = eta.reshape(T, n)
     if fixed is not None:
         alpha = float(fixed)
-    sxb = X @ beta
+    fx = unit_effects
+    c = np.zeros(fx.n_groups) if fx is not None else None
+    sigma_c = fx.sd_scale if fx is not None else None
+
+    def effects():
+        """The unit effects on the stack, ``(T, n)``."""
+        return 0.0 if fx is None else c[fx.group].reshape(T, n)
+
+    sxb = (X @ beta).reshape(T, n)
     s1 = ones_n.copy()
     step = 0.1
 
@@ -411,46 +517,52 @@ def run_chain(
     par_draws = np.empty(n_keep)
     beta_draws = np.empty((n_keep, k))
     alpha_draws = np.empty(n_keep)
-    latent_draws = np.empty((n_keep, n)) if store_latent else None
+    latent_draws = np.empty((n_keep, nT)) if store_latent else None
+    if fx is not None:
+        c_draws = np.empty((n_keep, fx.n_groups))
+        sd_draws = np.empty(n_keep)
     for it in range(tune + draws):
-        # 1. The log-means, given the disturbances' map.
+        # 1. The log-means, given the disturbances' map, period by period.
+        Xb = (X @ beta).reshape(T, n)
         if sar:
-            eps = eta - par * (W @ eta) - X @ beta
+            eps = eta - par * lag(eta) - Xb - effects()
         else:
-            r = eta - X @ beta
-            eps = r - par * (W @ r)
-        _eta_sweep(eta, eps, y, alpha, indptr, rows, ones - par * wvals, rng)
+            r = eta - Xb
+            eps = r - par * lag(r)
+        aval = ones - par * wvals
+        for t in range(T):
+            _eta_sweep(eta[t], eps[t], y[t], alpha, indptr, rows, aval, rng)
 
         # 2. The spatial parameter, given eta.
-        Weta = W @ eta
+        Weta = lag(eta)
+        logdet = (lambda r: T * logdet_fn(r)) if T > 1 else logdet_fn
         if sar:
             # beta = u - rho g keeps eps = e0 - rho d.
-            g = XtX_inv_Xt @ Weta
+            g = XtX_inv_Xt @ Weta.reshape(-1)
             u = beta + par * g
-            e0 = eta - X @ u
-            d = Weta - X @ g
+            e0 = (eta - effects()).reshape(-1) - X @ u
+            d = Weta.reshape(-1) - X @ g
 
             def logp(r):
                 b = u - r * g - b0
                 return (
-                    logdet_fn(r)
-                    + _gamma_loglik(e0 - r * d, alpha)
-                    - 0.5 * b @ B0inv @ b
+                    logdet(r) + _gamma_loglik(e0 - r * d, alpha) - 0.5 * b @ B0inv @ b
                 )
 
             par, _, _, _ = slice_sample_1d_adaptive(
                 logp, par, lo, hi, width_state=width, rng=rng
             )
             beta = u - par * g
-            c, Z = eta - par * Weta, X
+            target, Z = (eta - par * Weta - effects()).reshape(-1), X
         else:
             # beta = u + bhat(lam), bhat(lam) the least-squares fit of
             # A eta - m on A X: the disturbances keep their level as lam moves.
             m = _gamma_moments(alpha)[0]
+            ev, We = eta.reshape(-1), Weta.reshape(-1)
             G0, G1, G2 = X.T @ X, X.T @ WX + WX.T @ X, WX.T @ WX
-            h0 = X.T @ (eta - m)
-            h1 = X.T @ Weta + WX.T @ (eta - m)
-            h2 = WX.T @ Weta
+            h0 = X.T @ (ev - m)
+            h1 = X.T @ We + WX.T @ (ev - m)
+            h2 = WX.T @ We
 
             def bhat(lam):
                 return np.linalg.solve(
@@ -461,9 +573,9 @@ def run_chain(
 
             def logp(lam):
                 b = u + bhat(lam)
-                e = eta - lam * Weta - (X - lam * WX) @ b
+                e = ev - lam * We - (X - lam * WX) @ b
                 return (
-                    logdet_fn(lam)
+                    logdet(lam)
                     + _gamma_loglik(e, alpha)
                     - 0.5 * (b - b0) @ B0inv @ (b - b0)
                 )
@@ -472,35 +584,58 @@ def run_chain(
                 logp, par, lo, hi, width_state=width, rng=rng
             )
             beta = u + bhat(par)
-            c, Z = eta - par * Weta, X - par * WX
+            target, Z = ev - par * We, X - par * WX
 
-        # 3-4. beta and alpha, given eta.
-        beta = _beta_step(beta, c, Z, alpha, b0, B0inv, rng)
-        eps = c - Z @ beta
+        # 3-4. beta, the unit effects and alpha, given eta.
+        beta = _beta_step(beta, target, Z, alpha, b0, B0inv, rng)
+        eps = target - Z @ beta
+        if fx is not None:
+            base = eps + c[fx.group]
+            c = _unit_effect_step(c, base, alpha, fx, sigma_c, rng)
+            sigma_c = _unit_sd_step(sigma_c, c, fx, rng)
+            eps = base - c[fx.group]
         if fixed is None:
             alpha = _alpha_step(alpha, eps, priors, rng)
 
             # 5. alpha with the standardized disturbances held.
-            s1 = ones_n / (1.0 - par) if row_std else _filter_solve(W, par, ones_n, s1)
-            if sar:
-                sxb = _filter_solve(W, par, X @ beta, sxb)
+            if row_std:
+                s1 = ones_n / (1.0 - par)
             else:
-                sxb = X @ beta
-            alpha, eta = _alpha_interweave(alpha, eta, eps, sxb, s1, y, priors, rng)
+                s1 = _solve_periods(W, par, ones_n, s1)
+            Xb = (X @ beta).reshape(T, n)
+            if sar:
+                sxb = _solve_periods(W, par, Xb + effects(), sxb)
+            else:
+                sxb = Xb
+            alpha, eta_v = _alpha_interweave(
+                alpha,
+                eta.reshape(-1),
+                eps,
+                sxb.reshape(-1),
+                s1.reshape(-1),
+                y.reshape(-1),
+                priors,
+                rng,
+            )
+            eta = eta_v.reshape(T, n)
 
         # 6. The spatial parameter with the disturbances held.
+        Xb = (X @ beta).reshape(T, n)
         if sar:
-            xi = eta - par * (W @ eta)
-            cur, base = eta, np.zeros(n)
+            xi = eta - par * lag(eta)
+            cur, base_eta = eta, np.zeros((T, n))
         else:
-            xi = (eta - X @ beta) - par * (W @ (eta - X @ beta))
-            cur, base = eta - X @ beta, X @ beta
+            xi = (eta - Xb) - par * lag(eta - Xb)
+            cur, base_eta = eta - Xb, Xb
         prop = par + step * rng.standard_normal()
         accepted = False
         if lo < prop < hi:
-            new = _filter_solve(W, prop, xi, cur)
-            if np.log(rng.random()) < _poisson(y, base + new) - _poisson(y, base + cur):
-                par, eta, accepted = prop, base + new, True
+            new = _solve_periods(W, prop, xi, cur)
+            log_ratio = _poisson(
+                y.reshape(-1), (base_eta + new).reshape(-1)
+            ) - _poisson(y.reshape(-1), (base_eta + cur).reshape(-1))
+            if np.log(rng.random()) < log_ratio:
+                par, eta, accepted = prop, base_eta + new, True
         if it < tune:
             step *= np.exp((float(accepted) - _PAR_ACCEPT) / np.sqrt(it + 1.0))
 
@@ -510,12 +645,18 @@ def run_chain(
                 par_draws[idx] = par
                 beta_draws[idx] = beta
                 alpha_draws[idx] = alpha
+                if fx is not None:
+                    c_draws[idx] = c
+                    sd_draws[idx] = sigma_c
                 if store_latent:
-                    latent_draws[idx] = eta
+                    latent_draws[idx] = eta.reshape(-1)
         if progress_manager is not None:
             progress_manager.update(chain_id, it, tuning=it < tune)
 
     out = {"rho" if sar else "lam": par_draws, "beta": beta_draws, "alpha": alpha_draws}
+    if fx is not None:
+        out["unit_effect"] = c_draws
+        out["unit_effect_sd"] = sd_draws
     if store_latent:
         out["latent"] = latent_draws
     return out
