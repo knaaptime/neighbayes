@@ -14,13 +14,12 @@ import pytest
 from neighbayes import dgp
 from neighbayes.dgp import simulate_sar_negbin_flow
 from neighbayes.models import NegBin, NegBinFlow, SARNegBin, SARNegBinFlow
-from neighbayes.models.flow._flow import SARNegBinFlowSeparable
-from neighbayes.models.flow_panel._panel import (
-    NegBinFlowPanelRE,
-    SARNegBinFlowPanelRE,
-    SARNegBinFlowSeparablePanelRE,
-)
-from neighbayes.tests.helpers import W_to_graph, effects_kwargs, make_rook_W
+from neighbayes.tests.helpers import W_to_graph, effects_kwargs, flow_form, make_rook_W
+
+negbin_flow = flow_form(NegBinFlow)
+sar_negbin_flow = flow_form(SARNegBinFlow)
+sar_negbin_separable = flow_form(SARNegBinFlow, separable=True)
+
 
 A = 37.0
 SHORT = dict(draws=15, tune=15, chains=1, progressbar=False, random_seed=0)
@@ -59,8 +58,8 @@ def test_sar_negbin(backend):
         (NegBinFlow, "numpy"),
         (SARNegBinFlow, "numpy"),
         pytest.param(SARNegBinFlow, "jax", marks=pytest.mark.requires_jax),
-        (SARNegBinFlowSeparable, "numpy"),
-        pytest.param(SARNegBinFlowSeparable, "jax", marks=pytest.mark.requires_jax),
+        (sar_negbin_separable, "numpy"),
+        pytest.param(sar_negbin_separable, "jax", marks=pytest.mark.requires_jax),
     ],
 )
 def test_flow_cross_section(cls, backend):
@@ -75,15 +74,13 @@ def test_flow_cross_section(cls, backend):
 @pytest.mark.parametrize(
     "cls,effects,backend",
     [
-        (SARNegBinFlowPanelRE, 0, "numpy"),
-        (SARNegBinFlowPanelRE, 3, "numpy"),
-        (SARNegBinFlowSeparablePanelRE, 0, "numpy"),
-        (SARNegBinFlowSeparablePanelRE, 3, "numpy"),
-        pytest.param(
-            SARNegBinFlowSeparablePanelRE, 3, "jax", marks=pytest.mark.requires_jax
-        ),
-        (NegBinFlowPanelRE, 0, "numpy"),
-        (NegBinFlowPanelRE, 3, "numpy"),
+        (sar_negbin_flow, 0, "numpy"),
+        (sar_negbin_flow, 3, "numpy"),
+        (sar_negbin_separable, 0, "numpy"),
+        (sar_negbin_separable, 3, "numpy"),
+        pytest.param(sar_negbin_separable, 3, "jax", marks=pytest.mark.requires_jax),
+        (negbin_flow, 0, "numpy"),
+        (negbin_flow, 3, "numpy"),
     ],
 )
 def test_flow_panels(cls, effects, backend):
@@ -99,7 +96,7 @@ def test_flow_panels(cls, effects, backend):
             effects=effects,
             priors={"alpha_fixed": A},
         )
-        kw = {} if cls is NegBinFlowPanelRE else {"backend": backend}
+        kw = {} if cls is negbin_flow else {"backend": backend}
         idata = (
             m.fit(n_jobs=1, attach_log_abs_det=False, **kw, **SHORT)
             if kw

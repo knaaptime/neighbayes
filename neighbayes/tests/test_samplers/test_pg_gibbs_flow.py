@@ -18,6 +18,10 @@ from neighbayes.samplers.panel._kronecker import (
     kron_matvec,
     kron_P_matvec,
 )
+from neighbayes.tests.helpers import flow_form
+
+sar_negbin_separable = flow_form(SARNegBinFlow, separable=True)
+
 
 # ---------------------------------------------------------------------------
 # Kronecker matvec primitives
@@ -169,7 +173,7 @@ class TestNegativeBinomialFlowGibbs:
 
     def test_gibbs_returns_inference_data(self):
         """Gibbs sampler returns valid InferenceData."""
-        from neighbayes.models.flow._flow import NegBinFlow
+        from neighbayes.models import NegBinFlow
 
         data = _make_flow_data()
         model = NegBinFlow(data["y_vec"], data["X"], data["G"])
@@ -187,7 +191,7 @@ class TestNegativeBinomialFlowGibbs:
 
     def test_gibbs_shapes(self):
         """Gibbs posterior has correct shapes."""
-        from neighbayes.models.flow._flow import NegBinFlow
+        from neighbayes.models import NegBinFlow
 
         data = _make_flow_data()
         model = NegBinFlow(data["y_vec"], data["X"], data["G"])
@@ -209,7 +213,7 @@ class TestNegativeBinomialFlowGibbs:
 
     def test_gibbs_alpha_positive(self):
         """NB dispersion alpha should be positive."""
-        from neighbayes.models.flow._flow import NegBinFlow
+        from neighbayes.models import NegBinFlow
 
         data = _make_flow_data()
         model = NegBinFlow(data["y_vec"], data["X"], data["G"])
@@ -225,7 +229,7 @@ class TestNegativeBinomialFlowGibbs:
 
     def test_nuts_still_works(self):
         """NUTS (default sampler) still works after adding Gibbs."""
-        from neighbayes.models.flow._flow import NegBinFlow
+        from neighbayes.models import NegBinFlow
 
         data = _make_flow_data()
         model = NegBinFlow(data["y_vec"], data["X"], data["G"])
@@ -241,11 +245,10 @@ class TestNegativeBinomialFlowGibbs:
 
 
 class TestNegativeBinomialSARFlowSeparableGibbs:
-    """Tests for SARNegBinFlowSeparable.fit(sampler='gibbs')."""
+    """Tests for sar_negbin_separable.fit(sampler='gibbs')."""
 
     def test_gibbs_returns_inference_data(self):
         """Gibbs sampler returns valid InferenceData with spatial params."""
-        from neighbayes.models.flow._flow import SARNegBinFlowSeparable
 
         data = _make_flow_data()
         model = SARNegBinFlow(
@@ -272,7 +275,6 @@ class TestNegativeBinomialSARFlowSeparableGibbs:
 
     def test_gibbs_rho_w_deterministic(self):
         """rho_w = -rho_d * rho_o for separable model."""
-        from neighbayes.models.flow._flow import SARNegBinFlowSeparable
 
         data = _make_flow_data()
         model = SARNegBinFlow(
@@ -298,7 +300,6 @@ class TestNegativeBinomialSARFlowSeparableGibbs:
 
     def test_gibbs_shapes(self):
         """Gibbs posterior has correct shapes for separable model."""
-        from neighbayes.models.flow._flow import SARNegBinFlowSeparable
 
         data = _make_flow_data()
         model = SARNegBinFlow(
@@ -330,7 +331,7 @@ class TestNegativeBinomialSARFlowGibbs:
 
     def test_gibbs_returns_inference_data(self):
         """Gibbs sampler returns valid InferenceData with 3 spatial params."""
-        from neighbayes.models.flow._flow import SARNegBinFlow
+        from neighbayes.models import SARNegBinFlow
 
         data = _make_flow_data()
         model = SARNegBinFlow(data["y_vec"], data["X"], data["G"])
@@ -354,7 +355,7 @@ class TestNegativeBinomialSARFlowGibbs:
 
         if importlib.util.find_spec("sparsax") is None:
             pytest.skip("sparsax not installed")
-        from neighbayes.models.flow._flow import SARNegBinFlow
+        from neighbayes.models import SARNegBinFlow
 
         data = _make_flow_data()
         model = SARNegBinFlow(data["y_vec"], data["X"], data["G"])
@@ -380,7 +381,6 @@ class TestNegativeBinomialSARFlowGibbs:
 
         if importlib.util.find_spec("sparsax") is None:
             pytest.skip("sparsax not installed")
-        from neighbayes.models.flow._flow import SARNegBinFlowSeparable
 
         data = _make_flow_data()
         model = SARNegBinFlow(data["y_vec"], data["X"], data["G"], separable=True)
@@ -397,7 +397,7 @@ class TestNegativeBinomialSARFlowGibbs:
 
     def test_gibbs_shapes(self):
         """Gibbs posterior has correct shapes for unrestricted model."""
-        from neighbayes.models.flow._flow import SARNegBinFlow
+        from neighbayes.models import SARNegBinFlow
 
         data = _make_flow_data()
         model = SARNegBinFlow(data["y_vec"], data["X"], data["G"])
@@ -419,7 +419,7 @@ class TestNegativeBinomialSARFlowGibbs:
 
     def test_gibbs_rho_in_bounds(self):
         """Spatial parameters should be within prior bounds."""
-        from neighbayes.models.flow._flow import SARNegBinFlow
+        from neighbayes.models import SARNegBinFlow
 
         data = _make_flow_data()
         model = SARNegBinFlow(data["y_vec"], data["X"], data["G"])

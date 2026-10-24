@@ -19,6 +19,10 @@ import scipy.sparse as sp
 from pytensor.gradient import verify_grad
 
 from neighbayes.models import SARNegBinFlow
+from neighbayes.tests.helpers import flow_form
+
+sar_negbin_separable = flow_form(SARNegBinFlow, separable=True)
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -350,7 +354,7 @@ class TestKroneckerFlowSolveMatrixOpVJP:
 
 
 # ---------------------------------------------------------------------------
-# Smoke test: logp compiles for SARNegBinFlowSeparable at moderate n
+# Smoke test: logp compiles for sar_negbin_separable at moderate n
 # ---------------------------------------------------------------------------
 
 
@@ -359,7 +363,6 @@ class TestSeparableNegBinLogpCompiles:
     def test_logp_compiles_n20(self):
         """Check that the Kronecker op compiles inside PyMC at n=20."""
         from neighbayes.graph import flow_weight_matrices
-        from neighbayes.models.flow._flow import SARNegBinFlowSeparable
 
         n = 20
         rng = np.random.default_rng(6)

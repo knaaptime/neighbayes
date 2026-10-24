@@ -1,7 +1,7 @@
 """The zero part of the place two-part count models (ZINB, hurdle).
 
 Its design and weights default to the count part's.  The flows build their own
-zero part (:mod:`..flow_panel`).
+zero part (:class:`._designs.FlowCountDesigns`).
 """
 
 from __future__ import annotations

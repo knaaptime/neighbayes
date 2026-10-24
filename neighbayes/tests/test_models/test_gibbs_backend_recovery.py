@@ -29,9 +29,13 @@ from neighbayes.models import SARNegBinFlow
 from neighbayes.tests.helpers import (
     W_to_graph,
     _as_sparse,
+    flow_form,
     make_rook_W,
     make_sar_logit_data,
 )
+
+sar_negbin_separable = flow_form(SARNegBinFlow, separable=True)
+
 
 pytestmark = [pytest.mark.slow, pytest.mark.recovery]
 
@@ -417,7 +421,6 @@ def nb_flow_sep_data():
 
 def test_nb_flow_separable_backends_agree(nb_flow_sep_data):
     """Both separable-flow backends must sample the same posterior."""
-    from neighbayes.models.flow import SARNegBinFlowSeparable
 
     d = nb_flow_sep_data
     posteriors = {}
@@ -437,7 +440,7 @@ def test_nb_flow_separable_backends_agree(nb_flow_sep_data):
     _assert_backends_agree(
         posteriors,
         {"rho_d": 0.08, "rho_o": 0.08, "alpha": 0.30},
-        "SARNegBinFlowSeparable",
+        "sar_negbin_separable",
     )
 
 
@@ -448,8 +451,6 @@ def test_nb_flow_separable_jax_recovers_and_mixes(nb_flow_sep_data):
     rho; both halves of that failure are pinned here.
     """
     import arviz as az
-
-    from neighbayes.models.flow import SARNegBinFlowSeparable
 
     d = nb_flow_sep_data
     idata = SARNegBinFlow(

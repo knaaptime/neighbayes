@@ -41,8 +41,12 @@ def test_panel_models_no_frequentist_diagnostics():
         assert not hasattr(cls, "hausman_test")
 
 
-from neighbayes.models import SDEM, SDM, SLX
+from neighbayes.models import SDEM, SDM, SLX, NegBinFlow
 from neighbayes.models.flow import OLSFlow, SARFlow
+from neighbayes.tests.helpers import flow_form
+
+negbin_flow = flow_form(NegBinFlow)
+
 
 EXPECTED_REGISTRIES = {
     OLS: [
@@ -85,11 +89,10 @@ def test_fitted_spatial_and_count_flows_have_no_suite():
     """The flow tests take the Gaussian aspatial null; no other flow has a suite."""
     from neighbayes.diagnostics.lmtests.registry import get_diagnostic_suite
     from neighbayes.models.flow import NegBinFlow, SARNegBinFlow, SEMFlow
-    from neighbayes.models.flow_panel import NegBinFlowPanelRE
 
     for cls in (SARFlow, SEMFlow, NegBinFlow, SARNegBinFlow):
         assert get_diagnostic_suite(cls) is None, cls.__name__
-    assert get_diagnostic_suite(NegBinFlowPanelRE) is None
+    assert get_diagnostic_suite(negbin_flow) is None
 
 
 def test_spatial_diagnostics_registries_match_expected():

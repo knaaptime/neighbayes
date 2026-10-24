@@ -4,16 +4,19 @@ from __future__ import annotations
 
 import pytest
 
-from neighbayes.models.flow._flow import (
+from neighbayes.models import (
     NegBinFlow,
+    SARHurdleNegBinFlow,
     SARNegBinFlow,
-    SARNegBinFlowSeparable,
+    SARZINBFlow,
 )
-from neighbayes.models.flow_panel._panel import (
-    NegBinFlowPanelRE,
-    SARNegBinFlowPanelRE,
-    SARNegBinFlowSeparablePanelRE,
-)
+from neighbayes.tests.helpers import flow_form
+
+negbin_flow = flow_form(NegBinFlow)
+sar_hurdle_flow = flow_form(SARHurdleNegBinFlow, separable=True)
+sar_negbin_flow = flow_form(SARNegBinFlow)
+sar_negbin_separable = flow_form(SARNegBinFlow, separable=True)
+sar_zinb_flow = flow_form(SARZINBFlow, separable=True)
 
 
 def _small_negbin_flow(seed: int = 0):
@@ -432,7 +435,7 @@ class TestNegBinFlowAspatialRecovery:
 
 @pytest.mark.slow
 class TestNegBinFlowPanelAspatialRecovery:
-    """Recovery for the aspatial NegBinFlowPanelRE (no spatial parameters)."""
+    """Recovery for the aspatial negbin_flow (no spatial parameters)."""
 
     def test_negbin_flow_panel_recovers_beta_and_alpha(self):
         from neighbayes.dgp import simulate_sar_negbin_flow
@@ -482,20 +485,8 @@ class TestFlowGibbsBackend:
         import inspect
 
         from neighbayes._backends import select_backend
-        from neighbayes.models.flow_panel._hurdle import (
-            SARHurdleNegBinFlowSeparablePanelRE,
-        )
-        from neighbayes.models.flow_panel._panel import SARZINBFlowSeparablePanelRE
 
-        for cls in (
-            SARNegBinFlow,
-            SARNegBinFlowSeparable,
-            NegBinFlow,
-            SARNegBinFlowPanelRE,
-            SARNegBinFlowSeparablePanelRE,
-            SARZINBFlowSeparablePanelRE,
-            SARHurdleNegBinFlowSeparablePanelRE,
-        ):
+        for cls in (SARNegBinFlow, NegBinFlow, SARZINBFlow, SARHurdleNegBinFlow):
             default = inspect.signature(cls.fit).parameters["backend"].default
             assert default is None, cls.__name__
         assert select_backend("gibbs", None, {}) == "auto"

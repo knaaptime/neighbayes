@@ -1,4 +1,4 @@
-r"""Separable SAR hurdle NB flow models (panel and cross-section).
+r"""The SAR hurdle negative binomial flow model (separable).
 
 .. math::
 
@@ -11,8 +11,8 @@ r"""Separable SAR hurdle NB flow models (panel and cross-section).
     \text{ truncated at } 0,
 
 with :math:`L_{z,k} = I - \rho_{z,k} W_z` and
-:math:`L_k^{\rho} = I - \rho_k W`.  ``effects`` sets pair and period effects
-on **both** parts.  The zero part is fit to the observed ``d = 1(y > 0)``,
+:math:`L_k^{\rho} = I - \rho_k W`.  A panel's pair and period effects enter
+**both** parts.  The zero part is fit to the observed ``d = 1(y > 0)``,
 so unlike the flow ZINB it is identified on sparse flows; the price is that a
 zero is not split into "closed" and "open but quiet".
 """
@@ -22,30 +22,22 @@ from __future__ import annotations
 from typing import Optional
 
 import numpy as np
-import pandas as pd
 import pytensor.tensor as pt
 import scipy.sparse as sp
 
 from ..._backends.sampler_helpers import select_backend
 from ..._lazy_deps import pm, xr
 from ..._ops import kron_solve_matrix
-from ...graph import _weights_to_csr
 from .._base._nb import nb_alpha_rv
-from .._design import FacadeMeta, flow
-from .._mixins._count_panel import pop_mundlak, require_counts
+from .._mixins._designs import FlowCountDesigns
 from .._mixins._hurdle import HurdleMixin
-from ..flow._flow import FlowModel, _Separable
 from ..priors import FlowPanelHurdlePriors
-from ._panel import (
-    _pop_effects,
-    _SeparableCountFlowPanel,
-)
+from ._count import _FlowCount
+from ._flow import FlowModel
 
 
-class SARHurdleNegBinFlowSeparablePanelRE(
-    HurdleMixin, _SeparableCountFlowPanel, _Separable, FlowModel
-):
-    r"""Reduced-form separable SAR hurdle NB flow panel.
+class SARHurdleNegBinFlow(FlowCountDesigns, HurdleMixin, _FlowCount, FlowModel):
+    r"""Reduced-form SAR hurdle negative binomial flow model (separable).
 
     .. math::
 
@@ -56,8 +48,10 @@ class SARHurdleNegBinFlowSeparablePanelRE(
         + \tau_t + C,
 
     ``P(y > 0) = logit⁻¹(η_z)`` and ``y | y > 0`` a zero-truncated NB2 with
-    log-mean ``η^c``.  ``effects`` sets pair and period effects on **both**
-    parts: in the zero part a pair effect absorbs the pair's baseline chance of
+    log-mean ``η^c``, for each of ``T`` periods (``T=1`` the cross-section).
+    Implemented as the separable flow only: pass ``separable=True``.
+    ``pair_effects="random"`` and ``time_effects=True`` set pair and period
+    effects on **both** parts: in the zero part a pair effect absorbs the pair's baseline chance of
     any flow, so ``β_z`` is identified from the weeks in which a pair switches
     between zero and positive; in the count part it absorbs the pair's usual
     volume.  The parts share no parameters.  ``ρ_{z,d}``, ``ρ_{z,o}``, ``β_z``
@@ -69,60 +63,25 @@ class SARHurdleNegBinFlowSeparablePanelRE(
 
     Parameters
     ----------
-    y, X, W, T, col_names, k, priors, shared_od_covariates
-        As :class:`SARNegBinFlowSeparablePanelRE`.
+    y, X, W, T, pair_effects, time_effects, col_names, k, shared_od_covariates
+        As :class:`SARNegBinFlow` with ``separable=True``.
     X_zero : array-like or pandas.DataFrame, optional
         Zero-part design, time-first stacked ``(n²·T, p)``.  Default: ``X``
         (then the zero part's flow impacts are available).
     W_zero : libpysal.graph.Graph or scipy.sparse matrix, optional
         ``n × n`` zero-part weights.  Default: ``W``.
-    effects : int, default 0
-        Effects in both parts: ``0`` pooled, ``1`` pair, ``2`` period,
-        ``3`` both.
     priors : dict, optional
         See :class:`~neighbayes.models.priors.FlowPanelHurdlePriors`; the count
         priors are centred on the positive flows.
     """
 
     _priors_cls = FlowPanelHurdlePriors
+    _DESIGNS = {"separable": {"_flow_filter": "separable"}}
+    _zero_part = True
+    _needs_positive = True
+    _effects_equation = "count"
 
-    def __init__(self, y, X, W, X_zero=None, W_zero=None, **kwargs):
-        effects = _pop_effects(kwargs)
-        mundlak = pop_mundlak(kwargs)
-        y_arr = require_counts(y, type(self).__name__)
-        if not np.any(np.asarray(y_arr) > 0):
-            raise ValueError(
-                f"{type(self).__name__} needs at least one positive count."
-            )
-        super().__init__(y_arr.astype(np.float64), X, W, effects=0, **kwargs)
-        # Binary design, before the effects drop absorbed columns.
-        self._sel_is_X = X_zero is None
-        if X_zero is None:
-            self._Z = np.asarray(self._X, dtype=np.float64).copy()
-            self._sel_feature_names = list(self._feature_names)
-        else:
-            Z_arr = np.asarray(X_zero, dtype=np.float64)
-            Z_arr = Z_arr[:, None] if Z_arr.ndim == 1 else Z_arr
-            if Z_arr.shape[0] != self._N * self._T:
-                raise ValueError(
-                    f"Z must have n²·T = {self._N * self._T} rows, "
-                    f"got {Z_arr.shape[0]}."
-                )
-            self._sel_feature_names = (
-                [str(c) for c in X_zero.columns]
-                if isinstance(X_zero, pd.DataFrame)
-                else [f"z{j}" for j in range(Z_arr.shape[1])]
-            )
-            self._Z = Z_arr
-        if W_zero is None:
-            self._W_zero_sparse, self._same_W = self._W_sparse, True
-        else:
-            self._W_zero_sparse, self._same_W = _weights_to_csr(W_zero), False
-            if self._W_zero_sparse.shape != self._W_sparse.shape:
-                raise ValueError("W_zero must be n × n, like W.")
-        self._is_sel_row_std = True
-        self._effects_equation = "count"
-        self._finish_count_init(y_arr, effects, mundlak)
+    def _init_separable(self) -> None:
         self._binary_effects_design(self._N, self._T)
 
     def _model_coords(self, extra: Optional[dict] = None) -> dict:
@@ -445,44 +404,3 @@ class SARHurdleNegBinFlowSeparablePanelRE(
             )
         finally:
             self._effects_equation = "count"
-
-
-class SARHurdleNegBinFlowSeparable(SARHurdleNegBinFlowSeparablePanelRE):
-    """Cross-sectional separable SAR hurdle NB flow model (one period).
-
-    :class:`SARHurdleNegBinFlowSeparablePanelRE` with ``T = 1`` and no
-    effects; see there for the model, sampling and arguments.  ``y`` is the
-    ``n²`` flow vector (or the ``n × n`` matrix).
-    """
-
-    def __init__(self, y, X, W, **kwargs):
-        if _pop_effects(kwargs):
-            raise ValueError(
-                "SARHurdleNegBinFlowSeparable is a cross-section; pair and period effects need "
-                "SARHurdleNegBinFlowSeparablePanelRE."
-            )
-        kwargs.pop("T", None)
-        super().__init__(y, X, W, T=1, **kwargs)
-
-
-class SARHurdleNegBinFlow(metaclass=FacadeMeta):
-    """Hurdle negative binomial flow model with SAR dependence.
-
-    Implemented as the separable flow only: pass ``separable=True``.  Pass
-    ``T`` for a flow panel, whose pair effects are random and time effects
-    fixed.
-
-    Parameters
-    ----------
-    separable : bool
-        Must be ``True``.
-    T : int, optional
-        Periods; omit (or ``1``) for a cross-section.
-    pair_effects : {None, "random"}, default None
-    time_effects : bool, default False
-    **kwargs
-        ``y``, ``X``, ``W``, the zero part's ``X_zero`` and ``W_zero``, ``priors``,
-        and ``logdet_method``.
-    """
-
-    _dispatch = classmethod(flow)

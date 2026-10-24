@@ -84,12 +84,12 @@ def _cases():
         fd["y_vec"],
         lambda y: M.SARNegBinFlow(y, fd["X"], fd["G"]),
     )
-    out["SARNegBinFlowSeparable"] = (
+    out["SARNegBinFlow(separable)"] = (
         fd["y_vec"],
         lambda y: M.SARNegBinFlow(y, fd["X"], fd["G"], separable=True),
     )
     pf = dgp.simulate_sar_negbin_flow(n=5, T=3, rho_d=0.3, rho_o=0.2, seed=21, alpha=3.0, beta_d=[0.4, 0.4], beta_o=[0.4, 0.4], gamma_dist=-0.4, separable=True, pair_effects="random", pair_effect_sd=0.5, time_effects=True, time_effect_sd=0.3)  # fmt: skip
-    out["SARNegBinFlowSeparablePanelRE"] = (
+    out["SARNegBinFlow(separable) panel"] = (
         pf["y"],
         lambda y: M.SARNegBinFlow(
             separable=True,
@@ -103,7 +103,7 @@ def _cases():
         ),
     )
     hd = dgp.simulate_sar_hurdle_negbin_flow(n=6, T=1, seed=2, beta_d=[0.4, 0.4], beta_o=[0.4, 0.4], gamma_dist=-0.4, alpha=3.0, separable=True)  # fmt: skip
-    out["SARHurdleNegBinFlowSeparable"] = (
+    out["SARHurdleNegBinFlow"] = (
         hd["y_vec"],
         lambda y: M.SARHurdleNegBinFlow(
             y, hd["X"], hd["G"], separable=True, col_names=hd["col_names"]
@@ -119,7 +119,7 @@ def _cases():
         time_effects=True,
         time_effect_sd=0.3,
     )
-    out["SARZINBFlowSeparablePanelRE"] = (
+    out["SARZINBFlow panel"] = (
         zd["y"],
         lambda y: M.SARZINBFlow(
             y,
@@ -147,10 +147,10 @@ _CASES = (
     "SARNegBinLatent",
     "SEMNegBin",
     "SARNegBinFlow",
-    "SARNegBinFlowSeparable",
-    "SARNegBinFlowSeparablePanelRE",
-    "SARHurdleNegBinFlowSeparable",
-    "SARZINBFlowSeparablePanelRE",
+    "SARNegBinFlow(separable)",
+    "SARNegBinFlow(separable) panel",
+    "SARHurdleNegBinFlow",
+    "SARZINBFlow panel",
 )
 
 

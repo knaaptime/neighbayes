@@ -40,12 +40,14 @@ The binary families (Logit, SARLogit, SEMLogit, SDEMLogit),
     ``SARLogit(latent=True)``, the latent SAR, which propagates the logistic
     disturbance (:mod:`..cross_section._latent_logit`).
 
-The flow families (OLSFlow, SARFlow, SEMFlow), :class:`FlowDesigns`; each
-design is a cross-section (``T=1``) or a panel with pair and time effects:
+The flow families, :class:`FlowDesigns` (OLSFlow, SARFlow, SEMFlow) and
+:class:`FlowCountDesigns` (NegBinFlow, SARNegBinFlow, SARPoissonFlow,
+SARZINBFlow, SARHurdleNegBinFlow); each design is a cross-section (``T=1``)
+or a panel with pair and time effects:
 
 ``"static"``
     The unrestricted filter, three free spatial parameters (none for the
-    aspatial OLSFlow).
+    aspatial OLSFlow and NegBinFlow).
 ``"separable"``
     ``separable=True``: ``ρ_w = -ρ_d ρ_o``, so the filter factors as
     ``L_o ⊗ L_d``.
@@ -434,6 +436,8 @@ class FlowDesigns(DesignDispatch):
 
     #: The pair effects the family's panels take.
     _pair_effects: str = "fixed"
+    #: Whether the family is implemented as a panel.
+    _has_panel: bool = True
 
     def __init__(
         self,
@@ -457,10 +461,14 @@ class FlowDesigns(DesignDispatch):
             )
         )
         self._set_design(design)
-        super().__init__(y, X, W, **kwargs)
+        self._construct(y, X, W, **kwargs)
         init = getattr(self, f"_init_{design}", None)
         if init is not None:
             init()
+
+    def _construct(self, y, X, W, **kwargs) -> None:
+        """Build the flow model from the base class's arguments."""
+        super().__init__(y, X, W, **kwargs)
 
     @classmethod
     def _resolve_design(cls, kw: dict) -> tuple[str, dict]:
@@ -487,6 +495,8 @@ class FlowDesigns(DesignDispatch):
                     f"{name} takes pair effects only in a panel (pass T)."
                 )
             return design, kw
+        if not cls._has_panel:
+            raise NotImplementedError(f"{name} is not implemented with a panel.")
         if pair is not None and pair != cls._pair_effects:
             raise NotImplementedError(f"{name} panels take no {pair} pair effects.")
         kw["effects"] = _effects_code(pair is not None, time)
@@ -494,11 +504,32 @@ class FlowDesigns(DesignDispatch):
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
+        if "_DESIGNS" not in cls.__dict__:  # a design layer, not a family
+            return
         from ..flow._flow import FlowModel
 
-        cls.__signature__ = _constructor_signature(
-            FlowDesigns.__init__, base=FlowModel.__init__
+        # ``fit`` reads as the family's own (its first design's), not the shared NUTS fit.
+        impl = next(
+            (
+                getattr(cls, f"_fit_{d}")
+                for d in cls._DESIGNS
+                if hasattr(cls, f"_fit_{d}")
+            ),
+            None,
         )
+        if impl is not None and "fit" not in cls.__dict__:
+            fit = _by_design("fit")
+            fit.__doc__, fit.__wrapped__ = impl.__doc__, impl
+            cls.fit = fit
+
+        cls.__signature__ = _constructor_signature(
+            FlowDesigns.__init__, cls._signature_extra(), base=FlowModel.__init__
+        )
+
+    @classmethod
+    def _signature_extra(cls) -> tuple[str, ...]:
+        """Constructor arguments beyond the design's and the base class's."""
+        return ()
 
     _build_pymc_model = _by_design("_build_pymc_model")
     _compute_impacts_posterior = _by_design("_compute_impacts_posterior")
@@ -507,6 +538,80 @@ class FlowDesigns(DesignDispatch):
     fit = _by_design("fit")
     fit.__doc__ = FlowSharedMethods.fit.__doc__
     fit.__wrapped__ = FlowSharedMethods.fit
+
+
+class FlowCountDesigns(FlowDesigns):
+    """Design dispatch for the count flow families (see the module).
+
+    The response is validated as counts.  A panel's pair effects are random
+    and, with its period effects, are parameters of the count model rather than
+    a within transform (``mundlak=True`` adds the pair means of the
+    time-varying columns).  A two-part family (``_zero_part``) also takes the
+    zero part's design ``X_zero`` and weights ``W_zero``.
+    """
+
+    _pair_effects = "random"
+    #: Whether the family has a zero part (ZINB, hurdle).
+    _zero_part: bool = False
+    #: Whether the family needs a positive count (the hurdle's count part).
+    _needs_positive: bool = False
+
+    def _construct(self, y, X, W, *, effects=0, mundlak=False, **kwargs) -> None:
+        from ._count_panel import require_counts
+
+        zero = (
+            {k: kwargs.pop(k, None) for k in ("X_zero", "W_zero")}
+            if self._zero_part
+            else None
+        )
+        name = type(self).__name__
+        y_arr = require_counts(y, name)
+        if self._needs_positive and not np.any(y_arr > 0):
+            raise ValueError(f"{name} needs at least one positive count.")
+        # The effects are parameters of the count model, not a within transform.
+        super()._construct(y_arr.astype(np.float64), X, W, **kwargs)
+        if zero is not None:
+            # Before the count effects drop the columns they absorb from X.
+            self._init_flow_zero_part(**zero)
+        self._finish_count_init(y_arr, effects, mundlak)
+
+    def _init_flow_zero_part(self, X_zero=None, W_zero=None) -> None:
+        """The zero part's design ``_Z`` (default ``X``) and weights (default ``W``)."""
+        import pandas as pd
+
+        from ...graph import _weights_to_csr
+
+        self._sel_is_X = X_zero is None
+        if X_zero is None:
+            self._Z = np.asarray(self._X, dtype=np.float64).copy()
+            self._sel_feature_names = list(self._feature_names)
+        else:
+            Z_arr = np.asarray(X_zero, dtype=np.float64)
+            Z_arr = Z_arr[:, None] if Z_arr.ndim == 1 else Z_arr
+            if Z_arr.shape[0] != self._N * self._T:
+                raise ValueError(
+                    f"X_zero must have n²·T = {self._N * self._T} rows, "
+                    f"got {Z_arr.shape[0]}."
+                )
+            self._sel_feature_names = (
+                [str(c) for c in X_zero.columns]
+                if isinstance(X_zero, pd.DataFrame)
+                else [f"z{j}" for j in range(Z_arr.shape[1])]
+            )
+            self._Z = Z_arr
+        if W_zero is None:
+            self._W_zero_sparse, self._same_W = self._W_sparse, True
+        else:
+            self._W_zero_sparse, self._same_W = _weights_to_csr(W_zero), False
+            if self._W_zero_sparse.shape != self._W_sparse.shape:
+                raise ValueError("W_zero must be n × n, like W.")
+        self._is_sel_row_std = True
+
+    @classmethod
+    def _signature_extra(cls) -> tuple[str, ...]:
+        return (("mundlak",) if cls._has_panel else ()) + (
+            ("X_zero", "W_zero") if cls._zero_part else ()
+        )
 
 
 def _constructor_signature(

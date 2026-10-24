@@ -5,7 +5,7 @@ resolvent-Kronecker gradient (:mod:`neighbayes._logdet._flow_resolvent`); the ol
 ``"traces"`` value method was removed because it amplifies stochastic-moment noise
 for large directed ``W``.  What remains here is the *separable* flow factorization
 ``log|L_o ⊗ L_d| = n·log|I − ρ_d W| + n·log|I − ρ_o W|``, delegated to the general
-single-parameter logdet factories.  Used by ``models/flow`` and ``models/flow_panel``.
+single-parameter logdet factories.  Used by ``models/flow``.
 """
 
 import numpy as np

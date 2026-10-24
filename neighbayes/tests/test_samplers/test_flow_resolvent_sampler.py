@@ -16,6 +16,9 @@ from neighbayes.samplers.gaussian._flow_resolvent import (
     FlowResolventTarget,
     SEMFlowResolventTarget,
 )
+from neighbayes.tests.helpers import flow_form
+
+sar_negbin_separable = flow_form(SARNegBinFlow, separable=True)
 
 
 def _directed_sem_data(n, seed):
@@ -440,7 +443,6 @@ def test_separable_count_flow_log_abs_det_uses_closed_form(monkeypatch):
     import arviz as az
 
     import neighbayes.samplers.gaussian._flow_resolvent as fr
-    from neighbayes.models.flow import SARNegBinFlowSeparable
 
     W, _, X = _directed_flow_data(n=12, seed=4)
     y = np.random.default_rng(4).poisson(3.0, size=X.shape[0])

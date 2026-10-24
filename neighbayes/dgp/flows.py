@@ -1292,8 +1292,7 @@ def _simulate_sar_zinb_flow_separable(
         \qquad y = d \cdot y_{\mathrm{NB}},
 
     with :math:`L_{z,k} = I_n - \rho_{z,k} W`.  Matches
-    :class:`~neighbayes.models.SARZINBFlowSeparable` and
-    :class:`~neighbayes.models.SARZINBFlowSeparablePanelRE`.
+    :class:`~neighbayes.models.SARZINBFlow` (``separable=True``).
 
     Parameters
     ----------
@@ -1407,8 +1406,7 @@ def _simulate_sar_hurdle_negbin_flow_separable(
         \qquad d \sim \mathrm{Bernoulli}(\mathrm{logit}^{-1}(\eta_z)),
         \qquad y = d \cdot \mathrm{tNB}(\mu, \alpha).
 
-    Matches :class:`~neighbayes.models.SARHurdleNegBinFlowSeparable` and
-    :class:`~neighbayes.models.SARHurdleNegBinFlowSeparablePanelRE`.
+    Matches :class:`~neighbayes.models.SARHurdleNegBinFlow` (``separable=True``).
 
     Parameters
     ----------

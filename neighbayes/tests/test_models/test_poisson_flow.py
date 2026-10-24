@@ -4,7 +4,11 @@ import numpy as np
 import pytest
 
 from neighbayes.dgp import simulate_sar_poisson_flow
-from neighbayes.models.flow import SARPoissonFlow, SARPoissonFlowSeparable
+from neighbayes.models import SARPoissonFlow
+from neighbayes.models.flow import SARPoissonFlow
+from neighbayes.tests.helpers import flow_form
+
+sar_poisson_separable = flow_form(SARPoissonFlow, separable=True)
 
 
 @pytest.fixture(scope="module")

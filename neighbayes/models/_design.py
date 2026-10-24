@@ -16,20 +16,14 @@ flow restriction are constructor arguments:
 ``separable``
     ``True`` pins :math:`\\rho_w = -\\rho_o\\rho_d` (flows only).
 
-The Gaussian, Tobit, count, logit and probit classes implement every design
-themselves (see :mod:`._mixins._designs`, :mod:`.cross_section.tobit` and
-:mod:`.cross_section.sem_probit`).  The flow families are facades: each one's
-``_dispatch`` maps those arguments to the class that implements the
-combination and to that class's own keyword arguments, and raises for a
-combination the package does not implement.
-:class:`FacadeMeta` runs it when the public class is called and registers the
-implementation as a virtual subclass, so ``isinstance(model, SARFlow)`` holds
-for a SARFlow panel.
+Every class implements its designs itself (see :mod:`._mixins._designs`,
+:mod:`.cross_section.tobit` and :mod:`.cross_section.sem_probit`); this module
+holds the argument validation they share.  :class:`FacadeMeta` routes a
+class's construction through a ``_dispatch`` table where one is defined.
 """
 
 from __future__ import annotations
 
-import importlib
 from abc import ABCMeta
 
 _UNIT_VALUES = (None, "fixed", "random")
@@ -57,12 +51,6 @@ class FacadeMeta(ABCMeta):
             return super().__call__(*args, **kwargs)
         cls.register(impl)
         return impl(*args, **kwargs)
-
-
-def _load(path: str) -> type:
-    """Import ``"subpackage.module:Class"`` relative to ``neighbayes.models``."""
-    module, name = path.split(":")
-    return getattr(importlib.import_module(f"neighbayes.models.{module}"), name)
 
 
 def _pop_design(kw: dict, *, pair: bool = False) -> tuple:
@@ -121,75 +109,3 @@ def _cross_section_only(name: str, time: bool, dynamic) -> None:
         raise ValueError(f"{name}: time_effects needs a panel (pass time_col or T).")
     if dynamic:
         raise ValueError(f"{name}: dynamic needs a panel (pass time_col or T).")
-
-
-# ---------------------------------------------------------------------------
-# Flows
-# ---------------------------------------------------------------------------
-
-# Per family: the pair-effects treatment its panels take, and the implementations
-# indexed by (separable, panel).  A missing entry is not implemented.
-_FLOW = {
-    "NegBinFlow": {
-        "pairs": "random",
-        "aspatial": True,
-        (False, True): "flow_panel._panel:NegBinFlowPanelRE",
-    },
-    "SARNegBinFlow": {
-        "pairs": "random",
-        (True, False): "flow._flow:SARNegBinFlowSeparable",
-        (False, True): "flow_panel._panel:SARNegBinFlowPanelRE",
-        (True, True): "flow_panel._panel:SARNegBinFlowSeparablePanelRE",
-    },
-    "SARPoissonFlow": {
-        "pairs": None,
-        (True, False): "flow._flow:SARPoissonFlowSeparable",
-    },
-    "SARZINBFlow": {
-        "pairs": "random",
-        "pure": True,
-        (True, False): "flow_panel._panel:SARZINBFlowSeparable",
-        (True, True): "flow_panel._panel:SARZINBFlowSeparablePanelRE",
-    },
-    "SARHurdleNegBinFlow": {
-        "pairs": "random",
-        "pure": True,
-        (True, False): "flow_panel._hurdle:SARHurdleNegBinFlowSeparable",
-        (True, True): "flow_panel._hurdle:SARHurdleNegBinFlowSeparablePanelRE",
-    },
-}
-
-
-def flow(cls, kw: dict):
-    """Flow models: the separable restriction, flow panels, and pair effects."""
-    name = cls.__name__
-    spec = _FLOW[name]
-    pair, time, dynamic = _pop_design(kw, pair=True)
-    separable = kw.pop("separable", False)
-    if not isinstance(separable, bool):
-        raise ValueError(f"separable must be True or False; got {separable!r}.")
-    if separable and spec.get("aspatial"):
-        raise ValueError(f"{name} has no spatial dependence to restrict.")
-    if dynamic:
-        raise NotImplementedError(f"{name} has no dynamic panel.")
-    panel = _is_panel(kw)
-    if not panel:
-        _cross_section_only(name, time, dynamic)
-        if pair is not None:
-            raise NotImplementedError(
-                f"{name} takes pair effects only in a panel (pass T)."
-            )
-        if not separable and not spec.get("pure"):
-            return cls, kw
-    elif pair is not None and pair != spec["pairs"]:
-        raise NotImplementedError(f"{name} panels take no {pair} pair effects.")
-    path = spec.get((separable, panel))
-    if path is None:
-        what = ("the separable" if separable else "the unrestricted") + (
-            " panel" if panel else " cross-section"
-        )
-        hint = " (pass separable=True)" if not separable and spec.get("pure") else ""
-        raise NotImplementedError(f"{name} is not implemented as {what}{hint}.")
-    if panel:
-        kw["effects"] = _effects_code(pair is not None, time)
-    return _load(path), kw

@@ -16,6 +16,9 @@ from scipy.special import logit, ndtri
 
 from neighbayes.models import SARNegBinFlow
 from neighbayes.models._base._shared import gelman_default_beta_prior
+from neighbayes.tests.helpers import flow_form
+
+sar_negbin_separable = flow_form(SARNegBinFlow, separable=True)
 
 
 def _design(n=400, seed=0):
@@ -120,7 +123,6 @@ def _nb_flow():
 
 def test_nb_flow_nuts_and_gibbs_resolve_the_same_priors(monkeypatch):
     import neighbayes.samplers.negbin_reduced._flow as nbf
-    from neighbayes.models.flow._flow import SARNegBinFlowSeparable
 
     d = _nb_flow()
     m = SARNegBinFlow(
@@ -160,7 +162,6 @@ def test_nb_flow_nuts_and_gibbs_resolve_the_same_priors(monkeypatch):
 def test_nb_flow_panel_alpha_matches_gibbs():
     """The panel NUTS build uses the half-t on alpha that the Gibbs path uses."""
     from neighbayes.dgp import simulate_sar_negbin_flow
-    from neighbayes.models.flow_panel import SARNegBinFlowSeparablePanelRE
 
     d = simulate_sar_negbin_flow(n=5, T=3, seed=1)
     m = SARNegBinFlow(

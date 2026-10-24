@@ -789,3 +789,20 @@ def effects_kwargs(
         index: treatment if code in (1, 3) else None,
         "time_effects": code in (2, 3),
     }
+
+
+def flow_form(cls, **design):
+    """A constructor of the flow family ``cls`` with ``design`` keywords fixed.
+
+    It takes a legacy ``effects`` code (0 none, 1 pair, 2 time, 3 both), the
+    pair effects being the family's treatment.
+    """
+
+    def make(*args, effects: int = 0, **kw):
+        if effects:
+            kw.update(effects_kwargs(effects, "pair_effects", cls._pair_effects))
+        return cls(*args, **design, **kw)
+
+    make.__name__ = cls.__name__ + ("(separable)" if design.get("separable") else "")
+    make.family = cls
+    return make

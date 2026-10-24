@@ -1,12 +1,9 @@
 """The public classes resolve their design arguments.
 
 ADR 0002: a public class names a process and a family; panel structure,
-effects, dynamics, and the flow restriction are arguments.  A Gaussian, Tobit,
-count, logit, probit and Gaussian flow class implements every design itself;
-the count flow families' public classes still dispatch to implementation
-classes.  These tests pin the table from public call
-to design (or implementation class) and effects code, and the combinations that
-must raise.
+effects, dynamics, and the flow restriction are arguments, and every class
+implements its designs itself.  These tests pin the table from public call to
+design and effects code, and the combinations that must raise.
 """
 
 from __future__ import annotations
@@ -19,14 +16,7 @@ from neighbayes.dgp.utils import rook_grid_weights
 
 
 def _route(cls, **kwargs):
-    """Where a call goes, without constructing, and its effects code.
-
-    The implementation class for a dispatching public class, else the design
-    the class resolves.
-    """
-    if "_dispatch" in cls.__dict__:
-        impl, kw = cls.__dict__["_dispatch"].__func__(cls, dict(kwargs))
-        return impl.__name__, kw.get("effects")
+    """The design a call resolves, without constructing, and its effects code."""
     design, kw = cls._resolve_design(dict(kwargs))
     return design, kw.get("effects")
 
@@ -84,15 +74,15 @@ ROUTES = [
     (m.SARFlow, {"T": 2, "separable": True, "time_effects": True}, "separable", 2),
     (m.SEMFlow, {"separable": True}, "separable", None),
     (m.OLSFlow, {"T": 2}, "static", 0),
-    (m.NegBinFlow, {"T": 2, "pair_effects": "random"}, "NegBinFlowPanelRE", 1),
-    (m.SARNegBinFlow, {"separable": True}, "SARNegBinFlowSeparable", None),
-    (m.SARNegBinFlow, {"T": 2, "pair_effects": "random"}, "SARNegBinFlowPanelRE", 1),
-    (m.SARPoissonFlow, {"separable": True}, "SARPoissonFlowSeparable", None),
-    (m.SARZINBFlow, {"separable": True}, "SARZINBFlowSeparable", None),
+    (m.NegBinFlow, {"T": 2, "pair_effects": "random"}, "static", 1),
+    (m.SARNegBinFlow, {"separable": True}, "separable", None),
+    (m.SARNegBinFlow, {"T": 2, "pair_effects": "random"}, "static", 1),
+    (m.SARPoissonFlow, {"separable": True}, "separable", None),
+    (m.SARZINBFlow, {"separable": True}, "separable", None),
     (
         m.SARHurdleNegBinFlow,
         {"separable": True, "T": 2, "pair_effects": "random", "time_effects": True},
-        "SARHurdleNegBinFlowSeparablePanelRE",
+        "separable",
         3,
     ),
 ]

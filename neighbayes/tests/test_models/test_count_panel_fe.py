@@ -16,14 +16,14 @@ import pytest
 
 from neighbayes.dgp import simulate_sar_negbin, simulate_sar_negbin_flow
 from neighbayes.models import NegBin, NegBinFlow, SARNegBin, SARNegBinFlow
-from neighbayes.models.flow_panel._panel import (
-    NegBinFlowPanelRE,
-    SARNegBinFlowPanelRE,
-    SARNegBinFlowSeparablePanelRE,
-)
-from neighbayes.tests.helpers import effects_kwargs
+from neighbayes.tests.helpers import effects_kwargs, flow_form
 
-FLOW_CLASSES = [SARNegBinFlowPanelRE, SARNegBinFlowSeparablePanelRE, NegBinFlowPanelRE]
+negbin_flow = flow_form(NegBinFlow)
+sar_negbin_flow = flow_form(SARNegBinFlow)
+sar_negbin_separable = flow_form(SARNegBinFlow, separable=True)
+
+
+FLOW_CLASSES = [sar_negbin_flow, sar_negbin_separable, negbin_flow]
 PANEL_CLASSES = [SARNegBin, NegBin]
 QUICK = dict(draws=20, tune=20, chains=1, progressbar=False, random_seed=0, n_jobs=1)
 
@@ -163,7 +163,7 @@ class TestConstruction:
         data = _flow()
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            m = _flow_model(SARNegBinFlowPanelRE, data, 3, effects=1)
+            m = _flow_model(sar_negbin_flow, data, 3, effects=1)
         with pytest.raises(ValueError, match="not supported"):
             m.fit(backend="jax", **QUICK)
 
@@ -282,7 +282,7 @@ def test_separable_fixed_effects_jax_backend(effects, store):
     data = _flow()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        m = _flow_model(SARNegBinFlowSeparablePanelRE, data, 3, effects=effects)
+        m = _flow_model(sar_negbin_separable, data, 3, effects=effects)
         idata = m.fit(
             backend="jax",
             store_effects=store,
@@ -308,7 +308,7 @@ def test_log_likelihood_storage():
     data = _flow()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
-        m = _flow_model(SARNegBinFlowSeparablePanelRE, data, 3, effects=3)
+        m = _flow_model(sar_negbin_separable, data, 3, effects=3)
         idata = m.fit(idata_kwargs={"log_likelihood": True}, **QUICK)
     assert idata.log_likelihood["obs"].shape[-1] == data["y"].size
     assert np.all(np.isfinite(idata.log_likelihood["obs"].values))
@@ -404,7 +404,7 @@ def test_panel_two_way_recovery_beats_pooled():
 def test_flow_separable_pair_effects_recovery():
     rho_d, rho_o = 0.4, 0.3
     data = simulate_sar_negbin_flow(n=8, T=6, rho_d=rho_d, rho_o=rho_o, seed=21, alpha=3.0, beta_d=[0.4, 0.4], beta_o=[0.4, 0.4], gamma_dist=-0.4, fe_x_corr=0.6, separable=True, pair_effects="random", pair_effect_sd=0.7, time_effects=True, time_effect_sd=0.3)  # fmt: skip
-    m = _flow_model(SARNegBinFlowSeparablePanelRE, data, 6, effects=3)
+    m = _flow_model(sar_negbin_separable, data, 6, effects=3)
     idata = m.fit(draws=600, tune=400, chains=2, progressbar=False, random_seed=5)
     post = idata.posterior
     assert _covers(post["rho_d"].values, rho_d)
@@ -430,7 +430,7 @@ def test_structured_and_materialized_separable_kernels_agree():
         time_effects=True,
         time_effect_sd=0.3,
     )
-    m = _flow_model(SARNegBinFlowSeparablePanelRE, data, 4, effects=3)
+    m = _flow_model(sar_negbin_separable, data, 4, effects=3)
     fit = dict(draws=1500, tune=500, chains=2, progressbar=False, n_jobs=1)
     structured = m.fit(random_seed=1, attach_log_abs_det=False, **fit)
     pv = m._flow_count_priors()
@@ -471,7 +471,7 @@ def test_separable_fixed_effects_jax_matches_numpy():
         time_effects=True,
         time_effect_sd=0.3,
     )
-    m = _flow_model(SARNegBinFlowSeparablePanelRE, data, 4, effects=3)
+    m = _flow_model(sar_negbin_separable, data, 4, effects=3)
     fit = dict(
         draws=2000, tune=600, chains=2, progressbar=False, attach_log_abs_det=False
     )
@@ -563,11 +563,11 @@ def test_spatial_unit_effects_gibbs_matches_nuts():
 @pytest.mark.slow
 def test_unrestricted_flow_pair_effects_gibbs_matches_nuts():
     data = _flow(n=5, T=4, seed=3, rho_d=0.3, rho_o=0.2, rho_w=0.05, alpha=3.0, pair_effects="random", pair_effect_sd=0.5, time_effects=True, time_effect_sd=0.3)  # fmt: skip
-    gibbs = _flow_model(SARNegBinFlowPanelRE, data, 4, effects=3).fit(
+    gibbs = _flow_model(sar_negbin_flow, data, 4, effects=3).fit(
         sampler="gibbs", draws=2000, tune=500, chains=2, progressbar=False,
         random_seed=1, n_jobs=1,
     )  # fmt: skip
-    nuts = _flow_model(SARNegBinFlowPanelRE, data, 4, effects=3).fit(
+    nuts = _flow_model(sar_negbin_flow, data, 4, effects=3).fit(
         sampler="nuts", draws=1000, tune=1000, chains=2, progressbar=False,
         random_seed=1, target_accept=0.9,
     )  # fmt: skip
@@ -615,7 +615,7 @@ def test_separable_jax_pair_effects_cg_converges():
     data = _flow(
         pair_effects="random", pair_effect_sd=0.5, separable=True, time_effects=True
     )
-    m = _flow_model(SARNegBinFlowSeparablePanelRE, data, 3, effects=3)
+    m = _flow_model(sar_negbin_separable, data, 3, effects=3)
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         m.fit(backend="jax", **QUICK)

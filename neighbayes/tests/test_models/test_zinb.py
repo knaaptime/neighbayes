@@ -16,8 +16,10 @@ import pytest
 
 from neighbayes import dgp
 from neighbayes.models import SARZINB, ZINB, SARZINBFlow
-from neighbayes.models.flow_panel._panel import SARZINBFlowSeparable
-from neighbayes.tests.helpers import effects_kwargs
+from neighbayes.tests.helpers import effects_kwargs, flow_form
+
+sar_zinb_flow = flow_form(SARZINBFlow, separable=True)
+
 
 QUICK = dict(draws=20, tune=20, chains=1, progressbar=False, random_seed=0)
 A = 23.0
@@ -286,7 +288,7 @@ def test_zinb_panel_registry_and_storage():
 
 
 def _flow_model(cls, d, **kw):
-    if cls is SARZINBFlowSeparable:
+    if cls is sar_zinb_flow:
         return cls(d["y_vec"], d["X"], d["G"], col_names=d["col_names"], **kw)
     return cls(d["y"], d["X"], d["G"], T=3, col_names=d["col_names"], **kw)
 
@@ -297,7 +299,7 @@ def _flow_model(cls, d, **kw):
 )
 def test_flow_zinb_cross_section(backend):
     d = _flow()
-    m = _flow_model(SARZINBFlowSeparable, d, priors={"alpha_fixed": A})
+    m = _flow_model(sar_zinb_flow, d, priors={"alpha_fixed": A})
     kw = (
         dict(QUICK, sampler="nuts")
         if backend == "nuts"
@@ -353,10 +355,10 @@ def test_flow_zinb_panel(effects, backend):
 
 def test_flow_zinb_guards():
     d = _flow()
-    with pytest.raises(ValueError, match="cross-section"):
-        _flow_model(SARZINBFlowSeparable, d, effects=1)
+    with pytest.raises(NotImplementedError, match="only in a panel"):
+        _flow_model(sar_zinb_flow, d, effects=1)
     Z = d["X"][:, :3]
-    m = _flow_model(SARZINBFlowSeparable, d, X_zero=Z)
+    m = _flow_model(sar_zinb_flow, d, X_zero=Z)
     m.fit(n_jobs=1, **QUICK)
     with pytest.raises(NotImplementedError, match="X_zero=None"):
         m.impacts(equation="zero")
