@@ -23,8 +23,8 @@ Polynomials converge slowly near singularities (needing 50-100 nodes for
 typically needing only 6-15 support points for the same accuracy.
 
 **When to use**: non-symmetric ``W`` (directed graph) where Cholesky is
-unavailable.  For symmetric ``W``, use ``cheb_cholesky`` (exact, faster).
-For very large ``n`` (>20,000), use ``cheb_stochastic`` (avoids
+unavailable.  For symmetric ``W``, use ``chol_cheb`` (exact, faster).
+For very large ``n`` (>20,000), use ``stoch_cheb`` (avoids
 factorization entirely).
 
 **Cost**: ``n_coarse`` sparse LU factorizations + ``O(m)`` per-ρ
@@ -100,11 +100,6 @@ def _lu_logdet_from_factor(factor) -> float:
     if rscale is not None:
         logdet -= float(np.sum(np.log(np.abs(rscale))))
     return logdet
-
-
-# Retained under its original name: the diagonal formula is shared by both
-# backends, and this alias keeps existing importers working.
-_klu_logdet_from_factor = _lu_logdet_from_factor
 
 
 def _umf_logdet_from_factor(factor) -> float:

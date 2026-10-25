@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-__all__ = ["enable_compile_cache"]
+__all__ = ["checkpoints", "enable_compile_cache"]
 
 
 def enable_compile_cache(path: str | Path | None = None) -> Path:
@@ -63,3 +63,42 @@ def enable_compile_cache(path: str | Path | None = None) -> Path:
     jax.config.update("jax_compilation_cache_dir", str(jax_dir))
     pytensor.config.compiledir = str(pytensor_dir)
     return root
+
+
+def checkpoints(path: str | Path, *, every: float = 300.0):
+    """Save long JAX Gibbs fits to disk as they run, and resume them after a crash.
+
+    A context manager.  Every JAX Gibbs run started inside it is saved under
+    ``path`` at the end of a 128-sweep chunk, at most once every ``every``
+    seconds, in a directory named by a fingerprint of everything that
+    determines its draws: the run's lengths, the sampler's structure, every
+    chain's starting state and random keys, and the data.  Starting the same
+    fit again, with the same data, options and ``random_seed``, inside the same
+    ``path`` resumes it from its last save, and the draws are those an
+    uninterrupted run would have returned.  A fit whose inputs differ starts
+    afresh in its own directory, and so does any fit without a fixed
+    ``random_seed``.  A run that finishes removes its directory.
+
+    Parameters
+    ----------
+    path : str or Path
+        Directory for the checkpoints; created if missing.
+    every : float, default 300
+        Least number of seconds between saves of one run.  Each save writes
+        every chain's state, so at large ``n`` it costs a few seconds.
+
+    Examples
+    --------
+    >>> from neighbayes.config import checkpoints
+    >>> with checkpoints("runs/la-flows"):  # doctest: +SKIP
+    ...     idata = model.fit(backend="jax", random_seed=7)
+
+    Notes
+    -----
+    With :func:`enable_compile_cache` a resumed fit also skips compiling its
+    sampler.  The NumPy samplers are not checkpointed.  Checkpoints are
+    pickles; load only those you wrote.
+    """
+    from .samplers._utils._checkpoint import checkpoints as _checkpoints
+
+    return _checkpoints(path, every=every)

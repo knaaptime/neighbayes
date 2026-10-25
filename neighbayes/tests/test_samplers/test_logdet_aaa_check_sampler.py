@@ -93,7 +93,7 @@ class TestAAANodeCheck:
         import arviz as az
 
         aaa = _fit(high, backend)
-        exact = _fit(high, backend, method="exact", decomp="eig")
+        exact = _fit(high, backend, method="eigenvalue", decomp="auto")
         ra, re = _rho(aaa), _rho(exact)
         ess_a = float(az.ess(aaa, var_names=["rho"])["rho"])
         ess_e = float(az.ess(exact, var_names=["rho"])["rho"])

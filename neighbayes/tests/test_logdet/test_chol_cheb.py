@@ -11,10 +11,15 @@ from neighbayes._logdet._chebyshev import cheb_order_for_tolerance
 from neighbayes._logdet._chol_cheb import (
     CholChebPrecompute,
     _d_symmetrize,
-    chol_cheb_logdet_eval,
     chol_cheb_logdet_eval_vec,
     chol_cheb_logdet_precompute,
 )
+
+
+def _logdet_at(pre, rho):
+    """log|I - rho W| from a Chebyshev precompute, at one rho."""
+    return float(chol_cheb_logdet_eval_vec(pre, np.atleast_1d(float(rho)))[0])
+
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -173,7 +178,7 @@ class TestAdaptiveOrder:
             exact = np.array(
                 [np.sum(np.log(np.abs(1.0 - r * small_eigs))) for r in grid]
             )
-            approx = np.array([chol_cheb_logdet_eval(pre, float(r)) for r in grid])
+            approx = np.array([_logdet_at(pre, float(r)) for r in grid])
             err = np.abs(approx - exact).max()
             # The fitted model's worst observed under-prediction was 4x.
             assert err < 10 * tol, f"[{lo}, {hi}] tol={tol}: err={err:.2e}"
@@ -199,7 +204,7 @@ class TestAccuracy:
 
         for rho in rho_nodes:
             exact = np.sum(np.log(np.abs(1.0 - rho * small_eigs)))
-            approx = chol_cheb_logdet_eval(pre, float(rho))
+            approx = _logdet_at(pre, float(rho))
             assert abs(approx - exact) < 1e-8, f"rho={rho}: {approx} vs {exact}"
 
     def test_near_exact_between_nodes(self, small_W, small_eigs):
@@ -208,14 +213,14 @@ class TestAccuracy:
 
         for rho in [0.15, 0.25, 0.35, 0.45, 0.55, 0.65, 0.75]:
             exact = np.sum(np.log(np.abs(1.0 - rho * small_eigs)))
-            approx = chol_cheb_logdet_eval(pre, rho)
+            approx = _logdet_at(pre, rho)
             # Chebyshev interpolation error should be tiny for smooth functions
             assert abs(approx - exact) < 1e-6, f"rho={rho}: {approx} vs {exact}"
 
     def test_zero_rho(self, small_W):
         """At ρ=0, log|I| = 0.  Chebyshev extrapolation to endpoint should be close."""
         pre = chol_cheb_logdet_precompute(small_W, order=15, rho_min=0.01, rho_max=0.8)
-        val = chol_cheb_logdet_eval(pre, 0.0)
+        val = _logdet_at(pre, 0.0)
         assert abs(val) < 1e-3
 
     def test_monotone(self, small_W):
@@ -223,7 +228,7 @@ class TestAccuracy:
         (as ρ→1, det→0 so logdet→-∞)."""
         pre = chol_cheb_logdet_precompute(small_W, order=15, rho_min=0.1, rho_max=0.8)
         rhos = np.linspace(0.15, 0.75, 20)
-        vals = [chol_cheb_logdet_eval(pre, r) for r in rhos]
+        vals = [_logdet_at(pre, r) for r in rhos]
         diffs = np.diff(vals)
         assert np.all(diffs < 0), f"Not monotone decreasing: diffs={diffs}"
 
@@ -234,7 +239,7 @@ class TestAccuracy:
         )
         for rho in [-0.9, -0.5, -0.1, 0.0, 0.1, 0.3, 0.5, 0.7, 0.9]:
             exact = np.sum(np.log(np.abs(1.0 - rho * small_eigs)))
-            approx = chol_cheb_logdet_eval(pre, rho)
+            approx = _logdet_at(pre, rho)
             assert abs(approx - exact) < 1e-4, f"rho={rho}: {approx} vs {exact}"
 
     def test_negative_rho(self, small_W, small_eigs):
@@ -242,7 +247,7 @@ class TestAccuracy:
         pre = chol_cheb_logdet_precompute(small_W, order=20, rho_min=-0.8, rho_max=-0.1)
         for rho in [-0.7, -0.5, -0.3, -0.15]:
             exact = np.sum(np.log(np.abs(1.0 - rho * small_eigs)))
-            approx = chol_cheb_logdet_eval(pre, rho)
+            approx = _logdet_at(pre, rho)
             assert abs(approx - exact) < 1e-6, f"rho={rho}: {approx} vs {exact}"
 
 
@@ -252,14 +257,6 @@ class TestAccuracy:
 
 
 class TestVectorized:
-    def test_vec_matches_scalar(self, small_W):
-        """Vectorized eval should match scalar eval for each element."""
-        pre = chol_cheb_logdet_precompute(small_W, order=12, rho_min=0.1, rho_max=0.8)
-        rhos = np.linspace(0.15, 0.75, 50)
-        vec_vals = chol_cheb_logdet_eval_vec(pre, rhos)
-        scalar_vals = np.array([chol_cheb_logdet_eval(pre, r) for r in rhos])
-        assert np.allclose(vec_vals, scalar_vals, atol=1e-12)
-
     def test_vec_shape(self, small_W):
         pre = chol_cheb_logdet_precompute(small_W, order=10)
         rhos = np.linspace(0.1, 0.8, 30)
@@ -279,9 +276,9 @@ class TestVectorized:
 
 class TestFactory:
     def test_scalar_factory(self, small_W, small_eigs):
-        """make_logdet_numpy_fn with cheb_cholesky should match exact logdet."""
+        """make_logdet_numpy_fn with chol_cheb should match exact logdet."""
         fn = make_logdet_numpy_fn(
-            small_W, small_eigs, method="cheb_cholesky", rho_min=0.1, rho_max=0.8
+            small_W, small_eigs, method="chol_cheb", rho_min=0.1, rho_max=0.8
         )
         for rho in [0.2, 0.3, 0.5, 0.7]:
             exact = np.sum(np.log(np.abs(1.0 - rho * small_eigs)))
@@ -289,9 +286,9 @@ class TestFactory:
             assert abs(approx - exact) < 1e-6, f"rho={rho}: {approx} vs {exact}"
 
     def test_vec_factory(self, small_W, small_eigs):
-        """make_logdet_numpy_vec_fn with cheb_cholesky should match exact logdet."""
+        """make_logdet_numpy_vec_fn with chol_cheb should match exact logdet."""
         fn = make_logdet_numpy_vec_fn(
-            small_W, small_eigs, method="cheb_cholesky", rho_min=0.1, rho_max=0.8
+            small_W, small_eigs, method="chol_cheb", rho_min=0.1, rho_max=0.8
         )
         rhos = np.linspace(0.15, 0.75, 40)
         vals = fn(rhos)
@@ -301,7 +298,7 @@ class TestFactory:
     def test_factory_T(self, small_W, small_eigs):
         """T multiplier should scale the output."""
         fn = make_logdet_numpy_fn(
-            small_W, small_eigs, method="cheb_cholesky", rho_min=0.1, rho_max=0.8, T=3
+            small_W, small_eigs, method="chol_cheb", rho_min=0.1, rho_max=0.8, T=3
         )
         rho = 0.5
         exact = 3.0 * np.sum(np.log(np.abs(1.0 - rho * small_eigs)))
@@ -317,9 +314,9 @@ class TestFactory:
         assert resolve_logdet_method(None, n=10000) == "chol_aaa"
         assert resolve_logdet_method(None, n=20000) == "chol_aaa"
         assert resolve_logdet_method(None, n=60000) == "chol_aaa"
-        assert resolve_logdet_method(None, n=200000) == "cheb_stochastic"
-        # cheb_cholesky remains available as an explicit opt-in.
-        assert resolve_logdet_method("cheb_cholesky", n=10000) == "cheb_cholesky"
+        assert resolve_logdet_method(None, n=200000) == "stoch_cheb"
+        # chol_cheb remains available as an explicit opt-in.
+        assert resolve_logdet_method("chol_cheb", n=10000) == "chol_cheb"
 
 
 # ---------------------------------------------------------------------------
@@ -360,7 +357,7 @@ class TestCholChebContext:
 
         for rho in (0.2, 0.5, 0.75):
             exact = np.sum(np.log(np.abs(1.0 - rho * small_eigs)))
-            assert abs(chol_cheb_logdet_eval(wide, rho) - exact) < 1e-6
+            assert abs(_logdet_at(wide, rho) - exact) < 1e-6
 
     def test_narrow_refit_is_far_more_accurate(self, small_W, small_eigs):
         """The payoff: over the refit window, the narrow fit is orders better."""
@@ -374,10 +371,10 @@ class TestCholChebContext:
         grid = np.linspace(lo, hi, 41)
         exact = np.array([np.sum(np.log(np.abs(1.0 - r * small_eigs))) for r in grid])
         err_wide = np.abs(
-            np.array([chol_cheb_logdet_eval(wide, float(r)) for r in grid]) - exact
+            np.array([_logdet_at(wide, float(r)) for r in grid]) - exact
         ).max()
         err_narrow = np.abs(
-            np.array([chol_cheb_logdet_eval(narrow, float(r)) for r in grid]) - exact
+            np.array([_logdet_at(narrow, float(r)) for r in grid]) - exact
         ).max()
         assert err_narrow < err_wide / 100.0
 
@@ -400,7 +397,7 @@ class TestLUCheb:
     """The LU-Chebyshev cell: same interpolant, different factorizer.
 
     ``lu_cheb`` completes the factorizer x interpolant grid.  Its value is that
-    it isolates the two choices -- comparing it against ``cheb_cholesky`` varies
+    it isolates the two choices -- comparing it against ``chol_cheb`` varies
     only the factorizer, and against ``aaa`` only the interpolant -- and that it
     is the only way to put a Chebyshev interpolant on a directed ``W``.
     """
@@ -435,7 +432,6 @@ class TestLUCheb:
         import numpy as np
 
         from neighbayes._logdet._chol_cheb import (
-            chol_cheb_logdet_eval,
             chol_cheb_logdet_precompute,
             lu_cheb_logdet_precompute,
         )
@@ -450,8 +446,8 @@ class TestLUCheb:
         np.testing.assert_allclose(pl.coeffs, pc.coeffs, rtol=1e-9, atol=1e-9)
 
         for r in np.linspace(lo, hi, 11):
-            assert chol_cheb_logdet_eval(pl, float(r)) == pytest.approx(
-                chol_cheb_logdet_eval(pc, float(r)), rel=1e-9, abs=1e-9
+            assert _logdet_at(pl, float(r)) == pytest.approx(
+                _logdet_at(pc, float(r)), rel=1e-9, abs=1e-9
             )
 
     def test_works_on_directed_W_where_cholesky_cannot(self):
@@ -461,7 +457,6 @@ class TestLUCheb:
 
         from neighbayes._logdet._chol_cheb import (
             CholChebContext,
-            chol_cheb_logdet_eval,
             lu_cheb_logdet_precompute,
         )
 
@@ -484,9 +479,7 @@ class TestLUCheb:
         dense = W.toarray()
         for r in np.linspace(-0.9, 0.9, 9):
             exact = float(np.linalg.slogdet(np.eye(n) - r * dense)[1])
-            assert chol_cheb_logdet_eval(pre, float(r)) == pytest.approx(
-                exact, abs=1e-6
-            )
+            assert _logdet_at(pre, float(r)) == pytest.approx(exact, abs=1e-6)
 
     def test_is_refittable(self):
         from neighbayes._logdet._refit import REFITTABLE_METHODS

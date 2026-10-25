@@ -76,7 +76,7 @@ def _T_exact(rho, eigs, T):
     return T * float(np.sum(np.log(np.abs(1.0 - rho * eigs))))
 
 
-@pytest.mark.parametrize("method", ["cheb_cholesky", "eigenvalue"])
+@pytest.mark.parametrize("method", ["chol_cheb", "eigenvalue"])
 def test_panel_jax_logdet_is_T_times_exact_not_T_squared(method):
     """Panel (T>1) JAX logdet must equal T·log|I_N−ρW|, not T²·log."""
     side, T = 4, 6  # N=16
@@ -102,7 +102,7 @@ def test_cross_section_logdet_unaffected():
     N = side * side
     W = _rook_W(side)
     eigs = np.linalg.eigvals(W).real
-    est = _make_gibbs(sp.csr_matrix(W), N, 1, "cheb_cholesky")
+    est = _make_gibbs(sp.csr_matrix(W), N, 1, "chol_cheb")
     ldf = est._build_logdet_jax()
     for rho in (0.2, 0.5, 0.8):
         np.testing.assert_allclose(

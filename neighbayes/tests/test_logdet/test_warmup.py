@@ -36,10 +36,8 @@ def W():
 
 def test_sampler_builds_evaluators():
     assert sampler_builds_evaluators("chol_aaa", True, refit=False, aaa_check=True)
-    assert sampler_builds_evaluators("cheb_cholesky", True, refit=True, aaa_check=False)
-    assert not sampler_builds_evaluators(
-        "cheb_cholesky", True, refit=False, aaa_check=True
-    )
+    assert sampler_builds_evaluators("chol_cheb", True, refit=True, aaa_check=False)
+    assert not sampler_builds_evaluators("chol_cheb", True, refit=False, aaa_check=True)
     assert not sampler_builds_evaluators("eigenvalue", True, refit=True, aaa_check=True)
     assert not sampler_builds_evaluators("chol_aaa", False, refit=True, aaa_check=True)
 
@@ -61,7 +59,7 @@ def test_check_adds_nodes_near_the_singularity(W):
 
 
 def test_refit_narrows_the_support(W):
-    wj = WarmupJacobian(W, "cheb_cholesky", aaa_check=False)
+    wj = WarmupJacobian(W, "chol_cheb", aaa_check=False)
     wj.initial(tune=100)
     ev = wj.adapt(_draws(0.5), draws=1000, chains=4)
     assert ev is not None and wj.window is not None
@@ -132,7 +130,7 @@ def test_pickles_without_the_factorization(W):
     """Chain closures reach worker processes by pickling; a live factor cannot go."""
     import pickle
 
-    for method in ("chol_aaa", "cheb_cholesky"):
+    for method in ("chol_aaa", "chol_cheb"):
         wj = WarmupJacobian(W, method)
         wj.initial(tune=100)
         assert wj._fitter._context is not None

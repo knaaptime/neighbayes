@@ -260,7 +260,7 @@ class REGibbsEstimation:
 
     def _warmup_probes(self):
         """The probe check of a stochastic log-determinant, or ``None`` for any other."""
-        if not self.logdet_adapt or self.logdet_method != "cheb_stochastic":
+        if not self.logdet_adapt or self.logdet_method != "stoch_cheb":
             return None
         from ..._logdet._probe_check import WarmupProbes
 

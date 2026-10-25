@@ -150,8 +150,7 @@ def test_unsupported_method_falls_back_quietly(data, backend, caplog):
         X=X,
         W=W,
         priors=PRIORS,
-        logdet_method="exact",
-        logdet_decomp="eig",
+        logdet_method="eigenvalue",
         logdet_adapt=True,
     )
     with caplog.at_level(logging.INFO, logger="neighbayes"):

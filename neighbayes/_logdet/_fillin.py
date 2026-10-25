@@ -8,7 +8,7 @@ steps, which ``W²`` captures.
 
 The estimate is an **upper bound**: for each row ``i`` it sums the degrees of
 ``i``'s neighbors, which overcounts shared neighbors but never undercounts.
-This errs toward caution — routing to ``cheb_stochastic`` when the factor
+This errs toward caution — routing to ``stoch_cheb`` when the factor
 *might* be expensive — which is the safe failure mode.
 
 For dense ``W`` (e.g. a KNN graph stored as a dense array), the ratio is

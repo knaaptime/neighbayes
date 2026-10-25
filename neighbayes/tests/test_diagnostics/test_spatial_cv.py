@@ -55,9 +55,7 @@ def test_spatial_kfold_spatial_lag_with_group_kfold(sar_grid):
     from sklearn.model_selection import GroupKFold
 
     gdf, W = sar_grid
-    model = SAR(
-        formula="y ~ X_1", data=gdf, W=W, logdet_method="exact", logdet_decomp="eig"
-    )
+    model = SAR(formula="y ~ X_1", data=gdf, W=W, logdet_method="eigenvalue")
     # 6x6 lattice in row-major order: three 2-row bands.
     groups = np.arange(len(gdf)) // 12
     res = spatial_kfold(model, GroupKFold(n_splits=3), groups=groups, **FIT_KW)
@@ -71,9 +69,7 @@ def test_spatial_kfold_with_geovalidate_splitter(sar_grid):
     """Integration: a geovalidate splitter takes the geometry as ``X``."""
     geovalidate = pytest.importorskip("geovalidate")
     gdf, W = sar_grid
-    model = SAR(
-        formula="y ~ X_1", data=gdf, W=W, logdet_method="exact", logdet_decomp="eig"
-    )
+    model = SAR(formula="y ~ X_1", data=gdf, W=W, logdet_method="eigenvalue")
     splitter = geovalidate.HilbertKFold(n_splits=3)
     res = spatial_kfold(model, splitter, geometry=gdf.geometry, **FIT_KW)
     assert res.method == "HilbertKFold"

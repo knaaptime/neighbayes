@@ -82,8 +82,8 @@ def logdet_grad_chebyshev(rho, coeffs, rmin=-1.0, rmax=1.0, *, xp=np):
     """``g(ρ)`` for a Chebyshev-in-ρ logdet surrogate ``Σ_j coeffs[j] T_j(x(ρ))``.
 
     ``x(ρ) = (2ρ − rmax − rmin)/(rmax − rmin)`` so ``dx/dρ = 2/(rmax − rmin)``.
-    Serves the ``chebyshev``, ``cheb_cholesky``, ``lu_cheb`` and
-    ``cheb_stochastic`` keys (all share this coefficient representation).
+    Serves the ``chebyshev``, ``chol_cheb``, ``lu_cheb`` and
+    ``stoch_cheb`` keys (all share this coefficient representation).
     """
     x = (2.0 * rho - rmax - rmin) / (rmax - rmin)
     dxdrho = 2.0 / (rmax - rmin)

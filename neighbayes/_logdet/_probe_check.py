@@ -77,7 +77,7 @@ class WarmupProbes:
         this adaptation has neither, and leaves the support unchanged.
     """
 
-    method = "cheb_stochastic"
+    method = "stoch_cheb"
     window = None
     check = None
 

@@ -501,9 +501,7 @@ class GibbsEstimation:
 
         n_units = self.W_sparse.shape[0] // self.T
         W = self.W_sparse[:n_units, :n_units] if self.T > 1 else self.W_sparse
-        if resolve_logdet_method(self.logdet_method, n=n_units, W=W) == (
-            "cheb_stochastic"
-        ):
+        if resolve_logdet_method(self.logdet_method, n=n_units, W=W) == ("stoch_cheb"):
             wp = WarmupProbes.for_sampler(
                 self.W_sparse,
                 T=self.T,

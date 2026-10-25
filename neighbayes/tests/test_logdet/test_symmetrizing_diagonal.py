@@ -1,7 +1,7 @@
 """Tests for ``_recover_symmetrizing_diagonal``.
 
 The routine recovers ``D`` with ``D^{1/2} W D^{-1/2}`` symmetric, which is what
-lets ``cheb_cholesky`` factorize a row-standardized undirected ``W``.  It is
+lets ``chol_cheb`` factorize a row-standardized undirected ``W``.  It is
 also the routing predicate's applicability test (``_is_symmetric_W``), so an
 error here silently sends a Cholesky-capable problem down the LU path — or, far
 worse, lets a wrong ``W_sym`` through to CHOLMOD, which reads one triangle and

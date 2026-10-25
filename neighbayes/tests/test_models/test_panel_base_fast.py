@@ -260,7 +260,6 @@ class TestPanelInit:
             N=4,
             T=3,
             logdet_method="cheb",
-            logdet_decomp="eig",
         )
         assert "_W_eigs" not in model.__dict__
 
@@ -278,8 +277,7 @@ class TestPanelInit:
             W=W_graph,
             N=4,
             T=3,
-            logdet_method="exact",
-            logdet_decomp="eig",
+            logdet_method="eigenvalue",
         )
         assert "_W_eigs" not in model.__dict__
 

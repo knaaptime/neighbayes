@@ -14,9 +14,9 @@ import pytest
 from neighbayes._logdet._flow_resolvent import (
     FlowKron,
     flow_logdet_grad,
-    flow_logdet_grad_exact,
     flow_logdet_value,
 )
+from neighbayes.tests.helpers import flow_logdet_grad_exact
 
 
 def _directed_row_std(n, seed, density=0.06):

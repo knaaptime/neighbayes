@@ -12,14 +12,13 @@ import numpy as np
 import pytest
 
 from neighbayes._logdet._flow_kron_traces import FlowKronTraceLogdet
-from neighbayes._logdet._flow_resolvent import flow_logdet_grad_exact
 from neighbayes.models import SARNegBinFlow
 from neighbayes.samplers.gaussian import _flow_resolvent as fr
 from neighbayes.samplers.gaussian._flow_resolvent import (
     FlowResolventTarget,
     SEMFlowResolventTarget,
 )
-from neighbayes.tests.helpers import flow_form
+from neighbayes.tests.helpers import flow_form, flow_logdet_grad_exact
 
 sar_negbin_separable = flow_form(SARNegBinFlow, separable=True)
 
@@ -513,9 +512,7 @@ def test_separable_count_flow_log_abs_det_uses_closed_form(monkeypatch):
 
     W, _, X = _directed_flow_data(n=12, seed=4)
     y = np.random.default_rng(4).poisson(3.0, size=X.shape[0])
-    model = SARNegBinFlow(
-        y, X, W, separable=True, logdet_method="exact", logdet_decomp="eig"
-    )
+    model = SARNegBinFlow(y, X, W, separable=True, logdet_method="eigenvalue")
 
     def _no_resolvent(*args, **kwargs):
         raise AssertionError("separable class reached the resolvent route")

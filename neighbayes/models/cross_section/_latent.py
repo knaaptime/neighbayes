@@ -139,7 +139,7 @@ class LatentMixin:
         W, sized against the panel's ``T``-period Jacobian.
         """
         b = self._logdet_bounds
-        if b.method != "cheb_stochastic" or not self.logdet_adapt:
+        if b.method != "stoch_cheb" or not self.logdet_adapt:
             return None
         from ..._logdet._probe_check import WarmupProbes
 

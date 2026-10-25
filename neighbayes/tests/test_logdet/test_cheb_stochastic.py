@@ -15,7 +15,6 @@ from neighbayes._logdet._cheb_stochastic import (
     _power_traces,
     _probe_noise_rtol,
     cheb_stochastic_logdet_eval,
-    cheb_stochastic_logdet_eval_vec,
     cheb_stochastic_logdet_precompute,
     cheb_stochastic_order,
 )
@@ -263,7 +262,7 @@ class TestFactoryIntegration:
     def test_numpy_scalar_factory(self, small_W, small_eigs):
         """Factory should produce a working scalar evaluator."""
         fn = make_logdet_numpy_fn(
-            small_W, eigs=None, method="cheb_stochastic", rho_min=-0.95, rho_max=0.95
+            small_W, eigs=None, method="stoch_cheb", rho_min=-0.95, rho_max=0.95
         )
         rho = 0.5
         exact = np.sum(np.log(np.abs(1.0 - rho * small_eigs)))
@@ -273,7 +272,7 @@ class TestFactoryIntegration:
     def test_numpy_vectorized_factory(self, small_W, small_eigs):
         """Factory should produce a working vectorized evaluator."""
         fn = make_logdet_numpy_vec_fn(
-            small_W, eigs=None, method="cheb_stochastic", rho_min=-0.95, rho_max=0.95
+            small_W, eigs=None, method="stoch_cheb", rho_min=-0.95, rho_max=0.95
         )
         rho_arr = np.array([0.3, 0.5, 0.7, 0.9])
         result = fn(rho_arr)
@@ -283,17 +282,17 @@ class TestFactoryIntegration:
             assert abs(result[i] - exact) / abs(exact) < 0.05
 
     def test_auto_select(self):
-        """Past the Cholesky cutoff, auto-select should pick cheb_stochastic."""
+        """Past the Cholesky cutoff, auto-select should pick stoch_cheb."""
         from neighbayes._logdet import resolve_logdet_method
 
-        assert resolve_logdet_method(None, n=200000) == "cheb_stochastic"
+        assert resolve_logdet_method(None, n=200000) == "stoch_cheb"
 
     def test_eval_speed(self, small_W):
         """Eval should be O(20) Clenshaw, ~2μs per call."""
         import time
 
         fn = make_logdet_numpy_fn(
-            small_W, eigs=None, method="cheb_stochastic", rho_min=-0.95, rho_max=0.95
+            small_W, eigs=None, method="stoch_cheb", rho_min=-0.95, rho_max=0.95
         )
         # Warm up
         fn(0.5)
@@ -512,20 +511,19 @@ class TestExactMoments:
         exact = np.array([np.sum(np.log1p(-r * lam)) for r in rhos])
         rmse = {}
         for depth in (1, 2, 4):
-            errs = [
-                cheb_stochastic_logdet_eval_vec(
-                    cheb_stochastic_logdet_precompute(
-                        W,
-                        order=30,
-                        n_probes=12,
-                        n_exact=depth,
-                        rng=np.random.default_rng(s),
-                    ),
-                    rhos,
+            errs = []
+            for s in range(12):
+                pre = cheb_stochastic_logdet_precompute(
+                    W,
+                    order=30,
+                    n_probes=12,
+                    n_exact=depth,
+                    rng=np.random.default_rng(s),
                 )
-                - exact
-                for s in range(12)
-            ]
+                errs.append(
+                    np.array([cheb_stochastic_logdet_eval(pre, r) for r in rhos])
+                    - exact
+                )
             rmse[depth] = np.sqrt((np.array(errs) ** 2).mean(axis=0))
         assert np.all(rmse[2] < rmse[1])
         assert np.all(rmse[4] < rmse[2])

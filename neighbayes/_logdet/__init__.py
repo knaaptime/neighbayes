@@ -19,13 +19,10 @@ from ._aaa import (
 from ._cheb_stochastic import (
     ChebStochasticPrecompute,
     cheb_stochastic_logdet_eval,
-    cheb_stochastic_logdet_eval_vec,
     cheb_stochastic_logdet_precompute,
 )
-from ._chebyshev import chebyshev
 from ._chol_cheb import (
     CholChebPrecompute,
-    chol_cheb_logdet_eval,
     chol_cheb_logdet_eval_vec,
     chol_cheb_logdet_precompute,
 )
@@ -36,14 +33,12 @@ from ._config import (
     VALID_LOGDET_METHODS,
     LogdetBounds,
     LogDetMethod,
-    LogDetMethodName,
     logdet_key,
     logdet_label,
     resolve_logdet_bounds,
     resolve_logdet_method,
 )
 from ._factories import (
-    clear_logdet_fn_cache,
     get_cached_logdet_fn,
     make_logdet_fn,
     make_logdet_grad_numpy_fn,
@@ -62,13 +57,9 @@ from ._flow import (
 _FLOW_RESOLVENT_EXPORTS = frozenset(
     {
         "FlowKron",
-        "FlowKronJax",
         "flow_logdet_grad",
-        "flow_logdet_grad_exact",
-        "flow_logdet_grad_jax",
         "flow_logdet_value",
         "flow_logdet_value_and_grad",
-        "flow_logdet_value_and_grad_jax",
     }
 )
 
@@ -92,7 +83,6 @@ from ._resolvent import (
 __all__ = [
     # Config
     "LogDetMethod",
-    "LogDetMethodName",
     "LogdetBounds",
     "VALID_LOGDET_METHODS",
     "LOGDET_METHODS",
@@ -115,7 +105,6 @@ __all__ = [
     "make_logdet_grad_numpy_fn",
     "make_logdet_grad_numpy_vec_fn",
     "get_cached_logdet_fn",
-    "clear_logdet_fn_cache",
     # Resolvent trace / logdet gradient core
     "logdet_grad_eigenvalue",
     "logdet_grad_chebyshev",
@@ -126,14 +115,10 @@ __all__ = [
     # Flow resolvent-Kronecker gradient (scalable, eigenvalue-free)
     "FlowKron",
     "flow_logdet_grad",
-    "flow_logdet_grad_exact",
     "flow_logdet_value",
     "flow_logdet_value_and_grad",
-    # Chebyshev
-    "chebyshev",
     # Stochastic Chebyshev
     "ChebStochasticPrecompute",
     "cheb_stochastic_logdet_precompute",
     "cheb_stochastic_logdet_eval",
-    "cheb_stochastic_logdet_eval_vec",
 ]

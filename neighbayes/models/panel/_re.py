@@ -285,7 +285,7 @@ class _SARRandomEffects(_RandomEffectsMixin):
             self._logdet_bounds.rho_max,
         )
 
-        probes = self.logdet_adapt and self._logdet_bounds.method == "cheb_stochastic"
+        probes = self.logdet_adapt and self._logdet_bounds.method == "stoch_cheb"
         gibbs = GaussianSARREGibbs(
             y=self._y,
             X=self._X,
@@ -496,7 +496,7 @@ class _SEMRandomEffects(_RandomEffectsMixin):
             self._logdet_bounds.rho_max,
         )
 
-        probes = self.logdet_adapt and self._logdet_bounds.method == "cheb_stochastic"
+        probes = self.logdet_adapt and self._logdet_bounds.method == "stoch_cheb"
         gibbs = GaussianSEMREGibbs(
             y=self._y,
             X=self._X,

@@ -360,8 +360,7 @@ class TestResolventDirectEffects:
             y=np.zeros(n),
             X=X,
             W=_W_to_graph(W),
-            logdet_method="exact",
-            logdet_decomp="eig",
+            logdet_method="eigenvalue",
         )
         rho = np.linspace(-0.9, 0.9, 50)
         np.testing.assert_allclose(

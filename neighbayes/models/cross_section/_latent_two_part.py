@@ -215,7 +215,7 @@ class LatentTwoPartMixin:
         log-determinant is stochastic; parts on one W share one.
         """
         b = self._logdet_bounds
-        if b.method != "cheb_stochastic" or not self.logdet_adapt:
+        if b.method != "stoch_cheb" or not self.logdet_adapt:
             return None, None
         from ..._logdet._probe_check import WarmupProbes
 

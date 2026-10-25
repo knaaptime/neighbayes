@@ -16,6 +16,7 @@ import xarray as xr
 from libpysal.graph import Graph
 
 from neighbayes import dgp
+from neighbayes._logdet._chebyshev import chebyshev_coeffs_dct1
 
 # These helpers draw unit effects into dynamic panels (sigma_alpha), which the
 # public simulators refuse, so they call the private dynamic simulators.
@@ -806,3 +807,91 @@ def flow_form(cls, **design):
     make.__name__ = cls.__name__ + ("(separable)" if design.get("separable") else "")
     make.family = cls
     return make
+
+
+# ---------------------------------------------------------------------------
+# Log-determinant oracles: exact references the package itself no longer needs
+# ---------------------------------------------------------------------------
+
+
+def eigen_cheb_coeffs(
+    W,
+    order: int = 20,
+    rmin: float = -1.0,
+    rmax: float = 1.0,
+    eigs: np.ndarray | None = None,
+) -> dict:
+    """Chebyshev coefficients in ρ of log|I - ρW| from W's eigenvalues (a test oracle).
+
+    Near-minimax polynomial approximation over ``[rmin, rmax]``.
+
+    Parameters
+    ----------
+    W : array-like
+        Spatial weights matrix (dense or sparse).
+    order : int, default 20
+        Polynomial degree.  15–30 is usually sufficient.
+    rmin : float, default -1.0
+        Lower bound of the rho interval.
+    rmax : float, default 1.0
+        Upper bound of the rho interval.
+    eigs : np.ndarray, optional
+        Pre-computed eigenvalues of W (skips the O(n³) decomposition).
+
+    Returns
+    -------
+    dict
+        ``{"coeffs", "rmin", "rmax", "order", "method"}`` with ``method``
+        ``"eigenvalue"``.
+    """
+    if order <= 0:
+        raise ValueError("order must be positive.")
+    if rmax <= rmin:
+        raise ValueError("rmax must be greater than rmin.")
+
+    if eigs is not None:
+        eigs_arr = np.asarray(eigs, dtype=np.complex128)
+    else:
+        W_dense = W.toarray() if sp.issparse(W) else np.asarray(W, dtype=np.float64)
+        eigs_arr = np.linalg.eigvals(W_dense)
+
+    # Chebyshev nodes on [-1, 1], mapped to [rmin, rmax]
+    k = np.arange(1, order + 1)
+    nodes_cos = np.cos((2 * k - 1) * np.pi / (2 * order))
+    rho_nodes = 0.5 * (rmax - rmin) * nodes_cos + 0.5 * (rmax + rmin)
+
+    logdet_at_nodes = np.sum(
+        np.log(np.abs(1.0 - rho_nodes[:, None] * eigs_arr[None, :])), axis=1
+    ).real
+
+    # Chebyshev coefficients via DCT-I
+    coeffs = chebyshev_coeffs_dct1(logdet_at_nodes)
+
+    result = {
+        "coeffs": coeffs,
+        "rmin": rmin,
+        "rmax": rmax,
+        "order": order,
+        "method": "eigenvalue",
+    }
+
+    return result
+
+
+def flow_logdet_grad_exact(W, rho_d: float, rho_o: float, rho_w: float) -> np.ndarray:
+    r"""Exact ``∇_ρ log|I_N − W_F|`` from the spectrum of ``W`` (reference; small ``n``).
+
+    Uses the shared Kronecker eigenbasis: ``μ_ij = ρ_o λ_i + ρ_d λ_j + ρ_w λ_i λ_j``
+    and ``g_d = −Σ_ij λ_j/(1−μ_ij)`` etc.  Only for testing / small ``n`` — forms
+    the ``n`` eigenvalues of ``W`` (``O(n³)``), never the ``N×N`` matrix.
+    """
+    Wd = sp.csr_matrix(W).toarray()
+    lam = np.linalg.eigvals(Wd)
+    li = lam[:, None]
+    lj = lam[None, :]
+    mu = rho_o * li + rho_d * lj + rho_w * (li * lj)
+    inv = 1.0 / (1.0 - mu)
+    g_d = -np.sum(lj * inv).real
+    g_o = -np.sum(li * inv).real
+    g_w = -np.sum(li * lj * inv).real
+    return np.array([g_d, g_o, g_w], dtype=np.float64)

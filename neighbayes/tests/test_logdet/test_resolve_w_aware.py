@@ -1,7 +1,7 @@
 """Regression tests: logdet auto-selection must see W everywhere it is resolved.
 
-A directed (pattern-asymmetric) W must resolve to ``"aaa"`` — not the
-symmetric-only ``"cheb_cholesky"`` — in every resolution site: the model's
+A directed (pattern-asymmetric) W must resolve to ``"lu_aaa"`` — not the
+symmetric-only ``"chol_cheb"`` — in every resolution site: the model's
 ``_resolved_logdet_method`` and the method recorded on ``_logdet_bounds``,
 for both cross-sectional and panel models.
 """
@@ -35,8 +35,8 @@ def test_cross_section_directed_resolves_aaa():
     y = rng.normal(size=n)
 
     model = SAR(y=y, X=X, W=W)
-    assert model._resolved_logdet_method == "aaa"
-    assert model._logdet_bounds.method == "aaa"
+    assert model._resolved_logdet_method == "lu_aaa"
+    assert model._logdet_bounds.method == "lu_aaa"
 
 
 def test_panel_directed_resolves_aaa():
@@ -49,5 +49,5 @@ def test_panel_directed_resolves_aaa():
     y = rng.normal(size=N * T)
 
     model = SAR(y=y, X=X, W=W, N=N, T=T)
-    assert model._resolved_logdet_method == "aaa"
-    assert model._logdet_bounds.method == "aaa"
+    assert model._resolved_logdet_method == "lu_aaa"
+    assert model._logdet_bounds.method == "lu_aaa"

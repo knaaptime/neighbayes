@@ -358,7 +358,7 @@ def test_multilevel_sizes_one_pool_per_level(backend, monkeypatch):
     monkeypatch.setattr(
         ld,
         "resolve_logdet_bounds",
-        lambda method, **kw: resolve("cheb_stochastic", **kw),
+        lambda method, **kw: resolve("stoch_cheb", **kw),
     )
     d = dgp.simulate_multilevel(
         n_side=8,

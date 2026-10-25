@@ -90,9 +90,7 @@ class TestRecovery:
             chains=2,
             seed=0,
         )
-        m = SAR(
-            y=y, X=X, W=Wd, priors=_PRIORS, logdet_method="exact", logdet_decomp="eig"
-        )
+        m = SAR(y=y, X=X, W=Wd, priors=_PRIORS, logdet_method="eigenvalue")
         idata = m.fit(
             sampler="gibbs", draws=3000, tune=1000, chains=2, progressbar=False
         )
@@ -127,7 +125,7 @@ class TestSurrogateAgreesWithReference:
             X,
             W,
             _sar_priors(),
-            logdet_method="cheb_cholesky",
+            logdet_method="chol_cheb",
             rho_lower=0.0,
             rho_upper=0.95,
             **common,

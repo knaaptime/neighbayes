@@ -243,23 +243,24 @@ class Multilevel(SpatialModel):
         is its index ℓ in the notation and in the posterior names.
     priors : dict or MultilevelPriors, optional
         See :class:`~neighbayes.models.priors.MultilevelPriors`.
-    logdet_method : {"exact", "cheb", "aaa", "spline", "stochastic"}, optional
+    logdet_method : {"eigenvalue", "cheb", "aaa", "spline", "stochastic"}, optional
         The log-determinant at the units; upper levels choose their own.
-        How ``log|I - rho*W|`` is approximated over rho: evaluated exactly at
-        every rho, interpolated (Chebyshev, AAA rational, or cubic spline)
-        through exact values, or expanded stochastically with no
-        factorization.  ``None`` (default) selects from the size and symmetry
-        of ``W``: ``"exact"`` for ``n <= 500``; ``"aaa"`` up to
-        ``n = 60000`` (``NEIGHBAYES_LOGDET_FACTOR_MAX_N``) unless the
-        factorization's fill-in would dominate; ``"stochastic"`` beyond.
-    logdet_decomp : {"auto", "eig", "chol", "lu"}, default "auto"
-        What supplies the exact values: a dense eigendecomposition, a sparse
-        Cholesky (undirected ``W``; scikit-sparse CHOLMOD) or a sparse LU.
-        ``"auto"`` takes the first of ``"eig"`` (``n <= 500``,
-        ``NEIGHBAYES_LOGDET_EIGEN_MAX_N``), ``"chol"`` (undirected ``W``) and
-        ``"lu"`` that the method is implemented on.  Ignored by
-        ``"stochastic"``.  A pair with no implementation (``"spline"`` on
-        ``"chol"``, ``"exact"`` on ``"lu"``) raises.
+        How ``log|I - rho*W|`` is computed over rho: summed over the
+        eigenvalues of ``W``; interpolated (Chebyshev, AAA rational, or cubic
+        spline) through values from a sparse factorization, exact to the
+        interpolant's tolerance; or expanded stochastically with no
+        factorization, the one method with sampling error.  ``None`` (default)
+        selects from the size and symmetry of ``W``: ``"eigenvalue"`` for
+        ``n <= 500``; ``"aaa"`` up to ``n = 60000``
+        (``NEIGHBAYES_LOGDET_FACTOR_MAX_N``) unless the factorization's fill-in
+        would dominate; ``"stochastic"`` beyond.
+    logdet_decomp : {"auto", "chol", "lu"}, default "auto"
+        The factorization an interpolating method uses: sparse Cholesky
+        (undirected ``W``; scikit-sparse CHOLMOD) or sparse LU (KLU or UMFPACK,
+        chosen by the sparsity pattern).  ``"auto"`` takes ``"chol"`` where the
+        method has it and ``W`` is undirected, else ``"lu"``.  Ignored by
+        ``"eigenvalue"`` and ``"stochastic"``; ``"spline"`` on ``"chol"``
+        raises.
     logdet_adapt : bool, default True
         Halfway through Gibbs warmup, size each stochastic level's Hutchinson
         probes to the run, as :class:`~neighbayes.models.SAR` does; the pools
@@ -568,7 +569,7 @@ class Multilevel(SpatialModel):
             if r.process == "none":
                 continue
             b = self._level_bounds(ell)
-            if b.method == "cheb_stochastic":
+            if b.method == "stoch_cheb":
                 out[ell] = WarmupProbes(r.W, rho_min=b.rho_min, rho_max=b.rho_max)
         return out
 

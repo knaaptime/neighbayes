@@ -9,7 +9,7 @@ import pytest
 import scipy.sparse as sp
 
 import neighbayes._logdet._factories as fac
-from neighbayes._logdet import clear_logdet_fn_cache, make_logdet_jax_fn
+from neighbayes._logdet import make_logdet_jax_fn
 from neighbayes.tests.helpers import make_rook_W
 
 BACKENDS = ["numpy"] if sys.platform.startswith("win") else ["numpy", "jax"]
@@ -22,7 +22,8 @@ def W():
 
 @pytest.fixture
 def count_precomputes(monkeypatch):
-    clear_logdet_fn_cache()
+    fac._LOGDET_FN_CACHE.clear()
+    fac._CHEB_STOCHASTIC_COEFFS.clear()
     calls = []
     orig = fac.cheb_stochastic_logdet_precompute
 
@@ -32,7 +33,8 @@ def count_precomputes(monkeypatch):
 
     monkeypatch.setattr(fac, "cheb_stochastic_logdet_precompute", counted)
     yield calls
-    clear_logdet_fn_cache()
+    fac._LOGDET_FN_CACHE.clear()
+    fac._CHEB_STOCHASTIC_COEFFS.clear()
 
 
 def test_coefficients_are_computed_once_per_key(W, count_precomputes):
@@ -43,7 +45,8 @@ def test_coefficients_are_computed_once_per_key(W, count_precomputes):
     assert len(count_precomputes) == 2
     with pytest.raises(ValueError):
         first[0][0] = 0.0
-    clear_logdet_fn_cache()
+    fac._LOGDET_FN_CACHE.clear()
+    fac._CHEB_STOCHASTIC_COEFFS.clear()
     fac._cheb_stochastic_coeffs(W, -0.99, 0.99)
     assert len(count_precomputes) == 3
 
@@ -74,7 +77,7 @@ def test_looped_jax_evaluator_matches_the_unrolled_one(W):
     jax = pytest.importorskip("jax")
     from neighbayes._logdet._jax import jax_logdet_chebyshev
 
-    fn = make_logdet_jax_fn(W, method="cheb_stochastic", rho_min=-0.99, rho_max=0.99)
+    fn = make_logdet_jax_fn(W, method="stoch_cheb", rho_min=-0.99, rho_max=0.99)
     coeffs, lo, hi = fac._cheb_stochastic_coeffs(W, -0.99, 0.99)
 
     def unrolled(r):

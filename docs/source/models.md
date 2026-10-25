@@ -977,32 +977,31 @@ the term that makes large problems expensive. Two arguments of the **model**
 constructor (not of `fit()`) choose how it is computed, and both samplers
 honour them:
 
-- `logdet_method` is the approximation over ρ: `"exact"` evaluates it at every
-  ρ; `"cheb"`, `"aaa"` and `"spline"` interpolate exact values (Chebyshev, AAA
-  rational, cubic spline); `"stochastic"` is a stochastic Chebyshev expansion
-  (Han et al. 2015) that needs no factorization.
-- `logdet_decomp` is what supplies the exact values: `"eig"` (a dense
-  eigendecomposition), `"chol"` (sparse Cholesky through scikit-sparse's
-  CHOLMOD, for an undirected $W$) or `"lu"` (sparse LU by KLU or UMFPACK,
-  routed by the sparsity pattern, for any $W$).
-  `"auto"` takes the first of `"eig"` ($n \le 500$), `"chol"` (an undirected
-  $W$) and `"lu"` that the method is implemented on, so `"aaa"` at small $n$
-  takes `"chol"` and `"spline"` always takes `"lu"`. `"stochastic"` ignores it.
+- `logdet_method` is the method: `"eigenvalue"` sums over the eigenvalues of
+  $W$ from one dense eigendecomposition; `"cheb"`, `"aaa"` and `"spline"`
+  interpolate values from a sparse factorization (Chebyshev, AAA rational,
+  cubic spline), exact to the interpolant's tolerance; `"stochastic"` is a
+  stochastic Chebyshev expansion (Han et al. 2015) that needs no factorization
+  and is the one method with sampling error.
+- `logdet_decomp` is the factorization an interpolating method uses: `"chol"`
+  (sparse Cholesky through scikit-sparse's CHOLMOD, for an undirected $W$) or
+  `"lu"` (sparse LU by KLU or UMFPACK, routed by the sparsity pattern, for any
+  $W$). `"auto"` takes `"chol"` where the method has it and $W$ is undirected,
+  else `"lu"`; `"eigenvalue"` and `"stochastic"` ignore it.
 
-| `logdet_method` | `"eig"` | `"chol"` | `"lu"` |
-|---|---|---|---|
-| `"exact"` | ✅ the reference at small $n$ | ✅ one factorization per ρ | — |
-| `"cheb"` | ✅ | ✅ | ✅ |
-| `"aaa"` | — | ✅ | ✅ |
-| `"spline"` | — | — | ✅ |
+| `logdet_method` | `"chol"` | `"lu"` |
+|---|---|---|
+| `"cheb"` | ✅ | ✅ |
+| `"aaa"` | ✅ | ✅ |
+| `"spline"` | — | ✅ |
 
-Every pair except `"stochastic"` is exact up to its interpolation error; a pair
-marked — raises. Leaving both at their defaults auto-selects by size, by whether
-$W$ is undirected, and by how much fill-in a sparse factorization would incur:
+A pair marked — raises. Leaving both at their defaults auto-selects by size, by
+whether $W$ is undirected, and by how much fill-in a sparse factorization would
+incur:
 
 | $n$ | $W$ | Chosen | Why |
 |---|---|---|---|
-| ≤ 500 | any | `exact` on `eig` | one $O(n^3)$ eigendecomposition, then $O(n)$ per ρ — exact and cheap at this size |
+| ≤ 500 | any | `eigenvalue` | one $O(n^3)$ eigendecomposition, then $O(n)$ per ρ — exact and cheap at this size |
 | ≤ 60000 | undirected | `aaa` on `chol` | sparse Cholesky at adaptively chosen AAA support points; root-exponential convergence |
 | ≤ 60000 | directed | `aaa` on `lu` | the same rational scheme over sparse LU (KLU or UMFPACK) — k-nearest-neighbour, travel time, migration |
 | > 60000 | any | `stochastic` | no factorization, at the cost of stochastic error |

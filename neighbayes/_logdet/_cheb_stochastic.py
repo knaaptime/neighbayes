@@ -809,28 +809,6 @@ def cheb_stochastic_logdet_eval(pre: ChebStochasticPrecompute, rho: float) -> fl
     return float(val)
 
 
-def cheb_stochastic_logdet_eval_vec(
-    pre: ChebStochasticPrecompute, rho_arr: np.ndarray
-) -> np.ndarray:
-    """Vectorized evaluation over an array of ρ values.
-
-    Precomputes Chebyshev coefficients for each ρ, then evaluates via
-    matrix-vector product (coeffs @ moments).
-    """
-    rho_arr = np.asarray(rho_arr, dtype=np.float64)
-    n_rho = len(rho_arr)
-
-    # Build coefficient matrix: (n_rho, order+1)
-    all_coeffs = np.zeros((n_rho, pre.order + 1), dtype=np.float64)
-    for i in range(n_rho):
-        all_coeffs[i] = _log_cheb_coeffs(
-            rho_arr[i], pre.lam_min, pre.lam_max, pre.order
-        )
-
-    # logdet_i = Σ c_j · μ_j  (c₀ already includes /2 convention)
-    return all_coeffs @ pre.moments
-
-
 # ---------------------------------------------------------------------------
 # Probe pools: the probe count sized by the estimator's own spread
 # ---------------------------------------------------------------------------

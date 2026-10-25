@@ -70,9 +70,7 @@ class TestProbeCheckFit:
     def test_agrees_with_the_exact_logdet(self, data, backend, model_cls):
         import arviz as az
 
-        exact_idata, exact = _fit(
-            model_cls, data, backend, logdet_method="exact", logdet_decomp="eig"
-        )
+        exact_idata, exact = _fit(model_cls, data, backend, logdet_method="eigenvalue")
         idata, draws = _fit(
             model_cls,
             data,

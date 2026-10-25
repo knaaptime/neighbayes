@@ -26,7 +26,7 @@ only once and reused for all subsequent numeric factorizations via
 
 **When to use**: ``n ∈ (500, 60000]``, any ``ρ ∈ (-1, 1)``.  For ``n ≤ 500``
 use ``eigenvalue`` (exact eigendecomposition).  For ``n > 60000`` use
-``cheb_stochastic`` (avoids ``O(nnz^{1.5})`` Cholesky fill-in).  For
+``stoch_cheb`` (avoids ``O(nnz^{1.5})`` Cholesky fill-in).  For
 non-symmetric ``W`` (directed graphs: KNN, travel time) use ``aaa`` (rational
 approximation via sparse LU).
 
@@ -70,7 +70,7 @@ from ._chebyshev import (
     chebyshev_coeffs_dct1,
     chebyshev_gauss_nodes,
 )
-from ._clenshaw import clenshaw_scalar, clenshaw_vec
+from ._clenshaw import clenshaw_vec
 
 
 @dataclass(frozen=True)
@@ -454,21 +454,6 @@ def chol_cheb_logdet_precompute(
     return CholChebContext(W).coeffs_on(
         rho_min=rho_min, rho_max=rho_max, order=order, tol=tol
     )
-
-
-def chol_cheb_logdet_eval(pre: CholChebPrecompute, rho: float) -> float:
-    """Evaluate ``log|I - ρW|`` from precomputed Chebyshev coefficients.
-
-    Uses Clenshaw recurrence: ``O(order)`` per evaluation.
-
-    Parameters
-    ----------
-    pre : CholChebPrecompute
-        Precomputed coefficients from :func:`chol_cheb_logdet_precompute`.
-    rho : float
-        Spatial autoregressive parameter.
-    """
-    return clenshaw_scalar(pre.coeffs, rho, pre.rho_min, pre.rho_max)
 
 
 def chol_cheb_logdet_eval_vec(

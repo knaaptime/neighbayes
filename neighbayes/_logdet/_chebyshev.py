@@ -10,7 +10,6 @@ from __future__ import annotations
 import os
 
 import numpy as np
-import scipy.sparse as sp
 
 # ---------------------------------------------------------------------------
 # Chebyshev nodes, orders and coefficients
@@ -182,67 +181,3 @@ def chebyshev_coeffs_dct1(values: np.ndarray) -> np.ndarray:
             values * np.cos(j * (2 * k - 1) * np.pi / (2 * order))
         )
     return coeffs
-
-
-def chebyshev(
-    W,
-    order: int = 20,
-    rmin: float = -1.0,
-    rmax: float = 1.0,
-    eigs: np.ndarray | None = None,
-) -> dict:
-    """Compute Chebyshev approximation of log|I - ρW| (:cite:p:`pace2004ChebyshevApproximation`).
-
-    Near-minimax polynomial approximation over ``[rmin, rmax]``.
-
-    Parameters
-    ----------
-    W : array-like
-        Spatial weights matrix (dense or sparse).
-    order : int, default 20
-        Polynomial degree.  15–30 is usually sufficient.
-    rmin : float, default -1.0
-        Lower bound of the rho interval.
-    rmax : float, default 1.0
-        Upper bound of the rho interval.
-    eigs : np.ndarray, optional
-        Pre-computed eigenvalues of W (skips the O(n³) decomposition).
-
-    Returns
-    -------
-    dict
-        ``{"coeffs", "rmin", "rmax", "order", "method"}`` with ``method``
-        ``"eigenvalue"``.
-    """
-    if order <= 0:
-        raise ValueError("order must be positive.")
-    if rmax <= rmin:
-        raise ValueError("rmax must be greater than rmin.")
-
-    if eigs is not None:
-        eigs_arr = np.asarray(eigs, dtype=np.complex128)
-    else:
-        W_dense = W.toarray() if sp.issparse(W) else np.asarray(W, dtype=np.float64)
-        eigs_arr = np.linalg.eigvals(W_dense)
-
-    # Chebyshev nodes on [-1, 1], mapped to [rmin, rmax]
-    k = np.arange(1, order + 1)
-    nodes_cos = np.cos((2 * k - 1) * np.pi / (2 * order))
-    rho_nodes = 0.5 * (rmax - rmin) * nodes_cos + 0.5 * (rmax + rmin)
-
-    logdet_at_nodes = np.sum(
-        np.log(np.abs(1.0 - rho_nodes[:, None] * eigs_arr[None, :])), axis=1
-    ).real
-
-    # Chebyshev coefficients via DCT-I
-    coeffs = chebyshev_coeffs_dct1(logdet_at_nodes)
-
-    result = {
-        "coeffs": coeffs,
-        "rmin": rmin,
-        "rmax": rmax,
-        "order": order,
-        "method": "eigenvalue",
-    }
-
-    return result

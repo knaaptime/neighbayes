@@ -458,7 +458,7 @@ class TestVectorized:
 class TestFactory:
     def test_scalar_factory(self, small_symmetric_W, small_eigs):
         fn = make_logdet_numpy_fn(
-            small_symmetric_W, small_eigs, method="aaa", rho_min=0.1, rho_max=0.8
+            small_symmetric_W, small_eigs, method="lu_aaa", rho_min=0.1, rho_max=0.8
         )
         for rho in [0.2, 0.3, 0.5, 0.7]:
             exact = np.sum(np.log(np.abs(1.0 - rho * small_eigs)))
@@ -467,7 +467,7 @@ class TestFactory:
 
     def test_vec_factory(self, small_symmetric_W, small_eigs):
         fn = make_logdet_numpy_vec_fn(
-            small_symmetric_W, small_eigs, method="aaa", rho_min=0.1, rho_max=0.8
+            small_symmetric_W, small_eigs, method="lu_aaa", rho_min=0.1, rho_max=0.8
         )
         rhos = np.linspace(0.15, 0.75, 40)
         vals = fn(rhos)
@@ -479,7 +479,7 @@ class TestFactory:
         n = small_nonsymmetric_W.shape[0]
         eigs = np.linalg.eigvals(small_nonsymmetric_W.toarray())
         fn = make_logdet_numpy_fn(
-            small_nonsymmetric_W, eigs, method="aaa", rho_min=0.1, rho_max=0.8
+            small_nonsymmetric_W, eigs, method="lu_aaa", rho_min=0.1, rho_max=0.8
         )
         for rho in [0.2, 0.5]:
             exact = np.sum(np.log(np.abs(1.0 - rho * eigs)))
@@ -488,7 +488,12 @@ class TestFactory:
 
     def test_factory_T(self, small_symmetric_W, small_eigs):
         fn = make_logdet_numpy_fn(
-            small_symmetric_W, small_eigs, method="aaa", rho_min=0.1, rho_max=0.8, T=3
+            small_symmetric_W,
+            small_eigs,
+            method="lu_aaa",
+            rho_min=0.1,
+            rho_max=0.8,
+            T=3,
         )
         rho = 0.5
         exact = 3.0 * np.sum(np.log(np.abs(1.0 - rho * small_eigs)))

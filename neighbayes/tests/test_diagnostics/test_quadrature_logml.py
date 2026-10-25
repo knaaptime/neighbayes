@@ -36,7 +36,7 @@ def _make(name, y, X, G):
     Model = MODELS[name]
     if name in ("OLS", "SLX"):
         return Model(y=y, X=X, W=G)
-    return Model(y=y, X=X, W=G, logdet_method="exact", logdet_decomp="eig")
+    return Model(y=y, X=X, W=G, logdet_method="eigenvalue")
 
 
 def _brute_force_logml(model):

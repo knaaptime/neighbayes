@@ -289,7 +289,7 @@ def run_chain_blackjax_gaussian(
     then NUTS for ``draws``.  Returns constrained draws and per-draw NUTS
     diagnostics.
 
-    ``logdet_method`` is the internal logdet key ("eigenvalue", "cheb_cholesky",
+    ``logdet_method`` is the internal logdet key ("eigenvalue", "chol_cheb",
     "chol_aaa", ...) that the public method and decomposition resolve to; ``eigs`` (if given) is passed through so the eigenvalue method
     skips its own eigendecomposition.  ``rho_lower/rho_upper`` default to the
     priors' bounds.

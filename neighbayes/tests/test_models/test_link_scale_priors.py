@@ -130,8 +130,7 @@ def test_nb_flow_nuts_and_gibbs_resolve_the_same_priors(monkeypatch):
         d["X"],
         d["G"],
         separable=True,
-        logdet_method="exact",
-        logdet_decomp="eig",
+        logdet_method="eigenvalue",
     )
     pv = m._flow_count_priors()
     np.testing.assert_allclose(pv["beta_sigma"][1:], 2.5 / m._X[:, 1:].std(0))

@@ -99,7 +99,7 @@ class TestAdequacy:
             (np.ones(n * k), (np.repeat(np.arange(n), k), idx.ravel())), shape=(n, n)
         )
         W = sp.csr_matrix(sp.diags(1.0 / np.asarray(A.sum(axis=1)).ravel()) @ A)
-        knn = LogdetRefitter(W, "aaa")
+        knn = LogdetRefitter(W, "lu_aaa")
         pre = knn.aaa_fit(-0.99, 0.99, AAA_PILOT_NODES)
         assert knn.aaa_adequate(pre, (0.4, 0.6))[0]
         assert knn.left_singularity().real <= -1.0

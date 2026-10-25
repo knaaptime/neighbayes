@@ -146,7 +146,7 @@ def _require_separable_logdet(model) -> None:
         raise RuntimeError(
             f"{type(model).__name__}(separable=True) requires precomputed logdet "
             "data; initialize with a separable logdet_method (None/auto, "
-            "eigenvalue, chebyshev, cheb_cholesky, aaa, or cheb_stochastic)."
+            "eigenvalue, cheb, aaa, spline, or stochastic)."
         )
 
 

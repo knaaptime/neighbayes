@@ -319,6 +319,11 @@ def run_chains_chunked(
         Keys advance only on sweeps that run, so the split chunk leaves the
         draws of a hook that substitutes nothing unchanged.
 
+    Inside :func:`neighbayes.config.checkpoints` the run is saved to disk at
+    chunk boundaries and resumed from there when started again with the same
+    inputs (:mod:`._checkpoint`); a resumed run returns the draws of an
+    uninterrupted one.
+
     Returns
     -------
     states : list of pytree
@@ -359,9 +364,54 @@ def run_chains_chunked(
             states[c] = out[c][0][0]
         return [o[0][1] for o in out], [o[1] for o in out]
 
+    from ._checkpoint import RunCheckpoint
     from ._progress import GibbsProgressBarManager
 
+    hook = on_warmup_midpoint
+    midpoint = tune // 2 if hook is not None and tune >= 2 else None
+    ckpt = RunCheckpoint.for_run(
+        sweep_key=_sweep_key(owner),
+        lengths=(chains, tune, draws, chunk_len, midpoint is not None),
+        trees=(states, list(warm_keys), list(draw_keys), consts),
+    )
+    phase, done, keys = "warmup", 0, list(warm_keys)
+    kept = []  # per chunk, per chain: the kept trace leaves, cut to n_active
     parts = []  # per chunk, per chain: the trace pytree cut to n_active sweeps
+    midpoint_input = None  # what the hook was given, once it has run
+    saved = None if ckpt is None else ckpt.load()
+    if saved is not None:
+        import jax.numpy as jnp
+
+        phase, done, kept, parts = (
+            saved["phase"],
+            saved["done"],
+            saved["kept"],
+            saved["parts"],
+        )
+        keys = [jnp.asarray(k) for k in saved["keys"]]
+        states[:] = [jax.tree_util.tree_map(jnp.asarray, st) for st in saved["states"]]
+        midpoint_input = saved["midpoint_input"]
+        if midpoint_input is not None:
+            # Replay the adaptation for the consts it substituted and the
+            # hook's own state; the saved chain states already carry it.
+            midpoint = None
+            update = hook.adapt(midpoint_input, draws=draws, chains=chains)
+            if update is not None and update.consts is not None:
+                _, consts = _substitute(
+                    MidpointUpdate(consts=update.consts), states, consts
+                )
+
+    def checkpoint():
+        if ckpt is not None:
+            ckpt.save(
+                phase=phase,
+                done=done,
+                keys=keys,
+                states=states,
+                kept=kept,
+                midpoint_input=midpoint_input,
+            )
+
     with GibbsProgressBarManager(
         chains=chains,
         draws=draws,
@@ -376,56 +426,55 @@ def run_chains_chunked(
             for c in range(chains):
                 pm.update(c, sweep_index, tuning=tuning)
 
-        hook = on_warmup_midpoint
-        midpoint = tune // 2 if hook is not None and tune >= 2 else None
-        kept = []  # per chunk, per chain: the kept trace leaves, cut to n_active
-        keys = list(warm_keys)
-        done = 0
-        while done < tune:
-            stop = midpoint if midpoint is not None else tune
-            n_active = min(chunk_len, stop - done)
-            keys, chunk_traces = _advance(keys, n_active, True)
-            if midpoint is not None:
-                kept.append(
-                    [
-                        jax.tree_util.tree_map(
-                            lambda a: np.asarray(a)[:n_active], hook.keep(t)
-                        )
-                        for t in chunk_traces
-                    ]
-                )
-            done += n_active
-            report(done - 1, True)
-            if midpoint is not None and done == midpoint:
-                per_chain = [
-                    jax.tree_util.tree_map(
-                        lambda *xs: np.concatenate(xs), *[k[c] for k in kept]
+        if phase == "warmup":
+            while done < tune:
+                stop = midpoint if midpoint is not None else tune
+                n_active = min(chunk_len, stop - done)
+                keys, chunk_traces = _advance(keys, n_active, True)
+                if midpoint is not None:
+                    kept.append(
+                        [
+                            jax.tree_util.tree_map(
+                                lambda a: np.asarray(a)[:n_active], hook.keep(t)
+                            )
+                            for t in chunk_traces
+                        ]
                     )
-                    for c in range(chains)
-                ]
-                update = hook.adapt(
-                    jax.tree_util.tree_map(lambda *xs: np.stack(xs), *per_chain),
-                    draws=draws,
-                    chains=chains,
-                )
-                kept, midpoint = [], None
-                if update is not None:
-                    states[:], consts = _substitute(update, states, consts)
+                done += n_active
+                report(done - 1, True)
+                if midpoint is not None and done == midpoint:
+                    per_chain = [
+                        jax.tree_util.tree_map(
+                            lambda *xs: np.concatenate(xs), *[k[c] for k in kept]
+                        )
+                        for c in range(chains)
+                    ]
+                    midpoint_input = jax.tree_util.tree_map(
+                        lambda *xs: np.stack(xs), *per_chain
+                    )
+                    update = hook.adapt(midpoint_input, draws=draws, chains=chains)
+                    kept, midpoint = [], None
+                    if update is not None:
+                        states[:], consts = _substitute(update, states, consts)
+                checkpoint()
+            phase, done, keys = "draws", 0, list(draw_keys)
 
-        keys = list(draw_keys)
-        done = 0
         while done < draws:
             n_active = min(chunk_len, draws - done)
             keys, chunk_traces = _advance(keys, n_active, False)
-            parts.append(
-                [
-                    jax.tree_util.tree_map(lambda a: np.asarray(a)[:n_active], t)
-                    for t in chunk_traces
-                ]
-            )
+            part = [
+                jax.tree_util.tree_map(lambda a: np.asarray(a)[:n_active], t)
+                for t in chunk_traces
+            ]
+            parts.append(part)
             done += n_active
             report(tune + done - 1, False)
+            if ckpt is not None:
+                ckpt.add_draws(part)
+            checkpoint()
 
+    if ckpt is not None:
+        ckpt.finish()
     if not parts:
         return states, jax.tree_util.tree_map(
             lambda a: np.zeros((chains, 0) + a.shape, a.dtype), trace_avals
@@ -440,6 +489,19 @@ def run_chains_chunked(
 #: One sweep per structure key, shared by every fit of that structure; each
 #: carries its compiled chunks (see :func:`run_chains_chunked`).
 _SWEEPS: dict = {}
+
+
+def _sweep_key(sweep) -> str:
+    """A name for ``sweep`` that is the same in every process.
+
+    Its :func:`cached_sweep` key, which fixes everything it closes over, or
+    else its qualified name.  A key holding an object identity differs between
+    processes, so a checkpointed run of that sweep starts afresh.
+    """
+    for key, value in _SWEEPS.items():
+        if value is sweep:
+            return repr(key)
+    return f"{sweep.__module__}.{sweep.__qualname__}"
 
 
 def cached_sweep(key, build):

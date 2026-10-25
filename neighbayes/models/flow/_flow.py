@@ -474,9 +474,7 @@ class FlowModel(FlowSharedMethods, SpatialModel):
         elif self._flow_filter == "separable" and self.logdet_method != "none":
             from ..._logdet._config import logdet_key, resolve_logdet_method
 
-            key = logdet_key(
-                self.logdet_method, self.logdet_decomp, n=self._n, W=self._W_sparse
-            )
+            key = logdet_key(self.logdet_method, self.logdet_decomp, W=self._W_sparse)
             self._separable_logdet_fn = make_flow_separable_logdet(
                 self._W_sparse,
                 self._n,
@@ -944,7 +942,7 @@ class FlowModel(FlowSharedMethods, SpatialModel):
             raise RuntimeError(
                 "Missing separable numeric logdet evaluator. "
                 "Initialize with a separable logdet_method (None/auto, "
-                "eigenvalue, chebyshev, cheb_cholesky, aaa, or cheb_stochastic)."
+                "eigenvalue, cheb, aaa, spline, or stochastic)."
             )
         d, o = self._spatial_draws(posterior, "do")
         return self._flow_jacobian(

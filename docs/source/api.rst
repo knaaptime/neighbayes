@@ -417,3 +417,19 @@ Graph Utilities
    od_weights
 
 
+
+
+Runtime Configuration
+---------------------
+
+Opt-in helpers that change how fits run, not what they estimate: a persistent
+compile cache, and on-disk checkpoints that let a long JAX Gibbs fit resume
+after a crash with the draws it would have returned uninterrupted.
+
+.. currentmodule:: neighbayes.config
+
+.. autosummary::
+   :toctree: generated/
+
+   checkpoints
+   enable_compile_cache

@@ -555,7 +555,7 @@ ABS_TOL_SIGMA = 0.35
 class TestSARFlowSeparableLogdetMethods:
     """SARFlowSeparable fits without error for each logdet method."""
 
-    @pytest.fixture(params=[("exact", "eig"), ("cheb", "eig")], scope="class")
+    @pytest.fixture(params=[("eigenvalue", "auto"), ("cheb", "auto")], scope="class")
     def fitted_model(self, request):
         from neighbayes.dgp import simulate_sar_flow
 
