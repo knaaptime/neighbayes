@@ -1,6 +1,6 @@
 r"""JAX port of the structured separable NB flow sampler (cross-section and panel).
 
-Same sweep as :mod:`._flow_structured` — ω → ρ_d → ρ_o (rank-one block ``β_c``
+Same sweep as :mod:`._flow_structured` — ω → ρ_d → ρ_o (every coefficient
 integrated out) → β jointly → α — with every block compiled into one XLA program
 per chunk of sweeps and the chains run thread-per-chain through
 :func:`.._utils._jax_utils.run_chains_chunked`.
@@ -142,7 +142,6 @@ def _structured_fns(n, T, k, cc_t, fc_t, n_keys, n_obs, lu_solve, has_alpha_fixe
 
     def bind(data):
         mu0_j, prec0_j = data["mu0"], data["prec0"]
-        mu_c, prec_c = mu0_j[cc], prec0_j[cc]
         rho_lo, rho_hi = data["rho_lo"], data["rho_hi"]
         alpha_sigma, alpha_nu = data["alpha_sigma"], data["alpha_nu"]
         alpha_fixed = data["alpha_fixed"] if has_alpha_fixed else None
@@ -198,28 +197,6 @@ def _structured_fns(n, T, k, cc_t, fc_t, n_keys, n_obs, lu_solve, has_alpha_fixe
             v = jnp.sum(Ac * ((Om * R) @ Bc), axis=0)
             return M, v
 
-        def rho_log_density(Om_all, Z_all, eta_f, A, B):
-            """``log p(ρ | ω, α, β_full, y)`` with ``β_c`` integrated out."""
-
-            def period(t):
-                R = Z_all[t] - eta_f[key_of_t[t]]
-                if k_c:
-                    Ac, Bc = A[:, ui[t]], B[:, vi[t]]
-                    R = R - (Ac * mu_c) @ Bc.T
-                    M, v = cheap_terms(Om_all[t], R, Ac, Bc, B, t)
-                else:
-                    M, v = jnp.zeros((0, 0)), jnp.zeros(0)
-                return M, v, jnp.sum(Om_all[t] * R * R)
-
-            M, v, quad = jax.lax.map(period, period_idx)
-            quad = quad.sum()
-            if not k_c:
-                return -0.5 * quad
-            L = jnp.linalg.cholesky(jnp.diag(prec_c) + M.sum(0))
-            w = solve_triangular(L, v.sum(0), lower=True)
-            val = -jnp.sum(jnp.log(jnp.diag(L))) - 0.5 * (quad - w @ w)
-            return jnp.where(jnp.isfinite(val), val, -jnp.inf)
-
         def beta_gram(Om_all, Z_all, Ufull, A, B):
             """``G = Σ_t U_tᵀΩ_tU_t`` and ``h = Σ_t U_tᵀΩ_t z_t``."""
 
@@ -247,6 +224,20 @@ def _structured_fns(n, T, k, cc_t, fc_t, n_keys, n_obs, lu_solve, has_alpha_fixe
 
             G, h = jax.lax.map(period, period_idx)
             return G.sum(0), h.sum(0)
+
+        def rho_log_density(Om_all, Z_all, Ufull, A, B):
+            """``log p(ρ | ω, α, y)``, every coefficient integrated out.
+
+            ``−½ log|M| − ½ (rᵀΩr − vᵀM⁻¹v)`` with ``r = z − Uμ₀``,
+            ``M = G + P₀``, ``v = h − Gμ₀`` (see :mod:`._flow_structured`).
+            """
+            G, h = beta_gram(Om_all, Z_all, Ufull, A, B)
+            v = h - G @ mu0_j
+            quad = jnp.sum(Om_all * Z_all * Z_all) - 2.0 * mu0_j @ h + mu0_j @ G @ mu0_j
+            L = jnp.linalg.cholesky(G + jnp.diag(prec0_j))
+            w = solve_triangular(L, v, lower=True)
+            val = -jnp.sum(jnp.log(jnp.diag(L))) - 0.5 * (quad - w @ w)
+            return jnp.where(jnp.isfinite(val), val, -jnp.inf)
 
         def eta_of(beta, Ufull, A, B):
             eta_key = key_arrays(key_coefs(beta[fc]), Ufull)
@@ -295,25 +286,24 @@ def _structured_fns(n, T, k, cc_t, fc_t, n_keys, n_obs, lu_solve, has_alpha_fixe
             )
             Om_all = omega.reshape(T, n, n)
             Z_all = (0.5 * (y_j - alpha) / omega + jnp.log(alpha)).reshape(T, n, n)
-            B_keys = key_arrays(key_coefs(beta[fc]), F)
 
-            # ρ_d: origin side fixed at ρ_o
-            P, A_fix = solve_left(ro, B_keys, U)
+            # ρ_d: origin side fixed at ρ_o, every coefficient integrated out
+            P, A_fix = solve_left(ro, F, U)
 
             def ld_d(rv):
-                eta_f, Bv = solve_right(rv, P, V)
-                return rho_log_density(Om_all, Z_all, eta_f, A_fix, Bv)
+                Uf, Bv = solve_right(rv, P, V)
+                return rho_log_density(Om_all, Z_all, Uf, A_fix, Bv)
 
             rd, _, sl_d, sr_d = jax_slice_sample_1d(
                 ld_d, rd, rho_lo, rho_hi, key=k_d, w=w_d, return_steps=True
             )
 
             # ρ_o: destination side fixed at the new ρ_d
-            P, B_fix = solve_right(rd, B_keys, V)
+            P, B_fix = solve_right(rd, F, V)
 
             def ld_o(rv):
-                eta_f, Av = solve_left(rv, P, U)
-                return rho_log_density(Om_all, Z_all, eta_f, Av, B_fix)
+                Uf, Av = solve_left(rv, P, U)
+                return rho_log_density(Om_all, Z_all, Uf, Av, B_fix)
 
             ro, _, sl_o, sr_o = jax_slice_sample_1d(
                 ld_o, ro, rho_lo, rho_hi, key=k_o, w=w_o, return_steps=True

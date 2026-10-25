@@ -3,8 +3,8 @@
 The structured sampler never forms ``U = A⁻¹X`` (``n² × k``): rank-one design
 columns stay rank one and full-rank columns are ``n × n`` two-sided solves.
 These tests build ``U`` densely from ``A = L_o ⊗ L_d`` on a small grid and check
-that the ρ log-density (rank-one block integrated out) and the β-conditional
-moments computed from structured parts match it exactly.
+that the ρ log-density (every coefficient integrated out) and the
+β-conditional moments computed from structured parts match it exactly.
 """
 
 from __future__ import annotations
@@ -62,36 +62,32 @@ def test_design_classification():
         np.testing.assert_array_equal(Y.ravel(), X[:, c])
 
 
+def _dense_marginal(U, omega, z, mu0, prec0):
+    """β ~ N(μ₀, diag(1/prec₀)) integrated out of N(z | Uβ, Ω⁻¹), densely."""
+    r = z - U @ mu0
+    M = U.T @ (omega[:, None] * U) + np.diag(prec0)
+    v = U.T @ (omega * r)
+    return -0.5 * np.linalg.slogdet(M)[1] - 0.5 * (
+        r @ (omega * r) - v @ np.linalg.solve(M, v)
+    )
+
+
 @pytest.mark.parametrize("rd, ro", [(0.3, 0.2), (-0.4, 0.5), (0.0, 0.0)])
 def test_rho_density_matches_dense(rd, ro):
     rng, W, n, X, omega, z = _setup(1)
     s = classify_flow_design(X, n)
-    cc, fc = s.cheap_cols, s.full_cols
-    beta_full = rng.standard_normal(len(fc))
-    mu_c = rng.standard_normal(len(cc))
-    prec_c = rng.uniform(0.5, 2.0, len(cc))
-
-    # Structured: L_o⁻¹ B_full L_d⁻ᵀ and transformed rank-one factors.
+    mu0 = rng.standard_normal(s.k)
+    prec0 = rng.uniform(0.5, 2.0, s.k)
     Lo, Ld = (
         _FilterSolver(sp.csc_matrix(W)).at(ro),
         _FilterSolver(sp.csc_matrix(W)).at(rd),
     )
-    B_full = sum(b * s.F[i] for b, i in zip(beta_full, s.f_idx[0]))
-    eta_full = Ld.solve(Lo.solve(B_full).T).T
+    Ufull = [Ld.solve(Lo.solve(F).T).T for F in s.F]
     Om, Z = omega.reshape(n, n), z.reshape(n, n)
     got = _rho_log_density(
-        [Om], [Z - eta_full], Lo.solve(s.U), Ld.solve(s.V), s, mu_c, prec_c
+        [Om], [Z], Lo.solve(s.U), Ld.solve(s.V), Ufull, s, mu0, prec0
     )
-
-    # Dense: β_c ~ N(μ_c, diag(1/prec_c)) integrated out of N(z | Uβ, Ω⁻¹).
-    U = _dense_U(W, n, rd, ro, X)
-    Uc = U[:, cc]
-    r = z - U[:, fc] @ beta_full - Uc @ mu_c
-    M = Uc.T @ (omega[:, None] * Uc) + np.diag(prec_c)
-    v = Uc.T @ (omega * r)
-    want = -0.5 * np.linalg.slogdet(M)[1] - 0.5 * (
-        r @ (omega * r) - v @ np.linalg.solve(M, v)
-    )
+    want = _dense_marginal(_dense_U(W, n, rd, ro, X), omega, z, mu0, prec0)
     np.testing.assert_allclose(got, want, rtol=1e-10, atol=1e-10)
 
 
@@ -164,31 +160,17 @@ def test_panel_rho_density_and_beta_gram_match_dense():
     T = 3
     rng, W, n, X, omega, z = _panel_setup(T)
     s = classify_flow_design(X, n, T)
-    cc, fc = s.cheap_cols, s.full_cols
     rd, ro = 0.3, -0.25
-    beta_full = rng.standard_normal(len(fc))
-    mu_c = rng.standard_normal(len(cc))
-    prec_c = rng.uniform(0.5, 2.0, len(cc))
+    mu0 = rng.standard_normal(s.k)
+    prec0 = rng.uniform(0.5, 2.0, s.k)
     Lo = _FilterSolver(sp.csc_matrix(W)).at(ro)
     Ld = _FilterSolver(sp.csc_matrix(W)).at(rd)
     A, B = Lo.solve(s.U), Ld.solve(s.V)
     Ufull = [Ld.solve(Lo.solve(F).T).T for F in s.F]
     Oms, Zs = omega.reshape(T, n, n), z.reshape(T, n, n)
-    eta_full = [
-        sum(b * Ufull[i] for b, i in zip(beta_full, s.f_idx[t])) for t in range(T)
-    ]
-    got = _rho_log_density(
-        list(Oms), [Zs[t] - eta_full[t] for t in range(T)], A, B, s, mu_c, prec_c
-    )
-
+    got = _rho_log_density(list(Oms), list(Zs), A, B, Ufull, s, mu0, prec0)
     U = _dense_panel_U(W, n, T, rd, ro, X)
-    Uc = U[:, cc]
-    r = z - U[:, fc] @ beta_full - Uc @ mu_c
-    M = Uc.T @ (omega[:, None] * Uc) + np.diag(prec_c)
-    v = Uc.T @ (omega * r)
-    want = -0.5 * np.linalg.slogdet(M)[1] - 0.5 * (
-        r @ (omega * r) - v @ np.linalg.solve(M, v)
-    )
+    want = _dense_marginal(U, omega, z, mu0, prec0)
     np.testing.assert_allclose(got, want, rtol=1e-10, atol=1e-10)
 
     G, h = _beta_gram(list(Oms), list(Zs), A, B, Ufull, s)
@@ -211,7 +193,6 @@ def test_jax_kernels_match_dense(T):
     ensure_x64()
     rng, W, n, X, omega, z = _panel_setup(T, seed=7)
     s = classify_flow_design(X, n, T)
-    cc, fc = s.cheap_cols, s.full_cols
     k = s.k
     mu0 = rng.standard_normal(k)
     sd0 = rng.uniform(0.7, 1.5, k)
@@ -228,26 +209,14 @@ def test_jax_kernels_match_dense(T):
     )
     kern = sweep.kernels
     rd, ro = 0.3, -0.25
-    beta_full = rng.standard_normal(len(fc))
     Oms, Zs = jnp.asarray(omega.reshape(T, n, n)), jnp.asarray(z.reshape(T, n, n))
-
-    # ρ_d candidate, as the sweep builds it: B_key → L_o⁻¹ B_key → · L_d⁻ᵀ
-    keys = sorted({tuple(int(i) for i in s.f_idx[t]) for t in range(T)})
-    B_keys = jnp.asarray(
-        np.stack([sum(b * s.F[i] for b, i in zip(beta_full, key)) for key in keys])
-    )
-    P, A = kern["solve_left"](ro, B_keys, jnp.asarray(s.U))
-    eta_f, B = kern["solve_right"](rd, P, jnp.asarray(s.V))
-    got = float(kern["rho_log_density"](Oms, Zs, eta_f, A, B))
-
     U = _dense_panel_U(W, n, T, rd, ro, X)
-    Uc = U[:, cc]
-    r = z - U[:, fc] @ beta_full - Uc @ mu0[cc]
-    M = Uc.T @ (omega[:, None] * Uc) + np.diag(1 / sd0[cc] ** 2)
-    v = Uc.T @ (omega * r)
-    want = -0.5 * np.linalg.slogdet(M)[1] - 0.5 * (
-        r @ (omega * r) - v @ np.linalg.solve(M, v)
-    )
+
+    # ρ_d candidate, as the sweep builds it: F → L_o⁻¹ F → · L_d⁻ᵀ
+    P, A = kern["solve_left"](ro, jnp.asarray(np.stack(s.F)), jnp.asarray(s.U))
+    Uf, B = kern["solve_right"](rd, P, jnp.asarray(s.V))
+    got = float(kern["rho_log_density"](Oms, Zs, Uf, A, B))
+    want = _dense_marginal(U, omega, z, mu0, 1 / sd0**2)
     np.testing.assert_allclose(got, want, rtol=1e-10, atol=1e-10)
 
     half, A = kern["solve_left"](ro, jnp.asarray(np.stack(s.F)), jnp.asarray(s.U))

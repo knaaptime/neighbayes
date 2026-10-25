@@ -43,16 +43,15 @@ class FlowSharedMethods:
         """The unrestricted flow log-determinant the resolvent sampler runs.
 
         ``"kron_traces"`` for the exact trace series (``logdet_method=
-        "trace_series"``, or ``None`` with an undirected ``W``), else the
-        resolvent estimator on ``"jax"`` or ``"numpy"`` (``backend``; ``"auto"``
-        takes JAX when it is installed).
+        "trace_series"`` or ``None``; a directed ``W``'s falls back on the
+        resolvent estimator near the stability wall), else the resolvent
+        estimator on ``"jax"`` or ``"numpy"`` (``backend``; ``"auto"`` takes JAX
+        when it is installed).
         """
-        from ..._logdet._config import _is_symmetric_W
-
         backend = select_backend("gibbs", backend, sample_kwargs)
         method = self.logdet_method
         if method is None:
-            method = "trace_series" if _is_symmetric_W(self._W_sparse) else "resolvent"
+            method = "trace_series"
         if method == "trace_series":
             return "kron_traces"
         if backend == "auto":

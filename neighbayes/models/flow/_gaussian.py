@@ -64,9 +64,10 @@ class _ResolventFit:
         Parameters
         ----------
         sampler : {"gibbs", "nuts", None}, default None
-            ``"gibbs"`` (the default) runs the resolvent-gradient sampler, MALA
-            on the spatial parameters within conjugate Gibbs for ``β, σ²``,
-            whose accuracy improves with the flow sample size ``N``;
+            ``"gibbs"`` (the default) runs the resolvent-gradient sampler:
+            MALA with a Laplace metric on the spatial parameters given ``σ²``,
+            ``β`` integrated out, then conjugate Gibbs for ``β, σ²``; its
+            accuracy improves with the flow sample size ``N``;
             ``"nuts"`` runs PyMC.  ``robust=True`` takes NUTS.
         backend : str, optional
             For Gibbs, what runs the resolvent estimator of the

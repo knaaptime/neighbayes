@@ -417,6 +417,13 @@ class CountPanelFEMixin:
             model_type=model_type,
             timeout=None,
         )
+        from ...samplers.negbin_reduced._core import warn_pg_information
+
+        warn_pg_information(
+            [r["pg_information_ratio"] for r in results],
+            float(np.median([r["alpha"][0] for r in results])),
+            float(np.mean(y)),
+        )
         names = list(filt.names)
         if separable_flow:
             for r in results:

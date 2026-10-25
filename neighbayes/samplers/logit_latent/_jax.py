@@ -137,6 +137,10 @@ def _latent_data(y, X, W, priors, ld_params, sign=None, unit_effects=None):
         "lo": jnp.float64(priors.rho_lower),
         "hi": jnp.float64(priors.rho_upper),
         "logdet": ld_params,
+        # The scale move's draw is a gamma when the prior means are zero.
+        "scale_gamma": jnp.asarray(
+            not np.any(b0) and (fx is None or float(fx.mu) == 0.0)
+        ),
     }
 
 
@@ -342,10 +346,10 @@ def _make_sweep(
         beta = mean + jax.scipy.linalg.solve_triangular(
             L.T, jax.random.normal(k_beta, (k,)), lower=False
         )
-        new = {"par": par, "beta": beta, "ystar": ystar, "m": m, "slice_width": width}
+        new = {"par": par, "slice_width": width, "m": m}
         if mixed:
             new["pneg"] = pneg
-        draws = (par, beta)
+        offset = 0.0
         if effects:
             # The unit effects given the scales, then their sd.
             grp, mu, sig = d["group"], d["c_mu"], st["sigma_c"]
@@ -374,8 +378,48 @@ def _make_sweep(
                 key=jax.random.fold_in(k_beta, 2),
                 w=0.5,
             )
-            new["c"], new["sigma_c"] = c, jnp.exp(ls)
-            draws = draws + (c, new["sigma_c"])
+            new["sigma_c"] = jnp.exp(ls)
+            offset = c[grp]
+
+        # The scale move (see :mod:`._core`): (y*, beta, c) -> g (y*, beta, c).
+        if sar:
+            e = ystar - par * z - X @ beta - offset
+        else:
+            e = (ystar - X @ beta) - par * (z - WX @ beta)
+        epe = e @ (p * e)
+        dim = n + k + n_groups
+        b0, B0inv, k_g = d["b0"], d["B0inv"], jax.random.fold_in(k_beta, 3)
+
+        def gamma_draw():
+            Q = epe + beta @ B0inv @ beta
+            if effects:
+                Q = Q + c @ c / new["sigma_c"] ** 2
+            return jnp.sqrt(2.0 * jax.random.gamma(k_g, 0.5 * dim) / Q)
+
+        def slice_draw():
+            def logp(lg):
+                g = jnp.exp(lg)
+                r = g * beta - b0
+                v = dim * lg - 0.5 * g * g * epe - 0.5 * r @ B0inv @ r
+                if effects:
+                    v = (
+                        v
+                        - 0.5 * jnp.sum((g * c - d["c_mu"]) ** 2) / new["sigma_c"] ** 2
+                    )
+                return v
+
+            lg, _ = jax_slice_sample_1d(
+                logp, 0.0, -10.0, 10.0, key=k_g, w=2.0 / jnp.sqrt(dim)
+            )
+            return jnp.exp(lg)
+
+        g = jax.lax.cond(d["scale_gamma"], gamma_draw, slice_draw)
+        ystar, beta = ystar * g, beta * g
+        new["ystar"], new["beta"] = ystar, beta
+        draws = (par, beta)
+        if effects:
+            new["c"] = c * g
+            draws = draws + (new["c"], new["sigma_c"])
         if store_latent:
             draws = draws + (ystar,)
         return new, draws

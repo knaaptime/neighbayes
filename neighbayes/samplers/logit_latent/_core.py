@@ -37,6 +37,21 @@ A SAR may carry random unit effects inside its filter, :math:`A y^* = X\beta
 + c_{g(i)} + \varepsilon`, :math:`c_g \sim N(\mu, \sigma_c^2)`: they offset
 steps 1–4, and given the scales they are Gaussian (step 5), :math:`\sigma_c`
 a slice under its half-*t* prior.
+
+6. The scale move (Liu & Wu 1999): :math:`(y^*, \beta, c) \to g\,(y^*,
+   \beta, c)` keeps every sign, so the data, and maps :math:`\varepsilon` to
+   :math:`g\varepsilon`; drawn from its conditional under the Haar measure
+   :math:`dg/g`, with :math:`d` coordinates scaled,
+
+   .. math::
+       \log \pi(g) = (d - 1)\log g - \tfrac{g^2}{2}\varepsilon^\top P
+       \varepsilon - \tfrac12 (g\beta - b_0)^\top B_0^{-1} (g\beta - b_0)
+       - \sum_g \frac{(g c_g - \mu)^2}{2\sigma_c^2},
+
+   it is exact: :math:`g^2 \sim \mathrm{Gamma}(d/2, Q/2)` when the prior
+   means are zero, a slice on :math:`\log g` otherwise.  It moves the
+   utilities' scale, which the conditional steps cross slowly when
+   :math:`\rho` is near one.
 """
 
 from __future__ import annotations
@@ -49,7 +64,7 @@ import numpy as np
 import scipy.sparse as sp
 
 from ...models.priors import LogitGibbsPriors
-from .._utils._slice import SliceWidthState, slice_sample_1d_adaptive
+from .._utils._slice import SliceWidthState, slice_sample_1d, slice_sample_1d_adaptive
 from .._utils._sweeps import run_sweeps
 from ..negbin_latent._core import UnitEffects, _unit_sd_step
 
@@ -187,6 +202,11 @@ class LatentLogitChain:
         if unit_effects is not None:
             self.c = np.full(unit_effects.n_groups, float(unit_effects.mu))
             self.sigma_c = float(unit_effects.sd_scale)
+        # The scale move's dimension, and whether its draw is a gamma.
+        self.scale_dim = n + k + (unit_effects.n_groups if unit_effects else 0)
+        self.scale_gamma = not np.any(self.b0) and (
+            unit_effects is None or unit_effects.mu == 0.0
+        )
 
     def sweep(self, tuning: bool) -> None:
         """One Gibbs sweep."""
@@ -274,10 +294,45 @@ class LatentLogitChain:
         self.par, self.m = par, m
 
         # 5. The unit effects, given the scales, and their sd.
+        offset = 0.0
         if self.fx is not None:
             e = ystar - par * z - X @ self.beta
             self.c = _unit_effect_step(e, p, self.fx, self.sigma_c, rng)
             self.sigma_c = _unit_sd_step(self.sigma_c, self.c, self.fx, rng)
+            offset = self.c[self.fx.group]
+
+        # 6. The scale move.
+        if self.sar:
+            e = ystar - par * z - X @ self.beta - offset
+        else:
+            e = (ystar - X @ self.beta) - par * (z - self.WX @ self.beta)
+        g = self._scale(float(e @ (p * e)))
+        self.ystar = ystar * g
+        self.beta = self.beta * g
+        if self.fx is not None:
+            self.c = self.c * g
+
+    def _scale(self, epe: float) -> float:
+        """The scale move's ``g`` (see the module), ``epe`` being ``eps' P eps``."""
+        d, beta, B0inv, rng = self.scale_dim, self.beta, self.B0inv, self.rng
+        fx = self.fx
+        if self.scale_gamma:
+            Q = epe + beta @ B0inv @ beta
+            if fx is not None:
+                Q += float(self.c @ self.c) / self.sigma_c**2
+            return float(np.sqrt(rng.gamma(0.5 * d, 2.0 / Q)))
+        b0 = self.b0
+
+        def logp(lg):
+            g = np.exp(lg)
+            r = g * beta - b0
+            v = d * lg - 0.5 * g * g * epe - 0.5 * r @ B0inv @ r
+            if fx is not None:
+                v -= 0.5 * float(np.sum((g * self.c - fx.mu) ** 2)) / self.sigma_c**2
+            return v
+
+        lg, _ = slice_sample_1d(logp, 0.0, -10.0, 10.0, w=2.0 / np.sqrt(d), rng=rng)
+        return float(np.exp(lg))
 
     def draw(self, store_latent: bool) -> dict:
         """The current values, named as :func:`run_chain` returns them."""

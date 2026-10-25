@@ -1,7 +1,7 @@
 r"""JAX port of the structured separable NB flow sweep with pair and period effects.
 
 Same sweep as :mod:`._flow_structured_fe` (read it first) — ω → ρ_d → ρ_o,
-centred then non-centred (``β_c`` and the period effects integrated out, the
+centred then non-centred (``β`` and the period effects integrated out, the
 pair effects held) → ``(β, τ)`` jointly → the pair effects by conjugate
 gradients → the time-invariant block move → their sd → α — compiled into one
 XLA program per chunk of sweeps and run thread-per-chain through
@@ -184,7 +184,6 @@ def _equation_fns(
             return data[prefix + name]
 
         mu0, prec0 = pre("mu0"), pre("prec0")
-        mu_c, prec_c = mu0[cc], prec0[cc]
         mu_o, prec_o = mu0[order], prec0[order]
         rho_lo, rho_hi = pre("rho_lo"), pre("rho_hi")
         m_pair, s_pair, sd_scale = pre("m_pair"), pre("s_pair"), pre("sd_scale")
@@ -216,17 +215,23 @@ def _equation_fns(
         def cheap_arrays(A, B, t):
             return A[:, ui[t]].T[:, :, None] * B[:, vi[t]].T[:, None, :]
 
-        def moments(cols_of, resid_of, kx, prec_x, Om_all):
-            r"""``(M, v, quad)`` over ``[x-cols, τ]`` (see ``_gram_block``)."""
+        def moments(cols_of, resid_of, kx, prec_x, Om_all, mu_x=None):
+            r"""``(M, v, quad)`` over ``[x-cols, τ]`` (see ``_gram_block``).
+
+            ``mu_x`` is taken off each period's residual along its columns.
+            """
             K = kx + n_tau
 
             def step(carry, t):
                 Mx, vx, quad = carry
                 Om, R = Om_all[t], resid_of(t)
+                if kx:
+                    C = cols_of(t)
+                    if mu_x is not None:
+                        R = R - jnp.tensordot(mu_x, C, axes=1)
                 OmR = Om * R
                 quad = quad + jnp.sum(OmR * R)
                 if kx:
-                    C = cols_of(t)
                     OmC = Om[None] * C
                     Mx = Mx + jnp.tensordot(OmC, C, axes=([1, 2], [1, 2]))
                     vx = vx + jnp.tensordot(OmC, R, axes=2)
@@ -256,9 +261,18 @@ def _equation_fns(
             val = -jnp.sum(jnp.log(jnp.diag(L))) - 0.5 * (quad - w @ w)
             return jnp.where(jnp.isfinite(val), val, -jnp.inf)
 
-        def key_sum(b_full, F):
-            """``Σ_j β_j F_j`` per period, ``(T, n, n)``."""
-            return jnp.tensordot(b_full, F[f_idx], axes=([0], [1])) if k_e else None
+        def columns(A, B, Ufull):
+            """``t ↦`` period ``t``'s transformed columns, ``(k, n, n)`` in ``order``."""
+
+            def cols(t):
+                parts = []
+                if k_c:
+                    parts.append(cheap_arrays(A, B, t))
+                if k_e:
+                    parts.append(Ufull[f_idx[t]])
+                return jnp.concatenate(parts) if parts else jnp.zeros((0, n, n))
+
+            return cols
 
         def eta_of(beta, tau, C, Ufull, A, B):
             def period(t):
@@ -297,26 +311,23 @@ def _equation_fns(
 
         def update(eq, Om_all, Z_all, key, tuning):
             F, U, V = data[kF], data[kU], data[kV]
-            beta, rd, ro = eq["beta"], eq["rho_d"], eq["rho_o"]
+            rd, ro = eq["rho_d"], eq["rho_o"]
             w_d, w_o, w_dn, w_on = eq["slice_widths"]
             keys = jax.random.split(key, 10)
             s_cur = eq["s_pair"] if learn_sd else s_pair
             C = eq["C"]
-            B_full = key_sum(beta[fc], F)
             tau_shift = jnp.where(in_tau, mu_tau, 0.0)
-            empty = jnp.zeros((0, n, n))
+            F_all = F if k_e else jnp.zeros((0, n, n))
 
-            def rho_density(Zr, eta_f, Av, Bv):
-                def resid(t):
-                    R = Zr[t] - tau_shift[t]
-                    if k_e:
-                        R = R - eta_f[t]
-                    if k_c:
-                        R = R - (Av[:, ui[t]] * mu_c) @ Bv[:, vi[t]].T
-                    return R
-
+            def rho_density(Zr, Uf, Av, Bv):
+                """The working data's density, ``β`` and ``τ`` integrated out."""
                 M, v, quad = moments(
-                    lambda t: cheap_arrays(Av, Bv, t), resid, k_c, prec_c, Om_all
+                    columns(Av, Bv, Uf),
+                    lambda t: Zr[t] - tau_shift[t],
+                    k,
+                    prec_o,
+                    Om_all,
+                    mu_x=mu_o,
                 )
                 return collapsed_density(M, v, quad)
 
@@ -332,20 +343,20 @@ def _equation_fns(
 
             # Centred: C̃ held, its ρ-dependent prior in the density.
             Zc = Z_all - C[None]
-            P, A_fix = solve_left(ro, B_full if k_e else empty, U)
+            P, A_fix = solve_left(ro, F_all, U)
 
             def ld_d(rv):
-                eta_f, Bv = solve_right(rv, P, V)
-                return rho_density(Zc, eta_f, A_fix, Bv) + prior_term(rv, ro)
+                Uf, Bv = solve_right(rv, P, V)
+                return rho_density(Zc, Uf, A_fix, Bv) + prior_term(rv, ro)
 
             rd, _, sl_d, sr_d = jax_slice_sample_1d(
                 ld_d, rd, rho_lo, rho_hi, key=keys[0], w=w_d, return_steps=True
             )
-            P, B_fix = solve_right(rd, B_full if k_e else empty, V)
+            P, B_fix = solve_right(rd, F_all, V)
 
             def ld_o(rv):
-                eta_f, Av = solve_left(rv, P, U)
-                return rho_density(Zc, eta_f, Av, B_fix) + prior_term(rd, rv)
+                Uf, Av = solve_left(rv, P, U)
+                return rho_density(Zc, Uf, Av, B_fix) + prior_term(rd, rv)
 
             ro, _, sl_o, sr_o = jax_slice_sample_1d(
                 ld_o, ro, rho_lo, rho_hi, key=keys[1], w=w_o, return_steps=True
@@ -354,24 +365,24 @@ def _equation_fns(
             if has_pairs:
                 # Non-centred: the effects held, C̃ = A(ρ)⁻¹C moving with ρ.
                 C_in = apply_A(C, rd, ro)
-                P, A_fix = solve_left(ro, B_full if k_e else empty, U)
+                P, A_fix = solve_left(ro, F_all, U)
                 fixed = solve(ro, C_in)
 
                 def ld_dn(rv):
-                    eta_f, Bv = solve_right(rv, P, V)
+                    Uf, Bv = solve_right(rv, P, V)
                     Ct = solve(rv, fixed.T).T
-                    return rho_density(Z_all - Ct[None], eta_f, A_fix, Bv)
+                    return rho_density(Z_all - Ct[None], Uf, A_fix, Bv)
 
                 rd, _, sl_dn, sr_dn = jax_slice_sample_1d(
                     ld_dn, rd, rho_lo, rho_hi, key=keys[2], w=w_dn, return_steps=True
                 )
-                P, B_fix = solve_right(rd, B_full if k_e else empty, V)
+                P, B_fix = solve_right(rd, F_all, V)
                 fixed = solve(rd, C_in.T).T
 
                 def ld_on(rv):
-                    eta_f, Av = solve_left(rv, P, U)
+                    Uf, Av = solve_left(rv, P, U)
                     Ct = solve(rv, fixed)
-                    return rho_density(Z_all - Ct[None], eta_f, Av, B_fix)
+                    return rho_density(Z_all - Ct[None], Uf, Av, B_fix)
 
                 ro, _, sl_on, sr_on = jax_slice_sample_1d(
                     ld_on, ro, rho_lo, rho_hi, key=keys[3], w=w_on, return_steps=True
@@ -385,14 +396,7 @@ def _equation_fns(
             # (β, τ) jointly, then the pair effects
             half, A = solve_left(ro, F, U)
             Ufull, B = solve_right(rd, half, V)
-
-            def cols(t):
-                parts = []
-                if k_c:
-                    parts.append(cheap_arrays(A, B, t))
-                if k_e:
-                    parts.append(Ufull[f_idx[t]])
-                return jnp.concatenate(parts) if parts else jnp.zeros((0, n, n))
+            cols = columns(A, B, Ufull)
 
             Zc = Z_all - C[None]
             M, h, _ = moments(cols, lambda t: Zc[t], k, prec_o, Om_all)

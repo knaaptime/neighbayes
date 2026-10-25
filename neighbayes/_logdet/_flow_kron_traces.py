@@ -215,6 +215,15 @@ class FlowKronTraceLogdet:
         return np.stack([D, Gd, Go, Gw])
 
     # -- evaluation --------------------------------------------------------
+    def taylor_order(self, rho_d, rho_o, rho_w) -> float:
+        """The Taylor order an evaluation at ``ρ`` needs, ``inf`` outside its region."""
+        r = (abs(rho_d) + abs(rho_o)) * self.w + abs(rho_w) * self.w**2
+        if r >= 1.0:
+            return np.inf
+        if r == 0.0:
+            return 1
+        return int(np.ceil(np.log(self.tol * (1.0 - r)) / np.log(r)))
+
     def _tail(self, c, P):
         """Largest coefficient in the last two rows/columns, relative to the largest.
 
@@ -229,21 +238,15 @@ class FlowKronTraceLogdet:
     def __call__(self, rho_d, rho_o, rho_w):
         rd, ro, rw = float(rho_d), float(rho_o), float(rho_w)
         if self.basis == "taylor":
-            r = (abs(rd) + abs(ro)) * self.w + abs(rw) * self.w**2
-            if r >= 1.0:
+            P = self.taylor_order(rd, ro, rw)
+            if not np.isfinite(P):
                 raise ValueError(
                     "flow parameters outside the Taylor convergence region"
                 )
-            P = (
-                1
-                if r == 0.0
-                else int(np.ceil(np.log(self.tol * (1.0 - r)) / np.log(r)))
-            )
             if P > self.max_order:
                 raise ValueError(
-                    f"Taylor flow log-determinant needs order {P} > max_order at "
-                    f"|rho| sum {r:.4f}; use the Chebyshev basis (undirected W) or "
-                    "the resolvent estimator."
+                    f"Taylor flow log-determinant needs order {P} > max_order; use "
+                    "the Chebyshev basis (undirected W) or the resolvent estimator."
                 )
             coeffs = self._taylor_coeffs(rd, ro, rw, P)
         else:

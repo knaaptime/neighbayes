@@ -19,14 +19,16 @@ from their names.
 **Sweep** (partially collapsed Gibbs, van Dyk & Park 2008):
 
 1. ``ω ~ PG(y + α, η − log α)``.
-2. ``ρ_d`` then ``ρ_o`` by slice sampling ``p(ρ | ω, α, β_full, y)`` with the
-   rank-one block ``β_c`` integrated out under its Normal prior.  That block holds
+2. ``ρ_d`` then ``ρ_o`` by slice sampling ``p(ρ | ω, α, y)`` with every
+   coefficient integrated out under its Normal prior.  The rank-one block holds
    the intercept, whose correlation with ρ (the mean level scales like
-   ``β₀ / ((1−ρ_o)(1−ρ_d))``) is what conditioning on β would otherwise freeze.
-   Per candidate: one ``n × n`` solve for the full-rank part of ``η`` and ``O(N)``
-   rank-one algebra.
-3. ``β = (β_c, β_full) | ρ, ω, α`` jointly — which also redraws ``β_c`` straight
-   after the ρ draws that integrated it out.
+   ``β₀ / ((1−ρ_o)(1−ρ_d))``) conditioning on β would freeze; the full columns
+   (log-distance above all) trade off against ρ as strongly, and holding them
+   left ρ and β crawling along that ridge (effective draws rose from about 5
+   to 75–200 per 1,000 on integrating them out too).  Per candidate: one
+   ``n × n`` solve per full column and the Gram of all the columns.
+3. ``β = (β_c, β_full) | ρ, ω, α`` jointly, straight after the ρ draws that
+   integrated it out.
 4. ``α`` by slice sampling on ``log α``.
 
 Given ``ω`` the PG likelihood is Gaussian in ``η`` with working response
@@ -215,38 +217,6 @@ def _low_rank(A, B, u_idx, v_idx, coef):
     return (A[:, u_idx] * coef) @ B[:, v_idx].T
 
 
-def _rho_log_density(Oms, Rbases, A, B, struct, mu_c, prec_c):
-    """``log p(ρ | ω, α, β_full, y)`` up to a constant, rank-one block integrated out.
-
-    ``Oms[t]`` and ``Rbases[t] = z_t − η_full,t`` are period ``t``'s ``n × n``
-    arrays.  With ``r_t = Rbase_t − U_c,t μ_c`` and
-    ``M = Λ_c + Σ_t U_c,tᵀΩ_tU_c,t``, ``v = Σ_t U_c,tᵀΩ_t r_t``:
-    ``−½ log|M| − ½ (Σ_t r_tᵀΩ_t r_t − vᵀM⁻¹v)``.
-    """
-    k_c = len(struct.cheap_cols)
-    M = np.diag(np.asarray(prec_c, dtype=np.float64)) if k_c else None
-    v = np.zeros(k_c)
-    quad = 0.0
-    for t, (Om, Rb) in enumerate(zip(Oms, Rbases)):
-        if k_c:
-            ui, vi = struct.u_idx[t], struct.v_idx[t]
-            R = Rb - _low_rank(A, B, ui, vi, mu_c)
-            Mc, vc = _cheap_gram_and_cross(Om, R, A, B, ui, vi)
-            M += Mc
-            v += vc
-        else:
-            R = Rb
-        quad += float(np.sum(Om * R * R))
-    if not k_c:
-        return -0.5 * quad
-    try:
-        L = np.linalg.cholesky(M)
-    except np.linalg.LinAlgError:
-        return -np.inf
-    w = solve_triangular(L, v, lower=True)
-    return -np.sum(np.log(np.diag(L))) - 0.5 * (quad - float(w @ w))
-
-
 def _beta_gram(Oms, zs, A, Bv, Ufull, struct):
     """``G = Σ_t U_tᵀΩ_tU_t`` and ``h = Σ_t U_tᵀΩ_t z_t`` from structured parts.
 
@@ -283,6 +253,26 @@ def _beta_gram(Oms, zs, A, Bv, Ufull, struct):
 # ---------------------------------------------------------------------------
 # Chain
 # ---------------------------------------------------------------------------
+
+
+def _rho_log_density(Oms, zs, A, Bv, Ufull, struct, mu0, prec0):
+    """``log p(ρ | ω, α, y)`` up to a constant, every coefficient integrated out.
+
+    With ``G = Σ_t U_tᵀΩ_tU_t`` and ``h = Σ_t U_tᵀΩ_t z_t`` (:func:`_beta_gram`),
+    the Normal prior ``N(μ₀, P₀⁻¹)`` integrates to ``−½ log|M| − ½ (rᵀΩr −
+    vᵀM⁻¹v)``, ``r = z − Uμ₀``, ``M = G + P₀``, ``v = h − Gμ₀``.
+    """
+    G, h = _beta_gram(Oms, zs, A, Bv, Ufull, struct)
+    v = h - G @ mu0
+    zz = sum(float(np.sum(Om * z * z)) for Om, z in zip(Oms, zs))
+    quad = zz - 2.0 * float(mu0 @ h) + float(mu0 @ G @ mu0)
+    G[np.diag_indices_from(G)] += prec0
+    try:
+        L = np.linalg.cholesky(G)
+    except np.linalg.LinAlgError:
+        return -np.inf
+    w = solve_triangular(L, v, lower=True)
+    return -np.sum(np.log(np.diag(L))) - 0.5 * (quad - float(w @ w))
 
 
 def _prior_arrays(priors, k):
@@ -325,7 +315,6 @@ def run_chain_separable_structured(
     k = struct.k
     cc, fc = struct.cheap_cols, struct.full_cols
     mu0, prec0 = _prior_arrays(priors, k)
-    mu_c, prec_c = mu0[cc], prec0[cc]
     core_priors = ReducedGibbsPriors(
         beta_mu=priors.beta_mu,
         beta_sigma=priors.beta_sigma,
@@ -389,39 +378,35 @@ def run_chain_separable_structured(
         omega = _sample_omega(y, alpha, eta.ravel() - np.log(alpha), rng=rng)
         Oms = omega.reshape(T, n, n)
         zs = (0.5 * (y - alpha) / omega + np.log(alpha)).reshape(T, n, n)
-        B_full = full_sums(beta[fc])
 
-        # --- ρ_d, ρ_o with the rank-one block integrated out ---
+        # --- ρ_d, ρ_o with every coefficient integrated out ---
         for name in ("rho_d", "rho_o"):
             if name == "rho_d":
                 Lo = solve_o.at(rho["rho_o"])
                 A_fix = Lo.solve(struct.U)  # origin side fixed
-                P = {key: Lo.solve(Bf) for key, Bf in B_full.items()}
+                P = [Lo.solve(Fi) for Fi in struct.F]
 
                 def parts(rv, _P=P, _A=A_fix):
                     Ld = solve_d.at(rv)
-                    eta_f = {key: Ld.solve(Pk.T).T for key, Pk in _P.items()}
-                    return eta_f, _A, Ld.solve(struct.V)
+                    return _A, Ld.solve(struct.V), [Ld.solve(Pi.T).T for Pi in _P]
 
             else:
                 Ld = solve_d.at(rho["rho_d"])
                 B_fix = Ld.solve(struct.V)  # destination side fixed
-                P = {key: Ld.solve(Bf.T).T for key, Bf in B_full.items()}
+                P = [Ld.solve(Fi.T).T for Fi in struct.F]
 
                 def parts(rv, _P=P, _B=B_fix):
                     Lo = solve_o.at(rv)
-                    eta_f = {key: Lo.solve(Pk) for key, Pk in _P.items()}
-                    return eta_f, Lo.solve(struct.U), _B
+                    return Lo.solve(struct.U), _B, [Lo.solve(Pi) for Pi in _P]
 
             def log_density(rv, _parts=parts):
                 if not (rho_lower < rv < rho_upper):
                     return -np.inf
                 try:
-                    eta_f, Av, Bv_ = _parts(rv)
+                    Av, Bv_, Uf = _parts(rv)
                 except FACTORIZATION_ERRORS:
                     return -np.inf  # ρ at the edge of its support
-                Rbases = [zs[t] - eta_f[full_keys[t]] for t in range(T)]
-                val = _rho_log_density(Oms, Rbases, Av, Bv_, struct, mu_c, prec_c)
+                val = _rho_log_density(Oms, zs, Av, Bv_, Uf, struct, mu0, prec0)
                 return val if np.isfinite(val) else -np.inf
 
             new, _, sl, sr = slice_sample_1d_adaptive(

@@ -577,7 +577,10 @@ variance parameter, which is why it is identified where the random-effects
 logits were not. The Gibbs sampler is exact: it draws the latent utilities
 (Albert and Chib 1993), the Kolmogorov scales that make the logistic a normal
 scale mixture (Holmes and Held 2006, through `augax`), $\rho$ with $\beta$
-integrated out, then $\beta$. It runs on JAX by default, drawing the
+integrated out, then $\beta$, and ends with a scale move that rescales the
+utilities and $\beta$ together (Liu and Wu 1999), which keeps $\rho$ mixing as
+it nears one (at $\rho = 0.97$ it quadruples its effective draws). It runs on
+JAX by default, drawing the
 utilities a colour class at a time (classes of utilities that share no row of
 $I - \rho W$ are conditionally independent), and on NumPy one at a time. There
 is no NUTS path (the likelihood is an orthant probability). Its pointwise

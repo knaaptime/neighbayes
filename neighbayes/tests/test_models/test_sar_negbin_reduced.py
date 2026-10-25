@@ -284,3 +284,43 @@ def test_reduced_nuts_uses_the_resolved_beta_prior():
         np.broadcast_to(sigma, expected_sigma.shape), expected_sigma, rtol=1e-8
     )
     assert np.all(sigma < 1e5), "beta prior fell back to the near-improper default"
+
+
+def test_pg_information_ratio_grows_as_alpha_leaves_the_counts_scale():
+    """Near one when alpha is near the mean; large far above or below it."""
+    from neighbayes.samplers.negbin_reduced._core import pg_information_ratio
+
+    rng = np.random.default_rng(0)
+    mu = 5.0
+    eta = np.full(20_000, np.log(mu))
+
+    def ratio(alpha):
+        y = rng.negative_binomial(alpha, alpha / (alpha + mu), size=eta.size)
+        return pg_information_ratio(y, eta, alpha)
+
+    assert 0.5 < ratio(mu) < 2.0
+    assert ratio(0.01) > 10.0
+    assert ratio(1000.0) > 10.0
+
+
+@pytest.mark.parametrize(
+    "backend", ["numpy", pytest.param("jax", marks=pytest.mark.requires_jax)]
+)
+@pytest.mark.parametrize("alpha, warns", [(0.02, True), (3.0, False)])
+def test_sar_negbin_warns_when_the_pg_augmentation_is_tight(alpha, warns, backend):
+    import warnings
+
+    d = bp.dgp.simulate_sar_negbin(n_side=8, seed=4, alpha=alpha, rho=0.3)
+    m = bp.models.SARNegBin(y=d["y"], X=d["X"], W=d["W_sparse"])
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        m.fit(
+            draws=30,
+            tune=60,
+            chains=2,
+            progressbar=False,
+            random_seed=0,
+            backend=backend,
+        )
+    hit = any("Pólya–Gamma augmentation carries" in str(w.message) for w in caught)
+    assert hit == warns

@@ -1,7 +1,7 @@
 """Correctness of the resolvent-gradient flow sampler's ρ-conditional target.
 
-The novel coupling is the ρ log-posterior and its gradient (exact O(N) data term +
-resolvent log-determinant).  We validate the gradient against a finite difference of
+The novel coupling is the ρ log-posterior given σ², β integrated out, and its
+gradient (exact data term + resolvent log-determinant).  We validate the gradient against a finite difference of
 the target value using the *exact* log-determinant — deterministic and fast, with no
 GMRES or MCMC loop.  (End-to-end posterior recovery is a GPU benchmark.)
 """
@@ -70,21 +70,85 @@ def test_rho_gradient_matches_finite_difference():
     W, y, X = _directed_flow_data(n=15, seed=0)
     tgt = FlowResolventTarget(W, y, X, logdet_value_and_grad=_exact_value_and_grad(W))
 
-    beta = np.array([0.8, -0.4])
     sigma2 = 0.3
     h = 1e-6
     for rho in ([0.3, 0.2, -0.05], [0.5, 0.1, 0.1], [-0.2, 0.4, -0.1]):
         rho = np.array(rho)
-        _, grad = tgt.logpost_and_grad(rho, beta, sigma2)
+        _, grad = tgt.logpost_and_grad(rho, sigma2)
         fd = np.zeros(3)
         for k in range(3):
             rp, rm = rho.copy(), rho.copy()
             rp[k] += h
             rm[k] -= h
-            vp, _ = tgt.logpost_and_grad(rp, beta, sigma2)
-            vm, _ = tgt.logpost_and_grad(rm, beta, sigma2)
+            vp, _ = tgt.logpost_and_grad(rp, sigma2)
+            vm, _ = tgt.logpost_and_grad(rm, sigma2)
             fd[k] = (vp - vm) / (2 * h)
         np.testing.assert_allclose(grad, fd, rtol=1e-4, atol=1e-3)
+
+
+def _dense_marginal(tgt, A_of, X_of, rho, sigma2):
+    """``J log|A| + log N(Ay; AX b0, σ² I + AX B0 X'A')``, β integrated densely."""
+    A = A_of(rho)
+    Xt = X_of(A)
+    S = sigma2 * np.eye(A.shape[0]) + Xt @ np.diag(tgt.beta_sigma**2) @ Xt.T
+    r = A @ tgt.y - Xt @ tgt.beta_mu
+    _, logdet_S = np.linalg.slogdet(S)
+    _, logdet_A = np.linalg.slogdet(A)
+    return logdet_A - 0.5 * logdet_S - 0.5 * r @ np.linalg.solve(S, r)
+
+
+def test_collapsed_target_is_the_beta_marginal():
+    """β integrated out of ρ's conditional matches the dense Gaussian marginal (SAR, SEM)."""
+    n = 6
+    for cls, data, sem in (
+        (FlowResolventTarget, _directed_flow_data, False),
+        (SEMFlowResolventTarget, _directed_sem_data, True),
+    ):
+        W, y, X = data(n=n, seed=3)
+        tgt = cls(W, y, X, logdet_value_and_grad=_exact_value_and_grad(W))
+        Ide = np.eye(n)
+        K = (np.kron(Ide, W), np.kron(W, Ide), np.kron(W, W))
+
+        def A_of(rho):
+            return np.eye(n * n) - sum(r * k for r, k in zip(rho, K))
+
+        def X_of(A, sem=sem):
+            return A @ X if sem else X
+
+        sigma2 = 0.4
+        rhos = (np.array([0.3, 0.2, -0.05]), np.array([-0.1, 0.4, 0.1]))
+        got = [tgt.logpost_and_grad(r, sigma2)[0] for r in rhos]
+        want = [_dense_marginal(tgt, A_of, X_of, r, sigma2) for r in rhos]
+        np.testing.assert_allclose(got[0] - got[1], want[0] - want[1], rtol=1e-9)
+
+
+def test_directed_w_takes_the_taylor_series_and_falls_back_near_the_wall(
+    monkeypatch,
+):
+    """Auto routing gives a directed W the exact Taylor series; beyond its order
+    cap the target evaluates its resolvent estimator instead."""
+    import neighbayes.samplers.gaussian._flow_resolvent as fr
+
+    def sentinel(kron, probes):
+        return lambda rd, ro, rw: (123.0, np.zeros(3))
+
+    monkeypatch.setattr(fr, "_default_logdet_value_and_grad", sentinel)
+    _TAYLOR_FALLBACK_ORDER, resolve_flow_logdet = (
+        fr._TAYLOR_FALLBACK_ORDER,
+        fr.resolve_flow_logdet,
+    )
+    W, y, X = _directed_flow_data(n=10, seed=5)
+    ld, method = resolve_flow_logdet(W)
+    assert method == "kron_traces" and ld.basis == "taylor"
+    tgt = FlowResolventTarget(W, y, X, logdet_value_and_grad=ld, logdet_method="numpy")
+    exact = _exact_value_and_grad(W)
+    far, near = (0.3, 0.2, -0.05), (0.6, 0.35, 0.02)
+    assert ld.taylor_order(*far) <= _TAYLOR_FALLBACK_ORDER < ld.taylor_order(*near)
+    v, g = tgt.logdet_value_and_grad(*far)
+    ve, ge = exact(*far)
+    np.testing.assert_allclose(v, ve, rtol=1e-10)
+    np.testing.assert_allclose(g, ge, rtol=1e-8)
+    assert tgt.logdet_value_and_grad(*near)[0] == 123.0
 
 
 def test_Ay_is_linear_in_rho():
@@ -163,19 +227,18 @@ def test_panel_rho_gradient_matches_finite_difference():
         W, y, X, T=T, logdet_value_and_grad=_exact_value_and_grad(W)
     )
     assert tgt.T == T and tgt.Ntot == y.shape[0]
-    beta = np.array([0.8, -0.4])
     sigma2 = 0.3
     h = 1e-6
     for rho in ([0.3, 0.2, -0.05], [0.5, 0.1, 0.1]):
         rho = np.array(rho)
-        _, grad = tgt.logpost_and_grad(rho, beta, sigma2)
+        _, grad = tgt.logpost_and_grad(rho, sigma2)
         fd = np.zeros(3)
         for k in range(3):
             rp, rm = rho.copy(), rho.copy()
             rp[k] += h
             rm[k] -= h
-            vp, _ = tgt.logpost_and_grad(rp, beta, sigma2)
-            vm, _ = tgt.logpost_and_grad(rm, beta, sigma2)
+            vp, _ = tgt.logpost_and_grad(rp, sigma2)
+            vm, _ = tgt.logpost_and_grad(rm, sigma2)
             fd[k] = (vp - vm) / (2 * h)
         np.testing.assert_allclose(grad, fd, rtol=1e-4, atol=1e-3)
 
@@ -210,19 +273,18 @@ def test_sem_rho_gradient_matches_finite_difference():
     tgt = SEMFlowResolventTarget(
         W, y, X, logdet_value_and_grad=_exact_value_and_grad(W)
     )
-    beta = np.array([0.8, -0.4])
     sigma2 = 0.3
     h = 1e-6
     for rho in ([0.3, 0.2, -0.05], [0.5, 0.1, 0.1], [-0.2, 0.4, -0.1]):
         rho = np.array(rho)
-        _, grad = tgt.logpost_and_grad(rho, beta, sigma2)
+        _, grad = tgt.logpost_and_grad(rho, sigma2)
         fd = np.zeros(3)
         for k in range(3):
             rp, rm = rho.copy(), rho.copy()
             rp[k] += h
             rm[k] -= h
-            vp, _ = tgt.logpost_and_grad(rp, beta, sigma2)
-            vm, _ = tgt.logpost_and_grad(rm, beta, sigma2)
+            vp, _ = tgt.logpost_and_grad(rp, sigma2)
+            vm, _ = tgt.logpost_and_grad(rm, sigma2)
             fd[k] = (vp - vm) / (2 * h)
         np.testing.assert_allclose(grad, fd, rtol=1e-4, atol=1e-3)
 

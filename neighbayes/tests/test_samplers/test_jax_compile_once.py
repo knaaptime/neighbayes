@@ -89,14 +89,14 @@ def _cases():
                 y=y, X=dt["X"], X_zero=dt["X_zero"], W=dt["W_sparse"], latent=True
             ),
         )
-        dp = sim(n_side=5, T=3, seed=13, **panel)
+        dtp = sim(n_side=5, T=3, seed=13, **panel)
         out[f"{name}Panel"] = (
-            dp["y"],
-            lambda y, dp=dp, cls=cls: cls(
+            dtp["y"],
+            lambda y, dtp=dtp, cls=cls: cls(
                 y=y,
-                X=dp["X"],
-                X_zero=dp["X_zero"],
-                W=dp["W_sparse"],
+                X=dtp["X"],
+                X_zero=dtp["X_zero"],
+                W=dtp["W_sparse"],
                 N=25,
                 T=3,
                 **panel,

@@ -272,7 +272,9 @@ class FlowModel(FlowSharedMethods, SpatialModel):
         Override default priors.  Supported keys vary by subclass.
     logdet_method : str, optional
         The flow log-determinant; ``None`` (default) auto-selects.  The
-        unrestricted classes take ``"trace_series"`` or ``"resolvent"``; the
+        unrestricted classes take ``"trace_series"`` (the default: exact, a
+        directed ``W``'s falling back on the resolvent estimator near the
+        stability wall) or ``"resolvent"``; the
         separable classes factor it into ``n x n`` terms and take the
         single-``W`` methods with ``logdet_decomp``; the aspatial classes have
         none.

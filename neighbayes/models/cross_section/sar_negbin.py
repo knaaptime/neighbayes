@@ -55,6 +55,8 @@ from ...samplers.negbin_reduced import (  # noqa: F401 — import side-effect re
 from ...samplers.negbin_reduced._core import (
     _KRYLOV_DEGREE_DEFAULT,
     _KRYLOV_DMAX_DEFAULT,
+    pg_information_ratio,
+    warn_pg_information,
 )
 from .._base._nb import nb_alpha_fixed, nb_alpha_rv
 from .._mixins._designs import CountDesigns
@@ -415,6 +417,22 @@ class SARNegBin(CountDesigns, LatentNegBinMixin, _CountPanel, SpatialModel):
                 "beta": np.stack([s["beta"] for s in chain_results], axis=0),
                 "alpha": np.stack([s["alpha"] for s in chain_results], axis=0),
             }
+            # The PG augmentation's tightness, at each chain's first kept draw.
+            eye = sp.identity(n, format="csc")
+            self._warn_pg_information(
+                [
+                    pg_information_ratio(
+                        self._y,
+                        sp.linalg.spsolve(
+                            (eye - s["rho"][0] * self._W_sparse).tocsc(),
+                            X @ s["beta"][0],
+                        ),
+                        float(s["alpha"][0]),
+                    )
+                    for s in chain_results
+                ],
+                stacked["alpha"],
+            )
             log_lik = (
                 np.stack([s["log_lik"] for s in chain_results], axis=0)
                 if log_likelihood
@@ -579,6 +597,9 @@ class SARNegBin(CountDesigns, LatentNegBinMixin, _CountPanel, SpatialModel):
             "beta": np.stack([s["beta"] for s in chain_samples], axis=0),
             "alpha": np.stack([s["alpha"] for s in chain_samples], axis=0),
         }
+        self._warn_pg_information(
+            [s["pg_information_ratio"] for s in chain_samples], stacked["alpha"]
+        )
         log_lik = (
             np.stack([s["log_lik"] for s in chain_samples], axis=0)
             if log_likelihood
@@ -600,6 +621,12 @@ class SARNegBin(CountDesigns, LatentNegBinMixin, _CountPanel, SpatialModel):
         )
         self._idata = idata
         return idata
+
+    def _warn_pg_information(self, ratios, alpha_draws) -> None:
+        """Warn when the PG augmentation over-states the data (see the sampler)."""
+        warn_pg_information(
+            ratios, float(np.median(alpha_draws[:, 0])), float(np.mean(self._y))
+        )
 
     # ------------------------------------------------------------------
     # Posterior-mean fitted values

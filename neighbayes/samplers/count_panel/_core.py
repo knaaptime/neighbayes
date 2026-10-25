@@ -154,13 +154,18 @@ def run_chain(
     Returns
     -------
     dict
-        ``beta``, ``time_effect``, each ρ, ``alpha``, the group effects and
-        ``log_lik``.
+        ``beta``, ``time_effect``, each ρ, ``alpha``, the group effects,
+        ``log_lik`` and ``pg_information_ratio`` at the end of warmup
+        (:func:`~neighbayes.samplers.negbin_reduced._core.pg_information_ratio`).
     """
     from .._utils._glm_equation import MaterializedEquation, init_from_counts
     from ..negbin._core import GibbsState as _AlphaState
     from ..negbin._core import _nb_loglik_pointwise, _sample_alpha
-    from ..negbin_reduced._core import ReducedGibbsPriors, _sample_omega
+    from ..negbin_reduced._core import (
+        ReducedGibbsPriors,
+        _sample_omega,
+        pg_information_ratio,
+    )
 
     rng = np.random.default_rng() if rng is None else rng
     y = np.asarray(y, dtype=np.float64)
@@ -216,6 +221,8 @@ def run_chain(
         # --- 4. dispersion (held when alpha_fixed) ---
         st = _AlphaState(eta=eq.eta, beta=eq.theta, rho=0.0, alpha=alpha, omega=omega)
         alpha = _sample_alpha(st, y, alpha_priors, rng=rng)
+        if it == max(tune, 1) - 1:
+            out["pg_information_ratio"] = pg_information_ratio(y, eq.eta, alpha)
 
         if not tuning and (it - tune) % thin == 0:
             j = (it - tune) // thin

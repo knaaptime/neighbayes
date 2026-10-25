@@ -20,8 +20,9 @@ effects are held while ρ moves and drawn by conjugate gradients.
 **Sweep** (partially collapsed Gibbs):
 
 1. ``ω ~ PG(y + α, η − log α)``.
-2. ``ρ_d`` then ``ρ_o`` by slice sampling with the rank-one block ``β_c`` and
-   the period effects ``τ`` integrated out (``β_full`` held), twice: centred,
+2. ``ρ_d`` then ``ρ_o`` by slice sampling with every coefficient ``β`` and
+   the period effects ``τ`` integrated out (as in :mod:`._flow_structured`),
+   twice: centred,
    with ``C̃`` held and its prior ``n log|L_o||L_d| − ‖AC̃ − μ‖²/2σ²`` in the
    density; then non-centred, with ``C`` held and ``C̃ = A(ρ)⁻¹C`` moving.
    Interweaving the two keeps ρ mixing whether the data pin the effects or
@@ -146,9 +147,8 @@ class StructuredEquation:
     ``η_t = L_o⁻¹ B_t L_d⁻ᵀ + τ_t + C`` with ``B_t = Σ_j β_j X_{t,j}`` on the
     ``n × n`` flow array.  :meth:`update` takes the working precisions
     ``Ω_t`` and responses ``z_t`` of one Gibbs sweep — Pólya–Gamma for an NB
-    count or a logit selection — and draws ``ρ_d`` and ``ρ_o`` (rank-one
-    columns, ``τ`` and ``C`` integrated out), then ``(β, τ)`` jointly, then
-    ``C``.  Cells with ``Ω = 0`` drop out of every moment exactly, which is how
+    count or a logit selection — and draws ``ρ_d`` and ``ρ_o`` (``β`` and
+    ``τ`` integrated out), then ``(β, τ)`` jointly, then ``C``.  Cells with ``Ω = 0`` drop out of every moment exactly, which is how
     the ZINB count equation leaves out its structural zeros.
 
     Parameters
@@ -199,7 +199,6 @@ class StructuredEquation:
         self.mu0, self.prec0 = _prior_arrays(
             SimpleNamespace(beta_mu=beta_mu, beta_sigma=beta_sigma), self.k
         )
-        self.mu_c, self.prec_c = self.mu0[self.cc], self.prec0[self.cc]
         self.mu_tau, s_tau, self.n_tau = (
             period_effects if period_effects is not None else (0, 1, 0)
         )
@@ -232,24 +231,12 @@ class StructuredEquation:
         }
         self.tau = np.full(self.n_tau, float(self.mu_tau))
         self.C = np.zeros((n, n)) if C_init is None or not self.has_pairs else C_init
-        self.full_keys = [tuple(int(i) for i in st.f_idx[t]) for t in range(T)]
-        self.distinct_keys = sorted(set(self.full_keys))
         self.order = np.concatenate([self.cc, self.fc]).astype(int)
         self._ti = self._time_invariant()
         A, Bv, Ufull = self._transformed(self.rho["rho_d"], self.rho["rho_o"])
         self.eta = self._eta_from(A, Bv, Ufull, self.beta) + self.C
 
     # --- helpers -------------------------------------------------------
-
-    def _full_sums(self, b_full):
-        st, n = self.struct, self.n
-        out = {}
-        for key in self.distinct_keys:
-            acc = np.zeros((n, n))
-            for bj, i in zip(b_full, key):
-                acc += bj * st.F[i]
-            out[key] = acc
-        return out
 
     def _tau_t(self, t):
         return self.tau[t - self.t0] if (self.n_tau and t >= self.t0) else 0.0
@@ -421,54 +408,58 @@ class StructuredEquation:
 
     # --- one Gibbs update ------------------------------------------------
 
-    def _parts(self, name, B_full):
-        """``rv ↦ (η_full, A, Bv)`` at ``name = rv``, the other ρ held."""
+    def _columns(self, A, Bv, Ufull):
+        """``t ↦`` period ``t``'s transformed columns, ``(k, n, n)`` in ``order``."""
+        st, n = self.struct, self.n
+
+        def cols_of(t):
+            parts = []
+            if self.k_c:
+                parts.append(_cheap_arrays(A, Bv, st, t))
+            if len(self.fc):
+                parts.append(np.stack([Ufull[i] for i in st.f_idx[t]]))
+            return np.concatenate(parts) if parts else np.zeros((0, n, n))
+
+        return cols_of
+
+    def _parts(self, name):
+        """``rv ↦ (A, Bv, Ufull)`` at ``name = rv``, the other ρ held."""
         st, rho = self.struct, self.rho
         if name == "rho_d":
             Lo = self.solve_o.at(rho["rho_o"])
             A_fix = Lo.solve(st.U)
-            P = {key: Lo.solve(Bf) for key, Bf in B_full.items()}
+            P = [Lo.solve(Fi) for Fi in st.F]
 
             def parts(rv):
                 Ld = self.solve_d.at(rv)
-                eta_f = {key: Ld.solve(Pk.T).T for key, Pk in P.items()}
-                return eta_f, A_fix, Ld.solve(st.V)
+                return A_fix, Ld.solve(st.V), [Ld.solve(Pi.T).T for Pi in P]
 
         else:
             Ld = self.solve_d.at(rho["rho_d"])
             B_fix = Ld.solve(st.V)
-            P = {key: Ld.solve(Bf.T).T for key, Bf in B_full.items()}
+            P = [Ld.solve(Fi.T).T for Fi in st.F]
 
             def parts(rv):
                 Lo = self.solve_o.at(rv)
-                eta_f = {key: Lo.solve(Pk) for key, Pk in P.items()}
-                return eta_f, Lo.solve(st.U), B_fix
+                return Lo.solve(st.U), B_fix, [Lo.solve(Pi) for Pi in P]
 
         return parts
 
-    def _collapsed(self, Oms, Zr, eta_f, Av, Bv_):
-        """``log p`` of the working data with ``β_c`` and ``τ`` integrated out.
+    def _collapsed(self, Oms, Zr, Av, Bv_, Ufull):
+        """``log p`` of the working data with ``β`` and ``τ`` integrated out.
 
-        ``Zr`` is the ``(T, n, n)`` working response less the pair effects;
-        ``β_full`` is held.
+        ``Zr`` is the ``(T, n, n)`` working response less the pair effects.
         """
-        st, T, k_c, n_tau, t0 = self.struct, self.T, self.k_c, self.n_tau, self.t0
+        order, n_tau, t0 = self.order, self.n_tau, self.t0
+        cols_of = self._columns(Av, Bv_, Ufull)
+        mu = self.mu0[order]
         Rs = []
-        for t in range(T):
-            R = Zr[t] - eta_f[self.full_keys[t]]
-            if k_c:
-                ui, vi = st.u_idx[t], st.v_idx[t]
-                R = R - (Av[:, ui] * self.mu_c) @ Bv_[:, vi].T
+        for t in range(self.T):
+            R = Zr[t] - np.tensordot(mu, cols_of(t), axes=1)
             if n_tau and t >= t0:
                 R = R - self.mu_tau
             Rs.append(R)
-        M, v, quad = _gram_block(
-            Oms,
-            Rs,
-            lambda t: _cheap_arrays(Av, Bv_, st, t),
-            self.prec_c if k_c else np.zeros(0),
-            self.prec_tau,
-        )
+        M, v, quad = _gram_block(Oms, Rs, cols_of, self.prec0[order], self.prec_tau)
         if M.size == 0:
             return -0.5 * quad
         try:
@@ -551,22 +542,20 @@ class StructuredEquation:
     def update(self, Oms: np.ndarray, z: np.ndarray, rng, tuning: bool) -> None:
         """Draw ``ρ``, then ``(β, τ)``, then the pair effects, from ``(T, n, n)``
         working data."""
-        st, n = self.struct, self.n
-        k_c, fc = self.k_c, self.fc
-        B_full = self._full_sums(self.beta[fc])
+        n = self.n
 
         # Centred: C̃ held, its ρ-dependent prior in the density.
         for name in ("rho_d", "rho_o"):
-            parts = self._parts(name, B_full)
+            parts = self._parts(name)
 
             def log_density(rv, _name=name, _parts=parts):
                 if not (self.rho_lower < rv < self.rho_upper):
                     return -np.inf
                 try:
-                    eta_f, Av, Bv_ = _parts(rv)
+                    Av, Bv_, Uf = _parts(rv)
                 except FACTORIZATION_ERRORS:
                     return -np.inf  # ρ at the edge of its support
-                val = self._collapsed(Oms, z - self.C, eta_f, Av, Bv_)
+                val = self._collapsed(Oms, z - self.C, Av, Bv_, Uf)
                 if self.has_pairs and np.isfinite(val):
                     rd, ro = (
                         (rv, self.rho["rho_o"])
@@ -584,7 +573,7 @@ class StructuredEquation:
         if self.has_pairs:
             C_in = self.effects()
             for name in ("rho_d", "rho_o"):
-                parts = self._parts(name, B_full)
+                parts = self._parts(name)
                 if name == "rho_d":
                     fixed = self.solve_o.at(self.rho["rho_o"]).solve(C_in)
 
@@ -601,11 +590,11 @@ class StructuredEquation:
                     if not (self.rho_lower < rv < self.rho_upper):
                         return -np.inf
                     try:
-                        eta_f, Av, Bv_ = _parts(rv)
+                        Av, Bv_, Uf = _parts(rv)
                         Ct = _moving(rv)
                     except FACTORIZATION_ERRORS:
                         return -np.inf
-                    return self._collapsed(Oms, z - Ct, eta_f, Av, Bv_)
+                    return self._collapsed(Oms, z - Ct, Av, Bv_, Uf)
 
                 self._slice_rho(name, log_density, self.width_nc[name], rng, tuning)
             self.C = self._solve_A(C_in)
@@ -613,15 +602,7 @@ class StructuredEquation:
         # (β, τ) jointly, then the pair effects
         rho = self.rho
         A, Bv, Ufull = self._transformed(rho["rho_d"], rho["rho_o"])
-
-        def cols_of(t, _A=A, _Bv=Bv, _U=Ufull):
-            parts_ = []
-            if k_c:
-                parts_.append(_cheap_arrays(_A, _Bv, st, t))
-            if len(fc):
-                parts_.append(np.stack([_U[i] for i in st.f_idx[t]]))
-            return np.concatenate(parts_) if parts_ else np.zeros((0, n, n))
-
+        cols_of = self._columns(A, Bv, Ufull)
         order = self.order
         M, h, _ = _gram_block(
             Oms, list(z - self.C), cols_of, self.prec0[order], self.prec_tau
