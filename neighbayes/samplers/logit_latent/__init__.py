@@ -7,9 +7,9 @@ from ``augax``.
 """
 
 from .._registry import register
-from ._core import run_chain
+from ._core import LatentLogitChain
 
-__all__ = ["run_chain"]
+__all__ = ["LatentLogitChain"]
 
 
 def _run_latent_logit(

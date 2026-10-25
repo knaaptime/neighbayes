@@ -46,7 +46,6 @@ import numpy as np
 import scipy.sparse as sp
 
 from ...models.priors import LogitGibbsPriors, ReducedGibbsPriors
-from .._utils._sweeps import run_sweeps
 from ..logit_latent._core import LatentLogitChain
 from ..negbin_latent._core import (
     POISSON,
@@ -96,6 +95,14 @@ class _TwoPartChain:
     def summary(self) -> dict:
         """What the chain accumulates beyond its draws."""
         return {}
+
+    def set_logdet(self, fn: Callable[[float], float], *, zero: bool) -> None:
+        """Install one part's log-determinant of one period."""
+        if not zero:
+            self.count.logdet_fn = fn
+            return
+        T = self.count.T
+        self.zero.logdet_fn = fn if T == 1 else (lambda r: T * fn(r))
 
 
 class LatentHurdleChain(_TwoPartChain):
@@ -227,7 +234,7 @@ class LatentZINBChain(_TwoPartChain):
         }
 
 
-def run_chain(
+def make_chain(
     *,
     model: str,
     y: np.ndarray,
@@ -239,28 +246,22 @@ def run_chain(
     priors_zero: LogitGibbsPriors,
     logdet_fn: Callable[[float], float],
     logdet_zero_fn: Callable[[float], float],
-    draws: int,
-    tune: int,
-    thin: int = 1,
     rng: np.random.Generator,
-    chain_id: int = 0,
-    progress_manager=None,
     slice_width: float = 0.4,
-    store_latent: bool = False,
     T: int = 1,
     unit_effects: Optional[UnitEffects] = None,
     unit_effects_zero: Optional[UnitEffects] = None,
-) -> dict:
-    """One chain of the latent ``model`` (``"hurdle"`` or ``"zinb"``).
+) -> _TwoPartChain:
+    """The chain object of the latent ``model`` (``"hurdle"`` or ``"zinb"``).
 
-    Returns ``rho_zero``, ``beta_zero``, ``rho``, ``beta`` and ``alpha``;
-    ``store_latent`` adds the utilities (``"latent_zero"``) and log-means
-    (``"latent"``) at every kept draw.  A panel's unit effects add
-    ``unit_effect`` and ``unit_effect_sd`` (the hurdle's zero part's
-    ``*_zero``).  The ZINB adds ``structural_prob`` and
-    ``structural_prob_sd`` over the zero counts.  ``W`` and ``W_zero`` are a
-    period's weights, ``logdet_fn`` and ``logdet_zero_fn`` a period's
-    log-determinants.
+    ``W`` and ``W_zero`` are a period's weights, ``logdet_fn`` and
+    ``logdet_zero_fn`` a period's log-determinants.  Under :func:`~neighbayes.samplers._utils._sweeps.run_sweeps` its draws are
+    ``rho_zero``, ``beta_zero``, ``rho``, ``beta`` and ``alpha``;
+    ``store_latent`` adds the utilities (``latent_zero``) and log-means
+    (``latent``).  A panel's unit effects add ``unit_effect`` and
+    ``unit_effect_sd`` (the hurdle's zero part's ``*_zero``).  Its
+    ``summary()`` holds the ZINB's ``structural_prob`` and
+    ``structural_prob_sd`` over the zero counts.
     """
     panel = dict(T=T, unit_effects=unit_effects)
     if model == "hurdle":
@@ -268,7 +269,7 @@ def run_chain(
     elif unit_effects_zero is not None:
         raise ValueError("The zero-inflated model's zero part takes no unit effects.")
     cls = {"hurdle": LatentHurdleChain, "zinb": LatentZINBChain}[model]
-    chain = cls(
+    return cls(
         y=y,
         X=X,
         Z=Z,
@@ -282,14 +283,3 @@ def run_chain(
         slice_width=slice_width,
         **panel,
     )
-    out = run_sweeps(
-        chain,
-        draws=draws,
-        tune=tune,
-        thin=thin,
-        chain_id=chain_id,
-        progress_manager=progress_manager,
-        store_latent=store_latent,
-    )
-    out.update(chain.summary())
-    return out

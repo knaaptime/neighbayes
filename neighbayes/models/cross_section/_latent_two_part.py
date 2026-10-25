@@ -87,6 +87,34 @@ def _draw_truncated_poisson(rng, lam: np.ndarray) -> np.ndarray:
     return 1 + rng.poisson(lam * np.clip(1.0 - t, 0.0, 1.0))
 
 
+def _probe_start(probes, tune: int, backend: str):
+    """The log-determinant a part's warmup starts on, from its probe check."""
+    if backend == "jax":
+        return "cheb", probes.initial(tune, jax=True).params
+    probes.initial(tune)
+    return probes.period_fn()
+
+
+def _zero_par(chain) -> float:
+    return chain.zero.par
+
+
+def _count_par(chain) -> float:
+    return chain.count.par
+
+
+def _set_zero_logdet(chain, fn) -> None:
+    chain.set_logdet(fn, zero=True)
+
+
+def _set_count_logdet(chain, fn) -> None:
+    chain.set_logdet(fn, zero=False)
+
+
+def _summary(chain) -> dict:
+    return chain.summary()
+
+
 class LatentTwoPartMixin:
     """Gibbs fit, log-likelihood and simulated summaries of the latent two-part models.
 
@@ -180,6 +208,25 @@ class LatentTwoPartMixin:
     # Fit
     # ------------------------------------------------------------------
 
+    def _latent_two_part_probes(self):
+        """The count and zero parts' probe checks, or ``(None, None)``.
+
+        Each is a :class:`~neighbayes._logdet._probe_check.WarmupProbes` when the
+        log-determinant is stochastic; parts on one W share one.
+        """
+        b = self._logdet_bounds
+        if b.method != "cheb_stochastic" or not self.logdet_adapt:
+            return None, None
+        from ..._logdet._probe_check import WarmupProbes
+
+        def probes(W):
+            return WarmupProbes(
+                W.tocsr(), T=self._latent_T, rho_min=b.rho_min, rho_max=b.rho_max
+            )
+
+        count = probes(self._W_sparse)
+        return count, count if self._same_W else probes(self._W_zero_sparse)
+
     def _latent_logdets(self, backend: str):
         """The count and zero parts' log-determinants for ``backend``."""
         from ..._logdet import make_logdet_numpy_fn
@@ -237,7 +284,17 @@ class LatentTwoPartMixin:
         W_zero = self._W_zero_sparse.tocsr()
         rng = np.random.default_rng(random_seed)
         seeds = [int(s) for s in rng.integers(0, 2**31, size=chains)]
-        logdet, logdet_zero = self._latent_logdets(backend)
+        probes, probes_zero = self._latent_two_part_probes()
+        self._fitted_probes, self._fitted_probes_zero = probes, probes_zero
+        if probes is None:
+            logdet, logdet_zero = self._latent_logdets(backend)
+        else:
+            logdet = _probe_start(probes, tune, backend)
+            logdet_zero = (
+                logdet
+                if probes_zero is probes
+                else _probe_start(probes_zero, tune, backend)
+            )
         common = dict(
             model=self._two_part,
             y=y,
@@ -265,35 +322,58 @@ class LatentTwoPartMixin:
                 logdet_zero=logdet_zero,
                 seeds=seeds,
                 progressbar=progressbar,
+                probes=probes,
+                probes_zero=probes_zero,
             )
-            return self._latent_two_part_idata(results, log_likelihood)
-
-        from ...samplers.gaussian._chain_runner import run_chains
-        from ...samplers.two_part_latent._core import run_chain
-
-        def _run_one_chain(chain_id, seed, progress_manager=None, chain_id_kw=None):
-            return run_chain(
-                **common,
-                logdet_fn=logdet,
-                logdet_zero_fn=logdet_zero,
-                rng=np.random.default_rng(seed),
-                chain_id=chain_id_kw if chain_id_kw is not None else chain_id,
-                progress_manager=progress_manager,
+        else:
+            from ...samplers._utils._sweeps import (
+                probe_sweep_midpoint,
+                run_sweeps_with_midpoint,
             )
+            from ...samplers.two_part_latent._core import make_chain
 
-        results = run_chains(
-            chain_fn=_run_one_chain,
-            n_chains=chains,
-            seeds=seeds,
-            n_jobs=n_jobs,
-            progressbar=progressbar,
-            parallel=(n_jobs != 1),
-            draws=draws,
-            tune=tune,
-            model_type=type(self).__name__,
-            timeout=None,
-        )
-        return self._latent_two_part_idata(results, log_likelihood)
+            build = {
+                key: common[key]
+                for key in common
+                if key not in ("draws", "tune", "thin", "store_latent")
+            }
+
+            def _make_chain(chain_rng):
+                return make_chain(
+                    **build,
+                    logdet_fn=logdet,
+                    logdet_zero_fn=logdet_zero,
+                    rng=chain_rng,
+                )
+
+            midpoint = None
+            if probes is not None:
+                midpoint = probe_sweep_midpoint(
+                    [
+                        (probes_zero, _zero_par, _set_zero_logdet),
+                        (probes, _count_par, _set_count_logdet),
+                    ]
+                )
+            results = run_sweeps_with_midpoint(
+                _make_chain,
+                seeds=seeds,
+                draws=draws,
+                tune=tune,
+                thin=thin,
+                midpoint=midpoint,
+                store_latent=log_likelihood,
+                finish=_summary,
+                n_jobs=n_jobs,
+                progressbar=progressbar,
+                model_type=type(self).__name__,
+            )
+        idata = self._latent_two_part_idata(results, log_likelihood)
+        if probes is not None:
+            post = idata.posterior
+            probes.record(idata, post["rho"].values)
+            if probes_zero is not probes:
+                probes_zero.record(idata, post["rho_zero"].values, suffix="_zero")
+        return idata
 
     def _latent_two_part_idata(self, results, log_likelihood: bool) -> xr.DataTree:
         def stack(name):

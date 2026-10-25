@@ -797,12 +797,16 @@ def run_multilevel_chain(
     store_log_lik: bool = False,
     chain_id: int = 0,
     progress_manager: object | None = None,
+    init: MultilevelState | None = None,
+    return_state: bool = False,
 ) -> dict[str, np.ndarray]:
     """Run one chain; returns traces keyed by level index.
 
     Keys: ``rho`` (n_keep, L+1), ``sigma`` (n_keep, L+1), ``beta_{ℓ}``
     (n_keep, k_ℓ), ``theta_{ℓ}`` (n_keep, J_ℓ) when ``store_theta``, and
-    ``log_lik`` (n_keep, n) when ``store_log_lik``.
+    ``log_lik`` (n_keep, n) when ``store_log_lik``.  The chain starts from
+    ``init`` when given; ``return_state`` adds its final state under
+    ``"_final_state"``, for a later call to resume from.
     """
     if parametrization not in PARAMETRIZATIONS:
         raise ValueError(
@@ -815,7 +819,16 @@ def run_multilevel_chain(
     centred = parametrization in ("interweave", "centred")
     noncentred = parametrization in ("interweave", "noncentred")
 
-    state = initialize(st, priors, rng)
+    state = (
+        initialize(st, priors, rng)
+        if init is None
+        else MultilevelState(
+            z=init.z.copy(),
+            rho=init.rho.copy(),
+            sig2=init.sig2.copy(),
+            aux=init.aux.copy(),
+        )
+    )
     factor = st.new_factor()
     widths_c = [
         SliceWidthState(w=0.1 * (lv.rho_upper - lv.rho_lower)) if lv.spatial else None
@@ -876,4 +889,6 @@ def run_multilevel_chain(
                     )
         if progress_manager is not None:
             progress_manager.update(chain_id, it, tuning=it < tune)
+    if return_state:
+        out["_final_state"] = state
     return out

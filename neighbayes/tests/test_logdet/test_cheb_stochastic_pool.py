@@ -159,7 +159,7 @@ class TestProbeBias:
         W, _ = ring
         pool = cheb_stochastic_pool(W, 12, seed=0)
         assert pool_probe_bias(pool, np.full(50, 0.5)) is None
-        sized, check = size_pool(pool, np.full(50, 0.5))
+        sized, check = size_pool(pool, np.full(50, 0.5), bar=0.05)
         assert sized is pool and check is None
 
 

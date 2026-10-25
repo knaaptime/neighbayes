@@ -80,7 +80,6 @@ from scipy.special import digamma, gammaln, polygamma
 from ...models.priors import ReducedGibbsPriors
 from .._utils._latent_loglik import POISSON, TRUNCATED, UNOBSERVED, log_positive
 from .._utils._slice import SliceWidthState, slice_sample_1d, slice_sample_1d_adaptive
-from .._utils._sweeps import run_sweeps
 
 #: Degrees of freedom of the β proposal.
 _BETA_DF = 8.0
@@ -487,7 +486,8 @@ class LatentNegBinChain:
     ``y`` and ``X`` stack ``T`` periods of ``n`` units time-first, ``W`` being
     the ``n x n`` weights.  ``kind`` says what each count observes
     (:data:`POISSON` everywhere by default); a two-part model sets it between
-    sweeps.  :func:`run_chain` runs one alone.
+    sweeps.  ``unit_effects`` (SAR only) adds random unit effects.
+    :func:`~neighbayes.samplers._utils._sweeps.run_sweeps` runs one.
     """
 
     def __init__(
@@ -700,7 +700,11 @@ class LatentNegBinChain:
         self.it += 1
 
     def draw(self, store_latent: bool) -> dict:
-        """The current values, named as :func:`run_chain` returns them."""
+        """The current values: ``rho`` or ``lam``, ``beta`` and ``alpha``.
+
+        Unit effects add ``unit_effect`` and ``unit_effect_sd``; ``store_latent``
+        adds the log-means, ``latent``, flattened time-first.
+        """
         out = {
             "rho" if self.sar else "lam": self.par,
             "beta": self.beta,
@@ -712,55 +716,3 @@ class LatentNegBinChain:
         if store_latent:
             out["latent"] = self.eta.reshape(-1)
         return out
-
-
-def run_chain(
-    *,
-    y: np.ndarray,
-    X: np.ndarray,
-    W: sp.csr_matrix,
-    process: Literal["sar", "sem"],
-    priors: ReducedGibbsPriors,
-    logdet_fn: Callable[[float], float],
-    draws: int,
-    tune: int,
-    thin: int = 1,
-    rng: np.random.Generator,
-    chain_id: int = 0,
-    progress_manager=None,
-    slice_width: float = 0.4,
-    store_latent: bool = False,
-    T: int = 1,
-    unit_effects: Optional[UnitEffects] = None,
-    kind: Optional[np.ndarray] = None,
-) -> dict:
-    """One chain; returns ``{"rho" | "lam": ..., "beta": ..., "alpha": ...}``.
-
-    ``y`` and ``X`` stack ``T`` periods of ``n`` units time-first, ``W`` being
-    the ``n x n`` weights; ``unit_effects`` (SAR only) adds ``"unit_effect"``
-    and ``"unit_effect_sd"``; ``kind`` is what each count observes
-    (:data:`POISSON` by default).  ``store_latent`` adds the log-means at every
-    kept draw, ``"latent"``, flattened time-first.
-    """
-    chain = LatentNegBinChain(
-        y=y,
-        X=X,
-        W=W,
-        process=process,
-        priors=priors,
-        logdet_fn=logdet_fn,
-        rng=rng,
-        slice_width=slice_width,
-        T=T,
-        unit_effects=unit_effects,
-        kind=kind,
-    )
-    return run_sweeps(
-        chain,
-        draws=draws,
-        tune=tune,
-        thin=thin,
-        chain_id=chain_id,
-        progress_manager=progress_manager,
-        store_latent=store_latent,
-    )

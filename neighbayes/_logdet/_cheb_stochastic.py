@@ -843,14 +843,44 @@ def cheb_stochastic_logdet_eval_vec(
 #: sd, against none starting from 50.
 DEFAULT_PROBE_MIN = 50
 
-#: Largest pool.  It also sizes the Chebyshev order, so truncation stays under
-#: the probe noise at every size the pool can grow to.
+#: Largest pool unless one is given, and the least a run-sized pool may grow to
+#: on any lattice (:func:`probe_cap`).  A pool's largest size also sets its
+#: Chebyshev order, so truncation stays under the probe noise at every size the
+#: pool can grow to.
 DEFAULT_PROBE_MAX = 200
 
-#: Target for the expected |bias| of the posterior mean of ρ, in posterior
-#: standard deviations: 1/√500, the Monte Carlo error of a posterior mean with
-#: an effective sample size of 500.
-DEFAULT_PROBE_BAR = 0.045
+#: Probe setup costs about the probe count times the lattice size: 1,000 probes
+#: take 0.7 s at n = 10,000 and 75 s at n = 490,000 on a rook lattice.  A pool
+#: sized against a run's own Monte Carlo error may grow to this budget over
+#: ``n`` probes, within [DEFAULT_PROBE_MAX, PROBE_MAX_SMALL_N]: 1,000 up to
+#: n = 100,000, 200 at 490,000, about 15 s of setup at the most.
+PROBE_SIZE_BUDGET = 1e8
+PROBE_MAX_SMALL_N = 1000
+
+
+def probe_cap(n: int) -> int:
+    """The most probes a run-sized pool may grow to on an ``n``-unit lattice."""
+    return int(
+        np.clip(
+            PROBE_SIZE_BUDGET / max(int(n), 1), DEFAULT_PROBE_MAX, PROBE_MAX_SMALL_N
+        )
+    )
+
+
+def run_bar(draws_by_chain, draws: int, chains: int) -> float:
+    """``1/√ESS`` of the run ahead: the Monte Carlo error of its posterior mean of ρ.
+
+    ``draws_by_chain`` is ``(chains, iters)`` of settled warmup draws, chains
+    apart; their effective sample size per draw, times ``draws × chains``, is
+    the run's.  A probe pool whose bias stays under it leaves the log-determinant
+    error below what the run can resolve.
+    """
+    import arviz as az
+
+    x = np.atleast_2d(np.asarray(draws_by_chain, dtype=np.float64))
+    per_draw = float(az.ess(x)) / x.size
+    return 1.0 / np.sqrt(max(per_draw * int(draws) * int(chains), 1.0))
+
 
 #: Safety divisor on the bar.  The spread is estimated from the probes in hand,
 #: and the pool stops on the first estimate under the target, so the realized
@@ -1048,7 +1078,7 @@ def pool_probe_bias(
 
 def probes_needed(
     q: np.ndarray,
-    bar: float = DEFAULT_PROBE_BAR,
+    bar: float,
     z: float = DEFAULT_PROBE_Z,
 ) -> int:
     """Probes at which the expected |bias| of the posterior mean falls to ``bar / z``.
@@ -1091,7 +1121,7 @@ def size_pool(
     pool: ChebStochasticPool,
     rho_draws,
     *,
-    bar: float = DEFAULT_PROBE_BAR,
+    bar: float,
     z: float = DEFAULT_PROBE_Z,
     max_probes: int = DEFAULT_PROBE_MAX,
     T: int = 1,

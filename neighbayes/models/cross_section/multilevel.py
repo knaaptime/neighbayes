@@ -260,6 +260,11 @@ class Multilevel(SpatialModel):
         ``"lu"`` that the method is implemented on.  Ignored by
         ``"stochastic"``.  A pair with no implementation (``"spline"`` on
         ``"chol"``, ``"exact"`` on ``"lu"``) raises.
+    logdet_adapt : bool, default True
+        Halfway through Gibbs warmup, size each stochastic level's Hutchinson
+        probes to the run, as :class:`~neighbayes.models.SAR` does; the pools
+        are recorded per level (``idata.attrs["logdet_probes_ℓ"]``).
+        ``False`` keeps 50.
 
     Notes
     -----
@@ -297,6 +302,7 @@ class Multilevel(SpatialModel):
         priors: dict | MultilevelPriors | None = None,
         logdet_method: str | None = None,
         logdet_decomp: str = "auto",
+        logdet_adapt: bool = True,
     ):
         if len(levels) < 2:
             raise ValueError(
@@ -324,6 +330,7 @@ class Multilevel(SpatialModel):
             priors=priors,
             logdet_method=logdet_method,
             logdet_decomp=logdet_decomp,
+            logdet_adapt=logdet_adapt,
         )
         self._y = np.asarray(self._y, dtype=np.float64).reshape(-1)
         self._jacobian_param = _PARAM[_COMPONENTS[unit.process][0]]
@@ -477,37 +484,65 @@ class Multilevel(SpatialModel):
     # Per-level logdets and priors
     # ------------------------------------------------------------------
 
-    def _level_logdet(self, ell: int):
-        """``(bounds, numpy fn, pytensor fn, grad vec fn)`` for level ℓ (cached)."""
-        cache = self.__dict__.setdefault("_logdet_cache", {})
-        if ell in cache:
-            return cache[ell]
+    #: Each level's probe check from the latest Gibbs fit, by level index.
+    _fitted_level_probes: dict | None = None
+
+    def _level_bounds(self, ell: int):
+        """Level ℓ's log-determinant method and support; upper levels choose their own."""
         if ell == 0:
-            out = (
-                self._logdet_bounds,
-                self._logdet_numpy_fn,
-                self._logdet_pytensor_fn,
-                self._logdet_grad_numpy_vec_fn,
-            )
-        else:
+            return self._logdet_bounds
+        cache = self.__dict__.setdefault("_level_bounds_cache", {})
+        if ell not in cache:
             from ..._logdet import resolve_logdet_bounds
-            from ..._logdet._factories import (
-                make_logdet_fn,
-                make_logdet_grad_numpy_vec_fn,
-                make_logdet_numpy_fn,
-            )
 
             W = self._levels[ell].W
-            b = resolve_logdet_bounds(None, n=W.shape[0], priors=self.priors, W=W)
-            kw = dict(method=b.method, rho_min=b.rho_min, rho_max=b.rho_max)
-            out = (
-                b,
-                make_logdet_numpy_fn(W, None, **kw),
-                make_logdet_fn(W, **kw),
-                make_logdet_grad_numpy_vec_fn(W, None, **kw),
+            cache[ell] = resolve_logdet_bounds(
+                None, n=W.shape[0], priors=self.priors, W=W
             )
-        cache[ell] = out
-        return out
+        return cache[ell]
+
+    def _level_logdet_numpy(self, ell: int):
+        """Level ℓ's ``log|I − rW_ℓ|`` (cached)."""
+        if ell == 0:
+            return self._logdet_numpy_fn
+        cache = self.__dict__.setdefault("_level_logdet_cache", {})
+        if ell not in cache:
+            from ..._logdet._factories import make_logdet_numpy_fn
+
+            b = self._level_bounds(ell)
+            cache[ell] = make_logdet_numpy_fn(
+                self._levels[ell].W,
+                None,
+                method=b.method,
+                rho_min=b.rho_min,
+                rho_max=b.rho_max,
+            )
+        return cache[ell]
+
+    def _level_logdet_grad(self, ell: int):
+        """Level ℓ's ``g(r) = d/dr log|I − rW_ℓ|``, vectorized.
+
+        The latest Gibbs fit's probe pool for the level when it sized one, as
+        :attr:`_logdet_grad_numpy_vec_fn`; otherwise the level's surrogate.
+        """
+        probes = (self._fitted_level_probes or {}).get(ell)
+        if probes is not None:
+            return probes.grad_vec_fn()
+        if ell == 0:
+            return self._logdet_grad_surrogate_vec_fn
+        cache = self.__dict__.setdefault("_level_grad_cache", {})
+        if ell not in cache:
+            from ..._logdet._factories import make_logdet_grad_numpy_vec_fn
+
+            b = self._level_bounds(ell)
+            cache[ell] = make_logdet_grad_numpy_vec_fn(
+                self._levels[ell].W,
+                None,
+                method=b.method,
+                rho_min=b.rho_min,
+                rho_max=b.rho_max,
+            )
+        return cache[ell]
 
     def _level_logdet_jax(self, ell: int):
         """``(kind, params)`` of level ℓ's log-determinant for the JAX sweep (cached)."""
@@ -515,12 +550,27 @@ class Multilevel(SpatialModel):
         if ell not in cache:
             from ..._logdet._jax import logdet_jax_params
 
-            b, *_ = self._level_logdet(ell)
+            b = self._level_bounds(ell)
             eigs = self._logdet_eigs if ell == 0 else None
             cache[ell] = logdet_jax_params(
                 self._levels[ell].W, b.method, b.rho_min, b.rho_max, eigs=eigs
             )
         return cache[ell]
+
+    def _level_probes(self) -> dict:
+        """Each spatial level's probe check when its log-determinant is stochastic."""
+        if not self.logdet_adapt:
+            return {}
+        from ..._logdet._probe_check import WarmupProbes
+
+        out = {}
+        for ell, r in enumerate(self._levels):
+            if r.process == "none":
+                continue
+            b = self._level_bounds(ell)
+            if b.method == "cheb_stochastic":
+                out[ell] = WarmupProbes(r.W, rho_min=b.rho_min, rho_max=b.rho_max)
+        return out
 
     def _beta_prior(self, ell: int) -> tuple[np.ndarray, np.ndarray]:
         r = self._levels[ell]
@@ -571,14 +621,21 @@ class Multilevel(SpatialModel):
             "sigma_scale": float(p.sigma_scale if p.sigma_scale is not None else sd_y),
         }
 
-    def _level_specs(self) -> list[LevelSpec]:
+    def _level_specs(self, starts: dict | None = None) -> list[LevelSpec]:
+        """The levels as the sampler sees them.
+
+        ``starts`` maps a level to the log-determinant warmup starts on in place
+        of its own: a probe check's.
+        """
+        starts = starts or {}
         specs = []
         for ell, r in enumerate(self._levels):
             mu, sd = self._beta_prior(ell)
             lo, hi, logdet, method = -1.0, 1.0, None, None
             if r.process != "none":
-                b, logdet, _, _ = self._level_logdet(ell)
+                b = self._level_bounds(ell)
                 lo, hi, method = b.rho_min, b.rho_max, b.method
+                logdet = starts.get(ell) or self._level_logdet_numpy(ell)
             specs.append(
                 LevelSpec(
                     X=r.X,
@@ -638,15 +695,28 @@ class Multilevel(SpatialModel):
         from ...samplers._utils._seeds import spawn_chain_seeds
         from ...samplers.gaussian._chain_runner import run_chains
 
-        specs = self._level_specs()
-        if backend == "jax":
+        # A stochastic level starts warmup on a small probe pool and sizes it
+        # halfway, on where the chains settled, before any retained draw.
+        probes = self._level_probes()
+        self._fitted_level_probes, self._fitted_probes = probes, probes.get(0)
+        jax = backend == "jax"
+        starts = {ell: p.initial(tune, jax=jax) for ell, p in probes.items()}
+        specs = self._level_specs({ell: ev.scalar_fn for ell, ev in starts.items()})
+        if jax:
             for ell, spec in enumerate(specs):
                 if spec.spatial:
-                    spec.logdet_jax = self._level_logdet_jax(ell)
+                    spec.logdet_jax = (
+                        ("cheb", starts[ell].params)
+                        if ell in starts
+                        else self._level_logdet_jax(ell)
+                    )
         st = MultilevelStructure(self._y, specs)
         priors = MultilevelGibbsPriors(**self._variance_priors())
-        seeds = spawn_chain_seeds(random_seed, chains)
-        if backend == "jax":
+        # A scouting phase draws from the extra seed, so runs without one keep
+        # their seeding.
+        all_seeds = spawn_chain_seeds(random_seed, chains, extra=1)
+        seeds = all_seeds[:chains]
+        if jax:
             from ...samplers.multilevel._jax import run_multilevel_jax
 
             results = run_multilevel_jax(
@@ -661,36 +731,86 @@ class Multilevel(SpatialModel):
                 store_theta=store_theta,
                 store_log_lik=log_likelihood,
                 progressbar=progressbar,
+                probes=probes,
             )
-            return self._assemble(results, log_likelihood, store_theta)
+            return self._record_level_probes(
+                self._assemble(results, log_likelihood, store_theta), probes
+            )
 
-        def _run_one_chain(chain_id, seed, progress_manager=None, chain_id_kw=None):
-            return run_multilevel_chain(
-                st,
-                priors,
-                draws,
-                tune,
-                thin=thin,
-                rng=np.random.default_rng(seed),
-                parametrization=parametrization,
-                store_theta=store_theta,
-                store_log_lik=log_likelihood,
-                chain_id=chain_id_kw if chain_id_kw is not None else chain_id,
-                progress_manager=progress_manager,
+        scouting_seeds = all_seeds[chains].spawn(chains)
+
+        def _chain_fn(inits, phase_draws, phase_tune, *, scouting=False):
+            def _run_one_chain(chain_id, seed, progress_manager=None, chain_id_kw=None):
+                return run_multilevel_chain(
+                    st,
+                    priors,
+                    phase_draws,
+                    phase_tune,
+                    thin=1 if scouting else thin,
+                    rng=np.random.default_rng(
+                        scouting_seeds[chain_id] if scouting else seed
+                    ),
+                    parametrization=parametrization,
+                    store_theta=store_theta and not scouting,
+                    store_log_lik=log_likelihood and not scouting,
+                    chain_id=chain_id_kw if chain_id_kw is not None else chain_id,
+                    progress_manager=progress_manager,
+                    init=inits[chain_id],
+                    return_state=scouting,
+                )
+
+            return _run_one_chain
+
+        parallel = n_jobs != 1
+        inits: list = [None] * chains
+        tune_remaining = tune
+        if probes and tune >= 2:
+            tune_a = tune // 2
+            warm = run_chains(
+                chain_fn=_chain_fn(inits, tune_a, 0, scouting=True),
+                n_chains=chains,
+                seeds=seeds,
+                n_jobs=n_jobs,
+                progressbar=False,
+                parallel=parallel,
+                draws=tune_a,
+                tune=0,
+                model_type="multilevel",
             )
+            inits = [w["_final_state"] for w in warm]
+            tune_remaining = tune - tune_a
+            for ell, p in probes.items():
+                adapted = p.adapt(
+                    np.stack([w["rho"][tune_a // 2 :, ell] for w in warm]),
+                    draws=draws,
+                    chains=chains,
+                )
+                if adapted is not None:
+                    st.levels[ell].logdet = adapted.scalar_fn
 
         results = run_chains(
-            chain_fn=_run_one_chain,
+            chain_fn=_chain_fn(inits, draws, tune_remaining),
             n_chains=chains,
             seeds=seeds,
             n_jobs=n_jobs,
             progressbar=progressbar,
-            parallel=n_jobs != 1,
+            parallel=parallel,
             draws=draws,
-            tune=tune,
+            tune=tune_remaining,
             model_type="multilevel",
+            # The scouting phase just spawned this pool with the same workers.
+            reuse_workers=inits[0] is not None,
         )
-        return self._assemble(results, log_likelihood, store_theta)
+        return self._record_level_probes(
+            self._assemble(results, log_likelihood, store_theta), probes
+        )
+
+    def _record_level_probes(self, idata, probes: dict):
+        """Attach each level's probe check, suffixed by its index."""
+        for ell, p in probes.items():
+            name = f"{_PARAM[self._levels[ell].process]}_{ell}"
+            p.record(idata, idata.posterior[name].values, suffix=f"_{ell}")
+        return idata
 
     def _assemble(self, results, log_likelihood, store_theta) -> xr.DataTree:
         """Per-chain trace dicts → the posterior, named by level."""
@@ -757,7 +877,7 @@ class Multilevel(SpatialModel):
                 if r.process == "none":
                     th = mean + sigma * raw
                 else:
-                    b, *_ = self._level_logdet(ell)
+                    b = self._level_bounds(ell)
                     coef = pm.Uniform(
                         f"{_PARAM[r.process]}_{ell}", lower=b.rho_min, upper=b.rho_max
                     )
@@ -781,7 +901,7 @@ class Multilevel(SpatialModel):
             if r0.process == "none":
                 pm.Normal("obs", mu=mean0, sigma=sigma0, observed=self._y)
                 return model
-            b0, _, logdet0, _ = self._level_logdet(0)
+            b0, logdet0 = self._level_bounds(0), self._logdet_pytensor_fn
             coef0 = pm.Uniform(
                 f"{_PARAM[r0.process]}_0", lower=b0.rho_min, upper=b0.rho_max
             )
@@ -921,8 +1041,7 @@ class Multilevel(SpatialModel):
         if r.process != "lag":
             one = np.ones(G)
             return one, np.full(G, w_diag), one, np.full(G, w_rows.mean())
-        _, _, _, grad = self._level_logdet(ell)
-        g = np.asarray(grad(coef), dtype=np.float64)
+        g = np.asarray(self._level_logdet_grad(ell)(coef), dtype=np.float64)
         md = 1.0 - (coef / J) * g
         md_w = -g / J
         rs, rs_w = _mean_rowsums(r.W, coef, lambda c, b: self._filter_solve(ell, c, b))

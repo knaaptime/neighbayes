@@ -285,20 +285,24 @@ class _SARRandomEffects(_RandomEffectsMixin):
             self._logdet_bounds.rho_max,
         )
 
+        probes = self.logdet_adapt and self._logdet_bounds.method == "cheb_stochastic"
         gibbs = GaussianSARREGibbs(
             y=self._y,
             X=self._X,
             W_sparse=self._W_sparse_NT,
             Wy=self._Wy,
             priors=priors,
-            logdet_fn=self._logdet_numpy_fn,
-            logdet_vec_fn=self._logdet_numpy_vec_fn,
+            # A stochastic log-determinant is built by the sampler, which sizes
+            # its probe pool in warmup.
+            logdet_fn=None if probes else self._logdet_numpy_fn,
+            logdet_vec_fn=None if probes else self._logdet_numpy_vec_fn,
             feature_names=list(self._feature_names),
             N=self._N,
             T=self._T,
             unit_idx=self._unit_idx,
             W_eigs=self._logdet_eigs,
             logdet_method=self._logdet_bounds.method,
+            logdet_adapt=self.logdet_adapt,
         )
 
         self._idata = gibbs.fit(
@@ -311,6 +315,7 @@ class _SARRandomEffects(_RandomEffectsMixin):
             progressbar=progressbar,
             log_likelihood=log_likelihood,
         )
+        self._fitted_probes = gibbs.warmup_probes
         return self._idata
 
     def _fitted_mean_from_posterior_random(self) -> np.ndarray:
@@ -491,19 +496,23 @@ class _SEMRandomEffects(_RandomEffectsMixin):
             self._logdet_bounds.rho_max,
         )
 
+        probes = self.logdet_adapt and self._logdet_bounds.method == "cheb_stochastic"
         gibbs = GaussianSEMREGibbs(
             y=self._y,
             X=self._X,
             W_sparse=self._W_sparse_NT,
             priors=priors,
-            logdet_fn=self._logdet_numpy_fn,
-            logdet_vec_fn=self._logdet_numpy_vec_fn,
+            # A stochastic log-determinant is built by the sampler, which sizes
+            # its probe pool in warmup.
+            logdet_fn=None if probes else self._logdet_numpy_fn,
+            logdet_vec_fn=None if probes else self._logdet_numpy_vec_fn,
             feature_names=list(self._feature_names),
             N=self._N,
             T=self._T,
             unit_idx=self._unit_idx,
             W_eigs=self._logdet_eigs,
             logdet_method=self._logdet_bounds.method,
+            logdet_adapt=self.logdet_adapt,
         )
 
         self._idata = gibbs.fit(
@@ -516,6 +525,7 @@ class _SEMRandomEffects(_RandomEffectsMixin):
             progressbar=progressbar,
             log_likelihood=log_likelihood,
         )
+        self._fitted_probes = gibbs.warmup_probes
         return self._idata
 
     def _fitted_mean_from_posterior_random(self) -> np.ndarray:

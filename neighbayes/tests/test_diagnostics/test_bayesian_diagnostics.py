@@ -998,7 +998,7 @@ class TestSpatialDiagnosticsMethod:
         obj.__dict__["_T_ww"] = float(
             np.sum(W_dense_arr * W_dense_arr) + np.trace(W_dense_arr @ W_dense_arr)
         )
-        obj.__dict__["_logdet_grad_numpy_vec_fn"] = exact_logdet_grad(W_sparse)
+        obj.__dict__["_logdet_grad_surrogate_vec_fn"] = exact_logdet_grad(W_sparse)
         obj._idata = idata
         return obj
 

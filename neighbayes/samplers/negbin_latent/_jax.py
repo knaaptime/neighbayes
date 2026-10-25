@@ -18,7 +18,7 @@ from __future__ import annotations
 import numpy as np
 import scipy.sparse as sp
 
-from .._utils._jax_utils import cached_sweep, run_chains_chunked
+from .._utils._jax_utils import cached_sweep, probe_midpoint, run_chains_chunked
 from .._utils._latent_loglik import POISSON, TRUNCATED, UNOBSERVED
 from ..logit_latent._jax import class_table, colour_classes, column_table
 from ._core import (
@@ -607,11 +607,15 @@ def run_chains_jax_latent_negbin(
     T=1,
     unit_effects=None,
     progressbar=False,
+    probes=None,
 ):
     """Run the latent-NB chains in parallel threads; one dict per chain.
 
-    ``T`` and ``unit_effects`` as :func:`._core.run_chain`; ``store_latent``
-    adds the log-means at every kept draw, ``"latent"``.
+    ``T`` and ``unit_effects`` as :class:`._core.LatentNegBinChain`; ``store_latent``
+    adds the log-means at every kept draw, ``"latent"``.  ``probes``, a
+    :class:`~neighbayes._logdet._probe_check.WarmupProbes` whose initial
+    parameters are ``logdet_params``, sizes the probe pool halfway through
+    warmup.
     """
     import jax
     import jax.numpy as jnp
@@ -680,6 +684,9 @@ def run_chains_jax_latent_negbin(
         draws=draws,
         progressbar=progressbar,
         model_type="latent_negbin",
+        on_warmup_midpoint=None
+        if probes is None
+        else probe_midpoint([(probes, lambda t: t[0], lambda c: c["logdet"])]),
         consts=data,
     )
     name = "rho" if process == "sar" else "lam"

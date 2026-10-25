@@ -15,7 +15,8 @@ from typing import Optional
 
 import numpy as np
 
-from ...samplers.negbin_latent import run_chain  # registers the Gibbs entry
+# Importing the sampler registers its Gibbs entry.
+from ...samplers.negbin_latent._core import LatentNegBinChain
 from .._base._nb import nb_alpha_fixed
 from ..priors import ReducedGibbsPriors
 from ._latent import LatentMixin
@@ -29,7 +30,7 @@ class LatentNegBinMixin(LatentMixin):
         "its likelihood integrates the propagated gamma disturbances over all "
         "n locations at once, which no NUTS model evaluates."
     )
-    _latent_chain = staticmethod(run_chain)
+    _latent_chain_class = LatentNegBinChain
 
     @staticmethod
     def _latent_chains_jax(**kwargs):

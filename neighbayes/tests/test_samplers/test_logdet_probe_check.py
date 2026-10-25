@@ -14,7 +14,13 @@ import numpy as np
 import pytest
 import scipy.sparse as sp
 
-from neighbayes._logdet._cheb_stochastic import DEFAULT_PROBE_MIN
+from neighbayes._logdet._cheb_stochastic import (
+    DEFAULT_PROBE_MAX,
+    DEFAULT_PROBE_MIN,
+    PROBE_MAX_SMALL_N,
+    probe_cap,
+    run_bar,
+)
 from neighbayes._logdet._probe_check import FIXED_PROBES, WarmupProbes
 from neighbayes.models.cross_section import SAR, SEM
 from neighbayes.tests.helpers import make_rook_W
@@ -91,7 +97,8 @@ class TestProbeCheckFit:
         )
         a = idata.attrs
         assert a["logdet_probes"] >= DEFAULT_PROBE_MIN
-        assert a["logdet_probe_bar"] == pytest.approx(0.045)
+        # The bar is the run's own Monte Carlo error, a fraction of a posterior sd.
+        assert 0.0 < a["logdet_probe_bar"] < 1.0
         if not a["logdet_probe_capped"]:
             assert a["logdet_probe_bias"] <= a["logdet_probe_bar"] / a["logdet_probe_z"]
 
@@ -128,7 +135,8 @@ class TestWarmupProbes:
 
     @staticmethod
     def _draws(mu=0.9, sd=0.01):
-        return np.random.default_rng(3).normal(mu, sd, 2000)
+        """Settled warmup draws of ρ, ``(chains, iters)``."""
+        return np.random.default_rng(3).normal(mu, sd, (4, 500))
 
     def test_warmup_starts_small_and_without_a_midpoint_uses_the_fixed_count(self, W):
         wp = WarmupProbes(W, min_probes=12)
@@ -143,14 +151,14 @@ class TestWarmupProbes:
     def test_loose_target_keeps_the_installed_evaluators(self, W):
         wp = WarmupProbes(W, bar=10.0)
         wp.initial(tune=1000)
-        assert wp.adapt(self._draws()) is None
+        assert wp.adapt(self._draws(), draws=1000, chains=4) is None
         assert wp.probe_check.n_probes == DEFAULT_PROBE_MIN
 
     def test_growth_keeps_the_jax_parameter_shape(self, W):
         pytest.importorskip("jax")
         wp = WarmupProbes(W, bar=0.02, min_probes=12)
         start = wp.initial(tune=1000, jax=True)
-        adapted = wp.adapt(self._draws(), jax=True)
+        adapted = wp.adapt(self._draws(), draws=1000, chains=4, jax=True)
         assert adapted is not None and wp.pool.n_probes > 12
         assert np.shape(adapted.params[0]) == np.shape(start.params[0])
         assert not np.allclose(adapted.params[0], start.params[0])
@@ -164,9 +172,37 @@ class TestWarmupProbes:
         stacked = panel.initial(tune=1000)
         assert stacked.scalar_fn(0.5) == pytest.approx(3 * per_period.scalar_fn(0.5))
 
+    def test_the_bar_comes_from_the_run(self, W):
+        """The same warmup sizes a bigger pool for a run that resolves more."""
+        sizes = {}
+        for draws, chains in ((100, 1), (8000, 8)):
+            wp = WarmupProbes(W)
+            wp.initial(tune=1000)
+            wp.adapt(self._draws(), draws=draws, chains=chains)
+            sizes[draws] = wp.pool.n_probes
+            assert wp.probe_check.bar == pytest.approx(
+                run_bar(self._draws(), draws, chains)
+            )
+        assert sizes[8000] > sizes[100]
+
     def test_cap_warns(self, W):
         wp = WarmupProbes(W, bar=1e-6, min_probes=12, max_probes=16)
         wp.initial(tune=1000)
         with pytest.warns(RuntimeWarning, match="cap"):
-            wp.adapt(self._draws())
+            wp.adapt(self._draws(), draws=1000, chains=4)
         assert wp.probe_check.capped and wp.pool.n_probes == 16
+
+
+def test_run_bar_is_the_runs_monte_carlo_error():
+    rng = np.random.default_rng(0)
+    iid = rng.normal(size=(4, 2000))
+    assert run_bar(iid, 1000, 4) == pytest.approx(1 / np.sqrt(4000), rel=0.1)
+    # Sticky chains resolve less, so the bar is looser.
+    sticky = np.cumsum(rng.normal(size=(4, 2000)), axis=1) * 0.01
+    assert run_bar(sticky, 1000, 4) > 3 * run_bar(iid, 1000, 4)
+
+
+def test_probe_cap_shrinks_with_the_lattice():
+    assert probe_cap(10_000) == probe_cap(100_000) == PROBE_MAX_SMALL_N
+    assert probe_cap(490_000) == 204
+    assert probe_cap(5_000_000) == DEFAULT_PROBE_MAX

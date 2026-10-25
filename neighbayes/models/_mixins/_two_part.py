@@ -65,9 +65,23 @@ class TwoPartMixin:
     # Selection-equation helpers (impacts of Z)
     # ------------------------------------------------------------------
 
-    @cached_property
+    #: The zero part's probe check from the latest Gibbs fit, on its own W.
+    _fitted_probes_zero = None
+
+    @property
     def _sel_logdet_grad_numpy_vec_fn(self):
-        """Vectorized ``(λ_arr) -> g(λ)`` logdet-gradient evaluator for W_zero."""
+        """Vectorized ``(λ_arr) -> g(λ)`` logdet-gradient evaluator for W_zero.
+
+        The zero part's fitted probe pool when it had one, as for
+        :attr:`_logdet_grad_numpy_vec_fn`.
+        """
+        if self._fitted_probes_zero is not None:
+            return self._fitted_probes_zero.grad_vec_fn()
+        return self._sel_logdet_grad_surrogate_vec_fn
+
+    @cached_property
+    def _sel_logdet_grad_surrogate_vec_fn(self):
+        """The resolved method's ``g(λ)`` for W_zero (lazy)."""
         from ..._logdet import make_logdet_grad_numpy_vec_fn
 
         return make_logdet_grad_numpy_vec_fn(

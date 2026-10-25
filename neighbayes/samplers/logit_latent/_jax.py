@@ -27,7 +27,7 @@ import numba
 import numpy as np
 import scipy.sparse as sp
 
-from .._utils._jax_utils import cached_sweep, run_chains_chunked
+from .._utils._jax_utils import cached_sweep, probe_midpoint, run_chains_chunked
 from ..negbin_latent._core import filter_columns
 
 
@@ -443,10 +443,14 @@ def run_chains_jax_latent_logit(
     slice_width=0.4,
     store_latent=False,
     progressbar=False,
+    probes=None,
 ):
     """Run the latent-logit chains in parallel threads; one dict per chain.
 
     ``store_latent`` adds the utilities at every kept draw, ``"latent"``.
+    ``probes``, a :class:`~neighbayes._logdet._probe_check.WarmupProbes` whose
+    initial parameters are ``logdet_params``, sizes the probe pool halfway
+    through warmup.
     """
     import jax
     import jax.numpy as jnp
@@ -497,6 +501,9 @@ def run_chains_jax_latent_logit(
         draws=draws,
         progressbar=progressbar,
         model_type="latent_logit",
+        on_warmup_midpoint=None
+        if probes is None
+        else probe_midpoint([(probes, lambda t: t[0], lambda c: c["logdet"])]),
         consts=data,
     )
     name = "rho" if process == "sar" else "lam"

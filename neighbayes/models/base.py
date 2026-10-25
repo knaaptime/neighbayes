@@ -116,9 +116,11 @@ class SpatialModel(SharedSpatialMethods, ABC):
         retained draws reach an edge it introduced.  ``"aaa"`` also adds exact
         factorizations when the posterior lies near a singularity
         (``idata.attrs["logdet_aaa_nodes"]``).  ``"stochastic"`` grows its
-        Hutchinson probes, from 50 to at most 200, until the bias they leave
-        in the posterior mean of the spatial parameter is expected to stay
-        under 0.0225 posterior sd (``idata.attrs["logdet_probes"]``).
+        Hutchinson probes from 50 until the bias they leave in the posterior
+        mean of the spatial parameter is expected to stay under half the
+        run's own Monte Carlo error, ``1/sqrt(ESS)`` estimated in warmup: at
+        most 1,000 probes up to 100,000 units, fewer beyond
+        (``idata.attrs["logdet_probes"]``).
         ``False`` keeps the fit on the prior interval.
 
     Attributes
@@ -903,6 +905,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
             gibbs_kwargs["nu"] = self._nu
         gibbs = GibbsClass(**gibbs_kwargs)
 
+        self._fitted_probes = None
         self._idata = gibbs.fit(
             draws=draws,
             tune=tune,
@@ -915,6 +918,10 @@ class SpatialModel(SharedSpatialMethods, ABC):
             slice_width=slice_width,
             log_likelihood=log_likelihood,
         )
+        from .._logdet._probe_check import WarmupProbes
+
+        if isinstance(gibbs.warmup_jacobian, WarmupProbes):
+            self._fitted_probes = gibbs.warmup_jacobian
         return self._idata
 
     @property

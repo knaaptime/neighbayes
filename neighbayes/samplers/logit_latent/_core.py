@@ -65,7 +65,6 @@ import scipy.sparse as sp
 
 from ...models.priors import LogitGibbsPriors
 from .._utils._slice import SliceWidthState, slice_sample_1d, slice_sample_1d_adaptive
-from .._utils._sweeps import run_sweeps
 from ..negbin_latent._core import UnitEffects, _unit_sd_step
 
 
@@ -148,7 +147,7 @@ class LatentLogitChain:
     ``sign`` is each utility's side of zero (``+1``, ``-1``, or ``0`` for
     unknown, which needs ``logq`` set before each sweep); by default it is
     that of ``y``.  ``unit_effects`` adds a SAR's random unit effects.
-    :func:`run_chain` runs one alone.
+    :func:`~neighbayes.samplers._utils._sweeps.run_sweeps` runs one.
     """
 
     def __init__(
@@ -335,7 +334,11 @@ class LatentLogitChain:
         return float(np.exp(lg))
 
     def draw(self, store_latent: bool) -> dict:
-        """The current values, named as :func:`run_chain` returns them."""
+        """The current values: ``rho`` or ``lam``, and ``beta``.
+
+        Unit effects add ``unit_effect`` and ``unit_effect_sd``; ``store_latent``
+        adds the utilities, ``latent``.
+        """
         out = {"rho" if self.sar else "lam": self.par, "beta": self.beta}
         if self.fx is not None:
             out["unit_effect"] = self.c
@@ -343,45 +346,3 @@ class LatentLogitChain:
         if store_latent:
             out["latent"] = self.ystar
         return out
-
-
-def run_chain(
-    *,
-    y: np.ndarray,
-    X: np.ndarray,
-    W: sp.csr_matrix,
-    process: Literal["sar", "sem"],
-    priors: LogitGibbsPriors,
-    logdet_fn: Callable[[float], float],
-    draws: int,
-    tune: int,
-    thin: int = 1,
-    rng: np.random.Generator,
-    chain_id: int = 0,
-    progress_manager=None,
-    slice_width: float = 0.4,
-    store_latent: bool = False,
-) -> dict:
-    """One chain; returns ``{"rho" | "lam": (n_keep,), "beta": (n_keep, k)}``.
-
-    ``store_latent`` adds the utilities at every kept draw, ``"latent"``.
-    """
-    chain = LatentLogitChain(
-        y=y,
-        X=X,
-        W=W,
-        process=process,
-        priors=priors,
-        logdet_fn=logdet_fn,
-        rng=rng,
-        slice_width=slice_width,
-    )
-    return run_sweeps(
-        chain,
-        draws=draws,
-        tune=tune,
-        thin=thin,
-        chain_id=chain_id,
-        progress_manager=progress_manager,
-        store_latent=store_latent,
-    )

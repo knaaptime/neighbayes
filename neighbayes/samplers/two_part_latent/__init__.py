@@ -6,9 +6,9 @@ Registers ``("hurdle_latent", "cross_section")`` and ``("zinb_latent",
 """
 
 from .._registry import register
-from ._core import run_chain
+from ._core import make_chain
 
-__all__ = ["run_chain"]
+__all__ = ["make_chain"]
 
 
 def _run_latent_two_part(

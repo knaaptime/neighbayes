@@ -13,7 +13,8 @@ from typing import Optional
 
 import numpy as np
 
-from ...samplers.logit_latent import run_chain  # registers the Gibbs entry
+# Importing the sampler registers its Gibbs entry.
+from ...samplers.logit_latent._core import LatentLogitChain
 from ..priors import LogitGibbsPriors
 from ._latent import LatentMixin
 
@@ -25,7 +26,7 @@ class LatentLogitMixin(LatentMixin):
         "its likelihood is an orthant probability of correlated utilities, "
         "which no NUTS model evaluates."
     )
-    _latent_chain = staticmethod(run_chain)
+    _latent_chain_class = LatentLogitChain
 
     @staticmethod
     def _latent_chains_jax(**kwargs):

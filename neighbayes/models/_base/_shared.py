@@ -1372,16 +1372,31 @@ class SharedSpatialMethods(metaclass=ABCMeta):
             T=self._jacobian_T,
         )
 
-    @cached_property
+    #: The probe check of the latest Gibbs fit on the stochastic
+    #: log-determinant, whose pool the impacts' gradient reuses; else ``None``.
+    _fitted_probes = None
+
+    @property
     def _logdet_grad_numpy_vec_fn(self):
-        """Vectorized ``(rho_arr) -> g(ρ)`` gradient of the **N×N** logdet (lazy).
+        """Vectorized ``(rho_arr) -> g(ρ)`` gradient of the **N×N** logdet.
 
         Built with ``T=1`` even for panels — the direct-effect trace is a
         per-period property of the N×N spatial multiplier, independent of
-        the number of periods.  Uses the resolved logdet method and rho
-        bounds, so it rides the fast surrogate (chol-cheb / AAA / …) and
-        only touches the eigenvalue path when that is genuinely the
-        resolved method (tiny n).
+        the number of periods.  After a Gibbs fit that sized a stochastic
+        probe pool it is that pool's gradient; otherwise the resolved method's
+        surrogate (:attr:`_logdet_grad_surrogate_vec_fn`).
+        """
+        if self._fitted_probes is not None:
+            return self._fitted_probes.grad_vec_fn()
+        return self._logdet_grad_surrogate_vec_fn
+
+    @cached_property
+    def _logdet_grad_surrogate_vec_fn(self):
+        """The resolved method's ``g(ρ)``, per period (lazy).
+
+        Uses the resolved logdet method and rho bounds, so it rides the fast
+        surrogate (chol-cheb / AAA / …) and only touches the eigenvalue path
+        when that is genuinely the resolved method (tiny n).
         """
         self._require_W()
         return make_logdet_grad_numpy_vec_fn(

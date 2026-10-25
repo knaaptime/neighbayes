@@ -1059,9 +1059,10 @@ def run_chains_jax_gibbs_vectorized(
             if refit_at is not None and iter_done >= refit_at:
                 pooled = np.concatenate(warm_rho, axis=0)  # (iters, chains)
                 # Chains start at ρ = 0; the early transient would stretch
-                # the window back to the initial value, so use the tail.
-                pooled = pooled[len(pooled) // 2 :].ravel()
-                refit = refit_hook(pooled)
+                # the window back to the initial value, so use the tail, and
+                # keep the chains apart for the run's effective sample size.
+                by_chain = pooled[len(pooled) // 2 :].T
+                refit = refit_hook(by_chain, draws=draws, chains=chains)
                 refit_at = None
                 warm_rho = []
                 if refit is not None:

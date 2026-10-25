@@ -157,10 +157,6 @@ class SARLogit(BinaryDesigns, LatentLogitMixin, SpatialModel):
     }
     _latent_process = "sar"
 
-    def _init_static(self) -> None:
-        # The ρ slice sampler's log-determinant.
-        self._logdet_fn = self._logdet_numpy_fn
-
     def _initialize_from_ols(self, rng):
         """Warm-start the reduced-form Gibbs sampler from a spatial profile.
 

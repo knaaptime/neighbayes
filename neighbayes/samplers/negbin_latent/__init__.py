@@ -7,9 +7,9 @@ and :class:`~neighbayes.models.SDEMNegBin` share, on the NumPy and JAX
 """
 
 from .._registry import register
-from ._core import run_chain
+from ._core import LatentNegBinChain
 
-__all__ = ["run_chain"]
+__all__ = ["LatentNegBinChain"]
 
 
 def _run_latent_negbin(

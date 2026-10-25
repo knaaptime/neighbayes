@@ -245,16 +245,21 @@ class WarmupJacobian:
             pre, _, _ = fitter._fit(lo, hi, cap=cap)
         return self._evaluators(pre, cap, jax)
 
-    def adapt(self, warmup_draws, *, jax: bool = False) -> Evaluators | None:
+    def adapt(
+        self, warmup_draws, *, draws: int, chains: int, jax: bool = False
+    ) -> Evaluators | None:
         """Adapt the installed fit to the warmup posterior; ``None`` keeps it.
 
-        ``warmup_draws`` are the settled draws of the spatial parameter pooled across
-        every chain.  The refit runs first, when it applies and its window is
+        ``warmup_draws`` is ``(chains, iters)``, the settled draws of the spatial
+        parameter, pooled here across every chain; ``draws`` and ``chains``, the
+        run's, are the interface :class:`._probe_check.WarmupProbes` shares and
+        are unused.  The refit runs first, when it applies and its window is
         materially narrower than the interval in use; the returned interval is then
         the sampler's new support.  The AAA node check runs next, on whichever fit
         is installed.  Each adaptation runs once per fit, so the factorization
         context is released afterwards.
         """
+        warmup_draws = np.ravel(np.asarray(warmup_draws, dtype=np.float64))
         fitter, cap = self._fitter, self.capacity
         lo_p, hi_p = self.prior
         new = None

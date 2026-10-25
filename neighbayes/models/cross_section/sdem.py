@@ -103,9 +103,11 @@ class SDEM(
         retained draws reach an edge it introduced.  ``"aaa"`` also adds exact
         factorizations when the posterior lies near a singularity
         (``idata.attrs["logdet_aaa_nodes"]``).  ``"stochastic"`` grows its
-        Hutchinson probes, from 50 to at most 200, until the bias they leave
-        in the posterior mean of the spatial parameter is expected to stay
-        under 0.0225 posterior sd (``idata.attrs["logdet_probes"]``).
+        Hutchinson probes from 50 until the bias they leave in the posterior
+        mean of the spatial parameter is expected to stay under half the
+        run's own Monte Carlo error, ``1/sqrt(ESS)`` estimated in warmup: at
+        most 1,000 probes up to 100,000 units, fewer beyond
+        (``idata.attrs["logdet_probes"]``).
         ``False`` keeps the fit on the prior interval.
     robust : bool, default False
         If True, replace the Normal disturbance with Student-t. See

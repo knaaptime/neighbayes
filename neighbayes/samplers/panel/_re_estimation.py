@@ -68,6 +68,10 @@ class REGibbsEstimation:
         Real eigenvalues of W (for JAX logdet).
     logdet_method : str or None
         Logdet method for JAX path (auto-selected when None).
+    logdet_adapt : bool, default True
+        Size a stochastic log-determinant's probe pool halfway through warmup
+        (:class:`~neighbayes._logdet._probe_check.WarmupProbes`); ``logdet_fn``
+        and ``logdet_vec_fn`` may then be ``None``.
     """
 
     def __init__(
@@ -86,6 +90,7 @@ class REGibbsEstimation:
         unit_idx: np.ndarray,
         W_eigs: np.ndarray | None = None,
         logdet_method: str | None = None,
+        logdet_adapt: bool = True,
     ):
         self.y = y
         self.X = X
@@ -101,6 +106,8 @@ class REGibbsEstimation:
         self.unit_idx = unit_idx
         self.W_eigs = W_eigs
         self.logdet_method = logdet_method
+        self.logdet_adapt = bool(logdet_adapt)
+        self.warmup_probes = None
         self.n, self.k = X.shape
 
     def fit(
@@ -148,56 +155,101 @@ class REGibbsEstimation:
         )
         t_start = time.time()
 
-        # Derive per-chain seeds
+        # Derive per-chain seeds; a scouting phase draws from the extra one, so
+        # runs without it keep their seeding.
         from .._utils._seeds import spawn_chain_seeds
 
-        seeds = spawn_chain_seeds(random_seed, chains)
+        all_seeds = spawn_chain_seeds(random_seed, chains, extra=1)
+        seeds = all_seeds[:chains]
+        scouting_seeds = all_seeds[chains].spawn(chains)
 
-        # Define per-chain function
-        def _run_one_chain(chain_id, seed, progress_manager=None, chain_id_kw=None):
-            rng = np.random.default_rng(seed)
-            init = _initialize_re_gibbs(
-                self.y,
-                self.X,
-                cache.XtX_cho,
-                self.N,
-                self.T,
-                self.unit_idx,
-                self.priors,
-                rng,
-            )
-            return run_re_chain(
-                y=self.y,
-                X=self.X,
-                cache=cache,
-                priors=self.priors,
-                init=init,
-                draws=draws,
-                tune=tune,
-                thin=thin,
-                rng=rng,
-                progressbar=progressbar,
-                chain_id=chain_id_kw if chain_id_kw is not None else chain_id,
-                progress_manager=progress_manager,
-                store_log_lik=log_likelihood,
-            )
+        def _chain_fn(inits, phase_draws, phase_tune, *, scouting=False):
+            def _run_one_chain(chain_id, seed, progress_manager=None, chain_id_kw=None):
+                rng = np.random.default_rng(
+                    scouting_seeds[chain_id] if scouting else seed
+                )
+                init = inits[chain_id]
+                if init is None:
+                    init = _initialize_re_gibbs(
+                        self.y,
+                        self.X,
+                        cache.XtX_cho,
+                        self.N,
+                        self.T,
+                        self.unit_idx,
+                        self.priors,
+                        rng,
+                    )
+                return run_re_chain(
+                    y=self.y,
+                    X=self.X,
+                    cache=cache,
+                    priors=self.priors,
+                    init=init,
+                    draws=phase_draws,
+                    tune=phase_tune,
+                    thin=thin,
+                    rng=rng,
+                    progressbar=progressbar,
+                    chain_id=chain_id_kw if chain_id_kw is not None else chain_id,
+                    progress_manager=progress_manager,
+                    store_log_lik=log_likelihood and not scouting,
+                    return_state=scouting,
+                )
 
-        # Run chains: n_jobs=1 → sequential, n_jobs≠1 → parallel via joblib
+            return _run_one_chain
+
         parallel = n_jobs != 1
+        inits: list = [None] * chains
+        tune_remaining = tune
+        # A stochastic log-determinant starts warmup on a small probe pool and
+        # sizes it halfway, on where the chains settled, before any retained
+        # draw (see GibbsEstimation.fit).
+        wp = self.warmup_probes = self._warmup_probes()
+        if wp is not None:
+            start = wp.initial(tune)
+            cache.logdet_fn, cache.logdet_vec_fn = start.scalar_fn, start.vec_fn
+        if wp is not None and wp.adapts(tune):
+            tune_a = tune // 2
+            warm = run_chains(
+                chain_fn=_chain_fn(inits, tune_a, 0, scouting=True),
+                n_chains=chains,
+                seeds=seeds,
+                n_jobs=n_jobs,
+                progressbar=False,
+                parallel=parallel,
+                draws=tune_a,
+                tune=0,
+                model_type=f"re_{self.model_type}",
+            )
+            inits = [c["_final_state"] for c in warm]
+            tune_remaining = tune - tune_a
+            adapted = wp.adapt(
+                np.stack([c[spatial_param][tune_a // 2 :] for c in warm]),
+                draws=draws,
+                chains=chains,
+            )
+            if adapted is not None:
+                cache.logdet_fn, cache.logdet_vec_fn = adapted.scalar_fn, adapted.vec_fn
+
         chain_results = run_chains(
-            chain_fn=_run_one_chain,
+            chain_fn=_chain_fn(inits, draws, tune_remaining),
             n_chains=chains,
             seeds=seeds,
             n_jobs=n_jobs,
             progressbar=progressbar,
             parallel=parallel,
             draws=draws,
-            tune=tune,
+            tune=tune_remaining,
             model_type=f"re_{self.model_type}",
+            # The scouting phase just spawned this pool with the same workers.
+            reuse_workers=inits[0] is not None,
         )
 
         # Assemble DataTree
         idata = self._assemble_idata(chain_results, log_likelihood=log_likelihood)
+        if wp is not None:
+            wp.record(idata, np.concatenate([c[spatial_param] for c in chain_results]))
         elapsed = time.time() - t_start
         _log.info(
             f"Sampling {chains} chains for {tune} tune and {draws} draw "
@@ -205,6 +257,19 @@ class REGibbsEstimation:
             f"took {elapsed:.0f} seconds."
         )
         return idata
+
+    def _warmup_probes(self):
+        """The probe check of a stochastic log-determinant, or ``None`` for any other."""
+        if not self.logdet_adapt or self.logdet_method != "cheb_stochastic":
+            return None
+        from ..._logdet._probe_check import WarmupProbes
+
+        return WarmupProbes.for_sampler(
+            self.W_sparse,
+            T=self.T,
+            rho_min=self.priors.rho_lower,
+            rho_max=self.priors.rho_upper,
+        )
 
     def _build_cache(self) -> REGibbsCache:
         """Build the REGibbsCache from model data."""
@@ -354,6 +419,7 @@ class GaussianSARREGibbs(REGibbsEstimation):
         unit_idx: np.ndarray,
         W_eigs: np.ndarray | None = None,
         logdet_method: str | None = None,
+        logdet_adapt: bool = True,
     ):
         super().__init__(
             y=y,
@@ -370,6 +436,7 @@ class GaussianSARREGibbs(REGibbsEstimation):
             unit_idx=unit_idx,
             W_eigs=W_eigs,
             logdet_method=logdet_method,
+            logdet_adapt=logdet_adapt,
         )
 
     def _spatial_param_name(self) -> str:
@@ -425,6 +492,7 @@ class GaussianSEMREGibbs(REGibbsEstimation):
         unit_idx: np.ndarray,
         W_eigs: np.ndarray | None = None,
         logdet_method: str | None = None,
+        logdet_adapt: bool = True,
     ):
         super().__init__(
             y=y,
@@ -441,6 +509,7 @@ class GaussianSEMREGibbs(REGibbsEstimation):
             unit_idx=unit_idx,
             W_eigs=W_eigs,
             logdet_method=logdet_method,
+            logdet_adapt=logdet_adapt,
         )
 
     def _spatial_param_name(self) -> str:

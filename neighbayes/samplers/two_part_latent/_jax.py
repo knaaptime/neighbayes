@@ -15,7 +15,7 @@ from __future__ import annotations
 import numpy as np
 import scipy.sparse as sp
 
-from .._utils._jax_utils import cached_sweep, run_chains_chunked
+from .._utils._jax_utils import cached_sweep, probe_midpoint, run_chains_chunked
 from .._utils._latent_loglik import POISSON, TRUNCATED, UNOBSERVED
 
 
@@ -58,11 +58,16 @@ def run_chains_jax_latent_two_part(
     unit_effects=None,
     unit_effects_zero=None,
     progressbar=False,
+    probes=None,
+    probes_zero=None,
 ):
     """Run the latent ``model`` (``"hurdle"`` or ``"zinb"``) chains; one dict per chain.
 
     ``logdet`` and ``logdet_zero`` are the parts' ``logdet_jax_params``, of
-    one period.  The keys are those of :func:`._core.run_chain`.
+    one period.  ``probes`` and ``probes_zero``, the parts'
+    :class:`~neighbayes._logdet._probe_check.WarmupProbes` (one object when
+    the parts share W), size their probe pools halfway through warmup; both
+    or neither.  The keys are those of :func:`._core.make_chain`.
     """
     import jax
     import jax.numpy as jnp
@@ -210,6 +215,22 @@ def run_chains_jax_latent_two_part(
             n_kept=jnp.float64(0),
         )
     consts = {"zero": data_z, "count": data_c, "zeros": zeros}
+    keys = ("rho_zero", "beta_zero")
+    if n_groups_z:
+        keys = keys + ("unit_effect_zero", "unit_effect_sd_zero")
+    keys = keys + (("latent_zero",) if store_latent else ()) + ("rho", "beta", "alpha")
+    if n_groups:
+        keys = keys + ("unit_effect", "unit_effect_sd")
+    keys = keys + (("latent",) if store_latent else ())
+    midpoint = None
+    if probes is not None:
+        i_rho = keys.index("rho")
+        midpoint = probe_midpoint(
+            [
+                (probes_zero, lambda t: t[0], lambda c: c["zero"]["logdet"]),
+                (probes, lambda t: t[i_rho], lambda c: c["count"]["logdet"]),
+            ]
+        )
     states = [dict(start) for _ in seeds]
     warm = [jax.random.PRNGKey(int(s)) for s in seeds]
     draw = [jax.random.fold_in(jax.random.PRNGKey(int(s)), 1) for s in seeds]
@@ -222,16 +243,10 @@ def run_chains_jax_latent_two_part(
         draws=draws,
         progressbar=progressbar,
         model_type=f"latent_{model}",
+        on_warmup_midpoint=midpoint,
         consts=consts,
     )
     sl = slice(None, None, thin) if thin > 1 else slice(None)
-    keys = ("rho_zero", "beta_zero")
-    if n_groups_z:
-        keys = keys + ("unit_effect_zero", "unit_effect_sd_zero")
-    keys = keys + (("latent_zero",) if store_latent else ()) + ("rho", "beta", "alpha")
-    if n_groups:
-        keys = keys + ("unit_effect", "unit_effect_sd")
-    keys = keys + (("latent",) if store_latent else ())
     out = []
     for c in range(len(seeds)):
         r = {key: np.asarray(arr[c, sl]) for key, arr in zip(keys, kept)}

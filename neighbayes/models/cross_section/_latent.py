@@ -29,16 +29,26 @@ import scipy.sparse as sp
 
 from ..._lazy_deps import xr
 from ...samplers._utils._idata import gibbs_to_inference_data
-from ...samplers.gaussian._chain_runner import run_chains
+from ...samplers._utils._sweeps import probe_sweep_midpoint, run_sweeps_with_midpoint
+
+
+def _chain_par(chain) -> float:
+    """A latent chain's spatial parameter."""
+    return chain.par
+
+
+def _set_chain_logdet(chain, fn) -> None:
+    chain.logdet_fn = fn
 
 
 class LatentMixin:
     """Gibbs fit and latent-index simulation of a latent model.
 
     The host sets ``_latent_process`` to ``"sar"`` or ``"sem"``; the family
-    mixin implements :meth:`_latent_priors`, :meth:`_latent_chain`,
-    :meth:`_latent_chains_jax` and :meth:`_latent_disturbances`, and names its
-    parameters beyond the spatial one and ``beta`` in ``_latent_extra``.
+    mixin sets ``_latent_chain_class``, its NumPy chain object, implements
+    :meth:`_latent_priors`, :meth:`_latent_chains_jax` and
+    :meth:`_latent_disturbances`, and names its parameters beyond the spatial
+    one and ``beta`` in ``_latent_extra``.
     """
 
     _latent_process: str = "sar"
@@ -122,6 +132,24 @@ class LatentMixin:
             T=1,
         )
 
+    def _latent_probes(self):
+        """The probe check of a stochastic log-determinant, or ``None`` for any other.
+
+        A :class:`~neighbayes._logdet._probe_check.WarmupProbes` on one period's
+        W, sized against the panel's ``T``-period Jacobian.
+        """
+        b = self._logdet_bounds
+        if b.method != "cheb_stochastic" or not self.logdet_adapt:
+            return None
+        from ..._logdet._probe_check import WarmupProbes
+
+        return WarmupProbes(
+            self._W_sparse.tocsr(),
+            T=self._latent_panel_kwargs().get("T", 1),
+            rho_min=b.rho_min,
+            rho_max=b.rho_max,
+        )
+
     def _latent_panel_kwargs(self) -> dict:
         """``T`` and the unit-effect spec the samplers take for a panel."""
         if not self._is_panel:
@@ -182,70 +210,76 @@ class LatentMixin:
         W = self._W_sparse.tocsr()
         rng = np.random.default_rng(random_seed)
         seeds = [int(s) for s in rng.integers(0, 2**31, size=chains)]
+        probes = self._latent_probes()
+        self._fitted_probes = probes
         if backend == "jax":
-            from ..._logdet._jax import logdet_jax_params
+            if probes is None:
+                from ..._logdet._jax import logdet_jax_params
 
-            bounds = self._logdet_bounds
-            eigs = self._logdet_eigs if bounds.method == "eigenvalue" else None
-            kind, params = logdet_jax_params(
-                W, bounds.method, bounds.rho_min, bounds.rho_max, eigs=eigs
-            )
-            return self._latent_idata(
-                self._latent_chains_jax(
-                    y=y,
-                    X=X,
-                    W=W,
-                    process=self._latent_process,
-                    priors=priors,
-                    logdet_kind=kind,
-                    logdet_params=params,
-                    draws=draws,
-                    tune=tune,
-                    thin=thin,
-                    seeds=seeds,
-                    slice_width=slice_width,
-                    store_latent=log_likelihood,
-                    **panel_kw,
-                    progressbar=progressbar,
-                ),
-                log_likelihood,
-            )
-        logdet = self._latent_logdet_fn
-        process = self._latent_process
-        chain = self._latent_chain
-
-        def _run_one_chain(chain_id, seed, progress_manager=None, chain_id_kw=None):
-            return chain(
+                bounds = self._logdet_bounds
+                eigs = self._logdet_eigs if bounds.method == "eigenvalue" else None
+                kind, params = logdet_jax_params(
+                    W, bounds.method, bounds.rho_min, bounds.rho_max, eigs=eigs
+                )
+            else:
+                kind, params = "cheb", probes.initial(tune, jax=True).params
+            results = self._latent_chains_jax(
                 y=y,
                 X=X,
                 W=W,
-                process=process,
+                process=self._latent_process,
                 priors=priors,
-                logdet_fn=logdet,
+                logdet_kind=kind,
+                logdet_params=params,
                 draws=draws,
                 tune=tune,
                 thin=thin,
-                rng=np.random.default_rng(seed),
-                chain_id=chain_id_kw if chain_id_kw is not None else chain_id,
-                progress_manager=progress_manager,
+                seeds=seeds,
                 slice_width=slice_width,
                 store_latent=log_likelihood,
                 **panel_kw,
+                progressbar=progressbar,
+                probes=probes,
             )
+        else:
+            if probes is None:
+                logdet = self._latent_logdet_fn
+            else:
+                probes.initial(tune)
+                logdet = probes.period_fn()
+            cls, process = self._latent_chain_class, self._latent_process
 
-        results = run_chains(
-            chain_fn=_run_one_chain,
-            n_chains=chains,
-            seeds=seeds,
-            n_jobs=n_jobs,
-            progressbar=progressbar,
-            parallel=(n_jobs != 1),
-            draws=draws,
-            tune=tune,
-            model_type=type(self).__name__,
-            timeout=None,
-        )
-        return self._latent_idata(results, log_likelihood)
+            def make_chain(chain_rng):
+                return cls(
+                    y=y,
+                    X=X,
+                    W=W,
+                    process=process,
+                    priors=priors,
+                    logdet_fn=logdet,
+                    rng=chain_rng,
+                    slice_width=slice_width,
+                    **panel_kw,
+                )
+
+            results = run_sweeps_with_midpoint(
+                make_chain,
+                seeds=seeds,
+                draws=draws,
+                tune=tune,
+                thin=thin,
+                midpoint=None
+                if probes is None
+                else probe_sweep_midpoint([(probes, _chain_par, _set_chain_logdet)]),
+                store_latent=log_likelihood,
+                n_jobs=n_jobs,
+                progressbar=progressbar,
+                model_type=type(self).__name__,
+            )
+        idata = self._latent_idata(results, log_likelihood)
+        if probes is not None:
+            probes.record(idata, idata.posterior[self._latent_param].values)
+        return idata
 
     def _latent_idata(self, results, log_likelihood: bool = False) -> xr.DataTree:
         def stack(name):

@@ -297,7 +297,9 @@ class GibbsEstimation:
             # window back to the initial value and defeat the refit; the
             # second half is what the chains have actually settled on.
             adapted = wj.adapt(
-                np.concatenate([c[spatial_param][tune_a // 2 :] for c in warm])
+                np.stack([c[spatial_param][tune_a // 2 :] for c in warm]),
+                draws=draws,
+                chains=chains,
             )
             if adapted is not None:
                 cache.logdet_fn, cache.logdet_vec_fn = adapted.scalar_fn, adapted.vec_fn
@@ -537,7 +539,7 @@ class GibbsEstimation:
         return None if wj is None else wj.check
 
     def _jax_adaptation_hook(self, wj: WarmupJacobian):
-        """The hook a JAX runner calls halfway through warmup, with ρ pooled across chains.
+        """The hook a JAX runner calls halfway through warmup, with ρ by chain.
 
         Returns ``(params, rho_min, rho_max)`` for the adapted fit, or ``None`` to keep
         the installed one.  The parameters keep the shape of the warmup fit's, so the
@@ -545,8 +547,8 @@ class GibbsEstimation:
         fit, so their pointwise log-likelihood switches to its NumPy evaluator.
         """
 
-        def _hook(pooled_rho):
-            adapted = wj.adapt(pooled_rho, jax=True)
+        def _hook(rho_by_chain, *, draws, chains):
+            adapted = wj.adapt(rho_by_chain, draws=draws, chains=chains, jax=True)
             if adapted is None:
                 return None
             self._active_logdet_vec_fn = adapted.vec_fn

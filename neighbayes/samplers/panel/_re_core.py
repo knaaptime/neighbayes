@@ -748,6 +748,7 @@ def run_re_chain(
     chain_id: int = 0,
     progress_manager: object | None = None,
     store_log_lik: bool = True,
+    return_state: bool = False,
 ) -> dict[str, np.ndarray]:
     """Run one chain of the RE panel Gibbs sampler.
 
@@ -778,6 +779,9 @@ def run_re_chain(
     progress_manager : object or None
         ``GibbsProgressBarManager`` instance. If provided,
         ``update()`` is called after each iteration.
+    return_state : bool, default False
+        Add the final state under ``"_final_state"``, so a later call can
+        resume the chain from it.
 
     Returns
     -------
@@ -941,7 +945,7 @@ def run_re_chain(
             progress_manager.update(chain_id, i, tuning=i < tune)
 
     spatial_param = "rho" if model_type in ("sar", "sdm") else "lam"
-    return {
+    result = {
         spatial_param: rho_samples,
         "beta": beta_samples,
         "sigma": sigma_samples,
@@ -949,3 +953,13 @@ def run_re_chain(
         "unit_effect_sd": sigma_alpha_samples,
         "log_lik": log_lik_samples,
     }
+    if return_state:
+        result["_final_state"] = REGibbsState(
+            beta=state.beta.copy(),
+            sigma2=state.sigma2,
+            alpha=state.alpha.copy(),
+            sigma_alpha2=state.sigma_alpha2,
+            rho=state.rho,
+            sigma_alpha_aux=state.sigma_alpha_aux,
+        )
+    return result

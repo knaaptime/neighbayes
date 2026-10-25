@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import functools
 import importlib.util
+from dataclasses import dataclass
+from typing import Callable, Optional
 
 
 def check_jax_available(*, require_equinox: bool = False) -> None:
@@ -158,6 +160,105 @@ def _compile_chunk(sweep, state0, key0, consts, chunk_len):
     return chunk, trace_avals
 
 
+@dataclass(frozen=True)
+class MidpointUpdate:
+    """Leaves :func:`run_chains_chunked` substitutes halfway through warmup.
+
+    ``state`` is ``(where, values)``: ``where(state)`` selects leaves of one
+    chain's state, as for :func:`equinox.tree_at`, and ``values[c]`` replaces
+    them in chain ``c``.  ``consts`` is ``(where, value)`` for the shared
+    ``consts``.  Either may be ``None``.  A replacement must keep its leaves'
+    shapes and dtypes (pad what varies to a fixed capacity, as
+    :meth:`~neighbayes._logdet._refit.LogdetRefitter.capacity` does), so the
+    compiled chunk is reused.
+    """
+
+    state: Optional[tuple] = None
+    consts: Optional[tuple] = None
+
+
+@dataclass(frozen=True)
+class WarmupMidpoint:
+    """An adaptation :func:`run_chains_chunked` runs once, after ``tune // 2`` sweeps.
+
+    ``keep(trace)`` picks the leaves of a sweep's trace to keep through the
+    first half of warmup; the rest of each chunk's trace is dropped as it
+    returns, so an adaptation that needs only ρ stores only ρ.  ``adapt(kept,
+    *, draws, chains)`` receives them stacked per chain, leading axes
+    ``(chains, tune // 2)`` (chains kept apart, not interleaved), and returns
+    a :class:`MidpointUpdate` or ``None``.
+    """
+
+    keep: Callable
+    adapt: Callable
+
+
+def probe_midpoint(arms) -> WarmupMidpoint:
+    """The :class:`WarmupMidpoint` that sizes stochastic log-determinant probe pools.
+
+    ``arms`` lists ``(adapter, rho_of, params_of)``: a
+    :class:`~neighbayes._logdet._probe_check.WarmupProbes`, ``rho_of(trace)``
+    picking a spatial parameter from a sweep's trace, and ``params_of(consts)``
+    the log-determinant parameters the sweep evaluates it with.  Arms that
+    share an adapter, two spatial parameters on one W, size one pool for both.
+    The first half of the kept warmup is transient and dropped; each adapter
+    sizes its pool on the rest, chains apart, against the run's ``draws`` and
+    ``chains``.  A grown pool's Chebyshev coefficients replace the parameters
+    in place, with the same shapes, so nothing recompiles.
+    """
+    import jax
+    import numpy as np
+
+    groups: dict = {}
+    for i, (adapter, _, _) in enumerate(arms):
+        groups.setdefault(id(adapter), (adapter, []))[1].append(i)
+
+    def keep(trace):
+        return tuple(rho_of(trace) for _, rho_of, _ in arms)
+
+    def adapt(kept, *, draws, chains):
+        where, values = [], []
+        for adapter, idx in groups.values():
+            settled = np.stack([kept[i][:, kept[i].shape[1] // 2 :] for i in idx])
+            adapted = adapter.adapt(settled, draws=draws, chains=chains, jax=True)
+            if adapted is None:
+                continue
+            for i in idx:
+                where.append(arms[i][2])
+                values.extend(jax.tree_util.tree_leaves(adapted.params))
+        if not where:
+            return None
+
+        def leaves(consts):
+            return tuple(
+                leaf for w in where for leaf in jax.tree_util.tree_leaves(w(consts))
+            )
+
+        return MidpointUpdate(consts=(leaves, tuple(values)))
+
+    return WarmupMidpoint(keep=keep, adapt=adapt)
+
+
+def _substitute(update: MidpointUpdate, states: list, consts):
+    """``(states, consts)`` with ``update``'s leaves in place, shapes unchanged."""
+    import equinox as eqx
+
+    before = _shape_signature((states[0], consts))
+    if update.state is not None:
+        where, values = update.state
+        states = [eqx.tree_at(where, st, values[c]) for c, st in enumerate(states)]
+    if update.consts is not None:
+        where, value = update.consts
+        consts = eqx.tree_at(where, consts, value)
+    if _shape_signature((states[0], consts)) != before:
+        raise ValueError(
+            "A warmup-midpoint update changed the shape or dtype of a state or "
+            "consts leaf, which would recompile the chunk; pad what varies to a "
+            "fixed capacity."
+        )
+    return states, consts
+
+
 def run_chains_chunked(
     sweep,
     states,
@@ -169,6 +270,7 @@ def run_chains_chunked(
     consts=None,
     progressbar=False,
     model_type="gibbs",
+    on_warmup_midpoint: Optional[WarmupMidpoint] = None,
 ):
     """Run Gibbs chains in parallel, in compiled chunks of sweeps.
 
@@ -210,6 +312,12 @@ def run_chains_chunked(
         Show per-chain progress bars, advanced after each chunk.
     model_type : str, default "gibbs"
         The model named in the progress announcement.
+    on_warmup_midpoint : WarmupMidpoint, optional
+        Run after the first ``tune // 2`` warmup sweeps (``tune >= 2``), a
+        chunk ending there: it sees the kept warmup traces of every chain and
+        may substitute state and ``consts`` leaves for the rest of the run.
+        Keys advance only on sweeps that run, so the split chunk leaves the
+        draws of a hook that substitutes nothing unchanged.
 
     Returns
     -------
@@ -268,13 +376,41 @@ def run_chains_chunked(
             for c in range(chains):
                 pm.update(c, sweep_index, tuning=tuning)
 
+        hook = on_warmup_midpoint
+        midpoint = tune // 2 if hook is not None and tune >= 2 else None
+        kept = []  # per chunk, per chain: the kept trace leaves, cut to n_active
         keys = list(warm_keys)
         done = 0
         while done < tune:
-            n_active = min(chunk_len, tune - done)
-            keys, _ = _advance(keys, n_active, True)
+            stop = midpoint if midpoint is not None else tune
+            n_active = min(chunk_len, stop - done)
+            keys, chunk_traces = _advance(keys, n_active, True)
+            if midpoint is not None:
+                kept.append(
+                    [
+                        jax.tree_util.tree_map(
+                            lambda a: np.asarray(a)[:n_active], hook.keep(t)
+                        )
+                        for t in chunk_traces
+                    ]
+                )
             done += n_active
             report(done - 1, True)
+            if midpoint is not None and done == midpoint:
+                per_chain = [
+                    jax.tree_util.tree_map(
+                        lambda *xs: np.concatenate(xs), *[k[c] for k in kept]
+                    )
+                    for c in range(chains)
+                ]
+                update = hook.adapt(
+                    jax.tree_util.tree_map(lambda *xs: np.stack(xs), *per_chain),
+                    draws=draws,
+                    chains=chains,
+                )
+                kept, midpoint = [], None
+                if update is not None:
+                    states[:], consts = _substitute(update, states, consts)
 
         keys = list(draw_keys)
         done = 0

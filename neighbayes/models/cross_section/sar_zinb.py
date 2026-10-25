@@ -189,8 +189,6 @@ class SARZINB(
     def _init_static(self) -> None:
         # Binary activity indicator: d = 1(y > 0)
         self._d = (self._y > 0).astype(np.float64)
-        # The count equation's ρ slice sampler's log-determinant.
-        self._logdet_fn = self._logdet_numpy_fn
 
     def _initialize_from_ols(self, rng):
         """Warm-start the ZINB Gibbs sampler.

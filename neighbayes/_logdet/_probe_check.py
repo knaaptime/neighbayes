@@ -20,14 +20,16 @@ from __future__ import annotations
 import logging
 import warnings
 
+import numpy as np
+
 from ._cheb_stochastic import (
-    DEFAULT_PROBE_BAR,
-    DEFAULT_PROBE_MAX,
     DEFAULT_PROBE_MIN,
     DEFAULT_PROBE_Z,
     ProbeCheck,
     cheb_stochastic_pool,
     pool_precompute,
+    probe_cap,
+    run_bar,
     size_pool,
 )
 from ._clenshaw import clenshaw_scalar, clenshaw_vec
@@ -52,10 +54,17 @@ class WarmupProbes:
     rho_min, rho_max : float
         Prior support of the spatial parameter; the Chebyshev-in-ρ series is fit
         on it.
-    bar, z : float
-        Target expected |bias| of the posterior mean of ρ, ``bar / z`` posterior sd.
-    min_probes, max_probes : int
-        The pool warmup starts with, and the most it may grow to.
+    bar : float or None, default None
+        Target expected |bias| of the posterior mean of ρ, in posterior sd.
+        ``None`` derives it from the run: ``1/√ESS``, the Monte Carlo error of
+        the posterior mean the run will produce (:func:`._cheb_stochastic.run_bar`).
+    z : float
+        Safety divisor: the target is ``bar / z``.
+    min_probes : int
+        The pool warmup starts with.
+    max_probes : int or None, default None
+        The most the pool may grow to; ``None`` caps it by the lattice size
+        (:func:`._cheb_stochastic.probe_cap`).
     seed : int, default 0
         Root of the probe streams, fixed so a fit is reproducible for a given W.
 
@@ -79,20 +88,25 @@ class WarmupProbes:
         T: int = 1,
         rho_min: float = -0.99,
         rho_max: float = 0.99,
-        bar: float = DEFAULT_PROBE_BAR,
+        bar: float | None = None,
         z: float = DEFAULT_PROBE_Z,
         min_probes: int = DEFAULT_PROBE_MIN,
-        max_probes: int = DEFAULT_PROBE_MAX,
+        max_probes: int | None = None,
         seed: int = 0,
     ):
         self.W = W
         self.T = int(T)
         self.rho_min, self.rho_max = float(rho_min), float(rho_max)
-        self.bar, self.z = float(bar), float(z)
-        self.min_probes, self.max_probes = int(min_probes), int(max_probes)
+        self.bar = None if bar is None else float(bar)
+        self.z = float(z)
+        self.min_probes = int(min_probes)
+        self.max_probes = (
+            probe_cap(W.shape[0]) if max_probes is None else int(max_probes)
+        )
         self.seed = int(seed)
         self.pool = None
         self.probe_check: ProbeCheck | None = None
+        self._coeffs = None  # (pool, its coefficients)
 
     @classmethod
     def for_sampler(
@@ -145,16 +159,34 @@ class WarmupProbes:
         )
         return self._evaluators(jax)
 
-    def adapt(self, warmup_draws, *, jax: bool = False) -> Evaluators | None:
-        """Size the pool on the warmup posterior; ``None`` keeps the installed evaluators."""
-        pool, check = size_pool(
-            self.pool,
-            warmup_draws,
-            bar=self.bar,
-            z=self.z,
-            max_probes=self.max_probes,
-            T=self.T,
-        )
+    def adapt(
+        self, warmup_draws, *, draws: int, chains: int, jax: bool = False
+    ) -> Evaluators | None:
+        """Size the pool on the warmup posterior; ``None`` keeps the installed evaluators.
+
+        ``warmup_draws`` is ``(chains, iters)``, the settled warmup draws of ρ
+        with the chains apart, or ``(m, chains, iters)`` for ``m`` spatial
+        parameters on this W, such as a two-part model's two; the pool is sized
+        for each in turn, and only grows.  ``draws`` and ``chains`` are the
+        run's, which set each bar unless one was given.  The check recorded is
+        the one nearest its target.
+        """
+        sets = np.asarray(warmup_draws, dtype=np.float64)
+        sets = sets.reshape((-1,) + np.atleast_2d(sets).shape[-2:])
+        pool, checks = self.pool, []
+        for by_chain in sets:
+            bar = self.bar if self.bar is not None else run_bar(by_chain, draws, chains)
+            pool, c = size_pool(
+                pool,
+                by_chain.ravel(),
+                bar=bar,
+                z=self.z,
+                max_probes=self.max_probes,
+                T=self.T,
+            )
+            if c is not None:
+                checks.append(c)
+        check = max(checks, key=lambda c: c.bias * c.z / c.bar, default=None)
         grew = pool is not self.pool
         self.pool, self.probe_check = pool, check
         if check is not None:
@@ -173,25 +205,60 @@ class WarmupProbes:
                 )
         return self._evaluators(jax) if grew else None
 
-    def record(self, idata, retained_draws) -> None:
-        """Attach the probe count and, when it was sized, how, to ``idata``."""
+    def record(self, idata, retained_draws, *, suffix: str = "") -> None:
+        """Attach the probe count and, when it was sized, how, to ``idata``.
+
+        ``suffix`` ends each name, for a model with a second W.
+        """
         if self.pool is not None:
-            idata.attrs["logdet_probes"] = int(self.pool.n_probes)
+            idata.attrs[f"logdet_probes{suffix}"] = int(self.pool.n_probes)
         chk = self.probe_check
         if chk is None:
             return
-        idata.attrs["logdet_probe_bias"] = float(chk.bias)
-        idata.attrs["logdet_probe_spread"] = float(chk.spread)
-        idata.attrs["logdet_probe_bar"] = float(chk.bar)
-        idata.attrs["logdet_probe_z"] = float(chk.z)
-        idata.attrs["logdet_probe_capped"] = int(chk.capped)
+        idata.attrs[f"logdet_probe_bias{suffix}"] = float(chk.bias)
+        idata.attrs[f"logdet_probe_spread{suffix}"] = float(chk.spread)
+        idata.attrs[f"logdet_probe_bar{suffix}"] = float(chk.bar)
+        idata.attrs[f"logdet_probe_z{suffix}"] = float(chk.z)
+        idata.attrs[f"logdet_probe_capped{suffix}"] = int(chk.capped)
 
-    def _evaluators(self, jax: bool) -> Evaluators:
+    def coefficients(self):
+        """``(coeffs, lo, hi)``: the current pool's Chebyshev series in ρ, of one period."""
         from ._factories import _cheb_stochastic_coeffs_from
 
-        coeffs, lo, hi = _cheb_stochastic_coeffs_from(
-            pool_precompute(self.pool), self.rho_min, self.rho_max
+        if self._coeffs is None or self._coeffs[0] is not self.pool:
+            self._coeffs = (
+                self.pool,
+                _cheb_stochastic_coeffs_from(
+                    pool_precompute(self.pool), self.rho_min, self.rho_max
+                ),
+            )
+        return self._coeffs[1]
+
+    def period_fn(self):
+        """``log|I - ρW|`` of one period from the current pool.
+
+        For samplers that apply the panel's ``T`` themselves; the pool is still
+        sized against the ``T``-period Jacobian.
+        """
+        coeffs, lo, hi = self.coefficients()
+        return lambda r: clenshaw_scalar(coeffs, r, lo, hi, 1)
+
+    def grad_vec_fn(self):
+        """Vectorized ``g(ρ) = d/dρ log|I - ρW|`` of one period from the current pool.
+
+        The impacts' direct-effect trace uses it.  The pool was sized to keep
+        the log-determinant's slope error from moving the posterior of ρ, which
+        is the error this gradient carries into the trace.
+        """
+        from ._resolvent import logdet_grad_chebyshev
+
+        coeffs, lo, hi = self.coefficients()
+        return lambda a: np.asarray(
+            logdet_grad_chebyshev(np.asarray(a, dtype=np.float64), coeffs, lo, hi)
         )
+
+    def _evaluators(self, jax: bool) -> Evaluators:
+        coeffs, lo, hi = self.coefficients()
         T = self.T
         params = None
         if jax:

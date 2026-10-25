@@ -678,13 +678,20 @@ def run_multilevel_jax(
     store_theta: bool = True,
     store_log_lik: bool = False,
     progressbar: bool = False,
+    probes: dict | None = None,
 ) -> list[dict]:
-    """Run ``chains`` chains; returns one trace dict per chain, as the NumPy runner."""
+    """Run ``chains`` chains; returns one trace dict per chain, as the NumPy runner.
+
+    ``probes`` maps a level to the
+    :class:`~neighbayes._logdet._probe_check.WarmupProbes` that sizes its
+    stochastic log-determinant halfway through warmup; that level's
+    ``logdet_jax`` must hold the parameters it starts from.
+    """
     import jax
     import jax.numpy as jnp
 
     from ..._jax_dispatch import ensure_x64
-    from .._utils._jax_utils import cached_sweep, run_chains_chunked
+    from .._utils._jax_utils import cached_sweep, probe_midpoint, run_chains_chunked
     from .._utils._sparsax_lu import set_sparsax_lu_cache_size
     from ._core import PARAMETRIZATIONS
 
@@ -734,6 +741,18 @@ def run_multilevel_jax(
         progressbar=progressbar,
         model_type="multilevel",
         consts=consts,
+        on_warmup_midpoint=probe_midpoint(
+            [
+                (
+                    p,
+                    lambda t, ell=ell: t["rho"][:, ell],
+                    lambda c, ell=ell: c["ld"][ell],
+                )
+                for ell, p in probes.items()
+            ]
+        )
+        if probes
+        else None,
     )
 
     n_keep = draws // thin
