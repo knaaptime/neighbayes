@@ -202,6 +202,7 @@ def run_negbin_flow_gibbs(
                 struct=struct,
                 jax_seeds=seeds,
                 store_log_lik=log_likelihood,
+                progressbar=progressbar,
             )
         else:
             from ...samplers.negbin_reduced._flow_jax import run_chains_jax_flow

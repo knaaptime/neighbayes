@@ -87,6 +87,23 @@ class _FlowCount(CountPanelFEMixin):
     _effect_index = "pair"
     _robust_nuts = False
 
+    def _attach_log_abs_det_or_warn(self, idata) -> None:
+        """Record the ``log|A|`` diagnostic without risking the finished posterior.
+
+        It runs after the chains; a failure (out of memory, a solver or XLA
+        runtime error, a singular or invalid system) warns and leaves
+        ``sample_stats`` without ``log_abs_det``.
+        """
+        try:
+            self._attach_flow_log_abs_det(idata)
+        except (MemoryError, RuntimeError, ValueError) as exc:
+            warnings.warn(
+                f"The log|A| diagnostic failed ({type(exc).__name__}: {exc}); the "
+                "posterior is returned without sample_stats['log_abs_det'].",
+                UserWarning,
+                stacklevel=3,
+            )
+
     def _finish_count_init(self, y_arr: np.ndarray, effects, mundlak=False) -> None:
         self._y_int_vec = np.asarray(y_arr).reshape(-1).astype(np.int64)
         self._init_count_fe(effects, self._N, self._T, mundlak)
@@ -457,7 +474,7 @@ class SARNegBinFlow(FlowCountDesigns, _FlowCount, FlowModel):
                 **sample_kwargs,
             )
         if attach_log_abs_det:
-            self._attach_flow_log_abs_det(idata)
+            self._attach_log_abs_det_or_warn(idata)
         return idata
 
     def _fit_separable(
@@ -560,7 +577,7 @@ class SARNegBinFlow(FlowCountDesigns, _FlowCount, FlowModel):
                 **sample_kwargs,
             )
         if attach_log_abs_det:
-            self._attach_flow_log_abs_det(idata)
+            self._attach_log_abs_det_or_warn(idata)
         return idata
 
     def _fit_pooled_gibbs(
@@ -700,6 +717,7 @@ class SARNegBinFlow(FlowCountDesigns, _FlowCount, FlowModel):
                 jax_seeds=int_seeds,
                 store_log_lik=log_likelihood,
                 cell_mask=cell_mask,
+                progressbar=progressbar,
             )
             return self._assemble_count_idata(
                 results, ["rho_d", "rho_o", "rho_w"], keep_groups, log_likelihood

@@ -550,14 +550,20 @@ class LogdetRefitter:
             from scipy.sparse.linalg import eigs, eigsh
 
             ctx = self._build_context()
+            sym = self.method == "chol_aaa"
+            # A fixed start, so the check's outcome never depends on ARPACK's own.
+            v0 = np.random.default_rng(0).standard_normal(
+                (ctx.W_sym if sym else ctx.W_sp).shape[0]
+            )
             try:
-                if self.method == "chol_aaa":
+                if sym:
                     lam = eigsh(
                         sp.csc_matrix(ctx.W_sym),
                         k=3,
                         sigma=-1.001,
                         which="LM",
                         return_eigenvectors=False,
+                        v0=v0,
                     )
                 else:
                     lam = eigs(
@@ -566,6 +572,7 @@ class LogdetRefitter:
                         sigma=-1.001,
                         which="LM",
                         return_eigenvectors=False,
+                        v0=v0,
                     )
                 sing = 1.0 / np.asarray(lam, dtype=complex)
                 self._sigma_left = complex(sing[np.argmin(np.abs(sing + 1.0))])

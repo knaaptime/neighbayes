@@ -448,7 +448,15 @@ def run_chains_jax_flow(
     warm_keys = [jax.random.PRNGKey(int(s)) for s in jax_seeds]
     draw_keys = [jax.random.fold_in(jax.random.PRNGKey(int(s)), 1) for s in jax_seeds]
     _, traces = run_chains_chunked(
-        sweep, states, warm_keys, draw_keys, tune=tune, draws=draws, consts=data
+        sweep,
+        states,
+        warm_keys,
+        draw_keys,
+        tune=tune,
+        draws=draws,
+        progressbar=progressbar,
+        model_type="nb_flow",
+        consts=data,
     )
     rd_all, ro_all, rw_all, beta_all, alpha_all = traces[:5]
     eta_all = traces[5] if store_log_lik else None

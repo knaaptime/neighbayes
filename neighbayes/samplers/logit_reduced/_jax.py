@@ -378,7 +378,15 @@ def run_chains_jax_reduced_logit(
 
     _sweep = cached_sweep(("sar_logit_reduced", *static, bool(store_log_lik)), _build)
     _, traces = run_chains_chunked(
-        _sweep, states, warm_keys, draw_keys, tune=tune, draws=draws, consts=data
+        _sweep,
+        states,
+        warm_keys,
+        draw_keys,
+        tune=tune,
+        draws=draws,
+        progressbar=progressbar,
+        model_type="sar_logit",
+        consts=data,
     )
     rho_all, beta_all = traces[:2]
     eta_all = traces[2] if store_log_lik else None

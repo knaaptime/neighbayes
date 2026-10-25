@@ -159,7 +159,16 @@ def _compile_chunk(sweep, state0, key0, consts, chunk_len):
 
 
 def run_chains_chunked(
-    sweep, states, warm_keys, draw_keys, *, tune, draws, on_chunk=None, consts=None
+    sweep,
+    states,
+    warm_keys,
+    draw_keys,
+    *,
+    tune,
+    draws,
+    consts=None,
+    progressbar=False,
+    model_type="gibbs",
 ):
     """Run Gibbs chains in parallel, in compiled chunks of sweeps.
 
@@ -168,8 +177,8 @@ def run_chains_chunked(
     whose remaining iterations hold the state, so warmup, draws and a short
     final chunk all reuse a single program.  It is compiled once, on the
     calling thread, before the chains fan out to
-    :func:`run_chains_in_threads`.  Between chunks the caller can report
-    progress.
+    :func:`run_chains_in_threads`.  Between chunks it reports each chain's
+    sweep count to the progress bars.
 
     The compiled chunk is cached on ``sweep`` itself, keyed by the chunk length
     and the shapes of the state and ``consts``.  A runner that keeps one
@@ -191,15 +200,16 @@ def run_chains_chunked(
         Each chain's key for the warmup phase and for the draw phase.
     tune, draws : int
         Warmup and post-warmup sweeps per chain.
-    on_chunk : callable, optional
-        ``on_chunk(sweep_index, tuning)``, called after each chunk with the
-        0-based index of the last completed sweep (warmup sweeps come first).
     consts : pytree, optional
         Read-only arrays shared by every chain (the data), passed to the
         compiled chunk as an argument and to the sweep as a fourth argument,
         ``sweep(state, key, tuning, consts)``.  Large arrays belong here rather
         than in the sweep's closure: XLA embeds closed-over arrays as constants
         and constant-folds operations on them at compile time.
+    progressbar : bool, default False
+        Show per-chain progress bars, advanced after each chunk.
+    model_type : str, default "gibbs"
+        The model named in the progress announcement.
 
     Returns
     -------
@@ -241,30 +251,44 @@ def run_chains_chunked(
             states[c] = out[c][0][0]
         return [o[0][1] for o in out], [o[1] for o in out]
 
-    keys = list(warm_keys)
-    done = 0
-    while done < tune:
-        n_active = min(chunk_len, tune - done)
-        keys, _ = _advance(keys, n_active, True)
-        done += n_active
-        if on_chunk is not None:
-            on_chunk(done - 1, True)
+    from ._progress import GibbsProgressBarManager
 
-    keys = list(draw_keys)
-    done = 0
     parts = []  # per chunk, per chain: the trace pytree cut to n_active sweeps
-    while done < draws:
-        n_active = min(chunk_len, draws - done)
-        keys, chunk_traces = _advance(keys, n_active, False)
-        parts.append(
-            [
-                jax.tree_util.tree_map(lambda a: np.asarray(a)[:n_active], t)
-                for t in chunk_traces
-            ]
-        )
-        done += n_active
-        if on_chunk is not None:
-            on_chunk(tune + done - 1, False)
+    with GibbsProgressBarManager(
+        chains=chains,
+        draws=draws,
+        tune=tune,
+        progressbar=progressbar,
+        model_type=model_type,
+    ) as pm:
+        for c in range(chains):
+            pm.start_chain(c)
+
+        def report(sweep_index, tuning):
+            for c in range(chains):
+                pm.update(c, sweep_index, tuning=tuning)
+
+        keys = list(warm_keys)
+        done = 0
+        while done < tune:
+            n_active = min(chunk_len, tune - done)
+            keys, _ = _advance(keys, n_active, True)
+            done += n_active
+            report(done - 1, True)
+
+        keys = list(draw_keys)
+        done = 0
+        while done < draws:
+            n_active = min(chunk_len, draws - done)
+            keys, chunk_traces = _advance(keys, n_active, False)
+            parts.append(
+                [
+                    jax.tree_util.tree_map(lambda a: np.asarray(a)[:n_active], t)
+                    for t in chunk_traces
+                ]
+            )
+            done += n_active
+            report(tune + done - 1, False)
 
     if not parts:
         return states, jax.tree_util.tree_map(

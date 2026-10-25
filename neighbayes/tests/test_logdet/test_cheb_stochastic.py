@@ -413,6 +413,17 @@ class TestDeflation:
         # matrix-free path is comfortably under a few seconds.
         assert elapsed < 20.0, f"elapsed={elapsed:.1f}s (densification regression?)"
 
+    def test_deflation_is_reproducible(self):
+        """One seed, one result, bit for bit: ARPACK starts from the estimator's rng."""
+        W = _weighted_ring_W(200, k=3, seed=1)
+
+        def moments():
+            return cheb_stochastic_logdet_precompute(
+                W, order=16, n_probes=8, n_deflate=5, rng=np.random.default_rng(4)
+            ).moments
+
+        np.testing.assert_array_equal(moments(), moments())
+
     def test_directed_W_warns_and_falls_back(self):
         """Asymmetric-pattern (directed) W: warn and ignore deflation."""
         n = 50

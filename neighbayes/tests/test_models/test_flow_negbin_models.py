@@ -520,3 +520,26 @@ class TestFlowGibbsBackend:
         )
         with pytest.raises(ValueError, match="not supported"):
             model.fit(draws=5, tune=5, chains=1, progressbar=False, backend="jax")
+
+
+@pytest.mark.parametrize("separable", [False, True])
+def test_failing_log_abs_det_diagnostic_keeps_the_posterior(monkeypatch, separable):
+    """The diagnostic runs after the chains: its failure warns, once, and the
+    finished posterior is returned without ``log_abs_det``."""
+    import warnings
+
+    def fail(self, idata):
+        raise RuntimeError("out of memory in the symbolic factorization")
+
+    monkeypatch.setattr(SARNegBinFlow, "_attach_flow_log_abs_det", fail)
+    data = _small_negbin_flow(seed=2)
+    model = SARNegBinFlow(data["y_vec"], data["X"], data["G"], separable=separable)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        idata = model.fit(draws=20, tune=20, chains=2, progressbar=False, random_seed=0)
+    hits = [w for w in caught if "log|A| diagnostic failed" in str(w.message)]
+    assert len(hits) == 1
+    assert idata.posterior["rho_d"].shape == (2, 20)
+    assert "sample_stats" not in idata.children or (
+        "log_abs_det" not in idata.sample_stats
+    )

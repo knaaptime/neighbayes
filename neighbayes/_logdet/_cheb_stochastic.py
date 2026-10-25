@@ -511,8 +511,11 @@ def _deflated_moments(
         matmat=wtilde_sym,
         dtype=np.float64,
     )
+    # ARPACK's starting vector comes from ``rng``: left to itself, ARPACK
+    # draws one of its own and the moments drift by about 1e-12 between runs.
+    v0 = rng.standard_normal(n)
     try:
-        lam_eig, U_eig = spla.eigsh(op, k=r, which="LM")
+        lam_eig, U_eig = spla.eigsh(op, k=r, which="LM", v0=v0)
     except spla.ArpackNoConvergence as exc:  # pragma: no cover - defensive
         lam_eig, U_eig = exc.eigenvalues, exc.eigenvectors
         r = lam_eig.shape[0]

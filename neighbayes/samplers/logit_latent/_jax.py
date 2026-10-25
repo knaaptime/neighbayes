@@ -442,6 +442,7 @@ def run_chains_jax_latent_logit(
     seeds,
     slice_width=0.4,
     store_latent=False,
+    progressbar=False,
 ):
     """Run the latent-logit chains in parallel threads; one dict per chain.
 
@@ -488,7 +489,15 @@ def run_chains_jax_latent_logit(
     warm = [jax.random.PRNGKey(int(s)) for s in seeds]
     draw = [jax.random.fold_in(jax.random.PRNGKey(int(s)), 1) for s in seeds]
     _, kept = run_chains_chunked(
-        sweep, states, warm, draw, tune=tune, draws=draws, consts=data
+        sweep,
+        states,
+        warm,
+        draw,
+        tune=tune,
+        draws=draws,
+        progressbar=progressbar,
+        model_type="latent_logit",
+        consts=data,
     )
     name = "rho" if process == "sar" else "lam"
     sl = slice(None, None, thin) if thin > 1 else slice(None)

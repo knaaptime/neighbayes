@@ -260,7 +260,11 @@ class LatentTwoPartMixin:
             from ...samplers.two_part_latent._jax import run_chains_jax_latent_two_part
 
             results = run_chains_jax_latent_two_part(
-                **common, logdet=logdet, logdet_zero=logdet_zero, seeds=seeds
+                **common,
+                logdet=logdet,
+                logdet_zero=logdet_zero,
+                seeds=seeds,
+                progressbar=progressbar,
             )
             return self._latent_two_part_idata(results, log_likelihood)
 

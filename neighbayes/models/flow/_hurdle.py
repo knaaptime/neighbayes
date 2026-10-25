@@ -229,6 +229,7 @@ class SARHurdleNegBinFlow(FlowCountDesigns, HurdleMixin, _FlowCount, FlowModel):
                 y, X, Z, W_csc, W_zero_csc, self._n, self._T, pr, draws, tune,
                 keep_group_draws=keep_groups, jax_seeds=int_seeds,
                 store_log_lik=log_likelihood, **fe_kwargs,
+                progressbar=progressbar,
             )  # fmt: skip
         else:
 

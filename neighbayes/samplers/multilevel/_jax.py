@@ -685,7 +685,6 @@ def run_multilevel_jax(
 
     from ..._jax_dispatch import ensure_x64
     from .._utils._jax_utils import cached_sweep, run_chains_chunked
-    from .._utils._progress import GibbsProgressBarManager
     from .._utils._sparsax_lu import set_sparsax_lu_cache_size
     from ._core import PARAMETRIZATIONS
 
@@ -725,32 +724,17 @@ def run_multilevel_jax(
         warm_keys.append(jax.random.PRNGKey(k_int))
         draw_keys.append(jax.random.fold_in(jax.random.PRNGKey(k_int), 1))
 
-    with GibbsProgressBarManager(
-        chains=chains,
-        draws=draws,
+    _, traces = run_chains_chunked(
+        sweep,
+        states,
+        warm_keys,
+        draw_keys,
         tune=tune,
+        draws=draws,
         progressbar=progressbar,
         model_type="multilevel",
-    ) as pm:
-        if pm is not None:
-            for ch in range(chains):
-                pm.start_chain(ch)
-
-        def _progress(i, tuning):
-            if pm is not None:
-                for ch in range(chains):
-                    pm.update(ch, i, tuning=tuning)
-
-        _, traces = run_chains_chunked(
-            sweep,
-            states,
-            warm_keys,
-            draw_keys,
-            tune=tune,
-            draws=draws,
-            on_chunk=_progress,
-            consts=consts,
-        )
+        consts=consts,
+    )
 
     n_keep = draws // thin
     sl = slice(None, None, thin)

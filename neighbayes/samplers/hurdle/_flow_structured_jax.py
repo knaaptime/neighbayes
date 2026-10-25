@@ -343,6 +343,7 @@ def run_chains_jax_hurdle_flow_structured(
     jax_seeds=None,
     slice_width: float = 0.4,
     store_log_lik: bool = False,
+    progressbar=False,
 ):
     """Run the structured separable hurdle flow sampler on JAX, one dict per chain.
 
@@ -430,7 +431,15 @@ def run_chains_jax_hurdle_flow_structured(
     warm_keys = [jax.random.PRNGKey(int(s)) for s in jax_seeds]
     draw_keys = [jax.random.fold_in(jax.random.PRNGKey(int(s)), 1) for s in jax_seeds]
     final, traces = run_chains_chunked(
-        sweep, states, warm_keys, draw_keys, tune=tune, draws=draws, consts=data
+        sweep,
+        states,
+        warm_keys,
+        draw_keys,
+        tune=tune,
+        draws=draws,
+        progressbar=progressbar,
+        model_type="hurdle_flow",
+        consts=data,
     )
     for name, eq in (("bin", binary), ("cnt", count)):
         if eq.has_pairs:

@@ -56,7 +56,7 @@ def run_chains(
     draws: int = 2000,
     tune: int = 1000,
     model_type: str = "sar",
-    timeout: float | None = 600,
+    timeout: float | None = None,
     reuse_workers: bool = False,
 ) -> list[dict]:
     """Run n_chains independent Gibbs chains.
@@ -99,9 +99,10 @@ def run_chains(
     timeout : float or None, default None
         Maximum wall-clock seconds to wait for **all** chains to
         finish when ``parallel=True``.  If any worker has not
-        returned by this deadline, a :class:`TimeoutError` is raised.
-        ``None`` waits indefinitely (backward-compatible default).
-        Ignored when ``parallel=False``.
+        returned by this deadline, joblib raises
+        :class:`multiprocessing.TimeoutError`.
+        ``None`` waits indefinitely: a fit's chains may rightly run for
+        hours.  Ignored when ``parallel=False``.
 
     Returns
     -------

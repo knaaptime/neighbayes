@@ -988,8 +988,6 @@ def run_chains_jax_reduced(
 
     ensure_x64()
 
-    from .._utils._progress import GibbsProgressBarManager
-
     chains = len(inits)
     n, k = X.shape
 
@@ -1061,32 +1059,17 @@ def run_chains_jax_reduced(
     warm_keys = [jax.random.PRNGKey(int(s)) for s in jax_seeds]
     draw_keys = [jax.random.fold_in(jax.random.PRNGKey(int(s)), 1) for s in jax_seeds]
 
-    with GibbsProgressBarManager(
-        chains=chains,
-        draws=draws,
+    _, traces = run_chains_chunked(
+        _sweep,
+        states,
+        warm_keys,
+        draw_keys,
         tune=tune,
+        draws=draws,
         progressbar=progressbar,
         model_type="sar_negbin",
-    ) as pm:
-        if pm is not None:
-            for c in range(chains):
-                pm.start_chain(c)
-
-        def _progress(i, tuning):
-            if pm is not None:
-                for c in range(chains):
-                    pm.update(c, i, tuning=tuning)
-
-        _, traces = run_chains_chunked(
-            _sweep,
-            states,
-            warm_keys,
-            draw_keys,
-            tune=tune,
-            draws=draws,
-            on_chunk=_progress,
-            consts=data,
-        )
+        consts=data,
+    )
 
     rho_all, beta_all, alpha_all = traces[:3]
     eta_all = traces[3] if store_log_lik else None

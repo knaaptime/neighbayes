@@ -303,7 +303,6 @@ def run_chains_jax_zinb(
     import jax.numpy as jnp
 
     from ..._jax_dispatch import ensure_x64
-    from .._utils._progress import GibbsProgressBarManager
     from ..negbin_reduced._jax import _build_sparse_ctx, _sparse_solve_parts
     from ._core import _zinb_loglik_pointwise
 
@@ -376,35 +375,17 @@ def run_chains_jax_zinb(
 
     _sweep = cached_sweep(("sar_zinb", *static, bool(store_log_lik)), _build)
 
-    with GibbsProgressBarManager(
-        chains=chains,
-        draws=draws,
+    _, traces = run_chains_chunked(
+        _sweep,
+        [jax.tree_util.tree_map(lambda a, c=c: a[c], state0) for c in range(chains)],
+        list(warm_keys),
+        list(draw_keys),
         tune=tune,
+        draws=draws,
         progressbar=progressbar,
         model_type="zinb_sar",
-    ) as pm:
-        if pm is not None:
-            for c in range(chains):
-                pm.start_chain(c)
-
-        def _progress(i, tuning):
-            if pm is not None:
-                for c in range(chains):
-                    pm.update(c, i, tuning=tuning)
-
-        _, traces = run_chains_chunked(
-            _sweep,
-            [
-                jax.tree_util.tree_map(lambda a, c=c: a[c], state0)
-                for c in range(chains)
-            ],
-            list(warm_keys),
-            list(draw_keys),
-            tune=tune,
-            draws=draws,
-            on_chunk=_progress,
-            consts=data,
-        )
+        consts=data,
+    )
 
     lam_all, gamma_all, rho_all, beta_all, alpha_all = traces[:5]
     if store_log_lik:

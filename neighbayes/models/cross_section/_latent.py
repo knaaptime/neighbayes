@@ -206,6 +206,7 @@ class LatentMixin:
                     slice_width=slice_width,
                     store_latent=log_likelihood,
                     **panel_kw,
+                    progressbar=progressbar,
                 ),
                 log_likelihood,
             )

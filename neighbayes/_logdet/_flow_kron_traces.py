@@ -121,8 +121,10 @@ class FlowKronTraceLogdet:
             lo, hi = lo - pad, hi + pad
         else:
             ends = []
+            # A fixed start keeps the interval, and so every value, reproducible.
+            v0 = np.random.default_rng(0).standard_normal(n)
             for which in ("SA", "LA"):
-                val, vec = spla.eigsh(S, k=1, which=which, tol=1e-10)
+                val, vec = spla.eigsh(S, k=1, which=which, tol=1e-10, v0=v0)
                 resid = float(np.linalg.norm(S @ vec[:, 0] - val[0] * vec[:, 0]))
                 ends.append((float(val[0]), resid))
             (lo, r_lo), (hi, r_hi) = ends

@@ -238,6 +238,7 @@ class SARZINBFlow(FlowCountDesigns, ZINBMixin, _FlowCount, FlowModel):
                 keep_group_draws=keep_groups,
                 jax_seeds=int_seeds,
                 store_log_lik=log_likelihood,
+                progressbar=progressbar,
             )
             return self._assemble_count_idata(
                 results, scalars, keep_groups, log_likelihood, extra=extra

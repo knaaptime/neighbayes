@@ -909,6 +909,7 @@ def run_chains_jax_flow_structured_fe(
     slice_width=0.4,
     store_log_lik=False,
     cell_mask=None,
+    progressbar=False,
 ):
     """Run the structured separable NB flow sampler with fixed effects on JAX.
 
@@ -995,7 +996,15 @@ def run_chains_jax_flow_structured_fe(
     warm_keys = [jax.random.PRNGKey(int(s)) for s in jax_seeds]
     draw_keys = [jax.random.fold_in(jax.random.PRNGKey(int(s)), 1) for s in jax_seeds]
     final, traces = run_chains_chunked(
-        sweep, states, warm_keys, draw_keys, tune=tune, draws=draws, consts=data
+        sweep,
+        states,
+        warm_keys,
+        draw_keys,
+        tune=tune,
+        draws=draws,
+        progressbar=progressbar,
+        model_type="nb_flow_panel",
+        consts=data,
     )
     if has_pairs:
         warn_unconverged_cg(f["cg_resid"] for f in final)
