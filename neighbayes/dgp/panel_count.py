@@ -186,6 +186,7 @@ def _simulate_sar_zinb_panel_re(
     gdf=None,
     n_side: int | None = None,
     contiguity: str = "queen",
+    latent: bool = False,
 ) -> dict:
     r"""Simulate a zero-inflated SAR-NB panel with per-period structural zeros.
 
@@ -200,7 +201,12 @@ def _simulate_sar_zinb_panel_re(
     with a fresh zero-part design ``X_{z,t}`` (intercept plus standard-normal
     columns) each period, and ``y = d · y_NB``.  Matches
     :class:`~neighbayes.models.SARZINB` panels (``rho = rho_zero = 0`` gives
-    the aspatial :class:`~neighbayes.models.ZINB`).
+    the aspatial :class:`~neighbayes.models.ZINB`).  With ``latent=True`` it
+    draws the latent panel, ``SARZINB(latent=True)``'s: the count part
+    :func:`_simulate_sar_negbin_panel_re`'s latent one, a unit active where its
+    utility :math:`(I - \rho_z W_z)^{-1}(X_{z,t}\beta_z + \varepsilon_{z,t})`
+    is positive, logistic :math:`\varepsilon_z` (``eta_zero`` holds the
+    utilities).
 
     Parameters
     ----------
@@ -224,7 +230,7 @@ def _simulate_sar_zinb_panel_re(
     rng = ensure_rng(rng, seed)
     out = _simulate_panel_count(
         N, T, rho, beta, alpha, unit_effect_sd, time_effect_sd,
-        fe_x_corr, err_hetero, rng, None, W, gdf, n_side, contiguity,
+        fe_x_corr, err_hetero, rng, None, W, gdf, n_side, contiguity, latent,
     )  # fmt: skip
     beta_zero = np.asarray([0.5, 1.0] if beta_zero is None else beta_zero, dtype=float)
     if W_zero is not None:
@@ -240,10 +246,14 @@ def _simulate_sar_zinb_panel_re(
             [np.ones(N), rng.standard_normal((N, len(beta_zero) - 1))]
         )
         Z_list.append(Z_t)
-        eta_list.append(solve(Z_t @ beta_zero))
+        eps = rng.logistic(size=N) if latent else 0.0
+        eta_list.append(solve(Z_t @ beta_zero + eps))
     X_zero = np.vstack(Z_list)
     eta_sel = np.concatenate(eta_list)
-    d = rng.binomial(1, 1.0 / (1.0 + np.exp(-eta_sel)))
+    if latent:
+        d = (eta_sel > 0).astype(np.int64)
+    else:
+        d = rng.binomial(1, 1.0 / (1.0 + np.exp(-eta_sel)))
     out["y"] = (out["y"] * d).astype(np.int64)
     out.update(X_zero=X_zero, d=d, eta_zero=eta_sel, W_zero_sparse=Ws_sel)
     out["params_true"].update(rho_zero=rho_zero, beta_zero=beta_zero)

@@ -86,6 +86,9 @@ from .._utils._sweeps import run_sweeps
 _BETA_DF = 8.0
 #: Stepping-out budget of the η slices.
 _ETA_MAX_STEPS = 32
+#: Shrinkage budget of an η slice, after which η keeps its value: reached only
+#: when the log density is too large to resolve the slice (counts near 1e16).
+_ETA_MAX_SHRINKS = 500
 #: Relative residual of the filter solves.
 _SOLVE_RTOL = 1e-12
 #: Iteration cap of a filter solve before it falls back on a direct solve.
@@ -187,14 +190,16 @@ def _eta_sweep(eta, eps, y, kind, alpha, indptr, rows, aval, rng):
         ):
             right += w
             k -= 1
-        while True:
-            x1 = left + rng.random() * (right - left)
-            if _eta_logf(x1, i, x0, y_i, k_i, alpha, eps, indptr, rows, aval) > z:
+        x1 = x0
+        for _ in range(_ETA_MAX_SHRINKS):
+            x = left + rng.random() * (right - left)
+            if _eta_logf(x, i, x0, y_i, k_i, alpha, eps, indptr, rows, aval) > z:
+                x1 = x
                 break
-            if x1 < x0:
-                left = x1
+            if x < x0:
+                left = x
             else:
-                right = x1
+                right = x
         d = x1 - x0
         for p in range(indptr[i], indptr[i + 1]):
             eps[rows[p]] += aval[p] * d

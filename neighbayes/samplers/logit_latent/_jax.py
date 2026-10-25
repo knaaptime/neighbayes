@@ -92,10 +92,11 @@ def column_table(W):
     return R, O, V
 
 
-def _latent_data(y, X, W, priors, ld_params, sign=None):
+def _latent_data(y, X, W, priors, ld_params, sign=None, unit_effects=None):
     """The read-only arrays every chain's sweep takes (``consts``).
 
-    ``sign`` is each utility's side of zero, that of ``y`` by default.
+    ``sign`` is each utility's side of zero, that of ``y`` by default;
+    ``unit_effects`` adds a SAR's random unit effects.
     """
     import jax.numpy as jnp
 
@@ -108,7 +109,18 @@ def _latent_data(y, X, W, priors, ld_params, sign=None):
     if sign is None:
         sign = np.where(np.asarray(y) > 0, 1.0, -1.0)
     R, O, V = column_table(W)
+    fx = unit_effects
+    effects = (
+        {
+            "group": jnp.asarray(fx.group, dtype=jnp.int32),
+            "c_mu": jnp.float64(fx.mu),
+            "c_scale": jnp.float64(fx.sd_scale),
+        }
+        if fx is not None
+        else {}
+    )
     return {
+        **effects,
         "sign": jnp.asarray(sign, dtype=jnp.float64),
         "X": jnp.asarray(X, dtype=jnp.float64),
         "WX": jnp.asarray(W @ X, dtype=jnp.float64),
@@ -172,11 +184,14 @@ def _tn_beyond(key, a, active):
     return z
 
 
-def _make_sweep(n, k, process, n_colours, logdet_eval, store_latent, mixed=False):
+def _make_sweep(
+    n, k, process, n_colours, logdet_eval, store_latent, mixed=False, n_groups=0
+):
     """One chain's sweep; ``mixed`` draws the unknown sides (``sign`` 0) too.
 
     A mixed sweep reads ``logq`` from the consts and keeps each utility's
-    probability of the negative side in the state's ``"pneg"``.
+    probability of the negative side in the state's ``"pneg"``.  ``n_groups``
+    random unit effects (a SAR's) are the state's ``"c"`` and ``"sigma_c"``.
     """
     import augax
     import jax
@@ -186,6 +201,7 @@ def _make_sweep(n, k, process, n_colours, logdet_eval, store_latent, mixed=False
     from .._utils._jax_slice import adapt_slice_width, jax_slice_sample_1d
 
     sar = process == "sar"
+    effects = n_groups > 0
 
     def sweep(st, key, tuning, d):
         rows, cols, vals = d["rows"], d["cols"], d["vals"]
@@ -196,7 +212,8 @@ def _make_sweep(n, k, process, n_colours, logdet_eval, store_latent, mixed=False
 
         par, beta, ystar, m = st["par"], st["beta"], st["ystar"], st["m"]
         X, WX = d["X"], d["WX"]
-        Xb = X @ beta
+        offset = st["c"][d["group"]] if effects else 0.0
+        Xb = X @ beta + offset
         p = 1.0 / (m * m)
         if sar:
             eps = ystar - par * W(ystar) - Xb
@@ -264,7 +281,9 @@ def _make_sweep(n, k, process, n_colours, logdet_eval, store_latent, mixed=False
         m = augax.ks_sample(eps, k_m)
         p = 1.0 / (m * m)
         z = W(ystar)
-        py, pz = p * ystar, p * z
+        # The SAR's response, less its unit effects.
+        yt = ystar - offset
+        py, pz = p * yt, p * z
         params = d["logdet"]
 
         if sar:
@@ -278,7 +297,7 @@ def _make_sweep(n, k, process, n_colours, logdet_eval, store_latent, mixed=False
             c1 = X.T @ pz
             Bc0, Bc1 = chol_solve(c0), chol_solve(c1)
             q00, q01, q11 = c0 @ Bc0, c0 @ Bc1, c1 @ Bc1
-            yPy, yPz, zPz = ystar @ py, ystar @ pz, z @ pz
+            yPy, yPz, zPz = yt @ py, yt @ pz, z @ pz
 
             def dens(r):
                 return (
@@ -326,7 +345,40 @@ def _make_sweep(n, k, process, n_colours, logdet_eval, store_latent, mixed=False
         new = {"par": par, "beta": beta, "ystar": ystar, "m": m, "slice_width": width}
         if mixed:
             new["pneg"] = pneg
-        return new, (par, beta, ystar) if store_latent else (par, beta)
+        draws = (par, beta)
+        if effects:
+            # The unit effects given the scales, then their sd.
+            grp, mu, sig = d["group"], d["c_mu"], st["sigma_c"]
+            e = ystar - par * z - X @ beta
+            prec = jax.ops.segment_sum(p, grp, num_segments=n_groups) + 1.0 / sig**2
+            mean = jax.ops.segment_sum(p * e, grp, num_segments=n_groups) + mu / sig**2
+            c = mean / prec + jax.random.normal(
+                jax.random.fold_in(k_beta, 1), (n_groups,)
+            ) / jnp.sqrt(prec)
+            ss, scale = jnp.sum((c - mu) ** 2), d["c_scale"]
+
+            def sd_density(ls):
+                s2 = jnp.exp(2.0 * ls)
+                return (
+                    -n_groups * ls
+                    - 0.5 * ss / s2
+                    - 2.0 * jnp.log1p(s2 / (3.0 * scale**2))
+                    + ls
+                )
+
+            ls, _ = jax_slice_sample_1d(
+                sd_density,
+                jnp.log(sig),
+                -10.0,
+                10.0,
+                key=jax.random.fold_in(k_beta, 2),
+                w=0.5,
+            )
+            new["c"], new["sigma_c"] = c, jnp.exp(ls)
+            draws = draws + (c, new["sigma_c"])
+        if store_latent:
+            draws = draws + (ystar,)
+        return new, draws
 
     return sweep
 

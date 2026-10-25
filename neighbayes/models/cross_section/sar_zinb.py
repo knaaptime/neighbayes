@@ -158,7 +158,8 @@ class SARZINB(
         The latent model instead of the reduced form: each part a latent SAR
         propagating its own disturbance, a unit active when its logistic
         utility is positive and its count then Poisson given the log-mean
-        (:mod:`neighbayes.samplers.two_part_latent`).  A cross-section only.
+        (:mod:`neighbayes.samplers.two_part_latent`).  As a panel its count
+        part takes the effects above inside its filter, its zero part none.
 
     Notes
     -----
@@ -178,6 +179,7 @@ class SARZINB(
         "panel": {"_priors_cls": PanelZINBPriors, "_gibbs_key": ("zinb", "panel")},
     }
     _zero_part = True
+    _latent_panel = True
 
     _spatial_params: tuple[str, ...] = ("rho", "rho_zero")
     _model_type: str = "zinb_sar"

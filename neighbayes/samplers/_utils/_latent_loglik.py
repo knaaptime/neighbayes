@@ -20,7 +20,8 @@ The conditional :math:`p(\eta_i \mid \eta_{-i}, \theta) \propto \prod_j
 f(\varepsilon_j)` runs over the equations column :math:`i` of :math:`A`
 touches, and is log-concave; a Newton step finds its mode and a
 double-exponential rule at the Laplace scale integrates it, over the line or,
-for the logit's threshold, the half-line.
+for the logit's threshold, each half-line, the two normalizing each other so
+that the probabilities of the sides sum to one exactly.
 """
 
 from __future__ import annotations
@@ -180,10 +181,13 @@ def integrated_loglik(
             out[d, i] = 0.0
             continue
         args = (i, latent[d, i], e[d], indptr, rows, ones, wvals, par[d], fam, alpha[d])
-        z = _log_integral(*args, y[i], UNOBSERVED, 0)
         if fam == NEGBIN:
+            z = _log_integral(*args, y[i], UNOBSERVED, 0)
             out[d, i] = _log_integral(*args, y[i], kind[i], 0) - z - lgy[i]
         else:
             side = 1 if y[i] > 0 else -1
-            out[d, i] = _log_integral(*args, y[i], UNOBSERVED, side) - z
+            own = _log_integral(*args, y[i], UNOBSERVED, side)
+            other = _log_integral(*args, y[i], UNOBSERVED, -side)
+            top = max(own, other)
+            out[d, i] = own - top - np.log(np.exp(own - top) + np.exp(other - top))
     return out

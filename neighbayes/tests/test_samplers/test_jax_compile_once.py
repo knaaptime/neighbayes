@@ -89,6 +89,19 @@ def _cases():
                 y=y, X=dt["X"], X_zero=dt["X_zero"], W=dt["W_sparse"], latent=True
             ),
         )
+        dp = sim(n_side=5, T=3, seed=13, **panel)
+        out[f"{name}Panel"] = (
+            dp["y"],
+            lambda y, dp=dp, cls=cls: cls(
+                y=y,
+                X=dp["X"],
+                X_zero=dp["X_zero"],
+                W=dp["W_sparse"],
+                N=25,
+                T=3,
+                **panel,
+            ),
+        )
     dne = dgp.simulate_sem_negbin(n_side=6, seed=10)
     out["SEMNegBin"] = (
         dne["y"],
@@ -165,6 +178,8 @@ _CASES = (
     "SARNegBinLatentPanel",
     "SARZINBLatent",
     "SARHurdleNegBinLatent",
+    "SARZINBLatentPanel",
+    "SARHurdleNegBinLatentPanel",
     "SEMNegBin",
     "SARNegBinFlow",
     "SARNegBinFlow(separable)",

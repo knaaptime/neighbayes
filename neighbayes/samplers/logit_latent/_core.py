@@ -32,6 +32,11 @@ disturbance, whose :math:`\rho = 0` member is not the logit.
 A zero-inflated count's zero leaves its activation unknown: its utility's
 side of zero is drawn with it, the positive side weighted by the probability
 :math:`q_i` that an active unit counts zero (``sign`` 0, ``logq``).
+
+A SAR may carry random unit effects inside its filter, :math:`A y^* = X\beta
++ c_{g(i)} + \varepsilon`, :math:`c_g \sim N(\mu, \sigma_c^2)`: they offset
+steps 1–4, and given the scales they are Gaussian (step 5), :math:`\sigma_c`
+a slice under its half-*t* prior.
 """
 
 from __future__ import annotations
@@ -46,6 +51,7 @@ import scipy.sparse as sp
 from ...models.priors import LogitGibbsPriors
 from .._utils._slice import SliceWidthState, slice_sample_1d_adaptive
 from .._utils._sweeps import run_sweeps
+from ..negbin_latent._core import UnitEffects, _unit_sd_step
 
 
 @numba.njit(cache=True)
@@ -113,12 +119,21 @@ def _chol_solve(L: np.ndarray, v: np.ndarray) -> np.ndarray:
     return np.linalg.solve(L.T, np.linalg.solve(L, v))
 
 
+def _unit_effect_step(e, p, fx: UnitEffects, sigma, rng):
+    """``c | e``, ``e = c[group] + eps`` with ``eps_r ~ N(0, 1 / p_r)``: Gaussian."""
+    G = fx.n_groups
+    prec = np.bincount(fx.group, weights=p, minlength=G) + 1.0 / sigma**2
+    mean = np.bincount(fx.group, weights=p * e, minlength=G) + fx.mu / sigma**2
+    return mean / prec + rng.standard_normal(G) / np.sqrt(prec)
+
+
 class LatentLogitChain:
     """One chain's state and sweep (see the module).
 
     ``sign`` is each utility's side of zero (``+1``, ``-1``, or ``0`` for
     unknown, which needs ``logq`` set before each sweep); by default it is
-    that of ``y``.  :func:`run_chain` runs one alone.
+    that of ``y``.  ``unit_effects`` adds a SAR's random unit effects.
+    :func:`run_chain` runs one alone.
     """
 
     def __init__(
@@ -133,9 +148,14 @@ class LatentLogitChain:
         rng: np.random.Generator,
         slice_width: float = 0.4,
         sign: Optional[np.ndarray] = None,
+        unit_effects: Optional[UnitEffects] = None,
     ):
         n, k = X.shape
         self.sar = process == "sar"
+        if unit_effects is not None and not self.sar:
+            raise NotImplementedError(
+                "Random unit effects are implemented for the SAR."
+            )
         self.n, self.k, self.rng = n, k, rng
         self.sign = (
             np.where(y > 0, 1, -1).astype(np.int8)
@@ -163,6 +183,10 @@ class LatentLogitChain:
         self.beta = self.b0.copy()
         self.ystar = 0.5 * np.where(self.sign != 0, self.sign, 1).astype(np.float64)
         self.m = np.full(n, np.sqrt(2.0 * np.pi) * np.log(2.0))
+        self.fx = unit_effects
+        if unit_effects is not None:
+            self.c = np.full(unit_effects.n_groups, float(unit_effects.mu))
+            self.sigma_c = float(unit_effects.sd_scale)
 
     def sweep(self, tuning: bool) -> None:
         """One Gibbs sweep."""
@@ -177,7 +201,8 @@ class LatentLogitChain:
         p = 1.0 / (m * m)
         Q = (A.T @ sp.diags(p) @ A).tocsr()
         Q.sort_indices()
-        Xb = X @ beta
+        offset = self.c[self.fx.group] if self.fx is not None else 0.0
+        Xb = X @ beta + offset
         b = A.T @ (p * Xb) if self.sar else Q @ Xb
         _orthant_sweep(
             ystar, self.sign, self.logq, self.pneg, Q.indptr, Q.indices, Q.data, b, rng
@@ -187,7 +212,9 @@ class LatentLogitChain:
         m = ks_sample_numpy(eps, rng)
         p = 1.0 / (m * m)
         z = W @ ystar
-        py, pz = p * ystar, p * z
+        # The SAR's response, less its unit effects.
+        yt = ystar - offset
+        py, pz = p * yt, p * z
 
         if self.sar:
             # r = y* - rho z; m(rho) = X'P r + B0^-1 b0 = c0 - rho c1.
@@ -197,7 +224,7 @@ class LatentLogitChain:
             c1 = X.T @ pz
             Bc0, Bc1 = _chol_solve(L, c0), _chol_solve(L, c1)
             q00, q01, q11 = c0 @ Bc0, c0 @ Bc1, c1 @ Bc1
-            yPy, yPz, zPz = ystar @ py, ystar @ pz, z @ pz
+            yPy, yPz, zPz = yt @ py, yt @ pz, z @ pz
 
             def logp(r):
                 return (
@@ -246,9 +273,18 @@ class LatentLogitChain:
         self.beta = mean + np.linalg.solve(L.T, rng.standard_normal(k))
         self.par, self.m = par, m
 
+        # 5. The unit effects, given the scales, and their sd.
+        if self.fx is not None:
+            e = ystar - par * z - X @ self.beta
+            self.c = _unit_effect_step(e, p, self.fx, self.sigma_c, rng)
+            self.sigma_c = _unit_sd_step(self.sigma_c, self.c, self.fx, rng)
+
     def draw(self, store_latent: bool) -> dict:
         """The current values, named as :func:`run_chain` returns them."""
         out = {"rho" if self.sar else "lam": self.par, "beta": self.beta}
+        if self.fx is not None:
+            out["unit_effect"] = self.c
+            out["unit_effect_sd"] = self.sigma_c
         if store_latent:
             out["latent"] = self.ystar
         return out

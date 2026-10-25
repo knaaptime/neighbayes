@@ -451,7 +451,11 @@ Rao–Blackwellized probability that each zero is structural.
 LOO. `impacts(equation, scale=...)` reports each part on its link scale (the
 default) or its outcome scale: `"probability"` of activation, and `"count"`,
 the expected count of an active unit. The identification caveat above applies
-unchanged. Cross-section only; NumPy or `backend="jax"`.
+unchanged. As a panel ($T$ periods stacked time-first, each filter acting
+within a period) the count part takes random unit effects inside its filter
+and period effects (`unit_effects="random"`, `time_effects=True`), as the
+latent `SARNegBin` panel does; the zero part takes none, as in the reduced
+form. NumPy or `backend="jax"`.
 
 ### ZINB panels (`SARZINB`, `ZINB`)
 
@@ -532,7 +536,9 @@ hurdle models with random effects. The parts still share nothing: the zero
 part is `SARLogit(latent=True)` fitted to $\mathbf 1(y > 0)$, the count part
 the latent SAR NB observing the positive counts only, and a sweep is one sweep
 of each. LOO and impacts work as for the latent SARZINB, the count part's
-outcome being the expected positive count. Cross-section only; NumPy or
+outcome being the expected positive count. As a panel both parts take random
+unit effects and period effects, each inside its own filter; given the
+logistic's normal scales the zero part's unit effects are Gaussian. NumPy or
 `backend="jax"`.
 
 ### Logit

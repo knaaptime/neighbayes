@@ -13,6 +13,12 @@ The hurdle's :math:`u_i > 0` is a positive count, which is then
 model's is an active unit, whose count is :math:`\mathrm{Poisson}(e^{\eta_i})`.
 The sampler is :mod:`neighbayes.samplers.two_part_latent`.
 
+A panel stacks ``T`` periods time-first, each part's filter acting within
+periods.  The count part takes the latent NB panel's effects (random unit
+effects inside its filter, period effects as columns of ``X``); the hurdle's
+zero part takes its own, the zero-inflated model's none, as in their reduced
+forms.
+
 The link-scale impacts are the reduced form's formulas, since
 :math:`\partial E u / \partial z' = S_z\gamma` and :math:`\partial E\eta /
 \partial x' = S\beta`.  Probabilities, means and predictions are posterior
@@ -58,6 +64,21 @@ def _truncated_slope(lam: np.ndarray) -> np.ndarray:
     return np.where(lam < 1e-2, lam * (0.5 + lam / 6.0), closed)
 
 
+def _with_periods(X: np.ndarray, priors, D_tau: np.ndarray, fp: dict):
+    """``X`` with the period dummies appended, under their own prior."""
+    from dataclasses import replace
+
+    k, n_tau = X.shape[1], D_tau.shape[1]
+    mu = np.r_[
+        np.broadcast_to(priors.beta_mu, (k,)), np.full(n_tau, fp["time_effect_mu"])
+    ]
+    sd = np.r_[
+        np.broadcast_to(priors.beta_sigma, (k,)),
+        np.full(n_tau, fp["time_effect_sigma"]),
+    ]
+    return np.hstack([X, D_tau]), replace(priors, beta_mu=mu, beta_sigma=sd)
+
+
 def _draw_truncated_poisson(rng, lam: np.ndarray) -> np.ndarray:
     """Zero-truncated Poisson draws, exactly: the first event's time given one by
     time 1, then a Poisson count over the rest of the interval."""
@@ -69,11 +90,13 @@ def _draw_truncated_poisson(rng, lam: np.ndarray) -> np.ndarray:
 class LatentTwoPartMixin:
     """Gibbs fit, log-likelihood and simulated summaries of the latent two-part models.
 
-    The host sets ``_two_part`` (``"hurdle"`` or ``"zinb"``) and implements
-    :meth:`_latent_two_part_priors`.
+    The host sets ``_two_part`` (``"hurdle"`` or ``"zinb"``) and
+    ``_zero_effects`` (whether a panel's zero part takes effects), and
+    implements :meth:`_latent_two_part_priors`.
     """
 
     _two_part: str
+    _zero_effects: bool
     #: Largest ``n`` whose multiplier diagonal comes from the eigendecomposition.
     _LATENT_EFFECTS_EIGEN_MAX_N: int = 2000
 
@@ -87,6 +110,71 @@ class LatentTwoPartMixin:
             "likelihood integrates both parts' propagated disturbances over all n "
             "locations at once, which no NUTS model evaluates."
         )
+
+    # ------------------------------------------------------------------
+    # Panel
+    # ------------------------------------------------------------------
+
+    @property
+    def _latent_T(self) -> int:
+        return int(self._T) if self._is_panel else 1
+
+    def _part_effects(self, zero: bool) -> tuple[bool, bool]:
+        """Whether one part has ``(period, unit)`` effects."""
+        on = self._is_panel and (self._zero_effects or not zero)
+        return (
+            on and getattr(self, "_fe_periods", False),
+            on and getattr(self, "_fe_groups", False),
+        )
+
+    def _latent_blocks(self):
+        """``(X, priors, Z, priors_zero)``: each part's design, then its period dummies."""
+        priors, priors_zero = self._latent_two_part_priors()
+        X = np.ascontiguousarray(self._X, dtype=np.float64)
+        Z = np.ascontiguousarray(self._Z, dtype=np.float64)
+        if self._part_effects(zero=False)[0]:
+            X, priors = _with_periods(X, priors, self._D_tau, self._count_fe_priors())
+        if self._part_effects(zero=True)[0]:
+            Z, priors_zero = _with_periods(
+                Z, priors_zero, self._D_tau, self._sel_fe_priors()
+            )
+        return X, priors, Z, priors_zero
+
+    def _latent_unit_effects(self, zero: bool):
+        """One part's random unit effects for the sampler, or ``None``."""
+        if not self._part_effects(zero)[1]:
+            return None
+        from ...samplers.negbin_latent._core import UnitEffects
+
+        fp = self._sel_fe_priors() if zero else self._count_fe_priors()
+        return UnitEffects(
+            group=np.asarray(self._row_group),
+            n_groups=int(self._n_groups),
+            mu=fp["effect_mu"],
+            sd_scale=fp["effect_sd_scale"],
+        )
+
+    def _latent_stack(self, W) -> sp.csr_matrix:
+        """A period's weights on the stack, ``I_T ⊗ W``."""
+        W = sp.csr_matrix(W)
+        T = self._latent_T
+        return sp.kron(sp.identity(T, format="csr"), W, format="csr") if T > 1 else W
+
+    def _part_systematic(self, zero: bool, g: Optional[int] = None) -> np.ndarray:
+        """One part's systematic term, effects included: ``(G, n T)``, or ``(n T,)`` at draw ``g``."""
+        pre = "_zero" if zero else ""
+
+        def draws(name):
+            v = self._flat_draw(name)
+            return v if g is None else v[g]
+
+        out = draws(f"beta{pre}") @ (self._Z if zero else self._X).T
+        periods, units = self._part_effects(zero)
+        if periods:
+            out = out + draws(self._time_name(zero=zero)) @ self._D_tau.T
+        if units:
+            out = out + draws(self._effect_name(zero=zero))[..., self._row_group]
+        return out
 
     # ------------------------------------------------------------------
     # Fit
@@ -143,10 +231,8 @@ class LatentTwoPartMixin:
         ``log_likelihood`` stores each observation's likelihood with both
         parts' latent values integrated out, for ``az.loo``.
         """
-        priors, priors_zero = self._latent_two_part_priors()
+        X, priors, Z, priors_zero = self._latent_blocks()
         y = np.asarray(self._y, dtype=np.float64)
-        X = np.ascontiguousarray(self._X, dtype=np.float64)
-        Z = np.ascontiguousarray(self._Z, dtype=np.float64)
         W = self._W_sparse.tocsr()
         W_zero = self._W_zero_sparse.tocsr()
         rng = np.random.default_rng(random_seed)
@@ -166,6 +252,9 @@ class LatentTwoPartMixin:
             thin=thin,
             slice_width=slice_width,
             store_latent=log_likelihood,
+            T=self._latent_T,
+            unit_effects=self._latent_unit_effects(zero=False),
+            unit_effects_zero=self._latent_unit_effects(zero=True),
         )
         if backend == "jax":
             from ...samplers.two_part_latent._jax import run_chains_jax_latent_two_part
@@ -206,10 +295,36 @@ class LatentTwoPartMixin:
         def stack(name):
             return np.stack([np.asarray(r[name]) for r in results], axis=0)
 
-        post = {
-            name: stack(name)
-            for name in ("rho_zero", "beta_zero", "rho", "beta", "alpha")
+        post = {name: stack(name) for name in ("rho_zero", "rho", "alpha")}
+        coords = {
+            "coefficient_zero": list(self._sel_feature_names),
+            "coefficient": list(self._feature_names),
+            "obs_id": list(range(len(self._y))),
         }
+        dims = {
+            "beta_zero": ["coefficient_zero"],
+            "beta": ["coefficient"],
+            "obs": ["obs_id"],
+        }
+        for zero, names in (
+            (True, self._sel_feature_names),
+            (False, self._feature_names),
+        ):
+            pre = "_zero" if zero else ""
+            block = stack(f"beta{pre}")
+            post[f"beta{pre}"] = block[..., : len(names)]
+            periods, units = self._part_effects(zero)
+            if periods:
+                name = self._time_name(zero=zero)
+                post[name] = block[..., len(names) :]
+                coords["time"] = self._period_labels
+                dims[name] = ["time"]
+            if units:
+                index = self._effect_index
+                post[self._effect_name(zero=zero)] = stack(f"unit_effect{pre}")
+                post[self._effect_name("_sd", zero)] = stack(f"unit_effect_sd{pre}")
+                coords[index] = list(range(self._n_groups))
+                dims[self._effect_name(zero=zero)] = [index]
         if self._two_part == "zinb":
             mean = np.mean([r["structural_prob"] for r in results], axis=0)
             second = np.mean(
@@ -228,16 +343,8 @@ class LatentTwoPartMixin:
                 else None
             ),
             observed_data={"obs": self._y_int},
-            coords={
-                "coefficient_zero": list(self._sel_feature_names),
-                "coefficient": list(self._feature_names),
-                "obs_id": list(range(len(self._y))),
-            },
-            dims={
-                "beta_zero": ["coefficient_zero"],
-                "beta": ["coefficient"],
-                "obs": ["obs_id"],
-            },
+            coords=coords,
+            dims=dims,
         )
         self._idata = idata
         return idata
@@ -266,11 +373,19 @@ class LatentTwoPartMixin:
         y = np.asarray(self._y, dtype=np.float64)
         n = y.size
         pos = y > 0
-        X = np.asarray(self._X, dtype=np.float64)
-        Z = np.asarray(self._Z, dtype=np.float64)
-        W = self._W_sparse.tocsr()
-        W_zero = self._W_zero_sparse.tocsr()
+        X, _, Z, _ = self._latent_blocks()
+        W = self._latent_stack(self._W_sparse)
+        W_zero = self._latent_stack(self._W_zero_sparse)
         cols, cols_zero = filter_columns(W), filter_columns(W_zero)
+        group = getattr(self, "_row_group", None)
+
+        def systematic(r, zero):
+            pre = "_zero" if zero else ""
+            out = np.asarray(r[f"beta{pre}"]) @ (Z if zero else X).T
+            if self._part_effects(zero)[1]:
+                out = out + np.asarray(r[f"unit_effect{pre}"])[:, group]
+            return out
+
         hurdle = self._two_part == "hurdle"
         kind = (
             np.where(pos, TRUNCATED, UNOBSERVED) if hurdle else np.full(n, POISSON)
@@ -287,7 +402,7 @@ class LatentTwoPartMixin:
         for r in results:
             u = np.ascontiguousarray(r["latent_zero"], dtype=np.float64)
             rz = np.asarray(r["rho_zero"], dtype=np.float64)
-            ez = disturbances(u, rz, np.asarray(r["beta_zero"]) @ Z.T, W_zero)
+            ez = disturbances(u, rz, systematic(r, True), W_zero)
 
             def zero_side(side):
                 return integrated_loglik(
@@ -296,7 +411,7 @@ class LatentTwoPartMixin:
 
             eta = np.ascontiguousarray(r["latent"], dtype=np.float64)
             rc = np.asarray(r["rho"], dtype=np.float64)
-            e = disturbances(eta, rc, np.asarray(r["beta"]) @ X.T, W)
+            e = disturbances(eta, rc, systematic(r, False), W)
             alpha = np.asarray(r["alpha"], dtype=np.float64)
             count = integrated_loglik(eta, e, y, *cols, rc, alpha, NEGBIN, lgy, kind)
             if hurdle:
@@ -342,6 +457,7 @@ class LatentTwoPartMixin:
         par = post[f"rho{name}"].values.reshape(-1)
         X = self._Z if zero else self._X
         beta = post[f"beta{name}"].values.reshape(par.size, X.shape[1])
+        # A period's weights; the effects act on their stack.
         W = (self._W_zero_sparse if zero else self._W_sparse).tocsr()
         if zero:
             extra = {}
@@ -377,9 +493,9 @@ class LatentTwoPartMixin:
         return latent_outcome_effects(
             par=par,
             beta=beta,
-            offset=beta @ X.T,
+            offset=self._part_systematic(zero),
             extra=extra,
-            W=W,
+            W=self._latent_stack(W),
             sar=True,
             ni=list(
                 self._sel_nonintercept_indices if zero else self._nonintercept_indices
@@ -388,6 +504,7 @@ class LatentTwoPartMixin:
             weight=weight,
             eigen=eigen,
             row_sums=self._multiplier_row_sums if own_W and row_std else None,
+            periods=self._latent_T,
             n_mc=n_mc,
             n_probes=n_probes,
         )
@@ -399,26 +516,29 @@ class LatentTwoPartMixin:
     def _latent_part_sims(
         self, g: int, n_sims: int, rng
     ) -> tuple[np.ndarray, np.ndarray]:
-        """Fresh utilities and log-means at posterior draw ``g``, each ``(n, n_sims)``."""
+        """Fresh utilities and log-means at posterior draw ``g``, each ``(n T, n_sims)``."""
         n = self._X.shape[0]
-        eye = sp.identity(n, format="csc")
+        T = self._latent_T
+        N = n // T
 
         def solve(W, par, rhs):
-            return sp.linalg.splu((eye - par * W).tocsc()).solve(rhs)
+            # Each period's filter: the periods ride along as columns.
+            lu = sp.linalg.splu((sp.identity(N, format="csc") - par * W).tocsc())
+            cols = rhs.reshape(T, N, n_sims).transpose(1, 0, 2).reshape(N, -1)
+            return (
+                lu.solve(cols).reshape(N, T, n_sims).transpose(1, 0, 2).reshape(n, -1)
+            )
 
-        draw = {
-            name: self._flat_draw(name)[g]
-            for name in ("rho_zero", "beta_zero", "rho", "beta", "alpha")
-        }
+        draw = {name: self._flat_draw(name)[g] for name in ("rho_zero", "rho", "alpha")}
         U = solve(
             self._W_zero_sparse,
             float(draw["rho_zero"]),
-            (self._Z @ draw["beta_zero"])[:, None] + rng.logistic(size=(n, n_sims)),
+            self._part_systematic(True, g)[:, None] + rng.logistic(size=(n, n_sims)),
         )
         H = solve(
             self._W_sparse,
             float(draw["rho"]),
-            (self._X @ draw["beta"])[:, None]
+            self._part_systematic(False, g)[:, None]
             + _log_gamma_noise(rng, float(draw["alpha"]), (n, n_sims)),
         )
         return U, H
@@ -489,6 +609,7 @@ class LatentHurdleMixin(LatentTwoPartMixin):
     """``SARHurdleNegBin(latent=True)``: priors and the positive count's mean."""
 
     _two_part = "hurdle"
+    _zero_effects = True
 
     def _latent_two_part_priors(self):
         from ..priors import LogitGibbsPriors, ReducedGibbsPriors
@@ -536,6 +657,7 @@ class LatentZINBMixin(LatentTwoPartMixin):
     """``SARZINB(latent=True)``: priors and the zeros' attribution."""
 
     _two_part = "zinb"
+    _zero_effects = False
 
     def _latent_two_part_priors(self):
         from ..priors import LogitGibbsPriors, ReducedGibbsPriors

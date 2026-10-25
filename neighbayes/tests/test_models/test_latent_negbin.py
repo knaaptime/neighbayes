@@ -85,8 +85,6 @@ def test_simulators_draw_the_latent_forms():
     np.testing.assert_array_equal(s["params_true"]["theta"], [0.5])
     p = dgp.simulate_sar_negbin(n_side=4, T=3, latent=True, rho=0.5, seed=3)
     assert p["y"].shape == (48,) and p["params_true"]["rho"] == 0.5
-    with pytest.raises(NotImplementedError, match="latent=True"):
-        dgp.simulate_sar_zinb(n_side=4, T=2, latent=True)
     with pytest.raises(NotImplementedError, match="as a panel"):
         dgp.simulate_sem_negbin(n_side=4, T=2)
 

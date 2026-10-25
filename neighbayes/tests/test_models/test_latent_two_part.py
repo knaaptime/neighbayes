@@ -40,8 +40,7 @@ def test_designs(which):
     assert m._gibbs_key == (f"{which}_latent", "cross_section")
     assert cls(y=d["y"], X=d["X"], W=d["W_sparse"])._design == "static"
     panel = dict(y=np.r_[d["y"], d["y"]], X=np.r_[d["X"], d["X"]], W=d["W_sparse"])
-    with pytest.raises(NotImplementedError, match="cross-section only"):
-        cls(**panel, N=25, T=2, latent=True)
+    assert cls(**panel, N=25, T=2, latent=True)._design == "latent"
     with pytest.raises(NotImplementedError, match="Gibbs sampling"):
         m._build_pymc_model_latent()
 
@@ -56,6 +55,69 @@ def test_simulators_draw_the_latent_forms(which):
         assert np.all(d["y"][on] >= 1)
     t = MODELS[which][1](n_side=12, seed=3, latent=True, target_pi=0.3)
     assert abs(np.mean(t["d"]) - 0.3) < 0.1
+
+
+PANEL = dict(unit_effects="random", time_effects=True)
+
+
+def _panel_model(which, n_side=5, T=3, seed=1, **kw):
+    cls, sim = MODELS[which]
+    d = sim(n_side=n_side, T=T, seed=seed, latent=True, **PANEL, **kw)
+    m = cls(
+        y=d["y"],
+        X=d["X"],
+        X_zero=d["X_zero"],
+        W=d["W_sparse"],
+        N=n_side**2,
+        T=T,
+        latent=True,
+        **PANEL,
+    )
+    return d, m
+
+
+@pytest.mark.parametrize("which", list(MODELS))
+def test_panel_simulators_draw_the_latent_forms(which):
+    d, _ = _panel_model(which, seed=3)
+    on = d["eta_zero"] > 0
+    np.testing.assert_array_equal(d["d"], on.astype(float))
+    assert np.all(d["y"][~on] == 0)
+    if which == "hurdle":
+        assert np.all(d["y"][on] >= 1)
+
+
+@pytest.mark.parametrize(
+    "backend", ["numpy", pytest.param("jax", marks=pytest.mark.requires_jax)]
+)
+@pytest.mark.parametrize("which", list(MODELS))
+def test_panel_fit_and_summaries(which, backend):
+    """Count effects in both models; the hurdle's zero part takes its own."""
+    d, m = _panel_model(which)
+    idata = m.fit(**QUICK, backend=backend, idata_kwargs={"log_likelihood": True})
+    post = idata.posterior
+    zero = which == "hurdle"
+    for suffix, present in (("", True), ("_zero", zero)):
+        names = {
+            f"time_effect{suffix}",
+            f"unit_effect{suffix}",
+            f"unit_effect_sd{suffix}",
+        }
+        assert (names <= set(post.data_vars)) == present, suffix
+    assert post["time_effect"].shape == (2, 40, 2)
+    assert post["unit_effect"].shape == (2, 40, 25)
+    n = d["y"].size
+    ll = idata.log_likelihood["obs"].values
+    assert ll.shape == (2, 40, n) and np.all(np.isfinite(ll)) and np.all(ll <= 0)
+    az.loo(idata)
+    assert m.activation_probabilities(draws=5).shape == (n,)
+    assert m.posterior_predictive(n_draws=3, random_seed=1).shape == (3, n)
+    for equation, outcome in (("zero", "probability"), ("count", "count")):
+        assert np.isfinite(m.impacts(equation=equation).to_numpy(float)).all()
+        out = m.impacts(equation=equation, scale=outcome)
+        assert np.isfinite(out.to_numpy(float)).all()
+    if which == "zinb":
+        za = m.zero_attribution()
+        assert za["structural_prob"].shape == (np.sum(d["y"] == 0),)
 
 
 def test_truncated_poisson():

@@ -111,7 +111,8 @@ class SARHurdleNegBin(
         The latent model instead of the reduced form: each part a latent SAR
         propagating its own disturbance, a count positive when its logistic
         utility is, and then Poisson given the log-mean, truncated at zero
-        (:mod:`neighbayes.samplers.two_part_latent`).  A cross-section only.
+        (:mod:`neighbayes.samplers.two_part_latent`).  As a panel both parts
+        take the effects above, each inside its own filter.
 
     Notes
     -----
@@ -137,6 +138,7 @@ class SARHurdleNegBin(
         },
     }
     _zero_part = True
+    _latent_panel = True
     _needs_positive = True
 
     _spatial_params: tuple[str, ...] = ("rho", "rho_zero")

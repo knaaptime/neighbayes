@@ -46,6 +46,14 @@ def truncated_negative_binomial(rng, mu, alpha: float) -> np.ndarray:
     return y
 
 
+def truncated_poisson(rng, eta) -> np.ndarray:
+    """Zero-truncated ``Poisson(e^eta)`` draws, exactly: the first event's time
+    given one by time 1, then a Poisson count over the rest of the interval."""
+    lam = np.maximum(np.exp(np.clip(eta, -30.0, 30.0)), 1e-300)
+    t = -np.log1p(rng.random(lam.shape) * np.expm1(-lam)) / lam
+    return 1 + rng.poisson(lam * np.clip(1.0 - t, 0.0, 1.0))
+
+
 def _intercept_shift(eta, a0, target):
     """The shift ``s`` with ``mean(logit⁻¹(η + s·a0)) = target``."""
     lo, hi = -50.0, 50.0
@@ -157,10 +165,7 @@ def simulate_sar_hurdle_negbin(
             target_pi,
         )  # fmt: skip
         d = (eta_bin > 0).astype(np.int64)
-        lam = np.maximum(np.exp(np.clip(eta_cnt, -30.0, 30.0)), 1e-300)
-        # The first event's time given one by time 1, then the rest: exact.
-        t = -np.log1p(rng.random(n) * np.expm1(-lam)) / lam
-        y = np.where(d == 1, 1 + rng.poisson(lam * np.clip(1.0 - t, 0.0, 1.0)), 0)
+        y = np.where(d == 1, truncated_poisson(rng, eta_cnt), 0)
         return _hurdle_output(
             y, d, X, X_zero, eta_bin, eta_cnt, Ws, Wg, W_zero_s, W_zero_g,
             rho, rho_zero, beta, beta_zero, alpha, gdf, create_gdf, geometry_type,
@@ -240,6 +245,7 @@ def _simulate_sar_hurdle_negbin_panel_re(
     gdf=None,
     n_side: int | None = None,
     contiguity: str = "queen",
+    latent: bool = False,
 ) -> dict:
     r"""Simulate a SAR hurdle NB panel with unit and period effects in both parts.
 
@@ -255,6 +261,12 @@ def _simulate_sar_hurdle_negbin_panel_re(
     period, ``d_{it} ~ Bernoulli(logit⁻¹(η_{z,it}))`` and ``y = d · tNB``.
     Matches :class:`~neighbayes.models.SARHurdleNegBin` panels
     (``rho = rho_zero = 0`` gives the aspatial :class:`~neighbayes.models.HurdleNegBin`).
+    With ``latent=True`` it draws the latent panel,
+    ``SARHurdleNegBin(latent=True)``'s: each part's disturbance and period
+    effect propagate with its unit effects, a count is positive where the
+    utility :math:`(I - \rho_z W_z)^{-1}(X_{z,t}\beta_z + c_z + \tau_{z,t} +
+    \varepsilon_{z,t})` is, logistic :math:`\varepsilon_z`, and then
+    ``Poisson(e^η)`` truncated at zero (``eta_zero`` holds the utilities).
 
     Parameters
     ----------
@@ -287,7 +299,7 @@ def _simulate_sar_hurdle_negbin_panel_re(
     rng = ensure_rng(rng, seed)
     out = _simulate_panel_count(
         N, T, rho, beta, alpha, unit_effect_sd, time_effect_sd,
-        fe_x_corr, err_hetero, rng, None, W, gdf, n_side, contiguity,
+        fe_x_corr, err_hetero, rng, None, W, gdf, n_side, contiguity, latent,
     )  # fmt: skip
     beta_zero = np.asarray([0.5, 1.0] if beta_zero is None else beta_zero, dtype=float)
     Ws_sel = (
@@ -310,13 +322,22 @@ def _simulate_sar_hurdle_negbin_panel_re(
             [np.ones(N), rng.standard_normal((N, len(beta_zero) - 1))]
         )
         Z_list.append(Z_t)
-        eta_list.append(solve(Z_t @ beta_zero + sel_unit) + sel_time[t])
+        if latent:
+            eps = rng.logistic(size=N)
+            eta_list.append(solve(Z_t @ beta_zero + sel_unit + sel_time[t] + eps))
+        else:
+            eta_list.append(solve(Z_t @ beta_zero + sel_unit) + sel_time[t])
     X_zero = np.vstack(Z_list)
     eta_bin = np.concatenate(eta_list)
-    d = rng.binomial(1, 1.0 / (1.0 + np.exp(-eta_bin)))
+    if latent:
+        d = (eta_bin > 0).astype(np.int64)
+    else:
+        d = rng.binomial(1, 1.0 / (1.0 + np.exp(-eta_bin)))
     y = np.zeros(N * T, dtype=np.int64)
     pos = d == 1
-    if pos.any():
+    if pos.any() and latent:
+        y[pos] = truncated_poisson(rng, np.log(out["mu"][pos]))
+    elif pos.any():
         y[pos] = truncated_negative_binomial(rng, out["mu"][pos], alpha)
     out.update(y=y, X_zero=X_zero, d=d, eta_zero=eta_bin, W_zero_sparse=Ws_sel)
     out["params_true"].update(

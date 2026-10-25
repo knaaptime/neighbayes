@@ -30,11 +30,17 @@ e^{-e^{\eta_i}}`; the count part then observes the active units only.  Each
 step draws from its full conditional, so the sweep is exact.  The posterior
 probability that a zero is structural is the average, over the sweeps after
 warmup, of the conditional probability of the negative side (Rao–Blackwell).
+
+A panel stacks ``T`` periods time-first: the count part is the latent NB's
+panel (random unit effects inside its filter, period effects as columns of
+``X``), the zero part the latent logit on :math:`I_T \otimes W_z` with
+:math:`T \log|A_z|`, and the hurdle's zero part takes its own unit effects
+(period effects as columns of ``Z``).
 """
 
 from __future__ import annotations
 
-from typing import Callable
+from typing import Callable, Optional
 
 import numpy as np
 import scipy.sparse as sp
@@ -47,7 +53,33 @@ from ..negbin_latent._core import (
     TRUNCATED,
     UNOBSERVED,
     LatentNegBinChain,
+    UnitEffects,
 )
+
+
+def _zero_part(
+    y, Z, W_zero, priors_zero, logdet_zero_fn, rng, slice_width, T, sign, effects
+) -> LatentLogitChain:
+    """The zero part's latent logit, on ``I_T ⊗ W_z`` with ``T log|A_z|``."""
+    if T > 1:
+        W_zero = sp.kron(sp.identity(T, format="csr"), W_zero, format="csr")
+        per_period = logdet_zero_fn
+
+        def logdet_zero_fn(r):
+            return T * per_period(r)
+
+    return LatentLogitChain(
+        y=y,
+        X=Z,
+        W=W_zero,
+        process="sar",
+        priors=priors_zero,
+        logdet_fn=logdet_zero_fn,
+        rng=rng,
+        slice_width=slice_width,
+        sign=sign,
+        unit_effects=effects,
+    )
 
 
 class _TwoPartChain:
@@ -57,11 +89,8 @@ class _TwoPartChain:
     count: LatentNegBinChain
 
     def draw(self, store_latent: bool) -> dict:
-        z = self.zero.draw(store_latent)
-        out = {"rho_zero": z["rho"], "beta_zero": z["beta"]}
+        out = {f"{k}_zero": v for k, v in self.zero.draw(store_latent).items()}
         out.update(self.count.draw(store_latent))
-        if store_latent:
-            out["latent_zero"] = z["latent"]
         return out
 
     def summary(self) -> dict:
@@ -86,17 +115,22 @@ class LatentHurdleChain(_TwoPartChain):
         logdet_zero_fn: Callable[[float], float],
         rng: np.random.Generator,
         slice_width: float = 0.4,
+        T: int = 1,
+        unit_effects: Optional[UnitEffects] = None,
+        unit_effects_zero: Optional[UnitEffects] = None,
     ):
         positive = np.asarray(y) > 0
-        self.zero = LatentLogitChain(
-            y=positive.astype(np.float64),
-            X=Z,
-            W=W_zero,
-            process="sar",
-            priors=priors_zero,
-            logdet_fn=logdet_zero_fn,
-            rng=rng,
-            slice_width=slice_width,
+        self.zero = _zero_part(
+            positive.astype(np.float64),
+            Z,
+            W_zero,
+            priors_zero,
+            logdet_zero_fn,
+            rng,
+            slice_width,
+            T,
+            None,
+            unit_effects_zero,
         )
         self.count = LatentNegBinChain(
             y=y,
@@ -107,6 +141,8 @@ class LatentHurdleChain(_TwoPartChain):
             logdet_fn=logdet_fn,
             rng=rng,
             slice_width=slice_width,
+            T=T,
+            unit_effects=unit_effects,
             kind=np.where(positive, TRUNCATED, UNOBSERVED),
         )
 
@@ -132,19 +168,22 @@ class LatentZINBChain(_TwoPartChain):
         logdet_zero_fn: Callable[[float], float],
         rng: np.random.Generator,
         slice_width: float = 0.4,
+        T: int = 1,
+        unit_effects: Optional[UnitEffects] = None,
     ):
         y = np.asarray(y, dtype=np.float64)
         self.zeros = y == 0
-        self.zero = LatentLogitChain(
-            y=y,
-            X=Z,
-            W=W_zero,
-            process="sar",
-            priors=priors_zero,
-            logdet_fn=logdet_zero_fn,
-            rng=rng,
-            slice_width=slice_width,
-            sign=np.where(self.zeros, 0, 1),
+        self.zero = _zero_part(
+            y,
+            Z,
+            W_zero,
+            priors_zero,
+            logdet_zero_fn,
+            rng,
+            slice_width,
+            T,
+            np.where(self.zeros, 0, 1),
+            None,
         )
         self.count = LatentNegBinChain(
             y=y,
@@ -155,6 +194,8 @@ class LatentZINBChain(_TwoPartChain):
             logdet_fn=logdet_fn,
             rng=rng,
             slice_width=slice_width,
+            T=T,
+            unit_effects=unit_effects,
         )
         self.structural = np.zeros(y.size)
         self.structural_sq = np.zeros(y.size)
@@ -206,14 +247,26 @@ def run_chain(
     progress_manager=None,
     slice_width: float = 0.4,
     store_latent: bool = False,
+    T: int = 1,
+    unit_effects: Optional[UnitEffects] = None,
+    unit_effects_zero: Optional[UnitEffects] = None,
 ) -> dict:
     """One chain of the latent ``model`` (``"hurdle"`` or ``"zinb"``).
 
     Returns ``rho_zero``, ``beta_zero``, ``rho``, ``beta`` and ``alpha``;
     ``store_latent`` adds the utilities (``"latent_zero"``) and log-means
-    (``"latent"``) at every kept draw.  The ZINB adds ``structural_prob`` and
-    ``structural_prob_sd`` over the zero counts.
+    (``"latent"``) at every kept draw.  A panel's unit effects add
+    ``unit_effect`` and ``unit_effect_sd`` (the hurdle's zero part's
+    ``*_zero``).  The ZINB adds ``structural_prob`` and
+    ``structural_prob_sd`` over the zero counts.  ``W`` and ``W_zero`` are a
+    period's weights, ``logdet_fn`` and ``logdet_zero_fn`` a period's
+    log-determinants.
     """
+    panel = dict(T=T, unit_effects=unit_effects)
+    if model == "hurdle":
+        panel["unit_effects_zero"] = unit_effects_zero
+    elif unit_effects_zero is not None:
+        raise ValueError("The zero-inflated model's zero part takes no unit effects.")
     cls = {"hurdle": LatentHurdleChain, "zinb": LatentZINBChain}[model]
     chain = cls(
         y=y,
@@ -227,6 +280,7 @@ def run_chain(
         logdet_zero_fn=logdet_zero_fn,
         rng=rng,
         slice_width=slice_width,
+        **panel,
     )
     out = run_sweeps(
         chain,
