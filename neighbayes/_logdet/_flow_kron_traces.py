@@ -48,6 +48,10 @@ __all__ = ["FlowKronTraceLogdet"]
 _BLOCK_BYTES = 256 * 1024 * 1024
 
 
+#: The Chebyshev order ladder's first rung.
+_CHEB_MIN_ORDER = 16
+
+
 class FlowKronTraceLogdet:
     """``log|A(ρ)|`` and its gradient for the unrestricted flow filter, exactly.
 
@@ -98,7 +102,6 @@ class FlowKronTraceLogdet:
         self.tol = float(tol)
         self.max_order = int(max_order)
         self._moments = np.empty(0)
-        self._order = 16  # order of the last converged evaluation
         self._ensure_moments(int(init_order) + 1)
 
     def _real_spectral_interval(self) -> tuple[float, float]:
@@ -226,6 +229,33 @@ class FlowKronTraceLogdet:
             return 1
         return int(np.ceil(np.log(self.tol * (1.0 - r)) / np.log(r)))
 
+    def _start_order(self, rd, ro, rw) -> int:
+        """The Chebyshev order an evaluation at ``ρ`` starts its search from.
+
+        A function of ``ρ`` alone, so the order an evaluation converges at, and
+        the value it returns, never depend on what was evaluated before.  It is
+        the largest order of the ladder ``16·2^k`` within what ``log(1 − s ξ)``
+        needs on ``[−1, 1]``, ``log(1/tol) / log R`` with ``R = 1/s + √(1/s² −
+        1)`` its Bernstein ellipse, ``s = 1 − g_min / g(0)`` the dip of ``g``
+        over the box.  On rook lattices it never started above the order an
+        evaluation converged at, and usually at it or one rung below.
+        """
+        c, h = self.c, self.h
+        g0 = 1.0 - ro * c - rd * c - rw * c * c
+        g_min = min(
+            1.0 - ro * lx - rd * ly - rw * lx * ly
+            for lx in (c - h, c + h)
+            for ly in (c - h, c + h)
+        )
+        P = _CHEB_MIN_ORDER
+        if g_min <= 0.0 or g0 <= g_min:
+            return P
+        s = 1.0 - g_min / g0
+        need = np.log(1.0 / self.tol) / np.log(1.0 / s + np.sqrt(1.0 / s**2 - 1.0))
+        while 2 * P <= min(need, self.max_order):
+            P *= 2
+        return P
+
     def _tail(self, c, P):
         """Largest coefficient in the last two rows/columns, relative to the largest.
 
@@ -252,7 +282,7 @@ class FlowKronTraceLogdet:
                 )
             coeffs = self._taylor_coeffs(rd, ro, rw, P)
         else:
-            P = self._order
+            P = self._start_order(rd, ro, rw)
             while True:
                 coeffs = self._cheb_coeffs(rd, ro, rw, P)
                 if self._tail(coeffs, P) < self.tol:
@@ -264,10 +294,6 @@ class FlowKronTraceLogdet:
                         "stability wall."
                     )
                 P = min(2 * P, self.max_order)
-            # Shrink the starting order when this one had room to spare.
-            self._order = (
-                P if self._tail(coeffs, P // 2) >= self.tol else max(16, P // 2)
-            )
         self._ensure_moments(P + 2)
         # Taylor gradients use moments one order higher (∂f/∂ρ shifts the index).
         m = self._moments[: coeffs.shape[1]]

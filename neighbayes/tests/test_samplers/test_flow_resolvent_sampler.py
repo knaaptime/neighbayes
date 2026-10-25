@@ -9,9 +9,12 @@ GMRES or MCMC loop.  (End-to-end posterior recovery is a GPU benchmark.)
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
+from neighbayes._logdet._flow_kron_traces import FlowKronTraceLogdet
 from neighbayes._logdet._flow_resolvent import flow_logdet_grad_exact
 from neighbayes.models import SARNegBinFlow
+from neighbayes.samplers.gaussian import _flow_resolvent as fr
 from neighbayes.samplers.gaussian._flow_resolvent import (
     FlowResolventTarget,
     SEMFlowResolventTarget,
@@ -196,6 +199,8 @@ def test_sample_flow_resolvent_returns_inferencedata():
     # Dominant components recover (true ρ_d=0.3, ρ_o=0.2).
     assert 0.15 < float(idata.posterior["rho_d"].mean()) < 0.45
     assert 0.05 < float(idata.posterior["rho_o"].mean()) < 0.35
+    # Which ρ kernel each chain kept after its warmup trial.
+    assert len(idata.attrs["rho_independence"]) == 2
 
 
 def _directed_panel_sar_data(n, T, seed):
@@ -555,3 +560,91 @@ def test_short_chain_with_exact_logdet_recovers_signs():
     assert post["rho_d"].mean() > 0.0
     assert post["rho_o"].mean() > 0.0
     assert abs(post["rho_d"].mean()) < 0.9
+
+
+# -- the Laplace t independence step behind its warmup trial ------------------
+
+
+def _rook_flow_data(side, rho, seed):
+    """An undirected (rook) unrestricted flow with ``rho = (ρ_d, ρ_o, ρ_w)``."""
+    import scipy.sparse as sp
+    from scipy.sparse.linalg import spsolve
+
+    from neighbayes.dgp.utils import rook_grid_weights
+
+    rng = np.random.default_rng(seed)
+    W, _ = rook_grid_weights(side)
+    W = sp.csr_matrix(W)
+    n = W.shape[0]
+    eye = sp.identity(n, format="csr")
+    A = (
+        sp.identity(n * n, format="csr")
+        - rho[0] * sp.kron(eye, W)
+        - rho[1] * sp.kron(W, eye)
+        - rho[2] * sp.kron(W, W)
+    )
+    X = np.column_stack([np.ones(n * n), rng.standard_normal(n * n)])
+    y = spsolve(A.tocsc(), X @ np.array([1.0, -0.5]) + rng.standard_normal(n * n))
+    return W, y, X
+
+
+def _rho_chain(W, y, X, ld, chain, **kw):
+    tgt = FlowResolventTarget(W, y, X, logdet_value_and_grad=ld, seed=chain)
+    kw = {"draws": 50, "tune": 400, **kw}
+    return fr.run_flow_resolvent_gibbs(
+        tgt, seed=10 + chain, compute_log_likelihood=False, progressbar=False, **kw
+    )
+
+
+@pytest.mark.parametrize(
+    "rho, keeps",
+    [
+        # A near-Gaussian posterior: the trial accepts most proposals.
+        ((0.3, 0.25, -0.1), True),
+        # Σ|ρ| ≈ 0.98 a posteriori, truncated by the wall: the trial fails.
+        ((0.55, 0.42, 0.0), False),
+    ],
+)
+def test_the_trial_keeps_the_laplace_t_only_where_it_fits(rho, keeps):
+    W, y, X = _rook_flow_data(7, rho, seed=3)
+    ld = FlowKronTraceLogdet(W)
+    kept = [bool(_rho_chain(W, y, X, ld, c)["rho_independence"]) for c in range(2)]
+    assert kept == [keeps, keeps]
+
+
+def test_the_kept_laplace_t_samples_the_same_posterior_as_mala(monkeypatch):
+    """Kept-t chains and MALA-only chains agree within Monte Carlo error."""
+    import arviz as az
+
+    W, y, X = _rook_flow_data(7, (0.3, 0.25, -0.1), seed=3)
+    ld = FlowKronTraceLogdet(W)
+
+    def run():
+        out = [_rho_chain(W, y, X, ld, c, draws=2000) for c in range(2)]
+        d = np.array(
+            [np.column_stack([o["rho_d"], o["rho_o"], o["rho_w"]]) for o in out]
+        )
+        ess = np.array([float(az.ess(d[..., k])) for k in range(3)])
+        flat = d.reshape(-1, 3)
+        return (
+            [bool(o["rho_independence"]) for o in out],
+            flat.mean(0),
+            flat.var(0) / ess,
+        )
+
+    kept, mean_t, mcse2_t = run()
+    assert kept == [True, True]
+    monkeypatch.setattr(fr, "_LAPLACE_T_TRIAL", 10**9)  # no room for a trial
+    kept, mean_m, mcse2_m = run()
+    assert kept == [False, False]
+    assert np.all(np.abs(mean_t - mean_m) < 4.0 * np.sqrt(mcse2_t + mcse2_m))
+
+
+def test_a_warmup_too_short_for_the_trial_keeps_mala(monkeypatch):
+    def no_trial(*args, **kwargs):
+        raise AssertionError("the Laplace t was built without room for its trial")
+
+    monkeypatch.setattr(fr, "_LaplaceT", no_trial)
+    W, y, X = _rook_flow_data(5, (0.3, 0.25, -0.1), seed=3)
+    out = _rho_chain(W, y, X, FlowKronTraceLogdet(W), 0, tune=2 * fr._LAPLACE_T_TRIAL)
+    assert not out["rho_independence"]

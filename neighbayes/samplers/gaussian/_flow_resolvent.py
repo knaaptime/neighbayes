@@ -569,6 +569,38 @@ def _laplace_metric(target, rho, sigma2, h=1e-4):
     return np.linalg.inv(H)
 
 
+#: The independence proposal a chain may switch to at the half-tuning metric
+#: refresh: a multivariate t with these degrees of freedom, on trial for
+#: ``_LAPLACE_T_TRIAL`` iterations, kept when its acceptance there reaches
+#: ``_LAPLACE_T_KEEP``.  Measured on rook and kNN flows against the exact
+#: posterior (pkm ``prototypes/flow-zigzag``, 2026-10-25): in the bulk and up to
+#: Σ|ρ| ≈ 0.92 the trial accepts 0.59–0.83 and the kept t costs 18–29% fewer
+#: log-determinant calls per effective draw than MALA; near the stationarity
+#: wall it accepts 0.20–0.26, where kept it stalls, and every chain returns to
+#: MALA.
+_LAPLACE_T_DF = 7.0
+_LAPLACE_T_TRIAL = 100
+_LAPLACE_T_KEEP = 0.5
+
+
+class _LaplaceT:
+    """A multivariate t independence proposal for ρ: location ``m``, scale Cholesky ``L``."""
+
+    def __init__(self, m, L):
+        self.m, self.L = np.asarray(m, dtype=np.float64), L
+        self.Linv = np.linalg.inv(L)
+
+    def logq(self, rho) -> float:
+        z = self.Linv @ (rho - self.m)
+        return -0.5 * (_LAPLACE_T_DF + 3.0) * np.log1p(z @ z / _LAPLACE_T_DF)
+
+    def draw(self, rng) -> np.ndarray:
+        z = rng.standard_normal(3)
+        return self.m + self.L @ (
+            z / np.sqrt(rng.chisquare(_LAPLACE_T_DF) / _LAPLACE_T_DF)
+        )
+
+
 def run_flow_resolvent_gibbs(
     target: FlowResolventTarget,
     *,
@@ -595,6 +627,14 @@ def run_flow_resolvent_gibbs(
     before the first refresh.  The step size is adapted during tuning toward
     ``target_accept`` (≈0.57 is optimal for MALA).  This is the reference
     driver; for large ``N`` run the GMRES solves on GPU.
+
+    At the half-tuning refresh the chain tries an independence proposal, a t at
+    the Laplace (one Newton step from the chain's ρ, the metric as scale), for
+    ``_LAPLACE_T_TRIAL`` iterations, and keeps it for the rest of the run if
+    its acceptance there reaches ``_LAPLACE_T_KEEP``; otherwise MALA resumes,
+    still adapting.  Where the posterior is near-Gaussian the t mixes faster;
+    near the stationarity wall it fails the trial.  ``rho_independence`` in the
+    result says which the chain kept.  Warmup too short for the trial keeps MALA.
     """
     rng = np.random.default_rng(seed)
     rho = np.zeros(3) if rho_init is None else np.asarray(rho_init, dtype=np.float64)
@@ -608,42 +648,68 @@ def run_flow_resolvent_gibbs(
     log_eps = np.log(step_size)
     metric, chol, precision = np.eye(3), np.eye(3), np.eye(3)
     refresh = {tune // 4, tune // 2} - {0}
+    # The Laplace t's trial ends inside warmup, or there is none.
+    trial_end = tune // 2 + _LAPLACE_T_TRIAL
+    has_trial = tune // 2 > 0 and trial_end < tune
+    laplace_t, trial_accept, kept_t = None, 0.0, False
     accepted_window = 0
     window = 0
     for it in range(tune + draws):
-        eps = np.exp(log_eps)
-        # Save cached logdet so we can restore it if the MALA proposal is
-        # rejected (logpost_and_grad overwrites _cached_ld_val with the
-        # proposed ρ's logdet).
+        # Save cached logdet so we can restore it if the proposal is rejected
+        # (logpost_and_grad overwrites _cached_ld_val with the proposed ρ's
+        # logdet).
         _saved_ld_val = target._cached_ld_val
         _saved_ld_grad = target._cached_ld_grad
         _saved_cached_rho = target._cached_rho
-        # --- MALA proposal on ρ | σ², preconditioned by the metric ---
-        prop = (
-            rho + eps * metric @ grad + np.sqrt(2 * eps) * chol @ rng.standard_normal(3)
-        )
-        logp_p, grad_p = target.logpost_and_grad(prop, sigma2)
         accept = 0.0
-        if np.isfinite(logp_p):
-            fwd = prop - rho - eps * metric @ grad
-            bwd = rho - prop - eps * metric @ grad_p
-            q_fwd = -(fwd @ precision @ fwd) / (4 * eps)
-            q_bwd = -(bwd @ precision @ bwd) / (4 * eps)
-            log_alpha = (logp_p - logp) + (q_bwd - q_fwd)
-            accept = min(1.0, np.exp(min(0.0, log_alpha)))
-            if np.log(rng.uniform()) < log_alpha:
-                rho, logp, grad = prop, logp_p, grad_p
+        if laplace_t is None:
+            # --- MALA proposal on ρ | σ², preconditioned by the metric ---
+            eps = np.exp(log_eps)
+            prop = (
+                rho
+                + eps * metric @ grad
+                + np.sqrt(2 * eps) * chol @ rng.standard_normal(3)
+            )
+            logp_p, grad_p = target.logpost_and_grad(prop, sigma2)
+            if np.isfinite(logp_p):
+                fwd = prop - rho - eps * metric @ grad
+                bwd = rho - prop - eps * metric @ grad_p
+                q_fwd = -(fwd @ precision @ fwd) / (4 * eps)
+                q_bwd = -(bwd @ precision @ bwd) / (4 * eps)
+                log_alpha = (logp_p - logp) + (q_bwd - q_fwd)
+                accept = min(1.0, np.exp(min(0.0, log_alpha)))
+                if np.log(rng.uniform()) < log_alpha:
+                    rho, logp, grad = prop, logp_p, grad_p
+                else:
+                    # Proposal rejected: restore the cache to the current ρ's logdet.
+                    target._cached_ld_val = _saved_ld_val
+                    target._cached_ld_grad = _saved_ld_grad
+                    target._cached_rho = _saved_cached_rho
             else:
-                # Proposal rejected: restore the cache to the current ρ's logdet.
                 target._cached_ld_val = _saved_ld_val
                 target._cached_ld_grad = _saved_ld_grad
                 target._cached_rho = _saved_cached_rho
         else:
-            target._cached_ld_val = _saved_ld_val
-            target._cached_ld_grad = _saved_ld_grad
-            target._cached_rho = _saved_cached_rho
-        # --- step-size and metric adaptation (during tuning only) ---
-        if it < tune:
+            # --- independence proposal on ρ | σ², from the Laplace t ---
+            prop = laplace_t.draw(rng)
+            # Outside the stationary region the target is zero: rejected
+            # before any log-determinant call.
+            if target.in_bounds(prop):
+                logp_p, grad_p = target.logpost_and_grad(prop, sigma2)
+                log_alpha = (logp_p - laplace_t.logq(prop)) - (
+                    logp - laplace_t.logq(rho)
+                )
+                accept = min(1.0, np.exp(min(0.0, log_alpha)))
+                if np.log(rng.uniform()) < log_alpha:
+                    rho, logp, grad = prop, logp_p, grad_p
+                else:
+                    target._cached_ld_val = _saved_ld_val
+                    target._cached_ld_grad = _saved_ld_grad
+                    target._cached_rho = _saved_cached_rho
+            if it <= trial_end:
+                trial_accept += accept
+        # --- step-size and metric adaptation (during tuning, under MALA) ---
+        if it < tune and laplace_t is None:
             accepted_window += accept
             window += 1
             if window == 50:
@@ -660,6 +726,13 @@ def run_flow_resolvent_gibbs(
                     # The metric carries the scale: restart near MALA's optimum.
                     log_eps = np.log(0.5)
                     accepted_window = window = 0
+                    if it == tune // 2 and has_trial:
+                        # The Laplace: one Newton step from ρ, the metric as scale.
+                        laplace_t = _LaplaceT(rho + metric @ grad, chol)
+        elif laplace_t is not None and it == trial_end:
+            kept_t = trial_accept / _LAPLACE_T_TRIAL >= _LAPLACE_T_KEEP
+            if not kept_t:
+                laplace_t = None  # MALA resumes, still adapting
         # --- β, σ² given ρ: β first, so (ρ, β) is a blocked draw given σ² ---
         beta, sigma2 = target.draw_beta_sigma2(rho, rng, sigma2)
         # ρ unchanged: σ² moved, so reuse the cached logdet.
@@ -689,7 +762,9 @@ def run_flow_resolvent_gibbs(
         # --- progress bar ---
         if progress_manager is not None:
             progress_manager.update(chain_idx, it, tuning=it < tune)
-    return {k: np.asarray(v) for k, v in out.items()}
+    result = {k: np.asarray(v) for k, v in out.items()}
+    result["rho_independence"] = kept_t
+    return result
 
 
 def _sample_flow_chains(
@@ -804,11 +879,14 @@ def _sample_flow_chains(
     groups = {"posterior": posterior, "sample_stats": sample_stats}
     if compute_log_likelihood:
         groups["log_likelihood"] = {"obs": _stack("loglik")}
-    return az.from_dict(
+    idata = az.from_dict(
         groups,
         coords={"coefficient": list(coord_names)},
         dims={"beta": ["coefficient"]},
     )
+    # Per chain, 1 where the ρ step kept the Laplace t after its warmup trial.
+    idata.attrs["rho_independence"] = [int(p["rho_independence"]) for p in posts]
+    return idata
 
 
 def sample_flow_resolvent(
