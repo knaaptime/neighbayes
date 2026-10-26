@@ -245,6 +245,7 @@ class TestProgressForwarding:
             progress_manager=None,
             chain_id=0,
             store_log_lik=True,
+            link="logit",
         ):
             seen["progress_manager"] = progress_manager
             seen["chain_id"] = chain_id
@@ -258,7 +259,7 @@ class TestProgressForwarding:
             }
 
         monkeypatch.setattr(
-            "neighbayes.models.cross_section.sar_logit.run_chain",
+            "neighbayes.models.cross_section._reduced_binary.run_chain",
             _fake_run_chain,
         )
 

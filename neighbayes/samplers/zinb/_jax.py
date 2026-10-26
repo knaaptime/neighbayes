@@ -3,7 +3,7 @@ r"""JAX reduced-form Zero-Inflated SAR Negative-Binomial Pólya-Gamma Gibbs.
 Composes the two reduced-form jax samplers already built:
 
 * **selection** — reduced-form SAR-**logit** on the *latent* activation ``z``
-  (``η_sel = (I − λ W_zero)⁻¹ Z γ``), reusing ``logit_reduced``'s Krylov-only
+  (``η_sel = (I − λ W_zero)⁻¹ Z γ``), reusing ``binary_reduced``'s Krylov-only
   ρ-slice density; the working response is ``κ_sel = z − ½`` and ``z`` is redrawn
   every sweep;
 * **count** — reduced-form SAR-**NB** on the counts (``η_cnt = (I − ρ W_cnt)⁻¹ X β``),
@@ -44,7 +44,7 @@ def _make_zinb_gibbs_step(
 
     from .._utils._jax_slice import jax_slice_sample_1d
     from .._utils._jax_utils import make_pg_draw
-    from ..logit_reduced._jax import _rho_log_density_logit
+    from ..binary_reduced._jax import _rho_log_density_binary
     from ..negbin_reduced._jax import (
         _bind_sparse_solvers,
         _build_krylov_basis_jax,
@@ -95,12 +95,12 @@ def _make_zinb_gibbs_step(
             # λ is confined to a window around its current value each sweep —
             # not a valid slice, and visibly biased at small n.  The standalone
             # reduced-logit and reduced-NB samplers both pass it.
-            lambda lv: _rho_log_density_logit(
+            lambda lv: _rho_log_density_binary(
                 lv,
                 V_sel,
                 lam,
                 omega_sel,
-                z,
+                z - 0.5,
                 V0g,
                 mu0g,
                 _IC,

@@ -391,42 +391,6 @@ def make_panel_sdmu_data(
 
 
 # ---------------------------------------------------------------------------
-# Spatial probit data generator
-# ---------------------------------------------------------------------------
-
-
-def make_spatial_probit_data(
-    rng: np.random.Generator,
-    W: np.ndarray,
-    rho: float = 0.35,
-    beta: np.ndarray | None = None,
-    sigma_a: float = 0.8,
-    n_per_region: int = 25,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Generate SEMProbit data in matrix mode.
-
-    Returns
-    -------
-    y : np.ndarray
-        Binary outcomes, shape ``(nobs,)``.
-    X : np.ndarray
-        Covariates including intercept, shape ``(nobs, k)``.
-    groups : np.ndarray
-        Group code for each observation, shape ``(nobs,)``.
-    """
-    out = dgp.simulate_sem_probit(
-        W=_as_sparse(W),
-        lam=rho,
-        beta=beta,
-        rng=rng,
-        group_effect_sd=sigma_a,
-        group_size=n_per_region,
-        group_effects="random",
-    )
-    return out["y"], out["X"], out["groups"]
-
-
-# ---------------------------------------------------------------------------
 # Tobit data generators
 # ---------------------------------------------------------------------------
 

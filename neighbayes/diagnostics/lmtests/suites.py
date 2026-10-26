@@ -147,9 +147,9 @@ SAR_TOBIT_SUITE = DiagnosticSuite(
     ),
 )
 
-# The logit and NB at the GLM null: the latent SAR's and SEM's score tests
-# (``cross_sectional_glm``), the WX score, and the Moran diagnostic on the
-# Pólya–Gamma working residuals.
+# The logit, probit and NB at the GLM null: the latent SAR's and SEM's score
+# tests (``cross_sectional_glm``), the WX score, and the Moran diagnostic on
+# the working residuals.
 _GLM_NULL_TESTS = (
     ("bayesian_glm_lm_lag_test", "LM-Lag"),
     ("bayesian_glm_lm_error_test", "LM-Error"),
@@ -167,8 +167,10 @@ _GLM_SAR_TESTS = (
 )
 
 LOGIT_SUITE = DiagnosticSuite(name="Logit", tests=_suite(*_GLM_NULL_TESTS))
+PROBIT_SUITE = DiagnosticSuite(name="Probit", tests=_suite(*_GLM_NULL_TESTS))
 NEGBIN_SUITE = DiagnosticSuite(name="NegBin", tests=_suite(*_GLM_NULL_TESTS))
 SAR_LOGIT_SUITE = DiagnosticSuite(name="SARLogit", tests=_suite(*_GLM_SAR_TESTS))
+SAR_PROBIT_SUITE = DiagnosticSuite(name="SARProbit", tests=_suite(*_GLM_SAR_TESTS))
 SAR_NEGBIN_SUITE = DiagnosticSuite(name="SARNegBin", tests=_suite(*_GLM_SAR_TESTS))
 
 SDM_TOBIT_SUITE = DiagnosticSuite(
@@ -308,8 +310,10 @@ __all__ = [
     "SDEM_SUITE",
     "SAR_TOBIT_SUITE",
     "LOGIT_SUITE",
+    "PROBIT_SUITE",
     "NEGBIN_SUITE",
     "SAR_LOGIT_SUITE",
+    "SAR_PROBIT_SUITE",
     "SAR_NEGBIN_SUITE",
     "SDM_TOBIT_SUITE",
     "FLOW_SUITE",

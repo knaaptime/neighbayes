@@ -3,14 +3,17 @@ from .cross_section.multilevel import Level as Level
 from .cross_section.multilevel import Multilevel as Multilevel
 from .cross_section.negbin import NegBin as NegBin
 from .cross_section.ols import OLS as OLS
+from .cross_section.probit import Probit as Probit
 from .cross_section.sar import SAR as SAR
 from .cross_section.sar_hurdle import SARHurdleNegBin as SARHurdleNegBin
 from .cross_section.sar_logit import SARLogit as SARLogit
 from .cross_section.sar_negbin import SARNegBin as SARNegBin
+from .cross_section.sar_probit import SARProbit as SARProbit
 from .cross_section.sar_zinb import SARZINB as SARZINB
 from .cross_section.sdem import SDEM as SDEM
 from .cross_section.sdem_logit import SDEMLogit as SDEMLogit
 from .cross_section.sdem_negbin import SDEMNegBin as SDEMNegBin
+from .cross_section.sdem_probit import SDEMProbit as SDEMProbit
 from .cross_section.sdm import SDM as SDM
 from .cross_section.sem import SEM as SEM
 from .cross_section.sem_logit import SEMLogit as SEMLogit

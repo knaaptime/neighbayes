@@ -1,10 +1,10 @@
-r"""JAX reduced-form SAR-logit Pólya–Gamma Gibbs sampler.
+r"""JAX reduced-form SAR logit and probit Gibbs sampler (:mod:`._core`).
 
 Reuses the reduced-form SAR-NB machinery (``..negbin_reduced._jax``): the sparse
 ``(I−ρW)⁻¹`` solve (sparsax LU, never densified), the shift-invert Krylov
-basis, the thread-parallel chain runner.  Only the Pólya–Gamma augmentation
-differs — Bernoulli (h = 1, κ = y − ½, working response κ/ω, no α) instead of
-Negative-Binomial.
+basis, the thread-parallel chain runner.  Only the augmentation differs:
+Pólya–Gamma for the logit (h = 1, κ = y − ½, working response κ/ω, no α),
+Albert–Chib for the probit (ω = 1, κ the truncated-normal utility).
 """
 
 from __future__ import annotations
@@ -14,12 +14,12 @@ import numpy as np
 from ..negbin_reduced._core import _KRYLOV_DEGREE_DEFAULT, _KRYLOV_DMAX_DEFAULT
 
 
-def _rho_log_density_logit(
+def _rho_log_density_binary(
     rho_val,
     V_stack,
     rho_basis,
     omega,
-    y_jax,
+    kappa,
     V0_inv_diag,
     mu0,
     intercept_col,
@@ -27,10 +27,10 @@ def _rho_log_density_logit(
     X_jax=None,
     solve_at=None,
 ):
-    """β-marginalized log-density of ρ for the reduced-form logit.
+    """β-marginalized log-density of ρ for the reduced-form logit or probit.
 
-    Identical Gaussian core to the reduced-NB density, with the Bernoulli
-    working response s = κ/ω (κ = y − ½) — no ``log α`` offset — and no
+    Identical Gaussian core to the reduced-NB density, with the working
+    response s = κ/ω (:mod:`._core`) — no ``log α`` offset — and no
     ``log|I−ρW|`` term (it cancels when β is marginalized out).
 
     Evaluates U(ρ) via the Krylov basis when |Δρ| is within the *safe* radius
@@ -87,8 +87,7 @@ def _rho_log_density_logit(
         reparam, mu0.at[intercept_col].set(mu0[intercept_col] / scale), mu0
     )
 
-    # Bernoulli working response: κ = y − ½, s = κ/ω (no log-α offset).
-    kappa = y_jax - 0.5
+    # The working response s = κ/ω (no log-α offset).
     s = kappa / omega
     r = s - U_rp @ mu0_rp
 
@@ -113,7 +112,7 @@ def _rho_log_density_logit(
     return result
 
 
-def _make_reduced_logit_gibbs_step(
+def _make_reduced_binary_gibbs_step(
     n,
     k,
     *,
@@ -121,11 +120,12 @@ def _make_reduced_logit_gibbs_step(
     intercept_col,
     krylov_degree,
     krylov_reuse=True,
+    link="logit",
 ):
-    """Build a JIT-compiled reduced-form SAR-logit Gibbs step (ω → ρ → β).
+    """Build a JIT-compiled reduced-form SAR logit or probit Gibbs step (ω → ρ → β).
 
     Static settings only; the model's arrays come in as the step's ``data``
-    argument (:func:`_reduced_logit_data`), so one compiled program serves
+    argument (:func:`_reduced_binary_data`), so one compiled program serves
     every fit of the same structure.
     """
     import jax
@@ -134,6 +134,7 @@ def _make_reduced_logit_gibbs_step(
 
     from .._utils._jax_slice import jax_slice_sample_1d
     from .._utils._jax_utils import make_pg_draw
+    from ..binary_latent._jax import signed_utilities
     from ..negbin_reduced._jax import (
         _bind_sparse_solvers,
         _build_krylov_basis_jax,
@@ -142,7 +143,7 @@ def _make_reduced_logit_gibbs_step(
     )
 
     # Pólya-Gamma: augax (on-device, exact) or numpy C extension fallback.
-    _draw_pg = make_pg_draw()
+    _draw_pg = make_pg_draw() if link == "logit" else None
 
     _reuse_threshold = jnp.float64(0.15) if krylov_reuse else jnp.float64(0.0)
     _V_init = jnp.zeros((krylov_degree + 1, n, k), dtype=jnp.float64)
@@ -166,7 +167,7 @@ def _make_reduced_logit_gibbs_step(
 
         # ── Krylov basis: reuse or rebuild ──
         V_stack_prev = state.get("V_stack", jnp.zeros_like(_V_init))
-        rho_basis_prev = state.get("rho_basis", jnp.float64(0.0))
+        rho_basis_prev = state.get("rho_basis", jnp.float64(jnp.inf))
         _drho_check = rho - rho_basis_prev
 
         # Clamp ρ away from the singular boundary before building the Krylov
@@ -186,25 +187,33 @@ def _make_reduced_logit_gibbs_step(
             return V_stack_prev, rho_basis_prev, _eta
 
         V_stack, rho_basis, eta = jax.lax.cond(
-            jnp.abs(_drho_check) < _reuse_threshold,
+            # Only inside the basis' own series radius: beyond it the Horner
+            # evaluation of U(ρ) diverges.
+            jnp.abs(_drho_check)
+            < jnp.minimum(_reuse_threshold, _series_radius_jax(V_stack_prev)),
             _reuse_basis,
             _rebuild_basis,
             operand=None,
         )
 
-        # ── Block 0: ω ~ PG(1, η) ── (Bernoulli augmentation)
-        z = jnp.clip(eta, -20.0, 20.0)
-        h = jnp.ones_like(z)  # per-device (n,)
-        omega = _draw_pg(h, z, key_pg)
+        # ── Block 0: the augmentation, ω ~ PG(1, η) or z ~ TN(η, 1) ──
+        if link == "logit":
+            z = jnp.clip(eta, -20.0, 20.0)
+            h = jnp.ones_like(z)  # per-device (n,)
+            omega = _draw_pg(h, z, key_pg)
+            kappa = y_jax - 0.5
+        else:
+            omega = jnp.ones_like(eta)
+            kappa = signed_utilities(key_pg, eta, 2.0 * y_jax - 1.0)
 
         # ── Block 1: ρ — slice with Krylov basis + direct-solve fallback ──
         def _dens(rv):
-            return _rho_log_density_logit(
+            return _rho_log_density_binary(
                 rv,
                 V_stack,
                 rho_basis,
                 omega,
-                y_jax,
+                kappa,
                 V0_inv_diag,
                 mu0,
                 _ic,
@@ -241,7 +250,6 @@ def _make_reduced_logit_gibbs_step(
         )
         mu0_rp = jnp.where(reparam_beta, mu0.at[_ic].set(mu0[_ic] / scale_beta), mu0)
 
-        kappa = y_jax - 0.5
         Xt_omega = Xtilde_rp * omega[:, None]
         Sigma_beta_inv = Xt_omega.T @ Xtilde_rp + jnp.diag(V0_inv_diag_rp)
         rhs = Xtilde_rp.T @ kappa + V0_inv_diag_rp * mu0_rp
@@ -268,7 +276,7 @@ def _make_reduced_logit_gibbs_step(
     return gibbs_step
 
 
-def _reduced_logit_data(y, X, sparse_arrays, priors, krylov_dmax):
+def _reduced_binary_data(y, X, sparse_arrays, priors, krylov_dmax):
     """The reduced-logit step's ``data``: every data-dependent array and scalar."""
     import jax.numpy as jnp
 
@@ -289,7 +297,7 @@ def _reduced_logit_data(y, X, sparse_arrays, priors, krylov_dmax):
     }
 
 
-def run_chains_jax_reduced_logit(
+def run_chains_jax_reduced_binary(
     y,
     X,
     W_sparse,
@@ -307,8 +315,9 @@ def run_chains_jax_reduced_logit(
     progressbar=False,
     krylov_reuse=True,
     store_log_lik=True,
+    link="logit",
 ):
-    """Run the reduced-form SAR-logit PG-Gibbs sampler (chains in parallel threads).
+    """Run the reduced-form SAR logit or probit Gibbs sampler (chains in parallel threads).
 
     Returns one dict per chain with keys ``rho``, ``beta``, ``log_lik``.
     ``slice_width`` is the initial ρ slice width; each chain adapts it during
@@ -325,7 +334,7 @@ def run_chains_jax_reduced_logit(
     chains = len(inits)
     n, k = X.shape
     lu_solve, sparse_arrays = _sparse_solve_parts(_build_sparse_ctx(W_sparse, n))
-    data = _reduced_logit_data(y, X, sparse_arrays, priors, krylov_dmax)
+    data = _reduced_binary_data(y, X, sparse_arrays, priors, krylov_dmax)
 
     from .._utils._sparsax_lu import set_sparsax_lu_cache_size
 
@@ -341,7 +350,8 @@ def run_chains_jax_reduced_logit(
             "rho": jnp.float64(float(i.rho)),
             "omega": jnp.asarray(i.omega, dtype=jnp.float64),
             "V_stack": _V_init,
-            "rho_basis": jnp.float64(0.0),
+            # No basis yet: the first sweep builds one.
+            "rho_basis": jnp.float64(jnp.inf),
             "slice_width": jnp.float64(slice_width),
         }
         for i in inits
@@ -352,16 +362,17 @@ def run_chains_jax_reduced_logit(
     from .._utils._jax_slice import adapt_slice_width
 
     # One step and sweep per structure (see run_chains_chunked).
-    static = (n, k, int(intercept_col), krylov_degree, krylov_reuse, lu_solve)
+    static = (n, k, int(intercept_col), krylov_degree, krylov_reuse, lu_solve, link)
 
     def _build():
-        gibbs_step = _make_reduced_logit_gibbs_step(
+        gibbs_step = _make_reduced_binary_gibbs_step(
             n,
             k,
             lu_solve=lu_solve,
             intercept_col=intercept_col,
             krylov_degree=krylov_degree,
             krylov_reuse=krylov_reuse,
+            link=link,
         )
 
         def _sweep(st, key, tuning, data):
@@ -376,7 +387,7 @@ def run_chains_jax_reduced_logit(
 
         return _sweep
 
-    _sweep = cached_sweep(("sar_logit_reduced", *static, bool(store_log_lik)), _build)
+    _sweep = cached_sweep(("binary_reduced", *static, bool(store_log_lik)), _build)
     _, traces = run_chains_chunked(
         _sweep,
         states,
@@ -385,14 +396,14 @@ def run_chains_jax_reduced_logit(
         tune=tune,
         draws=draws,
         progressbar=progressbar,
-        model_type="sar_logit",
+        model_type=f"sar_{link}",
         consts=data,
     )
     rho_all, beta_all = traces[:2]
     eta_all = traces[2] if store_log_lik else None
 
-    # Pointwise Bernoulli-logit log-likelihood from the fitted η (no post-hoc solves).
-    from ._core import _logit_loglik_pointwise
+    # Pointwise Bernoulli log-likelihood from the fitted η (no post-hoc solves).
+    from ._core import binary_loglik_pointwise
 
     sl = slice(None, None, thin) if thin > 1 else slice(None)
     y_np = np.asarray(y, dtype=np.float64)
@@ -401,7 +412,7 @@ def run_chains_jax_reduced_logit(
         log_lik = None
         if store_log_lik:
             eta_c = eta_all[c, sl]  # (n_keep, n)
-            log_lik = _logit_loglik_pointwise(y_np, eta_c)
+            log_lik = binary_loglik_pointwise(y_np, eta_c, link)
         results.append(
             {
                 "rho": rho_all[c, sl],

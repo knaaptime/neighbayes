@@ -1,4 +1,4 @@
-r"""JAX backend of the latent SAR and SEM logit sampler (:mod:`._core`).
+r"""JAX backend of the latent SAR and SEM logit and probit sampler (:mod:`._core`).
 
 The same exact sweep, with the latent utilities updated by colour rather than
 one at a time.  Utilities ``i`` and ``j`` interact only through
@@ -15,7 +15,7 @@ conditionally independent: a class is drawn at once, exactly, from
 and the classes are swept in turn.  A class reads :math:`\varepsilon` on its
 members' columns of :math:`A` only and its draws move it there only, so a
 sweep is one pass over the nonzeros of :math:`A` whatever the number of
-colours.  The Kolmogorov scales come from
+colours.  The logit's Kolmogorov scales come from
 :func:`augax.ks_sample`, on the device.  A zero-inflated count's zero (``sign``
 0, ``mixed``) has its side of zero drawn first, the positive side weighted by
 ``exp(logq)``, as in :func:`._core._orthant_sweep`.
@@ -188,8 +188,47 @@ def _tn_beyond(key, a, active):
     return z
 
 
+def _tn_standard(a, u, key, active):
+    """``z ~ N(0, 1) | z > a`` where ``active``: inversion of ``u``, rejection far out.
+
+    Above :data:`_TN_INVERT_MAX` the draw falls back on :func:`_tn_beyond`,
+    with ``key``; inactive entries are zero.
+    """
+    import jax
+    import jax.numpy as jnp
+
+    far = active & (a > _TN_INVERT_MAX)
+    z = jnp.where(far, 0.0, _tn_invert(jnp.minimum(a, _TN_INVERT_MAX), u))
+    return jax.lax.cond(
+        jnp.any(far),
+        lambda zz: jnp.where(far, _tn_beyond(key, a, far), zz),
+        lambda zz: zz,
+        z,
+    )
+
+
+def signed_utilities(key, mean, side):
+    """``z ~ N(mean, 1)`` truncated to the side of zero ``side`` (``±1``) gives."""
+    import jax
+    import jax.numpy as jnp
+
+    u = jax.random.uniform(key, mean.shape)
+    t = _tn_standard(
+        -side * mean, u, jax.random.fold_in(key, 1), jnp.ones(mean.shape, bool)
+    )
+    return mean + side * t
+
+
 def _make_sweep(
-    n, k, process, n_colours, logdet_eval, store_latent, mixed=False, n_groups=0
+    n,
+    k,
+    process,
+    n_colours,
+    logdet_eval,
+    store_latent,
+    mixed=False,
+    n_groups=0,
+    link="logit",
 ):
     """One chain's sweep; ``mixed`` draws the unknown sides (``sign`` 0) too.
 
@@ -197,7 +236,6 @@ def _make_sweep(
     probability of the negative side in the state's ``"pneg"``.  ``n_groups``
     random unit effects (a SAR's) are the state's ``"c"`` and ``"sigma_c"``.
     """
-    import augax
     import jax
     import jax.numpy as jnp
     from jax.scipy.special import log_ndtr
@@ -205,6 +243,9 @@ def _make_sweep(
     from .._utils._jax_slice import adapt_slice_width, jax_slice_sample_1d
 
     sar = process == "sar"
+    logit = link == "logit"
+    if logit:
+        import augax
     effects = n_groups > 0
 
     def sweep(st, key, tuning, d):
@@ -262,18 +303,7 @@ def _make_sweep(
                 )
             # Standardized bound on the side of 0 that y fixes.
             a = -side * mean / sd
-            far = active & (a > _TN_INVERT_MAX)
-            z = jnp.where(
-                far, 0.0, _tn_invert(jnp.minimum(a, _TN_INVERT_MAX), take(u_all))
-            )
-            z = jax.lax.cond(
-                jnp.any(far),
-                lambda zz: jnp.where(
-                    far, _tn_beyond(jax.random.fold_in(k_tail, c), a, far), zz
-                ),
-                lambda zz: zz,
-                z,
-            )
+            z = _tn_standard(a, take(u_all), jax.random.fold_in(k_tail, c), active)
             x1 = mean + side * sd * z
             delta = jnp.where(active, x1 - x0, 0.0)
             eps = eps.at[R].add(Av * delta[:, None])
@@ -282,8 +312,9 @@ def _make_sweep(
         ystar, eps, pneg = jax.lax.fori_loop(
             0, n_colours, colour_step, (ystar, eps, st.get("pneg", jnp.zeros(n)))
         )
-        m = augax.ks_sample(eps, k_m)
-        p = 1.0 / (m * m)
+        if logit:
+            m = augax.ks_sample(eps, k_m)
+            p = 1.0 / (m * m)
         z = W(ystar)
         # The SAR's response, less its unit effects.
         yt = ystar - offset
@@ -427,7 +458,7 @@ def _make_sweep(
     return sweep
 
 
-def run_chains_jax_latent_logit(
+def run_chains_jax_latent_binary(
     *,
     y,
     X,
@@ -444,8 +475,9 @@ def run_chains_jax_latent_logit(
     store_latent=False,
     progressbar=False,
     probes=None,
+    link="logit",
 ):
-    """Run the latent-logit chains in parallel threads; one dict per chain.
+    """Run the latent logit or probit chains in parallel threads; one dict per chain.
 
     ``store_latent`` adds the utilities at every kept draw, ``"latent"``.
     ``probes``, a :class:`~neighbayes._logdet._probe_check.WarmupProbes` whose
@@ -473,13 +505,15 @@ def run_chains_jax_latent_logit(
     data = _latent_data(y, X, W, priors, ld_params)
     n_colours = int(data["classes"].shape[0])
 
-    static = (n, k, process, n_colours, store_latent, *ld_key)
+    static = (n, k, process, n_colours, store_latent, link, *ld_key)
     sweep = cached_sweep(
-        ("logit_latent", *static),
-        lambda: _make_sweep(n, k, process, n_colours, logdet_eval, store_latent),
+        ("binary_latent", *static),
+        lambda: _make_sweep(
+            n, k, process, n_colours, logdet_eval, store_latent, link=link
+        ),
     )
     sign = np.asarray(data["sign"])
-    m0 = np.sqrt(2.0 * np.pi) * np.log(2.0)
+    m0 = np.sqrt(2.0 * np.pi) * np.log(2.0) if link == "logit" else 1.0
     states = [
         {
             "par": jnp.float64(0.0),
@@ -500,7 +534,7 @@ def run_chains_jax_latent_logit(
         tune=tune,
         draws=draws,
         progressbar=progressbar,
-        model_type="latent_logit",
+        model_type=f"latent_{link}",
         on_warmup_midpoint=None
         if probes is None
         else probe_midpoint([(probes, lambda t: t[0], lambda c: c["logdet"])]),

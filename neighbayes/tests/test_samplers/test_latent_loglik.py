@@ -20,6 +20,7 @@ from neighbayes.samplers._utils._latent_loglik import (
     LOGIT,
     NEGBIN,
     POISSON,
+    PROBIT,
     TRUNCATED,
     UNOBSERVED,
     integrated_loglik,
@@ -41,8 +42,11 @@ def _brute(fam, eta, c, par, alpha, y, i, kind=POISSON):
         if kind == TRUNCATED:
             obs -= np.log(-np.expm1(-np.exp(GRID)))
     else:
-        a = np.abs(E)
-        logf = (-a - 2 * np.log1p(np.exp(-a))).sum(0)
+        if fam == PROBIT:
+            logf = (-0.5 * E * E).sum(0)
+        else:
+            a = np.abs(E)
+            logf = (-a - 2 * np.log1p(np.exp(-a))).sum(0)
         obs = np.where((GRID > 0) == (y[i] > 0), 0.0, -np.inf)
 
     def log_trapz(v):
@@ -54,8 +58,8 @@ def _brute(fam, eta, c, par, alpha, y, i, kind=POISSON):
 
 @pytest.mark.parametrize(
     "fam, kind",
-    [(NEGBIN, POISSON), (NEGBIN, TRUNCATED), (LOGIT, POISSON)],
-    ids=["negbin", "negbin-truncated", "logit"],
+    [(NEGBIN, POISSON), (NEGBIN, TRUNCATED), (LOGIT, POISSON), (PROBIT, POISSON)],
+    ids=["negbin", "negbin-truncated", "logit", "probit"],
 )
 @pytest.mark.parametrize("par, alpha", [(0.7, 0.3), (-0.4, 5.0)])
 def test_matches_the_integral(fam, kind, par, alpha):
@@ -86,14 +90,19 @@ def test_matches_the_integral(fam, kind, par, alpha):
     "backend", ["numpy", pytest.param("jax", marks=pytest.mark.requires_jax)]
 )
 @pytest.mark.parametrize(
-    "cls, simulate, kw",
+    "cls, simulate, kw, high_k",
     [
-        (M.SARNegBin, dgp.simulate_sar_negbin, {"latent": True}),
-        (M.SEMLogit, dgp.simulate_sem_logit, {}),
+        (M.SARNegBin, dgp.simulate_sar_negbin, {"latent": True}, 0.05),
+        (M.SEMLogit, dgp.simulate_sem_logit, {}, 0.05),
+        # The normal's light tails make p(y_i | utilities of the rest) small
+        # wherever the neighbours point to the other side, so the probit's
+        # weights are heavier than the logit's: 4.7% of k above 0.7 at 4,000
+        # draws on this lattice, against none for the latent SAR logit.
+        (M.SARProbit, dgp.simulate_sar_probit, {}, 0.15),
     ],
-    ids=["SARNegBin latent", "SEMLogit"],
+    ids=["SARNegBin latent", "SEMLogit", "SARProbit"],
 )
-def test_a_fit_stores_it_for_loo(cls, simulate, kw, backend):
+def test_a_fit_stores_it_for_loo(cls, simulate, kw, high_k, backend):
     d = simulate(n_side=8, seed=2, **kw)
     m = cls(y=d["y"], X=d["X"], W=d["W_sparse"], **kw)
     idata = m.fit(
@@ -103,4 +112,4 @@ def test_a_fit_stores_it_for_loo(cls, simulate, kw, backend):
     ll = idata.log_likelihood["obs"].values
     assert ll.shape == (2, 200, 64) and np.all(np.isfinite(ll)) and np.all(ll <= 0)
     loo = az.loo(idata, pointwise=True)
-    assert np.mean(np.asarray(loo.pareto_k) > 0.7) < 0.05
+    assert np.mean(np.asarray(loo.pareto_k) > 0.7) < high_k

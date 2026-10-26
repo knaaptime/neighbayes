@@ -2,10 +2,11 @@
 
 The expected count of the latent negative binomial has a closed form in the
 multiplier's entries, :math:`\\mathbb{E}\\,y_i = e^{m_i}\\prod_j
-\\Gamma(\\alpha + M_{ij}) / (\\Gamma(\\alpha)\\alpha^{M_{ij}})`, and the density
+\\Gamma(\\alpha + M_{ij}) / (\\Gamma(\\alpha)\\alpha^{M_{ij}})`, the density
 of the latent logit's propagated disturbance is the Fourier inverse of
-:math:`\\prod_j \\pi M_{ij}t / \\sinh(\\pi M_{ij}t)`.  The Monte Carlo
-estimates must match both on a small lattice, for SAR, SEM and SDEM.
+:math:`\\prod_j \\pi M_{ij}t / \\sinh(\\pi M_{ij}t)`, and the latent probit's is
+normal with variance :math:`\\sum_j M_{ij}^2`.  The Monte Carlo estimates must
+match all three on a small lattice, for SAR, SEM and SDEM.
 """
 
 from __future__ import annotations
@@ -27,6 +28,9 @@ CASES = [
     (M.SARLogit, dgp.simulate_sar_logit, "logit"),
     (M.SEMLogit, dgp.simulate_sem_logit, "logit"),
     (M.SDEMLogit, dgp.simulate_sdem_logit, "logit"),
+    (M.SARProbit, dgp.simulate_sar_probit, "probit"),
+    (M.SEMProbit, dgp.simulate_sem_probit, "probit"),
+    (M.SDEMProbit, dgp.simulate_sdem_probit, "probit"),
 ]
 
 
@@ -63,6 +67,9 @@ def _exact_effects(m, X, beta, family):
     if family == "nb":
         logc = (gammaln(ALPHA + Mx) - gammaln(ALPHA) - Mx * np.log(ALPHA)).sum(1)
         w = np.exp(mean + logc)
+    elif family == "probit":
+        sd = np.sqrt((Mx**2).sum(1))
+        w = np.exp(-0.5 * (mean / sd) ** 2) / (np.sqrt(2 * np.pi) * sd)
     else:
         w = np.array([_logistic_sum_density(Mx[i], -mean[i]) for i in range(n)])
     if sar:

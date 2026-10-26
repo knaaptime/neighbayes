@@ -1,10 +1,10 @@
 r"""Pointwise log-likelihood of a latent model, each latent value integrated out.
 
 A latent model's observation :math:`y_i` depends on the parameters only through
-its latent value :math:`\eta_i` (the log-mean, or the logit's utility), and the
-latent values are coupled by the filter: :math:`A\eta - c = \varepsilon` with
-:math:`\varepsilon_j` i.i.d. from the family's disturbance (log-gamma or
-logistic) and :math:`c` the systematic part.  The pointwise likelihood the
+its latent value :math:`\eta_i` (the log-mean, or a binary model's utility), and
+the latent values are coupled by the filter: :math:`A\eta - c = \varepsilon`
+with :math:`\varepsilon_j` i.i.d. from the family's disturbance (log-gamma,
+logistic or normal) and :math:`c` the systematic part.  The pointwise likelihood the
 leave-one-out estimate needs is
 
 .. math::
@@ -20,7 +20,7 @@ The conditional :math:`p(\eta_i \mid \eta_{-i}, \theta) \propto \prod_j
 f(\varepsilon_j)` runs over the equations column :math:`i` of :math:`A`
 touches, and is log-concave; a Newton step finds its mode and a
 double-exponential rule at the Laplace scale integrates it, over the line or,
-for the logit's threshold, each half-line, the two normalizing each other so
+for a binary model's threshold, each half-line, the two normalizing each other so
 that the probabilities of the sides sum to one exactly.
 """
 
@@ -29,8 +29,9 @@ from __future__ import annotations
 import numpy as np
 from numba import njit, prange
 
-#: The disturbance families: the negative binomial's log-gamma, the logit's logistic.
-NEGBIN, LOGIT = 0, 1
+#: The disturbance families: the negative binomial's log-gamma, the logit's
+#: logistic, the probit's normal.
+NEGBIN, LOGIT, PROBIT = 0, 1, 2
 #: What a log-mean's count observes: nothing, a Poisson count, or a zero-truncated
 #: one (a hurdle's positive count).
 UNOBSERVED, POISSON, TRUNCATED = 0, 1, 2
@@ -46,6 +47,8 @@ def _logf(e, fam, alpha):
     if fam == NEGBIN:
         ex = np.exp(e)
         return alpha * e - alpha * ex, alpha * (1.0 - ex), -alpha * ex
+    if fam == PROBIT:
+        return -0.5 * e * e, -e, -1.0
     a = abs(e)
     t = np.tanh(0.5 * e)
     return -a - 2.0 * np.log1p(np.exp(-a)), -t, -0.5 * (1.0 - t * t)
@@ -170,7 +173,7 @@ def integrated_loglik(
     of ``A`` is ``ones - par * wvals`` over its rows); ``par`` and ``alpha``
     are ``(D,)``; ``lgy`` is ``log y!``.  For the negative binomial ``kind``
     is what each count observes (:data:`UNOBSERVED` contributes 0); the logit
-    takes the side of zero from ``y``.
+    and the probit take the side of zero from ``y``.
     """
     D, n = latent.shape
     out = np.empty((D, n))

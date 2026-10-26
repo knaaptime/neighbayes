@@ -1,18 +1,19 @@
-"""Gibbs sampler for the latent SAR and SEM logit (:mod:`._core`).
+"""Gibbs sampler for the latent SAR and SEM logit and probit (:mod:`._core`).
 
 Registers ``("binary_latent", "cross_section")``, which the latent
-:class:`~neighbayes.models.SARLogit` and :class:`~neighbayes.models.SEMLogit`
-share, on the NumPy and JAX (:mod:`._jax`) backends; the Kolmogorov scales come
-from ``augax``.
+:class:`~neighbayes.models.SARLogit`, :class:`~neighbayes.models.SEMLogit`,
+:class:`~neighbayes.models.SARProbit` and :class:`~neighbayes.models.SEMProbit`
+and their SDEMs share, on the NumPy and JAX (:mod:`._jax`) backends; the
+logit's Kolmogorov scales come from ``augax``.
 """
 
 from .._registry import register
-from ._core import LatentLogitChain
+from ._core import LatentBinaryChain
 
-__all__ = ["LatentLogitChain"]
+__all__ = ["LatentBinaryChain"]
 
 
-def _run_latent_logit(
+def _run_latent_binary(
     model,
     *,
     draws,
@@ -44,7 +45,7 @@ def _run_latent_logit(
 register(
     "binary_latent",
     "cross_section",
-    run=_run_latent_logit,
+    run=_run_latent_binary,
     backends={"numpy", "jax"},
     options={"slice_width"},
     skips_log_likelihood=True,

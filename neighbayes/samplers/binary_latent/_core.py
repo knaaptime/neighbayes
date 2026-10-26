@@ -1,4 +1,4 @@
-r"""Gibbs sampler for the latent SAR and SEM logit.
+r"""Gibbs sampler for the latent SAR and SEM logit and probit.
 
 With :math:`A = I - \rho W` (SAR) or :math:`I - \lambda W` (SEM), the model is
 
@@ -7,18 +7,20 @@ With :math:`A = I - \rho W` (SAR) or :math:`I - \lambda W` (SEM), the model is
     \text{SAR: } A y^* = X\beta + \varepsilon, \qquad
     \text{SEM: } A (y^* - X\beta) = \varepsilon,
 
-with :math:`\varepsilon_i` iid standard logistic, so that :math:`\rho = 0`
-(:math:`\lambda = 0`) is the logit.  The logistic is a normal scale mixture,
+with :math:`\varepsilon_i` iid standard logistic (``link="logit"``) or
+standard normal (``"probit"``), so that :math:`\rho = 0` (:math:`\lambda = 0`)
+is the logit or the probit.  The logistic is a normal scale mixture,
 :math:`\varepsilon_i \mid m_i \sim N(0, m_i^2)` with :math:`m_i = 2K_i` and
-:math:`K_i` Kolmogorov distributed, so given the scales ``m`` (``mix_scale``)
-the latent utilities are Gaussian with precision :math:`Q = A^\top P A`,
-:math:`P = \mathrm{diag}(m^{-2})`.  Each sweep is exact (Albert & Chib 1993 for
-the latent utilities, Holmes & Held 2006 for the scales):
+:math:`K_i` Kolmogorov distributed; the probit's scales are :math:`m_i = 1`.
+Given the scales ``m`` (``mix_scale``) the latent utilities are Gaussian with
+precision :math:`Q = A^\top P A`, :math:`P = \mathrm{diag}(m^{-2})`.  Each
+sweep is exact (Albert & Chib 1993 for the latent utilities, Holmes & Held
+2006 for the scales):
 
 1. :math:`y^* \mid y, \beta, \rho, m`: Gaussian truncated to the orthant of
    ``y``, one coordinate at a time (Geweke 1991), from the precision ``Q`` and
    linear term ``b`` of the joint (no solve).
-2. :math:`m \mid \varepsilon`: :func:`augax.ks_sample_numpy`.
+2. :math:`m \mid \varepsilon`: :func:`augax.ks_sample_numpy` (the logit only).
 3. :math:`\rho \mid y^*, m`: slice on the density with :math:`\beta`
    integrated out.  For the SAR :math:`X^\top P X` does not involve
    :math:`\rho`, so each evaluation is a quadratic plus the log-determinant;
@@ -63,20 +65,26 @@ import numba
 import numpy as np
 import scipy.sparse as sp
 
-from ...models.priors import LogitGibbsPriors
+from ...models.priors import BinaryGibbsPriors
 from .._utils._slice import SliceWidthState, slice_sample_1d, slice_sample_1d_adaptive
 from ..negbin_latent._core import UnitEffects, _unit_sd_step
 
 
 @numba.njit(cache=True)
 def _rtnorm_lower(a, rng):
-    """``z ~ N(0, 1)`` truncated to ``z > a`` (Robert 1995 above a = 0.45)."""
+    """``z ~ N(0, 1)`` truncated to ``z > a`` (Robert 1995 above a = 0.45).
+
+    A non-finite bound has no draw, and would never accept one: it raises.
+    """
+    if not np.isfinite(a):
+        raise ValueError("truncated-normal bound is not finite")
     if a < 0.45:
         while True:
             z = rng.standard_normal()
             if z > a:
                 return z
-    alpha = 0.5 * (a + np.sqrt(a * a + 4.0))
+    # The optimal rate; far out, where a * a would overflow, it is a.
+    alpha = 0.5 * (a + np.sqrt(a * a + 4.0)) if a < 1e150 else a
     while True:
         z = a + rng.standard_exponential() / alpha
         if rng.random() <= np.exp(-0.5 * (z - alpha) ** 2):
@@ -141,10 +149,10 @@ def _unit_effect_step(e, p, fx: UnitEffects, sigma, rng):
     return mean / prec + rng.standard_normal(G) / np.sqrt(prec)
 
 
-class LatentLogitChain:
+class LatentBinaryChain:
     """One chain's state and sweep (see the module).
 
-    ``sign`` is each utility's side of zero (``+1``, ``-1``, or ``0`` for
+    ``link`` is ``"logit"`` or ``"probit"``.  ``sign`` is each utility's side of zero (``+1``, ``-1``, or ``0`` for
     unknown, which needs ``logq`` set before each sweep); by default it is
     that of ``y``.  ``unit_effects`` adds a SAR's random unit effects.
     :func:`~neighbayes.samplers._utils._sweeps.run_sweeps` runs one.
@@ -157,15 +165,17 @@ class LatentLogitChain:
         X: np.ndarray,
         W: sp.csr_matrix,
         process: Literal["sar", "sem"],
-        priors: LogitGibbsPriors,
+        priors: BinaryGibbsPriors,
         logdet_fn: Callable[[float], float],
         rng: np.random.Generator,
+        link: Literal["logit", "probit"] = "logit",
         slice_width: float = 0.4,
         sign: Optional[np.ndarray] = None,
         unit_effects: Optional[UnitEffects] = None,
     ):
         n, k = X.shape
         self.sar = process == "sar"
+        self.logit = link == "logit"
         if unit_effects is not None and not self.sar:
             raise NotImplementedError(
                 "Random unit effects are implemented for the SAR."
@@ -191,12 +201,13 @@ class LatentLogitChain:
         self.WX = np.asarray(self.W @ X)
         self.width = SliceWidthState(w=slice_width)
 
-        # Logit start: the utilities on their side of zero, the prior mean of
-        # the scales (E[2K] = sqrt(2 pi) log 2), no dependence.
+        # Start: the utilities on their side of zero, the scales at the
+        # logit's prior mean (E[2K] = sqrt(2 pi) log 2) or the probit's 1, no
+        # dependence.
         self.par = 0.0
         self.beta = self.b0.copy()
         self.ystar = 0.5 * np.where(self.sign != 0, self.sign, 1).astype(np.float64)
-        self.m = np.full(n, np.sqrt(2.0 * np.pi) * np.log(2.0))
+        self.m = np.full(n, np.sqrt(2.0 * np.pi) * np.log(2.0) if self.logit else 1.0)
         self.fx = unit_effects
         if unit_effects is not None:
             self.c = np.full(unit_effects.n_groups, float(unit_effects.mu))
@@ -209,8 +220,6 @@ class LatentLogitChain:
 
     def sweep(self, tuning: bool) -> None:
         """One Gibbs sweep."""
-        from augax import ks_sample_numpy
-
         X, W, rng, k = self.X, self.W, self.rng, self.k
         par, beta, ystar, m = self.par, self.beta, self.ystar, self.m
         logdet_fn, B0inv, B0inv_b0 = self.logdet_fn, self.B0inv, self.B0inv_b0
@@ -227,9 +236,12 @@ class LatentLogitChain:
             ystar, self.sign, self.logq, self.pneg, Q.indptr, Q.indices, Q.data, b, rng
         )
 
-        eps = A @ ystar - Xb if self.sar else A @ (ystar - Xb)
-        m = ks_sample_numpy(eps, rng)
-        p = 1.0 / (m * m)
+        if self.logit:
+            from augax import ks_sample_numpy
+
+            eps = A @ ystar - Xb if self.sar else A @ (ystar - Xb)
+            m = ks_sample_numpy(eps, rng)
+            p = 1.0 / (m * m)
         z = W @ ystar
         # The SAR's response, less its unit effects.
         yt = ystar - offset

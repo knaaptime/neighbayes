@@ -17,7 +17,7 @@ processes implemented for that combination.
 
 | | Gaussian · Cross-section | Gaussian · Panel | Other families · Cross-section | Other families · Panel |
 |---|---|---|---|---|
-| **Single** | Aspatial, SLX, SAR, SEM, SDM, SDEM | Aspatial, SLX, SAR, SEM, SDM, SDEM | Aspatial, SAR, SEM, SDM | Aspatial, SAR, SEM |
+| **Single** | Aspatial, SLX, SAR, SEM, SDM, SDEM | Aspatial, SLX, SAR, SEM, SDM, SDEM | Aspatial, SAR, SEM, SDM, SDEM | Aspatial, SAR, SEM |
 | **Flow** | Aspatial, SAR, SEM | Aspatial, SAR, SEM | Aspatial, SAR | Aspatial, SAR |
 
 Gaussian panels take fixed or random unit effects and have dynamic
@@ -256,19 +256,61 @@ $$y_{it} = \phi y_{i,t-1} + x_{it}' \beta + W x_{it}' \theta + a_i + \tau_t + \e
 
 ## Non-Linear Models
 
-### SEMProbit (random group effects)
+### Binary models
 
-$$z = X\beta + \Delta\theta + \varepsilon, \quad \theta = \lambda W \theta + u, \quad u \sim \mathcal{N}(0, \sigma_u^2 I), \quad \varepsilon \sim \mathcal{N}(0, I), \quad y_{ik} = \mathbf{1}[z_{ik} > 0]$$
+A binary outcome is the sign of a latent utility, $y_i = \mathbf{1}[y_i^* > 0]$.
+The latent SAR propagates the link's own disturbance through the multiplier,
+standard logistic for the logit and standard normal for the probit, so its
+$\rho = 0$ member is the aspatial model and no scale parameter is pinned: the
+link fixes it. The reduced form propagates only the covariates. An unmarked SAR
+class is the form its field means by the name (ADR 0003): the latent SAR for the
+probit, `SARProbit`, and the reduced form for the logit, `SARLogit`; `latent=`
+names the other. The SEM and SDEM classes are latent in both links and take no
+`latent` argument.
 
-Observations nest in groups (`group_col`, or `groups` in matrix mode), and
-$\Delta$ maps each observation to its group. The groups' random effects
-$\theta$ (`group_effect`, with sd `group_effect_sd`) follow an error process on
-the group-level weights $W$, with dependence $\lambda$ (`lam`); nothing of $X$
-propagates. This is LeSage and Pace's (2009, §10.6) spatially structured
-effects probit (Smith and LeSage 2004), constructed as
-`SEMProbit(..., group_effects="random")`, not the standard SAR probit, which the
-package does not implement. For spatial binary outcomes prefer the
-Pólya–Gamma `SARLogit`, which is conjugate and has a Gibbs sampler.
+The latent models share one exact Gibbs sweep: the utilities from their
+truncated normal conditionals (Albert and Chib 1993), one at a time on NumPy or a
+colour class at a time on JAX (the default), then $\rho$ or $\lambda$ with
+$\beta$ integrated out, then $\beta$, and a scale move on $(y^*, \beta)$. The
+logit adds the Kolmogorov scales that make its disturbance a normal scale
+mixture (Holmes and Held 2006). The likelihood is an orthant probability, so
+there is no NUTS path; `idata_kwargs={"log_likelihood": True}` integrates each
+observation's utility out of its likelihood, given the others', for LOO.
+Impacts are on the latent index (`scale="index"` for the probit, `"logodds"` for
+the logit) or on $P(y_i = 1)$ (`scale="probability"`).
+
+#### SARProbit (latent SAR)
+
+$$y^* = (I - \rho W)^{-1}(X\beta + \varepsilon), \quad \varepsilon \sim \mathcal{N}(0, I)$$
+
+The textbook SAR probit (McMillen 1992; LeSage and Pace 2009, §10.1).
+
+#### SARProbit, reduced form (`latent=False`)
+
+$$y_i \sim \operatorname{Bernoulli}(\Phi(\eta_i)), \quad \eta = (I - \rho W)^{-1} X\beta$$
+
+Sampled as the reduced `SARLogit` is, with Albert–Chib utilities in place of
+its Pólya–Gamma step: $\beta$ conjugate given the utilities, $\rho$ by a slice
+with $\beta$ integrated out, where the log-determinant cancels.
+
+#### SEMProbit
+
+$$y^* = X\beta + u, \quad u = \lambda W u + \varepsilon, \quad \varepsilon \sim \mathcal{N}(0, I)$$
+
+#### SDEMProbit
+
+$$y^* = X\beta + WX\theta + u, \quad u = \lambda W u + \varepsilon, \quad \varepsilon \sim \mathcal{N}(0, I)$$
+
+#### SEMProbit with random unit effects (`unit_effects="random"`)
+
+$$y_j = \mathbf{1}[x_j'\beta + c_{u(j)} + \varepsilon_j > 0], \quad c = \lambda W c + v, \quad v \sim \mathcal{N}(0, \sigma_c^2 I), \quad \varepsilon \sim \mathcal{N}(0, I)$$
+
+Each unit, a row of $W$, is observed more than once (`unit_col`, or `units` in
+matrix mode, gives each observation's unit), and the error process carries one
+random effect per unit (`unit_effect`, with sd `unit_effect_sd`) in place of the
+probit's disturbance: LeSage and Pace's (2009, §10.6) spatially structured
+effects probit (Smith and LeSage 2004). It is fitted by NUTS; its probability
+impacts are the average marginal effects, with no indirect part.
 
 ### Tobit (SAR Tobit)
 

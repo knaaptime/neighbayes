@@ -16,7 +16,7 @@ The **hurdle**'s zero part is whether a count is positive, :math:`y_i > 0 \iff
 u_i > 0`, and a positive count is :math:`y_i \mid \eta_i \sim
 \mathrm{Poisson}(e^{\eta_i})` truncated at zero.  Its parts share no unknown,
 so a sweep is one sweep of each sampler
-(:class:`~neighbayes.samplers.logit_latent._core.LatentLogitChain` on
+(:class:`~neighbayes.samplers.binary_latent._core.LatentBinaryChain` on
 :math:`d = \mathbf 1(y > 0)`,
 :class:`~neighbayes.samplers.negbin_latent._core.LatentNegBinChain` observing
 the positive counts only).
@@ -45,8 +45,8 @@ from typing import Callable, Optional
 import numpy as np
 import scipy.sparse as sp
 
-from ...models.priors import LogitGibbsPriors, ReducedGibbsPriors
-from ..logit_latent._core import LatentLogitChain
+from ...models.priors import BinaryGibbsPriors, ReducedGibbsPriors
+from ..binary_latent._core import LatentBinaryChain
 from ..negbin_latent._core import (
     POISSON,
     TRUNCATED,
@@ -58,7 +58,7 @@ from ..negbin_latent._core import (
 
 def _zero_part(
     y, Z, W_zero, priors_zero, logdet_zero_fn, rng, slice_width, T, sign, effects
-) -> LatentLogitChain:
+) -> LatentBinaryChain:
     """The zero part's latent logit, on ``I_T ⊗ W_z`` with ``T log|A_z|``."""
     if T > 1:
         W_zero = sp.kron(sp.identity(T, format="csr"), W_zero, format="csr")
@@ -67,7 +67,7 @@ def _zero_part(
         def logdet_zero_fn(r):
             return T * per_period(r)
 
-    return LatentLogitChain(
+    return LatentBinaryChain(
         y=y,
         X=Z,
         W=W_zero,
@@ -84,7 +84,7 @@ def _zero_part(
 class _TwoPartChain:
     """A zero part and a count part; ``draw`` names the zero part's ``*_zero``."""
 
-    zero: LatentLogitChain
+    zero: LatentBinaryChain
     count: LatentNegBinChain
 
     def draw(self, store_latent: bool) -> dict:
@@ -117,7 +117,7 @@ class LatentHurdleChain(_TwoPartChain):
         W: sp.csr_matrix,
         W_zero: sp.csr_matrix,
         priors: ReducedGibbsPriors,
-        priors_zero: LogitGibbsPriors,
+        priors_zero: BinaryGibbsPriors,
         logdet_fn: Callable[[float], float],
         logdet_zero_fn: Callable[[float], float],
         rng: np.random.Generator,
@@ -170,7 +170,7 @@ class LatentZINBChain(_TwoPartChain):
         W: sp.csr_matrix,
         W_zero: sp.csr_matrix,
         priors: ReducedGibbsPriors,
-        priors_zero: LogitGibbsPriors,
+        priors_zero: BinaryGibbsPriors,
         logdet_fn: Callable[[float], float],
         logdet_zero_fn: Callable[[float], float],
         rng: np.random.Generator,
@@ -243,7 +243,7 @@ def make_chain(
     W: sp.csr_matrix,
     W_zero: sp.csr_matrix,
     priors: ReducedGibbsPriors,
-    priors_zero: LogitGibbsPriors,
+    priors_zero: BinaryGibbsPriors,
     logdet_fn: Callable[[float], float],
     logdet_zero_fn: Callable[[float], float],
     rng: np.random.Generator,

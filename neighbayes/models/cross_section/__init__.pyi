@@ -3,14 +3,17 @@ from .multilevel import Level as Level
 from .multilevel import Multilevel as Multilevel
 from .negbin import NegBin as NegBin
 from .ols import OLS as OLS
+from .probit import Probit as Probit
 from .sar import SAR as SAR
 from .sar_hurdle import SARHurdleNegBin as SARHurdleNegBin
 from .sar_logit import SARLogit as SARLogit
 from .sar_negbin import SARNegBin as SARNegBin
+from .sar_probit import SARProbit as SARProbit
 from .sar_zinb import SARZINB as SARZINB
 from .sdem import SDEM as SDEM
 from .sdem_logit import SDEMLogit as SDEMLogit
 from .sdem_negbin import SDEMNegBin as SDEMNegBin
+from .sdem_probit import SDEMProbit as SDEMProbit
 from .sdm import SDM as SDM
 from .sem import SEM as SEM
 from .sem_logit import SEMLogit as SEMLogit

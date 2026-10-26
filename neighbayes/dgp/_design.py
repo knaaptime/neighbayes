@@ -27,7 +27,6 @@ _DESIGN = {
     "time_effects": False,
     "dynamic": False,
     "separable": False,
-    "group_effects": None,
     "unit_effect_sd": None,
     "pair_effect_sd": None,
     "time_effect_sd": None,
@@ -251,12 +250,38 @@ def tobit(fn, design, kw):
 
 
 @accepts("unit_effects")
-def logit(fn, design, kw):
-    """The SAR logit: the reduced form, which takes no unit effects."""
+def binary(fn, design, kw):
+    """The logit and probit: cross-sections, which take no unit effects."""
     unit, _, _ = _validate(design)
     if unit is not None:
-        raise NotImplementedError("The logit simulators take no unit effects.")
+        raise NotImplementedError(
+            "The logit and probit simulators take no unit effects."
+        )
     return fn, kw
+
+
+@accepts("unit_effects", "unit_effect_sd")
+def sem_probit(fn, design, kw):
+    """The SEM probit: latent, or with random unit effects over repeated observations."""
+    unit, _, _ = _validate(design)
+    if unit == "fixed":
+        raise NotImplementedError(
+            f"{fn.__name__} takes random unit effects, not fixed ones."
+        )
+    per_unit = kw.pop("obs_per_unit", None)
+    if unit is None:
+        _scale(design, "unit_effect_sd", False, "unit_effects")
+        if per_unit is not None:
+            raise ValueError("obs_per_unit needs unit_effects='random'.")
+        return fn, kw
+    if kw.pop("create_gdf", False) or kw.pop("geometry_type", "polygon") != "polygon":
+        raise ValueError(
+            "With unit effects the observations are not the units of W; no "
+            "GeoDataFrame is returned."
+        )
+    kw["unit_effect_sd"] = _scale(design, "unit_effect_sd", True, "unit_effects")
+    kw["obs_per_unit"] = 25 if per_unit is None else int(per_unit)
+    return _private("nonlinear", "_simulate_sem_probit_re"), kw
 
 
 _COUNT = {
@@ -290,17 +315,6 @@ def count(fn, design, kw):
     )
     kw["time_effect_sd"] = _scale(design, "time_effect_sd", time, "time_effects")
     return target, _with_N(target, kw)
-
-
-@accepts("group_effects")
-def sem_probit(fn, design, kw):
-    """The SEM probit with random group effects."""
-    if design.get("group_effects") != "random":
-        raise NotImplementedError(
-            "The latent SEM probit is not implemented; pass group_effects='random' "
-            "for the SEM probit with random group effects."
-        )
-    return fn, kw
 
 
 # ---------------------------------------------------------------------------

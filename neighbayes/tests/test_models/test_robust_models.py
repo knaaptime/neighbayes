@@ -4,7 +4,7 @@ Each test verifies that:
 1. ``robust=True`` builds and samples without error
 2. ``nu`` (degrees of freedom) is a fixed hyperparameter, not sampled
 3. ``robust=False`` (default) still works (backward compatibility)
-4. SEMProbit raises ``NotImplementedError`` when ``robust=True``
+4. the probits raise ``NotImplementedError`` when ``robust=True``
 
 Run with::
 
@@ -282,28 +282,29 @@ class TestRobustTobit:
 
 
 # ---------------------------------------------------------------------------
-# SEMProbit — should raise NotImplementedError
+# The probits — should raise NotImplementedError
 # ---------------------------------------------------------------------------
 
 
 class TestRobustSpatialProbit:
-    """SEMProbit should raise NotImplementedError when robust=True."""
+    """The probit link fixes a normal disturbance: robust=True raises."""
 
-    def test_spatial_probit_raises(self, rng):
-        W = make_line_W(6)
-        W_graph = W_to_graph(W)
-        m = 6  # number of regions
-        region_ids = np.repeat(np.arange(m), 3)  # 3 obs per region
-        n = m * 3
-        X = rng.standard_normal((n, 2))
-        y = rng.binomial(1, 0.5, size=n).astype(float)
-        model = SEMProbit(
-            group_effects="random", y=y, X=X, W=W_graph, groups=region_ids, robust=True
-        )
-        with pytest.raises(
-            NotImplementedError, match="Robust.*not supported.*SEMProbit"
-        ):
-            model._build_pymc_model()
+    def test_unit_effects_probit_raises(self, rng):
+        W_graph = W_to_graph(make_line_W(6))
+        units = np.repeat(np.arange(6), 3)  # 3 obs per unit
+        X = rng.standard_normal((18, 2))
+        y = rng.binomial(1, 0.5, size=18).astype(float)
+        with pytest.raises(NotImplementedError, match="robust=True is not supported"):
+            SEMProbit(
+                unit_effects="random", y=y, X=X, W=W_graph, units=units, robust=True
+            )
+
+    def test_latent_probit_raises(self, rng):
+        W_graph = W_to_graph(make_line_W(6))
+        X = rng.standard_normal((6, 2))
+        y = rng.binomial(1, 0.5, size=6).astype(float)
+        with pytest.raises(NotImplementedError, match="robust=True is not supported"):
+            SEMProbit(y=y, X=X, W=W_graph, robust=True)
 
 
 # ---------------------------------------------------------------------------

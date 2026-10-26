@@ -20,9 +20,12 @@ from .hurdle import simulate_hurdle_negbin as simulate_hurdle_negbin
 from .hurdle import simulate_sar_hurdle_negbin as simulate_sar_hurdle_negbin
 from .multilevel import simulate_multilevel as simulate_multilevel
 from .nonlinear import simulate_logit as simulate_logit
+from .nonlinear import simulate_probit as simulate_probit
 from .nonlinear import simulate_sar_logit as simulate_sar_logit
+from .nonlinear import simulate_sar_probit as simulate_sar_probit
 from .nonlinear import simulate_sar_tobit as simulate_sar_tobit
 from .nonlinear import simulate_sdem_logit as simulate_sdem_logit
+from .nonlinear import simulate_sdem_probit as simulate_sdem_probit
 from .nonlinear import simulate_sdm_tobit as simulate_sdm_tobit
 from .nonlinear import simulate_sem_logit as simulate_sem_logit
 from .nonlinear import simulate_sem_probit as simulate_sem_probit

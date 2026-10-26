@@ -698,8 +698,9 @@ class ReducedGibbsCache(NamedTuple):
         behavior).
     krylov_reuse_threshold : float
         Maximum |Δρ| for which the previous sweep's Krylov basis is
-        reused.  Must be ≤ ``krylov_dmax`` to stay within the
-        polynomial's accuracy radius.  Default 0.15.
+        reused, and never beyond the basis' own series radius
+        (``safe_dmax``), outside which its Horner evaluation diverges.
+        Default 0.15.
     """
 
     W_sparse: sp.csr_matrix
@@ -1291,7 +1292,10 @@ def run_chain(
             if (
                 cache.krylov_reuse
                 and _prev_basis is not None
-                and abs(state.rho - _prev_rho) < cache.krylov_reuse_threshold
+                # Only inside the basis' own series radius: beyond it the
+                # Horner evaluation of U(ρ) diverges.
+                and abs(state.rho - _prev_rho)
+                < min(cache.krylov_reuse_threshold, _prev_basis.safe_dmax)
             ):
                 basis = _prev_basis
             else:

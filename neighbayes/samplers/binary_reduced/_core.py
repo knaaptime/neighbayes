@@ -1,22 +1,31 @@
-r"""NumPy reduced-form SAR-logit Pólya–Gamma Gibbs sampler.
+r"""NumPy reduced-form SAR logit and probit Gibbs sampler.
 
 Binary analogue of the reduced-form SAR Negative-Binomial sampler
 (:mod:`..negbin_reduced._core`): the spatial lag enters the *linear predictor*,
 
 .. math::
 
-    \eta = (I - \rho W)^{-1} X\beta, \qquad y_i \sim \mathrm{Bernoulli}(\sigma(\eta_i)),
+    \eta = (I - \rho W)^{-1} X\beta, \qquad
+    y_i \sim \mathrm{Bernoulli}(F(\eta_i)),
 
-so — exactly as in the reduced-form count model — the :math:`|I - \rho W|`
-Jacobian cancels when :math:`\beta` is marginalized out and the ρ conditional is
-Krylov-accelerable.  This module reuses the reduced-NB machinery almost verbatim
-(the shift-invert Krylov basis, the CHOLMOD normal-equations solver, and the
-adaptive slice sampler), differing only in the Pólya–Gamma augmentation:
+with :math:`F` the logistic or the normal distribution function, so —
+exactly as in the reduced-form count model — the :math:`|I - \rho W|`
+Jacobian cancels when :math:`\beta` is marginalized out and the ρ conditional
+is Krylov-accelerable.  This module reuses the reduced-NB machinery almost
+verbatim (the shift-invert Krylov basis, the CHOLMOD normal-equations solver,
+and the adaptive slice sampler).
 
-* the shape is **h = 1** (Bernoulli) instead of :math:`y + \alpha`;
-* the working response is :math:`s = \kappa/\omega` with :math:`\kappa = y - \tfrac12`
-  (no ``log α`` offset);
-* there is **no dispersion parameter α** (hence no α slice).
+Each sweep first makes the likelihood conditionally Gaussian in :math:`\eta`,
+a weighted regression of the working response :math:`s = \kappa/\omega` with
+weights :math:`\omega`:
+
+* logit: :math:`\omega \sim \mathrm{PG}(1, \eta)` (Pólya–Gamma, Polson, Scott
+  and Windle 2013), :math:`\kappa = y - \tfrac12`;
+* probit: :math:`\omega = 1` and :math:`\kappa = z`, the utility
+  :math:`z \sim N(\eta, 1)` truncated to the side of zero ``y`` fixes (Albert
+  and Chib 1993).
+
+There is no dispersion parameter (hence no α slice).
 """
 
 from __future__ import annotations
@@ -24,9 +33,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional
 
+import numba
 import numpy as np
 import scipy.sparse as sp
 from scipy.linalg import solve_triangular
+from scipy.special import log_ndtr
 
 from .._utils._polyagamma import sample_polyagamma
 from .._utils._slice import (
@@ -35,6 +46,7 @@ from .._utils._slice import (
     update_slice_width,
 )
 from .._utils._spatial_normal import CholmodFactor
+from ..binary_latent._core import _rtnorm_lower
 from ..negbin_reduced._core import (
     _KRYLOV_DMAX_DEFAULT,
     ReducedGibbsCache,
@@ -49,8 +61,8 @@ from ..negbin_reduced._core import (
 
 
 @dataclass
-class ReducedLogitGibbsState:
-    """Mutable state for one reduced-form SAR-logit Gibbs chain.
+class ReducedBinaryGibbsState:
+    """Mutable state for one reduced-form SAR logit or probit Gibbs chain.
 
     Attributes
     ----------
@@ -59,7 +71,8 @@ class ReducedLogitGibbsState:
     rho : float
         Spatial autoregressive parameter.
     omega : ndarray, shape (n,)
-        Pólya–Gamma auxiliary variables (PG(1, η)).
+        The working weights: Pólya–Gamma variables (PG(1, η)) for the logit,
+        ones for the probit.
     """
 
     beta: np.ndarray
@@ -77,10 +90,38 @@ def _sample_omega(eta: np.ndarray, *, rng: np.random.Generator) -> np.ndarray:
     return sample_polyagamma(np.ones_like(eta), np.clip(eta, -20.0, 20.0), rng=rng)
 
 
+def binary_loglik_pointwise(y: np.ndarray, eta: np.ndarray, link: str) -> np.ndarray:
+    """Pointwise Bernoulli log-likelihood at ``eta`` under the logit or probit link."""
+    if link == "logit":
+        return _logit_loglik_pointwise(y, eta)
+    return log_ndtr((2.0 * y - 1.0) * eta)
+
+
+@numba.njit(cache=True)
+def _signed_utilities(eta, y, rng):
+    """``z_i ~ N(eta_i, 1)`` truncated to ``z_i > 0`` where ``y_i = 1``, else ``< 0``."""
+    z = np.empty(eta.size)
+    for i in range(eta.size):
+        if y[i] > 0:
+            z[i] = eta[i] + _rtnorm_lower(-eta[i], rng)
+        else:
+            z[i] = eta[i] - _rtnorm_lower(eta[i], rng)
+    return z
+
+
+def augment(
+    link: str, eta: np.ndarray, y: np.ndarray, rng: np.random.Generator
+) -> tuple[np.ndarray, np.ndarray]:
+    """The working weights ``omega`` and ``kappa = omega * s`` at ``eta`` (see the module)."""
+    if link == "logit":
+        return _sample_omega(eta, rng=rng), y - 0.5
+    return np.ones_like(eta), _signed_utilities(eta, y, rng)
+
+
 def _rho_log_density_marginal(
     rho: float,
     omega: np.ndarray,
-    y: np.ndarray,
+    kappa: np.ndarray,
     X: np.ndarray,
     W_csc: sp.csc_matrix,
     n: int,
@@ -94,11 +135,11 @@ def _rho_log_density_marginal(
     cholmod_solver: Optional[_CholmodNormalEqSolver] = None,
     intercept_col: int = 0,
 ) -> float:
-    r"""β-marginalized conditional log-density of ρ for the reduced logit.
+    r"""β-marginalized conditional log-density of ρ for the reduced logit or probit.
 
     Identical Gaussian core to :func:`..negbin_reduced._core._rho_log_density_marginal`,
-    with the Bernoulli working response :math:`s = \kappa/\omega`
-    (:math:`\kappa = y - \tfrac12`) and no ``log α`` offset.  The
+    with the working response :math:`s = \kappa/\omega` (see the module) and
+    no ``log α`` offset.  The
     ``log|I − ρW|`` Jacobian cancels under β-marginalization, so the density is
     a plain Gaussian normalizing constant.  Candidates outside the Krylov radius
     fall back to a direct factorization of ``A_rho``.
@@ -135,8 +176,8 @@ def _rho_log_density_marginal(
         V0_inv_diag_rp = V0_inv_diag
         mu0_rp = mu0
 
-    # Bernoulli working response: κ = y − ½, s = κ/ω (no log-α offset).
-    s = (y - 0.5) / omega
+    # The working response s = κ/ω (no log-α offset).
+    s = kappa / omega
     r = s - U @ mu0_rp
 
     Uw = U * omega[:, None]
@@ -171,7 +212,7 @@ def _sample_beta(
     beta_current: np.ndarray,
     Xtilde: np.ndarray,
     omega: np.ndarray,
-    y: np.ndarray,
+    kappa: np.ndarray,
     priors,
     *,
     rng: np.random.Generator,
@@ -180,13 +221,12 @@ def _sample_beta(
 ) -> np.ndarray:
     r"""Block 2: conjugate Gaussian draw for :math:`\beta` (Bernoulli).
 
-    Same posterior as the reduced-NB β draw with :math:`\kappa = y - \tfrac12`
+    Same posterior as the reduced-NB β draw with the module's :math:`\kappa`
     and no ``ω log α`` term:
     :math:`\Sigma_\beta^{-1} = \tilde X^\top \Omega \tilde X + V_0^{-1}`,
     :math:`m_\beta = \Sigma_\beta(\tilde X^\top \kappa + V_0^{-1}\mu_0)`.
     """
     k = Xtilde.shape[1]
-    kappa = y - 0.5
     V0_inv_diag, mu0, _ = _prior_precision_and_mean(priors, k)
 
     reparam = intercept_col >= 0 and abs(rho) > 1e-8
@@ -228,9 +268,9 @@ def _sample_beta(
 
 
 def _sample_rho(
-    state: ReducedLogitGibbsState,
+    state: ReducedBinaryGibbsState,
     cache: ReducedGibbsCache,
-    y: np.ndarray,
+    kappa: np.ndarray,
     X: np.ndarray,
     priors,
     *,
@@ -251,7 +291,7 @@ def _sample_rho(
         return _rho_log_density_marginal(
             rho=rho,
             omega=state.omega,
-            y=y,
+            kappa=kappa,
             X=X,
             W_csc=cache.W_csc,
             n=n,
@@ -297,7 +337,7 @@ def run_chain(
     W_sparse: sp.csr_matrix,
     priors,
     cache: ReducedGibbsCache,
-    init: ReducedLogitGibbsState,
+    init: ReducedBinaryGibbsState,
     draws: int,
     tune: int,
     thin: int = 1,
@@ -305,8 +345,9 @@ def run_chain(
     chain_id: int = 0,
     progress_manager: object | None = None,
     store_log_lik: bool = True,
+    link: str = "logit",
 ) -> dict[str, np.ndarray]:
-    """Run one chain of the reduced-form SAR-logit PG-Gibbs sampler.
+    """Run one chain of the reduced-form SAR logit or probit Gibbs sampler.
 
     Returns
     -------
@@ -325,7 +366,7 @@ def run_chain(
     beta_samples = np.empty((n_keep, k), dtype=np.float64)
     log_lik_samples = np.empty((n_keep, n), dtype=np.float64) if store_log_lik else None
 
-    state = ReducedLogitGibbsState(
+    state = ReducedBinaryGibbsState(
         beta=np.asarray(init.beta, dtype=np.float64).copy(),
         rho=float(init.rho),
         omega=np.asarray(init.omega, dtype=np.float64).copy(),
@@ -372,7 +413,10 @@ def run_chain(
             if (
                 cache.krylov_reuse
                 and _prev_basis is not None
-                and abs(state.rho - _prev_rho) < cache.krylov_reuse_threshold
+                # Only inside the basis' own series radius: beyond it the
+                # Horner evaluation of U(ρ) diverges.
+                and abs(state.rho - _prev_rho)
+                < min(cache.krylov_reuse_threshold, _prev_basis.safe_dmax)
             ):
                 basis = _prev_basis
             else:
@@ -418,14 +462,14 @@ def run_chain(
             basis = None
 
         # --- (ω, ρ, β) cycles ---
-        state.omega = _sample_omega(eta, rng=rng)
+        state.omega, kappa = augment(link, eta, y, rng)
         Xtilde = None
 
         for _cycle in range(_n_cycles):
             state.rho, _ = _sample_rho(
                 state=state,
                 cache=cache,
-                y=y,
+                kappa=kappa,
                 X=X,
                 priors=priors,
                 rng=rng,
@@ -461,7 +505,7 @@ def run_chain(
                 beta_current=state.beta,
                 Xtilde=Xtilde,
                 omega=state.omega,
-                y=y,
+                kappa=kappa,
                 priors=priors,
                 rng=rng,
                 rho=state.rho,
@@ -471,7 +515,7 @@ def run_chain(
             eta = Xtilde @ state.beta
 
             if _cycle < _n_cycles - 1:
-                state.omega = _sample_omega(eta, rng=rng)
+                state.omega, kappa = augment(link, eta, y, rng)
 
         # --- Store post-warmup draw ---
         if i >= tune and (i - tune) % thin == 0:
@@ -480,7 +524,7 @@ def run_chain(
                 rho_samples[idx] = state.rho
                 beta_samples[idx] = state.beta
                 if store_log_lik:
-                    log_lik_samples[idx] = _logit_loglik_pointwise(y, eta)
+                    log_lik_samples[idx] = binary_loglik_pointwise(y, eta, link)
 
         if progress_manager is not None:
             progress_manager.update(chain_id, i, tuning=i < tune)

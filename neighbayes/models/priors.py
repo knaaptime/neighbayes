@@ -38,7 +38,7 @@ Two independent families live here:
 
 * **Internal Gibbs-sampler structs** — resolved-hyperparameter containers
   the numpy/JAX kernels consume (``GibbsBasePriors`` →
-  ``GaussianGibbsPriors`` / ``LogitGibbsPriors`` / ``REGibbsPriors``;
+  ``GaussianGibbsPriors`` / ``BinaryGibbsPriors`` / ``REGibbsPriors``;
   standalone ``GibbsPriors``, ``ReducedGibbsPriors``,
   ``FlowReducedGibbsPriors``, ``ZINBGibbsPriors``).  Models build these internally in
   ``_fit_gibbs``; they are not part of the user-facing ``priors=`` API.
@@ -305,28 +305,27 @@ class SDMTobitPriors(SDMPriors):
 
 
 @dataclass(frozen=True)
-class SARProbitPriors:
-    """Priors for :class:`neighbayes.models.SEMProbit`.
+class SEMProbitREPriors:
+    """Priors for ``SEMProbit(unit_effects="random")``.
 
-    Differs from :class:`SARPriors`: there is no ``sigma`` parameter (the
-    probit link absorbs the noise scale) and the group effects' sd
-    ``group_effect_sd`` has its own half-normal scale.
+    Differs from :class:`SEMPriors`: there is no ``sigma`` parameter (the
+    probit link absorbs the noise scale) and the unit effects' sd
+    ``unit_effect_sd`` has its own half-normal scale.
     """
 
     lam_lower: float = -0.95
     lam_upper: float = 0.95
     beta_mu: float | Any = None  # Gelman et al. (2008), link scale
     beta_sigma: float | Any = None
-    group_effect_sd_sigma: float = 2.0
+    unit_effect_sd_sigma: float = 2.0
 
 
 @dataclass(frozen=True)
 class SARLogitPriors:
     """Priors for :class:`neighbayes.models.SARLogit`.
 
-    Like :class:`SARProbitPriors` but without ``group_effect_sd_sigma``
-    (the logit model has no group effects).  There is no
-    ``sigma`` parameter because the logit link absorbs the noise scale.
+    There is no ``sigma`` parameter because the logit link absorbs the noise
+    scale.
     """
 
     rho_lower: float = -0.999
@@ -353,6 +352,38 @@ class SEMLogitPriors:
     beta_sigma: float | Any = None
 
 
+@dataclass(frozen=True)
+class SARProbitPriors:
+    """Priors for :class:`neighbayes.models.SARProbit`.
+
+    :class:`SARLogitPriors` on the probit scale: the probit link fixes the
+    disturbance's scale, so there is no ``sigma``.
+    """
+
+    rho_lower: float = -0.999
+    rho_upper: float = 0.999
+    beta_mu: float | Any = None  # Gelman et al. (2008), link scale
+    beta_sigma: float | Any = None
+
+
+# Alias — the non-spatial Probit model uses the same prior structure.
+ProbitPriors = SARProbitPriors
+
+
+@dataclass(frozen=True)
+class SEMProbitPriors:
+    """Priors for :class:`neighbayes.models.SEMProbit`, the latent SEM probit.
+
+    :class:`SARProbitPriors` with the bounds on the spatial error parameter
+    ``lam`` in place of ``rho``'s.
+    """
+
+    lam_lower: float = -0.999
+    lam_upper: float = 0.999
+    beta_mu: float | Any = None  # Gelman et al. (2008), link scale
+    beta_sigma: float | Any = None
+
+
 # ---------------------------------------------------------------------------
 # Resolution helper
 # ---------------------------------------------------------------------------
@@ -362,6 +393,8 @@ PriorsLike = Union[
     Mapping[str, Any],
     BasePriors,
     "SARProbitPriors",
+    "SEMProbitPriors",
+    "SEMProbitREPriors",
     "SARLogitPriors",
     "SEMLogitPriors",
     None,
@@ -837,7 +870,7 @@ class ZINBGibbsPriors:
 
 
 @dataclass
-class LogitGibbsPriors(GibbsBasePriors):
+class BinaryGibbsPriors(GibbsBasePriors):
     """Prior hyperparameters for the SAR-logit Gibbs sampler.
 
     All priors are weakly informative by default.  There is no σ²
@@ -883,6 +916,8 @@ __all__ = [
     "SEMTobitPriors",
     "SDMTobitPriors",
     "SARProbitPriors",
+    "SEMProbitPriors",
+    "SEMProbitREPriors",
     "SARLogitPriors",
     "SEMLogitPriors",
     "MultilevelPriors",
@@ -909,7 +944,7 @@ __all__ = [
     "ReducedGibbsPriors",
     "FlowReducedGibbsPriors",
     "ZINBGibbsPriors",
-    "LogitGibbsPriors",
+    "BinaryGibbsPriors",
     "REGibbsPriors",
     "PriorsLike",
     "resolve_priors",

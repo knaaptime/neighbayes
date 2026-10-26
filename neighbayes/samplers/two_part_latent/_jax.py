@@ -1,7 +1,7 @@
 """JAX backend of the latent hurdle and zero-inflated NB samplers (:mod:`._core`).
 
 One sweep is the latent logit's sweep on the zero part
-(:mod:`..logit_latent._jax`) and the latent NB's on the count part
+(:mod:`..binary_latent._jax`) and the latent NB's on the count part
 (:mod:`..negbin_latent._jax`), each with its own consts.  The zero-inflated
 sweep passes the count part's ``logq = -e^eta`` to the zero part, which draws
 the zero counts' sides of zero, and the active units to the count part as its
@@ -73,7 +73,7 @@ def run_chains_jax_latent_two_part(
     import jax.numpy as jnp
 
     from ..._jax_dispatch import ensure_x64
-    from ..logit_latent import _jax as logit_jax
+    from ..binary_latent import _jax as logit_jax
     from ..negbin_latent import _jax as nb_jax
     from ..negbin_latent._core import initial_state
     from ..negbin_reduced._jax import _build_sparse_ctx, _sparse_solve_parts
@@ -115,7 +115,7 @@ def run_chains_jax_latent_two_part(
         data_z["logq"] = jnp.zeros(nT)
     static_z = (nT, p, "sar", n_colours_z, store_latent, zinb, n_groups_z)
     sweep_z = cached_sweep(
-        ("logit_latent", *static_z, T, *key_z),
+        ("zero_part", *static_z, T, *key_z),
         lambda: logit_jax._make_sweep(
             *static_z[:4], eval_z, store_latent, mixed=zinb, n_groups=n_groups_z
         ),

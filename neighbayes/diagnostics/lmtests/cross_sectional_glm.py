@@ -1,4 +1,4 @@
-r"""Bayesian LM tests for the logit and NB families (cross-section).
+r"""Bayesian LM tests for the logit, probit and NB families (cross-section).
 
 The tests follow the Bayesian LM template of the Gaussian suites: posterior
 draws from the restricted model, the score of the alternative at each draw,
@@ -8,7 +8,8 @@ disturbance ``h``, ``tau = Var(h)``, ``kappa = Cov(e, h)``) are defined in
 :mod:`._glm`.
 
 At the GLM null (:class:`~neighbayes.models.Logit`,
-:class:`~neighbayes.models.NegBin`) the score of the latent SAR,
+:class:`~neighbayes.models.Probit`, :class:`~neighbayes.models.NegBin`) the
+score of the latent SAR,
 :math:`\eta = S(\rho)(X\beta + \varepsilon)` with :math:`\varepsilon` the
 family's own disturbance, splits into a spillover and an error term,
 
@@ -51,7 +52,8 @@ posterior mean, which equals :math:`s` at the maximum and is insensitive to
 information with :math:`\beta` and the NB dispersion is zero.
 
 At a reduced-form SAR null (:class:`~neighbayes.models.SARLogit`,
-:class:`~neighbayes.models.SARNegBin`) the restricted linear predictor is
+``SARProbit(latent=False)``, :class:`~neighbayes.models.SARNegBin`) the
+restricted linear predictor is
 :math:`\eta = S(\rho)X\beta`, and the units are again independent given it.
 ``LM-Error`` is then the score of a latent error process added to the fitted
 model, :math:`q = e^\top W h` at that :math:`\eta`; it is uncorrelated with
@@ -407,10 +409,11 @@ def bayesian_glm_lm_wx_test(model) -> BayesianLMTestResult:
 
 
 def bayesian_glm_moran_working_test(model) -> BayesianLMTestResult:
-    r"""Moran diagnostic on the Pólya–Gamma working residuals at the GLM null.
+    r"""Moran diagnostic on the working residuals at the GLM null.
 
     With :math:`\tilde e = \tilde z - X\beta` the working residual and
-    :math:`\Omega` the PG mean weights (:mod:`._glm`),
+    :math:`\Omega` its weights (:mod:`._glm`: the PG mean weights of the logit
+    and NB, the probit's Fisher weights),
 
     .. math::
         S^{(d)} = \tilde e^{(d)\top}\, \Omega^{(d)}\, W\, \tilde e^{(d)},

@@ -532,7 +532,7 @@ class LatentTwoPartMixin:
         :func:`~neighbayes.models.cross_section._latent.latent_outcome_effects`.
         """
         from ._latent import latent_outcome_effects
-        from ._latent_logit import LatentLogitMixin
+        from ._latent_binary import LatentLogitMixin
         from ._latent_negbin import LatentNegBinMixin
 
         post = self.inference_data.posterior
@@ -696,7 +696,7 @@ class LatentHurdleMixin(LatentTwoPartMixin):
     _zero_effects = True
 
     def _latent_two_part_priors(self):
-        from ..priors import LogitGibbsPriors, ReducedGibbsPriors
+        from ..priors import BinaryGibbsPriors, ReducedGibbsPriors
 
         beta_mu, beta_sigma = self._hurdle_beta_prior(self._X, self._feature_names)
         gamma_mu, gamma_sigma = self._hurdle_gamma_prior(
@@ -715,7 +715,7 @@ class LatentHurdleMixin(LatentTwoPartMixin):
                 rho_lower=lo,
                 rho_upper=hi,
             ),
-            LogitGibbsPriors(
+            BinaryGibbsPriors(
                 beta_mu=gamma_mu,
                 beta_sigma=gamma_sigma,
                 rho_lower=lo_z,
@@ -744,7 +744,7 @@ class LatentZINBMixin(LatentTwoPartMixin):
     _zero_effects = False
 
     def _latent_two_part_priors(self):
-        from ..priors import LogitGibbsPriors, ReducedGibbsPriors
+        from ..priors import BinaryGibbsPriors, ReducedGibbsPriors
 
         p = self._zinb_priors()
         return (
@@ -757,7 +757,7 @@ class LatentZINBMixin(LatentTwoPartMixin):
                 rho_lower=p.rho_lower,
                 rho_upper=p.rho_upper,
             ),
-            LogitGibbsPriors(
+            BinaryGibbsPriors(
                 beta_mu=p.gamma_mu,
                 beta_sigma=p.gamma_sigma,
                 rho_lower=p.lam_lower,

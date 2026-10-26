@@ -22,7 +22,7 @@ only if β is redrawn from its conditional immediately after (van Dyk & Park
 2008).  Both orderings matter numerically — see the block comments.
 
 **Both** equations are reduced-form: the selection is the reduced-form
-SAR-logit from :mod:`neighbayes.samplers.logit_reduced._core` (spatial lag on
+SAR-logit from :mod:`neighbayes.samplers.binary_reduced._core` (spatial lag on
 the linear predictor, no random effects — the ``|I−λW|`` Jacobian cancels when γ
 is marginalized out), and the count is the reduced-form SAR-NB from
 :mod:`neighbayes.samplers.negbin_reduced._core`.  This matches the JAX backend
@@ -47,17 +47,17 @@ from typing import NamedTuple
 import numpy as np
 import scipy.sparse as sp
 
-from ...models.priors import LogitGibbsPriors, ZINBGibbsPriors
+from ...models.priors import BinaryGibbsPriors, ZINBGibbsPriors
 from .._utils._polyagamma import sample_polyagamma
 from .._utils._spatial_normal import CholmodFactor
-from ..logit_reduced._core import ReducedLogitGibbsState
-from ..logit_reduced._core import (
+from ..binary_reduced._core import ReducedBinaryGibbsState
+from ..binary_reduced._core import (
     _sample_beta as _sample_gamma_sel,
 )
-from ..logit_reduced._core import (
+from ..binary_reduced._core import (
     _sample_omega as _sample_omega_sel,
 )
-from ..logit_reduced._core import (
+from ..binary_reduced._core import (
     _sample_rho as _sample_lam,
 )
 from ..negbin._core import GibbsState as _NBGibbsState
@@ -354,7 +354,7 @@ def run_zinb_chain(
     pi_mean_samples = np.empty(n_keep, dtype=np.float64)
 
     # Build sub-priors for the logit and NB blocks
-    sel_priors = LogitGibbsPriors(
+    sel_priors = BinaryGibbsPriors(
         beta_mu=priors.gamma_mu,
         beta_sigma=priors.gamma_sigma,
         rho_lower=priors.lam_lower,
@@ -383,7 +383,7 @@ def run_zinb_chain(
     )
 
     # Build reduced-form logit sub-state for the selection blocks
-    sel_state = ReducedLogitGibbsState(
+    sel_state = ReducedBinaryGibbsState(
         beta=state.gamma,
         rho=state.lam,
         omega=state.omega_sel,
@@ -460,10 +460,11 @@ def run_zinb_chain(
         sel_state.beta = state.gamma
 
         # Block 2: λ | γ, ω^sel, z   (β-marginalized 1-D slice, response z)
+        kappa_sel = z_float - 0.5
         state.lam, _ = _sample_lam(
             sel_state,
             sel_cache,
-            z_float,
+            kappa_sel,
             Z,
             sel_priors,
             rng=rng,
@@ -486,7 +487,7 @@ def run_zinb_chain(
             state.gamma,
             Ztilde,
             state.omega_sel,
-            z_float,
+            kappa_sel,
             sel_priors,
             rng=rng,
             rho=state.lam,

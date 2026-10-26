@@ -30,15 +30,17 @@ HurdleNegBin, SARHurdleNegBin), :class:`CountDesigns`:
     The panel, pooled or with random unit effects and fixed time effects
     (:mod:`..panel._count`, :mod:`..panel._zinb`, :mod:`..panel._hurdle`).
 
-The binary families (Logit, SARLogit, SEMLogit, SDEMLogit),
-:class:`BinaryDesigns`:
+The binary families (Logit, SARLogit, SEMLogit, SDEMLogit, Probit, SARProbit,
+SEMProbit, SDEMProbit), :class:`BinaryDesigns`:
 
 ``"static"``
-    The cross-section: SARLogit's reduced form, and the latent SEM of SEMLogit
-    and SDEMLogit (a SEM has no reduced form to distinguish, ADR 0003).
+    The cross-section: the reduced form of SARLogit and ``SARProbit(latent=False)``,
+    and the latent SEM of the SEM and SDEM classes (a SEM has no reduced form
+    to distinguish, ADR 0003).
 ``"latent"``
-    ``SARLogit(latent=True)``, the latent SAR, which propagates the logistic
-    disturbance (:mod:`..cross_section._latent_logit`).
+    The latent SAR, which propagates the link's own disturbance
+    (:mod:`..cross_section._latent_binary`): ``SARLogit(latent=True)``, and
+    ``SARProbit``, whose unmarked form it is.
 
 The flow families, :class:`FlowDesigns` (OLSFlow, SARFlow, SEMFlow) and
 :class:`FlowCountDesigns` (NegBinFlow, SARNegBinFlow, SARPoissonFlow,
@@ -225,10 +227,15 @@ class BinaryDesigns(DesignDispatch):
 
     The response is validated as binary; there is no panel, and a
     cross-section takes no unit effects.  ``latent=True`` selects the latent
-    SAR where the class implements it.
+    SAR where the class implements it; ``latent=None`` takes the class's
+    ``_latent_default``, the form its unmarked name means (ADR 0003).
     """
 
     _likelihood: str = "binary"
+    #: The link, ``"logit"`` or ``"probit"``, which the class or its latent
+    #: mixin sets.
+    _link: str
+    _latent_default: bool = False
 
     def __init__(
         self,
@@ -241,7 +248,7 @@ class BinaryDesigns(DesignDispatch):
         unit_effects=None,
         time_effects=False,
         dynamic=False,
-        latent=False,
+        latent=None,
         **kwargs,
     ):
         design, kwargs = self._resolve_design(
@@ -270,14 +277,16 @@ class BinaryDesigns(DesignDispatch):
         """The design the arguments describe, and the base class's arguments."""
         name = cls.__name__
         unit, time, dynamic = _pop_design(kw)
-        latent = kw.pop("latent", False)
+        latent = kw.pop("latent", None)
         if _is_panel(kw):
             raise NotImplementedError(f"{name} is not implemented with a panel.")
         _cross_section_only(name, time, dynamic)
         if unit is not None:
             # One draw per observation is a disturbance, not a unit effect.
             raise NotImplementedError(f"{name} takes no unit effects.")
-        latent = _latent_flag(cls, latent, "Logit")
+        if latent is None:
+            latent = cls._latent_default
+        latent = _latent_flag(cls, latent, cls._link.title())
         return ("latent" if latent else "static"), kw
 
     _build_pymc_model = _by_design("_build_pymc_model")

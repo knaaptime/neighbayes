@@ -1,21 +1,30 @@
-"""Spatial probit model with spatially dependent regional effects.
-
-Implements a Bayesian binary-response model analogous to legacy ``semip_g``:
+r"""Latent SEM probit, and the SEM probit with random unit effects.
 
 .. math::
-    y_{ij} = 1[z_{ij} > 0],\\quad z = X\\beta + \\Delta a + \\varepsilon,
 
-where regional effects follow
+    y_i = \mathbf 1\{y^*_i > 0\}, \qquad
+    y^* = X\beta + (I - \lambda W)^{-1}\varepsilon, \qquad
+    \varepsilon_i \sim N(0, 1)
+
+The error process carries the probit's own disturbance, so :math:`\lambda = 0`
+is the probit, and the GLM suite's ``LM-Error`` is this model's score test.  A
+SEM whose error process carried no disturbance would be the aspatial probit,
+so the unmarked SEM probit is the latent one (ADR 0003).
+
+With ``unit_effects="random"`` each unit (a row of ``W``) is observed more
+than once, and the error process carries a normal random effect per unit in
+place of the probit's disturbance (Smith and LeSage 2004; LeSage and Pace
+2009, §10.6):
 
 .. math::
-    a = \\lambda W a + u,\\quad u \\sim \\mathcal{N}(0, \\sigma_a^2 I).
 
-The probit link is used directly via ``P(y=1) = Phi(X\\beta + \\Delta a)``.
+    y_j = \mathbf 1\{x_j'\beta + c_{u(j)} + \varepsilon_j > 0\}, \qquad
+    c = \lambda W c + v, \quad v \sim N(0, \sigma_c^2 I).
 """
 
 from __future__ import annotations
 
-from typing import Any, Optional, Union
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -28,203 +37,242 @@ from ..._backends.sampler_helpers import (
     select_backend,
 )
 from ..._lazy_deps import pm, xr
-from .._base._shared import SharedSpatialMethods
 from .._design import _is_panel, _pop_design
-from ..priors import SARProbitPriors, priors_as_dict, resolve_priors
+from .._mixins._designs import BinaryDesigns, _by_design, _constructor_signature
+from ..base import SpatialModel
+from ..priors import SEMProbitPriors, SEMProbitREPriors, priors_as_dict, resolve_priors
+from ._latent_binary import LatentProbitMixin
 
 
-class SEMProbit(SharedSpatialMethods):
-    """SEM probit with random group effects (LeSage and Pace 2009, §10.6).
-
-    A binary-response model in which the latent utility includes a
-    spatially autoregressive regional random effect. Each observation
-    :math:`i` belongs to one of :math:`m` regions; region-level effects
-    :math:`a` follow a SAR process on the region-level weights matrix
-    :math:`W`, and observation-level disturbances are standard Normal
-    (probit link).
+class SEMProbit(BinaryDesigns, LatentProbitMixin, SpatialModel):
+    r"""Bayesian latent SEM probit, or the SEM probit with random unit effects.
 
     .. math::
 
-        y_i = \\mathbb{1}[z_i > 0],\\quad
-        z_i = x_i'\\beta + a_{r(i)} + \\varepsilon_i,\\quad
-        \\varepsilon_i \\sim \\mathcal{N}(0, 1),
+        y_i = \mathbb 1\{y^*_i > 0\}, \qquad
+        (I - \lambda W)(y^* - X\beta) = \varepsilon, \qquad
+        \varepsilon_i \sim N(0, 1).
 
-    .. math::
-
-        a = \\lambda W a + u,\\quad u \\sim \\mathcal{N}(0, \\sigma_a^2 I_m),
-
-    so that :math:`a \\sim \\mathcal{N}(0, \\sigma_a^2 (I_m - \\lambda W)^{-1}
-    (I_m - \\lambda W)^{-T})`. The marginal choice probability is
-    :math:`P(y_i = 1 \\mid \\beta, a) = \\Phi(x_i'\\beta + a_{r(i)})`.
-
-    The group effects are those of Smith and LeSage (2004).  The latent SEM
-    probit, whose error process carries the probit disturbance itself, is not
-    implemented, so the group effects are required.
+    The latent SEM is sampled by an exact Gibbs sweep: the latent utilities
+    (Albert & Chib 1993), :math:`\lambda` with :math:`\beta` integrated out,
+    then :math:`\beta`, on JAX by default (``backend="numpy"`` for the compiled
+    NumPy sweep).  There is no NUTS path, the likelihood being an orthant
+    probability.
 
     Parameters
     ----------
     formula : str, optional
-        Formula for the binary response model, e.g. ``"y ~ x1 + x2"``.
-        Requires ``data`` and ``group_col``.
-    data : pandas.DataFrame, optional
-        Data source used with ``formula`` mode.
+        Wilkinson-style formula, e.g. ``"y ~ x1 + x2"``.  Requires ``data``.
+    data : pandas.DataFrame or geopandas.GeoDataFrame, optional
+        Data source for formula mode.
     y : array-like, optional
-        Binary dependent variable (0/1), required in matrix mode.
+        Binary dependent variable (0/1) (matrix mode).
     X : array-like or pandas.DataFrame, optional
-        Covariate matrix, required in matrix mode.
+        Design matrix (matrix mode).
     W : libpysal.graph.Graph or scipy.sparse matrix
-        Group-level ``m x m`` spatial weights matrix. Accepts a
-        :class:`libpysal.graph.Graph` (the modern libpysal graph API) or any
-        :class:`scipy.sparse` matrix.  The legacy :class:`libpysal.weights.W`
-        object is **not** accepted directly; pass ``w.sparse`` or convert with
-        ``libpysal.graph.Graph.from_W(w)``.
-        W should be row-standardized; a :class:`UserWarning` is raised if not.
-    group_effects : {"random"}
-        Required: the random group effects.
-    group_col : str, optional
-        Group identifier column in ``data`` (formula mode).
-    groups : array-like, optional
-        Group identifier per observation (matrix mode).
-    group_sizes : array-like, optional
-        Observation counts per group ``(m,)``, in sorted group order, for
-        data sorted by group (matrix mode alternative to ``groups``).
-    priors : dict, optional
-        Override default priors. Supported keys:
+        Spatial weights over the units.  Without unit effects every
+        observation is a unit, ``(n, n)``; with them, ``(m, m)`` over the
+        ``m`` units the observations repeat, and it should be row-standardized
+        (a :class:`UserWarning` is raised if not).
+    unit_effects : {None, "random"}, default None
+        ``"random"``: the SEM probit with random unit effects, whose error
+        process carries one normal effect per unit,
 
-        - ``lam_lower`` (float, default -0.95): Lower bound of the
-          Uniform prior on :math:`\\lambda` (``lam``).
-        - ``lam_upper`` (float, default 0.95): Upper bound of the
-          Uniform prior on :math:`\\lambda`.
-        - ``beta_mu``, ``beta_sigma`` (float or array, default Gelman et al.
-          2008): Normal prior on :math:`\\beta`, on the probit scale (intercept at ``Φ⁻¹(mean(y))``, scale ``2.5 / 1.6``; slopes ``(2.5 / 1.6) / sd(x_j)``).
-        - ``group_effect_sd_sigma`` (float, default 2.0): HalfNormal scale
-          for the group effects' std :math:`\\sigma_a`.
+        .. math::
+            y_j = \mathbb 1\{x_j'\beta + c_{u(j)} + \varepsilon_j > 0\},
+            \qquad c = \lambda W c + v, \quad v \sim N(0, \sigma_c^2 I),
 
-    robust : bool, default False
-        Not supported. The probit link uses a Normal CDF; a Student-t
-        analogue is not implemented. Setting ``robust=True`` raises.
+        fitted by NUTS.  Needs ``unit_col`` (formula mode) or ``units``
+        (matrix mode).
+    unit_col : str, optional
+        The column of ``data`` naming each observation's unit (formula mode).
+    units : array-like, optional
+        Each observation's unit (matrix mode), in any coding; the units in
+        order of first appearance are the rows of ``W``.
+    priors : dict, SEMProbitPriors or SEMProbitREPriors, optional
+        ``lam_lower``, ``lam_upper``: the Uniform prior on :math:`\lambda`
+        (default -0.999, 0.999; -0.95, 0.95 with unit effects); ``beta_mu``,
+        ``beta_sigma`` (default Gelman et al. 2008 on the probit scale);
+        with unit effects, ``unit_effect_sd_sigma`` (default 2.0), the
+        half-normal scale of :math:`\sigma_c`.
+    logdet_method, logdet_decomp
+        As for :class:`~neighbayes.models.SEM` (the latent SEM only).
 
     Notes
     -----
-    This class follows the core ``semip_g`` structure (binary response with
-    spatially dependent regional effects). It uses a standard probit link with
-    unit observation-level variance and does not currently sample the ``v_i``/
-    ``r`` heteroskedastic hierarchy from legacy ``semip_g``.
-
-    **Robust regression**
-
-    ``robust=True`` is not supported for SEMProbit. The probit link
-    function uses a Normal CDF; a robust version would require a Student-t
-    CDF link, which is not yet implemented. Use ``robust=True`` with
-    Gaussian models (OLS, SAR, SEM, etc.) instead.
+    The latent SEM's impacts are :math:`\beta` on the latent index (the SEM
+    has no spillovers), or on :math:`P(y_i = 1)` with
+    ``scale="probability"``; :meth:`fitted_probabilities` simulates the
+    utilities, whose marginal variances the multiplier makes unequal.  With
+    unit effects the probability-scale impacts are the average marginal
+    effects :math:`\phi(x_j'\beta + c_{u(j)})\beta_k`, again with no indirect
+    part, and the model does not sample the heteroskedastic ``v_i``/``r``
+    hierarchy of LeSage's ``semip_g``.
     """
+
+    _priors_cls = SEMProbitPriors
+    _spatial_params: tuple[str, ...] = ("lam",)
+    _jacobian_param: str | None = "lam"
+    _model_type: str = "sem_probit"
+    _gibbs_key: tuple[str, str] | None = ("binary_latent", "cross_section")
+    _latent_process = "sem"
+    _DESIGNS = {
+        "static": {},
+        "random": {"_priors_cls": SEMProbitREPriors, "_gibbs_key": None},
+    }
 
     def __init__(
         self,
         formula: Optional[str] = None,
         data: Optional[pd.DataFrame] = None,
-        y: Optional[Union[np.ndarray, pd.Series]] = None,
-        X: Optional[Union[np.ndarray, pd.DataFrame]] = None,
-        W: Optional[Union[Graph, np.ndarray]] = None,
+        y=None,
+        X=None,
+        W=None,
         *,
-        group_effects: Optional[str] = None,
-        group_col: Optional[str] = None,
-        groups: Optional[Union[np.ndarray, pd.Series]] = None,
-        group_sizes: Optional[Union[np.ndarray, list[int]]] = None,
-        priors: Optional[dict] = None,
-        robust: bool = False,
-        **design,
+        unit_effects: Optional[str] = None,
+        unit_col: Optional[str] = None,
+        units=None,
+        **kwargs,
     ):
-        self._resolve_design(
-            dict(
-                design,
-                group_effects=group_effects,
-                group_col=group_col,
-                groups=groups,
-                group_sizes=group_sizes,
-            )
+        design, rest = self._resolve_design(
+            dict(kwargs, unit_effects=unit_effects, unit_col=unit_col, units=units)
         )
+        if design == "random":
+            self._init_unit_effects(formula, data, y, X, W, **rest)
+        else:
+            super().__init__(
+                formula, data, y, X, W, unit_effects=unit_effects, **kwargs
+            )
+
+    @classmethod
+    def _resolve_design(cls, kw: dict) -> tuple[str, dict]:
+        """The latent SEM, or ``"random"``: random unit effects over repeated observations."""
+        name = cls.__name__
+        unit_col, units = kw.pop("unit_col", None), kw.pop("units", None)
+        if kw.get("unit_effects") != "random":
+            if unit_col is not None or units is not None:
+                raise ValueError(
+                    "unit_col and units index random unit effects; pass "
+                    "unit_effects='random'."
+                )
+            return super()._resolve_design(kw)
+        _, time, dynamic = _pop_design(kw)
+        if time or dynamic or _is_panel(kw) or kw.pop("latent", None):
+            raise NotImplementedError(
+                f"{name} with random unit effects is a cross-section with repeated "
+                "observations of each unit; it takes no time, dynamics or latent=."
+            )
+        if unit_col is None and units is None:
+            raise ValueError(
+                "Random unit effects need unit_col (formula mode) or units "
+                "(matrix mode)."
+            )
+        return "random", dict(kw, unit_col=unit_col, units=units)
+
+    # The one cross-section design is the latent SEM.
+    _fit_gibbs_static = LatentProbitMixin._fit_gibbs_latent
+    _build_pymc_model_static = LatentProbitMixin._build_pymc_model_latent
+    _fitted_probabilities_static = LatentProbitMixin._fitted_probabilities_latent
+    _fitted_mean_from_posterior_static = (
+        LatentProbitMixin._fitted_mean_from_posterior_latent
+    )
+
+    fit = _by_design("fit")
+    fit.__doc__ = SpatialModel.fit.__doc__
+    fit.__wrapped__ = SpatialModel.fit
+
+    def _compute_impacts_posterior(
+        self,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Direct effects ``beta`` on the latent index; no indirect effects."""
+        return self._sem_effects()
+
+    def impacts(self, return_posterior_samples: bool = False, scale: str = "index"):
+        r"""Direct, indirect and total impacts on the latent index or probability scale.
+
+        ``scale="probability"`` gives the effects on :math:`P(y_i = 1)`: for
+        the latent SEM the derivative carries the density of the propagated
+        normal disturbance at the threshold (Monte Carlo per posterior draw,
+        conditioning on all but the unit's own disturbance), with unit
+        effects the average marginal effect :math:`\phi(x_j'\beta +
+        c_{u(j)})\beta_k`.  ``"index"`` gives :math:`\beta` on the latent
+        index.  Neither has an indirect part.
+        """
+        if self._design == "random" and scale == "probability":
+            self._require_fit()
+            return self._effects_frame(
+                *self._unit_effects_ame(),
+                return_posterior_samples=return_posterior_samples,
+                scale=scale,
+            )
+        return self._latent_impacts(scale, return_posterior_samples)
+
+    # ------------------------------------------------------------------
+    # The SEM probit with random unit effects
+    # ------------------------------------------------------------------
+
+    def _init_unit_effects(
+        self, formula, data, y, X, W, *, unit_col, units, priors=None, robust=False,
+        **unknown,
+    ):  # fmt: skip
+        """Construct the random-unit-effects design (see the class)."""
+        name = type(self).__name__
+        if unknown:
+            raise TypeError(f"{name} got unexpected arguments {sorted(unknown)}.")
+        if robust:
+            raise NotImplementedError(f"robust=True is not supported for {name}.")
         if W is None:
             raise ValueError("W is required.")
-
-        # Resolve typed priors.
-        self.priors_obj = resolve_priors(priors, SARProbitPriors)
+        self._set_design("random")
+        self.priors_obj = resolve_priors(priors, self._priors_cls)
         self.priors = priors_as_dict(self.priors_obj)
-        self.robust = robust
+        self.robust = False
         self._idata: Optional[xr.DataTree] = None
         self._pymc_model: Optional[pm.Model] = None
 
-        self._W_dense = self._as_dense_region_W(W)
+        self._W_dense = self._as_dense_unit_W(W)
         self._m = self._W_dense.shape[0]
-        # The weights matrix is group-level (m x m), not observation-level;
-        # inherited observation-level W machinery (spatial_diagnostics, ...)
-        # is not applicable and _require_W raises cleanly.
+        # W is over the units, not the observations: the observation-level W
+        # machinery (spatial_diagnostics, ...) does not apply, and _require_W
+        # raises cleanly.
         self._W_sparse = None
 
         if formula is not None:
             if data is None:
                 raise ValueError("data is required when using formula mode.")
-            if group_col is None:
-                raise ValueError("group_col is required when using formula mode.")
+            if unit_col is None:
+                raise ValueError("unit_col is required when using formula mode.")
             self._y, self._X, self._feature_names = self._parse_formula(formula, data)
-            region_series = data[group_col]
-            # pd.factorize returns (codes, uniques)
-            codes, uniques = pd.factorize(region_series, sort=False)
-            self._region_codes = codes.astype(int)
-            self._region_names = [str(v) for v in uniques.tolist()]
+            unit_ids = data[unit_col]
         elif y is not None and X is not None:
+            if units is None:
+                raise ValueError("units is required in matrix mode.")
             self._y, self._X, self._feature_names = self._parse_matrices(y, X)
-            self._region_codes, self._region_names = self._parse_regions(
-                nobs=self._X.shape[0],
-                groups=groups,
-                group_sizes=group_sizes,
-            )
+            unit_ids = np.asarray(units)
+            if unit_ids.shape[0] != self._X.shape[0]:
+                raise ValueError("units must have one entry per observation.")
         else:
             raise ValueError(
-                "Provide either (formula, data, group_col) or "
-                "(y, X, groups or group_sizes)."
+                "Provide either (formula, data, unit_col) or (y, X, units)."
             )
+        codes, uniques = pd.factorize(unit_ids, sort=False)
+        self._unit_codes = codes.astype(int)
+        self._unit_names = [str(v) for v in uniques.tolist()]
 
         # Shared parsers keep y as passed; flatten possible (n, 1) columns.
         self._y = np.asarray(self._y, dtype=np.float64).reshape(-1)
-
         if self._X.shape[0] != self._y.shape[0]:
             raise ValueError("X and y must have the same number of observations.")
-
         if not np.isin(self._y, [0.0, 1.0]).all():
             raise ValueError("y must be binary with values in {0, 1}.")
-
-        if len(np.unique(self._region_codes)) != self._m:
+        if len(self._unit_names) != self._m:
             raise ValueError(
-                f"Number of observed groups ({len(np.unique(self._region_codes))}) "
-                f"must match W dimension ({self._m})."
+                f"Number of observed units ({len(self._unit_names)}) must match "
+                f"W dimension ({self._m})."
             )
-
-    @classmethod
-    def _resolve_design(cls, kw: dict) -> tuple[str, dict]:
-        """The one design: random group effects, in a cross-section."""
-        unit, time, dynamic = _pop_design(kw)
-        group_effects = kw.pop("group_effects", None)
-        if unit is not None or time or dynamic or _is_panel(kw):
-            raise NotImplementedError("SEMProbit takes group effects only.")
-        unknown = set(kw) - {"group_col", "groups", "group_sizes"}
-        if unknown:
-            raise TypeError(f"SEMProbit got unexpected arguments {sorted(unknown)}.")
-        if group_effects != "random":
-            raise NotImplementedError(
-                "The latent SEM probit is not implemented; pass group_col (or "
-                "groups) and group_effects='random' for the SEM probit with "
-                "random group effects."
-            )
-        if all(kw.get(k) is None for k in ("group_col", "groups", "group_sizes")):
-            raise ValueError(
-                "Group effects need group_col (formula mode), or groups or "
-                "group_sizes (matrix mode)."
-            )
-        return "random", kw
 
     @staticmethod
-    def _as_dense_region_W(W: Union[Graph, Any, np.ndarray]) -> np.ndarray:
+    def _as_dense_unit_W(W) -> np.ndarray:
         import scipy.sparse as sp
 
         from .._base import _check_row_standardization
@@ -236,7 +284,7 @@ class SEMProbit(SharedSpatialMethods):
         elif hasattr(W, "sparse") and hasattr(W, "transform"):
             raise TypeError(
                 "W appears to be a legacy libpysal.weights.W object. "
-                "Convert it to a libpysysal.graph.Graph first: "
+                "Convert it to a libpysal.graph.Graph first: "
                 "Graph.from_W(w), or pass w.sparse (the scipy sparse matrix) directly."
             )
         else:
@@ -245,81 +293,46 @@ class SEMProbit(SharedSpatialMethods):
                 f"got {type(W).__name__}."
             )
         if W_csr.ndim != 2 or W_csr.shape[0] != W_csr.shape[1]:
-            raise ValueError("W must be a square group-level matrix.")
-        _check_row_standardization(W_csr, stacklevel=3)
+            raise ValueError("W must be a square unit-level matrix.")
+        _check_row_standardization(W_csr, stacklevel=4)
         return W_csr.toarray()
-
-    @staticmethod
-    def _parse_regions(
-        nobs: int,
-        groups: Optional[Union[np.ndarray, pd.Series]],
-        group_sizes: Optional[Union[np.ndarray, list[int]]],
-    ) -> tuple[np.ndarray, list[str]]:
-        if groups is not None:
-            ids = np.asarray(groups)
-            if ids.shape[0] != nobs:
-                raise ValueError("groups must have one entry per observation.")
-            codes, uniques = pd.factorize(ids, sort=False)
-            return codes.astype(int), [str(v) for v in uniques.tolist()]
-
-        if group_sizes is not None:
-            counts = np.asarray(group_sizes, dtype=int).reshape(-1)
-            if counts.sum() != nobs:
-                raise ValueError(
-                    "sum(group_sizes) must equal the number of observations."
-                )
-            codes = np.repeat(np.arange(len(counts), dtype=int), counts)
-            names = [f"group_{i}" for i in range(len(counts))]
-            return codes, names
-
-        raise ValueError("Provide either groups or group_sizes in matrix mode.")
 
     def _model_coords(self) -> dict[str, list[str]]:
         coords = super()._model_coords()
-        coords["group"] = list(self._region_names)
+        if self._design == "random":
+            coords["unit"] = list(self._unit_names)
         return coords
 
-    def _build_pymc_model(self) -> pm.Model:
-        k = self._X.shape[1]
-        if k == 0:
+    def _build_pymc_model_random(self) -> pm.Model:
+        if self._X.shape[1] == 0:
             raise ValueError("X must contain at least one predictor.")
-
-        rho_lower = self.priors.get("lam_lower", -0.95)
-        rho_upper = self.priors.get("lam_upper", 0.95)
+        lam_lower = self.priors.get("lam_lower", -0.95)
+        lam_upper = self.priors.get("lam_upper", 0.95)
         beta_mu, beta_sigma = self._resolved_beta_prior(link="probit")
-        sigma_a_sigma = self.priors.get("group_effect_sd_sigma", 2.0)
-
-        if self.robust:
-            raise NotImplementedError(
-                "Robust (Student-t) error distribution is not supported for "
-                "SEMProbit. The probit link function uses a Normal CDF; "
-                "a robust version would require a t-link (Student-t CDF) which "
-                "is not yet implemented. Use robust=True with Gaussian models "
-                "(OLS, SAR, SEM, etc.) instead."
-            )
+        sd_sigma = self.priors.get("unit_effect_sd_sigma", 2.0)
 
         W_pt = pt.as_tensor_variable(self._W_dense)
         I_pt = pt.eye(self._m)
 
         with pm.Model(coords=self._model_coords()) as model:
-            rho = pm.Uniform("lam", lower=rho_lower, upper=rho_upper)
+            lam = pm.Uniform("lam", lower=lam_lower, upper=lam_upper)
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            sigma_a = pm.HalfNormal("group_effect_sd", sigma=sigma_a_sigma)
+            sd = pm.HalfNormal("unit_effect_sd", sigma=sd_sigma)
 
-            a_raw = pm.Normal("group_effect_raw", mu=0.0, sigma=1.0, dims="group")
-            a = pm.Deterministic(
-                "group_effect",
-                pt.linalg.solve(I_pt - rho * W_pt, sigma_a * a_raw),
-                dims="group",
+            c_raw = pm.Normal("unit_effect_raw", mu=0.0, sigma=1.0, dims="unit")
+            c = pm.Deterministic(
+                "unit_effect",
+                pt.linalg.solve(I_pt - lam * W_pt, sd * c_raw),
+                dims="unit",
             )
 
-            eta = pt.dot(self._X, beta) + a[self._region_codes]
+            eta = pt.dot(self._X, beta) + c[self._unit_codes]
             p = pm.Deterministic("p", 0.5 * (1.0 + pt.erf(eta / np.sqrt(2.0))))
             pm.Bernoulli("obs", p=p, observed=self._y)
 
         return model
 
-    def fit(
+    def _fit_random(
         self,
         draws: int = 2000,
         tune: int = 1000,
@@ -330,15 +343,15 @@ class SEMProbit(SharedSpatialMethods):
         backend: str | None = None,
         **sample_kwargs,
     ) -> xr.DataTree:
-        """Draw samples from the posterior with NUTS (``backend`` as in
-        :meth:`~neighbayes.models.base.SpatialModel.fit`)."""
+        """Draw samples from the posterior with NUTS."""
         if sampler not in (None, "nuts"):
             raise NotImplementedError(
-                "SEMProbit has no Gibbs sampler; use sampler='nuts'."
+                "The SEM probit with random unit effects has no Gibbs sampler; "
+                "use sampler='nuts'."
             )
         nuts_sampler = select_backend("nuts", backend, sample_kwargs)
         target_accept = sample_kwargs.pop("target_accept", 0.9)
-        model = self._build_pymc_model()
+        model = self._build_pymc_model_random()
         self._pymc_model = model
         if "idata_kwargs" in sample_kwargs:
             sample_kwargs["idata_kwargs"] = prepare_idata_kwargs(
@@ -358,26 +371,14 @@ class SEMProbit(SharedSpatialMethods):
             )
         return self._idata
 
-    @property
-    def pymc_model(self) -> Optional[pm.Model]:
-        """Return the PyMC model object built for the most recent fit.
-
-        Returns
-        -------
-        pymc.Model or None
-            The model object used by :meth:`fit`, or ``None`` if the instance
-            has not been fit yet.
-        """
-        return self._pymc_model
-
     @staticmethod
     def _rename_summary_index(summary_df: pd.DataFrame) -> pd.DataFrame:
-        # Shared version strips beta[...]; additionally relabel the group
-        # effects group_effect[...] -> group_effect:...
-        out = SharedSpatialMethods._rename_summary_index(summary_df)
-        pre = "group_effect["
+        # The shared version strips beta[...]; also relabel the unit effects
+        # unit_effect[...] -> unit_effect:...
+        out = SpatialModel._rename_summary_index(summary_df)
+        pre = "unit_effect["
         out.index = [
-            f"group_effect:{label[len(pre) : -1]}"
+            f"unit_effect:{label[len(pre) : -1]}"
             if label.startswith(pre) and label.endswith("]")
             else label
             for label in out.index.astype(str)
@@ -385,140 +386,33 @@ class SEMProbit(SharedSpatialMethods):
         return out
 
     def random_effects_mean(self) -> pd.Series:
-        """Return the posterior mean group effects."""
+        """The posterior mean unit effects (``unit_effects="random"``)."""
+        if self._design != "random":
+            raise ValueError("random_effects_mean needs unit_effects='random'.")
         self._require_fit()
-        amean = self._idata.posterior["group_effect"].mean(("chain", "draw")).to_numpy()
-        return pd.Series(amean, index=self._region_names, name="group_effect_mean")
+        c = self._idata.posterior["unit_effect"].mean(("chain", "draw")).to_numpy()
+        return pd.Series(c, index=self._unit_names, name="unit_effect_mean")
 
-    def fitted_probabilities(self) -> np.ndarray:
-        """Return posterior mean fitted probabilities for observed data."""
+    def _fitted_probabilities_random(self) -> np.ndarray:
+        """The posterior mean of each observation's ``P(y = 1)``."""
         self._require_fit()
         p = self._idata.posterior["p"].mean(("chain", "draw")).to_numpy()
         return np.asarray(p, dtype=float)
 
-    def impacts(
-        self,
-        return_posterior_samples: bool = False,
-    ) -> Union[pd.DataFrame, tuple[pd.DataFrame, dict[str, np.ndarray]]]:
-        r"""Compute average marginal effects (AME) for the spatial probit model.
+    _fitted_mean_from_posterior_random = _fitted_probabilities_random
 
-        For the spatial probit with SAR regional random effects
-
-        .. math::
-
-            z_i = x_i'\beta + a_{r(i)} + \varepsilon_i,
-            \quad a = \lambda W a + u,
-
-        the marginal effect of covariate :math:`k` on the choice
-        probability is
-
-        .. math::
-
-            \frac{\partial P(y_i=1)}{\partial x_{ik}}
-            = \phi(x_i'\beta + a_{r(i)}) \, \beta_k,
-
-        where :math:`\phi(\cdot)` is the standard-normal PDF.
-
-        Because the spatial autoregression enters only through the
-        unobserved regional effects :math:`a` (not through a spatial
-        multiplier on :math:`x`), there is **no indirect effect** of
-        :math:`x_j` on :math:`y_i` for :math:`i \neq j`.  The
-        ``indirect`` column is therefore zero and ``total`` equals
-        ``direct``.
-
-        Parameters
-        ----------
-        return_posterior_samples : bool, default False
-            If ``True``, also return a dict of posterior draws for
-            each effect type.
-
-        Returns
-        -------
-        pandas.DataFrame
-            One row per non-intercept covariate with columns
-            ``direct``, ``direct_ci_lower``, ``direct_ci_upper``,
-            ``direct_pvalue``, ``indirect_*``, ``total_*``.
-        dict, optional
-            Only returned when ``return_posterior_samples=True``.
-            Keys: ``direct_samples``, ``indirect_samples``,
-            ``total_samples``.
-        """
-        import scipy.stats as st
-
-        self._require_fit()
+    def _unit_effects_ame(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        r"""Average marginal effects :math:`\overline{\phi(x_j'\beta + c_{u(j)})}\,\beta_k`."""
         post = self._idata.posterior
-        beta_draws = post["beta"].stack(samples=("chain", "draw")).values.T
-        a_draws = post["group_effect"].stack(samples=("chain", "draw")).values.T
-        n_draws = beta_draws.shape[0]
+        beta = post["beta"].stack(samples=("chain", "draw")).values.T
+        c = post["unit_effect"].stack(samples=("chain", "draw")).values.T
+        ni = self._nonintercept_indices
+        eta = beta @ self._X.T + c[:, self._unit_codes]
+        density = np.exp(-0.5 * eta * eta) / np.sqrt(2.0 * np.pi)
+        direct = density.mean(axis=1)[:, None] * beta[:, ni]
+        return direct, np.zeros_like(direct), direct.copy()
 
-        # Identify non-intercept columns
-        ni = [
-            i
-            for i, name in enumerate(self._feature_names)
-            if name not in ("Intercept", "1", "intercept")
-        ]
-        if not ni:
-            ni = list(range(len(self._feature_names)))
-        names = [self._feature_names[i] for i in ni]
 
-        n_eff = len(ni)
-
-        direct_samples = np.empty((n_draws, n_eff), dtype=np.float64)
-
-        for g in range(n_draws):
-            beta_g = beta_draws[g]
-            a_g = a_draws[g]
-            # Linear predictor for each observation (using region-level a)
-            z_g = self._X @ beta_g + a_g[self._region_codes]
-            # Standard-normal PDF evaluated at z_g
-            pdf_g = st.norm.pdf(z_g)
-            # Average marginal effect per covariate
-            direct_samples[g] = np.mean(pdf_g[:, None] * self._X[:, ni], axis=0)
-
-        indirect_samples = np.zeros_like(direct_samples)
-        total_samples = direct_samples.copy()
-
-        def _summarize(samples: np.ndarray) -> dict[str, np.ndarray]:
-            return {
-                "mean": np.mean(samples, axis=0),
-                "ci_lower": np.percentile(samples, 2.5, axis=0),
-                "ci_upper": np.percentile(samples, 97.5, axis=0),
-                "pvalue": 2.0
-                * np.minimum(
-                    np.mean(samples > 0, axis=0),
-                    np.mean(samples < 0, axis=0),
-                ),
-            }
-
-        d = _summarize(direct_samples)
-        i = _summarize(indirect_samples)
-        t = _summarize(total_samples)
-
-        df = pd.DataFrame(
-            {
-                "direct": d["mean"],
-                "direct_ci_lower": d["ci_lower"],
-                "direct_ci_upper": d["ci_upper"],
-                "direct_pvalue": d["pvalue"],
-                "indirect": i["mean"],
-                "indirect_ci_lower": i["ci_lower"],
-                "indirect_ci_upper": i["ci_upper"],
-                "indirect_pvalue": i["pvalue"],
-                "total": t["mean"],
-                "total_ci_lower": t["ci_lower"],
-                "total_ci_upper": t["ci_upper"],
-                "total_pvalue": t["pvalue"],
-            },
-            index=names,
-        )
-        df.attrs["model_type"] = self.__class__.__name__
-        df.attrs["n_draws"] = n_draws
-
-        if return_posterior_samples:
-            samples_dict = {
-                "direct_samples": direct_samples,
-                "indirect_samples": indirect_samples,
-                "total_samples": total_samples,
-            }
-            return df, samples_dict
-        return df
+SEMProbit.__signature__ = _constructor_signature(
+    BinaryDesigns.__init__, extra=("units",)
+)

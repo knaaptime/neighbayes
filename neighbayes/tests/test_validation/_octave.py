@@ -155,12 +155,25 @@ end;
 """
 
 
+NORMPDF_SHIM = """function p = normpdf(x, mu, sigma)
+% The normal density, for the toolbox's probit effects.  MATLAB ships
+% normpdf in its Statistics Toolbox, Octave in its separately installed
+% statistics package; the harness supplies the one function rather than the
+% package.
+  if nargin < 2, mu = 0; end;
+  if nargin < 3, sigma = 1; end;
+  p = exp(-0.5 * ((x - mu) ./ sigma) .^ 2) ./ (sqrt(2 * pi) .* sigma);
+end;
+"""
+
+
 def write_shims(workdir: Path) -> Path:
     """Write the harness shims into ``workdir/shims`` and return that dir."""
     shims = workdir / "shims"
     shims.mkdir(parents=True, exist_ok=True)
     (shims / "fminbnd.m").write_text(FMINBND_SHIM)
     (shims / "waitbar.m").write_text(WAITBAR_SHIM)
+    (shims / "normpdf.m").write_text(NORMPDF_SHIM)
     return shims
 
 
@@ -202,6 +215,148 @@ def gauss_driver(
         seed=seed,
         prefix=prefix,
     )
+
+
+PANEL_DRIVER = (
+    TOOLBOX_PATHS
+    + "load('y.txt');\n"
+    + "load('X.txt');\n"
+    + "load('W.txt');\n"
+    + "x = X;\n"
+    + "rand('state', {seed});\n"
+    + "randn('state', {seed});\n"
+    + "prior.model = 1;\n"  # unit fixed effects
+    + "prior.novi_flag = 1;\n"
+    + "prior.lflag = 0;\n"
+    + "res = sar_panel_FE_g(y, x, W, {T}, {ndraw}, {nomit}, prior);\n"
+    + _dump_lines("res.pdraw", "{prefix}_rho.txt")
+    + _dump_matrix("res.bdraw", "{prefix}_beta.txt")
+    + _dump_lines("res.sdraw", "{prefix}_sige.txt")
+    + "fprintf('METH %s\\n', res.meth);\n"
+)
+
+
+def panel_driver(
+    toolbox: Path,
+    workdir: Path,
+    T: int,
+    ndraw: int,
+    nomit: int,
+    seed: int,
+    prefix: str,
+) -> str:
+    """Driver text for ``sar_panel_FE_g`` (unit effects) on the exported panel.
+
+    The data are stacked by period, units within each period, as both sides
+    expect; ``W`` is the ``N x N`` matrix, which the toolbox expands to
+    ``I_T (x) W`` itself.
+    """
+    return PANEL_DRIVER.format(
+        toolbox=toolbox,
+        shims=write_shims(workdir),
+        T=T,
+        ndraw=ndraw,
+        nomit=nomit,
+        seed=seed,
+        prefix=prefix,
+    )
+
+
+PROBIT_DRIVER = (
+    TOOLBOX_PATHS
+    + "load('y.txt');\n"
+    + "load('X.txt');\n"
+    + "load('W.txt');\n"
+    + "x = X;\n"
+    + "rand('state', {seed});\n"
+    + "randn('state', {seed});\n"
+    + "prior.eig = 0;\n"
+    + "prior.lflag = 0;\n"
+    + "res = {routine}(y, x, W, {ndraw}, {nomit}, prior);\n"
+    + _dump_lines("res.pdraw", "{prefix}_rho.txt")
+    + _dump_matrix("res.bdraw", "{prefix}_beta.txt")
+    + "fprintf('METH %s\\n', res.meth);\n"
+)
+
+
+def probit_driver(
+    routine: str,
+    toolbox: Path,
+    workdir: Path,
+    ndraw: int,
+    nomit: int,
+    seed: int,
+    prefix: str,
+) -> str:
+    """Driver text for ``sarp_g`` (or its repair) on the exported binary dataset."""
+    return PROBIT_DRIVER.format(
+        toolbox=toolbox,
+        shims=write_shims(workdir),
+        routine=routine,
+        ndraw=ndraw,
+        nomit=nomit,
+        seed=seed,
+        prefix=prefix,
+    )
+
+
+# ``sarp_g`` as shipped does not sample the SAR probit posterior; three
+# repairs make it do so, each measured against neighbayes and against a plain
+# full-conditional Gibbs sampler (wiki: lesage-toolbox-validation).
+#
+# 1. Stale deviations.  The sweep keeps z = y* - mu between iterations while
+#    mu = (I - rho W)^-1 X beta changes, so each single-site pass starts from
+#    utilities shifted by mu_new - mu_old.  Recentring z on the stored
+#    utilities first restores the Gibbs step; without it the beta posterior
+#    is about 12% too wide.
+# 2. Step order.  beta is drawn given the current rho, then rho with beta
+#    integrated out, then the utilities given that beta and the new rho.  After
+#    a draw that integrates beta out, beta must be drawn again before anything
+#    conditions on it (van Dyk & Park 2008); the rho draw moves ahead.
+# 3. The rho conditional is sar_g's, which integrates out an error variance
+#    (|A| e(rho)^-(n-k)/2) the probit fixes at one (|A| exp(-e(rho)/2)).
+#
+# The repaired copy is written into the work directory from the served file,
+# nothing else changed; each anchor must match exactly once.
+_SARP_G = Path("spatial") / "sar_models" / "sarp_g.m"
+SARP_G_REPAIRED = "sarp_g_repaired"
+
+
+def write_sarp_g_repaired(toolbox: Path, workdir: Path) -> str:
+    """Write ``sarp_g`` with its sweep repaired as ``workdir/sarp_g_repaired.m``.
+
+    Returns the routine's name for :func:`probit_driver`.
+    """
+    lines = (toolbox / _SARP_G).read_text().replace("\r\n", "\n").split("\n")
+
+    def only(match, what):
+        hits = [i for i, line in enumerate(lines) if match(line.strip())]
+        if len(hits) != 1:
+            raise ValueError(f"sarp_g.m: {len(hits)} lines match the {what} anchor")
+        return hits[0]
+
+    # 1. recentre the deviations on the stored utilities before each pass
+    sweep = only(lambda s: s == "for initer=1:nsample;", "latent-sweep")
+    lines.insert(sweep, "          if iter > 1, z = y - mu; end;")
+    # 2. draw rho, then beta given it
+    beta_from = only(lambda s: s == "% update beta", "beta-draw start")
+    beta_to = only(lambda s: s == "xb = x*bhat;", "beta-draw end")
+    rho_from = only(
+        lambda s: "numerical integration to perform rho-draw" in s, "rho-draw start"
+    )
+    rho_to = only(lambda s: s.startswith("rho = draw_rho("), "rho-draw end")
+    if not beta_from < beta_to < rho_from < rho_to < sweep:
+        raise ValueError("sarp_g.m: the sweep's steps are not in the expected order")
+    lines[beta_from : rho_to + 1] = (
+        lines[rho_from : rho_to + 1] + lines[beta_from : beta_to + 1]
+    )
+    # 3. the probit's rho conditional, variance one
+    profile = only(lambda s: s == "z = -nmk*log(z);", "rho-conditional")
+    lines[profile] = lines[profile].replace("-nmk*log(z)", "-0.5*z")
+    header = only(lambda s: s.startswith("function results = sarp_g("), "header")
+    lines[header] = lines[header].replace("sarp_g(", f"{SARP_G_REPAIRED}(", 1)
+    (workdir / f"{SARP_G_REPAIRED}.m").write_text("\n".join(lines))
+    return SARP_G_REPAIRED
 
 
 QUALIFICATION_DRIVER = (
@@ -258,14 +413,17 @@ def write_ascii(dataset: dict, workdir: Path) -> None:
         np.savetxt(workdir / name, arr, fmt="%.17e")
 
 
-def load_draws(workdir: Path, prefix: str) -> dict:
-    """Read back the toolbox's posterior draws as flat arrays."""
-    out = {}
-    for key, name in (
-        ("rho", f"{prefix}_rho.txt"),
-        ("beta", f"{prefix}_beta.txt"),
-        ("sige", f"{prefix}_sige.txt"),
-    ):
-        arr = np.atleast_2d(np.loadtxt(workdir / name))
-        out[key] = arr[0] if arr.shape[0] == 1 and key != "beta" else arr
-    return out
+def load_draws(
+    workdir: Path, prefix: str, keys: tuple[str, ...] = ("rho", "beta", "sige")
+) -> dict:
+    """Read back the toolbox's posterior draws.
+
+    ``beta`` comes back as ``(draws, k)`` (one row per draw, also for a single
+    regressor), the scalar parameters as ``(draws,)``.
+    """
+    return {
+        key: np.loadtxt(
+            workdir / f"{prefix}_{key}.txt", ndmin=2 if key == "beta" else 1
+        )
+        for key in keys
+    }

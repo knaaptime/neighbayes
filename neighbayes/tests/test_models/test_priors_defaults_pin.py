@@ -9,12 +9,12 @@ Note the deliberate entanglement this captures — it is why the priors do not
 factor into three orthogonal axes:
 
 * ``rho``/``lam`` bounds differ by likelihood and static/dynamic:
-  SAR ``[-1, 1]``, SEMProbit ``[-0.95, 0.95]``, SARLogit ``[-0.999, 0.999]``,
+  SAR ``[-1, 1]``, SEMProbitRE ``[-0.95, 0.95]``, SARLogit ``[-0.999, 0.999]``,
   PanelSARDynamic ``[-0.95, 0.95]``.
 * ``beta`` defaults are data-scaled (omitted) for every family, resolved on
   the link scale (identity, log, logit or probit) at fit time.
 * the noise block differs: Gaussian/NB/Tobit carry ``sigma2_alpha``;
-  SEMProbit carries ``group_effect_sd_sigma``; Logit carries neither.
+  SEMProbitRE carries ``unit_effect_sd_sigma``; Logit carries neither.
 """
 
 from __future__ import annotations
@@ -95,10 +95,18 @@ EXPECTED: dict[str, dict[str, float]] = {
         "rho_lower": -1.0,
         "rho_upper": 1.0,
     },
-    "SARProbitPriors": {
+    "SEMProbitREPriors": {
         "lam_lower": -0.95,
         "lam_upper": 0.95,
-        "group_effect_sd_sigma": 2.0,
+        "unit_effect_sd_sigma": 2.0,
+    },
+    "SARProbitPriors": {
+        "rho_lower": -0.999,
+        "rho_upper": 0.999,
+    },
+    "SEMProbitPriors": {
+        "lam_lower": -0.999,
+        "lam_upper": 0.999,
     },
     "SARLogitPriors": {
         "rho_lower": -0.999,
@@ -233,7 +241,7 @@ _GIBBS_PRIOR_STRUCTS = {
     "ReducedGibbsPriors",
     "FlowReducedGibbsPriors",
     "ZINBGibbsPriors",
-    "LogitGibbsPriors",
+    "BinaryGibbsPriors",
     "REGibbsPriors",
 }
 

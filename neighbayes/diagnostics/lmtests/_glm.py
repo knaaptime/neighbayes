@@ -1,4 +1,4 @@
-r"""GLM helpers for the Bayesian LM tests of the logit and NB families.
+r"""GLM helpers for the Bayesian LM tests of the logit, probit and NB families.
 
 Score quantities
 ----------------
@@ -6,21 +6,25 @@ The score tests of the latent SAR and SEM (Knaap, esda_triad) are built from
 per-unit quantities at the restricted fit's linear predictor :math:`\eta_i`,
 with the units independent under the null:
 
-=========  ==========================================  =========================================
-quantity   logit                                       NB2 (:math:`\mu = e^\eta`, dispersion r)
-=========  ==========================================  =========================================
-``e``      :math:`y_i - p_i`                           :math:`r(y_i - \mu_i)/(r + \mu_i)`
-``omega``  :math:`p_i(1 - p_i)`                        :math:`r\mu_i/(r + \mu_i)`
-``h``      :math:`E[\varepsilon_i \mid y_i]`           :math:`\psi(r + y_i) - \log(r + \mu_i) - \psi(r) + \log r`
-``tau``    :math:`\mathrm{Var}(h_i)`                   summed over the NB2 mass function
-``kappa``  :math:`\mathrm{Cov}(e_i, h_i)`              summed over the NB2 mass function
-=========  ==========================================  =========================================
+=========  =================================  =================================================  ==========================================================
+quantity   logit                              probit (:math:`\phi_i, \Phi_i` at :math:`\eta_i`)  NB2 (:math:`\mu = e^\eta`, dispersion r)
+=========  =================================  =================================================  ==========================================================
+``e``      :math:`y_i - p_i`                  :math:`\lambda_i`, the generalized residual        :math:`r(y_i - \mu_i)/(r + \mu_i)`
+``omega``  :math:`p_i(1 - p_i)`               :math:`\phi_i^2/(\Phi_i(1 - \Phi_i))`              :math:`r\mu_i/(r + \mu_i)`
+``h``      :math:`E[\varepsilon_i \mid y_i]`  :math:`\lambda_i`                                  :math:`\psi(r + y_i) - \log(r + \mu_i) - \psi(r) + \log r`
+``tau``    :math:`\mathrm{Var}(h_i)`          ``omega``                                          summed over the NB2 mass function
+``kappa``  :math:`\mathrm{Cov}(e_i, h_i)`     ``omega``                                          summed over the NB2 mass function
+=========  =================================  =================================================  ==========================================================
 
 ``e`` is the score residual (the derivative of the unit's log-likelihood in
 its linear predictor), ``omega`` its Fisher information, ``h`` the predicted
-disturbance: the logistic disturbance for the logit and the log of the gamma
-heterogeneity for the NB.  :func:`score_units` returns the per-draw pair
-``(e, h)``; :func:`information_units` the moments ``(omega, tau, kappa)``.
+disturbance: the logistic disturbance for the logit, the normal one for the
+probit, and the log of the gamma heterogeneity for the NB.  The probit's
+generalized residual :math:`\lambda_i = E[\varepsilon_i \mid y_i]` is
+:math:`\phi_i/\Phi_i` when :math:`y_i = 1` and :math:`-\phi_i/(1 - \Phi_i)`
+when :math:`y_i = 0`, both its score residual and its predicted disturbance.
+:func:`score_units` returns the per-draw pair ``(e, h)``;
+:func:`information_units` the moments ``(omega, tau, kappa)``.
 
 Pólya–Gamma working residuals
 -----------------------------
@@ -36,7 +40,9 @@ linear predictor:
 Conditional on :math:`\omega`, this is a weighted Gaussian regression with
 pseudo-outcome :math:`\tilde z_i = \kappa_i/\omega_i` and weights
 :math:`\Omega = \mathrm{diag}(\omega_i)`, which the Moran diagnostic on working
-residuals uses.  :math:`\omega` is replaced by its conditional mean given the
+residuals uses.  The probit has no Pólya–Gamma form; its working response is
+the Fisher-scoring one, :math:`\tilde z_i = \eta_i + e_i/\omega_i` with the
+Fisher weights.  :math:`\omega` is replaced by its conditional mean given the
 draw,
 
 .. math::
@@ -54,7 +60,7 @@ are not the Fisher information, so the score tests do not use them.
 from __future__ import annotations
 
 import numpy as np
-from scipy.special import digamma, expit, gammaln
+from scipy.special import digamma, expit, gammaln, log_ndtr
 
 from .core import _get_posterior_draws
 
@@ -64,14 +70,14 @@ from .core import _get_posterior_draws
 
 
 def glm_family(model) -> str:
-    """``"logit"`` or ``"negbin"``, from the model's likelihood."""
+    """``"logit"``, ``"probit"`` or ``"negbin"``, from the model's likelihood and link."""
     likelihood = getattr(model, "_likelihood", "")
     if likelihood == "binary":
-        return "logit"
+        return model._link
     if likelihood == "count":
         return "negbin"
     raise NotImplementedError(
-        f"GLM LM tests are implemented for the logit and NB families; "
+        f"GLM LM tests are implemented for the logit, probit and NB families; "
         f"{type(model).__name__} has likelihood {likelihood!r}."
     )
 
@@ -103,6 +109,12 @@ def _logit_gap(eta: np.ndarray) -> np.ndarray:
     return _logistic_upper_mean(-eta) + _logistic_upper_mean(eta)
 
 
+def _probit_parts(eta: np.ndarray):
+    """``log phi``, ``log Phi`` and ``log(1 - Phi)`` at ``eta``, in log space."""
+    log_phi = -0.5 * eta * eta - 0.5 * np.log(2.0 * np.pi)
+    return log_phi, log_ndtr(eta), log_ndtr(-eta)
+
+
 def score_units(family: str, y: np.ndarray, eta: np.ndarray, r=None):
     """Score residual ``e`` and predicted disturbance ``h`` at ``eta``.
 
@@ -111,6 +123,10 @@ def score_units(family: str, y: np.ndarray, eta: np.ndarray, r=None):
     if family == "logit":
         e = y - expit(eta)
         return e, e * _logit_gap(eta)
+    if family == "probit":
+        log_phi, log_P, log_Q = _probit_parts(eta)
+        lam = np.where(y == 1.0, np.exp(log_phi - log_P), -np.exp(log_phi - log_Q))
+        return lam, lam
     mu = np.exp(eta)
     e = r * (y - mu) / (r + mu)
     h = digamma(r + y) - np.log(r + mu) - digamma(r) + np.log(r)
@@ -168,6 +184,10 @@ def information_units(family: str, eta: np.ndarray, r=None):
         v = p * (1.0 - p)
         gap = _logit_gap(eta)
         return v, gap**2 * v, gap * v
+    if family == "probit":
+        log_phi, log_P, log_Q = _probit_parts(eta)
+        omega = np.exp(2.0 * log_phi - log_P - log_Q)
+        return omega, omega, omega
     mu = np.exp(eta)
     var_d, cov_yd = _nb_digamma_moments(mu, r)
     return r * mu / (r + mu), var_d, r / (r + mu) * cov_yd
@@ -243,6 +263,28 @@ def _logit_working_response(
     return z_tilde, e_tilde, omega
 
 
+def _probit_working_response(
+    model, beta_draws: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    r"""Fisher-scoring working response, residual and weights for a probit model.
+
+    Returns
+    -------
+    z_tilde : (draws, n) array
+        :math:`\eta_i + e_i/\omega_i`, :math:`e` the score residual.
+    e_tilde : (draws, n) array
+        Working residual :math:`e_i/\omega_i`.
+    omega : (draws, n) array
+        The Fisher weight :math:`\phi_i^2/(\Phi_i(1 - \Phi_i))`.
+    """
+    y = np.asarray(model._y, dtype=np.float64)
+    eta = _glm_eta_draws(model, beta_draws)
+    e, _ = score_units("probit", y, eta)
+    omega, _, _ = information_units("probit", eta)
+    e_tilde = e / omega
+    return eta + e_tilde, e_tilde, omega
+
+
 def _negbin_working_response(
     model, beta_draws: np.ndarray, alpha_draws: np.ndarray
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -278,9 +320,12 @@ def _negbin_working_response(
 def glm_working_response(
     model, beta_draws: np.ndarray, idata
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """The PG working response, residual and weights for the model's family."""
-    if glm_family(model) == "logit":
+    """The working response, residual and weights for the model's family."""
+    family = glm_family(model)
+    if family == "logit":
         return _logit_working_response(model, beta_draws)
+    if family == "probit":
+        return _probit_working_response(model, beta_draws)
     alpha_draws = nb_dispersion_draws(model, idata, beta_draws.shape[0])
     return _negbin_working_response(model, beta_draws, alpha_draws)
 

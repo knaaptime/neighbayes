@@ -19,7 +19,7 @@ def test_one_simulator_per_public_class():
     import neighbayes.models as m
 
     classes = {n for n in m.__all__ if n != "Level"}
-    assert len(d.__all__) == len(classes) == 31
+    assert len(d.__all__) == len(classes) == 34
 
 
 def test_signature_shows_design_arguments():
@@ -120,7 +120,18 @@ REFUSALS = [
         NotImplementedError,
         "restricted",
     ),
-    (d.simulate_sem_probit, {"n_side": 3}, NotImplementedError, "latent SEM probit"),
+    (
+        d.simulate_sem_probit,
+        {"n_side": 3, "unit_effect_sd": 0.5},
+        ValueError,
+        "needs unit_effects",
+    ),
+    (
+        d.simulate_sar_probit,
+        {"n_side": 3, "unit_effects": "random"},
+        NotImplementedError,
+        "no unit effects",
+    ),
     (d.simulate_zinb, {"n_side": 4}, NotImplementedError, "panels only"),
     (d.simulate_negbin, {"rho": 0.3}, TypeError, "no spatial dependence"),
     (d.simulate_ols_flow, {"separable": True}, ValueError, "no spatial dependence"),

@@ -3,8 +3,8 @@ r"""The latent SAR, SEM and SDEM families: sampling and the latent index.
 A latent model propagates the family's own disturbance through the spatial
 filter, :math:`A\eta = X\beta + \varepsilon` (SAR) or :math:`A(\eta - X\beta)
 = \varepsilon` (SEM), with :math:`A = I - \rho W`: the logit's logistic
-(:mod:`._latent_logit`) and the negative binomial's log-gamma
-(:mod:`._latent_negbin`).  The family supplies its Gibbs priors, samplers,
+and the probit's normal (:mod:`._latent_binary`) and the negative binomial's
+log-gamma (:mod:`._latent_negbin`).  The family supplies its Gibbs priors, samplers,
 disturbance draws and summaries; :class:`LatentMixin` runs the chains, builds
 the posterior and simulates the index.
 
@@ -45,14 +45,16 @@ class LatentMixin:
     """Gibbs fit and latent-index simulation of a latent model.
 
     The host sets ``_latent_process`` to ``"sar"`` or ``"sem"``; the family
-    mixin sets ``_latent_chain_class``, its NumPy chain object, implements
-    :meth:`_latent_priors`, :meth:`_latent_chains_jax` and
-    :meth:`_latent_disturbances`, and names its parameters beyond the spatial
-    one and ``beta`` in ``_latent_extra``.
+    mixin sets ``_latent_chain_class``, its NumPy chain object, and
+    ``_latent_chain_kw``, the keywords both backends' chains take beyond the
+    shared ones, implements :meth:`_latent_priors`, :meth:`_latent_chains_jax`
+    and :meth:`_latent_disturbances`, and names its parameters beyond the
+    spatial one and ``beta`` in ``_latent_extra``.
     """
 
     _latent_process: str = "sar"
     _latent_extra: tuple[str, ...] = ()
+    _latent_chain_kw: dict = {}
     #: Why the family's latent model has no NUTS path.
     _latent_no_nuts: str = ""
     #: The scales impacts are reported on: the latent index and the outcome.
@@ -238,6 +240,7 @@ class LatentMixin:
                 slice_width=slice_width,
                 store_latent=log_likelihood,
                 **panel_kw,
+                **self._latent_chain_kw,
                 progressbar=progressbar,
                 probes=probes,
             )
@@ -248,6 +251,7 @@ class LatentMixin:
                 probes.initial(tune)
                 logdet = probes.period_fn()
             cls, process = self._latent_chain_class, self._latent_process
+            chain_kw = self._latent_chain_kw
 
             def make_chain(chain_rng):
                 return cls(
@@ -260,6 +264,7 @@ class LatentMixin:
                     rng=chain_rng,
                     slice_width=slice_width,
                     **panel_kw,
+                    **chain_kw,
                 )
 
             results = run_sweeps_with_midpoint(

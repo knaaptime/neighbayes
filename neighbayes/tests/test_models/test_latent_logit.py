@@ -131,7 +131,7 @@ def test_jax_backend_runs(cls, kw):
 
 def test_colour_classes_are_conditionally_independent():
     """No two utilities of one colour share a nonzero of Q = A'PA."""
-    from neighbayes.samplers.logit_latent._jax import colour_classes
+    from neighbayes.samplers.binary_latent._jax import colour_classes
 
     W = dgp.simulate_sar_logit(n_side=9, seed=0)["W_sparse"]
     colour = colour_classes(W)
@@ -148,7 +148,7 @@ def test_truncated_normal_draws(a):
     import jax
     import jax.numpy as jnp
 
-    from neighbayes.samplers.logit_latent import _jax as J
+    from neighbayes.samplers.binary_latent import _jax as J
 
     jax.config.update("jax_enable_x64", True)
     stats = pytest.importorskip("scipy.stats")

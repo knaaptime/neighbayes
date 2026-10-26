@@ -151,7 +151,7 @@ def test_nonlinear_generators_run_with_sparse_W() -> None:
     out_sar_tobit = dgp.simulate_sar_tobit(W=W, rng=rng)
     out_sem_tobit = dgp.simulate_sem_tobit(W=W, rng=rng)
     out_sdm_tobit = dgp.simulate_sdm_tobit(W=W, rng=rng)
-    out_probit = dgp.simulate_sem_probit(W=W, rng=rng, group_effects="random")
+    out_probit = dgp.simulate_sem_probit(W=W, rng=rng, unit_effects="random")
 
     for out in (out_sar_tobit, out_sem_tobit, out_sdm_tobit):
         assert "y_latent" in out and "censored_mask" in out
@@ -159,7 +159,7 @@ def test_nonlinear_generators_run_with_sparse_W() -> None:
         assert out["censored_mask"].shape == out["y"].shape
 
     assert out_probit["y"].shape[0] == out_probit["X"].shape[0]
-    assert out_probit["groups"].shape[0] == out_probit["y"].shape[0]
+    assert out_probit["units"].shape[0] == out_probit["y"].shape[0]
 
 
 def test_gdf_input_path_for_representative_generators() -> None:
@@ -177,7 +177,7 @@ def test_gdf_input_path_for_representative_generators() -> None:
 
     out_sar = dgp.simulate_sar(gdf=gdf, rng=rng)
     out_panel = dgp.simulate_sar(N=9, T=3, gdf=gdf, rng=rng, unit_effects="fixed")
-    out_probit = dgp.simulate_sem_probit(gdf=gdf, rng=rng, group_effects="random")
+    out_probit = dgp.simulate_sem_probit(gdf=gdf, rng=rng, unit_effects="random")
 
     assert isinstance(out_sar, gpd.GeoDataFrame)
     assert len(out_sar) == 9
@@ -185,7 +185,7 @@ def test_gdf_input_path_for_representative_generators() -> None:
     assert isinstance(out_panel, tuple)
     _, panel_long = out_panel
     assert panel_long["y"].shape[0] == 27
-    assert out_probit["groups"].max() == 8
+    assert out_probit["units"].max() == 8
 
 
 def test_cross_sectional_create_gdf_reuses_input_geometry() -> None:
@@ -468,10 +468,10 @@ def test_spatial_probit_err_hetero_runs() -> None:
     W = sp.csr_matrix(make_rook_W(3))
 
     out_homo = dgp.simulate_sem_probit(
-        W=W, rng=rng, err_hetero=False, group_effects="random"
+        W=W, rng=rng, err_hetero=False, unit_effects="random"
     )
     out_hetero = dgp.simulate_sem_probit(
-        W=W, rng=rng, err_hetero=True, group_effects="random"
+        W=W, rng=rng, err_hetero=True, unit_effects="random"
     )
     assert out_homo.keys() == out_hetero.keys()
     assert out_homo["y"].shape == out_hetero["y"].shape

@@ -50,7 +50,10 @@ Censored and binary
    SARLogit
    SEMLogit
    SDEMLogit
+   Probit
+   SARProbit
    SEMProbit
+   SDEMProbit
 
 Counts
 ^^^^^^
@@ -104,7 +107,7 @@ Default Gibbs Priors
    ReducedGibbsPriors
    FlowReducedGibbsPriors
    ZINBGibbsPriors
-   LogitGibbsPriors
+   BinaryGibbsPriors
    REGibbsPriors
 
 Default NUTS Priors
@@ -128,6 +131,8 @@ Default NUTS Priors
    SEMTobitPriors
    SDMTobitPriors
    SARProbitPriors
+   SEMProbitPriors
+   SEMProbitREPriors
    SARLogitPriors
    SEMLogitPriors
    PanelBasePriors
@@ -188,7 +193,7 @@ Bayesian Diagnostics
 GLM Bayesian LM Tests
 ^^^^^^^^^^^^^^^^^^^^^
 
-LM tests for the logit and NB families: the latent SAR and SEM score tests at the GLM null (Logit, NegBin), the error and WX tests at a reduced-form SAR null (SARLogit, SARNegBin), and a Moran diagnostic on Pólya–Gamma working residuals.
+LM tests for the logit, probit and NB families: the latent SAR and SEM score tests at the GLM null (Logit, Probit, NegBin), the error and WX tests at a reduced-form SAR null (SARLogit, ``SARProbit(latent=False)``, SARNegBin), and a Moran diagnostic on working residuals.
 
 .. autosummary::
    :toctree: generated/
@@ -354,7 +359,10 @@ Data Generating Processes
    simulate_sar_logit
    simulate_sem_logit
    simulate_sdem_logit
+   simulate_probit
+   simulate_sar_probit
    simulate_sem_probit
+   simulate_sdem_probit
    simulate_negbin
    simulate_sar_negbin
    simulate_sem_negbin

@@ -63,6 +63,7 @@ class Logit(BinaryDesigns, SpatialModel):
     _has_wx_in_beta: bool = False
     _gibbs_class: str | None = None
     _model_type: str = "logit"
+    _link: str = "logit"
 
     def _build_pymc_model(self) -> pm.Model:
         X = self._X

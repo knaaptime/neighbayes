@@ -4,7 +4,7 @@ The same sweep, with the log-means updated by colour class rather than one at a
 time.  The conditional of :math:`\eta_i` touches the disturbances in the rows
 of column ``i`` of :math:`A = I - \rho W`; log-means whose columns share no row
 are conditionally independent, so the latent logit's colouring
-(:func:`..logit_latent._jax.colour_classes`) splits them into classes, each
+(:func:`..binary_latent._jax.colour_classes`) splits them into classes, each
 drawn at once and the classes in turn.  A slice per lane would run as long as
 the slowest lane of its class, so a class is drawn instead by independence
 Metropolis–Hastings from a *t* at each conditional's mode (:func:`_eta_mh`),
@@ -20,7 +20,7 @@ import scipy.sparse as sp
 
 from .._utils._jax_utils import cached_sweep, probe_midpoint, run_chains_chunked
 from .._utils._latent_loglik import POISSON, TRUNCATED, UNOBSERVED
-from ..logit_latent._jax import class_table, colour_classes, column_table
+from ..binary_latent._jax import class_table, colour_classes, column_table
 from ._core import (
     _BETA_DF,
     _PAR_ACCEPT,

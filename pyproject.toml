@@ -57,7 +57,7 @@ Issues = "https://github.com/knaaptime/neighbayes/issues"
 
 [project.optional-dependencies]
 viz = ["graphviz"]
-backend = ['dm-tree', 'blackjax', 'numpyro', 'nutpie', 'equinox', 'sparsax', 'pgjax']
+backend = ['dm-tree', 'blackjax', 'numpyro', 'nutpie', 'equinox', 'sparsax', 'augax']
 cv = ["spml"]
 
 [tool.setuptools.packages.find]
@@ -68,11 +68,12 @@ neighbayes = ["py.typed", "*.pyi", "**/*.pyi"]
 
 [tool.pytest.ini_options]
 testpaths = ["neighbayes/tests"]
-addopts = "-m 'not slow'"   # run fast tests by default; use -m slow or -m '' to include all
+addopts = "-m 'not slow and not octave'"   # octave: LeSage-toolbox validation — run with -m octave after installing Octave + the toolbox
 markers = [
     "slow: marks tests as slow (MCMC parameter recovery — deselected by default)",
     "recovery: marks parameter recovery tests (fit model, assert posterior ≈ true params)",
     "requires_jax: marks tests that activate a JAX backend (gibbs_backend='jax', numpyro/blackjax NUTS) — auto-skipped on Windows",
+    "octave: marks the LeSage-toolbox validation tests (shell out to Octave, deselected by default; a bespoke Actions workflow parallel to standard CI runs them with -m octave — see wiki page lesage-toolbox-validation)",
 ]
 # The NumPy count samplers are tested on purpose; their known-bias warning
 # would otherwise fill the summary.  pytest.warns still sees it.

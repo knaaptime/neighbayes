@@ -759,11 +759,13 @@ def _sdm_tobit_spec() -> TreeNode:
     )
 
 
-def _glm_spec(family: str) -> TreeNode:
+def _glm_spec(family: str, latent_unmarked: bool = False) -> TreeNode:
     """A GLM's tests, read as a pair (:mod:`.lmtests.cross_sectional_glm`).
 
-    ``family`` is the aspatial class (``"Logit"``, ``"NegBin"``), whose SAR,
-    SEM and SDEM classes the leaves name.  At the GLM null the latent SAR's
+    ``family`` is the aspatial class (``"Logit"``, ``"Probit"``, ``"NegBin"``),
+    whose SAR, SEM and SDEM classes the leaves name; ``latent_unmarked`` says
+    that its unmarked SAR is the latent one (the probit, ADR 0003), so the
+    reduced form is the one marked ``latent=False``.  At the GLM null the latent SAR's
     score splits into the spillover term (``Robust-LM-Lag``, the reduced-form
     SAR's score) and the error term (``LM-Error``, the latent SEM's), and
     ``Robust-LM-Error`` tests whether they move in the proportion one
@@ -779,8 +781,11 @@ def _glm_spec(family: str) -> TreeNode:
 
     The full test (``LM-Lag``) and ``LM-SARMA`` are reported beside the tree.
     """
-    sar, sem, sdem = f"SAR{family}", f"SEM{family}", f"SDEM{family}"
-    latent_sar = f"{sar}(latent=True)"
+    sem, sdem = f"SEM{family}", f"SDEM{family}"
+    if latent_unmarked:
+        sar, latent_sar = f"SAR{family}(latent=False)", f"SAR{family}"
+    else:
+        sar, latent_sar = f"SAR{family}", f"SAR{family}(latent=True)"
     return TreeNode(
         kind="test",
         name="Robust-LM-Lag",
@@ -811,6 +816,7 @@ def _glm_spec(family: str) -> TreeNode:
 
 _CROSS_SECTIONAL_SPECS: dict[str, Callable[[], TreeNode]] = {
     "Logit": lambda: _glm_spec("Logit"),
+    "Probit": lambda: _glm_spec("Probit", latent_unmarked=True),
     "NegBin": lambda: _glm_spec("NegBin"),
     "OLS": _ols_spec,
     "SAR": _sar_spec,

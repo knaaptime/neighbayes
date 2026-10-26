@@ -631,7 +631,7 @@ def _make_reduced_gibbs_step(
         # When |Δρ| < reuse_threshold, skip the sparsax factorization + (m+1)
         # solves and evaluate η via the Horner polynomial instead.
         V_stack_prev = state.get("V_stack", jnp.zeros_like(V_stack_init))
-        rho_basis_prev = state.get("rho_basis", jnp.float64(0.0))
+        rho_basis_prev = state.get("rho_basis", jnp.float64(jnp.inf))
         _drho_check = rho - rho_basis_prev
 
         # Clamp ρ away from the singular boundary before building the Krylov
@@ -657,7 +657,10 @@ def _make_reduced_gibbs_step(
             return V_stack_prev, rho_basis_prev, _eta
 
         V_stack, rho_basis, eta = jax.lax.cond(
-            jnp.abs(_drho_check) < _reuse_threshold,
+            # Only inside the basis' own series radius: beyond it the Horner
+            # evaluation of U(ρ) diverges.
+            jnp.abs(_drho_check)
+            < jnp.minimum(_reuse_threshold, _series_radius_jax(V_stack_prev)),
             _reuse_basis,
             _rebuild_basis,
             operand=None,
@@ -1051,7 +1054,8 @@ def run_chains_jax_reduced(
             "alpha": jnp.float64(float(i.alpha)),
             "omega": jnp.asarray(i.omega, dtype=jnp.float64),
             "V_stack": _V_init,
-            "rho_basis": jnp.float64(0.0),
+            # No basis yet: the first sweep builds one.
+            "rho_basis": jnp.float64(jnp.inf),
             "slice_width": slice_width_jax,
         }
         for i in inits

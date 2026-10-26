@@ -5,12 +5,20 @@ built in Python and exported as matrix files that the ``.m`` side reads
 verbatim, so construction-order and standardization drift cannot enter as a
 disagreement.  Both sides carry diffuse priors with the same uniform support
 on the spatial parameter, so every tolerance comes from the two chains'
-Monte-Carlo error — ``az.mcse`` on each side, joined in quadrature — never
-from the reference's print precision.
+Monte-Carlo error (:mod:`._mcse`, joined in quadrature), never from the
+reference's print precision.
 
 The Gaussian cross-section is the plan's first comparison target: two Gibbs
 implementations with entirely different log-determinant machinery agreeing on
 one posterior.
+
+The toolbox stores each iteration's beta beside the *next* iteration's rho:
+``sar_g`` draws beta given the current rho, then a new rho from its marginal
+posterior, and saves the pair.  The marginals are right, but the stored pairs
+are independent (the intercept-rho posterior correlation, about -0.9 here,
+reads as 0), and so are the pairs the toolbox's own impacts are computed from.
+Shifting rho back one iteration restores the joint, which the SAR test
+compares.
 """
 
 from __future__ import annotations
@@ -68,29 +76,6 @@ def _fit_neighbayes(model_cls, dataset):
     )
 
 
-def _assert_mean_matches(label, nb_draws, tb_draws, multiplier=4.0):
-    """|Δ posterior mean| within ``multiplier`` × joined Monte-Carlo error."""
-    ess_nb = _mcse.ess(nb_draws)
-    ess_tb = _mcse.ess(tb_draws)
-    mcse_nb = _mcse.mcse_mean(nb_draws)
-    mcse_tb = _mcse.mcse_mean(tb_draws)
-    tol = multiplier * np.hypot(mcse_nb, mcse_tb)
-    diff = abs(float(np.mean(nb_draws)) - float(np.mean(tb_draws)))
-    assert diff <= tol, (
-        f"{label}: |Δ posterior mean| = {diff:.4f} > {tol:.4f} "
-        f"(neighbayes {np.mean(nb_draws):.4f} [ESS {ess_nb:.0f}], "
-        f"toolbox {np.mean(tb_draws):.4f} [ESS {ess_tb:.0f}])"
-    )
-
-
-def _assert_sd_matches(label, nb_draws, tb_draws, multiplier=4.0):
-    mcse_nb = _mcse.mcse_sd(nb_draws)
-    mcse_tb = _mcse.mcse_sd(tb_draws)
-    tol = multiplier * np.hypot(mcse_nb, mcse_tb)
-    diff = abs(float(np.std(nb_draws)) - float(np.std(tb_draws)))
-    assert diff <= tol, f"{label}: |Δ posterior sd| = {diff:.4f} > {tol:.4f}"
-
-
 def _assert_truth_sanity(dataset, idata, spatial_name, abs_tol):
     """Recovery sanity band on the exported dataset's own true parameters."""
     params = dataset["params_true"]
@@ -115,17 +100,17 @@ def _compare(dataset, idata, draws, spatial_name):
     # 1/sige ~ Gamma); neighbayes's `sigma` is the std deviation
     tb_sigma = np.sqrt(draws["sige"])
     # posterior means, tolerance from each side's Monte-Carlo error
-    _assert_mean_matches(spatial_name, nb[spatial_name].values, draws["rho"])
-    _assert_mean_matches("sigma", nb["sigma"].values, tb_sigma)
+    _mcse.assert_mean_matches(spatial_name, nb[spatial_name].values, draws["rho"])
+    _mcse.assert_mean_matches("sigma", nb["sigma"].values, tb_sigma)
     for j in range(nb["beta"].shape[-1]):
-        _assert_mean_matches(
+        _mcse.assert_mean_matches(
             f"beta[{j}]", nb["beta"][:, :, j].values, draws["beta"][:, j]
         )
     # posterior shapes agree
-    _assert_sd_matches(spatial_name, nb[spatial_name].values, draws["rho"])
-    _assert_sd_matches("sigma", nb["sigma"].values, tb_sigma)
+    _mcse.assert_sd_matches(spatial_name, nb[spatial_name].values, draws["rho"])
+    _mcse.assert_sd_matches("sigma", nb["sigma"].values, tb_sigma)
     for j in range(nb["beta"].shape[-1]):
-        _assert_sd_matches(
+        _mcse.assert_sd_matches(
             f"beta[{j}]", nb["beta"][:, :, j].values, draws["beta"][:, j]
         )
     _assert_truth_sanity(dataset, idata, spatial_name, abs_tol=0.25)
@@ -147,6 +132,19 @@ def test_sar_g_posterior_matches_neighbayes(sar_dataset, octave_run, toolbox, tm
     assert draws["rho"].shape == (TB_POST,)
     assert draws["beta"].shape == (TB_POST, sar_dataset["X"].shape[1])
     _compare(sar_dataset, idata, draws, "rho")
+
+    # the joint: the intercept-rho correlation, with the toolbox's rho shifted
+    # back to the iteration its beta was drawn under
+    nb = idata.posterior
+    tb_intercept, tb_rho = draws["beta"][:, 0], draws["rho"]
+    _mcse.assert_corr_matches(
+        "corr(beta[0], rho)",
+        (nb["beta"][:, :, 0].values, nb["rho"].values),
+        (tb_intercept[1:], tb_rho[:-1]),
+    )
+    # as stored, the toolbox's pairs carry no correlation at all
+    r_stored = np.corrcoef(tb_intercept, tb_rho)[0, 1]
+    assert abs(r_stored) < 4.0 / np.sqrt(_mcse.ess(tb_rho)), r_stored
 
 
 def test_sem_g_posterior_matches_neighbayes(sem_dataset, octave_run, toolbox, tmp_path):

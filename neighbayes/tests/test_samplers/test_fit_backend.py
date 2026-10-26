@@ -49,9 +49,9 @@ def test_flow_and_nuts_only_models_check_the_backend():
     f = dgp.simulate_sar_negbin_flow(n=4, seed=0)
     with pytest.raises(TypeError, match="replaced by backend="):
         SARNegBinFlow(f["y_vec"], f["X"], f["G"]).fit(gibbs_backend="numpy")
-    p = dgp.simulate_sem_probit(n_side=3, seed=0, group_effects="random")
+    p = dgp.simulate_sem_probit(n_side=3, seed=0, unit_effects="random")
     m = SEMProbit(
-        group_effects="random", y=p["y"], X=p["X"], W=p["W_sparse"], groups=p["groups"]
+        unit_effects="random", y=p["y"], X=p["X"], W=p["W_sparse"], units=p["units"]
     )
     with pytest.raises(NotImplementedError, match="no Gibbs sampler"):
         m.fit(sampler="gibbs")

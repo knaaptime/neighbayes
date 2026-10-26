@@ -19,7 +19,7 @@ import numpy as np
 from .._mixins._designs import BinaryDesigns
 from ..base import SpatialModel
 from ..priors import SEMLogitPriors
-from ._latent_logit import LatentLogitMixin
+from ._latent_binary import LatentLogitMixin
 
 
 class SDEMLogit(BinaryDesigns, LatentLogitMixin, SpatialModel):
