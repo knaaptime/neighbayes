@@ -1,6 +1,6 @@
 """Contract pins for the shared numpy Clenshaw helper (``_logdet._clenshaw``).
 
-``chol_cheb_logdet_eval`` and the logdet factories both evaluate a
+``chol_cheb_logdet_eval_vec`` and the logdet factories both evaluate a
 Chebyshev-in-ρ series through these helpers, so they must reproduce
 ``numpy.polynomial.chebyshev.chebval`` on the mapped domain exactly, and the
 scalar and vector forms must agree.

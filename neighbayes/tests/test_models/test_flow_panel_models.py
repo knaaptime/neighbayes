@@ -1,9 +1,9 @@
 """Tests for panel flow models.
 
 This file targets the first implementation slice:
-- FlowPanelModel behavior through SARFlowPanel
-- SARFlowPanel construction and demeaning
-- SARFlowSeparablePanel model build
+- FlowModel panel behavior through SARFlowPanelFE
+- SARFlowPanelFE construction and demeaning
+- SARFlowSeparablePanelFE model build
 - Parameter recovery tests for all 4 panel flow variants
 """
 
@@ -12,25 +12,22 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from neighbayes.models.flow_panel import (
-    OLSFlowPanel,
-    SARFlowPanel,
-    SARFlowSeparablePanel,
-)
+from neighbayes.models import OLSFlow, SARFlow
+from neighbayes.tests.helpers import effects_kwargs
 
 
 def _flow_test_graph(n: int):
     """Return a small Graph for tests via neighbayes's DGP machinery."""
-    from neighbayes.dgp.flows import generate_flow_data
+    from neighbayes.dgp import simulate_sar_flow
 
-    return generate_flow_data(n=n, seed=0)["G"]
+    return simulate_sar_flow(n=n, seed=0)["G"]
 
 
 def _panel_flow_stack(n: int, T: int, k: int, seed: int = 0):
     """Build a noise-only panel-flow stack via neighbayes's panel DGP."""
-    from neighbayes.dgp.flows import generate_panel_flow_data
+    from neighbayes.dgp import simulate_sar_flow
 
-    out = generate_panel_flow_data(
+    out = simulate_sar_flow(
         n=n,
         T=T,
         k=k,
@@ -40,31 +37,29 @@ def _panel_flow_stack(n: int, T: int, k: int, seed: int = 0):
         beta_d=np.zeros(k),
         beta_o=np.zeros(k),
         sigma=1.0,
-        sigma_alpha=0.0,
         seed=seed,
     )
     return out["y"], out["X"], out["col_names"]
 
 
-class TestFlowPanelModelConstruction:
+class TestFlowPanelConstruction:
     def test_sar_flow_panel_builds(self):
         n = 4
         T = 3
         G = _flow_test_graph(n)
         y, X, col_names = _panel_flow_stack(n=n, T=T, k=2, seed=10)
 
-        model = SARFlowPanel(
+        model = SARFlow(
             y=y,
             W=G,
             X=X,
             T=T,
             col_names=col_names,
-            effects=0,
         )
 
         assert model._n == n
         assert model._T == T
-        assert model._N_flow == n * n
+        assert model._N == n * n
         assert model._y.shape == (n * n * T,)
         assert model._X.shape[0] == n * n * T
         assert model._Wd_y.shape == (n * n * T,)
@@ -75,13 +70,13 @@ class TestFlowPanelModelConstruction:
         G = _flow_test_graph(n)
         y, X, col_names = _panel_flow_stack(n=n, T=T, k=2, seed=11)
 
-        model = SARFlowPanel(
+        model = SARFlow(
+            pair_effects="fixed",
             y=y,
             W=G,
             X=X,
             T=T,
             col_names=col_names,
-            effects=1,
         )
 
         y2 = model._y.reshape(T, n * n)
@@ -94,7 +89,7 @@ class TestFlowPanelModelConstruction:
         y, X, col_names = _panel_flow_stack(n=n, T=T, k=2, seed=12)
 
         with pytest.raises(ValueError, match=r"n\^2\*T"):
-            SARFlowPanel(
+            SARFlow(
                 y=y[:-1],
                 W=G,
                 X=X,
@@ -110,13 +105,13 @@ class TestSeparablePanelModelBuild:
         G = _flow_test_graph(n)
         y, X, col_names = _panel_flow_stack(n=n, T=T, k=2, seed=13)
 
-        model = SARFlowSeparablePanel(
+        model = SARFlow(
+            separable=True,
             y=y,
             W=G,
             X=X,
             T=T,
             col_names=col_names,
-            effects=0,
         )
 
         pm_model = model._build_pymc_model()
@@ -132,14 +127,13 @@ def test_sar_flow_panel_fit_smoke():
     G = _flow_test_graph(n)
     y, X, col_names = _panel_flow_stack(n=n, T=T, k=1, seed=15)
 
-    model = SARFlowPanel(
+    model = SARFlow(
         y=y,
         W=G,
         X=X,
         T=T,
         col_names=col_names,
-        effects=0,
-        restrict_positive=True,
+        nonnegative_dependence=True,
     )
     idata = model.fit(draws=50, tune=50, chains=1, progressbar=False, random_seed=0)
     assert "rho_d" in idata.posterior
@@ -179,14 +173,14 @@ ABS_TOL_SIGMA = 0.25
 
 @pytest.mark.slow
 class TestSARFlowPanelRecovery:
-    """SARFlowPanel posterior means should be close to true DGP values."""
+    """SARFlowPanelFE posterior means should be close to true DGP values."""
 
     @pytest.fixture(scope="class")
     def fitted_panel(self):
-        from neighbayes.dgp.flows import generate_panel_flow_data
+        from neighbayes.dgp import simulate_sar_flow
 
         G = _flow_test_graph(PANEL_FLOW_N)
-        out = generate_panel_flow_data(
+        out = simulate_sar_flow(
             n=PANEL_FLOW_N,
             T=PANEL_FLOW_T,
             G=G,
@@ -196,19 +190,19 @@ class TestSARFlowPanelRecovery:
             beta_d=PF_BETA_D_TRUE,
             beta_o=PF_BETA_O_TRUE,
             sigma=PF_SIGMA_TRUE,
-            sigma_alpha=PF_SIGMA_ALPHA_TRUE,
             seed=42,
+            pair_effects="fixed",
+            pair_effect_sd=PF_SIGMA_ALPHA_TRUE,
         )
-        # Default panel-flow DGP is lognormal; SARFlowPanel has Gaussian
+        # Default panel-flow DGP is lognormal; SARFlowPanelFE has Gaussian
         # likelihood, so fit on np.log(y) (== eta).
-        model = SARFlowPanel(
+        model = SARFlow(
             y=np.log(out["y"]),
             W=G,
             X=out["X"],
             T=PANEL_FLOW_T,
             col_names=out["col_names"],
-            effects=0,
-            restrict_positive=True,
+            nonnegative_dependence=True,
         )
         idata = model.fit(
             draws=1000,
@@ -224,25 +218,25 @@ class TestSARFlowPanelRecovery:
     def test_sar_flow_panel_recovers_rho_d(self, fitted_panel):
         rho_hat = float(fitted_panel.posterior["rho_d"].mean())
         assert abs(rho_hat - PF_RHO_D_TRUE) < ABS_TOL_RHO, (
-            f"SARFlowPanel rho_d: expected ≈{PF_RHO_D_TRUE}, got {rho_hat:.3f}"
+            f"SARFlowPanelFE rho_d: expected ≈{PF_RHO_D_TRUE}, got {rho_hat:.3f}"
         )
 
     def test_sar_flow_panel_recovers_rho_o(self, fitted_panel):
         rho_hat = float(fitted_panel.posterior["rho_o"].mean())
         assert abs(rho_hat - PF_RHO_O_TRUE) < ABS_TOL_RHO, (
-            f"SARFlowPanel rho_o: expected ≈{PF_RHO_O_TRUE}, got {rho_hat:.3f}"
+            f"SARFlowPanelFE rho_o: expected ≈{PF_RHO_O_TRUE}, got {rho_hat:.3f}"
         )
 
     def test_sar_flow_panel_recovers_rho_w(self, fitted_panel):
         rho_hat = float(fitted_panel.posterior["rho_w"].mean())
         assert abs(rho_hat - PF_RHO_W_TRUE) < ABS_TOL_RHO, (
-            f"SARFlowPanel rho_w: expected ≈{PF_RHO_W_TRUE}, got {rho_hat:.3f}"
+            f"SARFlowPanelFE rho_w: expected ≈{PF_RHO_W_TRUE}, got {rho_hat:.3f}"
         )
 
     def test_sar_flow_panel_recovers_sigma(self, fitted_panel):
         sigma_hat = float(fitted_panel.posterior["sigma"].mean())
         assert abs(sigma_hat - PF_SIGMA_TRUE) < ABS_TOL_SIGMA, (
-            f"SARFlowPanel sigma: expected ≈{PF_SIGMA_TRUE}, got {sigma_hat:.3f}"
+            f"SARFlowPanelFE sigma: expected ≈{PF_SIGMA_TRUE}, got {sigma_hat:.3f}"
         )
 
     def test_sar_flow_panel_recovers_beta(self, fitted_panel):
@@ -253,23 +247,23 @@ class TestSARFlowPanelRecovery:
         beta_d_hat = beta_hat[2 : 2 + k]
         beta_o_hat = beta_hat[2 + k : 2 + 2 * k]
         assert np.allclose(beta_d_hat, PF_BETA_D_TRUE, atol=ABS_TOL_BETA), (
-            f"SARFlowPanel beta_d: expected ≈{PF_BETA_D_TRUE}, got {beta_d_hat}"
+            f"SARFlowPanelFE beta_d: expected ≈{PF_BETA_D_TRUE}, got {beta_d_hat}"
         )
         assert np.allclose(beta_o_hat, PF_BETA_O_TRUE, atol=ABS_TOL_BETA), (
-            f"SARFlowPanel beta_o: expected ≈{PF_BETA_O_TRUE}, got {beta_o_hat}"
+            f"SARFlowPanelFE beta_o: expected ≈{PF_BETA_O_TRUE}, got {beta_o_hat}"
         )
 
 
 @pytest.mark.slow
 class TestSARFlowSeparablePanelRecovery:
-    """SARFlowSeparablePanel posterior means should be close to true DGP values."""
+    """SARFlowSeparablePanelFE posterior means should be close to true DGP values."""
 
     @pytest.fixture(scope="class")
     def fitted_separable_panel(self):
-        from neighbayes.dgp.flows import generate_panel_flow_data_separable
+        from neighbayes.dgp import simulate_sar_flow
 
         G = _flow_test_graph(PANEL_FLOW_N)
-        out = generate_panel_flow_data_separable(
+        out = simulate_sar_flow(
             n=PANEL_FLOW_N,
             T=PANEL_FLOW_T,
             G=G,
@@ -278,17 +272,19 @@ class TestSARFlowSeparablePanelRecovery:
             beta_d=PF_BETA_D_TRUE,
             beta_o=PF_BETA_O_TRUE,
             sigma=PF_SIGMA_TRUE,
-            sigma_alpha=PF_SIGMA_ALPHA_TRUE,
             seed=42,
+            separable=True,
+            pair_effects="fixed",
+            pair_effect_sd=PF_SIGMA_ALPHA_TRUE,
         )
         # Default panel-flow DGP is lognormal; fit on np.log(y).
-        model = SARFlowSeparablePanel(
+        model = SARFlow(
+            separable=True,
             y=np.log(out["y"]),
             W=G,
             X=out["X"],
             T=PANEL_FLOW_T,
             col_names=out["col_names"],
-            effects=0,
         )
         idata = model.fit(
             draws=1000,
@@ -303,17 +299,17 @@ class TestSARFlowSeparablePanelRecovery:
     def test_separable_panel_recovers_rho_d(self, fitted_separable_panel):
         rho_hat = float(fitted_separable_panel.posterior["rho_d"].mean())
         assert abs(rho_hat - PF_RHO_D_SEP_TRUE) < ABS_TOL_RHO, (
-            f"SARFlowSeparablePanel rho_d: expected ≈{PF_RHO_D_SEP_TRUE}, got {rho_hat:.3f}"
+            f"SARFlowSeparablePanelFE rho_d: expected ≈{PF_RHO_D_SEP_TRUE}, got {rho_hat:.3f}"
         )
 
     def test_separable_panel_recovers_rho_o(self, fitted_separable_panel):
         rho_hat = float(fitted_separable_panel.posterior["rho_o"].mean())
         assert abs(rho_hat - PF_RHO_O_SEP_TRUE) < ABS_TOL_RHO, (
-            f"SARFlowSeparablePanel rho_o: expected ≈{PF_RHO_O_SEP_TRUE}, got {rho_hat:.3f}"
+            f"SARFlowSeparablePanelFE rho_o: expected ≈{PF_RHO_O_SEP_TRUE}, got {rho_hat:.3f}"
         )
 
     def test_separable_panel_recovers_beta(self, fitted_separable_panel):
-        # Same design layout as SARFlowPanel: [alpha, intra, beta_d (k),
+        # Same design layout as SARFlowPanelFE: [alpha, intra, beta_d (k),
         # beta_o (k), ..., gamma_dist].
         k = len(PF_BETA_D_TRUE)
         beta_hat = (
@@ -322,20 +318,20 @@ class TestSARFlowSeparablePanelRecovery:
         beta_d_hat = beta_hat[2 : 2 + k]
         beta_o_hat = beta_hat[2 + k : 2 + 2 * k]
         assert np.allclose(beta_d_hat, PF_BETA_D_TRUE, atol=ABS_TOL_BETA), (
-            f"SARFlowSeparablePanel beta_d: expected ≈{PF_BETA_D_TRUE}, "
+            f"SARFlowSeparablePanelFE beta_d: expected ≈{PF_BETA_D_TRUE}, "
             f"got {beta_d_hat}"
         )
         assert np.allclose(beta_o_hat, PF_BETA_O_TRUE, atol=ABS_TOL_BETA), (
-            f"SARFlowSeparablePanel beta_o: expected ≈{PF_BETA_O_TRUE}, "
+            f"SARFlowSeparablePanelFE beta_o: expected ≈{PF_BETA_O_TRUE}, "
             f"got {beta_o_hat}"
         )
 
 
 def _ols_panel_flow_data(n: int, T: int, beta_d, beta_o, sigma, seed=0):
     """Stack T panel-flow periods with rho = 0 via neighbayes's panel DGP."""
-    from neighbayes.dgp.flows import generate_panel_flow_data
+    from neighbayes.dgp import simulate_sar_flow
 
-    out = generate_panel_flow_data(
+    out = simulate_sar_flow(
         n=n,
         T=T,
         k=len(beta_d),
@@ -345,14 +341,13 @@ def _ols_panel_flow_data(n: int, T: int, beta_d, beta_o, sigma, seed=0):
         beta_d=beta_d,
         beta_o=beta_o,
         sigma=sigma,
-        sigma_alpha=0.0,
         seed=seed,
     )
     return out["G"], out["y"], out["X"], out["col_names"]
 
 
 class TestOLSFlowPanelEffects:
-    """Tests for the new non-spatial OLSFlowPanel gravity baseline."""
+    """Tests for the new non-spatial OLSFlowPanelFE gravity baseline."""
 
     def test_olsflow_panel_builds_and_skips_logdet_precompute(self):
         n = 4
@@ -360,13 +355,12 @@ class TestOLSFlowPanelEffects:
         G = _flow_test_graph(n)
         y, X, col_names = _panel_flow_stack(n=n, T=T, k=2, seed=20)
 
-        model = OLSFlowPanel(
+        model = OLSFlow(
             y=y,
             W=G,
             X=X,
             T=T,
             col_names=col_names,
-            effects=0,
         )
         # Trace / separable precomputation must be skipped.
         assert model._traces is None
@@ -385,13 +379,12 @@ class TestOLSFlowPanelEffects:
             sigma=0.5,
             seed=1,
         )
-        model = OLSFlowPanel(
+        model = OLSFlow(
             y=y,
             W=G,
             X=X,
             T=T,
             col_names=col_names,
-            effects=0,
         )
         model.fit(draws=20, tune=20, chains=1, progressbar=False, random_seed=0)
         y_rep = model.posterior_predictive(n_draws=5, random_seed=3)
@@ -411,13 +404,13 @@ class TestOLSFlowPanelEffects:
             sigma=0.2,
             seed=fe_mode,
         )
-        model = OLSFlowPanel(
+        model = OLSFlow(
             y=y,
             W=G,
             X=X,
             T=T,
             col_names=col_names,
-            effects=fe_mode,
+            **effects_kwargs(fe_mode, "pair_effects"),
         )
         model.fit(draws=20, tune=20, chains=1, progressbar=False, random_seed=0)
         post = model._idata.posterior
@@ -453,13 +446,12 @@ class TestFlowPanelLogLikelihood:
         n, T = 4, 2
         G = _flow_test_graph(n)
         y, X, col_names = _panel_flow_stack(n=n, T=T, k=2, seed=0)
-        m = SARFlowPanel(
+        m = SARFlow(
             y=y,
             W=G,
             X=X,
             T=T,
             col_names=col_names,
-            effects=0,
         )
         idata = m.fit(
             draws=40,
@@ -475,13 +467,13 @@ class TestFlowPanelLogLikelihood:
         n, T = 4, 2
         G = _flow_test_graph(n)
         y, X, col_names = _panel_flow_stack(n=n, T=T, k=2, seed=0)
-        m = SARFlowSeparablePanel(
+        m = SARFlow(
+            separable=True,
             y=y,
             W=G,
             X=X,
             T=T,
             col_names=col_names,
-            effects=0,
         )
         idata = m.fit(
             draws=40,
@@ -497,7 +489,7 @@ class TestFlowPanelLogLikelihood:
         n, T = 4, 2
         G = _flow_test_graph(n)
         y, X, col_names = _panel_flow_stack(n=n, T=T, k=2, seed=0)
-        m = OLSFlowPanel(y=y, W=G, X=X, T=T, col_names=col_names, effects=0)
+        m = OLSFlow(y=y, W=G, X=X, T=T, col_names=col_names)
         idata = m.fit(
             draws=40,
             tune=20,
@@ -522,23 +514,22 @@ class TestFlowPanelLogLikelihood:
             random_seed=0,
             idata_kwargs={"log_likelihood": True},
         )
-        m_sar = SARFlowPanel(
+        m_sar = SARFlow(
             y=y,
             W=G,
             X=X,
             T=T,
             col_names=col_names,
-            effects=0,
         )
-        m_sep = SARFlowSeparablePanel(
+        m_sep = SARFlow(
+            separable=True,
             y=y,
             W=G,
             X=X,
             T=T,
             col_names=col_names,
-            effects=0,
         )
-        m_ols = OLSFlowPanel(y=y, W=G, X=X, T=T, col_names=col_names, effects=0)
+        m_ols = OLSFlow(y=y, W=G, X=X, T=T, col_names=col_names)
         idata_sar = m_sar.fit(**kw)
         idata_sep = m_sep.fit(**kw)
         idata_ols = m_ols.fit(**kw)
@@ -551,18 +542,17 @@ class TestFlowPanelSamplerDispatch:
     """Flow panel models should dispatch sampler='gibbs'/'nuts' correctly."""
 
     def test_sar_flow_panel_sampler_gibbs(self):
-        """Unrestricted SARFlowPanel with sampler='gibbs' uses the resolvent sampler."""
+        """Unrestricted SARFlowPanelFE with sampler='gibbs' uses the resolvent sampler."""
         n, T = 4, 3
         G = _flow_test_graph(n)
         y, X, col_names = _panel_flow_stack(n=n, T=T, k=2, seed=50)
-        m = SARFlowPanel(
+        m = SARFlow(
             y=y,
             W=G,
             X=X,
             T=T,
             col_names=col_names,
-            effects=0,
-            restrict_positive=True,
+            nonnegative_dependence=True,
         )
         idata = m.fit(
             draws=20,
@@ -579,18 +569,17 @@ class TestFlowPanelSamplerDispatch:
         assert "sigma" in idata.posterior.data_vars
 
     def test_sar_flow_panel_sampler_nuts(self):
-        """Unrestricted SARFlowPanel with sampler='nuts' uses PyMC NUTS."""
+        """Unrestricted SARFlowPanelFE with sampler='nuts' uses PyMC NUTS."""
         n, T = 4, 3
         G = _flow_test_graph(n)
         y, X, col_names = _panel_flow_stack(n=n, T=T, k=2, seed=51)
-        m = SARFlowPanel(
+        m = SARFlow(
             y=y,
             W=G,
             X=X,
             T=T,
             col_names=col_names,
-            effects=0,
-            restrict_positive=True,
+            nonnegative_dependence=True,
         )
         idata = m.fit(
             draws=10,
@@ -609,13 +598,13 @@ class TestFlowPanelSamplerDispatch:
         n, T = 4, 2
         G = _flow_test_graph(n)
         y, X, col_names = _panel_flow_stack(n=n, T=T, k=2, seed=52)
-        m = SARFlowSeparablePanel(
+        m = SARFlow(
+            separable=True,
             y=y,
             W=G,
             X=X,
             T=T,
             col_names=col_names,
-            effects=0,
         )
         idata = m.fit(
             draws=10,
@@ -633,14 +622,13 @@ class TestFlowPanelSamplerDispatch:
         n, T = 4, 2
         G = _flow_test_graph(n)
         y, X, col_names = _panel_flow_stack(n=n, T=T, k=2, seed=53)
-        m = SARFlowPanel(
+        m = SARFlow(
             y=y,
             W=G,
             X=X,
             T=T,
             col_names=col_names,
-            effects=0,
-            restrict_positive=True,
+            nonnegative_dependence=True,
         )
         with pytest.raises(ValueError, match="sampler must be"):
             m.fit(

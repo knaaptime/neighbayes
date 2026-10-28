@@ -3,14 +3,11 @@
 Mirrors the PyTensor symbolic functions but uses ``jax.numpy`` so the
 returned callables are compatible with ``jax.jit`` and ``jax.grad``.
 
-Supports ``"eigenvalue"``, ``"chebyshev"``, ``"cheb_stochastic"``,
-``"cheb_cholesky"``, ``"aaa"``, and ``"slq"``.  The stochastic Chebyshev
+Supports the internal keys ``"eigenvalue"``,
+``"stoch_cheb"``, ``"chol_cheb"``, ``"lu_cheb"``, ``"lu_aaa"``,
+``"chol_aaa"`` and ``"lu_spline"``.  The stochastic Chebyshev
 method precomputes moments in numpy and evaluates via JAX-native Clenshaw.
-SLQ consumes the numpy :func:`slq_logdet_precompute` quadrature rules
-(sparse batched D-symmetrized Lanczos, canonical ``n·v₁²`` weights; complex
-bilinear ``γ`` for the directed-``W`` Arnoldi fallback) and evaluates the
-ρ-dependent quadrature in JAX — differentiable and JIT-compatible, with no
-dense ``W`` materialization.  ``cheb_cholesky`` precomputes Chebyshev
+``chol_cheb`` precomputes Chebyshev
 coefficients via sparse Cholesky in numpy and evaluates via JAX-native
 Clenshaw.  ``aaa`` precomputes support points and barycentric weights via
 sparse LU in numpy and evaluates via JAX-native barycentric formula.
@@ -18,12 +15,12 @@ sparse LU in numpy and evaluates via JAX-native barycentric formula.
 
 from __future__ import annotations
 
+import functools
+
 import numpy as np
 import scipy.sparse as sp
 
-from ._chebyshev import chebyshev
 from ._config import resolve_logdet_method
-from ._slq import slq_logdet_precompute
 
 
 def jax_logdet_chebyshev_traced(rho, coeffs, rmin, rmax):
@@ -103,6 +100,7 @@ def jax_logdet_chebyshev(
     return c[0] + x * b_curr - b_next
 
 
+@functools.lru_cache(maxsize=None)
 def make_logdet_jax_param_fn(method: str, T: int = 1):
     """Return ``fn(rho, params) -> logdet`` for a refittable method.
 
@@ -118,7 +116,7 @@ def make_logdet_jax_param_fn(method: str, T: int = 1):
     Parameters
     ----------
     method : str
-        ``"cheb_cholesky"`` (Chebyshev coefficients), or ``"aaa"`` /
+        ``"chol_cheb"`` (Chebyshev coefficients), or ``"lu_aaa"`` /
         ``"chol_aaa"`` (barycentric support points, values and weights).  The
         two AAA variants differ only in the factorizer used to obtain the
         support values at precompute time — LU versus Cholesky — and share one
@@ -130,11 +128,12 @@ def make_logdet_jax_param_fn(method: str, T: int = 1):
     -------
     callable
         ``(rho, params) -> jax.numpy.ndarray``, differentiable and
-        JIT-compatible.
+        JIT-compatible.  Cached, so a ``(method, T)`` always returns the same
+        function and a sweep closing over it keeps a stable identity.
     """
     T = int(T)
 
-    if method in ("cheb_cholesky", "lu_cheb"):
+    if method in ("chol_cheb", "lu_cheb"):
 
         def _cheb(rho, params):
             coeffs, rmin, rmax = params
@@ -143,7 +142,7 @@ def make_logdet_jax_param_fn(method: str, T: int = 1):
 
         return _cheb
 
-    if method in ("aaa", "chol_aaa"):
+    if method in ("lu_aaa", "chol_aaa"):
 
         def _aaa(rho, params):
             import jax.numpy as jnp
@@ -159,9 +158,104 @@ def make_logdet_jax_param_fn(method: str, T: int = 1):
 
     raise ValueError(
         f"make_logdet_jax_param_fn does not support method {method!r}; "
-        "only 'cheb_cholesky', 'lu_cheb', 'aaa' and 'chol_aaa' carry a refittable "
+        "only 'chol_cheb', 'lu_cheb', 'lu_aaa' and 'chol_aaa' carry a refittable "
         "parameterization."
     )
+
+
+def logdet_jax_params(W, method: str, rho_min: float, rho_max: float, eigs=None):
+    """``(kind, params)``: ``log|I − ρW|`` in a form a compiled sweep takes as data.
+
+    :func:`make_logdet_jax_fn` closes over the precomputed coefficients, so a
+    sweep built on it is new for every model and recompiles every fit.  Passed
+    as an argument instead, the coefficients let one compiled sweep serve every
+    fit — and every dataset — of the same structure.  The precompute is the one
+    the NumPy evaluator of ``method`` uses, so both backends evaluate one
+    function.
+
+    ``kind`` is ``"eig"`` (eigenvalues, exact), ``"cheb"`` (Chebyshev
+    coefficients and interval) or ``"aaa"`` (barycentric nodes, values and
+    weights).  ``lu_spline``, which has no array form, returns
+    ``("closure", fn)``: a sweep using it compiles per fit.
+    Evaluate with :func:`eval_logdet_params`.  Requires JAX's float64 mode.
+    """
+    import jax.numpy as jnp
+
+    from ._factories import _cheb_precompute_for, _cheb_stochastic_coeffs
+
+    W_sparse = W if sp.issparse(W) else sp.csr_matrix(np.asarray(W))
+    n = W_sparse.shape[0]
+    method = resolve_logdet_method(method, n=n, W=W_sparse)
+    if method == "eigenvalue":
+        ev = np.asarray(
+            eigs if eigs is not None else np.linalg.eigvals(W_sparse.toarray()),
+            dtype=np.complex128,
+        )
+        return "eig", (jnp.asarray(ev.real), jnp.asarray(ev.imag))
+    if method in ("chol_cheb", "lu_cheb"):
+        pre = _cheb_precompute_for(method)(
+            W_sparse, order=None, rho_min=rho_min, rho_max=rho_max
+        )
+        return "cheb", (
+            jnp.asarray(pre.coeffs, dtype=jnp.float64),
+            jnp.float64(pre.rho_min),
+            jnp.float64(pre.rho_max),
+        )
+    if method == "stoch_cheb":
+        coeffs, rmin, rmax = _cheb_stochastic_coeffs(W_sparse, rho_min, rho_max)
+        return "cheb", (jnp.asarray(coeffs), jnp.float64(rmin), jnp.float64(rmax))
+    if method in ("lu_aaa", "chol_aaa"):
+        from . import _aaa
+
+        fn = (
+            _aaa.aaa_logdet_precompute
+            if method == "lu_aaa"
+            else _aaa.chol_aaa_logdet_precompute
+        )
+        pre = fn(W_sparse, rho_min=rho_min, rho_max=rho_max)
+        return "aaa", (
+            jnp.asarray(pre.support_points, dtype=jnp.float64),
+            jnp.asarray(pre.support_values, dtype=jnp.float64),
+            jnp.asarray(pre.weights, dtype=jnp.float64),
+        )
+    return "closure", make_logdet_jax_fn(W_sparse, method, rho_min, rho_max)
+
+
+@functools.lru_cache(maxsize=None)
+def logdet_param_evaluator(kind: str, T: int = 1):
+    """A stable ``(rho, params) -> T·log|I − ρW|`` for :func:`logdet_jax_params` output.
+
+    Cached per ``(kind, T)``, so a sweep that closes over it keeps one identity
+    and its compiled program can be reused.  ``kind`` must be an array kind
+    (``"eig"``, ``"cheb"``, ``"aaa"``); a ``"closure"`` has no params to carry.
+    """
+    if kind == "closure":
+        raise ValueError("a 'closure' log-determinant has no parameters to evaluate")
+
+    def evaluate(rho, params):
+        val = eval_logdet_params(kind, params, rho)
+        return val if T == 1 else T * val
+
+    return evaluate
+
+
+def eval_logdet_params(kind: str, params, rho):
+    """``log|I − ρW|`` from :func:`logdet_jax_params` output (JIT-compatible)."""
+    import jax.numpy as jnp
+
+    if kind == "closure":
+        return params(rho)
+    if kind == "eig":
+        re, im = params
+        return 0.5 * jnp.sum(jnp.log((1.0 - rho * re) ** 2 + (rho * im) ** 2))
+    if kind == "cheb":
+        coeffs, rmin, rmax = params
+        return jax_logdet_chebyshev_traced(rho, coeffs, rmin, rmax)
+    if kind == "aaa":
+        z_j, f_j, w_j = params
+        diff = rho - z_j
+        return jnp.sum(w_j * f_j / diff) / jnp.sum(w_j / diff)
+    raise ValueError(f"unknown logdet kind {kind!r}")
 
 
 def make_logdet_jax_fn(
@@ -173,10 +267,9 @@ def make_logdet_jax_fn(
 ):
     """Return a JAX-native ``(rho) -> log|I - ρW|`` callable.
 
-    Supports ``"eigenvalue"``, ``"chebyshev"``, ``"cheb_stochastic"``,
-    ``"cheb_cholesky"``, ``"aaa"``, ``"cholmod"``, and ``"slq"``.
-    ``"cholmod"`` uses ``sparsax`` for exact sparse CHOLMOD logdet
-    (requires the ``sparsax`` package; CPU-only).
+    Supports the internal keys ``"eigenvalue"``,
+    ``"stoch_cheb"``, ``"chol_cheb"``, ``"lu_cheb"``, ``"lu_aaa"``,
+    ``"chol_aaa"`` and ``"lu_spline"``.
     """
     T = int(T)
 
@@ -211,25 +304,7 @@ def make_logdet_jax_fn(
 
         return _jax_eigenvalue
 
-    if method == "chebyshev":
-        out = chebyshev(
-            W_sparse if eigs is None else None,
-            order=20,
-            rmin=rho_min,
-            rmax=rho_max,
-            eigs=eigs,
-        )
-        coeffs = out["coeffs"].astype(np.float64)
-        rmin_cb = float(out["rmin"])
-        rmax_cb = float(out["rmax"])
-
-        def _jax_chebyshev(rho):
-            val = jax_logdet_chebyshev(rho, coeffs, rmin=rmin_cb, rmax=rmax_cb)
-            return val if T == 1 else T * val
-
-        return _jax_chebyshev
-
-    if method == "cheb_stochastic":
+    if method == "stoch_cheb":
         # Precompute stochastic moments in numpy, then evaluate at Chebyshev
         # nodes in ρ-space and fit a Chebyshev-in-ρ polynomial for JAX
         # Clenshaw evaluation (differentiable, JIT-compatible).  The series runs
@@ -246,65 +321,11 @@ def make_logdet_jax_fn(
 
         return _jax_cheb_stochastic
 
-    if method == "slq":
-        if eigs is not None:
-            raise ValueError(
-                "SLQ requires the weight matrix W, not a 1-D eigenvalue array."
-            )
-        # Consume the numpy sparse SLQ rules: batched D-symmetrized Lanczos
-        # (real nodes θ and real n·v₁² weights) for undirected W, or Arnoldi
-        # (complex Ritz values θ and complex bilinear weights γ) for directed
-        # W.  Evaluate the ρ-dependent quadrature in JAX via the complex log;
-        # the Lanczos case is the zero-imaginary special case of the same
-        # formula.  No dense W is materialized — the precompute is matvec-only.
-        pre = slq_logdet_precompute(W_sparse)
-        nodes = np.asarray(pre.nodes)
-        weights = np.asarray(pre.weights)
-        n_probes = pre.n_probes
-
-        # The exact-moment control variate is part of the value the numpy
-        # evaluator returns, so it has to be carried into the traced graph too;
-        # otherwise the JAX and numpy paths compute different functions.
-        cv = (
-            np.zeros(0)
-            if pre.cv_coeffs is None
-            else np.asarray(pre.cv_coeffs, dtype=np.float64)
-        )
-
-        nodes_real = np.ascontiguousarray(nodes.real.astype(np.float64))
-        nodes_imag = np.ascontiguousarray(nodes.imag.astype(np.float64))
-        w_real = np.ascontiguousarray(weights.real.astype(np.float64))
-        w_imag = np.ascontiguousarray(weights.imag.astype(np.float64))
-
-        def _jax_slq(rho):
-            import jax.numpy as jnp
-
-            nr = jnp.asarray(nodes_real)
-            ni = jnp.asarray(nodes_imag)
-            wr = jnp.asarray(w_real)
-            wi = jnp.asarray(w_imag)
-            # 1 - ρθ = (1 - ρ·Re θ) + i(-ρ·Im θ)
-            # log(1 - ρθ) = 0.5·log|1-ρθ|² + i·atan2(Im, Re)
-            re = 1.0 - rho * nr
-            im = -rho * ni
-            log_re = 0.5 * jnp.log(jnp.maximum(re**2 + im**2, 1e-300))
-            log_im = jnp.arctan2(im, re)
-            # Re(Σ γ·log(1-ρθ)) = Σ [Re(γ)·log_re - Im(γ)·log_im]; the second
-            # term vanishes for real (Lanczos) weights but keeps the cross term
-            # that a magnitude-only log would drop for the complex Arnoldi case.
-            val = jnp.sum(wr * log_re - wi * log_im) / n_probes
-            if cv.size:
-                j = jnp.arange(1, cv.size + 1, dtype=jnp.float64)
-                val = val + jnp.sum(rho**j / j * jnp.asarray(cv))
-            return val if T == 1 else T * val
-
-        return _jax_slq
-
-    if method in ("cheb_cholesky", "lu_cheb"):
+    if method in ("chol_cheb", "lu_cheb"):
         from ._factories import _cheb_precompute_for
 
         # Precompute Chebyshev coefficients in numpy — via sparse Cholesky for
-        # ``cheb_cholesky``, sparse LU for ``lu_cheb`` — then evaluate via
+        # ``chol_cheb``, sparse LU for ``lu_cheb`` — then evaluate via
         # JAX-native Clenshaw (differentiable, JIT-compatible).
         pre = _cheb_precompute_for(method)(
             W_sparse, order=None, rho_min=rho_min, rho_max=rho_max
@@ -319,7 +340,7 @@ def make_logdet_jax_fn(
 
         return _jax_cheb_chol
 
-    if method == "aaa":
+    if method == "lu_aaa":
         from ._aaa import aaa_logdet_precompute
 
         # Precompute support points and barycentric weights via sparse LU
@@ -332,7 +353,7 @@ def make_logdet_jax_fn(
 
         # Same barycentric formula as the refittable form; the only difference
         # is that the support arrays are fixed here, so bind them and reuse it.
-        _bary = make_logdet_jax_param_fn("aaa", T=T)
+        _bary = make_logdet_jax_param_fn("lu_aaa", T=T)
 
         def _jax_aaa(rho):
             import jax.numpy as jnp
@@ -344,14 +365,14 @@ def make_logdet_jax_fn(
     if method == "chol_aaa":
         from ._aaa import chol_aaa_logdet_precompute
 
-        # Same as "aaa" but precompute via sparse Cholesky of the D-symmetrized
+        # Same as "lu_aaa" but precompute via sparse Cholesky of the D-symmetrized
         # system (~2× cheaper than KLU for symmetrizable W).
         pre = chol_aaa_logdet_precompute(W_sparse, rho_min=rho_min, rho_max=rho_max)
         sp_z = pre.support_points.astype(np.float64)
         sp_f = pre.support_values.astype(np.float64)
         w = pre.weights.astype(np.float64)
 
-        _bary = make_logdet_jax_param_fn("aaa", T=T)
+        _bary = make_logdet_jax_param_fn("chol_aaa", T=T)
 
         def _jax_chol_aaa(rho):
             import jax.numpy as jnp
@@ -360,7 +381,7 @@ def make_logdet_jax_fn(
 
         return _jax_chol_aaa
 
-    if method == "grid_spline":
+    if method == "lu_spline":
         from ._grid_spline import (
             grid_spline_breaks_coeffs,
             grid_spline_eval_jax,
@@ -369,7 +390,7 @@ def make_logdet_jax_fn(
 
         # Incumbent practice: precompute the exact LU grid and fit the cubic
         # spline in numpy, then evaluate its piecewise-cubic form JAX-natively
-        # (differentiable, JIT-compatible), mirroring the "aaa" split above.
+        # (differentiable, JIT-compatible), mirroring the "lu_aaa" split above.
         pre = grid_spline_logdet_precompute(W_sparse, rho_min=rho_min, rho_max=rho_max)
         breaks_np, coeffs_np = grid_spline_breaks_coeffs(pre)
 
@@ -382,97 +403,4 @@ def make_logdet_jax_fn(
 
         return _jax_grid_spline
 
-    if method == "cholmod":
-        # JAX-native exact logdet via sparsax sparse CHOLMOD.
-        # Requires W to be D-symmetrizable (row-standardized undirected
-        # graph): W = D⁻¹A with symmetric A → W_sym = D^{1/2} W D^{-1/2}
-        # is symmetric with the same eigenvalues, so I−ρW_sym is SPD
-        # for |ρ| < 1 and sparsax.logdet applies directly.
-        # If W is not D-symmetrizable (directed graph), this raises
-        # ValueError — use logdet_method="aaa" for such matrices.
-        from .._jax_dispatch import _sparsax_available
-
-        if not _sparsax_available():
-            raise ImportError(
-                "logdet method 'cholmod' requires the 'sparsax' package. "
-                "Install it with: pip install sparsax"
-            )
-
-        from ._chol_cheb import _d_symmetrize
-
-        # D-symmetrize: raises ValueError if W is not symmetrizable.
-        W_sym_sp = _d_symmetrize(W_sparse)  # csc_matrix, symmetric
-
-        # Build the COO pattern for I − ρW_sym.
-        # sparsax reads only Ai <= Aj entries (upper triangle),
-        # so we include the upper triangle of W_sym plus all diagonal
-        # entries (for the I in I − ρW_sym, since W_sym has zero diagonal
-        # for graphs without self-loops).
-        W_sym_coo = W_sym_sp.tocoo()
-        mask_upper = W_sym_coo.row <= W_sym_coo.col
-        upper_rows = W_sym_coo.row[mask_upper]
-        upper_cols = W_sym_coo.col[mask_upper]
-        upper_vals = W_sym_coo.data[mask_upper]
-
-        # Add diagonal entries that are missing from W_sym's pattern
-        existing_diag = set(zip(upper_rows.tolist(), upper_cols.tolist()))
-        diag_rows = []
-        diag_cols = []
-        for i in range(n):
-            if (i, i) not in existing_diag:
-                diag_rows.append(i)
-                diag_cols.append(i)
-
-        _Ai_direct = np.concatenate(
-            [
-                upper_rows.astype(np.int32),
-                np.array(diag_rows, dtype=np.int32),
-            ]
-        )
-        _Aj_direct = np.concatenate(
-            [
-                upper_cols.astype(np.int32),
-                np.array(diag_cols, dtype=np.int32),
-            ]
-        )
-        # W_sym values at these positions (0 for added diagonal entries)
-        _W_sym_vals = np.concatenate(
-            [
-                upper_vals.astype(np.float64),
-                np.zeros(len(diag_rows), dtype=np.float64),
-            ]
-        )
-        _nnz_direct = len(_Ai_direct)
-        _n_static = n
-
-        # Diagonal indices for I − ρW_sym
-        _diag_idx_direct = np.full(n, -1, dtype=np.int32)
-        for k_idx in range(_nnz_direct):
-            if _Ai_direct[k_idx] == _Aj_direct[k_idx]:
-                _diag_idx_direct[_Ai_direct[k_idx]] = k_idx
-
-        def _jax_cholmod(rho):
-            import jax.numpy as jnp
-            import sparsax
-
-            Ai = jnp.asarray(_Ai_direct, dtype=jnp.int32)
-            Aj = jnp.asarray(_Aj_direct, dtype=jnp.int32)
-            W_vals = jnp.asarray(_W_sym_vals, dtype=jnp.float64)
-            diag_idx = jnp.asarray(_diag_idx_direct, dtype=jnp.int32)
-
-            # Ax = I − ρW_sym at pattern positions
-            Ax = -rho * W_vals
-            diag_vals = jnp.zeros(_nnz_direct, dtype=jnp.float64)
-            diag_vals = diag_vals.at[diag_idx].set(1.0)
-            Ax = Ax + diag_vals
-
-            val = sparsax.logdet(Ai, Aj, Ax, _n_static)
-            return val if T == 1 else T * val
-
-        return _jax_cholmod
-
-    raise ValueError(
-        f"Method '{method}' has no JAX implementation. "
-        "Use 'eigenvalue', 'chebyshev', 'cheb_stochastic', "
-        "'cheb_cholesky', 'aaa', 'chol_aaa', 'cholmod', or 'slq'."
-    )
+    raise ValueError(f"Log-determinant key {method!r} has no JAX implementation.")

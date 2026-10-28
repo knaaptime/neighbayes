@@ -1,0 +1,90 @@
+---
+# Posteriors against the LeSage MATLAB toolbox, run under Octave.
+#
+# Parallel to the standard CI, not inside it: the flagged tests (pytest
+# marker ``octave``, deselected by default) shell out to Octave and run long
+# MCMC chains on both sides.  The toolbox is the author's served artifact,
+# fetched at a pinned URL and checked against a pinned sha256; nothing in the
+# repository vendors it.
+name: LeSage toolbox validation
+
+on:
+  schedule:
+    - cron: "0 7 * * 1"
+  pull_request:
+    paths:
+      - "neighbayes/tests/test_validation/**"
+      - ".github/workflows/lesage_validation.yml"
+  workflow_dispatch:
+
+env:
+  TOOLBOX_URL: https://www.spatial-econometrics.com/html/toolbox_may2021.zip
+  TOOLBOX_SHA256: 16f90ef3190faf0706397c512cf8e67fe0ce94d717207180cc4d778a7edb0019
+  OCTAVE_VERSION: "10.3"
+
+jobs:
+  validation:
+    name: neighbayes vs LeSage toolbox
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    defaults:
+      run:
+        shell: bash -l {0}
+
+    steps:
+      - name: checkout repo
+        uses: actions/checkout@v6
+
+      - name: setup micromamba
+        uses: mamba-org/setup-micromamba@v3
+        with:
+          environment-file: ci/314-latest.yml
+          micromamba-version: "latest"
+
+      # Octave gets its own environment, so its library stack never enters
+      # the solve for the package's.
+      - name: install Octave
+        run: |
+          micromamba create -y -n octave -c conda-forge "octave=${OCTAVE_VERSION}"
+          : "${MAMBA_EXE:?setup-micromamba did not export MAMBA_EXE}"
+          wrapper="$RUNNER_TEMP/octave"
+          printf '#!/usr/bin/env bash\nexec "%s" run -n octave octave "$@"\n' \
+            "$MAMBA_EXE" > "$wrapper"
+          chmod +x "$wrapper"
+          echo "NEIGHBAYES_OCTAVE=$wrapper" >> "$GITHUB_ENV"
+          "$wrapper" --version | head -1
+
+      - name: cache toolbox
+        id: toolbox-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/lesage
+          key: lesage-toolbox-${{ env.TOOLBOX_SHA256 }}
+
+      - name: fetch toolbox
+        if: steps.toolbox-cache.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p "$RUNNER_TEMP/lesage"
+          cd "$RUNNER_TEMP/lesage"
+          curl -fsSL --retry 3 --max-time 600 "$TOOLBOX_URL" -o toolbox.zip
+          echo "${TOOLBOX_SHA256}  toolbox.zip" | sha256sum -c -
+          unzip -q toolbox.zip
+          rm toolbox.zip
+
+      - name: point the harness at the toolbox
+        run: echo "NEIGHBAYES_TOOLBOX_DIR=$RUNNER_TEMP/lesage/toolbox_may2021" >> "$GITHUB_ENV"
+
+      - name: install package
+        run: pip install -e . --no-deps
+
+      # The toolbox's progress bars need a figure handle; xvfb gives the
+      # headless runner a display to create it on.
+      - name: run validation tests
+        run: |
+          xvfb-run -a python -m pytest neighbayes/tests/test_validation \
+            -m octave \
+            -n auto \
+            -v \
+            -r a \
+            --color yes

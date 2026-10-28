@@ -135,18 +135,7 @@ def compile_log_posterior(pymc_model) -> tuple[Callable, list[str], dict, Callab
     param_sizes = {}
     for vv in value_vars:
         name = vv.name
-        if name in initial_pt:
-            shape = tuple(np.asarray(initial_pt[name]).shape)
-        else:
-            # Fallback: try to find the corresponding free_RV
-            shape = ()
-            for fv in free_vars:
-                if name == fv.name or name.startswith(fv.name + "_"):
-                    try:
-                        shape = tuple(fv.eval().shape)
-                    except Exception:
-                        shape = ()
-                    break
+        shape = tuple(np.asarray(initial_pt[name]).shape)
         param_shapes[name] = shape
         param_sizes[name] = int(np.prod(shape)) if shape else 1
 
@@ -460,13 +449,14 @@ def _run_iterative_scheme(
     # package, which recomputes coda's single-sequence ESS per iteration;
     # the logml estimate is identical either way — only the error bar moves.
     if use_neff:
-        try:
-            if summand_shape is not None and summand_shape[0] > 1:
-                S1_eff = float(az.ess(den_vals.reshape(summand_shape), method="bulk"))
-            else:
-                S1_eff = float(az.ess(np.asarray(den_vals), method="bulk"))
-        except Exception:
-            S1_eff = N1
+        # ArviZ's ``ess`` needs a (chain, draw) array; a flattened sequence is
+        # one chain.  A 1-D array raised here and the error bar silently fell
+        # back to the nominal N1.
+        if summand_shape is not None and summand_shape[0] > 1:
+            layout = den_vals.reshape(summand_shape)
+        else:
+            layout = np.asarray(den_vals).reshape(1, -1)
+        S1_eff = float(az.ess(layout, method="bulk"))
         var_den_adj = var_den * N1 / max(S1_eff, 1.0)
     else:
         S1_eff = N1
@@ -642,17 +632,7 @@ def _bridge_logml(
     cov = _nearest_pos_def(cov)
 
     # --- 4. Compute ESS for the iterative samples ---
-    if use_neff:
-        try:
-            neff = _compute_ess(samples_4_iter)
-        except Exception:
-            warnings.warn(
-                "ESS computation failed; using nominal sample size.",
-                stacklevel=2,
-            )
-            neff = None
-    else:
-        neff = None
+    neff = _compute_ess(samples_4_iter) if use_neff else None
 
     # --- 5. Evaluate log densities for posterior samples ---
     q11 = np.array([log_posterior(samples_4_iter[j]) for j in range(N1)])

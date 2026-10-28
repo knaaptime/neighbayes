@@ -25,24 +25,7 @@ from neighbayes.models import (
     SEM,
     SLX,
     SARLogit,
-    SARLogitStructural,
     SARNegBin,
-    SARNegBinStructural,
-    SEMLogit,
-)
-from neighbayes.models.panel._fe import (
-    OLSPanelFE,
-    SARPanelFE,
-    SDEMPanelFE,
-    SDMPanelFE,
-    SEMPanelFE,
-    SLXPanelFE,
-)
-from neighbayes.models.panel._re import (
-    OLSPanelRE,
-    SARPanelRE,
-    SDEMPanelRE,
-    SEMPanelRE,
 )
 from neighbayes.tests.helpers import (
     PANEL_N,
@@ -138,33 +121,33 @@ def _panel_graph():
 # name -> (ctor, data_fn, expected_varnames, samplers)
 GAUSSIAN_PANEL_FE: dict[str, tuple] = {
     "SAR": (
-        SARPanelFE,
+        SAR,
         make_panel_sar_data,
         {"beta", "rho", "sigma", "sigma2"},
         ("gibbs", "nuts"),
     ),
     "SEM": (
-        SEMPanelFE,
+        SEM,
         make_panel_sem_data,
         {"beta", "lam", "sigma", "sigma2"},
         ("gibbs", "nuts"),
     ),
     "SDM": (
-        SDMPanelFE,
+        SDM,
         make_panel_sdm_fe_data,
         {"beta", "rho", "sigma", "sigma2"},
         ("gibbs", "nuts"),
     ),
     "SDEM": (
-        SDEMPanelFE,
+        SDEM,
         make_panel_sdem_fe_data,
         {"beta", "lam", "sigma", "sigma2"},
         ("gibbs", "nuts"),
     ),
-    "OLS": (OLSPanelFE, make_panel_ols_data, {"beta", "sigma", "sigma2"}, ("nuts",)),
+    "OLS": (OLS, make_panel_ols_data, {"beta", "sigma", "sigma2"}, ("nuts",)),
     # SLX has no closed-form panel DGP helper; the SDM generator supplies WX
     # signal and SLX ignores the ρ lag.
-    "SLX": (SLXPanelFE, make_panel_sdm_fe_data, {"beta", "sigma", "sigma2"}, ("nuts",)),
+    "SLX": (SLX, make_panel_sdm_fe_data, {"beta", "sigma", "sigma2"}, ("nuts",)),
 }
 
 
@@ -179,7 +162,7 @@ def _panel_fe_cases():
 @pytest.mark.parametrize("name,ctor,data_fn,expected,sampler", list(_panel_fe_cases()))
 def test_gaussian_panel_fe_fit_contract(name, ctor, data_fn, expected, sampler):
     y, X, _ = data_fn(np.random.default_rng(1), _W_PANEL, PANEL_N, PANEL_T)
-    model = ctor(y=y, X=X, W=_panel_graph(), N=PANEL_N, T=PANEL_T, effects=1)
+    model = ctor(y=y, X=X, W=_panel_graph(), N=PANEL_N, T=PANEL_T, unit_effects="fixed")
     kwargs = dict(
         sampler=sampler, draws=6, tune=6, chains=1, progressbar=False, random_seed=1
     )
@@ -201,28 +184,28 @@ def test_gaussian_panel_fe_fit_contract(name, ctor, data_fn, expected, sampler):
 # The 5-block RE Gibbs sampler does not emit the deterministic ``sigma2`` that
 # the NUTS build derives, so the contract is pinned *per sampler*.  NUTS
 # samples the effects non-centered by default (``alpha = sigma_alpha *
-# alpha_z``) and keeps the free variable ``alpha_z``: bridge sampling reads
+# unit_effect_raw``) and keeps the free variable ``unit_effect_raw``: bridge sampling reads
 # every free variable's draws from the posterior.
 # ---------------------------------------------------------------------------
 
-_RE_BASE = {"alpha", "beta", "sigma", "sigma_alpha"}
-_RE_NUTS = _RE_BASE | {"sigma2", "alpha_z"}
+_RE_BASE = {"unit_effect", "beta", "sigma", "unit_effect_sd"}
+_RE_NUTS = _RE_BASE | {"sigma2", "unit_effect_raw"}
 
 # name -> (ctor, data_fn, {sampler: expected_varnames})
 GAUSSIAN_PANEL_RE: dict[str, tuple] = {
-    "OLS": (OLSPanelRE, make_panel_ols_data, {"nuts": _RE_NUTS}),
+    "OLS": (OLS, make_panel_ols_data, {"nuts": _RE_NUTS}),
     "SAR": (
-        SARPanelRE,
+        SAR,
         make_panel_sar_data,
         {"gibbs": _RE_BASE | {"rho"}, "nuts": _RE_NUTS | {"rho"}},
     ),
     "SEM": (
-        SEMPanelRE,
+        SEM,
         make_panel_sem_data,
         {"gibbs": _RE_BASE | {"lam"}, "nuts": _RE_NUTS | {"lam"}},
     ),
     "SDEM": (
-        SDEMPanelRE,
+        SDEM,
         make_panel_sdem_fe_data,
         {"nuts": _RE_NUTS | {"lam"}},
     ),
@@ -240,7 +223,9 @@ def _panel_re_cases():
 @pytest.mark.parametrize("name,ctor,data_fn,expected,sampler", list(_panel_re_cases()))
 def test_gaussian_panel_re_fit_contract(name, ctor, data_fn, expected, sampler):
     y, X, _ = data_fn(np.random.default_rng(1), _W_PANEL, PANEL_N, PANEL_T)
-    model = ctor(y=y, X=X, W=_panel_graph(), N=PANEL_N, T=PANEL_T)
+    model = ctor(
+        y=y, X=X, W=_panel_graph(), N=PANEL_N, T=PANEL_T, unit_effects="random"
+    )
     kwargs = dict(
         sampler=sampler, draws=6, tune=6, chains=1, progressbar=False, random_seed=1
     )
@@ -258,8 +243,8 @@ def test_gaussian_panel_re_fit_contract(name, ctor, data_fn, expected, sampler):
 # ---------------------------------------------------------------------------
 # Binary (Pólya-Gamma logit) cross-section family
 #
-# SARLogit/SEMLogit are Gibbs-only (no NUTS build).  The logit link fixes
-# σ² = 1, so the posterior carries only the spatial parameter and β.
+# SARLogit is Gibbs-only (no NUTS build).  The logit link fixes the noise
+# scale, so the posterior carries only ρ and β.
 # ---------------------------------------------------------------------------
 
 _N_BINARY = 24
@@ -278,14 +263,9 @@ def _binary_graph():
     return W_to_graph(make_line_W(_N_BINARY))
 
 
-# name -> (ctor, expected_varnames)
-# The canonical SARLogit is reduced-form (auto→jax); SARLogitStructural is the
-# structural latent-field model; SEMLogit is the structural SEM.  All three
-# expose only the spatial parameter and β.
+# name -> (ctor, expected_varnames); the reduced-form SARLogit (auto→jax).
 BINARY_XS: dict[str, tuple] = {
     "SARLogit": (SARLogit, {"beta", "rho"}),
-    "SARLogitStructural": (SARLogitStructural, {"beta", "rho"}),
-    "SEMLogit": (SEMLogit, {"beta", "lam"}),
 }
 
 
@@ -317,7 +297,7 @@ def test_sarlogit_numpy_backend_fit_contract():
     model = SARLogit(y=y, X=X, W=_binary_graph())
     idata = model.fit(
         sampler="gibbs",
-        gibbs_backend="numpy",
+        backend="numpy",
         draws=6,
         tune=6,
         chains=1,
@@ -334,7 +314,7 @@ def test_sarlogit_numpy_backend_fit_contract():
 # Count (Pólya-Gamma NegBin / ZINB) cross-section family
 #
 # Gibbs-registered count models.  ``auto`` resolves to NumPy/CHOLMOD for all
-# of them (the jax_dense path is opt-in via gibbs_backend="jax").  SARNegBin
+# of them (the jax_dense path is opt-in via backend="jax").  SARNegBin
 # also supports NUTS (reduced-form PyMC model with a Deterministic ``mu``).
 # ---------------------------------------------------------------------------
 
@@ -362,15 +342,10 @@ COUNT_XS: dict[str, tuple] = {
         False,
         {"gibbs": {"beta", "rho", "alpha"}, "nuts": {"beta", "rho", "alpha", "mu"}},
     ),
-    "SARNegBinStructural": (
-        SARNegBinStructural,
-        False,
-        {"gibbs": {"beta", "rho", "alpha", "sigma"}},
-    ),
     "SARZINB": (
         SARZINB,
         True,
-        {"gibbs": {"beta", "rho", "alpha", "gamma", "lam"}},
+        {"gibbs": {"beta", "rho", "alpha", "beta_zero", "rho_zero"}},
     ),
 }
 
@@ -409,15 +384,15 @@ def test_count_xs_fit_contract(name, ctor, zi, expected, sampler):
 def test_zinb_jax_backend_fit_contract():
     """SARZINB's opt-in JAX backend yields the same posterior contract.
 
-    The JAX path is a *reduced-form* selection variant (vs the structural
-    NumPy default), but exposes the identical parameter set and attaches a
-    pointwise log-likelihood, so downstream tooling is backend-agnostic.
+    Both backends fit the same reduced-form ZINB, so the JAX path exposes the
+    identical parameter set and attaches a pointwise log-likelihood, and
+    downstream tooling is backend-agnostic.
     """
     y, X = _count_xy(zero_inflate=True)
     model = SARZINB(y=y, X=X, W=_count_graph())
     idata = model.fit(
         sampler="gibbs",
-        gibbs_backend="jax",
+        backend="jax",
         draws=6,
         tune=6,
         chains=1,
@@ -427,7 +402,9 @@ def test_zinb_jax_backend_fit_contract():
         idata_kwargs=_LL,
     )
     varnames = set(idata.posterior.data_vars)
-    assert varnames == {"beta", "rho", "alpha", "gamma", "lam"}, sorted(varnames)
+    assert varnames == {"beta", "rho", "alpha", "beta_zero", "rho_zero"}, sorted(
+        varnames
+    )
     assert "log_likelihood" in idata.children
 
 
@@ -445,14 +422,16 @@ def _default_cases():
     )
     yield (
         "SARPanelFE",
-        lambda: SARPanelFE(
-            y=yp, X=Xp, W=_panel_graph(), N=PANEL_N, T=PANEL_T, effects=1
+        lambda: SAR(
+            unit_effects="fixed", y=yp, X=Xp, W=_panel_graph(), N=PANEL_N, T=PANEL_T
         ),
         {"n_jobs": 1},
     )
     yield (
         "SARPanelRE",
-        lambda: SARPanelRE(y=yp, X=Xp, W=_panel_graph(), N=PANEL_N, T=PANEL_T),
+        lambda: SAR(
+            unit_effects="random", y=yp, X=Xp, W=_panel_graph(), N=PANEL_N, T=PANEL_T
+        ),
         {"n_jobs": 1},
     )
     yb, Xb = _binary_xy()

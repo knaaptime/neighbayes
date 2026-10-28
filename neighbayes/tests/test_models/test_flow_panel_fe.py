@@ -11,19 +11,21 @@ import numpy as np
 import pytest
 import scipy.sparse as sp
 
-from neighbayes.dgp.flows import generate_panel_flow_data
-from neighbayes.models.flow_panel import OLSFlowPanel, SARFlowPanel
+from neighbayes.dgp import simulate_sar_flow
+from neighbayes.models import OLSFlow, SARFlow
+from neighbayes.tests.helpers import effects_kwargs
 
 
 def _data(effects_sigma=1.0):
-    return generate_panel_flow_data(
+    return simulate_sar_flow(
         n=6,
         T=3,
         seed=0,
         distribution="normal",
         beta_d=[1.0, -0.5],
         beta_o=[0.5, 0.3],
-        sigma_alpha=effects_sigma,
+        pair_effects="fixed",
+        pair_effect_sd=effects_sigma,
     )
 
 
@@ -37,8 +39,13 @@ def _data(effects_sigma=1.0):
 )
 def test_absorbed_columns_are_dropped(effects, absorbed):
     d = _data()
-    m = OLSFlowPanel(
-        y=d["y"], X=d["X"], W=d["G"], T=3, col_names=d["col_names"], effects=effects
+    m = OLSFlow(
+        y=d["y"],
+        X=d["X"],
+        W=d["G"],
+        T=3,
+        col_names=d["col_names"],
+        **effects_kwargs(effects, "pair_effects"),
     )
     assert m._design_feature_names == list(d["col_names"])
     assert [c for c in d["col_names"] if c not in m._feature_names] == absorbed
@@ -53,13 +60,20 @@ def test_time_invariant_attribute_warns():
     j = d["col_names"].index("dest_x0")
     X[:, j] = np.tile(X[:N, j], 3)  # same in every period
     with pytest.warns(UserWarning, match="dest_x0"):
-        OLSFlowPanel(y=d["y"], X=X, W=d["G"], T=3, col_names=d["col_names"], effects=1)
+        OLSFlow(
+            pair_effects="fixed", y=d["y"], X=X, W=d["G"], T=3, col_names=d["col_names"]
+        )
 
 
 def test_beta_layout_scatters_with_nan():
     d = _data()
-    m = OLSFlowPanel(
-        y=d["y"], X=d["X"], W=d["G"], T=3, col_names=d["col_names"], effects=1
+    m = OLSFlow(
+        pair_effects="fixed",
+        y=d["y"],
+        X=d["X"],
+        W=d["G"],
+        T=3,
+        col_names=d["col_names"],
     )
 
     k = len(m._feature_names)
@@ -110,8 +124,13 @@ def test_flow_logdet_op_gradient():
 
 def test_sar_flow_panel_nuts_includes_jacobian():
     d = _data()
-    m = SARFlowPanel(
-        y=d["y"], X=d["X"], W=d["G"], T=3, col_names=d["col_names"], effects=1
+    m = SARFlow(
+        pair_effects="fixed",
+        y=d["y"],
+        X=d["X"],
+        W=d["G"],
+        T=3,
+        col_names=d["col_names"],
     )
     model = m._build_pymc_model()
     assert "jacobian" in [p.name for p in model.potentials]
@@ -145,8 +164,13 @@ def test_gaussian_flow_priors_are_shared_and_data_scaled():
     from neighbayes.samplers.gaussian._flow_resolvent import FlowResolventTarget
 
     d = _data()
-    m = SARFlowPanel(
-        y=d["y"], X=d["X"], W=d["G"], T=3, col_names=d["col_names"], effects=1
+    m = SARFlow(
+        pair_effects="fixed",
+        y=d["y"],
+        X=d["X"],
+        W=d["G"],
+        T=3,
+        col_names=d["col_names"],
     )
     pv = m._flow_gaussian_priors()
     assert pv["sigma2_alpha"] == 2.0
@@ -162,8 +186,13 @@ def test_gaussian_flow_priors_are_shared_and_data_scaled():
     np.testing.assert_array_equal(tgt.beta_sigma, pv["beta_sigma"])
     np.testing.assert_array_equal(tgt.beta_mu, pv["beta_mu"])
     # The defaults scale with y: rescaling y rescales every prior scale.
-    m2 = SARFlowPanel(
-        y=1000 * d["y"], X=d["X"], W=d["G"], T=3, col_names=d["col_names"], effects=1
+    m2 = SARFlow(
+        pair_effects="fixed",
+        y=1000 * d["y"],
+        X=d["X"],
+        W=d["G"],
+        T=3,
+        col_names=d["col_names"],
     )
     pv2 = m2._flow_gaussian_priors()
     np.testing.assert_allclose(pv2["beta_sigma"], 1000 * pv["beta_sigma"])
@@ -175,7 +204,7 @@ def test_gaussian_flow_priors_are_shared_and_data_scaled():
 
 def test_old_sigma_sigma_key_is_rejected():
     d = _data()
-    m = OLSFlowPanel(
+    m = OLSFlow(
         y=d["y"],
         X=d["X"],
         W=d["G"],
@@ -190,7 +219,7 @@ def test_old_sigma_sigma_key_is_rejected():
 @pytest.mark.slow
 def test_sar_flow_panel_nuts_and_gibbs_agree():
     """Same likelihood, same priors: the two samplers share a posterior."""
-    d = generate_panel_flow_data(
+    d = simulate_sar_flow(
         n=8,
         T=3,
         seed=1,
@@ -200,12 +229,18 @@ def test_sar_flow_panel_nuts_and_gibbs_agree():
         rho_d=0.3,
         rho_o=0.2,
         rho_w=0.1,
-        sigma_alpha=1.0,
+        pair_effects="fixed",
+        pair_effect_sd=1.0,
     )
     fits = {}
     for sampler in ("nuts", "gibbs"):
-        m = SARFlowPanel(
-            y=d["y"], X=d["X"], W=d["G"], T=3, col_names=d["col_names"], effects=1
+        m = SARFlow(
+            pair_effects="fixed",
+            y=d["y"],
+            X=d["X"],
+            W=d["G"],
+            T=3,
+            col_names=d["col_names"],
         )
         fits[sampler] = m.fit(
             sampler=sampler,

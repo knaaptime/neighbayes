@@ -8,15 +8,7 @@ import pymc as pm
 import pytest
 import xarray as xr
 
-from neighbayes.models import (
-    OLSPanelDynamic,
-    SARPanelDynamic,
-    SDEMPanelDynamic,
-    SDMRPanelDynamic,
-    SDMUPanelDynamic,
-    SEMPanelDynamic,
-    SLXPanelDynamic,
-)
+from neighbayes.models import OLS, SAR, SDEM, SDM, SEM, SLX
 from neighbayes.tests.helpers import W_to_graph, make_line_W
 
 
@@ -42,7 +34,7 @@ def test_dynamic_panel_models_fitted_values_and_effects_with_mock_posteriors():
     # k=2, kw=1 => beta length is 3
     beta = np.array([0.25, 0.85, 0.10])
 
-    dlm = OLSPanelDynamic(y=y, X=X, W=W, N=N, T=T, effects=0)
+    dlm = OLS(dynamic=True, y=y, X=X, W=W, N=N, T=T)
     dlm._idata = _idata(
         {
             "beta": np.stack([beta, beta + 1e-3]),
@@ -50,7 +42,7 @@ def test_dynamic_panel_models_fitted_values_and_effects_with_mock_posteriors():
         }
     )
 
-    sdmr = SDMRPanelDynamic(y=y, X=X, W=W, N=N, T=T, effects=0)
+    sdmr = SDM(dynamic="restricted", y=y, X=X, W=W, N=N, T=T)
     sdmr._idata = _idata(
         {
             "beta": np.stack([beta, beta + 1e-3]),
@@ -59,7 +51,7 @@ def test_dynamic_panel_models_fitted_values_and_effects_with_mock_posteriors():
         }
     )
 
-    sdmu = SDMUPanelDynamic(y=y, X=X, W=W, N=N, T=T, effects=0)
+    sdmu = SDM(dynamic=True, y=y, X=X, W=W, N=N, T=T)
     sdmu._idata = _idata(
         {
             "beta": np.stack([beta, beta + 1e-3]),
@@ -71,7 +63,7 @@ def test_dynamic_panel_models_fitted_values_and_effects_with_mock_posteriors():
 
     for model in [dlm, sdmr, sdmu]:
         fitted = model.fitted_values()
-        effects = model.spatial_effects()
+        effects = model.impacts()
 
         assert fitted.shape[0] == N * (T - 1)
         assert np.all(np.isfinite(fitted))
@@ -96,7 +88,7 @@ def test_dynamic_dlm_no_wx_branch_uses_feature_names():
     y, _, W, N, T = _panel_data(seed=51)
     X = np.ones((N * T, 1), dtype=float)  # only intercept => no WX columns
 
-    model = OLSPanelDynamic(y=y, X=X, W=W, N=N, T=T, effects=0)
+    model = OLS(dynamic=True, y=y, X=X, W=W, N=N, T=T)
     model._idata = _idata(
         {
             "beta": np.array([[0.3], [0.301]]),
@@ -104,35 +96,28 @@ def test_dynamic_dlm_no_wx_branch_uses_feature_names():
         }
     )
 
-    effects = model.spatial_effects()
+    effects = model.impacts()
     assert list(effects.index) == ["x0"]
     assert np.allclose(effects["indirect"].values, 0.0)
 
 
-def test_dynamic_models_require_at_least_two_periods():
+def test_dynamic_models_require_a_panel():
+    """T=1 is a cross-section, so a dynamic model with one period is refused."""
     rng = np.random.default_rng(52)
     N, T = 4, 1
     y = rng.normal(size=N * T)
     X = np.column_stack([np.ones(N * T), rng.normal(size=N * T)])
     W = W_to_graph(make_line_W(N))
 
-    model = OLSPanelDynamic(y=y, X=X, W=W, N=N, T=T, effects=0)
-    model._idata = _idata(
-        {
-            "beta": np.array([[0.2, 0.8], [0.201, 0.801]]),
-            "phi": np.array([0.3, 0.301]),
-        }
-    )
-
-    with pytest.raises(ValueError, match="T >= 2"):
-        model.fitted_values()
+    with pytest.raises(ValueError, match="dynamic needs a panel"):
+        OLS(dynamic=True, y=y, X=X, W=W, N=N, T=T)
 
 
 def test_dynamic_sar_panel_fitted_values_and_effects():
     y, X, W, N, T = _panel_data()
     beta = np.array([0.25, 0.85])
 
-    model = SARPanelDynamic(y=y, X=X, W=W, N=N, T=T, effects=0)
+    model = SAR(dynamic=True, y=y, X=X, W=W, N=N, T=T)
     model._idata = _idata(
         {
             "beta": np.stack([beta, beta + 1e-3]),
@@ -142,7 +127,7 @@ def test_dynamic_sar_panel_fitted_values_and_effects():
     )
 
     fitted = model.fitted_values()
-    effects = model.spatial_effects()
+    effects = model.impacts()
 
     assert fitted.shape[0] == N * (T - 1)
     assert np.all(np.isfinite(fitted))
@@ -169,7 +154,7 @@ def test_dynamic_sem_panel_fitted_values_and_effects():
     y, X, W, N, T = _panel_data()
     beta = np.array([0.25, 0.85])
 
-    model = SEMPanelDynamic(y=y, X=X, W=W, N=N, T=T, effects=0)
+    model = SEM(dynamic=True, y=y, X=X, W=W, N=N, T=T)
     model._idata = _idata(
         {
             "beta": np.stack([beta, beta + 1e-3]),
@@ -179,7 +164,7 @@ def test_dynamic_sem_panel_fitted_values_and_effects():
     )
 
     fitted = model.fitted_values()
-    effects = model.spatial_effects()
+    effects = model.impacts()
 
     assert fitted.shape[0] == N * (T - 1)
     assert np.all(np.isfinite(fitted))
@@ -191,7 +176,7 @@ def test_dynamic_sdem_panel_fitted_values_and_effects():
     y, X, W, N, T = _panel_data()
     beta = np.array([0.25, 0.85, 0.10])  # k=2, kw=1
 
-    model = SDEMPanelDynamic(y=y, X=X, W=W, N=N, T=T, effects=0)
+    model = SDEM(dynamic=True, y=y, X=X, W=W, N=N, T=T)
     model._idata = _idata(
         {
             "beta": np.stack([beta, beta + 1e-3]),
@@ -201,7 +186,7 @@ def test_dynamic_sdem_panel_fitted_values_and_effects():
     )
 
     fitted = model.fitted_values()
-    effects = model.spatial_effects()
+    effects = model.impacts()
 
     assert fitted.shape[0] == N * (T - 1)
     assert np.all(np.isfinite(fitted))
@@ -216,7 +201,7 @@ def test_dynamic_slx_panel_fitted_values_and_effects():
     y, X, W, N, T = _panel_data()
     beta = np.array([0.25, 0.85, 0.10])  # k=2, kw=1
 
-    model = SLXPanelDynamic(y=y, X=X, W=W, N=N, T=T, effects=0)
+    model = SLX(dynamic=True, y=y, X=X, W=W, N=N, T=T)
     model._idata = _idata(
         {
             "beta": np.stack([beta, beta + 1e-3]),
@@ -225,7 +210,7 @@ def test_dynamic_slx_panel_fitted_values_and_effects():
     )
 
     fitted = model.fitted_values()
-    effects = model.spatial_effects()
+    effects = model.impacts()
 
     assert fitted.shape[0] == N * (T - 1)
     assert np.all(np.isfinite(fitted))
@@ -248,16 +233,16 @@ def test_dynamic_slx_panel_fitted_values_and_effects():
 @pytest.mark.parametrize(
     "cls,expected_present,expected_absent",
     [
-        (SARPanelDynamic, ("rho", "phi"), ()),
-        (SEMPanelDynamic, ("lam", "phi"), ()),
-        (SDEMPanelDynamic, ("lam", "phi"), ()),
-        (SLXPanelDynamic, ("phi",), ("rho", "lam")),
+        (SAR, ("rho", "phi"), ()),
+        (SEM, ("lam", "phi"), ()),
+        (SDEM, ("lam", "phi"), ()),
+        (SLX, ("phi",), ("rho", "lam")),
     ],
     ids=lambda v: getattr(v, "__name__", str(v)),
 )
 def test_dynamic_panel_builds_pymc_model(cls, expected_present, expected_absent):
     y, X, W, N, T = _panel_data()
-    model = cls(y=y, X=X, W=W, N=N, T=T, effects=0)
+    model = cls(y=y, X=X, W=W, N=N, T=T, dynamic=True)
     pymc_model = model._build_pymc_model()
     rv_names = [v.name for v in pymc_model.free_RVs]
     for name in expected_present:
@@ -267,31 +252,39 @@ def test_dynamic_panel_builds_pymc_model(cls, expected_present, expected_absent)
 
 
 # ---------------------------------------------------------------------------
-# Nickell bias guard: effects=1 must raise ValueError for all dynamic models
+# Nickell bias guard: unit effects must raise ValueError for all dynamic models
 # ---------------------------------------------------------------------------
 
-_DYNAMIC_CLASSES = [
-    OLSPanelDynamic,
-    SDMRPanelDynamic,
-    SDMUPanelDynamic,
-    SARPanelDynamic,
-    SEMPanelDynamic,
-    SDEMPanelDynamic,
-    SLXPanelDynamic,
+_DYNAMIC_DESIGNS = [
+    (OLS, True),
+    (SDM, "restricted"),
+    (SDM, True),
+    (SAR, True),
+    (SEM, True),
+    (SDEM, True),
+    (SLX, True),
 ]
 
 
-@pytest.mark.parametrize("cls", _DYNAMIC_CLASSES, ids=lambda c: c.__name__)
-def test_dynamic_panel_model1_raises_nickell_bias(cls):
-    """effects=1 (unit FE) must raise ValueError for dynamic panel models.
+@pytest.mark.parametrize(
+    "unit,time", [("fixed", False), ("fixed", True), ("random", False)]
+)
+@pytest.mark.parametrize(
+    "cls,dynamic", _DYNAMIC_DESIGNS, ids=lambda v: getattr(v, "__name__", str(v))
+)
+def test_dynamic_panel_unit_effects_raise_nickell_bias(cls, dynamic, unit, time):
+    """Unit effects, alone or two-way, must raise for dynamic panel models.
 
     The within-transformation creates correlation between the demeaned
     lagged dependent variable and the demeaned error, biasing the
     autoregressive coefficient toward zero (Nickell, 1981).
     """
     y, X, W, N, T = _panel_data()
-    with pytest.raises(ValueError, match="Nickell|effects=1|unit fixed effects"):
-        cls(y=y, X=X, W=W, N=N, T=T, effects=1)
+    with pytest.raises(ValueError, match="Nickell"):
+        cls(
+            y=y, X=X, W=W, N=N, T=T, dynamic=dynamic, unit_effects=unit,
+            time_effects=time,
+        )  # fmt: skip
 
 
 # ---------------------------------------------------------------------------
@@ -314,9 +307,9 @@ def test_dynamic_panel_build_pymc_models_and_prepare_dynamic_design_cache():
     y, X, W, N, T = _builds_data()
 
     models = [
-        OLSPanelDynamic(y=y, X=X, W=W, N=N, T=T, effects=0),
-        SDMRPanelDynamic(y=y, X=X, W=W, N=N, T=T, effects=0),
-        SDMUPanelDynamic(y=y, X=X, W=W, N=N, T=T, effects=0),
+        OLS(dynamic=True, y=y, X=X, W=W, N=N, T=T),
+        SDM(dynamic="restricted", y=y, X=X, W=W, N=N, T=T),
+        SDM(dynamic=True, y=y, X=X, W=W, N=N, T=T),
     ]
 
     for model in models:
@@ -335,7 +328,7 @@ def test_dynamic_sdm_models_no_wx_branch_effects_and_names():
     # Use X with 2 columns (intercept + x1) so WX has 1 column
     X = np.column_stack([np.ones(N * T), np.linspace(-1, 1, N * T)])
 
-    sdmr = SDMRPanelDynamic(y=y, X=X, W=W, N=N, T=T, effects=0)
+    sdmr = SDM(dynamic="restricted", y=y, X=X, W=W, N=N, T=T)
     sdmr._idata = _idata(
         {
             "beta": np.array([[0.2, 0.5, 0.1], [0.201, 0.501, 0.101]]),
@@ -344,7 +337,7 @@ def test_dynamic_sdm_models_no_wx_branch_effects_and_names():
         }
     )
 
-    sdmu = SDMUPanelDynamic(y=y, X=X, W=W, N=N, T=T, effects=0)
+    sdmu = SDM(dynamic=True, y=y, X=X, W=W, N=N, T=T)
     sdmu._idata = _idata(
         {
             "beta": np.array([[0.2, 0.5, 0.1], [0.201, 0.501, 0.101]]),
@@ -355,7 +348,7 @@ def test_dynamic_sdm_models_no_wx_branch_effects_and_names():
     )
 
     for model in [sdmr, sdmu]:
-        eff = model.spatial_effects()
+        eff = model.impacts()
         # SDM models with WX terms report effects for lagged covariates only
         assert len(eff.index) >= 1
         assert np.all(np.isfinite(eff["direct"].values))
@@ -366,7 +359,7 @@ def test_dynamic_sdm_models_no_wx_branch_effects_and_names():
 def test_dynamic_beta_names_include_wx_labels_when_present():
     y, X, W, N, T = _builds_data(seed=102)
 
-    model = OLSPanelDynamic(y=y, X=X, W=W, N=N, T=T, effects=0)
+    model = OLS(dynamic=True, y=y, X=X, W=W, N=N, T=T)
     names = model._beta_names()
 
     assert any(name.startswith("W*") for name in names)

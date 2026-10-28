@@ -125,7 +125,7 @@ class TestProbeBias:
 
     def test_predicted_spread_matches_realized_bias(self, ring):
         """std(q)/√s prices the posterior-mean bias against the exact logdet."""
-        from neighbayes._logdet._cheb_stochastic import cheb_stochastic_logdet_eval_vec
+        from neighbayes._logdet._cheb_stochastic import cheb_stochastic_logdet_eval
 
         W, eigs = ring
         grid = np.linspace(self.MU - 6 * self.SD, self.MU + 6 * self.SD, 241)
@@ -138,7 +138,8 @@ class TestProbeBias:
         s, realized, predicted = 20, [], []
         for seed in range(40):
             pool = cheb_stochastic_pool(W, s, rho_min=-0.99, rho_max=0.99, seed=seed)
-            err = cheb_stochastic_logdet_eval_vec(pool_precompute(pool), grid) - exact
+            pre = pool_precompute(pool)
+            err = np.array([cheb_stochastic_logdet_eval(pre, r) for r in grid]) - exact
             lp = lp0 + err
             w = np.exp(lp - lp.max())
             w /= w.sum()
@@ -159,7 +160,7 @@ class TestProbeBias:
         W, _ = ring
         pool = cheb_stochastic_pool(W, 12, seed=0)
         assert pool_probe_bias(pool, np.full(50, 0.5)) is None
-        sized, check = size_pool(pool, np.full(50, 0.5))
+        sized, check = size_pool(pool, np.full(50, 0.5), bar=0.05)
         assert sized is pool and check is None
 
 

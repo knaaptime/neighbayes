@@ -1,7 +1,7 @@
 """Correctness of the resolvent-gradient flow sampler's ρ-conditional target.
 
-The novel coupling is the ρ log-posterior and its gradient (exact O(N) data term +
-resolvent log-determinant).  We validate the gradient against a finite difference of
+The novel coupling is the ρ log-posterior given σ², β integrated out, and its
+gradient (exact data term + resolvent log-determinant).  We validate the gradient against a finite difference of
 the target value using the *exact* log-determinant — deterministic and fast, with no
 GMRES or MCMC loop.  (End-to-end posterior recovery is a GPU benchmark.)
 """
@@ -9,12 +9,18 @@ GMRES or MCMC loop.  (End-to-end posterior recovery is a GPU benchmark.)
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
-from neighbayes._logdet._flow_resolvent import flow_logdet_grad_exact
+from neighbayes._logdet._flow_kron_traces import FlowKronTraceLogdet
+from neighbayes.models import SARNegBinFlow
+from neighbayes.samplers.gaussian import _flow_resolvent as fr
 from neighbayes.samplers.gaussian._flow_resolvent import (
     FlowResolventTarget,
     SEMFlowResolventTarget,
 )
+from neighbayes.tests.helpers import flow_form, flow_logdet_grad_exact
+
+sar_negbin_separable = flow_form(SARNegBinFlow, separable=True)
 
 
 def _directed_sem_data(n, seed):
@@ -66,21 +72,85 @@ def test_rho_gradient_matches_finite_difference():
     W, y, X = _directed_flow_data(n=15, seed=0)
     tgt = FlowResolventTarget(W, y, X, logdet_value_and_grad=_exact_value_and_grad(W))
 
-    beta = np.array([0.8, -0.4])
     sigma2 = 0.3
     h = 1e-6
     for rho in ([0.3, 0.2, -0.05], [0.5, 0.1, 0.1], [-0.2, 0.4, -0.1]):
         rho = np.array(rho)
-        _, grad = tgt.logpost_and_grad(rho, beta, sigma2)
+        _, grad = tgt.logpost_and_grad(rho, sigma2)
         fd = np.zeros(3)
         for k in range(3):
             rp, rm = rho.copy(), rho.copy()
             rp[k] += h
             rm[k] -= h
-            vp, _ = tgt.logpost_and_grad(rp, beta, sigma2)
-            vm, _ = tgt.logpost_and_grad(rm, beta, sigma2)
+            vp, _ = tgt.logpost_and_grad(rp, sigma2)
+            vm, _ = tgt.logpost_and_grad(rm, sigma2)
             fd[k] = (vp - vm) / (2 * h)
         np.testing.assert_allclose(grad, fd, rtol=1e-4, atol=1e-3)
+
+
+def _dense_marginal(tgt, A_of, X_of, rho, sigma2):
+    """``J log|A| + log N(Ay; AX b0, σ² I + AX B0 X'A')``, β integrated densely."""
+    A = A_of(rho)
+    Xt = X_of(A)
+    S = sigma2 * np.eye(A.shape[0]) + Xt @ np.diag(tgt.beta_sigma**2) @ Xt.T
+    r = A @ tgt.y - Xt @ tgt.beta_mu
+    _, logdet_S = np.linalg.slogdet(S)
+    _, logdet_A = np.linalg.slogdet(A)
+    return logdet_A - 0.5 * logdet_S - 0.5 * r @ np.linalg.solve(S, r)
+
+
+def test_collapsed_target_is_the_beta_marginal():
+    """β integrated out of ρ's conditional matches the dense Gaussian marginal (SAR, SEM)."""
+    n = 6
+    for cls, data, sem in (
+        (FlowResolventTarget, _directed_flow_data, False),
+        (SEMFlowResolventTarget, _directed_sem_data, True),
+    ):
+        W, y, X = data(n=n, seed=3)
+        tgt = cls(W, y, X, logdet_value_and_grad=_exact_value_and_grad(W))
+        Ide = np.eye(n)
+        K = (np.kron(Ide, W), np.kron(W, Ide), np.kron(W, W))
+
+        def A_of(rho):
+            return np.eye(n * n) - sum(r * k for r, k in zip(rho, K))
+
+        def X_of(A, sem=sem):
+            return A @ X if sem else X
+
+        sigma2 = 0.4
+        rhos = (np.array([0.3, 0.2, -0.05]), np.array([-0.1, 0.4, 0.1]))
+        got = [tgt.logpost_and_grad(r, sigma2)[0] for r in rhos]
+        want = [_dense_marginal(tgt, A_of, X_of, r, sigma2) for r in rhos]
+        np.testing.assert_allclose(got[0] - got[1], want[0] - want[1], rtol=1e-9)
+
+
+def test_directed_w_takes_the_taylor_series_and_falls_back_near_the_wall(
+    monkeypatch,
+):
+    """Auto routing gives a directed W the exact Taylor series; beyond its order
+    cap the target evaluates its resolvent estimator instead."""
+    import neighbayes.samplers.gaussian._flow_resolvent as fr
+
+    def sentinel(kron, probes):
+        return lambda rd, ro, rw: (123.0, np.zeros(3))
+
+    monkeypatch.setattr(fr, "_default_logdet_value_and_grad", sentinel)
+    _TAYLOR_FALLBACK_ORDER, resolve_flow_logdet = (
+        fr._TAYLOR_FALLBACK_ORDER,
+        fr.resolve_flow_logdet,
+    )
+    W, y, X = _directed_flow_data(n=10, seed=5)
+    ld, method = resolve_flow_logdet(W)
+    assert method == "kron_traces" and ld.basis == "taylor"
+    tgt = FlowResolventTarget(W, y, X, logdet_value_and_grad=ld, logdet_method="numpy")
+    exact = _exact_value_and_grad(W)
+    far, near = (0.3, 0.2, -0.05), (0.6, 0.35, 0.02)
+    assert ld.taylor_order(*far) <= _TAYLOR_FALLBACK_ORDER < ld.taylor_order(*near)
+    v, g = tgt.logdet_value_and_grad(*far)
+    ve, ge = exact(*far)
+    np.testing.assert_allclose(v, ve, rtol=1e-10)
+    np.testing.assert_allclose(g, ge, rtol=1e-8)
+    assert tgt.logdet_value_and_grad(*near)[0] == 123.0
 
 
 def test_Ay_is_linear_in_rho():
@@ -128,6 +198,8 @@ def test_sample_flow_resolvent_returns_inferencedata():
     # Dominant components recover (true ρ_d=0.3, ρ_o=0.2).
     assert 0.15 < float(idata.posterior["rho_d"].mean()) < 0.45
     assert 0.05 < float(idata.posterior["rho_o"].mean()) < 0.35
+    # Which ρ kernel each chain kept after its warmup trial.
+    assert len(idata.attrs["rho_independence"]) == 2
 
 
 def _directed_panel_sar_data(n, T, seed):
@@ -159,19 +231,18 @@ def test_panel_rho_gradient_matches_finite_difference():
         W, y, X, T=T, logdet_value_and_grad=_exact_value_and_grad(W)
     )
     assert tgt.T == T and tgt.Ntot == y.shape[0]
-    beta = np.array([0.8, -0.4])
     sigma2 = 0.3
     h = 1e-6
     for rho in ([0.3, 0.2, -0.05], [0.5, 0.1, 0.1]):
         rho = np.array(rho)
-        _, grad = tgt.logpost_and_grad(rho, beta, sigma2)
+        _, grad = tgt.logpost_and_grad(rho, sigma2)
         fd = np.zeros(3)
         for k in range(3):
             rp, rm = rho.copy(), rho.copy()
             rp[k] += h
             rm[k] -= h
-            vp, _ = tgt.logpost_and_grad(rp, beta, sigma2)
-            vm, _ = tgt.logpost_and_grad(rm, beta, sigma2)
+            vp, _ = tgt.logpost_and_grad(rp, sigma2)
+            vm, _ = tgt.logpost_and_grad(rm, sigma2)
             fd[k] = (vp - vm) / (2 * h)
         np.testing.assert_allclose(grad, fd, rtol=1e-4, atol=1e-3)
 
@@ -206,19 +277,18 @@ def test_sem_rho_gradient_matches_finite_difference():
     tgt = SEMFlowResolventTarget(
         W, y, X, logdet_value_and_grad=_exact_value_and_grad(W)
     )
-    beta = np.array([0.8, -0.4])
     sigma2 = 0.3
     h = 1e-6
     for rho in ([0.3, 0.2, -0.05], [0.5, 0.1, 0.1], [-0.2, 0.4, -0.1]):
         rho = np.array(rho)
-        _, grad = tgt.logpost_and_grad(rho, beta, sigma2)
+        _, grad = tgt.logpost_and_grad(rho, sigma2)
         fd = np.zeros(3)
         for k in range(3):
             rp, rm = rho.copy(), rho.copy()
             rp[k] += h
             rm[k] -= h
-            vp, _ = tgt.logpost_and_grad(rp, beta, sigma2)
-            vm, _ = tgt.logpost_and_grad(rm, beta, sigma2)
+            vp, _ = tgt.logpost_and_grad(rp, sigma2)
+            vm, _ = tgt.logpost_and_grad(rm, sigma2)
             fd[k] = (vp - vm) / (2 * h)
         np.testing.assert_allclose(grad, fd, rtol=1e-4, atol=1e-3)
 
@@ -431,6 +501,50 @@ def test_attach_flow_log_abs_det_skips_aspatial_posterior():
     )
 
 
+def test_separable_count_flow_log_abs_det_uses_closed_form(monkeypatch):
+    """Separable count flow classes take log|A| from n f(rho_d) + n f(rho_o),
+    never from the resolvent route, which factors the N x N system (KLU ran out
+    of memory at N = 9.68M).  The value equals the exact double sum with
+    rho_w = -rho_d rho_o, and T rescales it."""
+    import arviz as az
+
+    import neighbayes.samplers.gaussian._flow_resolvent as fr
+
+    W, _, X = _directed_flow_data(n=12, seed=4)
+    y = np.random.default_rng(4).poisson(3.0, size=X.shape[0])
+    model = SARNegBinFlow(y, X, W, separable=True, logdet_method="eigenvalue")
+
+    def _no_resolvent(*args, **kwargs):
+        raise AssertionError("separable class reached the resolvent route")
+
+    monkeypatch.setattr(fr, "attach_flow_log_abs_det", _no_resolvent)
+
+    nchain, ndraw = 2, 3
+    rd = np.array([[0.3, 0.1, -0.2], [0.25, 0.0, 0.4]])
+    ro = np.array([[0.2, -0.3, 0.15], [0.05, 0.35, -0.1]])
+    idata = az.from_dict({"posterior": {"rho_d": rd, "rho_o": ro, "rho_w": -rd * ro}})
+    model._attach_flow_log_abs_det(idata)
+    lad = idata.sample_stats["log_abs_det"].values
+    assert lad.shape == (nchain, ndraw)
+    assert "log_likelihood" not in idata.children
+
+    lam = np.linalg.eigvals(W)
+    li, lj = lam[:, None], lam[None, :]
+    exact = np.array(
+        [
+            np.sum(np.log(np.abs(1.0 - (b * li + a * lj - a * b * (li * lj)))))
+            for a, b in zip(rd.ravel(), ro.ravel())
+        ]
+    ).reshape(nchain, ndraw)
+    np.testing.assert_allclose(lad, exact, rtol=1e-8, atol=1e-8)
+
+    model._T = 3
+    model._attach_flow_log_abs_det(idata)
+    np.testing.assert_allclose(
+        idata.sample_stats["log_abs_det"].values, 3.0 * exact, rtol=1e-8, atol=1e-8
+    )
+
+
 def test_short_chain_with_exact_logdet_recovers_signs():
     """A short MALA-within-Gibbs run (exact ld, no GMRES) moves ρ toward the truth."""
     from neighbayes.samplers.gaussian._flow_resolvent import run_flow_resolvent_gibbs
@@ -443,3 +557,91 @@ def test_short_chain_with_exact_logdet_recovers_signs():
     assert post["rho_d"].mean() > 0.0
     assert post["rho_o"].mean() > 0.0
     assert abs(post["rho_d"].mean()) < 0.9
+
+
+# -- the Laplace t independence step behind its warmup trial ------------------
+
+
+def _rook_flow_data(side, rho, seed):
+    """An undirected (rook) unrestricted flow with ``rho = (ρ_d, ρ_o, ρ_w)``."""
+    import scipy.sparse as sp
+    from scipy.sparse.linalg import spsolve
+
+    from neighbayes.dgp.utils import rook_grid_weights
+
+    rng = np.random.default_rng(seed)
+    W, _ = rook_grid_weights(side)
+    W = sp.csr_matrix(W)
+    n = W.shape[0]
+    eye = sp.identity(n, format="csr")
+    A = (
+        sp.identity(n * n, format="csr")
+        - rho[0] * sp.kron(eye, W)
+        - rho[1] * sp.kron(W, eye)
+        - rho[2] * sp.kron(W, W)
+    )
+    X = np.column_stack([np.ones(n * n), rng.standard_normal(n * n)])
+    y = spsolve(A.tocsc(), X @ np.array([1.0, -0.5]) + rng.standard_normal(n * n))
+    return W, y, X
+
+
+def _rho_chain(W, y, X, ld, chain, **kw):
+    tgt = FlowResolventTarget(W, y, X, logdet_value_and_grad=ld, seed=chain)
+    kw = {"draws": 50, "tune": 400, **kw}
+    return fr.run_flow_resolvent_gibbs(
+        tgt, seed=10 + chain, compute_log_likelihood=False, progressbar=False, **kw
+    )
+
+
+@pytest.mark.parametrize(
+    "rho, keeps",
+    [
+        # A near-Gaussian posterior: the trial accepts most proposals.
+        ((0.3, 0.25, -0.1), True),
+        # Σ|ρ| ≈ 0.98 a posteriori, truncated by the wall: the trial fails.
+        ((0.55, 0.42, 0.0), False),
+    ],
+)
+def test_the_trial_keeps_the_laplace_t_only_where_it_fits(rho, keeps):
+    W, y, X = _rook_flow_data(7, rho, seed=3)
+    ld = FlowKronTraceLogdet(W)
+    kept = [bool(_rho_chain(W, y, X, ld, c)["rho_independence"]) for c in range(2)]
+    assert kept == [keeps, keeps]
+
+
+def test_the_kept_laplace_t_samples_the_same_posterior_as_mala(monkeypatch):
+    """Kept-t chains and MALA-only chains agree within Monte Carlo error."""
+    import arviz as az
+
+    W, y, X = _rook_flow_data(7, (0.3, 0.25, -0.1), seed=3)
+    ld = FlowKronTraceLogdet(W)
+
+    def run():
+        out = [_rho_chain(W, y, X, ld, c, draws=2000) for c in range(2)]
+        d = np.array(
+            [np.column_stack([o["rho_d"], o["rho_o"], o["rho_w"]]) for o in out]
+        )
+        ess = np.array([float(az.ess(d[..., k])) for k in range(3)])
+        flat = d.reshape(-1, 3)
+        return (
+            [bool(o["rho_independence"]) for o in out],
+            flat.mean(0),
+            flat.var(0) / ess,
+        )
+
+    kept, mean_t, mcse2_t = run()
+    assert kept == [True, True]
+    monkeypatch.setattr(fr, "_LAPLACE_T_TRIAL", 10**9)  # no room for a trial
+    kept, mean_m, mcse2_m = run()
+    assert kept == [False, False]
+    assert np.all(np.abs(mean_t - mean_m) < 4.0 * np.sqrt(mcse2_t + mcse2_m))
+
+
+def test_a_warmup_too_short_for_the_trial_keeps_mala(monkeypatch):
+    def no_trial(*args, **kwargs):
+        raise AssertionError("the Laplace t was built without room for its trial")
+
+    monkeypatch.setattr(fr, "_LaplaceT", no_trial)
+    W, y, X = _rook_flow_data(5, (0.3, 0.25, -0.1), seed=3)
+    out = _rho_chain(W, y, X, FlowKronTraceLogdet(W), 0, tune=2 * fr._LAPLACE_T_TRIAL)
+    assert not out["rho_independence"]

@@ -58,32 +58,9 @@ def test_resolve_backend_auto_numpy_only_family(fresh_registry):
     assert R.resolve_backend("auto", entry, jax_ok=True) == "numpy"
 
 
-def test_resolve_backend_auto_numpy_pref_despite_jax_support(fresh_registry):
-    # A JAX-capable family whose auto still prefers NumPy (Pólya-Gamma pattern:
-    # CHOLMOD ``factorize`` is the fast default, ``jax_dense`` is opt-in).
-    entry = fresh_registry.register(
-        "binary",
-        "cross_section",
-        run=_dummy_run,
-        backends={"jax", "numpy"},
-        auto_backend="numpy",
-    )
-    assert entry.auto_backend == "numpy"
-    assert R.resolve_backend("auto", entry, jax_ok=True) == "numpy"
-    # Explicit jax still works when JAX is present.
-    assert R.resolve_backend("jax", entry, jax_ok=True) == "jax"
-
-
-def test_register_rejects_auto_backend_not_in_backends(fresh_registry):
-    with pytest.raises(ValueError, match="auto_backend"):
-        fresh_registry.register(
-            "g", "cs", run=_dummy_run, backends={"numpy"}, auto_backend="jax"
-        )
-
-
-def test_register_auto_backend_defaults_to_numpy_for_numpy_only(fresh_registry):
+def test_resolve_backend_auto_is_numpy_for_a_numpy_only_family(fresh_registry):
     entry = fresh_registry.register("re", "panel", run=_dummy_run, backends={"numpy"})
-    assert entry.auto_backend == "numpy"
+    assert R.resolve_backend("auto", entry, jax_ok=True) == "numpy"
 
 
 def test_resolve_backend_explicit_unsupported_raises(fresh_registry):
@@ -102,7 +79,7 @@ def test_resolve_backend_explicit_jax_without_jax_raises(fresh_registry):
 
 def test_resolve_backend_invalid_value(fresh_registry):
     entry = fresh_registry.register("g", "cs", run=_dummy_run, backends={"numpy"})
-    with pytest.raises(ValueError, match="gibbs_backend must be one of"):
+    with pytest.raises(ValueError, match="backend for sampler='gibbs' must be one of"):
         R.resolve_backend("factorize", entry, jax_ok=True)
 
 

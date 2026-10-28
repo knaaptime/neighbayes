@@ -40,7 +40,7 @@ class BayesianLMTestResult:
     Attributes
     ----------
     lm_samples : np.ndarray
-        Posterior samples of the LM statistic.
+        Posterior samples of the LM statistic, one per draw.
     mean : float
         Posterior mean of the LM statistic.
     median : float
@@ -48,9 +48,13 @@ class BayesianLMTestResult:
     credible_interval : Tuple[float, float]
         95% credible interval for the LM statistic.
     bayes_pvalue : float
-        P-value computed at the posterior mean of the LM statistic,
-        ``1 - chi2.cdf(mean, df)``. Under H₀ the LM statistic follows
-        a :math:`\\chi^2` distribution (:cite:p:`dogan2021BayesianRobust`, Proposition 1).
+        ``1 - chi2.cdf(statistic, df)``; :math:`\\chi^2_{df}` under H₀
+        (:cite:p:`dogan2021BayesianRobust`, Proposition 1).
+    statistic : float
+        The test statistic: the LM form of the posterior-mean score.  The
+        posterior mean of the per-draw statistic exceeds it by the score's
+        posterior variance in the metric of the information, which is not
+        part of the test; ``mean`` keeps it, for the samples' summary.
     test_type : str
         Label identifying the test (e.g. ``"bayesian_lm_lag"``).
     df : int
@@ -68,15 +72,19 @@ class BayesianLMTestResult:
     test_type: str
     df: int = 1
     details: Dict[str, Any] = None
+    statistic: float = None
 
     def __post_init__(self):
         if self.details is None:
             self.details = {}
+        if self.statistic is None:
+            self.statistic = self.mean
 
     def to_dict(self):
         """Convert the test result to a dictionary."""
         d = {
             "lm_samples": self.lm_samples,
+            "statistic": self.statistic,
             "mean": self.mean,
             "median": self.median,
             "credible_interval": self.credible_interval,
@@ -128,18 +136,22 @@ def _finalize_lm(
     test_type: str,
     df: int,
     details: Optional[Dict[str, Any]] = None,
+    statistic: Optional[float] = None,
 ) -> BayesianLMTestResult:
     """Build a :class:`BayesianLMTestResult` from per-draw LM samples.
 
     Centralises the boilerplate (mean / median / 95% CI / Bayesian p-value
     against ``chi2(df)``) shared by every Bayesian LM test in this module.
+    ``statistic`` is the LM form of the posterior-mean score, against which
+    the p-value is computed; without it, the mean of the samples is used.
     The ``n_draws`` entry is added to ``details`` automatically.
     """
     LM = np.asarray(LM)
     mean = float(np.mean(LM))
     median = float(np.median(LM))
     ci = (float(np.percentile(LM, 2.5)), float(np.percentile(LM, 97.5)))
-    bayes_pvalue = float(1 - sp_stats.chi2.cdf(mean, df))
+    statistic = mean if statistic is None else float(statistic)
+    bayes_pvalue = float(1 - sp_stats.chi2.cdf(statistic, df))
     merged: Dict[str, Any] = {"n_draws": int(LM.shape[0])}
     if details:
         merged.update(details)
@@ -152,6 +164,7 @@ def _finalize_lm(
         test_type=test_type,
         df=df,
         details=merged,
+        statistic=statistic,
     )
 
 
@@ -306,14 +319,14 @@ def _resolve_X_for_beta(model, beta_draws: np.ndarray) -> np.ndarray:
     return model._X
 
 
-def _maybe_subtract_alpha(model, idata, resid: np.ndarray) -> np.ndarray:
-    """Subtract per-unit random-effect ``alpha[unit_idx]`` from ``resid`` if present.
+def _maybe_subtract_unit_effects(model, idata, resid: np.ndarray) -> np.ndarray:
+    """Subtract the random unit effects ``unit_effect[unit_idx]`` from ``resid``, if any.
 
     Used by panel LM tests so that the cross-sectional residual formulas
     transparently work for both pooled and random-effects fits.
     """
-    if hasattr(model, "_unit_idx") and "alpha" in idata.posterior:
-        alpha_draws = _get_posterior_draws(idata, "alpha")
+    if hasattr(model, "_unit_idx") and "unit_effect" in idata.posterior:
+        alpha_draws = _get_posterior_draws(idata, "unit_effect")
         resid = resid - alpha_draws[:, model._unit_idx]
     return resid
 
@@ -490,7 +503,7 @@ def _compute_residuals(
         Wu = _panel_spatial_lag(W_sp, resid, N, T)
         resid = resid - lam_draws[:, None] * Wu
 
-    resid = _maybe_subtract_alpha(model, idata, resid)
+    resid = _maybe_subtract_unit_effects(model, idata, resid)
     return resid
 
 
@@ -521,14 +534,20 @@ def _lm_scalar(
     test_type: str,
     df: int,
     details: Optional[Dict[str, Any]] = None,
+    score_bar: Optional[float] = None,
 ) -> BayesianLMTestResult:
     """Finalize a scalar LM statistic: ``LM = score² / variance``.
 
     Centralises the ``1e-12`` epsilon guard and the call to
-    :func:`_finalize_lm`.
+    :func:`_finalize_lm`.  The statistic is the LM form of ``score_bar``, the
+    score at the posterior-mean parameters, or of the posterior-mean score.
     """
     LM = score**2 / (variance + 1e-12)
-    return _finalize_lm(LM, test_type=test_type, df=df, details=details)
+    g = float(np.mean(score)) if score_bar is None else float(score_bar)
+    statistic = g**2 / (variance + 1e-12)
+    return _finalize_lm(
+        LM, test_type=test_type, df=df, details=details, statistic=statistic
+    )
 
 
 def _lm_vector(
@@ -539,15 +558,20 @@ def _lm_vector(
     df: int,
     details: Optional[Dict[str, Any]] = None,
     label: str = "information matrix",
+    score_bar: Optional[np.ndarray] = None,
 ) -> BayesianLMTestResult:
     """Finalize a vector LM statistic: ``LM = g' V⁻¹ g``.
 
     Centralises the ``_safe_inv`` call, the ``einsum`` pattern, and the
-    ``1e-12`` epsilon guard.
+    ``1e-12`` epsilon guard.  The statistic is the LM form of ``score_bar``
+    (see :func:`_lm_scalar`).
     """
     V_inv = _safe_inv(V, label)
     LM = np.einsum("di,ij,dj->d", score, V_inv, score)
-    return _finalize_lm(LM, test_type=test_type, df=df, details=details)
+    g = np.mean(score, axis=0) if score_bar is None else np.asarray(score_bar)
+    return _finalize_lm(
+        LM, test_type=test_type, df=df, details=details, statistic=float(g @ V_inv @ g)
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -619,23 +643,3 @@ def _trace_WtW_WW(W_sparse) -> float:
     # tr(W'W) = ||W||_F^2 = sum(W_ij^2)  [O(nnz)]
     # tr(W^2) = sum_ij W_ij * W_ji = sum(W * W.T)  [O(nnz)]
     return float(W_sparse.power(2).sum() + W_sparse.multiply(W_sparse.T).sum())
-
-
-def _resolve_lam_name(idata) -> str:
-    """Return the posterior variable name for the SEM/SDEM spatial parameter.
-
-    Some models store the spatial-error parameter as ``"lam"`` and others as
-    ``"lambda"`` (PyMC reserves ``lambda`` for Python's keyword in some
-    contexts).  This helper checks which is present.
-
-    Parameters
-    ----------
-    idata : xarray.DataTree
-        Fitted-model inference data with a ``posterior`` group.
-
-    Returns
-    -------
-    str
-        Either ``"lam"`` or ``"lambda"``.
-    """
-    return "lam" if "lam" in idata.posterior else "lambda"

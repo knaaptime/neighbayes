@@ -2,7 +2,7 @@
 
 Single home for the numpy evaluation of a Chebyshev series
 ``Σ_j coeffs[j] T_j(x(ρ))`` where ``x`` maps ``[rho_min, rho_max] → [-1, 1]``.
-Both the ``cheb_cholesky`` evaluator (:mod:`neighbayes._logdet._chol_cheb`)
+Both the ``chol_cheb`` evaluator (:mod:`neighbayes._logdet._chol_cheb`)
 and the logdet factories (:mod:`neighbayes._logdet._factories`) evaluate the
 same series with the same recurrence; keeping it here removes the duplicate
 inline copies.  JAX / PyTensor evaluators are intentionally *not* routed

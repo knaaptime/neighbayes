@@ -7,17 +7,16 @@ import pytest
 from libpysal.graph import Graph
 from scipy import sparse as sp
 
-from neighbayes.models import OLS, SAR, SDEM, SDM, SEM, SLX
-from neighbayes.models.cross_section.sar_probit import SARProbit
+from neighbayes.models import OLS, SAR, SDEM, SDM, SEM, SLX, SEMProbit
 from neighbayes.models.cross_section.tobit import SARTobit
 from neighbayes.models.priors import (
     BasePriors,
     OLSPriors,
     SARPriors,
-    SARProbitPriors,
     SDEMPriors,
     SDMPriors,
     SEMPriors,
+    SEMProbitREPriors,
     SLXPriors,
     priors_as_dict,
     resolve_priors,
@@ -124,10 +123,11 @@ def test_spatial_probit_priors_defaults():
     X = rng.normal(size=(n, 2))
     y = (rng.normal(size=n) > 0).astype(int)
     W = _make_w(n)
-    m = SARProbit(y=y, X=X, W=W, region_ids=np.arange(n))
-    assert isinstance(m.priors_obj, SARProbitPriors)
-    assert m.priors["rho_lower"] == -0.95
-    assert m.priors["rho_upper"] == 0.95
+    m = SEMProbit(unit_effects="random", y=y, X=X, W=W, units=np.arange(n))
+    assert isinstance(m.priors_obj, SEMProbitREPriors)
+    assert m.priors["lam_lower"] == -0.95
+    assert m.priors["lam_upper"] == 0.95
+    assert m.priors["unit_effect_sd_sigma"] == 2.0
 
 
 def test_basepriors_is_abstract_default():

@@ -2,20 +2,9 @@
 
 from __future__ import annotations
 
-from neighbayes.models import (
-    OLS,
-    SAR,
-    SDEM,
-    SDM,
-    SEM,
-    SLX,
-    OLSPanelFE,
-    OLSPanelRE,
-    SARPanelFE,
-    SARPanelRE,
-    SEMPanelFE,
-    SEMPanelRE,
-)
+import numpy as np
+
+from neighbayes.models import OLS, SAR, SDEM, SDM, SEM, SLX
 
 
 def test_cross_sectional_models_no_frequentist_spec_tests():
@@ -42,7 +31,7 @@ def test_cross_sectional_models_no_frequentist_spec_tests():
 
 def test_panel_models_no_frequentist_diagnostics():
     """Panel models should not expose frequentist diagnostic methods."""
-    for cls in [OLSPanelFE, OLSPanelRE, SARPanelFE, SARPanelRE, SEMPanelFE, SEMPanelRE]:
+    for cls in [OLS, SAR, SEM]:
         assert not hasattr(cls, "diagnostics")
         assert not hasattr(cls, "regression_diagnostics")
         assert not hasattr(cls, "heteroskedasticity_diagnostics")
@@ -52,9 +41,12 @@ def test_panel_models_no_frequentist_diagnostics():
         assert not hasattr(cls, "hausman_test")
 
 
-from neighbayes.models import SDEMPanelFE, SDEMPanelRE, SDMPanelFE, SLXPanelFE
+from neighbayes.models import SDEM, SDM, SLX, NegBinFlow
 from neighbayes.models.flow import OLSFlow, SARFlow
-from neighbayes.models.flow_panel import OLSFlowPanel
+from neighbayes.tests.helpers import flow_form
+
+negbin_flow = flow_form(NegBinFlow)
+
 
 EXPECTED_REGISTRIES = {
     OLS: [
@@ -70,56 +62,37 @@ EXPECTED_REGISTRIES = {
     SLX: ["LM-Lag", "LM-Error", "Robust-LM-Lag-SDM", "Robust-LM-Error-SDEM"],
     SDM: ["LM-Error-SDM", "Robust-LM-Error-SDM"],
     SDEM: ["LM-Lag-SDEM", "Robust-LM-Lag-SDEM"],
-    OLSPanelFE: [
-        "Panel-LM-Lag",
-        "Panel-LM-Error",
-        "Panel-LM-SDM-Joint",
-        "Panel-LM-SLX-Error-Joint",
-        "Panel-Robust-LM-Lag",
-        "Panel-Robust-LM-Error",
-    ],
-    SARPanelFE: ["Panel-LM-Error", "Panel-LM-WX", "Panel-Robust-LM-WX"],
-    SEMPanelFE: ["Panel-LM-Lag", "Panel-LM-WX"],
-    SLXPanelFE: [
-        "Panel-LM-Lag",
-        "Panel-LM-Error",
-        "Panel-Robust-LM-Lag-SDM",
-        "Panel-Robust-LM-Error-SDEM",
-    ],
-    SDMPanelFE: ["Panel-LM-Error-SDM"],
-    SDEMPanelFE: ["Panel-LM-Lag-SDEM"],
-    OLSPanelRE: [
-        "Panel-LM-Lag",
-        "Panel-LM-Error",
-        "Panel-LM-SDM-Joint",
-        "Panel-LM-SLX-Error-Joint",
-        "Panel-Robust-LM-Lag",
-        "Panel-Robust-LM-Error",
-    ],
-    SARPanelRE: ["Panel-LM-Error", "Panel-LM-WX", "Panel-Robust-LM-WX"],
-    SEMPanelRE: ["Panel-LM-Lag", "Panel-LM-WX"],
-    SDEMPanelRE: ["Panel-LM-Lag-SDEM"],
     OLSFlow: [
-        "LM-Flow-Dest",
-        "LM-Flow-Orig",
-        "LM-Flow-Network",
+        "LM-Flow-Destination",
+        "LM-Flow-Origin",
+        "LM-Flow-OD",
         "LM-Flow-Joint",
-        "LM-Flow-Intra",
-    ],
-    SARFlow: [
-        "Robust-LM-Flow-Dest",
-        "Robust-LM-Flow-Orig",
-        "Robust-LM-Flow-Network",
-        "LM-Flow-Intra",
-    ],
-    OLSFlowPanel: [
-        "Panel-LM-Flow-Dest",
-        "Panel-LM-Flow-Orig",
-        "Panel-LM-Flow-Network",
-        "Panel-LM-Flow-Joint",
-        "Panel-LM-Flow-Intra",
+        "Robust-LM-Flow-Destination",
+        "Robust-LM-Flow-Origin",
+        "Robust-LM-Flow-OD",
     ],
 }
+
+
+def test_a_flow_panel_takes_the_panel_flow_suite():
+    from neighbayes.dgp import simulate_sar_flow
+    from neighbayes.diagnostics.lmtests.registry import get_diagnostic_suite
+
+    d = simulate_sar_flow(n=3, seed=0, distribution="normal")
+    y, X = np.tile(d["y_vec"], 2), np.tile(d["X"], (2, 1))
+    panel = OLSFlow(y, X, d["G"], T=2, col_names=d["col_names"])
+    labels = [label for _, label in get_diagnostic_suite(panel).tests]
+    assert labels == [f"Panel-{x}" for x in EXPECTED_REGISTRIES[OLSFlow]]
+
+
+def test_fitted_spatial_and_count_flows_have_no_suite():
+    """The flow tests take the Gaussian aspatial null; no other flow has a suite."""
+    from neighbayes.diagnostics.lmtests.registry import get_diagnostic_suite
+    from neighbayes.models.flow import NegBinFlow, SARNegBinFlow, SEMFlow
+
+    for cls in (SARFlow, SEMFlow, NegBinFlow, SARNegBinFlow):
+        assert get_diagnostic_suite(cls) is None, cls.__name__
+    assert get_diagnostic_suite(negbin_flow) is None
 
 
 def test_spatial_diagnostics_registries_match_expected():
@@ -135,6 +108,94 @@ def test_spatial_diagnostics_registries_match_expected():
         )
 
 
+def _panel(cls, **design):
+    """A small panel instance of ``cls``: a panel's suite depends on its design."""
+    from neighbayes.tests.helpers import W_to_graph, make_line_W
+
+    rng = np.random.default_rng(0)
+    N, T = 6, 3
+    X = np.column_stack([np.ones(N * T), rng.standard_normal(N * T)])
+    W = W_to_graph(make_line_W(N))
+    return cls(y=rng.standard_normal(N * T), X=X, W=W, N=N, T=T, **design)
+
+
+_OLS_PANEL = [
+    "Panel-LM-Lag",
+    "Panel-LM-Error",
+    "Panel-LM-SDM-Joint",
+    "Panel-LM-SLX-Error-Joint",
+    "Panel-Robust-LM-Lag",
+    "Panel-Robust-LM-Error",
+]
+_FE = {"unit_effects": "fixed"}
+_RE = {"unit_effects": "random"}
+EXPECTED_PANEL_REGISTRIES = [
+    (OLS, _FE, _OLS_PANEL),
+    (SAR, _FE, ["Panel-LM-Error", "Panel-LM-WX", "Panel-Robust-LM-WX"]),
+    (SEM, _FE, ["Panel-LM-Lag", "Panel-LM-WX"]),
+    (
+        SLX,
+        _FE,
+        [
+            "Panel-LM-Lag",
+            "Panel-LM-Error",
+            "Panel-Robust-LM-Lag-SDM",
+            "Panel-Robust-LM-Error-SDEM",
+        ],
+    ),
+    (SDM, _FE, ["Panel-LM-Error-SDM"]),
+    (SDEM, _FE, ["Panel-LM-Lag-SDEM"]),
+    (OLS, _RE, _OLS_PANEL),
+    (SAR, _RE, ["Panel-LM-Error", "Panel-LM-WX", "Panel-Robust-LM-WX"]),
+    (SEM, _RE, ["Panel-LM-Lag", "Panel-LM-WX"]),
+    (SDEM, _RE, ["Panel-LM-Lag-SDEM"]),
+]
+
+
+def test_panel_diagnostics_registries_match_expected():
+    """A panel's suite follows its design, not the cross-section's."""
+    from neighbayes.diagnostics.lmtests.registry import get_diagnostic_suite
+
+    for cls, design, expected_labels in EXPECTED_PANEL_REGISTRIES:
+        suite = get_diagnostic_suite(_panel(cls, **design))
+        assert suite is not None, f"No suite registered for a {cls.__name__} panel"
+        actual_labels = [label for _, label in suite.tests]
+        assert actual_labels == expected_labels, (
+            f"{cls.__name__} {design}: expected {expected_labels}, got {actual_labels}"
+        )
+
+
+def test_count_suites_follow_the_design():
+    """A count cross-section has its reduced-form SAR suite; the panels have none."""
+    from neighbayes.diagnostics.lmtests.registry import get_diagnostic_suite
+    from neighbayes.models import NegBin, SARNegBin
+    from neighbayes.tests.helpers import W_to_graph, make_line_W
+
+    rng = np.random.default_rng(0)
+    N, T = 6, 3
+    X = np.column_stack([np.ones(N * T), rng.standard_normal(N * T)])
+    y = rng.poisson(2.0, size=N * T)
+    W = W_to_graph(make_line_W(N))
+    xs = dict(y=y[:N], X=X[:N], W=W)
+
+    def labels(model):
+        return [label for _, label in get_diagnostic_suite(model).tests]
+
+    assert labels(SARNegBin(**xs)) == ["LM-Error", "LM-WX"]
+    assert labels(NegBin(**xs)) == [
+        "LM-Lag",
+        "LM-Error",
+        "Robust-LM-Lag",
+        "Robust-LM-Error",
+        "LM-SARMA",
+        "LM-WX",
+        "Moran-Working",
+    ]
+    for cls in (NegBin, SARNegBin):
+        panel = cls(y=y, X=X, W=W, N=N, T=T, unit_effects="random")
+        assert get_diagnostic_suite(panel) is None
+
+
 def test_slx_uses_slx_specific_lm_tests():
     """SLX uses Koley-Bera SLX-specific LM tests, not raw OLS LM tests."""
     from neighbayes.diagnostics.lmtests.registry import get_diagnostic_suite
@@ -146,14 +207,10 @@ def test_slx_uses_slx_specific_lm_tests():
 
 
 def test_flow_models_expose_decision_api():
-    """FlowModel and FlowPanelModel must expose spatial_diagnostics_decision."""
+    """FlowModel, cross-section and panel alike, exposes spatial_diagnostics_decision."""
     from neighbayes.models.flow import FlowModel
-    from neighbayes.models.flow_panel import FlowPanelModel
 
-    assert hasattr(FlowModel, "spatial_diagnostics_decision")
     assert callable(FlowModel.spatial_diagnostics_decision)
-    assert hasattr(FlowPanelModel, "spatial_diagnostics_decision")
-    assert callable(FlowPanelModel.spatial_diagnostics_decision)
 
 
 def test_flow_decision_tree_dispatch():
@@ -175,20 +232,7 @@ def test_flow_decision_tree_dispatch():
     d2, _ = _dt.evaluate(spec, lambda name: False)
     assert d2 == "OLSFlow"
 
-    # SARFlow: dest robust sig -> SARFlow
-    spec_sar = _dt.get_flow_spec("SARFlow")
-    d3, _ = _dt.evaluate(spec_sar, lambda name: name == "Robust-LM-Flow-Dest")
-    assert d3 == "SARFlow"
-
-    # SARFlow: no robust sig -> OLSFlow
-    d4, _ = _dt.evaluate(spec_sar, lambda name: False)
-    assert d4 == "OLSFlow"
-
     # Panel variants
-    spec_p = _dt.get_panel_flow_spec("OLSFlowPanel")
+    spec_p = _dt.get_panel_flow_spec("OLSFlow")
     dp, _ = _dt.evaluate(spec_p, lambda name: name == "Panel-LM-Flow-Joint")
-    assert dp == "SARFlowPanel"
-
-    spec_sp = _dt.get_panel_flow_spec("SARFlowPanel")
-    dp2, _ = _dt.evaluate(spec_sp, lambda name: False)
-    assert dp2 == "OLSFlowPanel"
+    assert dp == "SARFlow"

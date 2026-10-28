@@ -46,13 +46,9 @@ from neighbayes._jax_dispatch import ensure_x64
 
 __all__ = [
     "FlowKron",
-    "FlowKronJax",
     "flow_logdet_grad",
-    "flow_logdet_grad_exact",
     "flow_logdet_value",
     "flow_logdet_value_and_grad",
-    "flow_logdet_grad_jax",
-    "flow_logdet_value_and_grad_jax",
 ]
 
 
@@ -312,7 +308,7 @@ def flow_logdet_grad(
                 const_vals - rho_d * coef_d - rho_o * coef_o - rho_w * coef_w,
                 dtype=jnp.float64,
             )
-            lu_solve = sparsax_lu(Ai, Aj, Ax, kron.N).solve
+            lu_solve = sparsax_lu(Ai, Aj, kron.N).solve
             Xt = np.asarray(
                 lu_solve(Ai, Aj, Ax, jnp.asarray(probes, dtype=jnp.float64)),
                 dtype=np.float64,
@@ -437,30 +433,9 @@ def flow_logdet_value_and_grad(
     return value, grad
 
 
-def flow_logdet_grad_exact(W, rho_d: float, rho_o: float, rho_w: float) -> np.ndarray:
-    r"""Exact ``∇_ρ log|I_N − W_F|`` from the spectrum of ``W`` (reference; small ``n``).
-
-    Uses the shared Kronecker eigenbasis: ``μ_ij = ρ_o λ_i + ρ_d λ_j + ρ_w λ_i λ_j``
-    and ``g_d = −Σ_ij λ_j/(1−μ_ij)`` etc.  Only for testing / small ``n`` — forms
-    the ``n`` eigenvalues of ``W`` (``O(n³)``), never the ``N×N`` matrix.
-    """
-    Wd = _as_csr(W).toarray()
-    lam = np.linalg.eigvals(Wd)
-    li = lam[:, None]
-    lj = lam[None, :]
-    mu = rho_o * li + rho_d * lj + rho_w * (li * lj)
-    inv = 1.0 / (1.0 - mu)
-    g_d = -np.sum(lj * inv).real
-    g_o = -np.sum(li * inv).real
-    g_w = -np.sum(li * lj * inv).real
-    return np.array([g_d, g_o, g_w], dtype=np.float64)
-
-
 # ---------------------------------------------------------------------------
 # JAX-native resolvent gradient (sparsax + equinox, fully jittable)
 # ---------------------------------------------------------------------------
-
-import jax.numpy as jnp  # noqa: E402 — lazy import for JAX convenience funcs
 
 
 def _make_flow_kron_jax(kron: FlowKron, probes: np.ndarray, n_quad: int = 8):
@@ -530,11 +505,8 @@ def _make_flow_kron_jax(kron: FlowKron, probes: np.ndarray, n_quad: int = 8):
     _coef_d = jnp.asarray(coef_d, dtype=jnp.float64)
     _coef_o = jnp.asarray(coef_o, dtype=jnp.float64)
     _coef_w = jnp.asarray(coef_w, dtype=jnp.float64)
-    # KLU or UMFPACK, whichever is faster on this pattern, probed at ρ = 0.2 in
-    # each direction (inside the stable region).
-    lu_solve = sparsax_lu(
-        Ai, Aj, _const_vals - 0.2 * (_coef_d + _coef_o + _coef_w), kron.N
-    ).solve
+    # KLU or UMFPACK, routed by the pattern.
+    lu_solve = sparsax_lu(Ai, Aj, kron.N).solve
 
     # Frozen probes as JAX array
     probes_jax = jnp.asarray(probes, dtype=jnp.float64)  # (N, P)
@@ -614,112 +586,3 @@ def _make_flow_kron_jax(kron: FlowKron, probes: np.ndarray, n_quad: int = 8):
         _value_and_grad_jitted = jax.jit(_value_and_grad)
 
     return _value_and_grad_jitted
-
-
-class FlowKronJax:
-    """JAX-native flow logdet value+grad with sparsax solves and JIT compilation.
-
-    Wraps :func:`_make_flow_kron_jax` to provide a clean interface matching
-    the numpy :class:`FlowKron` but returning JAX arrays.
-
-    Parameters
-    ----------
-    W : array or sparse
-        The ``n x n`` weights matrix.
-    n_probes : int
-        Number of frozen Rademacher probes.
-    n_quad : int
-        Number of Gauss-Legendre quadrature nodes for the value.
-    seed : int
-        Random seed for probe generation.
-    """
-
-    def __init__(self, W, n_probes: int = 48, n_quad: int = 8, seed: int = 0):
-        self.kron = FlowKron(W)
-        self.n = self.kron.n
-        self.N = self.kron.N
-        rng = np.random.default_rng(seed)
-        probes = rng.choice([-1.0, 1.0], size=(self.N, int(n_probes))).astype(
-            np.float64
-        )
-        self._fn = _make_flow_kron_jax(self.kron, probes, n_quad=n_quad)
-
-    def value_and_grad(self, rho_d, rho_o, rho_w):
-        """Return ``(value, grad)`` as JAX arrays."""
-        import jax.numpy as jnp
-
-        return self._fn(jnp.float64(rho_d), jnp.float64(rho_o), jnp.float64(rho_w))
-
-    def value_and_grad_numpy(self, rho_d, rho_o, rho_w):
-        """Return ``(value, grad)`` as numpy arrays (convenience)."""
-        v, g = self.value_and_grad(rho_d, rho_o, rho_w)
-        return float(v), np.asarray(g)
-
-
-def flow_logdet_grad_jax(
-    W,
-    rho_d: float,
-    rho_o: float,
-    rho_w: float,
-    *,
-    probes: np.ndarray | None = None,
-    n_probes: int = 48,
-    seed: int = 0,
-) -> np.ndarray:
-    """JAX-native stochastic gradient of ``log|I_N − W_F(ρ)|`` (sparsax, jittable).
-
-    Convenience wrapper around :class:`FlowKronJax` for one-off gradient
-    evaluation.  For repeated calls (e.g. inside a sampler), construct a
-    :class:`FlowKronJax` once and call ``value_and_grad_numpy`` to reuse the
-    JIT-compiled function and cached symbolic analysis.
-
-    Parameters
-    ----------
-    W : array or sparse
-    rho_d, rho_o, rho_w : float
-    probes : ndarray (N, P), optional
-        Frozen probe matrix.  Generated if not provided.
-    n_probes : int
-    seed : int
-
-    Returns
-    -------
-    np.ndarray, shape (3,)
-        Gradient ``(g_d, g_o, g_w)``.
-    """
-    kron = FlowKron(W)
-    if probes is None:
-        rng = np.random.default_rng(seed)
-        probes = rng.choice([-1.0, 1.0], size=(kron.N, int(n_probes))).astype(
-            np.float64
-        )
-    fn = _make_flow_kron_jax(kron, probes, n_quad=2)
-    _, grad = fn(jnp.float64(rho_d), jnp.float64(rho_o), jnp.float64(rho_w))
-    return np.asarray(grad)
-
-
-def flow_logdet_value_and_grad_jax(
-    W,
-    rho_d: float,
-    rho_o: float,
-    rho_w: float,
-    *,
-    probes: np.ndarray | None = None,
-    n_probes: int = 48,
-    n_quad: int = 8,
-    seed: int = 0,
-) -> tuple[float, np.ndarray]:
-    """JAX-native ``log|I_N − W_F|`` and ``∇_ρ log|I_N − W_F|`` (sparsax, jittable).
-
-    Convenience wrapper around :class:`FlowKronJax`.
-
-    Returns
-    -------
-    value : float
-    grad : np.ndarray, shape (3,)
-    """
-    est = FlowKronJax(W, n_probes=n_probes, n_quad=n_quad, seed=seed)
-    if probes is not None:
-        # Rebuild with provided probes
-        est._fn = _make_flow_kron_jax(est.kron, probes, n_quad=n_quad)
-    return est.value_and_grad_numpy(rho_d, rho_o, rho_w)

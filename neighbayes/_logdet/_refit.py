@@ -59,9 +59,10 @@ _log = logging.getLogger(__name__)
 #: ``eigenvalue`` is excluded because it is already exact and interval-free;
 #: the stochastic estimators are excluded because their error is dominated by
 #: probe noise rather than by the interval, so narrowing it buys nothing.
-REFITTABLE_METHODS = frozenset({"cheb_cholesky", "lu_cheb", "aaa", "chol_aaa"})
+REFITTABLE_METHODS = frozenset({"chol_cheb", "lu_cheb", "lu_aaa", "chol_aaa"})
 
-#: Default padding, in warmup posterior standard deviations.
+#: Padding of the refit window, in warmup posterior standard deviations.  At ten
+#: the truncated tail is ~1e-23 under normality, for a node or two at most.
 DEFAULT_PAD_SD = 10.0
 
 #: Default absolute error target for the refit.  Tight on purpose: on a narrow
@@ -100,7 +101,7 @@ MIN_NARROWING = 1.25
 MIN_WINDOW_WIDTH = 1e-6
 
 #: The AAA methods, whose node count the warmup check sets.
-AAA_METHODS = frozenset({"aaa", "chol_aaa"})
+AAA_METHODS = frozenset({"lu_aaa", "chol_aaa"})
 
 #: Nodes of the AAA fit warmup starts on, before the posterior is located (7
 #: support points).  In the calibration sweeps this count kept the bias an
@@ -269,8 +270,8 @@ def boundary_warning(
         "Post-warmup draws of the spatial parameter reached the "
         + " and ".join(hits)
         + " of the warmup-refit window, so the reported posterior is truncated "
-        "there. Increase `logdet_refit_pad_sd`, lengthen warmup, or disable the "
-        "refit with `logdet_refit=False`."
+        "there. Lengthen warmup, or keep the fit on the prior interval with "
+        "`logdet_adapt=False`."
     )
 
 
@@ -289,7 +290,7 @@ class LogdetRefitter:
         Panel replication factor applied to the returned evaluators, matching
         :func:`~._factories.make_logdet_numpy_fn`.
     tol : float, default 1e-12
-        Absolute error target for the refit.  Applies to ``cheb_cholesky``,
+        Absolute error target for the refit.  Applies to ``chol_cheb``,
         where it selects the Chebyshev order.  It is **not** used by ``aaa``:
         AAA picks its support points greedily to its own internal convergence
         tolerance, so its accuracy is not a dial the caller sets here — in
@@ -352,7 +353,7 @@ class LogdetRefitter:
 
     def _build_context(self):
         if self._context is None:
-            if self.method in ("cheb_cholesky", "lu_cheb"):
+            if self.method in ("chol_cheb", "lu_cheb"):
                 from ._chol_cheb import CholChebContext
 
                 self._context = CholChebContext(self.W_sparse)
@@ -360,7 +361,7 @@ class LogdetRefitter:
                 from ._chol_cheb import LUChebContext
 
                 self._context = LUChebContext(self.W_sparse)
-            elif self.method == "aaa":
+            elif self.method == "lu_aaa":
                 from ._aaa import AAAContext
 
                 self._context = AAAContext(self.W_sparse)
@@ -414,7 +415,7 @@ class LogdetRefitter:
         only bites when the window is barely narrower, exactly where there was
         little to gain.
         """
-        if self.method in ("cheb_cholesky", "lu_cheb"):
+        if self.method in ("chol_cheb", "lu_cheb"):
             from ._chebyshev import cheb_order_for_tolerance
 
             n = int(self.W_sparse.shape[0])
@@ -440,7 +441,7 @@ class LogdetRefitter:
         it is the interval's static count.
         """
         ctx = self._build_context()
-        if self.method in ("cheb_cholesky", "lu_cheb"):
+        if self.method in ("chol_cheb", "lu_cheb"):
             from ._chebyshev import cheb_order_for_tolerance
 
             order = cheb_order_for_tolerance(
@@ -463,7 +464,7 @@ class LogdetRefitter:
 
     def scout_order(self, prior_min: float, prior_max: float) -> int:
         """Nodes the scouting interpolant will use on the prior interval."""
-        if self.method not in ("cheb_cholesky", "lu_cheb"):
+        if self.method not in ("chol_cheb", "lu_cheb"):
             # AAA's coarse grid is already small and its size is not a
             # tolerance dial, so there is no coarse variant to offer.
             return self.capacity(prior_min, prior_max)
@@ -473,23 +474,10 @@ class LogdetRefitter:
             cheb_order_for_tolerance(prior_min, prior_max, self.n, tol=self.scout_tol)
         )
 
-    def scout_fit(self, prior_min: float, prior_max: float):
-        """Build the loose interpolant that carries warmup up to the refit.
-
-        Returns ``(scalar_fn, vec_fn, order)``.  Costs
-        :meth:`scout_order` factorizations against the
-        :meth:`capacity` the un-refitted run would have paid, and that
-        difference is the whole of the refit's speed argument — see
-        :data:`DEFAULT_SCOUT_TOL`.
-        """
-        pre, order, _ = self._fit(prior_min, prior_max, tol=self.scout_tol)
-        scalar_fn, vec_fn = self._numpy_fns(pre)
-        return scalar_fn, vec_fn, order
-
     def _numpy_fns(self, pre):
         """NumPy ``(scalar, vectorized)`` evaluators for an already-fitted precompute."""
         T = self.T
-        if self.method in ("cheb_cholesky", "lu_cheb"):
+        if self.method in ("chol_cheb", "lu_cheb"):
             # ``clenshaw_*`` already apply the panel factor, so no wrapper is
             # needed here — the same route ``make_logdet_numpy_fn`` takes.
             from ._clenshaw import clenshaw_scalar, clenshaw_vec
@@ -549,14 +537,20 @@ class LogdetRefitter:
             from scipy.sparse.linalg import eigs, eigsh
 
             ctx = self._build_context()
+            sym = self.method == "chol_aaa"
+            # A fixed start, so the check's outcome never depends on ARPACK's own.
+            v0 = np.random.default_rng(0).standard_normal(
+                (ctx.W_sym if sym else ctx.W_sp).shape[0]
+            )
             try:
-                if self.method == "chol_aaa":
+                if sym:
                     lam = eigsh(
                         sp.csc_matrix(ctx.W_sym),
                         k=3,
                         sigma=-1.001,
                         which="LM",
                         return_eigenvectors=False,
+                        v0=v0,
                     )
                 else:
                     lam = eigs(
@@ -565,10 +559,11 @@ class LogdetRefitter:
                         sigma=-1.001,
                         which="LM",
                         return_eigenvectors=False,
+                        v0=v0,
                     )
                 sing = 1.0 / np.asarray(lam, dtype=complex)
                 self._sigma_left = complex(sing[np.argmin(np.abs(sing + 1.0))])
-            except Exception:  # noqa: BLE001 - any eigensolver failure falls back
+            except (RuntimeError, np.linalg.LinAlgError):  # ARPACK or a singular shift
                 _log.info(
                     "logdet AAA check: eigensolver failed; using -1 as the left singularity."
                 )
@@ -642,7 +637,7 @@ class LogdetRefitter:
         import jax.numpy as jnp
 
         cap = int(capacity)
-        if self.method in ("cheb_cholesky", "lu_cheb"):
+        if self.method in ("chol_cheb", "lu_cheb"):
             order = int(pre.order)
             if order > cap:
                 raise ValueError(

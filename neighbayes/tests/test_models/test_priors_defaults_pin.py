@@ -9,12 +9,12 @@ Note the deliberate entanglement this captures — it is why the priors do not
 factor into three orthogonal axes:
 
 * ``rho``/``lam`` bounds differ by likelihood and static/dynamic:
-  SAR ``[-1, 1]``, SARProbit ``[-0.95, 0.95]``, SARLogit ``[-0.999, 0.999]``,
+  SAR ``[-1, 1]``, SEMProbitRE ``[-0.95, 0.95]``, SARLogit ``[-0.999, 0.999]``,
   PanelSARDynamic ``[-0.95, 0.95]``.
 * ``beta`` defaults are data-scaled (omitted) for every family, resolved on
   the link scale (identity, log, logit or probit) at fit time.
 * the noise block differs: Gaussian/NB/Tobit carry ``sigma2_alpha``;
-  SARProbit carries ``sigma_a_sigma``; Logit carries neither.
+  SEMProbitRE carries ``unit_effect_sd_sigma``; Logit carries neither.
 """
 
 from __future__ import annotations
@@ -54,6 +54,7 @@ EXPECTED: dict[str, dict[str, float]] = {
         "lam_lower": -1.0,
         "lam_upper": 1.0,
     },
+    "MultilevelPriors": {"nu": NU, "sigma2_alpha": 2.0, "sigma_nu": 3.0},
     "NegBinPriors": {
         "nu": NU,
         "sigma2_alpha": 2.0,
@@ -67,6 +68,14 @@ EXPECTED: dict[str, dict[str, float]] = {
         "alpha_nu": 3.0,
         "rho_lower": -1.0,
         "rho_upper": 1.0,
+    },
+    "SEMNegBinPriors": {
+        "nu": NU,
+        "sigma2_alpha": 2.0,
+        "alpha_sigma": 2.5,
+        "alpha_nu": 3.0,
+        "lam_lower": -1.0,
+        "lam_upper": 1.0,
     },
     "SARTobitPriors": {
         "nu": NU,
@@ -86,10 +95,18 @@ EXPECTED: dict[str, dict[str, float]] = {
         "rho_lower": -1.0,
         "rho_upper": 1.0,
     },
+    "SEMProbitREPriors": {
+        "lam_lower": -0.95,
+        "lam_upper": 0.95,
+        "unit_effect_sd_sigma": 2.0,
+    },
     "SARProbitPriors": {
-        "rho_lower": -0.95,
-        "rho_upper": 0.95,
-        "sigma_a_sigma": 2.0,
+        "rho_lower": -0.999,
+        "rho_upper": 0.999,
+    },
+    "SEMProbitPriors": {
+        "lam_lower": -0.999,
+        "lam_upper": 0.999,
     },
     "SARLogitPriors": {
         "rho_lower": -0.999,
@@ -101,7 +118,6 @@ EXPECTED: dict[str, dict[str, float]] = {
     },
     "PanelBasePriors": {"nu": NU, "sigma2_alpha": 2.0},
     "PanelOLSPriors": {"nu": NU, "sigma2_alpha": 2.0},
-    "PanelSLXPriors": {"nu": NU, "sigma2_alpha": 2.0},
     "PanelSARPriors": {
         "nu": NU,
         "sigma2_alpha": 2.0,
@@ -114,12 +130,6 @@ EXPECTED: dict[str, dict[str, float]] = {
         "lam_lower": -1.0,
         "lam_upper": 1.0,
     },
-    "PanelSDMPriors": {
-        "nu": NU,
-        "sigma2_alpha": 2.0,
-        "rho_lower": -1.0,
-        "rho_upper": 1.0,
-    },
     "PanelSDEMPriors": {
         "nu": NU,
         "sigma2_alpha": 2.0,
@@ -129,38 +139,26 @@ EXPECTED: dict[str, dict[str, float]] = {
     "PanelOLSREPriors": {
         "nu": NU,
         "sigma2_alpha": 2.0,
-        "sigma_alpha_nu": 1.0,
+        "unit_effect_sd_nu": 1.0,
     },
     "PanelSARREPriors": {
         "nu": NU,
         "sigma2_alpha": 2.0,
-        "sigma_alpha_nu": 1.0,
+        "unit_effect_sd_nu": 1.0,
         "rho_lower": -1.0,
         "rho_upper": 1.0,
     },
     "PanelSEMREPriors": {
         "nu": NU,
         "sigma2_alpha": 2.0,
-        "sigma_alpha_nu": 1.0,
+        "unit_effect_sd_nu": 1.0,
         "lam_lower": -1.0,
         "lam_upper": 1.0,
     },
     "PanelSDEMREPriors": {
         "nu": NU,
         "sigma2_alpha": 2.0,
-        "sigma_alpha_nu": 1.0,
-        "lam_lower": -1.0,
-        "lam_upper": 1.0,
-    },
-    "PanelSARTobitPriors": {
-        "nu": NU,
-        "sigma2_alpha": 2.0,
-        "rho_lower": -1.0,
-        "rho_upper": 1.0,
-    },
-    "PanelSEMTobitPriors": {
-        "nu": NU,
-        "sigma2_alpha": 2.0,
+        "unit_effect_sd_nu": 1.0,
         "lam_lower": -1.0,
         "lam_upper": 1.0,
     },
@@ -240,12 +238,10 @@ def test_default_prior_hyperparams_pinned(name):
 _GIBBS_PRIOR_STRUCTS = {
     "GibbsBasePriors",
     "GaussianGibbsPriors",
-    "GibbsPriors",
     "ReducedGibbsPriors",
     "FlowReducedGibbsPriors",
     "ZINBGibbsPriors",
-    "LogitGibbsPriors",
-    "SEMLogitGibbsPriors",
+    "BinaryGibbsPriors",
     "REGibbsPriors",
 }
 

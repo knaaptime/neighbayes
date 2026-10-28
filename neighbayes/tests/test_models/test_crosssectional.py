@@ -112,7 +112,7 @@ BACKENDS = ["numpy", "jax"]
 
 def _backend_kwargs(backend):
     kw = dict(SAMPLE_KWARGS)
-    kw["gibbs_backend"] = backend
+    kw["backend"] = backend
     if backend == "numpy":
         kw["n_jobs"] = 1
     return kw
@@ -134,14 +134,14 @@ def test_sem_backend_recovery(rng, W_dense, W_graph, backend):
     _assert_beta(idata, BETA_TRUE, f"SEM[{backend}]")
 
 
-@pytest.mark.parametrize("backend", BACKENDS)
-def test_slx_backend_recovery(rng, W_dense, W_graph, backend):
+def test_slx_recovery(rng, W_dense, W_graph):
+    """SLX has no Gibbs sampler, so no Gibbs backend to vary: NUTS once."""
     y, X = make_slx_data(
         rng, W_dense, beta1=BETA_TRUE, beta2=BETA2_TRUE, sigma=SIGMA_TRUE
     )
-    idata = SLX(y=y, X=X, W=W_graph).fit(**_backend_kwargs(backend))
+    idata = SLX(y=y, X=X, W=W_graph).fit(**SAMPLE_KWARGS)
     combined = np.concatenate([BETA_TRUE, BETA2_TRUE])
-    _assert_beta(idata, combined, f"SLX[{backend}]")
+    _assert_beta(idata, combined, "SLX")
 
 
 @pytest.mark.parametrize("backend", BACKENDS)

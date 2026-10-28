@@ -130,7 +130,7 @@ class TestBoundaryWarning:
         draws = 0.6 + 0.01 * rng.standard_normal(2000)
         msg = boundary_warning(draws, self._win(0.4, 0.62))
         assert msg is not None and "upper edge" in msg
-        assert "logdet_refit_pad_sd" in msg  # tells the user what to change
+        assert "logdet_adapt" in msg  # tells the user what to change
 
     def test_silent_at_an_edge_that_is_the_prior_bound(self):
         """The prior always truncated there; the refit changed nothing."""
@@ -146,19 +146,19 @@ class TestBoundaryWarning:
 
 class TestRefitter:
     def test_only_interval_owning_methods_are_supported(self, W):
-        for method in ("cheb_cholesky", "aaa"):
+        for method in ("chol_cheb", "lu_aaa"):
             assert LogdetRefitter(W, method).supported
             assert method in REFITTABLE_METHODS
-        for method in ("eigenvalue", "cheb_stochastic", "slq", "chebyshev", "traces"):
+        for method in ("eigenvalue", "stoch_cheb"):
             assert not LogdetRefitter(W, method).supported
 
     def test_construction_does_no_work(self, W):
         """A run that never reaches the refit point must not pay for one."""
-        r = LogdetRefitter(W, "cheb_cholesky")
+        r = LogdetRefitter(W, "chol_cheb")
         assert r._context is None
 
     def test_declines_when_the_window_is_not_narrower(self, W):
-        r = LogdetRefitter(W, "cheb_cholesky")
+        r = LogdetRefitter(W, "chol_cheb")
         assert not r.worth_refitting(0.0, 0.94, 0.0, 0.95)
         assert r.worth_refitting(0.5, 0.7, 0.0, 0.95)
 
@@ -180,10 +180,10 @@ class TestRefitter:
         grid = np.linspace(lo, hi, 25)
         truth = np.array([exact(r) for r in grid])
 
-        base_fn = make_logdet_numpy_fn(W, None, "cheb_cholesky", 0.0, 0.95)
+        base_fn = make_logdet_numpy_fn(W, None, "chol_cheb", 0.0, 0.95)
         base = np.array([base_fn(float(r)) for r in grid]) - truth
 
-        refit_fn, _, info = LogdetRefitter(W, "cheb_cholesky").refit(lo, hi, 0.0, 0.95)
+        refit_fn, _, info = LogdetRefitter(W, "chol_cheb").refit(lo, hi, 0.0, 0.95)
         got = np.array([refit_fn(float(r)) for r in grid]) - truth
 
         # The tilt — the variation of the error across the window — is what
@@ -194,20 +194,20 @@ class TestRefitter:
         assert info.rho_min == pytest.approx(lo) and info.rho_max == pytest.approx(hi)
 
     def test_scalar_and_vector_evaluators_agree(self, W):
-        fn, vec_fn, _ = LogdetRefitter(W, "cheb_cholesky").refit(0.5, 0.7, 0.0, 0.95)
+        fn, vec_fn, _ = LogdetRefitter(W, "chol_cheb").refit(0.5, 0.7, 0.0, 0.95)
         grid = np.linspace(0.51, 0.69, 17)
         np.testing.assert_allclose(
             vec_fn(grid), [fn(float(r)) for r in grid], rtol=0, atol=1e-12
         )
 
     def test_T_scales_the_panel_jacobian(self, W):
-        one, _, _ = LogdetRefitter(W, "cheb_cholesky", T=1).refit(0.5, 0.7, 0.0, 0.95)
-        three, _, _ = LogdetRefitter(W, "cheb_cholesky", T=3).refit(0.5, 0.7, 0.0, 0.95)
+        one, _, _ = LogdetRefitter(W, "chol_cheb", T=1).refit(0.5, 0.7, 0.0, 0.95)
+        three, _, _ = LogdetRefitter(W, "chol_cheb", T=3).refit(0.5, 0.7, 0.0, 0.95)
         assert three(0.6) == pytest.approx(3.0 * one(0.6))
 
     def test_aaa_refit_on_directed_weights(self):
         W_dir = _knn()
-        fn, vec_fn, info = LogdetRefitter(W_dir, "aaa").refit(0.5, 0.7, 0.0, 0.95)
+        fn, vec_fn, info = LogdetRefitter(W_dir, "lu_aaa").refit(0.5, 0.7, 0.0, 0.95)
         grid = np.linspace(0.51, 0.69, 13)
         np.testing.assert_allclose(
             vec_fn(grid), [fn(float(r)) for r in grid], atol=1e-9
@@ -216,7 +216,7 @@ class TestRefitter:
 
     def test_context_is_reused_across_refits(self, W):
         """The symbolic analysis is paid once, however many windows are fitted."""
-        r = LogdetRefitter(W, "cheb_cholesky")
+        r = LogdetRefitter(W, "chol_cheb")
         r.refit(0.4, 0.8, 0.0, 0.95)
         ctx = r._context
         r.refit(0.55, 0.65, 0.0, 0.95)
@@ -233,9 +233,9 @@ jax = pytest.importorskip("jax")
 class TestJaxParams:
     """Params must be fixed-shape so a refit does not invalidate the compiled step."""
 
-    @pytest.mark.parametrize("method", ["cheb_cholesky", "aaa"])
+    @pytest.mark.parametrize("method", ["chol_cheb", "lu_aaa"])
     def test_shapes_are_identical_across_intervals(self, W, method):
-        Wm = W if method == "cheb_cholesky" else _knn()
+        Wm = W if method == "chol_cheb" else _knn()
         r = LogdetRefitter(Wm, method)
         cap = r.capacity(0.0, 0.95)
         shapes = []
@@ -246,13 +246,13 @@ class TestJaxParams:
 
     def test_params_are_float64(self, W):
         """A float32/float64 mismatch at the swap would force the retrace."""
-        params, _ = LogdetRefitter(W, "cheb_cholesky").jax_params(
-            0.4, 0.8, LogdetRefitter(W, "cheb_cholesky").capacity(0.0, 0.95)
+        params, _ = LogdetRefitter(W, "chol_cheb").jax_params(
+            0.4, 0.8, LogdetRefitter(W, "chol_cheb").capacity(0.0, 0.95)
         )
         for leaf in jax.tree.leaves(params):
             assert leaf.dtype == np.float64
 
-    @pytest.mark.parametrize("method", ["cheb_cholesky", "aaa"])
+    @pytest.mark.parametrize("method", ["chol_cheb", "lu_aaa"])
     def test_padded_params_evaluate_exactly(self, W, method):
         """Zero padding must contribute nothing to either representation.
 
@@ -264,7 +264,7 @@ class TestJaxParams:
 
         from neighbayes._logdet._jax import make_logdet_jax_param_fn
 
-        Wm = W if method == "cheb_cholesky" else _knn()
+        Wm = W if method == "chol_cheb" else _knn()
         r = LogdetRefitter(Wm, method)
         fn = make_logdet_jax_param_fn(method)
         lo, hi = 0.5, 0.7
@@ -274,7 +274,7 @@ class TestJaxParams:
         def _extend(leaf, fill):
             return jnp.concatenate([leaf, jnp.full((40,), fill, leaf.dtype)])
 
-        if method == "cheb_cholesky":
+        if method == "chol_cheb":
             coeffs, rmin, rmax = tight
             roomy = (_extend(coeffs, 0.0), rmin, rmax)
         else:
@@ -293,17 +293,17 @@ class TestJaxParams:
     def test_matches_the_numpy_evaluator(self, W):
         from neighbayes._logdet._jax import make_logdet_jax_param_fn
 
-        r = LogdetRefitter(W, "cheb_cholesky")
+        r = LogdetRefitter(W, "chol_cheb")
         cap = r.capacity(0.0, 0.95)
         params, _ = r.jax_params(0.5, 0.7, cap)
         fn_np, _, _ = r.refit(0.5, 0.7, 0.0, 0.95)
-        fn_jax = make_logdet_jax_param_fn("cheb_cholesky")
+        fn_jax = make_logdet_jax_param_fn("chol_cheb")
         for rho in (0.52, 0.6, 0.68):
             assert float(fn_jax(rho, params)) == pytest.approx(fn_np(rho), abs=1e-10)
 
     def test_capacity_bounds_every_window(self, W):
         """Any sub-interval of the prior must fit; otherwise the refit would raise."""
-        r = LogdetRefitter(W, "cheb_cholesky")
+        r = LogdetRefitter(W, "chol_cheb")
         cap = r.capacity(-0.99, 0.99)
         for lo, hi in [(-0.99, 0.99), (-0.5, 0.9), (0.1, 0.8), (0.59, 0.61)]:
             params, info = r.jax_params(lo, hi, cap)
@@ -317,7 +317,7 @@ class TestJaxParams:
         would have used.  It is safe because the window is a sub-interval of the
         prior, so at equal order the refit is strictly the more accurate fit.
         """
-        r = LogdetRefitter(W, "cheb_cholesky")
+        r = LogdetRefitter(W, "chol_cheb")
         for cap in (4, 8, 20):
             _, info = r.jax_params(-0.99, 0.99, cap)
             assert info.order <= cap
@@ -326,9 +326,9 @@ class TestJaxParams:
         """The refit path must stay differentiable for gradient-based samplers."""
         from neighbayes._logdet._jax import make_logdet_jax_param_fn
 
-        r = LogdetRefitter(W, "cheb_cholesky")
+        r = LogdetRefitter(W, "chol_cheb")
         params, _ = r.jax_params(0.5, 0.7, r.capacity(0.0, 0.95))
-        fn = make_logdet_jax_param_fn("cheb_cholesky")
+        fn = make_logdet_jax_param_fn("chol_cheb")
         g = jax.grad(lambda rho: fn(rho, params))(0.6)
         assert np.isfinite(float(g))
         # dJ/dρ = -tr(W(I-ρW)^{-1}) < 0 for ρ > 0 on a row-standardized W

@@ -25,14 +25,17 @@ import numpy as np
 import pytest
 
 from neighbayes import dgp
+from neighbayes.models import SARNegBinFlow
 from neighbayes.tests.helpers import (
     W_to_graph,
     _as_sparse,
+    flow_form,
     make_rook_W,
     make_sar_logit_data,
-    make_sar_logit_structural_data,
-    make_sem_logit_data,
 )
+
+sar_negbin_separable = flow_form(SARNegBinFlow, separable=True)
+
 
 pytestmark = [pytest.mark.slow, pytest.mark.recovery]
 
@@ -41,21 +44,19 @@ BACKENDS = ["numpy", "jax"]
 
 # ---------------------------------------------------------------------------
 # Logit models: 30×30 grid (n=900), matching test_spatial_logit_recovery.py
-# NB/ZINB models: 32×32 grid (n=1024), matching test_sar_negbin_latent.py
+# NB/ZINB models: 32×32 grid (n=1024)
 # ---------------------------------------------------------------------------
 SIDE_LOGIT = 30
 SIDE_NB = 32
 
 # True parameters — logit (matching test_spatial_logit_recovery.py)
 RHO_LOGIT = 0.4
-LAM_LOGIT = 0.4
 BETA_LOGIT = np.array([0.3, 1.0])
 
-# True parameters — NB (matching test_sar_negbin_latent.py)
+# True parameters — NB
 RHO_NB = 0.4
 BETA_NB = np.array([0.5, 0.8])
 ALPHA_NB = 2.0
-SIGMA2_NB = 0.5
 
 # True parameters — ZINB (matching test_sar_zinb_recovery.py)
 RHO_ZINB = 0.4
@@ -72,7 +73,6 @@ CHAINS = 2
 # Tolerances — matching the per-model recovery tests exactly
 TOL_SPATIAL_LOGIT = 0.15
 TOL_BETA_LOGIT = 0.25
-TOL_BETA_INTERCEPT_SEM = 0.50
 
 TOL_SPATIAL_NB = 0.20
 TOL_BETA_NB = 0.40
@@ -119,7 +119,7 @@ def test_sar_logit_backend_recovery(sar_logit_data, backend):
     from neighbayes.models import SARLogit
 
     y, X, W = sar_logit_data
-    idata = SARLogit(y=y, X=X, W=W).fit(gibbs_backend=backend, **_fit_kwargs(backend))
+    idata = SARLogit(y=y, X=X, W=W).fit(backend=backend, **_fit_kwargs(backend))
 
     rho_hat = float(idata.posterior["rho"].mean())
     beta_hat = idata.posterior["beta"].mean(("chain", "draw")).values
@@ -134,75 +134,6 @@ def test_sar_logit_backend_recovery(sar_logit_data, backend):
 
 
 # ======================================================================
-# SARLogitStructural (latent-field)
-# ======================================================================
-
-
-@pytest.fixture(scope="module")
-def sar_logit_struct_data():
-    """Structural-form SAR-logit data (with noise) on a 30×30 rook grid."""
-    rng = np.random.default_rng(42)
-    W_dense = make_rook_W(SIDE_LOGIT)
-    y, X = make_sar_logit_structural_data(rng, W_dense, rho=RHO_LOGIT, beta=BETA_LOGIT)
-    return y, X, W_to_graph(W_dense)
-
-
-@pytest.mark.parametrize("backend", BACKENDS)
-def test_sar_logit_struct_backend_recovery(sar_logit_struct_data, backend):
-    """SARLogitStructural recovers ρ and β on both backends."""
-    from neighbayes.models import SARLogitStructural
-
-    y, X, W = sar_logit_struct_data
-    idata = SARLogitStructural(y=y, X=X, W=W).fit(
-        gibbs_backend=backend, **_fit_kwargs(backend)
-    )
-
-    rho_hat = float(idata.posterior["rho"].mean())
-    beta_hat = idata.posterior["beta"].mean(("chain", "draw")).values
-
-    assert abs(rho_hat - RHO_LOGIT) < TOL_SPATIAL_LOGIT, (
-        f"SARLogitStructural[{backend}] rho: {rho_hat:.3f} vs {RHO_LOGIT}"
-    )
-    for j, (bh, bt) in enumerate(zip(beta_hat, BETA_LOGIT)):
-        assert abs(bh - bt) < TOL_BETA_LOGIT, (
-            f"SARLogitStructural[{backend}] beta[{j}]: {bh:.3f} vs {bt}"
-        )
-
-
-# ======================================================================
-# SEMLogit (spatial error)
-# ======================================================================
-
-
-@pytest.fixture(scope="module")
-def sem_logit_data():
-    """SEM-logit data on a 30×30 rook grid."""
-    rng = np.random.default_rng(42)
-    W_dense = make_rook_W(SIDE_LOGIT)
-    y, X = make_sem_logit_data(rng, W_dense, lam=LAM_LOGIT, beta=BETA_LOGIT)
-    return y, X, W_to_graph(W_dense)
-
-
-@pytest.mark.parametrize("backend", BACKENDS)
-def test_sem_logit_backend_recovery(sem_logit_data, backend):
-    """SEMLogit recovers λ and β on both backends."""
-    from neighbayes.models import SEMLogit
-
-    y, X, W = sem_logit_data
-    idata = SEMLogit(y=y, X=X, W=W).fit(gibbs_backend=backend, **_fit_kwargs(backend))
-
-    lam_hat = float(idata.posterior["lam"].mean())
-    beta_hat = idata.posterior["beta"].mean(("chain", "draw")).values
-
-    assert abs(lam_hat - LAM_LOGIT) < TOL_SPATIAL_LOGIT, (
-        f"SEMLogit[{backend}] lam: {lam_hat:.3f} vs {LAM_LOGIT}"
-    )
-    for j, (bh, bt) in enumerate(zip(beta_hat, BETA_LOGIT)):
-        tol = TOL_BETA_INTERCEPT_SEM if j == 0 else TOL_BETA_LOGIT
-        assert abs(bh - bt) < tol, f"SEMLogit[{backend}] beta[{j}]: {bh:.3f} vs {bt}"
-
-
-# ======================================================================
 # SARNegBin (reduced-form, sigma2=0)
 # ======================================================================
 
@@ -213,12 +144,7 @@ def sar_negbin_data():
     rng = np.random.default_rng(42)
     W = W_to_graph(make_rook_W(SIDE_NB))
     return dgp.simulate_sar_negbin(
-        W=_as_sparse(W),
-        rho=RHO_NB,
-        beta=BETA_NB,
-        alpha=ALPHA_NB,
-        sigma2=0.0,
-        rng=rng,
+        W=_as_sparse(W), rho=RHO_NB, beta=BETA_NB, alpha=ALPHA_NB, rng=rng
     )
 
 
@@ -230,7 +156,7 @@ def test_sar_negbin_backend_recovery(sar_negbin_data, backend):
     d = sar_negbin_data
     W = W_to_graph(make_rook_W(SIDE_NB))
     idata = SARNegBin(y=d["y"], X=d["X"], W=W).fit(
-        gibbs_backend=backend, **_fit_kwargs(backend)
+        backend=backend, **_fit_kwargs(backend)
     )
 
     rho_hat = float(idata.posterior["rho"].mean())
@@ -250,53 +176,6 @@ def test_sar_negbin_backend_recovery(sar_negbin_data, backend):
 
 
 # ======================================================================
-# SARNegBinStructural (latent-field, sigma2>0)
-# ======================================================================
-
-
-@pytest.fixture(scope="module")
-def sar_negbin_struct_data():
-    """Structural-form SAR-NB data (with latent noise, sigma2=0.5) on a 32×32 rook grid."""
-    rng = np.random.default_rng(42)
-    W = W_to_graph(make_rook_W(SIDE_NB))
-    return dgp.simulate_sar_negbin(
-        W=_as_sparse(W),
-        rho=RHO_NB,
-        beta=BETA_NB,
-        alpha=ALPHA_NB,
-        sigma2=SIGMA2_NB,
-        rng=rng,
-    )
-
-
-@pytest.mark.parametrize("backend", BACKENDS)
-def test_sar_negbin_struct_backend_recovery(sar_negbin_struct_data, backend):
-    """SARNegBinStructural recovers ρ, β, α on both backends."""
-    from neighbayes.models import SARNegBinStructural
-
-    d = sar_negbin_struct_data
-    W = W_to_graph(make_rook_W(SIDE_NB))
-    idata = SARNegBinStructural(y=d["y"], X=d["X"], W=W).fit(
-        gibbs_backend=backend, **_fit_kwargs(backend)
-    )
-
-    rho_hat = float(idata.posterior["rho"].mean())
-    beta_hat = idata.posterior["beta"].mean(("chain", "draw")).values
-    alpha_hat = float(idata.posterior["alpha"].mean())
-
-    assert abs(rho_hat - RHO_NB) < TOL_SPATIAL_NB, (
-        f"SARNegBinStructural[{backend}] rho: {rho_hat:.3f} vs {RHO_NB}"
-    )
-    for j, (bh, bt) in enumerate(zip(beta_hat, BETA_NB)):
-        assert abs(bh - bt) < TOL_BETA_NB, (
-            f"SARNegBinStructural[{backend}] beta[{j}]: {bh:.3f} vs {bt}"
-        )
-    assert abs(alpha_hat - ALPHA_NB) < TOL_ALPHA_NB, (
-        f"SARNegBinStructural[{backend}] alpha: {alpha_hat:.3f} vs {ALPHA_NB}"
-    )
-
-
-# ======================================================================
 # SARZINB (zero-inflated NB)
 # ======================================================================
 
@@ -309,9 +188,9 @@ def sar_zinb_data():
     return dgp.simulate_sar_zinb(
         W=_as_sparse(W),
         rho=RHO_ZINB,
-        lam=LAM_ZINB,
+        rho_zero=LAM_ZINB,
         beta=BETA_ZINB,
-        gamma=GAMMA_ZINB,
+        beta_zero=GAMMA_ZINB,
         alpha=ALPHA_ZINB,
         rng=rng,
     )
@@ -324,14 +203,14 @@ def test_sar_zinb_backend_recovery(sar_zinb_data, backend):
 
     d = sar_zinb_data
     W = W_to_graph(make_rook_W(SIDE_NB))
-    idata = SARZINB(y=d["y"], X=d["X"], Z=d["Z"], W=W).fit(
-        gibbs_backend=backend, **_fit_kwargs(backend)
+    idata = SARZINB(y=d["y"], X=d["X"], X_zero=d["X_zero"], W=W).fit(
+        backend=backend, **_fit_kwargs(backend)
     )
 
     rho_hat = float(idata.posterior["rho"].mean())
-    lam_hat = float(idata.posterior["lam"].mean())
+    lam_hat = float(idata.posterior["rho_zero"].mean())
     beta_hat = idata.posterior["beta"].mean(("chain", "draw")).values
-    gamma_hat = idata.posterior["gamma"].mean(("chain", "draw")).values
+    gamma_hat = idata.posterior["beta_zero"].mean(("chain", "draw")).values
     alpha_hat = float(idata.posterior["alpha"].mean())
 
     assert abs(rho_hat - RHO_ZINB) < TOL_SPATIAL_ZINB, (
@@ -366,7 +245,7 @@ def test_sar_logit_backend_mixing(sar_logit_data, backend):
     from neighbayes.models import SARLogit
 
     y, X, W = sar_logit_data
-    idata = SARLogit(y=y, X=X, W=W).fit(gibbs_backend=backend, **_fit_kwargs(backend))
+    idata = SARLogit(y=y, X=X, W=W).fit(backend=backend, **_fit_kwargs(backend))
 
     summ = az.summary(idata, var_names=["rho"])
     ess = float(summ.loc["rho", "ess_bulk"])
@@ -386,10 +265,7 @@ def test_sar_logit_backend_mixing(sar_logit_data, backend):
 # draws, n = 900/1024):
 #
 #     SARLogit             rho 0.0006   beta 0.0060
-#     SARLogitStructural   rho 0.0007   beta 0.0098
-#     SEMLogit             lam 0.0161   beta 0.0064
 #     SARNegBin            rho 0.0020   beta 0.0029   alpha 0.0054
-#     SARNegBinStructural  rho 0.0013   beta 0.0018   alpha 0.0038
 #
 # The tolerances sit ~3-30x above that noise and one to two orders of
 # magnitude below the bugs this class of test exists to catch.
@@ -430,9 +306,9 @@ def sar_zinb_small_data():
     return dgp.simulate_sar_zinb(
         n_side=18,
         rho=RHO_ZINB,
-        lam=LAM_ZINB,
+        rho_zero=LAM_ZINB,
         beta=BETA_ZINB,
-        gamma=GAMMA_ZINB,
+        beta_zero=GAMMA_ZINB,
         alpha=ALPHA_ZINB,
         seed=3,
     )
@@ -453,8 +329,8 @@ def test_sar_zinb_backends_agree(sar_zinb_small_data):
 
     fits = {}
     for backend in BACKENDS:
-        idata = SARZINB(y=d["y"], X=d["X"], Z=d["Z"], W=W).fit(
-            gibbs_backend=backend, **_fit_kwargs(backend)
+        idata = SARZINB(y=d["y"], X=d["X"], X_zero=d["X_zero"], W=W).fit(
+            backend=backend, **_fit_kwargs(backend)
         )
         fits[backend] = idata.posterior
 
@@ -464,10 +340,10 @@ def test_sar_zinb_backends_agree(sar_zinb_small_data):
 
     for name, tol in (
         ("rho", 0.08),
-        ("lam", 0.08),
+        ("rho_zero", 0.08),
         ("alpha", 0.25),
         ("beta", 0.10),
-        ("gamma", 0.08),
+        ("beta_zero", 0.08),
     ):
         a, b = _mean(fits["numpy"], name), _mean(fits["jax"], name)
         assert np.allclose(a, b, atol=tol), (
@@ -488,17 +364,10 @@ def _assert_backends_agree(posteriors, tols, label):
         )
 
 
-# (model name, fixture, builder, tolerances)
+# (model name, fixture, tolerances)
 _AGREEMENT_CASES = [
     ("SARLogit", "sar_logit_data", {"rho": 0.05, "beta": 0.05}),
-    ("SARLogitStructural", "sar_logit_struct_data", {"rho": 0.05, "beta": 0.05}),
-    ("SEMLogit", "sem_logit_data", {"lam": 0.06, "beta": 0.05}),
     ("SARNegBin", "sar_negbin_data", {"rho": 0.05, "beta": 0.05, "alpha": 0.15}),
-    (
-        "SARNegBinStructural",
-        "sar_negbin_struct_data",
-        {"rho": 0.05, "beta": 0.05, "alpha": 0.15},
-    ),
 ]
 
 
@@ -524,8 +393,7 @@ def test_backends_agree(request, model_name, fixture_name, tols):
         kwargs = dict(y=data["y"], X=data["X"], W=W)
 
     posteriors = {
-        b: cls(**kwargs).fit(gibbs_backend=b, **_fit_kwargs(b)).posterior
-        for b in BACKENDS
+        b: cls(**kwargs).fit(backend=b, **_fit_kwargs(b)).posterior for b in BACKENDS
     }
     _assert_backends_agree(posteriors, tols, model_name)
 
@@ -544,36 +412,35 @@ def test_backends_agree(request, model_name, fixture_name, tols):
 @pytest.fixture(scope="module")
 def nb_flow_sep_data():
     """Separable NB flow counts on a 20x20 origin-destination grid (N=400)."""
-    from neighbayes.dgp.flows import generate_negbin_flow_data_separable
+    from neighbayes.dgp import simulate_sar_negbin_flow
 
-    return generate_negbin_flow_data_separable(
-        n=20, rho_d=0.35, rho_o=0.25, alpha=2.0, seed=7
+    return simulate_sar_negbin_flow(
+        n=20, rho_d=0.35, rho_o=0.25, alpha=2.0, seed=7, separable=True
     )
 
 
 def test_nb_flow_separable_backends_agree(nb_flow_sep_data):
     """Both separable-flow backends must sample the same posterior."""
-    from neighbayes.models.flow import SARNegBinFlowSeparable
 
     d = nb_flow_sep_data
     posteriors = {}
     for backend in BACKENDS:
-        model = SARNegBinFlowSeparable(
-            d["y_vec"], d["X"], d["G"], col_names=d["col_names"]
+        model = SARNegBinFlow(
+            d["y_vec"], d["X"], d["G"], separable=True, col_names=d["col_names"]
         )
         posteriors[backend] = model.fit(
             draws=DRAWS,
             tune=TUNE // 2,
             chains=CHAINS,
             random_seed=11,
-            gibbs_backend=backend,
+            backend=backend,
             progressbar=False,
         ).posterior
 
     _assert_backends_agree(
         posteriors,
         {"rho_d": 0.08, "rho_o": 0.08, "alpha": 0.30},
-        "SARNegBinFlowSeparable",
+        "sar_negbin_separable",
     )
 
 
@@ -585,17 +452,15 @@ def test_nb_flow_separable_jax_recovers_and_mixes(nb_flow_sep_data):
     """
     import arviz as az
 
-    from neighbayes.models.flow import SARNegBinFlowSeparable
-
     d = nb_flow_sep_data
-    idata = SARNegBinFlowSeparable(
-        d["y_vec"], d["X"], d["G"], col_names=d["col_names"]
+    idata = SARNegBinFlow(
+        d["y_vec"], d["X"], d["G"], separable=True, col_names=d["col_names"]
     ).fit(
         draws=DRAWS,
         tune=TUNE // 2,
         chains=CHAINS,
         random_seed=11,
-        gibbs_backend="jax",
+        backend="jax",
         progressbar=False,
     )
 

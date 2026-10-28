@@ -211,7 +211,7 @@ class SparseFlowSolveOp(_CachedSolverOpMixin, pt.Op):
     Wo : scipy.sparse.csr_matrix, shape (N, N)
         Origin weight matrix :math:`W_o = W \otimes I_n`.
     Ww : scipy.sparse.csr_matrix, shape (N, N)
-        Network weight matrix :math:`W_w = W \otimes W`.
+        Origin–destination weight matrix :math:`W_w = W \otimes W`.
 
     Examples
     --------
@@ -219,7 +219,7 @@ class SparseFlowSolveOp(_CachedSolverOpMixin, pt.Op):
     >>> from neighbayes.graph import flow_weight_matrices
     >>> import pytensor.tensor as pt, pytensor
     >>> wms = flow_weight_matrices(G)
-    >>> op = SparseFlowSolveOp(wms["destination"], wms["origin"], wms["network"])
+    >>> op = SparseFlowSolveOp(wms["destination"], wms["origin"], wms["od"])
     >>> rho_d, rho_o, rho_w = pt.scalars("rho_d", "rho_o", "rho_w")
     >>> b = pt.vector("b")
     >>> eta = op(rho_d, rho_o, rho_w, b)

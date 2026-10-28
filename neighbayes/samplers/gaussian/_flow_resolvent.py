@@ -19,8 +19,12 @@ non-trivial; these come from the scalable resolvent-Kronecker estimator
 (:mod:`neighbayes._logdet._flow_resolvent`), whose relative error *improves* with
 ``N`` — replacing the noise-amplified ``"traces"`` value method.
 
-``β`` and ``σ²`` have the usual conjugate Gibbs updates given ``ρ`` (``A(ρ)y`` is a
-cheap linear transform of the data), so the sampler is MALA-on-``ρ`` within Gibbs.
+The sampler draws ``ρ`` given ``σ²`` with ``β`` integrated out under its Normal
+prior (:class:`_Collapsed`), by MALA with a Laplace metric, then ``β`` and ``σ²``
+from their conjugate conditionals: a blocked draw of ``(ρ, β)`` given ``σ²``.
+Integrating ``β`` out removes the ``ρ``–``β`` coupling that made the conditional
+step crawl (effective draws 2% of draws with ``β`` held, about half with it
+integrated, at the same cost per iteration).
 
 .. note::
    Per-step this needs a handful of Kronecker GMRES solves; it is intended for the
@@ -42,24 +46,27 @@ from ..._logdet._flow_resolvent import (
     flow_logdet_value_and_grad,
 )
 
+#: Taylor order beyond which a directed ``W``'s exact flow log-determinant gives
+#: way to the resolvent estimator: ``|ρ|`` sums near 0.97 for row-standardized W.
+_TAYLOR_FALLBACK_ORDER = 1024
+
 
 def resolve_flow_logdet(W, method: str = "auto"):
     """Pick the unrestricted flow log-determinant backend.
 
-    ``"auto"`` uses the exact trace-moment method
-    (:class:`~neighbayes._logdet._flow_kron_traces.FlowKronTraceLogdet`) when ``W``
-    is undirected (D-symmetrizable, so its spectrum is real and the Chebyshev
-    basis converges up to the stability wall), and the stochastic resolvent
-    estimator (``"jax"``) for directed ``W``.  ``"kron_traces"`` forces the exact
-    method (Taylor basis for directed ``W``, which is slow near the wall).
+    ``"auto"`` and ``"kron_traces"`` use the exact trace-moment method
+    (:class:`~neighbayes._logdet._flow_kron_traces.FlowKronTraceLogdet`): the
+    Chebyshev basis for an undirected ``W`` (real spectrum; it converges up to
+    the stability wall), the Taylor basis for a directed one, which slows near
+    the wall, so each target falls back there on its resolvent estimator
+    (:func:`_target_logdet`).  On a directed ``W`` the Taylor series ran the
+    same chains 29 times faster than the resolvent estimator, and exactly.
 
     Returns ``(logdet_value_and_grad or None, resolved_method)``; ``None`` means
     each chain's target builds its own resolvent estimator.
     """
     if method == "auto":
-        from ..._logdet._config import _is_symmetric_W
-
-        method = "kron_traces" if _is_symmetric_W(W) else "jax"
+        method = "kron_traces"
     if method == "kron_traces":
         from ..._logdet._flow_kron_traces import FlowKronTraceLogdet
 
@@ -69,6 +76,43 @@ def resolve_flow_logdet(W, method: str = "auto"):
             f"logdet_method must be 'auto', 'kron_traces', 'jax' or 'numpy', got {method!r}"
         )
     return None, method
+
+
+def _target_logdet(target):
+    """A target's ``log|A|`` value and gradient: the given one, or its resolvent.
+
+    The resolvent estimator runs on frozen probes from the target's ``seed``
+    (JAX unless ``logdet_method="numpy"`` or JAX is missing).  A Taylor-basis
+    trace series is used wherever its order stays within
+    ``_TAYLOR_FALLBACK_ORDER`` and the resolvent, built on first need, beyond.
+    """
+    from ..._backends.sampler_helpers import jax_available
+    from ..._logdet._flow_kron_traces import FlowKronTraceLogdet
+
+    def resolvent():
+        rng = np.random.default_rng(target.seed)
+        probes = rng.choice([-1.0, 1.0], size=(target.Nf, target.n_probes)).astype(
+            np.float64
+        )
+        if target.logdet_method != "numpy" and jax_available():
+            return _jax_logdet_value_and_grad(target.kron, probes, n_quad=target.n_quad)
+        return _default_logdet_value_and_grad(target.kron, probes)
+
+    given = target.logdet_value_and_grad
+    if given is None:
+        return resolvent()
+    if not (isinstance(given, FlowKronTraceLogdet) and given.basis == "taylor"):
+        return given
+    fallback = []
+
+    def taylor_or_resolvent(rho_d, rho_o, rho_w):
+        if given.taylor_order(rho_d, rho_o, rho_w) <= _TAYLOR_FALLBACK_ORDER:
+            return given(rho_d, rho_o, rho_w)
+        if not fallback:
+            fallback.append(resolvent())
+        return fallback[0](rho_d, rho_o, rho_w)
+
+    return taylor_or_resolvent
 
 
 def _default_logdet_value_and_grad(kron, probes):
@@ -146,6 +190,63 @@ def _resolve_priors(target) -> None:
     target.sigma2_beta = float(target.sigma2_beta)
 
 
+class _Collapsed:
+    r"""``β`` integrated out of the flow parameters' conditional given ``σ²``.
+
+    With ``r(ρ) = a - Σ_k ρ_k A_k`` the filtered response less ``Z b₀`` and
+    ``Z(ρ)`` the (filtered, for the SEM) design, ``P = Z'Z + σ² B₀⁻¹`` and
+    ``m = P⁻¹ Z'r``, the Normal prior integrates to
+
+    .. math::
+        \log p(\rho \mid \sigma^2) = J\log|A| - \frac{r'r - r'Zm}{2\sigma^2}
+            - \tfrac12 \log|P| + \text{const},
+
+    whose gradient, by the envelope theorem, is ``J ∂log|A|`` plus
+    ``res'(A_k - W_k X m)/σ² + tr(P⁻¹ Z' W_k X)``, ``res = r - Zm`` (the
+    ``W_k X`` terms are the SEM's).  Every vector is a combination of the
+    columns of ``V = [a, A, X, W_d X, W_o X, W_w X]``, so one Gram matrix
+    ``V'V`` makes each evaluation ``O(k³)``.
+    """
+
+    def __init__(self, a, A, X, WX, beta_mu, beta_sigma):
+        self.k = X.shape[1]
+        self.sem = WX is not None
+        V = np.hstack([a[:, None], A, X] + (list(WX) if self.sem else []))
+        self.G = V.T @ V
+        self.nv = V.shape[1]
+        self.prior_prec = np.diag(1.0 / np.asarray(beta_sigma, dtype=np.float64) ** 2)
+
+    def _blocks(self, j):
+        """The columns of ``W_j X`` in ``V``."""
+        start = 4 + self.k * (j + 1)
+        return slice(start, start + self.k)
+
+    def value_and_grad(self, rho, sigma2):
+        k, G = self.k, self.G
+        cr = np.zeros(self.nv)
+        cr[0] = 1.0
+        cr[1:4] = -rho
+        CZ = np.zeros((self.nv, k))
+        CZ[4 : 4 + k] = np.eye(k)
+        if self.sem:
+            for j in range(3):
+                CZ[self._blocks(j)] = -rho[j] * np.eye(k)
+        Gcr = G @ cr
+        Ztr = CZ.T @ Gcr
+        P = CZ.T @ G @ CZ + sigma2 * self.prior_prec
+        L = np.linalg.cholesky(P)
+        m = scipy.linalg.cho_solve((L, True), Ztr)
+        value = -0.5 * (cr @ Gcr - Ztr @ m) / sigma2 - np.sum(np.log(np.diag(L)))
+        Gres = G @ (cr - CZ @ m)
+        grad = Gres[1:4] / sigma2
+        if self.sem:
+            for j in range(3):
+                b = self._blocks(j)
+                grad[j] -= Gres[b] @ m / sigma2
+                grad[j] += np.trace(scipy.linalg.cho_solve((L, True), CZ.T @ G[:, b]))
+        return value, grad
+
+
 def _draw_beta_sigma2(target, X, XtX, e, sigma2, rng):
     """``β | σ²`` under the Normal prior, then ``σ² | β`` under the IG prior.
 
@@ -170,8 +271,52 @@ def _draw_beta_sigma2(target, X, XtX, e, sigma2, rng):
     return beta, sigma2
 
 
+class _RhoTarget:
+    """``ρ``'s collapsed log-posterior and gradient, with the ``log|A|`` cache.
+
+    The host sets ``collapsed`` (:class:`_Collapsed`), ``logdet_value_and_grad``,
+    ``positive`` and ``rho_bound``.
+    """
+
+    def in_bounds(self, rho) -> bool:
+        rho = np.asarray(rho, dtype=np.float64)
+        if self.positive and np.any(rho < 0.0):
+            return False
+        return bool(np.abs(rho).sum() < self.rho_bound and rho.sum() < self.rho_bound)
+
+    def logpost_and_grad(self, rho, sigma2):
+        """``(logp, grad3)`` of ``log p(ρ | σ²)``, ``β`` integrated out (flat ρ prior in-bounds).
+
+        ``log|A_panel| = T·log|I_N − W_F|`` so the log-determinant value/gradient
+        are scaled by ``jacobian_T`` (``T``, or ``T − 1`` under Lee & Yu's
+        pair-effect correction; ``1`` for the cross-section), less any
+        time-effect ``m·log(1 − Σρ)`` (see :func:`_fe_jacobian`).  The per-period
+        ``log|A|`` is cached (``_last_ld_val`` for the sampler's Jacobian, and
+        for :meth:`logpost_cached` once ``σ²`` has moved).
+        """
+        rho = np.asarray(rho, dtype=np.float64)
+        if not self.in_bounds(rho):
+            self._cached_rho = None
+            return -np.inf, np.zeros(3)
+        ld_val, ld_grad = self.logdet_value_and_grad(rho[0], rho[1], rho[2])
+        self._cached_rho = rho.copy()
+        self._cached_ld_val = ld_val
+        self._cached_ld_grad = np.asarray(ld_grad, dtype=np.float64)
+        return self.logpost_cached(rho, sigma2)
+
+    def logpost_cached(self, rho, sigma2):
+        """:meth:`logpost_and_grad` from the cached ``log|A|`` (``ρ`` must be unchanged)."""
+        rho = np.asarray(rho, dtype=np.float64)
+        self._last_ld_val = float(self._cached_ld_val)
+        jac, jac_grad = _fe_jacobian(
+            self, self._cached_ld_val, self._cached_ld_grad, rho
+        )
+        value, grad = self.collapsed.value_and_grad(rho, sigma2)
+        return jac + value, jac_grad + grad
+
+
 @dataclass
-class FlowResolventTarget:
+class FlowResolventTarget(_RhoTarget):
     """ρ-conditional log-posterior and gradient for the unrestricted flow model.
 
     Parameters
@@ -191,7 +336,7 @@ class FlowResolventTarget:
         (a conservative row-stochastic stability wall).
     positive : bool
         Additionally reject any ``ρ_k < 0`` (the model-level
-        ``restrict_positive=True`` prior: flat on the positive simplex).
+        ``nonnegative_dependence=True`` prior: flat on the positive simplex).
     """
 
     W: object
@@ -246,23 +391,19 @@ class FlowResolventTarget:
             ]
         )
         self.XtX = self.X.T @ self.X
+        self.collapsed = _Collapsed(
+            self.y - self.X @ self.beta_mu,
+            self.L,
+            self.X,
+            None,
+            self.beta_mu,
+            self.beta_sigma,
+        )
         self._last_ld_val = 0.0  # cached per-period log|A| for the Jacobian
         self._cached_rho = None  # cache key for logdet reuse after Gibbs
         self._cached_ld_val = 0.0
         self._cached_ld_grad = np.zeros(3)
-        if self.logdet_value_and_grad is None:
-            rng = np.random.default_rng(self.seed)
-            probes = rng.choice([-1.0, 1.0], size=(self.Nf, self.n_probes)).astype(
-                np.float64
-            )
-            if self.logdet_method == "jax":
-                self.logdet_value_and_grad = _jax_logdet_value_and_grad(
-                    self.kron, probes, n_quad=self.n_quad
-                )
-            else:
-                self.logdet_value_and_grad = _default_logdet_value_and_grad(
-                    self.kron, probes
-                )
+        self.logdet_value_and_grad = _target_logdet(self)
 
     def _period_lag(self, vec, fn):
         """Apply the per-period flow operator ``fn`` to each length-``Nf`` block."""
@@ -282,61 +423,6 @@ class FlowResolventTarget:
     def residual(self, rho, beta):
         """Pointwise Gaussian residual ``r = A(ρ)y − Xβ`` (length ``Ntot``)."""
         return self.Ay(rho) - self.X @ np.asarray(beta, dtype=np.float64)
-
-    def in_bounds(self, rho) -> bool:
-        rho = np.asarray(rho, dtype=np.float64)
-        if self.positive and np.any(rho < 0.0):
-            return False
-        return bool(np.abs(rho).sum() < self.rho_bound and rho.sum() < self.rho_bound)
-
-    # -- ρ-conditional target ---------------------------------------------
-    def logpost_and_grad(self, rho, beta, sigma2):
-        """Return ``(logp, grad3)`` of ``log p(ρ | β, σ²)`` (flat ρ prior in-bounds).
-
-        ``log|A_panel| = T·log|I_N − W_F|`` so the log-determinant value/gradient
-        are scaled by ``jacobian_T`` (``T``, or ``T − 1`` under Lee & Yu's
-        pair-effect correction; ``1`` for the cross-section), less any
-        time-effect ``m·log(1 − Σρ)`` (see :func:`_fe_jacobian`).  The per-period
-        ``log|A|`` value is cached in ``self._last_ld_val`` so the sampler can attach
-        the change-of-variables Jacobian to the ``log_likelihood`` group.
-
-        Caches the logdet ``(value, grad)`` keyed on ρ so that
-        :meth:`logpost_cached` can reuse it when only β/σ² have changed
-        (after a Gibbs update), avoiding a redundant resolvent computation.
-        """
-        rho = np.asarray(rho, dtype=np.float64)
-        if not self.in_bounds(rho):
-            self._cached_rho = None
-            return -np.inf, np.zeros(3)
-        r = self.Ay(rho) - self.X @ beta
-        ld_val, ld_grad = self.logdet_value_and_grad(rho[0], rho[1], rho[2])
-        self._last_ld_val = float(ld_val)
-        # Cache logdet for reuse after Gibbs β/σ² updates (ρ unchanged)
-        self._cached_rho = rho.copy()
-        self._cached_ld_val = ld_val
-        self._cached_ld_grad = np.asarray(ld_grad, dtype=np.float64)
-        jac, jac_grad = _fe_jacobian(self, ld_val, self._cached_ld_grad, rho)
-        logp = jac - 0.5 * float(r @ r) / sigma2
-        # d/dρ_k [-||r||²/2σ²] = (rᵀ L_k)/σ²  since ∂r/∂ρ_k = -L_k
-        grad = jac_grad + (self.L.T @ r) / sigma2
-        return logp, grad
-
-    def logpost_cached(self, rho, beta, sigma2):
-        """Recompute ``logp, grad`` using the cached logdet (ρ must be unchanged).
-
-        After a Gibbs β/σ² update the logdet ``(value, grad)`` is identical
-        because it depends only on ρ.  This method avoids the expensive
-        resolvent computation, cutting the per-iteration GMRES solves in half.
-        """
-        rho = np.asarray(rho, dtype=np.float64)
-        r = self.Ay(rho) - self.X @ beta
-        ld_val = self._cached_ld_val
-        ld_grad = self._cached_ld_grad
-        self._last_ld_val = float(ld_val)
-        jac, jac_grad = _fe_jacobian(self, ld_val, ld_grad, rho)
-        logp = jac - 0.5 * float(r @ r) / sigma2
-        grad = jac_grad + (self.L.T @ r) / sigma2
-        return logp, grad
 
     # -- conjugate Gibbs updates for β, σ² given ρ ------------------------
     def draw_beta_sigma2(self, rho, rng, sigma2):
@@ -363,7 +449,7 @@ def _lag_matrix(kron: FlowKron, M: np.ndarray, which: str, T: int = 1) -> np.nda
 
 
 @dataclass
-class SEMFlowResolventTarget:
+class SEMFlowResolventTarget(_RhoTarget):
     """λ-conditional log-posterior/gradient for the unrestricted SEM flow model.
 
     Model: ``y = Xβ + u``, ``A(λ) u = ε`` with ``A = I_N − W_F(λ)``,
@@ -428,29 +514,20 @@ class SEMFlowResolventTarget:
         self.WdX = _lag_matrix(self.kron, self.X, "d", self.T)
         self.WoX = _lag_matrix(self.kron, self.X, "o", self.T)
         self.WwX = _lag_matrix(self.kron, self.X, "w", self.T)
+        WX = (self.WdX, self.WoX, self.WwX)
+        self.collapsed = _Collapsed(
+            self.y - self.X @ self.beta_mu,
+            self.L_y - np.column_stack([M @ self.beta_mu for M in WX]),
+            self.X,
+            WX,
+            self.beta_mu,
+            self.beta_sigma,
+        )
         self._last_ld_val = 0.0  # cached per-period log|A| for the Jacobian
         self._cached_rho = None  # cache key for logdet reuse after Gibbs
         self._cached_ld_val = 0.0
         self._cached_ld_grad = np.zeros(3)
-        if self.logdet_value_and_grad is None:
-            rng = np.random.default_rng(self.seed)
-            probes = rng.choice([-1.0, 1.0], size=(self.Nf, self.n_probes)).astype(
-                np.float64
-            )
-            if self.logdet_method == "jax":
-                self.logdet_value_and_grad = _jax_logdet_value_and_grad(
-                    self.kron, probes, n_quad=self.n_quad
-                )
-            else:
-                self.logdet_value_and_grad = _default_logdet_value_and_grad(
-                    self.kron, probes
-                )
-
-    def in_bounds(self, rho) -> bool:
-        rho = np.asarray(rho, dtype=np.float64)
-        if self.positive and np.any(rho < 0.0):
-            return False
-        return bool(np.abs(rho).sum() < self.rho_bound and rho.sum() < self.rho_bound)
+        self.logdet_value_and_grad = _target_logdet(self)
 
     def _whiten(self, rho):
         """Return ``(ỹ, X̃) = (Ay, AX)`` at the given λ (linear in λ)."""
@@ -464,56 +541,64 @@ class SEMFlowResolventTarget:
         ytil, Xtil = self._whiten(rho)
         return ytil - Xtil @ np.asarray(beta, dtype=np.float64)
 
-    def logpost_and_grad(self, rho, beta, sigma2):
-        rho = np.asarray(rho, dtype=np.float64)
-        if not self.in_bounds(rho):
-            self._cached_rho = None
-            return -np.inf, np.zeros(3)
-        ytil, Xtil = self._whiten(rho)
-        r = ytil - Xtil @ beta
-        ld_val, ld_grad = self.logdet_value_and_grad(rho[0], rho[1], rho[2])
-        self._last_ld_val = float(ld_val)
-        # Cache logdet for reuse after Gibbs β/σ² updates (ρ unchanged)
-        self._cached_rho = rho.copy()
-        self._cached_ld_val = ld_val
-        self._cached_ld_grad = np.asarray(ld_grad, dtype=np.float64)
-        jac, jac_grad = _fe_jacobian(self, ld_val, self._cached_ld_grad, rho)
-        logp = jac - 0.5 * float(r @ r) / sigma2
-        # W_k e = W_k y - W_k X β ;  d/dλ_k[-||r||²/2σ²] = (rᵀ W_k e)/σ²
-        WkE = np.column_stack(
-            [
-                self.L_y[:, 0] - self.WdX @ beta,
-                self.L_y[:, 1] - self.WoX @ beta,
-                self.L_y[:, 2] - self.WwX @ beta,
-            ]
-        )
-        grad = jac_grad + (WkE.T @ r) / sigma2
-        return logp, grad
-
-    def logpost_cached(self, rho, beta, sigma2):
-        """Recompute ``logp, grad`` using the cached logdet (ρ must be unchanged)."""
-        rho = np.asarray(rho, dtype=np.float64)
-        ytil, Xtil = self._whiten(rho)
-        r = ytil - Xtil @ beta
-        ld_val = self._cached_ld_val
-        ld_grad = self._cached_ld_grad
-        self._last_ld_val = float(ld_val)
-        jac, jac_grad = _fe_jacobian(self, ld_val, ld_grad, rho)
-        logp = jac - 0.5 * float(r @ r) / sigma2
-        WkE = np.column_stack(
-            [
-                self.L_y[:, 0] - self.WdX @ beta,
-                self.L_y[:, 1] - self.WoX @ beta,
-                self.L_y[:, 2] - self.WwX @ beta,
-            ]
-        )
-        grad = jac_grad + (WkE.T @ r) / sigma2
-        return logp, grad
-
     def draw_beta_sigma2(self, rho, rng, sigma2):
         """Draw ``β | σ², λ`` (GLS) then ``σ² | β, λ`` from their full conditionals."""
         ytil, Xtil = self._whiten(rho)
         return _draw_beta_sigma2(self, Xtil, Xtil.T @ Xtil, ytil, sigma2, rng)
+
+
+def _laplace_metric(target, rho, sigma2, h=1e-4):
+    """The inverse of the collapsed target's negative Hessian at ``rho``, or ``None``.
+
+    The Hessian is a central difference of the exact gradient (six
+    log-determinant evaluations); ``None`` where it is not negative definite.
+    The ``log|A|`` cache is restored to ``rho``.
+    """
+    saved = (target._cached_ld_val, target._cached_ld_grad, target._cached_rho)
+    H = np.empty((3, 3))
+    for j in range(3):
+        step = np.zeros(3)
+        step[j] = h
+        _, gp = target.logpost_and_grad(rho + step, sigma2)
+        _, gm = target.logpost_and_grad(rho - step, sigma2)
+        H[:, j] = (gp - gm) / (2.0 * h)
+    target._cached_ld_val, target._cached_ld_grad, target._cached_rho = saved
+    H = -0.5 * (H + H.T)
+    if not np.all(np.isfinite(H)) or np.any(np.linalg.eigvalsh(H) <= 0.0):
+        return None
+    return np.linalg.inv(H)
+
+
+#: The independence proposal a chain may switch to at the half-tuning metric
+#: refresh: a multivariate t with these degrees of freedom, on trial for
+#: ``_LAPLACE_T_TRIAL`` iterations, kept when its acceptance there reaches
+#: ``_LAPLACE_T_KEEP``.  Measured on rook and kNN flows against the exact
+#: posterior (pkm ``prototypes/flow-zigzag``, 2026-10-25): in the bulk and up to
+#: Σ|ρ| ≈ 0.92 the trial accepts 0.59–0.83 and the kept t costs 18–29% fewer
+#: log-determinant calls per effective draw than MALA; near the stationarity
+#: wall it accepts 0.20–0.26, where kept it stalls, and every chain returns to
+#: MALA.
+_LAPLACE_T_DF = 7.0
+_LAPLACE_T_TRIAL = 100
+_LAPLACE_T_KEEP = 0.5
+
+
+class _LaplaceT:
+    """A multivariate t independence proposal for ρ: location ``m``, scale Cholesky ``L``."""
+
+    def __init__(self, m, L):
+        self.m, self.L = np.asarray(m, dtype=np.float64), L
+        self.Linv = np.linalg.inv(L)
+
+    def logq(self, rho) -> float:
+        z = self.Linv @ (rho - self.m)
+        return -0.5 * (_LAPLACE_T_DF + 3.0) * np.log1p(z @ z / _LAPLACE_T_DF)
+
+    def draw(self, rng) -> np.ndarray:
+        z = rng.standard_normal(3)
+        return self.m + self.L @ (
+            z / np.sqrt(rng.chisquare(_LAPLACE_T_DF) / _LAPLACE_T_DF)
+        )
 
 
 def run_flow_resolvent_gibbs(
@@ -530,54 +615,101 @@ def run_flow_resolvent_gibbs(
     chain_idx: int = 0,
     progress_manager=None,
 ):
-    """MALA-on-ρ within Gibbs for the unrestricted Gaussian flow model.
+    """MALA on ``ρ | σ²`` (``β`` integrated out), then ``β``, ``σ²``, for the unrestricted flows.
 
     Returns a dict of stacked posterior draws for ``rho_d, rho_o, rho_w, beta, sigma``,
     plus ``log_abs_det`` (per-draw ``log|A|``) and — when ``compute_log_likelihood`` —
     ``loglik`` (per-draw pointwise log-likelihood *including* the change-of-variables
     Jacobian, spread uniformly), so the caller can build a ``log_likelihood`` group
-    for LOO/WAIC.  The MALA step size is adapted during tuning toward ``target_accept``
-    (≈0.57 is optimal for MALA).  This is the reference driver; for large ``N`` run the
-    GMRES solves on GPU.
+    for LOO/WAIC.  The MALA proposal is preconditioned by a Laplace metric, the
+    inverse negative Hessian of the collapsed target, refreshed at a quarter and
+    a half of tuning and frozen after; ``step_size`` is the isotropic step
+    before the first refresh.  The step size is adapted during tuning toward
+    ``target_accept`` (≈0.57 is optimal for MALA).  This is the reference
+    driver; for large ``N`` run the GMRES solves on GPU.
+
+    At the half-tuning refresh the chain tries an independence proposal, a t at
+    the Laplace (one Newton step from the chain's ρ, the metric as scale), for
+    ``_LAPLACE_T_TRIAL`` iterations, and keeps it for the rest of the run if
+    its acceptance there reaches ``_LAPLACE_T_KEEP``; otherwise MALA resumes,
+    still adapting.  Where the posterior is near-Gaussian the t mixes faster;
+    near the stationarity wall it fails the trial.  ``rho_independence`` in the
+    result says which the chain kept.  Warmup too short for the trial keeps MALA.
     """
     rng = np.random.default_rng(seed)
     rho = np.zeros(3) if rho_init is None else np.asarray(rho_init, dtype=np.float64)
     beta, sigma2 = target.draw_beta_sigma2(rho, rng, target.sigma2_beta)
-    logp, grad = target.logpost_and_grad(rho, beta, sigma2)
+    logp, grad = target.logpost_and_grad(rho, sigma2)
 
     out = {k: [] for k in ("rho_d", "rho_o", "rho_w", "beta", "sigma", "log_abs_det")}
     if compute_log_likelihood:
         out["loglik"] = []
     _half_log_2pi = 0.5 * np.log(2.0 * np.pi)
     log_eps = np.log(step_size)
+    metric, chol, precision = np.eye(3), np.eye(3), np.eye(3)
+    refresh = {tune // 4, tune // 2} - {0}
+    # The Laplace t's trial ends inside warmup, or there is none.
+    trial_end = tune // 2 + _LAPLACE_T_TRIAL
+    has_trial = tune // 2 > 0 and trial_end < tune
+    laplace_t, trial_accept, kept_t = None, 0.0, False
     accepted_window = 0
     window = 0
     for it in range(tune + draws):
-        eps = np.exp(log_eps)
-        # Save cached logdet so we can restore it if the MALA proposal is
-        # rejected (logpost_and_grad overwrites _cached_ld_val with the
-        # proposed ρ's logdet).
+        # Save cached logdet so we can restore it if the proposal is rejected
+        # (logpost_and_grad overwrites _cached_ld_val with the proposed ρ's
+        # logdet).
         _saved_ld_val = target._cached_ld_val
         _saved_ld_grad = target._cached_ld_grad
         _saved_cached_rho = target._cached_rho
-        # --- MALA proposal on ρ ---
-        prop = rho + eps * grad + np.sqrt(2 * eps) * rng.standard_normal(3)
-        logp_p, grad_p = target.logpost_and_grad(prop, beta, sigma2)
         accept = 0.0
-        if np.isfinite(logp_p):
-            q_fwd = -np.sum((prop - rho - eps * grad) ** 2) / (4 * eps)
-            q_bwd = -np.sum((rho - prop - eps * grad_p) ** 2) / (4 * eps)
-            log_alpha = (logp_p - logp) + (q_bwd - q_fwd)
-            accept = min(1.0, np.exp(min(0.0, log_alpha)))
-            if np.log(rng.uniform()) < log_alpha:
-                rho, logp, grad = prop, logp_p, grad_p
+        if laplace_t is None:
+            # --- MALA proposal on ρ | σ², preconditioned by the metric ---
+            eps = np.exp(log_eps)
+            prop = (
+                rho
+                + eps * metric @ grad
+                + np.sqrt(2 * eps) * chol @ rng.standard_normal(3)
+            )
+            logp_p, grad_p = target.logpost_and_grad(prop, sigma2)
+            if np.isfinite(logp_p):
+                fwd = prop - rho - eps * metric @ grad
+                bwd = rho - prop - eps * metric @ grad_p
+                q_fwd = -(fwd @ precision @ fwd) / (4 * eps)
+                q_bwd = -(bwd @ precision @ bwd) / (4 * eps)
+                log_alpha = (logp_p - logp) + (q_bwd - q_fwd)
+                accept = min(1.0, np.exp(min(0.0, log_alpha)))
+                if np.log(rng.uniform()) < log_alpha:
+                    rho, logp, grad = prop, logp_p, grad_p
+                else:
+                    # Proposal rejected: restore the cache to the current ρ's logdet.
+                    target._cached_ld_val = _saved_ld_val
+                    target._cached_ld_grad = _saved_ld_grad
+                    target._cached_rho = _saved_cached_rho
             else:
-                # Proposal rejected: restore the cache to the current ρ's logdet.
                 target._cached_ld_val = _saved_ld_val
                 target._cached_ld_grad = _saved_ld_grad
                 target._cached_rho = _saved_cached_rho
-        # --- step-size adaptation (during tuning only) ---
-        if it < tune:
+        else:
+            # --- independence proposal on ρ | σ², from the Laplace t ---
+            prop = laplace_t.draw(rng)
+            # Outside the stationary region the target is zero: rejected
+            # before any log-determinant call.
+            if target.in_bounds(prop):
+                logp_p, grad_p = target.logpost_and_grad(prop, sigma2)
+                log_alpha = (logp_p - laplace_t.logq(prop)) - (
+                    logp - laplace_t.logq(rho)
+                )
+                accept = min(1.0, np.exp(min(0.0, log_alpha)))
+                if np.log(rng.uniform()) < log_alpha:
+                    rho, logp, grad = prop, logp_p, grad_p
+                else:
+                    target._cached_ld_val = _saved_ld_val
+                    target._cached_ld_grad = _saved_ld_grad
+                    target._cached_rho = _saved_cached_rho
+            if it <= trial_end:
+                trial_accept += accept
+        # --- step-size and metric adaptation (during tuning, under MALA) ---
+        if it < tune and laplace_t is None:
             accepted_window += accept
             window += 1
             if window == 50:
@@ -585,10 +717,26 @@ def run_flow_resolvent_gibbs(
                 log_eps += 0.5 * (rate - target_accept)  # nudge toward target
                 accepted_window = 0
                 window = 0
-        # --- Gibbs β, σ² ---
+            if it in refresh:
+                laplace = _laplace_metric(target, rho, sigma2)
+                if laplace is not None:
+                    metric = laplace
+                    chol = np.linalg.cholesky(metric)
+                    precision = np.linalg.inv(metric)
+                    # The metric carries the scale: restart near MALA's optimum.
+                    log_eps = np.log(0.5)
+                    accepted_window = window = 0
+                    if it == tune // 2 and has_trial:
+                        # The Laplace: one Newton step from ρ, the metric as scale.
+                        laplace_t = _LaplaceT(rho + metric @ grad, chol)
+        elif laplace_t is not None and it == trial_end:
+            kept_t = trial_accept / _LAPLACE_T_TRIAL >= _LAPLACE_T_KEEP
+            if not kept_t:
+                laplace_t = None  # MALA resumes, still adapting
+        # --- β, σ² given ρ: β first, so (ρ, β) is a blocked draw given σ² ---
         beta, sigma2 = target.draw_beta_sigma2(rho, rng, sigma2)
-        # ρ unchanged after Gibbs β/σ² update — reuse cached logdet (50% fewer GMRES solves)
-        logp, grad = target.logpost_cached(rho, beta, sigma2)
+        # ρ unchanged: σ² moved, so reuse the cached logdet.
+        logp, grad = target.logpost_cached(rho, sigma2)
         if it >= tune:
             out["rho_d"].append(rho[0])
             out["rho_o"].append(rho[1])
@@ -614,7 +762,9 @@ def run_flow_resolvent_gibbs(
         # --- progress bar ---
         if progress_manager is not None:
             progress_manager.update(chain_idx, it, tuning=it < tune)
-    return {k: np.asarray(v) for k, v in out.items()}
+    result = {k: np.asarray(v) for k, v in out.items()}
+    result["rho_independence"] = kept_t
+    return result
 
 
 def _sample_flow_chains(
@@ -729,11 +879,14 @@ def _sample_flow_chains(
     groups = {"posterior": posterior, "sample_stats": sample_stats}
     if compute_log_likelihood:
         groups["log_likelihood"] = {"obs": _stack("loglik")}
-    return az.from_dict(
+    idata = az.from_dict(
         groups,
         coords={"coefficient": list(coord_names)},
         dims={"beta": ["coefficient"]},
     )
+    # Per chain, 1 where the ρ step kept the Laplace t after its warmup trial.
+    idata.attrs["rho_independence"] = [int(p["rho_independence"]) for p in posts]
+    return idata
 
 
 def sample_flow_resolvent(
@@ -755,7 +908,7 @@ def sample_flow_resolvent(
     progressbar: bool = True,
     n_jobs: int = -1,
     logdet_method: str = "auto",
-    restrict_positive: bool = False,
+    nonnegative_dependence: bool = False,
     fe_dims: dict | None = None,
     priors: dict | None = None,
 ):
@@ -766,7 +919,7 @@ def sample_flow_resolvent(
     handles the panel (stacked over ``T`` periods; log-det scaled by ``T``).
     ``logdet_method`` selects the log-det backend (see :func:`resolve_flow_logdet`;
     ``"auto"`` is exact for undirected ``W``); ``logdet_value_and_grad`` overrides it
-    with any ``(ρ_d, ρ_o, ρ_w) -> (value, grad)`` callable.  With ``restrict_positive`` the flat ρ prior is
+    with any ``(ρ_d, ρ_o, ρ_w) -> (value, grad)`` callable.  With ``nonnegative_dependence`` the flat ρ prior is
     truncated to ``ρ_k ≥ 0`` (the model-level positivity constraint).  The per-draw
     Jacobian ``log|A|`` is attached in ``sample_stats``; with
     ``compute_log_likelihood`` (default) a pointwise ``log_likelihood`` group
@@ -793,7 +946,7 @@ def sample_flow_resolvent(
         n_jobs=n_jobs,
         logdet_method=logdet_method,
         n_quad=n_quad,
-        positive=restrict_positive,
+        positive=nonnegative_dependence,
         fe_dims=fe_dims,
         priors=priors,
     )
@@ -818,7 +971,7 @@ def sample_sem_flow_resolvent(
     progressbar: bool = True,
     n_jobs: int = -1,
     logdet_method: str = "auto",
-    restrict_positive: bool = False,
+    nonnegative_dependence: bool = False,
     fe_dims: dict | None = None,
     priors: dict | None = None,
 ):
@@ -826,7 +979,7 @@ def sample_sem_flow_resolvent(
 
     Same resolvent log-det and sampler as the SAR flow; the data term uses the
     whitened residual ``A(y−Xβ)`` and a GLS ``β`` draw.  ``T>1`` handles the panel.
-    With ``restrict_positive`` the flat λ prior is truncated to ``λ_k ≥ 0``.
+    With ``nonnegative_dependence`` the flat λ prior is truncated to ``λ_k ≥ 0``.
     Packages ``lam_d, lam_o, lam_w, beta, sigma`` with the per-draw Jacobian ``log|A|``
     in ``sample_stats`` and (default) a pointwise ``log_likelihood`` group for LOO/WAIC.
     """
@@ -850,7 +1003,7 @@ def sample_sem_flow_resolvent(
         n_jobs=n_jobs,
         logdet_method=logdet_method,
         n_quad=n_quad,
-        positive=restrict_positive,
+        positive=nonnegative_dependence,
         fe_dims=fe_dims,
         priors=priors,
     )

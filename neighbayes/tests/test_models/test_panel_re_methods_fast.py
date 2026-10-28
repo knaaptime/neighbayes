@@ -7,7 +7,7 @@ import numpy as np
 import pymc as pm
 import xarray as xr
 
-from neighbayes.models import OLSPanelRE, SARPanelRE, SDEMPanelRE, SEMPanelRE
+from neighbayes.models import OLS, SAR, SDEM, SEM
 from neighbayes.tests.helpers import W_to_graph, make_line_W
 
 
@@ -30,8 +30,8 @@ def _panel_data(seed: int = 70):
 def test_panel_re_build_pymc_models_and_force_model_zero():
     y, X, W, N, T = _panel_data()
 
-    for cls in [OLSPanelRE, SARPanelRE, SEMPanelRE]:
-        model = cls(y=y, X=X, W=W, N=N, T=T, effects=1)
+    for cls in [OLS, SAR, SEM]:
+        model = cls(y=y, X=X, W=W, N=N, T=T, unit_effects="random")
         assert model.model == 0
         assert model._unit_idx.shape[0] == N * T
 
@@ -44,35 +44,35 @@ def test_panel_re_fitted_values_and_effects_with_mock_posteriors():
     alpha = np.array([0.1, -0.05, 0.02, -0.01])
     beta = np.array([0.2, 0.8])
 
-    ols = OLSPanelRE(y=y, X=X, W=W, N=N, T=T)
+    ols = OLS(unit_effects="random", y=y, X=X, W=W, N=N, T=T)
     ols._idata = _idata(
         {
             "beta": np.stack([beta, beta + 1e-3]),
-            "alpha": np.stack([alpha, alpha + 1e-3]),
+            "unit_effect": np.stack([alpha, alpha + 1e-3]),
         }
     )
 
-    sar = SARPanelRE(y=y, X=X, W=W, N=N, T=T)
+    sar = SAR(unit_effects="random", y=y, X=X, W=W, N=N, T=T)
     sar._idata = _idata(
         {
             "beta": np.stack([beta, beta + 1e-3]),
-            "alpha": np.stack([alpha, alpha + 1e-3]),
+            "unit_effect": np.stack([alpha, alpha + 1e-3]),
             "rho": np.array([0.2, 0.201]),
         }
     )
 
-    sem = SEMPanelRE(y=y, X=X, W=W, N=N, T=T)
+    sem = SEM(unit_effects="random", y=y, X=X, W=W, N=N, T=T)
     sem._idata = _idata(
         {
             "beta": np.stack([beta, beta + 1e-3]),
-            "alpha": np.stack([alpha, alpha + 1e-3]),
+            "unit_effect": np.stack([alpha, alpha + 1e-3]),
             "lam": np.array([0.1, 0.101]),
         }
     )
 
     for model in [ols, sar, sem]:
         fitted = model.fitted_values()
-        effects = model.spatial_effects()
+        effects = model.impacts()
 
         assert fitted.shape == y.shape
         assert np.all(np.isfinite(fitted))
@@ -96,7 +96,7 @@ def test_panel_re_fitted_values_and_effects_with_mock_posteriors():
 def test_sdem_panel_re_builds_and_computes_effects():
     y, X, W, N, T = _panel_data(seed=72)
 
-    sdem = SDEMPanelRE(y=y, X=X, W=W, N=N, T=T, effects=2)
+    sdem = SDEM(unit_effects="random", y=y, X=X, W=W, N=N, T=T)
     assert sdem.model == 0
     pymc_model = sdem._build_pymc_model()
     assert isinstance(pymc_model, pm.Model)
@@ -108,13 +108,13 @@ def test_sdem_panel_re_builds_and_computes_effects():
     sdem._idata = _idata(
         {
             "beta": np.stack([beta_full, beta_full + 1e-3]),
-            "alpha": np.stack([alpha, alpha + 1e-3]),
+            "unit_effect": np.stack([alpha, alpha + 1e-3]),
             "lam": np.array([0.1, 0.101]),
         }
     )
 
     fitted = sdem.fitted_values()
-    effects = sdem.spatial_effects()
+    effects = sdem.impacts()
     assert fitted.shape == y.shape
     assert np.all(np.isfinite(fitted))
     assert np.all(np.isfinite(effects["direct"].values))

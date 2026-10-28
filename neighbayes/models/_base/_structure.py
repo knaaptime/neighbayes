@@ -1,87 +1,33 @@
-"""Spatial-structure strategy objects (Phase 5c).
+"""The spatial structure of a model's data: ``W`` applied within each period.
 
-These encapsulate the structure-specific operations that differ between
-cross-section and panel models — the spatial lag and the non-eigenvalue ``W``
-operand handed to the log-determinant factory — behind one small interface so
-the two model base classes (:class:`SpatialModel`, :class:`SpatialPanelModel`)
-can share a single implementation of the surrounding methods and, eventually,
-collapse into one class parameterized by its structure.
-
-Only the concerns that are genuinely structure-dependent live here; everything
-behavior-identical across structures stays in
+A cross-section is the ``T = 1`` panel, so one class serves both: the spatial
+lag, the batched lag of residual draws, the ``(N*T)×(N*T)`` operator
+``I_T ⊗ W`` and the ``W`` operand handed to the log-determinant factory.
+Everything else that is behaviour-identical across designs lives in
 :class:`neighbayes.models._base._shared.SharedSpatialMethods`.
 """
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-
 import numpy as np
 
 
-class SpatialStructure(ABC):
-    """Strategy encapsulating structure-specific spatial operations."""
-
-    @abstractmethod
-    def spatial_lag(self, x: np.ndarray) -> np.ndarray:
-        """Return the spatial lag of ``x`` (a vector or a column-stacked matrix)."""
-
-    @abstractmethod
-    def logdet_W_operand(self):
-        """Return the non-eigenvalue ``W`` operand for the logdet factory."""
-
-    @abstractmethod
-    def W_pt_sparse(self):
-        """Return the cached PyTensor sparse operator applied in the PyMC model.
-
-        Cross-section wraps the ``N×N`` ``W``; panel wraps the ``(N*T)×(N*T)``
-        Kronecker block ``I_T ⊗ W`` so a single symbolic multiply performs the
-        per-period lag on a stacked panel vector.
-        """
-
-
-class CrossSectionStructure(SpatialStructure):
-    """Cross-section: a single ``N×N`` weights matrix ``W``.
-
-    The lag is the plain ``W @ x`` product and the logdet factory receives the
-    dense ``W`` (mirrors the historical cross-section behavior).
-    """
-
-    def __init__(self, W_sparse):
-        self._W_sparse = W_sparse
-        self._W_pt_cache = None
-
-    def spatial_lag(self, x: np.ndarray) -> np.ndarray:
-        return np.asarray(self._W_sparse @ x, dtype=np.float64)
-
-    def logdet_W_operand(self):
-        return self._W_sparse
-
-    def W_pt_sparse(self):
-        if self._W_pt_cache is None:
-            import scipy.sparse as sp
-            from pytensor import sparse as pts
-
-            self._W_pt_cache = pts.as_sparse_variable(sp.csc_matrix(self._W_sparse))
-        return self._W_pt_cache
-
-
-class PanelStructure(SpatialStructure):
-    """Panel: ``W`` acts per period through the Kronecker structure ``W ⊗ I_T``.
+class SpatialStructure:
+    """``W ⊗ I_T`` on stacked data ordered by period, then unit.
 
     Accepts either an ``N×N`` ``W`` (applied per period in one batched matmul)
     or a full ``(N*T)×(N*T)`` block matrix.  The logdet factory receives the
-    sparse ``W`` (the panel logdet path stays sparse).
+    sparse ``W``.
     """
 
-    def __init__(self, W_sparse, N: int, T: int):
+    def __init__(self, W_sparse, N: int, T: int = 1):
         self._W_sparse = W_sparse
         self._N = int(N)
         self._T = int(T)
-        self._W_pt_cache = None
         self._W_sparse_NT_cache = None
 
     def spatial_lag(self, v: np.ndarray) -> np.ndarray:
+        """The spatial lag of a stacked vector or a column-stacked matrix."""
         W = self._W_sparse
         N, T = self._N, self._T
         v = np.asarray(v, dtype=float)
@@ -103,7 +49,7 @@ class PanelStructure(SpatialStructure):
     def batch_spatial_lag(
         self, resid: np.ndarray, T_eff: int | None = None
     ) -> np.ndarray:
-        """Apply the panel spatial lag to a batch of stacked residual draws.
+        """Apply the spatial lag to a batch of stacked residual draws.
 
         Parameters
         ----------
@@ -156,14 +102,17 @@ class PanelStructure(SpatialStructure):
         """Cached sparse ``(N*T)×(N*T)`` Kronecker block ``I_T ⊗ W``.
 
         Exposes a single linear operator that applies the per-period lag to a
-        stacked panel vector without the ``O((N*T)²)`` dense footprint.  When
-        the caller already supplied a full ``(N*T)×(N*T)`` matrix it is reused.
+        stacked panel vector without the ``O((N*T)²)`` dense footprint.  It is
+        ``W`` itself in a cross-section, and the caller's matrix when a full
+        ``(N*T)×(N*T)`` one was supplied.
         """
         if self._W_sparse_NT_cache is None:
             import scipy.sparse as sp
 
             W = self._W_sparse
-            if W.shape[0] == self._N:
+            if self._T == 1 or W.shape[0] != self._N:
+                self._W_sparse_NT_cache = W if self._T == 1 else sp.csr_matrix(W)
+            else:
                 # Ensure int64 indices to prevent overflow in scipy kron
                 W = sp.csr_matrix(W, dtype=np.float64)
                 W.indices = W.indices.astype(np.int64)
@@ -174,14 +123,4 @@ class PanelStructure(SpatialStructure):
                 self._W_sparse_NT_cache = sp.csr_matrix(
                     sp.kron(sp.eye(self._T, format="csr"), W, format="csr")
                 )
-            else:
-                self._W_sparse_NT_cache = sp.csr_matrix(W)
         return self._W_sparse_NT_cache
-
-    def W_pt_sparse(self):
-        if self._W_pt_cache is None:
-            import scipy.sparse as sp
-            from pytensor import sparse as pts
-
-            self._W_pt_cache = pts.as_sparse_variable(sp.csc_matrix(self.W_sparse_NT()))
-        return self._W_pt_cache

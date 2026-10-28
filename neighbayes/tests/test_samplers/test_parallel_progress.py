@@ -30,6 +30,11 @@ def _silent_chain(chain_id, seed, progress_manager=None, chain_id_kw=None):
     return {"chain": chain_id}
 
 
+def _sleeping_chain(chain_id, seed, progress_manager=None, chain_id_kw=None):
+    time.sleep(2.0)
+    return {"chain": chain_id}
+
+
 def _record_reporter_type(chain_id, seed, progress_manager=None, chain_id_kw=None):
     return {"chain": chain_id, "type": type(progress_manager).__name__}
 
@@ -253,3 +258,107 @@ class TestRunChainsParallelProgress:
         )
         assert len(results) == 2
         assert all(r["type"] == GibbsProgressBarManager.__name__ for r in results)
+
+
+class TestRunChainsTimeout:
+    """Chains may run for hours: ``run_chains`` waits unless told otherwise."""
+
+    def test_default_waits_indefinitely(self):
+        import inspect
+
+        from neighbayes.samplers.gaussian._chain_runner import run_chains
+
+        assert inspect.signature(run_chains).parameters["timeout"].default is None
+
+    @pytest.mark.parametrize("timeout", [1.0, None])
+    def test_parallel_chains_outlasting_a_timeout(self, timeout):
+        from neighbayes.samplers.gaussian._chain_runner import run_chains
+
+        kw = dict(
+            chain_fn=_sleeping_chain,
+            n_chains=2,
+            seeds=[1, 2],
+            n_jobs=2,
+            progressbar=False,
+            parallel=True,
+            timeout=timeout,
+        )
+        if timeout is None:
+            assert len(run_chains(**kw)) == 2
+        else:
+            import multiprocessing
+
+            with pytest.raises(multiprocessing.TimeoutError):
+                run_chains(**kw)
+
+
+# ---------------------------------------------------------------------------
+# JAX runners: progress between compiled chunks
+# ---------------------------------------------------------------------------
+
+
+def _latent_negbin():
+    from neighbayes import dgp
+    from neighbayes.models import SARNegBin
+
+    d = dgp.simulate_sar_negbin(n_side=5, seed=1, latent=True)
+    return SARNegBin(y=d["y"], X=d["X"], W=d["W_sparse"], latent=True)
+
+
+def _latent_logit():
+    from neighbayes import dgp
+    from neighbayes.models import SARLogit
+
+    d = dgp.simulate_sar_logit(n_side=5, seed=1, latent=True)
+    return SARLogit(y=d["y"], X=d["X"], W=d["W_sparse"], latent=True)
+
+
+def _separable_negbin_flow():
+    from neighbayes import dgp
+    from neighbayes.models import SARNegBinFlow
+
+    d = dgp.simulate_sar_negbin_flow(n=5, seed=2)
+    return SARNegBinFlow(d["y_vec"], d["X"], d["G"], separable=True)
+
+
+@pytest.mark.requires_jax
+@pytest.mark.parametrize(
+    "build", [_latent_negbin, _latent_logit, _separable_negbin_flow]
+)
+def test_jax_fit_shows_sweep_counts_before_it_returns(monkeypatch, build):
+    """The bars advance at chunk boundaries, not only once the run is over."""
+    from neighbayes.samplers._utils import _progress
+
+    shown = []
+    original = _progress._GibbsProgress.update
+
+    def record(self, task_id, **kw):
+        if "completed" in kw:
+            shown.append(kw["completed"])
+        return original(self, task_id, **kw)
+
+    monkeypatch.setattr(_progress._GibbsProgress, "update", record)
+    build().fit(
+        draws=300, tune=200, chains=2, progressbar=True, random_seed=0, backend="jax"
+    )
+    assert any(0 < c < 500 for c in shown), shown
+    assert max(shown) == 500
+
+
+def test_progress_throttle_shows_chunk_boundaries():
+    """Updates every 128 sweeps redraw although 128 is no multiple of the
+    redraw interval (here 15)."""
+    pm = GibbsProgressBarManager(chains=1, draws=2000, tune=1000, progressbar=True)
+    shown = []
+    with pm:
+        original = pm._progress.update
+
+        def record(task_id, **kw):
+            shown.append(kw.get("completed"))
+            return original(task_id, **kw)
+
+        pm._progress.update = record
+        pm.start_chain(0)
+        for it in (127, 255, 383):
+            pm.update(0, it, tuning=True)
+    assert shown == [128, 256, 384]

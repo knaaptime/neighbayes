@@ -9,7 +9,10 @@ Not part of the public API.
 
 from __future__ import annotations
 
+import functools
 import importlib.util
+from dataclasses import dataclass
+from typing import Callable, Optional
 
 
 def check_jax_available(*, require_equinox: bool = False) -> None:
@@ -98,63 +101,39 @@ def run_chains_in_threads(fn, per_chain_args):
         )
 
 
-def run_chains_chunked(
-    sweep, states, warm_keys, draw_keys, *, tune, draws, on_chunk=None, consts=None
-):
-    """Run Gibbs chains in parallel, in compiled chunks of sweeps.
+#: Sweeps per compiled chunk.  Fixed, so the compiled program does not depend
+#: on ``tune`` or ``draws`` and a refit of any length reuses it.  Each chunk
+#: costs one host round trip; at this length that is negligible, and a short
+#: run only idles through the held iterations.  Chunking never changes the
+#: draws: each active sweep splits the carried key once, wherever the chunk
+#: boundaries fall.
+CHUNK_LEN = 128
 
-    Every JAX Gibbs runner drives its chains through here.  A chunk is one
-    compiled fixed-length ``lax.scan`` whose first ``n_active`` sweeps run and
-    whose remaining iterations hold the state, so warmup, draws and a short
-    final chunk all reuse a single program.  It is compiled once, on the
-    calling thread, before the chains fan out to
-    :func:`run_chains_in_threads`.  Between chunks the caller can report
-    progress.
 
-    Parameters
-    ----------
-    sweep : callable
-        ``sweep(state, key, tuning) -> (state, trace)``: one Gibbs sweep of one
-        chain.  ``tuning`` is a traced boolean, true during warmup, so a sweep
-        can adapt tuning parameters it carries in ``state``.  ``trace`` is a
-        pytree of arrays, recorded for post-warmup sweeps.
-    states : list of pytree
-        Initial state of each chain.
-    warm_keys, draw_keys : sequence of PRNG keys
-        Each chain's key for the warmup phase and for the draw phase.
-    tune, draws : int
-        Warmup and post-warmup sweeps per chain.
-    on_chunk : callable, optional
-        ``on_chunk(sweep_index, tuning)``, called after each chunk with the
-        0-based index of the last completed sweep (warmup sweeps come first).
-    consts : pytree, optional
-        Read-only arrays shared by every chain (the data), passed to the
-        compiled chunk as an argument and to the sweep as a fourth argument,
-        ``sweep(state, key, tuning, consts)``.  Large arrays belong here rather
-        than in the sweep's closure: XLA embeds closed-over arrays as constants
-        and constant-folds operations on them at compile time.
+def _chunk_length(tune: int, draws: int) -> int:
+    """Sweeps per compiled chunk (:data:`CHUNK_LEN`, whatever the run length)."""
+    return CHUNK_LEN
 
-    Returns
-    -------
-    states : list of pytree
-        Final state of each chain.
-    traces : pytree of numpy.ndarray
-        ``trace`` stacked with leading axes ``(chains, draws)``.
-    """
+
+def _shape_signature(tree) -> tuple:
+    """Structure, shapes and dtypes of a pytree: what a compiled program fixes."""
     import jax
-    import jax.numpy as jnp
     import numpy as np
 
-    states = list(states)
-    chains = len(states)
-    chunk_len = max(50, max(tune, draws) // 10)
-    if consts is None:
-        _sweep = sweep
+    def dtype(x):
+        dt = getattr(x, "dtype", None)
+        return (np.dtype(dt) if dt is not None else np.result_type(x)).str
 
-        def sweep(st, key, tuning, _consts):
-            return _sweep(st, key, tuning)
+    leaves, treedef = jax.tree_util.tree_flatten(tree)
+    return treedef, tuple((np.shape(x), dtype(x)) for x in leaves)
 
-    trace_avals = jax.eval_shape(sweep, states[0], warm_keys[0], True, consts)[1]
+
+def _compile_chunk(sweep, state0, key0, consts, chunk_len):
+    """``(chunk, trace_avals)``: the jitted fixed-length scan of ``sweep``, compiled."""
+    import jax
+    import jax.numpy as jnp
+
+    trace_avals = jax.eval_shape(sweep, state0, key0, True, consts)[1]
 
     def _chunk(state, key, n_active, tuning, consts):
         def body(carry, i):
@@ -177,7 +156,204 @@ def run_chains_chunked(
     chunk = jax.jit(_chunk)
     # A zero-sweep call compiles here; threads reaching an uncompiled function
     # together would each compile their own copy.
-    jax.block_until_ready(chunk(states[0], warm_keys[0], 0, True, consts))
+    jax.block_until_ready(chunk(state0, key0, 0, True, consts))
+    return chunk, trace_avals
+
+
+@dataclass(frozen=True)
+class MidpointUpdate:
+    """Leaves :func:`run_chains_chunked` substitutes halfway through warmup.
+
+    ``state`` is ``(where, values)``: ``where(state)`` selects leaves of one
+    chain's state, as for :func:`equinox.tree_at`, and ``values[c]`` replaces
+    them in chain ``c``.  ``consts`` is ``(where, value)`` for the shared
+    ``consts``.  Either may be ``None``.  A replacement must keep its leaves'
+    shapes and dtypes (pad what varies to a fixed capacity, as
+    :meth:`~neighbayes._logdet._refit.LogdetRefitter.capacity` does), so the
+    compiled chunk is reused.
+    """
+
+    state: Optional[tuple] = None
+    consts: Optional[tuple] = None
+
+
+@dataclass(frozen=True)
+class WarmupMidpoint:
+    """An adaptation :func:`run_chains_chunked` runs once, after ``tune // 2`` sweeps.
+
+    ``keep(trace)`` picks the leaves of a sweep's trace to keep through the
+    first half of warmup; the rest of each chunk's trace is dropped as it
+    returns, so an adaptation that needs only ρ stores only ρ.  ``adapt(kept,
+    *, draws, chains)`` receives them stacked per chain, leading axes
+    ``(chains, tune // 2)`` (chains kept apart, not interleaved), and returns
+    a :class:`MidpointUpdate` or ``None``.
+    """
+
+    keep: Callable
+    adapt: Callable
+
+
+def probe_midpoint(arms) -> WarmupMidpoint:
+    """The :class:`WarmupMidpoint` that sizes stochastic log-determinant probe pools.
+
+    ``arms`` lists ``(adapter, rho_of, params_of)``: a
+    :class:`~neighbayes._logdet._probe_check.WarmupProbes`, ``rho_of(trace)``
+    picking a spatial parameter from a sweep's trace, and ``params_of(consts)``
+    the log-determinant parameters the sweep evaluates it with.  Arms that
+    share an adapter, two spatial parameters on one W, size one pool for both.
+    The first half of the kept warmup is transient and dropped; each adapter
+    sizes its pool on the rest, chains apart, against the run's ``draws`` and
+    ``chains``.  A grown pool's Chebyshev coefficients replace the parameters
+    in place, with the same shapes, so nothing recompiles.
+    """
+    import jax
+    import numpy as np
+
+    groups: dict = {}
+    for i, (adapter, _, _) in enumerate(arms):
+        groups.setdefault(id(adapter), (adapter, []))[1].append(i)
+
+    def keep(trace):
+        return tuple(rho_of(trace) for _, rho_of, _ in arms)
+
+    def adapt(kept, *, draws, chains):
+        where, values = [], []
+        for adapter, idx in groups.values():
+            settled = np.stack([kept[i][:, kept[i].shape[1] // 2 :] for i in idx])
+            adapted = adapter.adapt(settled, draws=draws, chains=chains, jax=True)
+            if adapted is None:
+                continue
+            for i in idx:
+                where.append(arms[i][2])
+                values.extend(jax.tree_util.tree_leaves(adapted.params))
+        if not where:
+            return None
+
+        def leaves(consts):
+            return tuple(
+                leaf for w in where for leaf in jax.tree_util.tree_leaves(w(consts))
+            )
+
+        return MidpointUpdate(consts=(leaves, tuple(values)))
+
+    return WarmupMidpoint(keep=keep, adapt=adapt)
+
+
+def _substitute(update: MidpointUpdate, states: list, consts):
+    """``(states, consts)`` with ``update``'s leaves in place, shapes unchanged."""
+    import equinox as eqx
+
+    before = _shape_signature((states[0], consts))
+    if update.state is not None:
+        where, values = update.state
+        states = [eqx.tree_at(where, st, values[c]) for c, st in enumerate(states)]
+    if update.consts is not None:
+        where, value = update.consts
+        consts = eqx.tree_at(where, consts, value)
+    if _shape_signature((states[0], consts)) != before:
+        raise ValueError(
+            "A warmup-midpoint update changed the shape or dtype of a state or "
+            "consts leaf, which would recompile the chunk; pad what varies to a "
+            "fixed capacity."
+        )
+    return states, consts
+
+
+def run_chains_chunked(
+    sweep,
+    states,
+    warm_keys,
+    draw_keys,
+    *,
+    tune,
+    draws,
+    consts=None,
+    progressbar=False,
+    model_type="gibbs",
+    on_warmup_midpoint: Optional[WarmupMidpoint] = None,
+):
+    """Run Gibbs chains in parallel, in compiled chunks of sweeps.
+
+    Every JAX Gibbs runner drives its chains through here.  A chunk is one
+    compiled fixed-length ``lax.scan`` whose first ``n_active`` sweeps run and
+    whose remaining iterations hold the state, so warmup, draws and a short
+    final chunk all reuse a single program.  It is compiled once, on the
+    calling thread, before the chains fan out to
+    :func:`run_chains_in_threads`.  Between chunks it reports each chain's
+    sweep count to the progress bars.
+
+    The compiled chunk is cached on ``sweep`` itself, keyed by the chunk length
+    and the shapes of the state and ``consts``.  A runner that keeps one
+    ``sweep`` per model structure, with every data-dependent value passed in
+    ``consts``, compiles once and reuses the program on later fits.  A runner
+    that builds a fresh ``sweep`` per fit compiles per fit, and its cache is
+    collected along with it.
+
+    Parameters
+    ----------
+    sweep : callable
+        ``sweep(state, key, tuning) -> (state, trace)``: one Gibbs sweep of one
+        chain.  ``tuning`` is a traced boolean, true during warmup, so a sweep
+        can adapt tuning parameters it carries in ``state``.  ``trace`` is a
+        pytree of arrays, recorded for post-warmup sweeps.
+    states : list of pytree
+        Initial state of each chain.
+    warm_keys, draw_keys : sequence of PRNG keys
+        Each chain's key for the warmup phase and for the draw phase.
+    tune, draws : int
+        Warmup and post-warmup sweeps per chain.
+    consts : pytree, optional
+        Read-only arrays shared by every chain (the data), passed to the
+        compiled chunk as an argument and to the sweep as a fourth argument,
+        ``sweep(state, key, tuning, consts)``.  Large arrays belong here rather
+        than in the sweep's closure: XLA embeds closed-over arrays as constants
+        and constant-folds operations on them at compile time.
+    progressbar : bool, default False
+        Show per-chain progress bars, advanced after each chunk.
+    model_type : str, default "gibbs"
+        The model named in the progress announcement.
+    on_warmup_midpoint : WarmupMidpoint, optional
+        Run after the first ``tune // 2`` warmup sweeps (``tune >= 2``), a
+        chunk ending there: it sees the kept warmup traces of every chain and
+        may substitute state and ``consts`` leaves for the rest of the run.
+        Keys advance only on sweeps that run, so the split chunk leaves the
+        draws of a hook that substitutes nothing unchanged.
+
+    Inside :func:`neighbayes.config.checkpoints` the run is saved to disk at
+    chunk boundaries and resumed from there when started again with the same
+    inputs (:mod:`._checkpoint`); a resumed run returns the draws of an
+    uninterrupted one.
+
+    Returns
+    -------
+    states : list of pytree
+        Final state of each chain.
+    traces : pytree of numpy.ndarray
+        ``trace`` stacked with leading axes ``(chains, draws)``.
+    """
+    import jax
+    import numpy as np
+
+    states = list(states)
+    chains = len(states)
+    chunk_len = _chunk_length(tune, draws)
+
+    owner = sweep
+    if consts is None:
+
+        def sweep(st, key, tuning, _consts):
+            return owner(st, key, tuning)
+
+    try:
+        cache = owner.__dict__.setdefault("_compiled_chunks", {})
+    except AttributeError:  # a callable without attributes: no caching
+        cache = {}
+    cache_key = (chunk_len, consts is None, _shape_signature((states[0], consts)))
+    if cache_key not in cache:
+        cache[cache_key] = _compile_chunk(
+            sweep, states[0], warm_keys[0], consts, chunk_len
+        )
+    chunk, trace_avals = cache[cache_key]
 
     def _advance(keys, n_active, tuning):
         out = run_chains_in_threads(
@@ -188,31 +364,117 @@ def run_chains_chunked(
             states[c] = out[c][0][0]
         return [o[0][1] for o in out], [o[1] for o in out]
 
-    keys = list(warm_keys)
-    done = 0
-    while done < tune:
-        n_active = min(chunk_len, tune - done)
-        keys, _ = _advance(keys, n_active, True)
-        done += n_active
-        if on_chunk is not None:
-            on_chunk(done - 1, True)
+    from ._checkpoint import RunCheckpoint
+    from ._progress import GibbsProgressBarManager
 
-    keys = list(draw_keys)
-    done = 0
+    hook = on_warmup_midpoint
+    midpoint = tune // 2 if hook is not None and tune >= 2 else None
+    ckpt = RunCheckpoint.for_run(
+        sweep_key=_sweep_key(owner),
+        lengths=(chains, tune, draws, chunk_len, midpoint is not None),
+        trees=(states, list(warm_keys), list(draw_keys), consts),
+    )
+    phase, done, keys = "warmup", 0, list(warm_keys)
+    kept = []  # per chunk, per chain: the kept trace leaves, cut to n_active
     parts = []  # per chunk, per chain: the trace pytree cut to n_active sweeps
-    while done < draws:
-        n_active = min(chunk_len, draws - done)
-        keys, chunk_traces = _advance(keys, n_active, False)
-        parts.append(
-            [
+    midpoint_input = None  # what the hook was given, once it has run
+    saved = None if ckpt is None else ckpt.load()
+    if saved is not None:
+        import jax.numpy as jnp
+
+        phase, done, kept, parts = (
+            saved["phase"],
+            saved["done"],
+            saved["kept"],
+            saved["parts"],
+        )
+        keys = [jnp.asarray(k) for k in saved["keys"]]
+        states[:] = [jax.tree_util.tree_map(jnp.asarray, st) for st in saved["states"]]
+        midpoint_input = saved["midpoint_input"]
+        if midpoint_input is not None:
+            # Replay the adaptation for the consts it substituted and the
+            # hook's own state; the saved chain states already carry it.
+            midpoint = None
+            update = hook.adapt(midpoint_input, draws=draws, chains=chains)
+            if update is not None and update.consts is not None:
+                _, consts = _substitute(
+                    MidpointUpdate(consts=update.consts), states, consts
+                )
+
+    def checkpoint():
+        if ckpt is not None:
+            ckpt.save(
+                phase=phase,
+                done=done,
+                keys=keys,
+                states=states,
+                kept=kept,
+                midpoint_input=midpoint_input,
+            )
+
+    with GibbsProgressBarManager(
+        chains=chains,
+        draws=draws,
+        tune=tune,
+        progressbar=progressbar,
+        model_type=model_type,
+    ) as pm:
+        for c in range(chains):
+            pm.start_chain(c)
+
+        def report(sweep_index, tuning):
+            for c in range(chains):
+                pm.update(c, sweep_index, tuning=tuning)
+
+        if phase == "warmup":
+            while done < tune:
+                stop = midpoint if midpoint is not None else tune
+                n_active = min(chunk_len, stop - done)
+                keys, chunk_traces = _advance(keys, n_active, True)
+                if midpoint is not None:
+                    kept.append(
+                        [
+                            jax.tree_util.tree_map(
+                                lambda a: np.asarray(a)[:n_active], hook.keep(t)
+                            )
+                            for t in chunk_traces
+                        ]
+                    )
+                done += n_active
+                report(done - 1, True)
+                if midpoint is not None and done == midpoint:
+                    per_chain = [
+                        jax.tree_util.tree_map(
+                            lambda *xs: np.concatenate(xs), *[k[c] for k in kept]
+                        )
+                        for c in range(chains)
+                    ]
+                    midpoint_input = jax.tree_util.tree_map(
+                        lambda *xs: np.stack(xs), *per_chain
+                    )
+                    update = hook.adapt(midpoint_input, draws=draws, chains=chains)
+                    kept, midpoint = [], None
+                    if update is not None:
+                        states[:], consts = _substitute(update, states, consts)
+                checkpoint()
+            phase, done, keys = "draws", 0, list(draw_keys)
+
+        while done < draws:
+            n_active = min(chunk_len, draws - done)
+            keys, chunk_traces = _advance(keys, n_active, False)
+            part = [
                 jax.tree_util.tree_map(lambda a: np.asarray(a)[:n_active], t)
                 for t in chunk_traces
             ]
-        )
-        done += n_active
-        if on_chunk is not None:
-            on_chunk(tune + done - 1, False)
+            parts.append(part)
+            done += n_active
+            report(tune + done - 1, False)
+            if ckpt is not None:
+                ckpt.add_draws(part)
+            checkpoint()
 
+    if ckpt is not None:
+        ckpt.finish()
     if not parts:
         return states, jax.tree_util.tree_map(
             lambda a: np.zeros((chains, 0) + a.shape, a.dtype), trace_avals
@@ -224,15 +486,67 @@ def run_chains_chunked(
     return states, jax.tree_util.tree_map(lambda *xs: np.stack(xs), *per_chain)
 
 
+#: One sweep per structure key, shared by every fit of that structure; each
+#: carries its compiled chunks (see :func:`run_chains_chunked`).
+_SWEEPS: dict = {}
+
+
+def _sweep_key(sweep) -> str:
+    """A name for ``sweep`` that is the same in every process.
+
+    Its :func:`cached_sweep` key, which fixes everything it closes over, or
+    else its qualified name.  A key holding an object identity differs between
+    processes, so a checkpointed run of that sweep starts afresh.
+    """
+    for key, value in _SWEEPS.items():
+        if value is sweep:
+            return repr(key)
+    return f"{sweep.__module__}.{sweep.__qualname__}"
+
+
+def cached_sweep(key, build):
+    """The sweep for ``key``, built once with ``build()`` and then reused.
+
+    ``key`` must determine everything the sweep closes over — sizes, flags,
+    the identities of the functions it calls — and nothing data-dependent,
+    which reaches the sweep through ``consts``.  Then a refit, or a new dataset
+    of the same structure, reuses the compiled program.
+    """
+    if key not in _SWEEPS:
+        _SWEEPS[key] = build()
+    return _SWEEPS[key]
+
+
+def padded_value_counts(y):
+    """``(values, counts)`` of ``y``, zero-padded to a power-of-two length.
+
+    A sum over distinct values, ``counts @ f(values)``, is cheaper than one over
+    observations, but the number of distinct values changes with the data, and
+    with it the shapes of the compiled program.  Padding with zero-count
+    entries of value 0 (which every ``f`` must accept) keeps the shape fixed
+    until that number crosses a power of two.
+    """
+    import numpy as np
+
+    vals, counts = np.unique(np.asarray(y, dtype=np.float64), return_counts=True)
+    size = max(16, 1 << (vals.size - 1).bit_length())
+    pad = size - vals.size
+    return np.pad(vals, (0, pad)), np.pad(counts.astype(np.float64), (0, pad))
+
+
+@functools.lru_cache(maxsize=1)
 def make_pg_draw():
     """Return a JAX-compatible Pólya-Gamma draw function.
 
-    Prefers ``pgjax.pg_sample`` (exact Devroye sampler, on-device, no
-    host round-trip) when installed — it dominates every alternative on
-    speed, works inside ``jax.lax.scan``, and is exact for any ``h``
-    (integer or non-integer).  Falls back to the ``polyagamma`` C extension
-    via ``jax.pure_callback``; this is slower (host round-trip per call)
-    but still correct for any ``h``.
+    Cached, so every caller gets the same function — a sweep closing over it
+    keeps a stable identity, and its compiled program can be reused.
+
+    Prefers ``augax.pg_sample`` (on-device, no host round-trip) when
+    installed — it dominates every alternative on speed, works inside
+    ``jax.lax.scan``, and is exact for any ``h`` (integer or non-integer).
+    Falls back to the ``polyagamma`` C extension via ``jax.pure_callback``,
+    which is slower (a host round-trip per call) and, without augax, carries
+    polyagamma's bias for ``h < 8`` (see :mod:`._polyagamma`).
 
     Returns
     -------
@@ -240,17 +554,17 @@ def make_pg_draw():
         ``draw_pg(h, z, key) -> jnp.ndarray`` — vectorised PG draw.
     """
     try:
-        import pgjax
+        import augax
 
         def _draw_pg(h, z, key):
-            return pgjax.pg_sample(h, z, key)
+            return augax.pg_sample(h, z, key)
 
         return _draw_pg
     except ImportError:
         pass
 
-    # Fallback: numpy polyagamma via pure_callback (slower but correct).
-    # Numpy polyagamma beats the old on-device "exp" approximation at every
+    # Fallback: numpy polyagamma via pure_callback, slower and biased for
+    # h < 8.  It still beats the old on-device "exp" approximation at every
     # size tested, so there is no reason to keep the truncated-series path.
     def _draw_pg(h, z, key):
         import jax
@@ -276,6 +590,7 @@ def make_pg_draw():
                 np.asarray(h_np, dtype=np.float64),
                 np.asarray(z_np, dtype=np.float64),
                 rng=rng,
+                warn=False,  # the warning is for the NumPy backend only
             )
 
         result = jax.pure_callback(_callback, result_shape, h_j, z_j, cb_seed)

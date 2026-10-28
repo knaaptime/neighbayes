@@ -11,11 +11,21 @@ from __future__ import annotations
 import numpy as np
 
 from .._mixins import GaussianLikelihoodMixin, GaussianPredictionMixin
+from .._mixins._designs import GaussianDesigns
 from ..base import SpatialModel
-from ..priors import SEMPriors
+from ..panel._dynamic import _SEMDynamic
+from ..panel._re import _SEMRandomEffects
+from ..priors import PanelSEMDynamicPriors, PanelSEMREPriors, SEMPriors
 
 
-class SEM(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
+class SEM(
+    GaussianDesigns,
+    _SEMRandomEffects,
+    _SEMDynamic,
+    GaussianPredictionMixin,
+    GaussianLikelihoodMixin,
+    SpatialModel,
+):
     """Bayesian Spatial Error Model.
 
     Spatial dependence enters through the disturbance via the
@@ -65,54 +75,65 @@ class SEM(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
         - ``nu`` (float, default 4.0): Fixed Student-t degrees of
           freedom (only used when ``robust=True``).
 
-    logdet_method : str, optional
-        How to compute :math:`\\log|I - \\lambda W|`. ``None`` (default)
-        auto-selects by size: ``"eigenvalue"`` for ``n <= 500``; for
-        ``500 < n <= 60000``, ``"cheb_cholesky"`` (exact, sparse Cholesky
-        at Chebyshev nodes) when ``W`` is symmetric else ``"aaa"`` (AAA
-        rational approximation); ``"cheb_stochastic"`` for ``n > 60000``.
-        Explicit opt-ins: ``"chebyshev"`` (Barry-Pace) and ``"slq"``
-        (stochastic Lanczos quadrature).
-    logdet_refit : bool, default True
-        Rebuild the log-determinant interpolant halfway through warmup, on
-        the range the chains have found rather than the interval implied by
-        the prior.  A warmup posterior is typically one to two orders of
-        magnitude narrower than the prior, which needs far fewer interpolation
-        nodes and drives the approximation error over the posterior's support
-        down to the factorization's roundoff floor.  Applies to
-        ``"cheb_cholesky"``, ``"lu_cheb"``, ``"aaa"`` and ``"chol_aaa"``;
-        ignored otherwise.
-
-        The interpolant is only valid on its interval, so the refit window
-        becomes the sampler's support.  The window is padded by
-        ``logdet_refit_pad_sd`` warmup standard deviations, recorded in
-        ``idata.attrs["logdet_refit_window"]``, and a warning is raised if
-        the retained draws ever reach an edge the refit introduced.
-    logdet_refit_pad_sd : float, default 10.0
-        Padding for the refit window, in warmup posterior standard
-        deviations.  At the default the truncated tail is ~1e-23 under
-        normality, and the padding costs a node or two at most.
-    logdet_aaa_check : bool, default True
-        For the AAA methods (``"aaa"``, ``"chol_aaa"``), set the number of
-        exact factorizations from where the posterior lies.  Warmup starts on a
-        14-node fit; halfway through, nodes are added only if the warmup
-        posterior lies closer to a singularity of the Jacobian than four times
-        the distance at which the fit's poles resolve it.  The count used is
-        recorded in ``idata.attrs["logdet_aaa_nodes"]``.  Off, or on a path
-        without a warmup midpoint, the count is fixed by the prior interval:
-        14 nodes within ``|ρ| ≤ 0.9``, 18 otherwise.
-    logdet_probe_check : bool, default True
-        For ``"cheb_stochastic"``, set the number of Hutchinson probes from
-        where the posterior lies.  Warmup starts on 50 probes; halfway through,
-        the probes' own spread prices the bias they leave in the posterior mean
-        of the spatial parameter, and the pool grows, to at most 200, until
-        that bias is expected to stay under 0.0225 posterior sd.  The count
-        used is recorded in ``idata.attrs["logdet_probes"]``, with a warning
-        if the cap is reached first.  Probes cost setup time only; the cost of
-        each draw does not depend on how many there are.
+    logdet_method : {"eigenvalue", "cheb", "aaa", "spline", "stochastic"}, optional
+        How ``log|I - rho*W|`` is computed over rho: summed over the
+        eigenvalues of ``W``; interpolated (Chebyshev, AAA rational, or cubic
+        spline) through values from a sparse factorization, exact to the
+        interpolant's tolerance; or expanded stochastically with no
+        factorization, the one method with sampling error.  ``None`` (default)
+        selects from the size and symmetry of ``W``: ``"eigenvalue"`` for
+        ``n <= 500``; ``"aaa"`` up to ``n = 60000``
+        (``NEIGHBAYES_LOGDET_FACTOR_MAX_N``) unless the factorization's fill-in
+        would dominate; ``"stochastic"`` beyond.
+    logdet_decomp : {"auto", "chol", "lu"}, default "auto"
+        The factorization an interpolating method uses: sparse Cholesky
+        (undirected ``W``; scikit-sparse CHOLMOD) or sparse LU (KLU or UMFPACK,
+        chosen by the sparsity pattern).  ``"auto"`` takes ``"chol"`` where the
+        method has it and ``W`` is undirected, else ``"lu"``.  Ignored by
+        ``"eigenvalue"`` and ``"stochastic"``; ``"spline"`` on ``"chol"``
+        raises.
+    logdet_adapt : bool, default True
+        Halfway through warmup, let the Gibbs sampler fit the log-determinant
+        to where the chains have found the posterior rather than to the prior
+        interval.  An interpolant on Cholesky or LU values (``"cheb"``,
+        ``"aaa"``) is refit on that range, padded by ten warmup standard
+        deviations; the window becomes the sampler's support, is recorded in
+        ``idata.attrs["logdet_refit_window"]``, and a warning is raised if the
+        retained draws reach an edge it introduced.  ``"aaa"`` also adds exact
+        factorizations when the posterior lies near a singularity
+        (``idata.attrs["logdet_aaa_nodes"]``).  ``"stochastic"`` grows its
+        Hutchinson probes from 50 until the bias they leave in the posterior
+        mean of the spatial parameter is expected to stay under half the
+        run's own Monte Carlo error, ``1/sqrt(ESS)`` estimated in warmup: at
+        most 1,000 probes up to 100,000 units, fewer beyond
+        (``idata.attrs["logdet_probes"]``).
+        ``False`` keeps the fit on the prior interval.
     robust : bool, default False
         If True, replace the Normal disturbance with Student-t. See
         *Robust regression* below.
+
+    time_col, unit_col : str, optional
+        Formula-mode panel: the period and unit columns of ``data``.  Given
+        time, the model is a panel, stacked by period, then unit.
+    N, T : int, optional
+        Matrix-mode panel: the numbers of units and periods; ``T=1`` is the
+        cross-section.
+    unit_effects : {None, "fixed", "random"}, default None
+        Panel unit effects: ``"fixed"`` applies the within transformation
+        (with Lee and Yu's 2010 likelihood dimensions), ``"random"`` adds a normal
+        effect per unit, ``unit_effect`` with sd ``unit_effect_sd`` (priors
+        ``unit_effect_sd_nu`` and ``unit_effect_sd_scale``, half-Cauchy on ``sd(y)``
+        by default).
+    time_effects : bool, default False
+        Fixed time effects (panels).
+    dynamic : bool, default False
+        Add the time lag :math:`\\phi y_{t-1}` (priors ``phi_lower``,
+        ``phi_upper``; the ``lam`` bounds default to ``±0.95``).  A dynamic
+        panel takes no unit effects (Nickell 1981).
+    centered : bool, default False
+        With random unit effects, sample them centered under NUTS rather than
+        as :math:`\\alpha_i = \\sigma_\\alpha z_i`; better when every unit has
+        many observations.
 
     Notes
     -----
@@ -133,6 +154,23 @@ class SEM(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     must exceed 2 so the variance exists.
     """
 
+    _DESIGNS = {
+        "static": {},
+        "random": {
+            "_priors_cls": PanelSEMREPriors,
+            "_gibbs_class": None,
+            "_gibbs_key": ("gaussian", "panel_re"),
+        },
+        "dynamic": {
+            "_priors_cls": PanelSEMDynamicPriors,
+            "_jacobian_param": None,
+            "_gibbs_class": None,
+            "_gibbs_key": None,
+            "_likelihood": "",
+            "_lee_yu": False,
+        },
+    }
+
     _priors_cls = SEMPriors
     _spatial_params: tuple[str, ...] = ("lam",)
     _lag_terms: tuple[str, ...] = ()
@@ -143,7 +181,7 @@ class SEM(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     _likelihood: str = "gaussian"
     _gibbs_key: tuple[str, str] | None = ("gaussian", "cross_section")
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior_static(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute direct, indirect, and total effects for each posterior draw.

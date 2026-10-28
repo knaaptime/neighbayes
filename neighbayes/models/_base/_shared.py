@@ -1,14 +1,15 @@
 """Shared helper functions for Bayesian spatial regression models.
 
-These utilities are used by multiple base classes (SpatialModel,
-SpatialPanelModel, FlowModel, FlowPanelModel) and are collected here
-to avoid circular imports and code duplication.
+These utilities are used by the base classes (SpatialModel, FlowModel)
+and are collected here to avoid circular imports and code
+duplication.
 """
 
 from __future__ import annotations
 
 import inspect
 import warnings
+from abc import ABCMeta
 from functools import cached_property, partial
 from typing import Any, Optional, Union
 
@@ -436,30 +437,28 @@ _DECISION_PREDICATE_PAIRS: dict[str, tuple[str, str]] = {
 }
 
 
-class SharedSpatialMethods:
-    """Behaviour-preserving mixin of methods shared verbatim by the two base
-    classes (:class:`SpatialModel` and :class:`SpatialPanelModel`).
+class SharedSpatialMethods(metaclass=ABCMeta):
+    """Methods shared by every model: :class:`SpatialModel` (cross-section or
+    panel) and the flow bases.
 
-    Phase 5c converges the ~39 duplicated methods into this single home before
-    the two hierarchies are collapsed.  Only methods whose bodies are *already
-    identical* across the two classes live here; anything that differs (N vs NT
-    sizing, cross-section vs panel Jacobians, ...) stays on the subclasses and
-    overrides the mixin via normal MRO.  All methods rely only on attributes
-    both classes provide (``self._X``, ``self._feature_names``, ``self.priors``,
-    ``self._idata``).
-
+    They rely only on attributes every model provides (``self._X``,
+    ``self._feature_names``, ``self.priors``, ``self._idata``).
     Structure-dependent operations (spatial lag, logdet ``W`` operand) are
     delegated to ``self._structure`` (a
-    :class:`neighbayes.models._base._structure.SpatialStructure`), which the two
-    base ``__init__`` methods assign.  The class-level ``None`` default keeps the
+    :class:`neighbayes.models._base._structure.SpatialStructure`), which
+    :class:`SpatialModel` assigns.  The class-level ``None`` default keeps the
     attribute resolvable for classes that do not use it (e.g. flow models, which
     shadow ``_spatial_lag`` and never touch the single-``W`` logdet path).
     """
 
     _structure = None
 
+    def _implementation(self, name: str):
+        """The bound method that method ``name`` runs (see ``GaussianDesigns``)."""
+        return getattr(self, name)
+
     # Panel decision trees use "Panel-"-prefixed test names, "panel_"-prefixed
-    # predicate keys, and the panel spec registry; SpatialPanelModel flips this.
+    # predicate keys, and the panel spec registry; a panel SpatialModel sets it.
     _panel_diagnostics = False
 
     @property
@@ -467,7 +466,7 @@ class SharedSpatialMethods:
         """Return indices of non-constant (non-intercept) columns in X.
 
         This is used to exclude the intercept from impact measures, since
-        the intercept has no meaningful spatial effect interpretation.
+        the intercept has no meaningful impact interpretation.
 
         Returns
         -------
@@ -590,7 +589,7 @@ class SharedSpatialMethods:
         return coords
 
     # ------------------------------------------------------------------
-    # Shared spatial-effects helpers
+    # Shared impacts helpers
     # ------------------------------------------------------------------
     # These centralise the repeated direct/indirect/total effects formulas
     # used by SAR, SEM, SLX/SDEM, and SDM models (cross-section and panel).
@@ -822,7 +821,7 @@ class SharedSpatialMethods:
         idata_kwargs = dict(idata_kwargs or {})
 
         build_kwargs: dict[str, Any] = {}
-        build_sig = inspect.signature(self._build_pymc_model)
+        build_sig = inspect.signature(self._implementation("_build_pymc_model"))
         if "compute_log_likelihood" in build_sig.parameters:
             build_kwargs["compute_log_likelihood"] = compute_log_likelihood
         if "nuts_sampler" in build_sig.parameters:
@@ -1069,8 +1068,8 @@ class SharedSpatialMethods:
             If ``n`` exceeds ``NEIGHBAYES_LOGDET_EIGEN_MAX_N`` (default 500).
             The eigenvalue logdet method densifies ``W`` and runs an O(n³)
             eigendecomposition, which is prohibitively expensive for large
-            graphs.  Use ``logdet_method="cheb_cholesky"`` (symmetric ``W``)
-            or ``logdet_method="aaa"`` (non-symmetric ``W``) instead.
+            graphs.  Use ``logdet_decomp="chol"`` (undirected ``W``) or
+            ``"lu"`` (directed ``W``) instead.
         """
         if self._W_sparse is None:
             return None
@@ -1082,9 +1081,8 @@ class SharedSpatialMethods:
                 f"Eigenvalue logdet/effect computation requires densifying W "
                 f"(n={n} > NEIGHBAYES_LOGDET_EIGEN_HARD_MAX_N={_eigen_hard_max_n()}). "
                 f"This is O(n³) and O(n²) memory. Use "
-                f'logdet_method="cheb_cholesky" (symmetric W) or '
-                f'logdet_method="aaa" (non-symmetric W) instead, or raise '
-                f"NEIGHBAYES_LOGDET_EIGEN_HARD_MAX_N."
+                f'logdet_decomp="chol" (undirected W) or "lu" (directed W) '
+                f"instead, or raise NEIGHBAYES_LOGDET_EIGEN_HARD_MAX_N."
             )
         return np.linalg.eigvals(self._W_sparse.toarray().astype(np.float64))
 
@@ -1156,7 +1154,7 @@ class SharedSpatialMethods:
         eigs = self._logdet_eigs
         return self._logdet_W_operand if eigs is None else eigs
 
-    def spatial_effects(
+    def impacts(
         self, return_posterior_samples: bool = False
     ) -> pd.DataFrame | tuple[pd.DataFrame, dict[str, np.ndarray]]:
         r"""Compute Bayesian inference for direct, indirect, and total impacts.
@@ -1193,17 +1191,29 @@ class SharedSpatialMethods:
             ``"direct"``, ``"indirect"``, ``"total"``, each mapping
             to a ``(G, k)`` array of posterior draws.
         """
-        from ...diagnostics.spatial_effects import _build_effects_dataframe
-
         self._require_fit()
-        direct_samples, indirect_samples, total_samples = (
-            self._compute_spatial_effects_posterior()
+        return self._effects_frame(
+            *self._compute_impacts_posterior(),
+            return_posterior_samples=return_posterior_samples,
         )
 
-        # Determine feature names based on the shape of the posterior samples.
-        # Models with WX terms (SDM, SLX, SDEM) report effects only for
-        # lagged covariates (k_wx columns), while models without WX terms
-        # (SAR, SEM) report effects for non-intercept covariates.
+    def _effects_frame(
+        self,
+        direct_samples: np.ndarray,
+        indirect_samples: np.ndarray,
+        total_samples: np.ndarray,
+        *,
+        return_posterior_samples: bool = False,
+        scale: Optional[str] = None,
+    ) -> pd.DataFrame | tuple[pd.DataFrame, dict[str, np.ndarray]]:
+        """The impacts summary of posterior draws ``(G, k)`` of each effect.
+
+        Models with WX terms (SDM, SLX, SDEM) report effects only for the
+        lagged covariates, models without them (SAR, SEM) for the
+        non-intercept covariates.
+        """
+        from ...diagnostics.impacts import _build_effects_dataframe
+
         k_effects = direct_samples.shape[1]
         if (
             hasattr(self, "_wx_feature_names")
@@ -1217,18 +1227,15 @@ class SharedSpatialMethods:
             feature_names = list(self._nonintercept_feature_names)
         else:
             feature_names = list(self._feature_names[:k_effects])
-
-        # Determine model type label
-        model_type = self.__class__.__name__
-
         df = _build_effects_dataframe(
             direct_samples=direct_samples,
             indirect_samples=indirect_samples,
             total_samples=total_samples,
             feature_names=feature_names,
-            model_type=model_type,
+            model_type=type(self).__name__,
         )
-
+        if scale is not None:
+            df.attrs["scale"] = scale
         if return_posterior_samples:
             posterior_samples = {
                 "direct": direct_samples,
@@ -1318,9 +1325,9 @@ class SharedSpatialMethods:
     # Lazy logdet evaluators (cross-section is the T=1 case)
     # ------------------------------------------------------------------
 
-    # Likelihood dimensions.  A cross-section (and a pooled panel) counts
-    # every observation and applies the Jacobian T times; fixed-effects
-    # panels override these (Lee & Yu 2010; see ``SpatialPanelModel``).
+    # Likelihood dimensions: every observation counts and the Jacobian applies
+    # T times.  SpatialModel overrides these with the fixed-effects panel
+    # dimensions (Lee & Yu 2010).
 
     @property
     def _jacobian_T(self) -> int:
@@ -1365,16 +1372,31 @@ class SharedSpatialMethods:
             T=self._jacobian_T,
         )
 
-    @cached_property
+    #: The probe check of the latest Gibbs fit on the stochastic
+    #: log-determinant, whose pool the impacts' gradient reuses; else ``None``.
+    _fitted_probes = None
+
+    @property
     def _logdet_grad_numpy_vec_fn(self):
-        """Vectorized ``(rho_arr) -> g(ρ)`` gradient of the **N×N** logdet (lazy).
+        """Vectorized ``(rho_arr) -> g(ρ)`` gradient of the **N×N** logdet.
 
         Built with ``T=1`` even for panels — the direct-effect trace is a
         per-period property of the N×N spatial multiplier, independent of
-        the number of periods.  Uses the resolved logdet method and rho
-        bounds, so it rides the fast surrogate (chol-cheb / AAA / …) and
-        only touches the eigenvalue path when that is genuinely the
-        resolved method (tiny n).
+        the number of periods.  After a Gibbs fit that sized a stochastic
+        probe pool it is that pool's gradient; otherwise the resolved method's
+        surrogate (:attr:`_logdet_grad_surrogate_vec_fn`).
+        """
+        if self._fitted_probes is not None:
+            return self._fitted_probes.grad_vec_fn()
+        return self._logdet_grad_surrogate_vec_fn
+
+    @cached_property
+    def _logdet_grad_surrogate_vec_fn(self):
+        """The resolved method's ``g(ρ)``, per period (lazy).
+
+        Uses the resolved logdet method and rho bounds, so it rides the fast
+        surrogate (chol-cheb / AAA / …) and only touches the eigenvalue path
+        when that is genuinely the resolved method (tiny n).
         """
         self._require_W()
         return make_logdet_grad_numpy_vec_fn(
@@ -1408,7 +1430,7 @@ class SharedSpatialMethods:
         return lambda rho: fn(rho) - m * pt.log1p(-rho)
 
     # ------------------------------------------------------------------
-    # Eigendecomposition-backed spatial-effect helpers
+    # Eigendecomposition-backed impact helpers
     # ------------------------------------------------------------------
 
     @cached_property
@@ -1424,7 +1446,7 @@ class SharedSpatialMethods:
         Eigenvalues are sorted by real part (descending) for numerical
         stability.  Row-standardized W is generally non-symmetric, so V
         and Vinv are complex; taking ``.real`` prematurely drops imaginary
-        parts and produces wrong results for spatial effects.
+        parts and produces wrong results for impacts.
 
         Raises
         ------
@@ -1442,9 +1464,8 @@ class SharedSpatialMethods:
                 f"Eigenvalue logdet/effect computation requires densifying W "
                 f"(n={n} > NEIGHBAYES_LOGDET_EIGEN_HARD_MAX_N={_eigen_hard_max_n()}). "
                 f"This is O(n³) and O(n²) memory. Use "
-                f'logdet_method="cheb_cholesky" (symmetric W) or '
-                f'logdet_method="aaa" (non-symmetric W) instead, or raise '
-                f"NEIGHBAYES_LOGDET_EIGEN_HARD_MAX_N."
+                f'logdet_decomp="chol" (undirected W) or "lu" (directed W) '
+                f"instead, or raise NEIGHBAYES_LOGDET_EIGEN_HARD_MAX_N."
             )
         W_dense = np.asarray(self._W_sparse.toarray(), dtype=np.float64)
         eigs, V = np.linalg.eig(W_dense)
@@ -1528,7 +1549,7 @@ class SharedSpatialMethods:
         """Compute mean row sum of (I - rho*W)^{-1} for each posterior draw.
 
         Always uses the N×N cross-sectional weights matrix (never the
-        (N·T)×(N·T) Kronecker product), because spatial effects are defined
+        (N·T)×(N·T) Kronecker product), because impacts are defined
         in terms of the cross-sectional spatial multiplier.
 
         For row-standardized W this is ``1/(1 - rho)`` on the connected units.
@@ -1566,7 +1587,7 @@ class SharedSpatialMethods:
         c = self._eig_inv_ones  # complex128, (n,)
         eigs = decomp[0]  # complex128, (n,)
         V_col_sums = decomp[1].sum(axis=0)  # complex128, (n,)
-        from ...diagnostics.spatial_effects import _chunked_eig_means
+        from ...diagnostics.impacts import _chunked_eig_means
 
         return _chunked_eig_means(
             rho_draws,
@@ -1578,7 +1599,7 @@ class SharedSpatialMethods:
         """Compute mean row sum of (I - rho*W)^{-1} W for each posterior draw.
 
         Always uses the N×N cross-sectional weights matrix (never the
-        (N·T)×(N·T) Kronecker product), because spatial effects are defined
+        (N·T)×(N·T) Kronecker product), because impacts are defined
         in terms of the cross-sectional spatial multiplier.
 
         For row-standardized W this equals ``1/(1 - rho)`` (same as
@@ -1617,7 +1638,7 @@ class SharedSpatialMethods:
         c = self._eig_inv_ones  # complex128, (n,)
         eigs = decomp[0]  # complex128, (n,)
         V_col_sums = decomp[1].sum(axis=0)  # complex128, (n,)
-        from ...diagnostics.spatial_effects import _chunked_eig_means
+        from ...diagnostics.impacts import _chunked_eig_means
 
         return _chunked_eig_means(
             rho_draws,
@@ -1645,7 +1666,7 @@ class SharedSpatialMethods:
             try:
                 result = test_fn(model)
                 rows[label] = {
-                    "statistic": result.mean,
+                    "statistic": result.statistic,
                     "median": result.median,
                     "df": result.df,
                     "p_value": result.bayes_pvalue,
@@ -1721,7 +1742,7 @@ class SharedSpatialMethods:
         --------
         spatial_diagnostics_decision : Model-selection decision based on
             the test results.
-        spatial_effects : Posterior inference for direct/indirect/total
+        impacts : Posterior inference for direct/indirect/total
             impacts.
 
         Examples
@@ -1784,11 +1805,11 @@ class SharedSpatialMethods:
 
         - Robust-LM-Lag-SDM significant → SDM;
           Robust-LM-Error-SDEM significant → SDEM;
-          both → MANSAR; neither → SLX.
+          both → GNS; neither → SLX.
 
-        **From SDM**: LM-Error-SDM significant → MANSAR; else SDM.
+        **From SDM**: LM-Error-SDM significant → GNS; else SDM.
 
-        **From SDEM**: LM-Lag-SDEM significant → MANSAR; else SDEM.
+        **From SDEM**: LM-Lag-SDEM significant → GNS; else SDEM.
 
         Parameters
         ----------

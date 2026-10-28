@@ -15,6 +15,7 @@ from .sampler_helpers import (
     jax_available,
     prepare_compile_kwargs,
     prepare_idata_kwargs,
+    select_backend,
     use_jax_likelihood,
 )
 
@@ -23,5 +24,6 @@ __all__ = [
     "jax_available",
     "prepare_compile_kwargs",
     "prepare_idata_kwargs",
+    "select_backend",
     "use_jax_likelihood",
 ]

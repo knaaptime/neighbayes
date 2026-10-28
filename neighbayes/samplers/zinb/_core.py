@@ -22,8 +22,8 @@ only if β is redrawn from its conditional immediately after (van Dyk & Park
 2008).  Both orderings matter numerically — see the block comments.
 
 **Both** equations are reduced-form: the selection is the reduced-form
-SAR-logit from :mod:`neighbayes.samplers.logit_reduced._core` (spatial lag on
-the linear predictor, no latent field — the ``|I−λW|`` Jacobian cancels when γ
+SAR-logit from :mod:`neighbayes.samplers.binary_reduced._core` (spatial lag on
+the linear predictor, no random effects — the ``|I−λW|`` Jacobian cancels when γ
 is marginalized out), and the count is the reduced-form SAR-NB from
 :mod:`neighbayes.samplers.negbin_reduced._core`.  This matches the JAX backend
 (:mod:`neighbayes.samplers.zinb._jax`) block-for-block, so both backends fit the
@@ -47,21 +47,19 @@ from typing import NamedTuple
 import numpy as np
 import scipy.sparse as sp
 
-from ...models.priors import ZINBGibbsPriors
+from ...models.priors import BinaryGibbsPriors, ZINBGibbsPriors
 from .._utils._polyagamma import sample_polyagamma
 from .._utils._spatial_normal import CholmodFactor
-from ..logit._core import LogitGibbsPriors
-from ..logit_reduced._core import ReducedLogitGibbsState
-from ..logit_reduced._core import (
+from ..binary_reduced._core import ReducedBinaryGibbsState
+from ..binary_reduced._core import (
     _sample_beta as _sample_gamma_sel,
 )
-from ..logit_reduced._core import (
+from ..binary_reduced._core import (
     _sample_omega as _sample_omega_sel,
 )
-from ..logit_reduced._core import (
+from ..binary_reduced._core import (
     _sample_rho as _sample_lam,
 )
-from ..negbin._core import GibbsPriors as _NBGibbsPriors
 from ..negbin._core import GibbsState as _NBGibbsState
 from ..negbin._core import _nb_loglik_pointwise, _sample_alpha
 from ..negbin_reduced._core import (
@@ -134,7 +132,7 @@ class ZINBGibbsState:
 class ZINBGibbsCache(NamedTuple):
     """Precomputed data that doesn't change across sweeps."""
 
-    # Selection equation cache (reduced-form SAR-logit; ReducedGibbsCache on W_sel)
+    # Selection equation cache (reduced-form SAR-logit; ReducedGibbsCache on W_zero)
     sel_cache: ReducedGibbsCache
     # Count equation cache (reduced-form SAR-NB; ReducedGibbsCache on W_cnt)
     cnt_cache: ReducedGibbsCache
@@ -144,7 +142,7 @@ class ZINBGibbsCache(NamedTuple):
     Z: np.ndarray  # (n, p) selection covariates
     X: np.ndarray  # (n, k) count covariates
     # Weights
-    W_sel_sparse: sp.csr_matrix
+    W_zero_sparse: sp.csr_matrix
     W_cnt_sparse: sp.csr_matrix
     same_W: bool
 
@@ -166,7 +164,7 @@ def _sample_z(
 
     For y_i > 0: z_i = 1 (only count process generates positives).
     For y_i = 0:
-      π_i = expit(η^sel_i)     (corridor activation probability)
+      π_i = expit(η^sel_i)     (activation probability)
       p_nb_zero = (α/(exp(η^cnt_i)+α))^α  (NB probability of zero)
       P(z=1 | y=0) = π_i · p_nb_zero / (π_i · p_nb_zero + (1 - π_i))
 
@@ -282,7 +280,7 @@ def run_zinb_chain(
     d: np.ndarray,
     Z: np.ndarray,
     X: np.ndarray,
-    W_sel_sparse: sp.csr_matrix,
+    W_zero_sparse: sp.csr_matrix,
     W_cnt_sparse: sp.csr_matrix,
     priors: ZINBGibbsPriors,
     cache: ZINBGibbsCache,
@@ -310,7 +308,7 @@ def run_zinb_chain(
         Selection covariate matrix.
     X : ndarray of shape (n, k)
         Count covariate matrix.
-    W_sel_sparse : csr_matrix of shape (n, n)
+    W_zero_sparse : csr_matrix of shape (n, n)
         Spatial weights for the selection equation.
     W_cnt_sparse : csr_matrix of shape (n, n)
         Spatial weights for the count equation.
@@ -356,7 +354,7 @@ def run_zinb_chain(
     pi_mean_samples = np.empty(n_keep, dtype=np.float64)
 
     # Build sub-priors for the logit and NB blocks
-    sel_priors = LogitGibbsPriors(
+    sel_priors = BinaryGibbsPriors(
         beta_mu=priors.gamma_mu,
         beta_sigma=priors.gamma_sigma,
         rho_lower=priors.lam_lower,
@@ -385,7 +383,7 @@ def run_zinb_chain(
     )
 
     # Build reduced-form logit sub-state for the selection blocks
-    sel_state = ReducedLogitGibbsState(
+    sel_state = ReducedBinaryGibbsState(
         beta=state.gamma,
         rho=state.lam,
         omega=state.omega_sel,
@@ -436,11 +434,11 @@ def run_zinb_chain(
 
     for i in range(total_iters):
         # ── SELECTION EQUATION (reduced-form SAR-logit, 3 blocks) ──────
-        # CRITICAL: The selection equation models the *latent* corridor
-        # activity z, NOT the observed d = 1(y > 0).  Using d conflates
+        # CRITICAL: The selection equation models the *latent* activity
+        # z, NOT the observed d = 1(y > 0).  Using d conflates
         # structural zeros with NB sampling zeros, biasing γ and λ.
         #
-        # Reduced form: η^sel = (I − λW_sel)⁻¹ Zγ (deterministic, no latent
+        # Reduced form: η^sel = (I − λW_zero)⁻¹ Zγ (deterministic, no latent
         # field).  Mirrors the JAX backend and the reduced-NB count blocks:
         # ω^sel = PG(1, η^sel); λ is a β-marginalized slice (Jacobian cancels);
         # γ is conjugate given Z̃ = A_λ^{-1} Z.
@@ -462,10 +460,11 @@ def run_zinb_chain(
         sel_state.beta = state.gamma
 
         # Block 2: λ | γ, ω^sel, z   (β-marginalized 1-D slice, response z)
+        kappa_sel = z_float - 0.5
         state.lam, _ = _sample_lam(
             sel_state,
             sel_cache,
-            z_float,
+            kappa_sel,
             Z,
             sel_priors,
             rng=rng,
@@ -488,7 +487,7 @@ def run_zinb_chain(
             state.gamma,
             Ztilde,
             state.omega_sel,
-            z_float,
+            kappa_sel,
             sel_priors,
             rng=rng,
             rho=state.lam,
@@ -616,14 +615,14 @@ def run_zinb_chain(
             alpha_state = _NBGibbsState(
                 eta=eta_cnt[z1],
                 beta=state.beta,
-                sigma2=1.0,  # unused by _sample_alpha
                 rho=state.rho,
                 alpha=state.alpha,
                 omega=state.omega_cnt[z1],
             )
-            alpha_priors = _NBGibbsPriors(
+            alpha_priors = ReducedGibbsPriors(
                 alpha_sigma=priors.alpha_sigma,
                 alpha_nu=priors.alpha_nu,
+                alpha_fixed=getattr(priors, "alpha_fixed", None),
             )
             state.alpha = _sample_alpha(alpha_state, y[z1], alpha_priors, rng=rng)
         # else: all z=0 → no count data; keep current alpha
@@ -646,15 +645,15 @@ def run_zinb_chain(
                         y, state.eta_sel, eta_cnt, state.alpha
                     )
 
-                # Posterior mean corridor activation probability
+                # Posterior mean activation probability
                 pi_mean_samples[idx] = float(np.mean(_expit(state.eta_sel)))
 
         if progress_manager is not None:
             progress_manager.update(chain_id, i, tuning=i < tune)
 
     return {
-        "lam": lam_samples,
-        "gamma": gamma_samples,
+        "rho_zero": lam_samples,
+        "beta_zero": gamma_samples,
         "rho": rho_samples,
         "beta": beta_samples,
         "alpha": alpha_samples,

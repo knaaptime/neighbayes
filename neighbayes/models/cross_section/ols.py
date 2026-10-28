@@ -13,11 +13,21 @@ from __future__ import annotations
 import numpy as np
 
 from .._mixins import GaussianLikelihoodMixin, GaussianPredictionMixin
+from .._mixins._designs import GaussianDesigns
 from ..base import SpatialModel
-from ..priors import OLSPriors
+from ..panel._dynamic import _OLSDynamic
+from ..panel._re import _OLSRandomEffects
+from ..priors import OLSPriors, PanelOLSDynamicPriors, PanelOLSREPriors
 
 
-class OLS(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
+class OLS(
+    GaussianDesigns,
+    _OLSRandomEffects,
+    _OLSDynamic,
+    GaussianPredictionMixin,
+    GaussianLikelihoodMixin,
+    SpatialModel,
+):
     """Bayesian ordinary least squares cross-sectional regression.
 
     .. math::
@@ -76,7 +86,42 @@ class OLS(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
 
     robust : bool, default False
         If True, use a Student-t error distribution instead of Normal.
+    time_col, unit_col : str, optional
+        Formula-mode panel: the period and unit columns of ``data``.  Given
+        time, the model is a panel, stacked by period, then unit.
+    N, T : int, optional
+        Matrix-mode panel: the numbers of units and periods; ``T=1`` is the
+        cross-section.
+    unit_effects : {None, "fixed", "random"}, default None
+        Panel unit effects: ``"fixed"`` applies the within transformation
+        (with Lee and Yu's 2010 likelihood dimensions), ``"random"`` adds a normal
+        effect per unit, ``unit_effect`` with sd ``unit_effect_sd`` (priors
+        ``unit_effect_sd_nu`` and ``unit_effect_sd_scale``, half-Cauchy on ``sd(y)``
+        by default).
+    time_effects : bool, default False
+        Fixed time effects (panels).
+    dynamic : bool, default False
+        Add the time lag :math:`\\phi y_{t-1}` (priors ``phi_lower``,
+        ``phi_upper``).  A dynamic panel takes no unit effects (Nickell
+        1981).
+    centered : bool, default False
+        With random unit effects, sample them centered under NUTS rather than
+        as :math:`\\alpha_i = \\sigma_\\alpha z_i`; better when every unit has
+        many observations.
     """
+
+    _DESIGNS = {
+        "static": {},
+        "random": {
+            "_priors_cls": PanelOLSREPriors,
+        },
+        "dynamic": {
+            "_priors_cls": PanelOLSDynamicPriors,
+            "_has_wx_in_beta": True,
+            "_likelihood": "",
+            "_lee_yu": False,
+        },
+    }
 
     _priors_cls = OLSPriors
     _spatial_params: tuple[str, ...] = ()
@@ -87,29 +132,22 @@ class OLS(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     _model_type: str = "ols"
     _likelihood: str = "gaussian"  # NUTS-only (no _gibbs_key)
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior_static(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Not applicable — OLS has no spatial lag structure.
+        """The coefficients as direct effects in a panel; none in a cross-section.
 
         Raises
         ------
         NotImplementedError
-            Always raised; use Bayesian LM diagnostics instead.
+            For a cross-section, which has no spatial lag structure; use the
+            Bayesian LM diagnostics instead.
         """
+        if self._is_panel:
+            # A panel OLS reports its coefficients as direct effects.
+            return self._sem_effects()
         raise NotImplementedError(
-            "OLS has no spatial lag structure and therefore no spatial effects. "
+            "OLS has no spatial lag structure and therefore no impacts. "
             "Use Bayesian LM diagnostics to assess which spatial model "
             "is appropriate, then refit with SAR, SEM, SLX, SDM, or SDEM."
         )
-
-    def _fitted_mean_from_posterior(self) -> np.ndarray:
-        """Compute fitted values at posterior mean coefficients.
-
-        Returns
-        -------
-        np.ndarray
-            Posterior-mean fitted values ``X @ E[beta | data]``.
-        """
-        beta = self._posterior_mean("beta")
-        return self._X @ beta

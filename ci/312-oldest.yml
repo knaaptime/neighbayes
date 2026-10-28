@@ -42,7 +42,7 @@ dependencies:
   - pip
   - pip:
     - jax # force from pip to allow windows
-    - pgjax
+    - augax
     - blackjax
     - numpyro
     - sparsax

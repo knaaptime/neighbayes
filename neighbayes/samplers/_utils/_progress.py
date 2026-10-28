@@ -151,6 +151,8 @@ class GibbsProgressBarManager:
         # task creation (not chain start), making later chains appear
         # slower than they really are.
         self._chain_start_times: dict[int, float] = {}
+        # The iteration each chain's bar last showed.
+        self._last_shown: dict[int, int] = {}
 
         # Throttle rich updates so per-iteration overhead stays
         # negligible even when samplers exceed thousands of iters/sec.
@@ -261,8 +263,14 @@ class GibbsProgressBarManager:
 
         iter1 = iteration + 1
         is_phase_end = iter1 == self.tune or iter1 == self.total
-        if iter1 % self._update_every != 0 and not is_phase_end:
+        # Throttle on the iterations since this chain's last redraw, not on
+        # multiples: a chunked JAX runner reports every 128 sweeps, which
+        # rarely land on a multiple.
+        if iter1 - self._last_shown.get(chain_idx, 0) < self._update_every and (
+            not is_phase_end
+        ):
             return
+        self._last_shown[chain_idx] = iter1
 
         task_id = self._tasks[chain_idx]
         phase = "tune" if tuning else "draw"
@@ -361,8 +369,8 @@ class _SharedCounterReporter:
         if shm is not None:
             try:
                 shm.close()
-            except Exception:
-                pass
+            except (BufferError, OSError):
+                pass  # a view still holds the buffer, or it is already gone
             self._shm = None
             self._buf = None
 

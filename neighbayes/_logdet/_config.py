@@ -1,27 +1,30 @@
-"""Log-determinant configuration: method enum, resolution, and bounds.
+"""Log-determinant configuration: method names, resolution, and bounds.
 
-Five methods are supported:
+A model names its log-determinant with ``logdet_method``:
 
-* ``"eigenvalue"`` — exact O(n) per-call after one-time O(n³) eigendecomposition.
-* ``"slq"`` — stochastic Lanczos quadrature; D-symmetrized batched Lanczos
-  with Gauss quadrature trace estimation → Chebyshev coefficients.
-* ``"chebyshev"`` — Barry-Pace Monte Carlo traces → Chebyshev approximation; O(m) per call.
-* ``"cheb_stochastic"`` — stochastic Chebyshev expansion (Han et al. 2015);
-  operator-valued Chebyshev polynomials with geometric convergence via
-  Bernstein ellipse.  Same matvec cost as ``chebyshev`` but better accuracy at high |ρ|.
-* ``"grid_spline"`` — incumbent baseline: exact sparse-LU log-determinants on
-  an equispaced grid of 100 rho values, then cubic-spline interpolation.
-* ``"traces"`` — multinomial trace expansion for unrestricted 3-parameter
-  flow models (the only option when the system matrix doesn't factor).
+* ``"eigenvalue"`` — the sum over W's eigenvalues, from one dense
+  eigendecomposition;
+* ``"cheb"`` — Chebyshev interpolation of factorized values at Chebyshev nodes;
+* ``"aaa"`` — AAA rational interpolation of factorized values at adaptive points;
+* ``"spline"`` — cubic spline through factorized values on a grid;
+* ``"stochastic"`` — stochastic Chebyshev expansion (Han et al. 2015), no
+  factorization, the one method with sampling error;
+* ``"trace_series"``, ``"resolvent"`` — the unrestricted flow models' trace
+  series and stochastic resolvent estimator.
 
-When ``logdet_method`` is ``None`` the method is auto-selected:
-``"eigenvalue"`` for n ≤ ``NEIGHBAYES_LOGDET_EIGEN_MAX_N`` (default 500),
-``"chol_aaa"`` for n ≤ ``NEIGHBAYES_LOGDET_CHEB_MAX_N`` (default 60000)
-when ``W`` is symmetric (undirected graph), ``"aaa"`` when ``W`` is
-non-symmetric (directed graph), otherwise ``"cheb_stochastic"``
-(geometric convergence, same cost as Barry-Pace).
-``"cheb_cholesky"`` (Chebyshev interpolation via Cholesky) and
-``"slq"`` and ``"chebyshev"`` are available as explicit opt-ins.
+The interpolating methods factor ``I − ρW``, and ``logdet_decomp`` picks how:
+``"chol"`` (sparse Cholesky, for an undirected, D-symmetrizable ``W``) or
+``"lu"`` (sparse LU, KLU or UMFPACK by pattern); ``"auto"`` takes ``chol`` where
+the method has it and ``W`` allows it, else ``lu``.  The other methods ignore it.
+
+With both left to auto the method is selected from the problem: ``eigenvalue``
+for n ≤ ``NEIGHBAYES_LOGDET_EIGEN_MAX_N`` (default 500); ``aaa`` on ``chol``
+(undirected ``W``) or ``lu`` (directed) for n ≤
+``NEIGHBAYES_LOGDET_FACTOR_MAX_N`` (default 60000) unless factorization
+fill-in would dominate; ``stochastic`` otherwise.
+
+Internally each pair resolves to one key (:func:`logdet_key`), on which the
+factories and samplers dispatch.
 """
 
 from __future__ import annotations
@@ -31,7 +34,7 @@ import warnings
 from collections import OrderedDict
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Literal, Mapping
+from typing import Any, Mapping
 
 # ---------------------------------------------------------------------------
 # Cache constants
@@ -46,36 +49,99 @@ _LOGDET_FN_CACHE: OrderedDict[tuple, Any] = OrderedDict()
 
 
 class LogDetMethod(str, Enum):
-    """Canonical log-determinant computation methods."""
+    """Internal log-determinant keys (see :func:`logdet_key` for the public names)."""
 
     EIGENVALUE = "eigenvalue"
-    SLQ = "slq"
-    CHEBYSHEV = "chebyshev"
-    CHEB_STOCHASTIC = "cheb_stochastic"
-    CHEB_CHOLESKY = "cheb_cholesky"
+    STOCH_CHEB = "stoch_cheb"
+    CHOL_CHEB = "chol_cheb"
     LU_CHEB = "lu_cheb"
-    AAA = "aaa"
+    LU_AAA = "lu_aaa"
     CHOL_AAA = "chol_aaa"
-    GRID_SPLINE = "grid_spline"
-    TRACES = "traces"
-    CHOLMOD = "cholmod"  # JAX-native sparse CHOLMOD logdet (requires sparsax)
+    LU_SPLINE = "lu_spline"
 
 
 VALID_LOGDET_METHODS: frozenset[str] = frozenset(m.value for m in LogDetMethod)
 
-LogDetMethodName = Literal[
+#: The public names: the method, and for the interpolating ones, the factorization.
+LOGDET_METHODS = (
     "eigenvalue",
-    "slq",
-    "chebyshev",
-    "cheb_stochastic",
-    "cheb_cholesky",
-    "lu_cheb",
+    "cheb",
     "aaa",
-    "chol_aaa",
-    "grid_spline",
-    "traces",
-    "cholmod",
-]
+    "spline",
+    "stochastic",
+    "trace_series",
+    "resolvent",
+)
+LOGDET_DECOMPS = ("auto", "chol", "lu")
+
+#: ``(logdet_method, logdet_decomp)`` → internal key.
+_KEYS = {
+    ("cheb", "chol"): "chol_cheb",
+    ("cheb", "lu"): "lu_cheb",
+    ("aaa", "chol"): "chol_aaa",
+    ("aaa", "lu"): "lu_aaa",
+    ("spline", "lu"): "lu_spline",
+}
+#: Methods that factor nothing (``logdet_decomp`` is ignored).
+_UNDECOMPOSED = {"eigenvalue": "eigenvalue", "stochastic": "stoch_cheb"}
+#: The unrestricted flow models' own methods.
+FLOW_LOGDET_METHODS = ("trace_series", "resolvent")
+_PUBLIC = {key: pair for pair, key in _KEYS.items()} | {
+    key: (method, None) for method, key in _UNDECOMPOSED.items()
+}
+
+
+def logdet_key(method: str | None, decomp: str = "auto", *, W=None) -> str | None:
+    """The internal key for ``logdet_method`` × ``logdet_decomp``.
+
+    ``None`` when both are left to auto (the key is then selected from the
+    problem by :func:`resolve_logdet_method`).  An interpolating method given
+    with ``decomp="auto"`` takes ``chol`` where it has it and ``W`` is
+    undirected, else ``lu``; a decomposition given with ``method=None`` takes
+    ``aaa``.
+
+    Raises
+    ------
+    ValueError
+        For an unknown name, or a flow-only method.
+    NotImplementedError
+        For a pair with no implementation (e.g. ``spline`` on ``chol``).
+    """
+    if decomp not in LOGDET_DECOMPS:
+        raise ValueError(
+            f"logdet_decomp must be one of {LOGDET_DECOMPS}, got {decomp!r}."
+        )
+    if method is None:
+        if decomp == "auto":
+            return None
+        method = "aaa"
+    if method not in LOGDET_METHODS:
+        raise ValueError(
+            f"logdet_method must be one of {LOGDET_METHODS} or None, got {method!r}."
+        )
+    if method in FLOW_LOGDET_METHODS:
+        raise ValueError(
+            f"logdet_method={method!r} is for the unrestricted flow models only."
+        )
+    if method in _UNDECOMPOSED:
+        return _UNDECOMPOSED[method]
+    if decomp == "auto":
+        # Every interpolating method has lu.
+        decomp = "chol" if (method, "chol") in _KEYS and _is_symmetric_W(W) else "lu"
+    key = _KEYS.get((method, decomp))
+    if key is None:
+        pairs = ", ".join(f"{m}/{d}" for m, d in _KEYS)
+        raise NotImplementedError(
+            f"logdet_method={method!r} on logdet_decomp={decomp!r} is not "
+            f"implemented; implemented pairs: {pairs}."
+        )
+    return key
+
+
+def logdet_label(key: str) -> str:
+    """The public spelling of an internal key, for messages (``"aaa on chol"``)."""
+    method, decomp = _PUBLIC.get(key, (key, None))
+    return method if decomp is None else f"{method} on {decomp}"
 
 
 # ---------------------------------------------------------------------------
@@ -116,8 +182,8 @@ def resolve_logdet_method(
         Optional spatial weights matrix.  When ``method`` is ``None``
         and ``n`` is in the medium range, the auto-selector checks
         whether ``W`` is symmetric (undirected graph) to choose between
-        ``"cheb_cholesky"`` (symmetric) and ``"aaa"`` (non-symmetric).
-        If ``W`` is not provided, defaults to ``"cheb_cholesky"``.
+        ``"chol_cheb"`` (symmetric) and ``"lu_aaa"`` (non-symmetric).
+        If ``W`` is not provided, defaults to ``"chol_cheb"``.
 
     Returns
     -------
@@ -137,7 +203,7 @@ def _is_symmetric_W(W) -> bool:
 
     The discriminator is **D-symmetrizability**, not literal matrix symmetry:
     a *row-standardized* undirected graph ``W = D⁻¹A`` (``A`` symmetric) is not
-    literally symmetric, yet ``cheb_cholesky`` handles it via D-symmetrization.
+    literally symmetric, yet ``chol_cheb`` handles it via D-symmetrization.
     Only genuinely directed graphs (asymmetric adjacency, e.g. KNN / travel time
     / migration) fall through to the LU-based ``aaa`` path.
 
@@ -145,7 +211,7 @@ def _is_symmetric_W(W) -> bool:
     when ``W`` is a Graph.  For a sparse/dense matrix — which is what the models
     actually pass (``self._W_sparse``) — a literally symmetric matrix returns
     ``True`` immediately; otherwise D-symmetrizability is tested with the same
-    ``_d_symmetrize`` routine ``cheb_cholesky`` relies on, so this predicate
+    ``_d_symmetrize`` routine ``chol_cheb`` relies on, so this predicate
     agrees exactly with whether the Cholesky path is applicable.
     """
     import numpy as np
@@ -157,11 +223,7 @@ def _is_symmetric_W(W) -> bool:
     # libpysal Graph: use built-in topology asymmetry check (intrinsic=False
     # ignores weight values, so row-standardization does not read as directed).
     if hasattr(W, "asymmetry"):
-        try:
-            asym = W.asymmetry(intrinsic=False)
-            return asym.empty
-        except Exception:
-            pass
+        return W.asymmetry(intrinsic=False).empty
 
     if sp.issparse(W):
         # Sparse difference stays sparse — never densify (n=20k dense is ~3.2GB).
@@ -170,14 +232,14 @@ def _is_symmetric_W(W) -> bool:
         if diff.nnz == 0 or bool(np.all(np.abs(diff.data) <= 1e-10)):
             return True
         # Not literally symmetric: may still be a D-symmetrizable (row-
-        # standardized undirected) graph, which cheb_cholesky handles.  Test
+        # standardized undirected) graph, which chol_cheb handles.  Test
         # with the actual symmetrization so routing == applicability.
         try:
             from ._chol_cheb import _d_symmetrize
 
             _d_symmetrize(Wc)
             return True
-        except Exception:
+        except ValueError:  # no symmetrizing diagonal: directed W
             return False
     else:
         W_arr = np.asarray(W)
@@ -190,7 +252,7 @@ def _is_symmetric_W(W) -> bool:
 
             _d_symmetrize(sp.csr_matrix(W_arr))
             return True
-        except Exception:
+        except ValueError:  # no symmetrizing diagonal: directed W
             return False
 
 
@@ -198,7 +260,7 @@ def _auto_logdet_method(n: int, W=None) -> str:
     """Auto-select based on matrix dimension n and W symmetry.
 
     - ``eigenvalue`` for n ≤ eigen_cutoff (default 500): exact O(n³) eigendecomposition.
-    - ``cheb_cholesky`` for n ≤ cheb_cutoff (default 60000) when W is symmetric:
+    - ``chol_cheb`` for n ≤ cheb_cutoff (default 60000) when W is symmetric:
       exact logdet via sparse Cholesky at Chebyshev nodes with symbolic reuse.
       Measured setup (2D rook, ρ ∈ [0.1, 0.8], 2026-07): ~96ms at n=10k, ~583ms
       at n=40k, ~1.18s at n=60k.  Accuracy: 4.6e-7 (n=10k) to 2.6e-6 (n=60k).
@@ -209,7 +271,7 @@ def _auto_logdet_method(n: int, W=None) -> str:
       singularities.  Uses an adaptive coarse grid of 8–30 LU factorizations,
       sized from the interval's Bernstein-ellipse rate, selecting ~7 support
       points.  Measured setup ~157ms at n=10k; eval ~5μs/ρ; error 1e-8 to 5e-8.
-    - ``cheb_stochastic`` for n > cheb_cutoff: stochastic Chebyshev expansion.
+    - ``stoch_cheb`` for n > cheb_cutoff: stochastic Chebyshev expansion.
       Lower setup cost (~62ms at n=10k, ~328ms at n=60k) but carries stochastic
       error 0.7 to 3.5 with 200 probes.  Eval: ~57μs/ρ.  Use when factorization
       fill-in makes exact setup too expensive.
@@ -218,7 +280,7 @@ def _auto_logdet_method(n: int, W=None) -> str:
     auto-selector estimates the fill-in ratio ``nnz(W²) / nnz(W)`` (in
     ``O(nnz)`` via :func:`~._fillin.estimate_fillin_ratio`).  If this exceeds
     ``NEIGHBAYES_LOGDET_MAX_FILLIN_RATIO`` (default 20), the exact
-    factorization path is skipped in favour of ``cheb_stochastic`` and a
+    factorization path is skipped in favour of ``stoch_cheb`` and a
     warning is issued.  This catches dense or hub-dominated graphs (e.g.
     KNN-50, fully dense W) at medium ``n`` where the ``n`` cutoff alone
     would not route to stochastic.
@@ -228,11 +290,11 @@ def _auto_logdet_method(n: int, W=None) -> str:
     symmetrizing-diagonal recovery roughly halved Cholesky setup: at n = 60,000
     the exact path now costs ~850ms more than the stochastic one for six orders
     of magnitude less error, which is negligible against any chain that runs for
-    seconds.  Raise it further via ``NEIGHBAYES_LOGDET_CHEB_MAX_N`` if Cholesky
+    seconds.  Raise it further via ``NEIGHBAYES_LOGDET_FACTOR_MAX_N`` if Cholesky
     fill-in on your graph stays affordable past that.
     """
     eigen_cutoff = _eigen_cutoff()
-    cheb_cutoff_raw = os.getenv("NEIGHBAYES_LOGDET_CHEB_MAX_N", "60000")
+    cheb_cutoff_raw = os.getenv("NEIGHBAYES_LOGDET_FACTOR_MAX_N", "60000")
     try:
         cheb_cutoff = max(eigen_cutoff + 1, int(cheb_cutoff_raw))
     except ValueError:
@@ -251,16 +313,17 @@ def _auto_logdet_method(n: int, W=None) -> str:
             ratio = estimate_fillin_ratio(W_csr)
             max_ratio = _max_fillin_ratio()
             if ratio > max_ratio:
-                fallback = "chol_aaa" if _is_symmetric_W(W) else "aaa"
+                fallback = "chol_aaa" if _is_symmetric_W(W) else "lu_aaa"
                 warnings.warn(
                     f"Estimated fill-in ratio nnz(W²)/nnz(W) ≈ {ratio:.0f}× "
                     f"exceeds max_fillin_ratio={max_ratio:.0f}×. "
                     f"Sparse factorization fill-in would dominate setup cost; "
-                    f"auto-selecting cheb_stochastic instead of {fallback}. "
-                    f"Set logdet_method explicitly to override.",
+                    f"auto-selecting the stochastic method instead of "
+                    f"{logdet_label(fallback)}. Set logdet_method explicitly to "
+                    f"override.",
                     stacklevel=3,
                 )
-                return "cheb_stochastic"
+                return "stoch_cheb"
         # Check W symmetry: chol_aaa for symmetric (undirected graph),
         # aaa for non-symmetric (directed graph: KNN, travel time, migration).
         # chol_aaa combines CHOLMOD's cheaper factorization with AAA's
@@ -268,10 +331,10 @@ def _auto_logdet_method(n: int, W=None) -> str:
         if _is_symmetric_W(W):
             return "chol_aaa"
         else:
-            return "aaa"
+            return "lu_aaa"
     # Stochastic Chebyshev (Han et al. 2015): geometric convergence via
     # Bernstein ellipse, avoids O(n³) eigendecomposition.
-    return "cheb_stochastic"
+    return "stoch_cheb"
 
 
 def _eigen_cutoff() -> int:
@@ -289,7 +352,7 @@ def _eigen_cutoff() -> int:
         return 500
 
 
-#: Hard limit for explicit ``logdet_method="eigenvalue"`` on large W.
+#: Hard limit for an explicit ``logdet_decomp="eig"`` on large W.
 #: The auto-select cutoff (:func:`_eigen_cutoff`, default 500) is a performance
 #: guideline — slightly exceeding it is fine.  This hard guard prevents
 #: genuinely dangerous O(n²) memory allocations (e.g. a dense 20k×20k matrix
@@ -302,7 +365,7 @@ def _eigen_hard_max_n() -> int:
 
     The auto-select cutoff (``NEIGHBAYES_LOGDET_EIGEN_MAX_N``, default 500) is
     a performance guideline — tests and users may legitimately force
-    ``logdet_method="eigenvalue"`` on moderately larger W.  This hard guard
+    ``logdet_decomp="eig"`` on moderately larger W.  This hard guard
     only fires when the allocation would be genuinely dangerous (O(n²) memory
     in the multi-GB range).  Read from ``NEIGHBAYES_LOGDET_EIGEN_HARD_MAX_N``
     (default 5000; a 5000×5000 dense matrix is ~200 MB).
@@ -317,7 +380,7 @@ def _eigen_hard_max_n() -> int:
 
 
 #: Default fill-in ratio (estimated ``nnz(W²) / nnz(W)``) above which the
-#: auto-selector routes to ``cheb_stochastic`` instead of exact factorization.
+#: auto-selector routes to ``stoch_cheb`` instead of exact factorization.
 #: The Cholesky factor has at least as many nonzeros as ``W²`` in its early
 #: rows, so this ratio directly predicts factorization cost.  The 2D rook
 #: lattice (degree ~8) gives ratio ~8; KNN-50 gives ~50; dense W gives ~n.
@@ -354,7 +417,7 @@ def resolve_logdet_bounds(
     ``W`` (when supplied) participates in auto-selection so that the
     method recorded here agrees with every other resolution site —
     without it a directed graph would be auto-routed to the
-    symmetric-only ``cheb_cholesky``.
+    symmetric-only ``chol_cheb``.
     """
     resolved_method = resolve_logdet_method(method, n=int(n), W=W)
     source = "default"

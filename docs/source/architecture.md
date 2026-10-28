@@ -22,7 +22,7 @@ implementation detail to be chosen silently on a user's behalf.
 
 **Automatic choices are overridable.** The library picks a log-determinant method, a
 sampler, a sparse backend, and a set of priors for you. Every one of them can be
-replaced by an explicit argument — `logdet_method=`, `sampler=`, `gibbs_backend=`,
+replaced by an explicit argument — `logdet_method=`, `sampler=`, `backend=`,
 `priors=` — and the resolved log-determinant method is recorded on the model as
 `_resolved_logdet_method`. Nothing is chosen in a way you cannot see or change.
 
@@ -81,33 +81,35 @@ are variations on a small number of themes.
 
 ### Cross-section and panel share one implementation
 
-Cross-sectional and panel models differ in only a few operations: what the spatial lag
-means, what operand the log-determinant factory receives, and what the symbolic sparse
-operator looks like inside a PyMC model. Those three are isolated behind the
-`SpatialStructure` strategy in
+A cross-section is the `T = 1` panel. One base class,
+[`SpatialModel`](https://github.com/pysal/neighbayes/blob/main/neighbayes/models/base.py),
+parses either kind of data: given time (`time_col`, or `T`), it sorts and stacks the
+panel by period, then unit, and applies the within transformation its fixed effects
+need; without time it holds `N = n` units and `T = 1` period. The operations that
+depend on that layout are isolated in the `SpatialStructure` of
 [`models/_base/_structure.py`](https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_structure.py):
 
 :::{list-table}
 :header-rows: 1
-:widths: 22 39 39
+:widths: 30 70
 
 * - operation
-  - `CrossSectionStructure`
-  - `PanelStructure`
+  - what it does
 * - `spatial_lag(x)`
-  - `W @ x`
-  - `W` applied per period via the Kronecker structure
+  - `W` applied within each period of the stacked data (`W @ x` in a cross-section)
+* - `batch_spatial_lag(resid)`
+  - the same lag for a batch of residual draws, one sparse multiply
+* - `W_sparse_NT()`
+  - the `(N·T)×(N·T)` block `I_T ⊗ W`, so one multiply lags a stacked panel; `W`
+    itself in a cross-section
 * - `logdet_W_operand()`
-  - dense `W`
-  - sparse `W` (the panel logdet path stays sparse)
-* - `W_pt_sparse()`
-  - the `N×N` `W`
-  - the `(N·T)×(N·T)` block `I_T ⊗ W`, so one symbolic multiply lags a stacked panel
+  - the sparse `W` handed to the log-determinant factory
 :::
 
-Everything that is behaviour-identical across the two lives in the shared base. This is
-why panel models inherit the diagnostics, effects, and prior handling of their
-cross-sectional counterparts without re-implementation.
+Everything else is behaviour-identical across the two, so panel models inherit the
+diagnostics, effects, and prior handling of their cross-sectional counterparts without
+re-implementation. The fixed-effects likelihood dimensions (Lee and Yu 2010) reduce to
+the cross-section's when there are no effects and `T = 1`.
 
 ### Priors mirror model inheritance
 
@@ -129,7 +131,7 @@ rather than a function. Three design decisions shape it.
 **Precompute once, evaluate many times.** Every method splits into a `*_precompute`
 step that does the expensive linear algebra and an `*_eval` step that answers a single
 $\rho$. The sampler pays the setup once per model and then evaluates in microseconds.
-This is what makes exact interpolation competitive: `cheb_cholesky` factorises at a
+This is what makes exact interpolation competitive: `cheb` on `chol` factorises at a
 handful of Chebyshev nodes and then costs ~1.3 μs per $\rho$ via Clenshaw recurrence;
 `aaa` factorises on an adaptive coarse grid, selects ~7 support points, and costs ~5 μs.
 Both are accurate to near machine precision, and both need far fewer factorisations than
@@ -167,14 +169,16 @@ Built callables are cached by a signature of $W$ and the resolved bounds
 (`get_cached_logdet_fn`), so refitting a model, or fitting several models on the same
 graph, reuses the setup.
 
-**Auto-selection from the shape of the problem.** `resolve_logdet_method` picks from the
-size and symmetry of $W$: exact eigendecomposition below $n=500$; `cheb_cholesky` for
-symmetric $W$ (undirected graphs) up to $n=20{,}000$; `aaa` for non-symmetric $W$ (KNN,
-travel time, migration flows) in the same range; a stochastic method above it, where
-factorisation fill-in stops being affordable. The symmetry test uses
-`Graph.asymmetry(intrinsic=False)` for libpysal graphs and never densifies a sparse
-matrix to check. Both cutoffs are environment variables, and `logdet_method=` overrides
-the choice outright.
+**Auto-selection from the shape of the problem.** A model names its log-determinant
+by `logdet_method` (the approximation over ρ) and `logdet_decomp` (what supplies exact
+values), and `logdet_key` resolves the pair to one internal key that the factories
+and samplers dispatch on. Left to auto, `resolve_logdet_method` picks from the size
+and symmetry of $W$: `exact` on `eig` below $n=500$; `aaa` on `chol` for undirected $W$
+and on `lu` for directed $W$ (KNN, travel time, migration flows) up to $n=60{,}000$; and
+`stochastic` above it, where factorisation fill-in stops being affordable. The
+symmetry test uses `Graph.asymmetry(intrinsic=False)` for libpysal graphs and never
+densifies a sparse matrix to check. Both cutoffs are environment variables, and the two
+arguments override the choice outright.
 
 ## Sampler dispatch
 
@@ -195,11 +199,13 @@ know about it:
   `run_chains` + `gibbs_to_inference_data`. The registry unifies dispatch, not sampler
   internals.
 
-`backends` / `auto_backend`
-: Which of `{"jax", "numpy"}` the family supports, and which one `"auto"` should prefer.
-  The Gaussian families prefer JAX, where a vmapped Gibbs is the fast path. The
-  Pólya–Gamma families pin `auto` to NumPy, because there the CHOLMOD `factorize` path
-  is fastest and the dense JAX path is an opt-in for GPU work.
+`backends`
+: Which of `{"jax", "numpy"}` the family supports; `"auto"` takes JAX when the family
+  supports it and JAX is installed. The JAX path solves with sparse
+  factorizations (sparsax), compiles once per model structure, and draws Pólya–Gamma
+  variables exactly (augax), where the NumPy path's draws carry a known bias in the
+  `polyagamma` package and warn. The random-effects, count-panel and hurdle families
+  are NumPy-only.
 
 `options`
 : The family-specific `fit` keywords this runner accepts, e.g. `slice_width`,
@@ -235,13 +241,17 @@ identical data — the check the package's own validation notebooks run.
 There is one model code path. Acceleration is selected at run time and degrades to a
 working default rather than an error:
 
-- **JAX** is optional. `gibbs_backend="auto"` uses it when it is installed and the
+- **JAX** is optional. `backend="auto"` uses it when it is installed and the
   family prefers it, NumPy otherwise. Requesting `"jax"` explicitly without JAX
   installed raises, because a silent downgrade of an explicit request would be
   misleading.
-- **Sparse solves** prefer KLU, then UMFPACK (both from `scikit-sparse`), then SciPy's
-  SuperLU, with a one-time advisory warning when it falls back so the performance loss
-  is visible.
+- **Sparse solves** use KLU or UMFPACK (both from `scikit-sparse` and `sparsax`), chosen
+  for each sparsity pattern by the work per factor entry of its factorization: KLU on
+  the sparse graphs of contiguity and few-neighbour KNN weights, UMFPACK once the
+  factor's fronts grow dense. The choice depends on the pattern alone, never on a
+  timing, so a fixed seed reproduces the same draws. Without `scikit-sparse` they fall
+  back to SciPy's SuperLU, with a one-time advisory warning so the performance loss is
+  visible.
 - **A dense LAPACK fast path** handles small problems: below `NEIGHBAYES_KRON_DENSE_MAX`
   (512), `lu_factor` on a dense $I - \rho W$ beats `splu`, because SuperLU spends most of
   its time in symbolic-factorisation overhead at that size while `dgetrf` is a single
@@ -272,7 +282,7 @@ resolved through a registry of test suites. `spatial_diagnostics_decision()` wal
 results through a decision tree and reports both the favoured model and the path it took
 to reach it, so the recommendation can be audited rather than taken on faith.
 
-`spatial_effects()` decomposes a change in $X$ through the spatial multiplier
+`impacts()` decomposes a change in $X$ through the spatial multiplier
 $(I - \rho W)^{-1}$ into direct, indirect, and total effects, computed from the posterior
 draws. These are distributions, not delta-method approximations — which is much of the
 argument for estimating these models in a Bayesian framework in the first place.
@@ -290,8 +300,8 @@ without touching model code:
   - effect
 * - `NEIGHBAYES_LOGDET_EIGEN_MAX_N`
   - largest `n` auto-routed to exact eigendecomposition (default 500)
-* - `NEIGHBAYES_LOGDET_CHEB_MAX_N`
-  - largest `n` auto-routed to an exact interpolating method (default 60000)
+* - `NEIGHBAYES_LOGDET_FACTOR_MAX_N`
+  - largest `n` auto-routed to a factorization (default 60000)
 * - `NEIGHBAYES_SPARSE_BACKEND`
   - force a sparse solver instead of auto-detecting
 * - `NEIGHBAYES_SPARSE_STRICT`

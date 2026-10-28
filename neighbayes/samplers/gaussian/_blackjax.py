@@ -10,8 +10,8 @@ SAR residual
 costs one extra vector op over the OLS residual ``y − Xβ``; the Jacobian term
 ``log|I − ρW|`` is the *only* spatial addition to the log-density, supplied as a
 pluggable differentiable callable ``logdet_fn(ρ)`` (eigenvalue, chol-cheb
-Clenshaw, or SLQ — all differentiable via the fixed :mod:`neighbayes._logdet`
-jax closures).  Its ρ-gradient — the resolvent trace ``−tr(W(I−ρW)⁻¹)`` — flows
+Clenshaw, AAA or stochastic Chebyshev — all differentiable via the fixed
+:mod:`neighbayes._logdet` jax closures).  Its ρ-gradient — the resolvent trace ``−tr(W(I−ρW)⁻¹)`` — flows
 through ``jax.grad`` automatically, so no per-leapfrog solves are needed.
 
 Backend-neutrality
@@ -289,8 +289,8 @@ def run_chain_blackjax_gaussian(
     then NUTS for ``draws``.  Returns constrained draws and per-draw NUTS
     diagnostics.
 
-    ``logdet_method`` selects the logdet surrogate ("eigenvalue", "cheb_cholesky",
-    "slq", ...); ``eigs`` (if given) is passed through so the eigenvalue method
+    ``logdet_method`` is the internal logdet key ("eigenvalue", "chol_cheb",
+    "chol_aaa", ...) that the public method and decomposition resolve to; ``eigs`` (if given) is passed through so the eigenvalue method
     skips its own eigendecomposition.  ``rho_lower/rho_upper`` default to the
     priors' bounds.
     """

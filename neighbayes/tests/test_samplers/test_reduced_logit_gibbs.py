@@ -1,6 +1,6 @@
 """Tests for the reduced-form SAR-logit Pólya-Gamma Gibbs sampler.
 
-Covers the NumPy chain runner (``logit_reduced._core.run_chain``) and its
+Covers the NumPy chain runner (``binary_reduced._core.run_chain``) and its
 NumPy↔JAX parity via the model API — both backends fit the *same* reduced-form
 model (η = (I − ρW)⁻¹Xβ, Bernoulli), so their posteriors should agree within
 Monte-Carlo noise.
@@ -12,10 +12,10 @@ import numpy as np
 import pytest
 import scipy.sparse as sp
 
-from neighbayes.models.priors import LogitGibbsPriors
+from neighbayes.models.priors import BinaryGibbsPriors
 from neighbayes.samplers._utils._slice import SliceWidthState
-from neighbayes.samplers.logit_reduced._core import (
-    ReducedLogitGibbsState,
+from neighbayes.samplers.binary_reduced._core import (
+    ReducedBinaryGibbsState,
     _logit_loglik_pointwise,
     run_chain,
 )
@@ -63,12 +63,12 @@ def _cache(W, *, slice_width=0.4):
 
 
 def _run(y, X, W, seed, draws=1200, tune=800):
-    priors = LogitGibbsPriors(
+    priors = BinaryGibbsPriors(
         beta_mu=0.0, beta_sigma=10.0, rho_lower=-0.99, rho_upper=0.99
     )
     n, k = X.shape
     r = np.random.default_rng(seed)
-    init = ReducedLogitGibbsState(
+    init = ReducedBinaryGibbsState(
         beta=r.normal(0, 0.2, k),
         rho=float(r.uniform(-0.1, 0.1)),
         omega=0.25 * np.ones(n),
@@ -129,8 +129,8 @@ class TestReducedLogitBackendParity:
         graph = W_to_graph(W.toarray())
 
         common = dict(draws=1000, tune=800, chains=4, random_seed=0, progressbar=False)
-        inp = SARLogit(y=y, X=X, W=graph).fit(gibbs_backend="numpy", n_jobs=1, **common)
-        ij = SARLogit(y=y, X=X, W=graph).fit(gibbs_backend="jax", **common)
+        inp = SARLogit(y=y, X=X, W=graph).fit(backend="numpy", n_jobs=1, **common)
+        ij = SARLogit(y=y, X=X, W=graph).fit(backend="jax", **common)
 
         rho_np = float(inp.posterior["rho"].mean())
         rho_jx = float(ij.posterior["rho"].mean())

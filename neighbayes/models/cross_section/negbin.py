@@ -17,11 +17,14 @@ import numpy as np
 import pytensor.tensor as pt
 
 from ..._lazy_deps import pm
+from .._base._nb import nb_alpha_fixed, nb_alpha_rv
+from .._mixins._designs import CountDesigns
 from ..base import SpatialModel
-from ..priors import NegBinPriors
+from ..panel._count import _CountPanel
+from ..priors import NegBinPriors, PanelCountPriors
 
 
-class NegBin(SpatialModel):
+class NegBin(CountDesigns, _CountPanel, SpatialModel):
     r"""Bayesian (non-spatial) Negative Binomial regression.
 
     .. math::
@@ -32,7 +35,7 @@ class NegBin(SpatialModel):
     NB2 parameterization: :math:`\mathrm{Var}(y_i) = \mu_i + \mu_i^2 / \alpha`.
     Sampled with NUTS.  ``W`` is optional and is used only by Bayesian
     LM diagnostics to assess whether a spatial count model
-    (e.g. :class:`neighbayes.models.SARNegBinStructural`) is warranted.
+    (e.g. :class:`neighbayes.models.SARNegBin`) is warranted.
 
     Parameters
     ----------
@@ -47,7 +50,7 @@ class NegBin(SpatialModel):
         Design matrix.  Required in matrix mode.
     W : libpysal.graph.Graph or scipy.sparse matrix, optional
         Spatial weights matrix.  Not used during estimation; required for
-        post-hoc Bayesian LM spatial diagnostics.
+        post-hoc Bayesian LM spatial diagnostics, and by a panel.
     priors : dict or NegBinPriors, optional
         Override default priors.  Supported keys:
 
@@ -63,31 +66,39 @@ class NegBin(SpatialModel):
         - ``alpha_nu`` (float, default 3.0): Degrees of freedom of the
           :math:`\mathrm{Half\text{-}Student\text{-}t}` prior on
           :math:`\alpha`.
+
+        A panel's are those of
+        :class:`~neighbayes.models.priors.PanelCountPriors`, with
+        ``alpha_fixed`` and the effects' ``unit_effect_mu``,
+        ``unit_effect_sd_scale``, ``time_effect_mu`` and
+        ``time_effect_sigma``.
+    time_col, unit_col : str, optional
+        Formula-mode panel: the period and unit columns of ``data``.  Given
+        time, the model is a panel (:mod:`neighbayes.models.panel._count`),
+        stacked by period, then unit, and sampled by Pólya–Gamma Gibbs with
+        the unit effects integrated out.
+    N, T : int, optional
+        Matrix-mode panel: the numbers of units and periods.
+    unit_effects : {None, "random"}, default None
+        A panel's random unit effects, ``unit_effect``.
+    time_effects : bool, default False
+        A panel's fixed time effects, ``time_effect``.
+    mundlak : bool, default False
+        Add the unit means of the time-varying columns to a panel's design,
+        absorbing a correlation between the unit effects and ``X``.  Needs
+        unit effects.
     """
 
+    _DESIGNS = {
+        "static": {},
+        "panel": {"_priors_cls": PanelCountPriors, "_gibbs_key": ("count", "panel")},
+    }
+
     _priors_cls = NegBinPriors
-    _spatial_params: tuple[str, ...] = ()
-    _lag_terms: tuple[str, ...] = ()
-    _jacobian_param: str | None = None
-    _has_wx_in_beta: bool = False
-    _gibbs_class: str | None = None
     _model_type: str = "negbin"
+    _count_spatial = False
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        if self.robust:
-            raise NotImplementedError("robust=True is not supported for NegBin.")
-
-        y_round = np.round(self._y).astype(np.int64)
-        if not np.allclose(self._y, y_round):
-            raise ValueError("NegBin requires integer-valued observations.")
-        if np.any(y_round < 0):
-            raise ValueError("NegBin requires non-negative integer observations.")
-        self._y_int = y_round
-        self._y = y_round.astype(np.float64)
-
-    def _build_pymc_model(self) -> pm.Model:
+    def _build_pymc_model_static(self) -> pm.Model:
         X = self._X
         names = list(self._feature_names)
         default_beta_mu, default_beta_sigma = self._gelman_default_beta_prior(
@@ -100,25 +111,25 @@ class NegBin(SpatialModel):
 
         with pm.Model(coords=self._model_coords()) as model:
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            alpha = pm.HalfStudentT("alpha", nu=alpha_nu, sigma=alpha_sigma)
+            alpha = nb_alpha_rv(nb_alpha_fixed(self.priors), alpha_nu, alpha_sigma)
             mu = pt.exp(pt.dot(X, beta))
             pm.NegativeBinomial("obs", mu=mu, alpha=alpha, observed=self._y_int)
         return model
 
     # ------------------------------------------------------------------
-    # Spatial-effects hooks (not applicable for non-spatial model)
+    # Impacts hooks (not applicable for non-spatial model)
     # ------------------------------------------------------------------
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior_static(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         raise NotImplementedError(
             "NegBin has no spatial structure and therefore no "
-            "spatial effects. Use Bayesian LM diagnostics to assess whether "
-            "a spatial count model (e.g. SARNegBinStructural) is appropriate."
+            "impacts. Use Bayesian LM diagnostics to assess whether "
+            "a spatial count model (e.g. SARNegBin) is appropriate."
         )
 
-    def _fitted_mean_from_posterior(self) -> np.ndarray:
+    def _fitted_mean_from_posterior_static(self) -> np.ndarray:
         """Posterior-mean response mean ``exp(X @ E[beta])``."""
         beta = self._posterior_mean("beta")
         return np.exp(self._X @ beta)

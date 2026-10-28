@@ -1,6 +1,6 @@
 """Kronecker-product spatial weight utilities for flow (O-D) models.
 
-Provides helpers to build destination, origin, and network weight matrices
+Provides helpers to build destination, origin, and origin–destination weight matrices
 from a single n×n :class:`libpysal.graph.Graph` using Kronecker products,
 following :cite:t:`lesage2008SpatialEconometric`.
 
@@ -44,49 +44,6 @@ def sparse_trace_WtW_plus_WW(W: sp.spmatrix) -> float:
     Lagrange-multiplier information-matrix formulas.
     """
     return float(W.power(2).sum() + W.multiply(W.T).sum())
-
-
-def flow_trace_blocks(W: sp.spmatrix) -> np.ndarray:
-    r"""Return the symmetric :math:`3 \times 3` Kronecker trace matrix
-    :math:`T_{ij} = \operatorname{tr}(W_i^\top W_j) + \operatorname{tr}(W_i W_j)`,
-    indexed by the flow weight matrices :math:`(W_d, W_o, W_w)` with
-    :math:`W_d = I_n \otimes W`, :math:`W_o = W \otimes I_n`,
-    :math:`W_w = W \otimes W`.
-
-    Used by Bayesian LM tests on flow models as the noise-free part of the
-    information matrix block for the spatial-lag scores.  All entries are
-    derived in :math:`O(\mathrm{nnz})` from three base traces of the
-    :math:`n \times n` graph weight matrix
-    (:math:`\operatorname{tr}(W)`, :math:`\operatorname{tr}(W^2)`,
-    :math:`\operatorname{tr}(W^\top W)`) using
-    :math:`\operatorname{tr}(A \otimes B) = \operatorname{tr}(A)\operatorname{tr}(B)`.
-
-    Parameters
-    ----------
-    W : scipy.sparse.spmatrix
-        Row-standardized :math:`n \times n` weight matrix on the base graph.
-
-    Returns
-    -------
-    numpy.ndarray
-        Dense ``(3, 3)`` array with rows/cols ordered as
-        ``(destination, origin, network)``.
-    """
-    W = W.tocsr()
-    n = W.shape[0]
-    tr_W = float(W.diagonal().sum())
-    tr_W2 = float(W.multiply(W.T).sum())  # tr(W^2) = sum_ij W_ij W_ji
-    tr_WtW = float(W.power(2).sum())  # tr(W'W) = ||W||_F^2
-
-    s = tr_WtW + tr_W2  # tr(W'W) + tr(W^2)
-    T = np.empty((3, 3), dtype=np.float64)
-    T[0, 0] = n * s
-    T[1, 1] = n * s
-    T[2, 2] = tr_WtW * tr_WtW + tr_W2 * tr_W2
-    T[0, 1] = T[1, 0] = 2.0 * tr_W * tr_W
-    T[0, 2] = T[2, 0] = tr_W * s
-    T[1, 2] = T[2, 1] = tr_W * s
-    return T
 
 
 def _graph_to_csr(G: Graph) -> sp.csr_matrix:
@@ -167,8 +124,8 @@ def origin_weights(G: Graph) -> sp.csr_matrix:
     return sp.kron(W, sp.eye(n, format="csr"), format="csr")
 
 
-def network_weights(G: Graph) -> sp.csr_matrix:
-    """Build the N×N network weight matrix :math:`W_w = W \\otimes W`.
+def od_weights(G: Graph) -> sp.csr_matrix:
+    """Build the N×N origin–destination weight matrix :math:`W_w = W \\otimes W`.
 
     Captures joint origin-destination neighborhood structure: a non-zero
     entry at :math:`(i \\cdot n + j,\\; k \\cdot n + l)` indicates that
@@ -182,7 +139,7 @@ def network_weights(G: Graph) -> sp.csr_matrix:
     Returns
     -------
     scipy.sparse.csr_matrix
-        :math:`N \\times N` network weight matrix (:math:`N = n^2`).
+        :math:`N \\times N` origin–destination weight matrix (:math:`N = n^2`).
     """
     W = _weights_to_csr(G)
     return sp.kron(W, W, format="csr")
@@ -199,7 +156,7 @@ def flow_weight_matrices(G: Graph) -> dict[str, sp.csr_matrix]:
     Returns
     -------
     dict[str, scipy.sparse.csr_matrix]
-        Dictionary with keys ``"destination"``, ``"origin"``, ``"network"``.
+        Dictionary with keys ``"destination"``, ``"origin"``, ``"od"``.
     """
     W = _weights_to_csr(G)
     n = W.shape[0]
@@ -207,7 +164,7 @@ def flow_weight_matrices(G: Graph) -> dict[str, sp.csr_matrix]:
     return {
         "destination": sp.kron(eye, W, format="csr"),
         "origin": sp.kron(W, eye, format="csr"),
-        "network": sp.kron(W, W, format="csr"),
+        "od": sp.kron(W, W, format="csr"),
     }
 
 

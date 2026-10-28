@@ -34,6 +34,8 @@ class GaussianPredictionMixin:
     # ------------------------------------------------------------------
 
     def _prediction_kind(self) -> str:
+        if getattr(self, "_is_panel", False):
+            raise NotImplementedError("Prediction is implemented for cross-sections.")
         if getattr(self, "robust", False):
             raise NotImplementedError(
                 "Prediction uses the Gaussian conditional of y_O given y_S, "

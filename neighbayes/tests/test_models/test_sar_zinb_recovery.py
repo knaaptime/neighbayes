@@ -7,7 +7,8 @@ equations.
 
 The ZINB DGP has two equations:
 - **Selection** (SAR-logit): ``d ~ Bernoulli(logit^{-1}(eta^sel))`` where
-  ``eta^sel = (I - lam W)^{-1}(Z gamma + nu)``, ``nu ~ N(0, I)``
+  ``eta^sel = (I - lam W)^{-1} Z gamma`` — the reduced form the model fits
+  (the DGP's former latent ``nu`` was removed on 2026-10-03)
 - **Count** (reduced-form SAR-NB): ``y|d=1 ~ NegBin(exp(eta^cnt), alpha)``
   where ``eta^cnt = (I - rho W)^{-1} X beta``
 
@@ -60,9 +61,9 @@ def zinb_data():
     return dgp.simulate_sar_zinb(
         W=_as_sparse(W_graph),
         rho=RHO_TRUE,
-        lam=LAM_TRUE,
+        rho_zero=LAM_TRUE,
         beta=BETA_TRUE,
-        gamma=GAMMA_TRUE,
+        beta_zero=GAMMA_TRUE,
         alpha=ALPHA_TRUE,
         rng=rng,
     )
@@ -74,10 +75,10 @@ class TestSARZINBRecovery:
     def test_recovers_rho(self, zinb_data):
         y = zinb_data["y"]
         X = zinb_data["X"]
-        Z = zinb_data["Z"]
+        Z = zinb_data["X_zero"]
         W = zinb_data["W_graph"]
 
-        model = SARZINB(y=y, X=X, Z=Z, W=W)
+        model = SARZINB(y=y, X=X, X_zero=Z, W=W)
         idata = model.fit(
             draws=DRAWS,
             tune=TUNE,
@@ -94,10 +95,10 @@ class TestSARZINBRecovery:
     def test_recovers_lam(self, zinb_data):
         y = zinb_data["y"]
         X = zinb_data["X"]
-        Z = zinb_data["Z"]
+        Z = zinb_data["X_zero"]
         W = zinb_data["W_graph"]
 
-        model = SARZINB(y=y, X=X, Z=Z, W=W)
+        model = SARZINB(y=y, X=X, X_zero=Z, W=W)
         idata = model.fit(
             draws=DRAWS,
             tune=TUNE,
@@ -106,7 +107,7 @@ class TestSARZINBRecovery:
             progressbar=False,
         )
 
-        lam_hat = float(idata.posterior["lam"].mean())
+        lam_hat = float(idata.posterior["rho_zero"].mean())
         assert abs(lam_hat - LAM_TRUE) < ABS_TOL_LAM, (
             f"lam: {lam_hat:.3f} vs {LAM_TRUE}"
         )
@@ -114,10 +115,10 @@ class TestSARZINBRecovery:
     def test_recovers_beta(self, zinb_data):
         y = zinb_data["y"]
         X = zinb_data["X"]
-        Z = zinb_data["Z"]
+        Z = zinb_data["X_zero"]
         W = zinb_data["W_graph"]
 
-        model = SARZINB(y=y, X=X, Z=Z, W=W)
+        model = SARZINB(y=y, X=X, X_zero=Z, W=W)
         idata = model.fit(
             draws=DRAWS,
             tune=TUNE,
@@ -133,10 +134,10 @@ class TestSARZINBRecovery:
     def test_recovers_gamma(self, zinb_data):
         y = zinb_data["y"]
         X = zinb_data["X"]
-        Z = zinb_data["Z"]
+        Z = zinb_data["X_zero"]
         W = zinb_data["W_graph"]
 
-        model = SARZINB(y=y, X=X, Z=Z, W=W)
+        model = SARZINB(y=y, X=X, X_zero=Z, W=W)
         idata = model.fit(
             draws=DRAWS,
             tune=TUNE,
@@ -145,7 +146,7 @@ class TestSARZINBRecovery:
             progressbar=False,
         )
 
-        gamma_hat = idata.posterior["gamma"].mean(("chain", "draw")).values
+        gamma_hat = idata.posterior["beta_zero"].mean(("chain", "draw")).values
         for j, (ghat, gtrue) in enumerate(zip(gamma_hat, GAMMA_TRUE)):
             assert abs(ghat - gtrue) < ABS_TOL_GAMMA, (
                 f"gamma[{j}]: {ghat:.3f} vs {gtrue}"
@@ -154,10 +155,10 @@ class TestSARZINBRecovery:
     def test_recovers_alpha(self, zinb_data):
         y = zinb_data["y"]
         X = zinb_data["X"]
-        Z = zinb_data["Z"]
+        Z = zinb_data["X_zero"]
         W = zinb_data["W_graph"]
 
-        model = SARZINB(y=y, X=X, Z=Z, W=W)
+        model = SARZINB(y=y, X=X, X_zero=Z, W=W)
         idata = model.fit(
             draws=DRAWS,
             tune=TUNE,

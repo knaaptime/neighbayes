@@ -26,7 +26,7 @@ only once and reused for all subsequent numeric factorizations via
 
 **When to use**: ``n ∈ (500, 60000]``, any ``ρ ∈ (-1, 1)``.  For ``n ≤ 500``
 use ``eigenvalue`` (exact eigendecomposition).  For ``n > 60000`` use
-``cheb_stochastic`` (avoids ``O(nnz^{1.5})`` Cholesky fill-in).  For
+``stoch_cheb`` (avoids ``O(nnz^{1.5})`` Cholesky fill-in).  For
 non-symmetric ``W`` (directed graphs: KNN, travel time) use ``aaa`` (rational
 approximation via sparse LU).
 
@@ -70,7 +70,7 @@ from ._chebyshev import (
     chebyshev_coeffs_dct1,
     chebyshev_gauss_nodes,
 )
-from ._clenshaw import clenshaw_scalar, clenshaw_vec
+from ._clenshaw import clenshaw_vec
 
 
 @dataclass(frozen=True)
@@ -123,7 +123,7 @@ def _d_symmetrize(W: sp.csr_matrix) -> sp.csc_matrix:
     ValueError
         If no symmetrizing diagonal exists (directed graph, or weights
         inconsistent with ``W = D⁻¹A`` for symmetric ``A``).  Pass
-        ``logdet_method="aaa"`` for such matrices.
+        ``logdet_decomp="lu"`` for such matrices.
     """
     n = W.shape[0]
     W = sp.csr_matrix(W)
@@ -144,18 +144,18 @@ def _d_symmetrize(W: sp.csr_matrix) -> sp.csc_matrix:
     import os
 
     if os.environ.get("NEIGHBAYES_NUMBA_SYMMETRIZE", "") == "1":
-        from ._slq import _numba_available
+        from ._symmetrize import _numba_available
 
         if _numba_available:
-            from ._slq import _d_symmetrize_numba
+            from ._symmetrize import _d_symmetrize_numba
 
             W_sym = _d_symmetrize_numba(W)
             if W_sym is None:
                 raise ValueError(
-                    "cheb_cholesky requires a D-symmetrizable W (row-"
+                    "logdet_decomp='chol' requires a D-symmetrizable W (row-"
                     "standardized undirected graph); no valid symmetrizing "
-                    'diagonal was found. Use logdet_method="aaa" for '
-                    "directed or non-symmetrizable W."
+                    "diagonal was found. Use logdet_decomp='lu' for a directed "
+                    "or non-symmetrizable W."
                 )
             sym_diff = (W_sym - W_sym.T).tocoo()
             sym_err = float(np.abs(sym_diff.data).max()) if sym_diff.nnz else 0.0
@@ -163,19 +163,19 @@ def _d_symmetrize(W: sp.csr_matrix) -> sp.csc_matrix:
                 raise ValueError(
                     f"D-symmetrization failed (max asymmetry {sym_err:.2e}); "
                     "W is not of the form D^-1 A with symmetric A. Use "
-                    'logdet_method="aaa" for this weights matrix.'
+                    "logdet_decomp='lu' for this weights matrix."
                 )
             return W_sym
 
     # Pure-NumPy path (default).
-    from ._slq import _recover_symmetrizing_diagonal
+    from ._symmetrize import _recover_symmetrizing_diagonal
 
     D = _recover_symmetrizing_diagonal(W)
     if D is None or not np.all(np.isfinite(D)) or np.any(D <= 0):
         raise ValueError(
-            "cheb_cholesky requires a D-symmetrizable W (row-standardized "
+            "logdet_decomp='chol' requires a D-symmetrizable W (row-standardized "
             "undirected graph); no valid symmetrizing diagonal was found. "
-            'Use logdet_method="aaa" for directed or non-symmetrizable W.'
+            "Use logdet_decomp='lu' for a directed or non-symmetrizable W."
         )
 
     D_sqrt = np.sqrt(D)
@@ -194,7 +194,7 @@ def _d_symmetrize(W: sp.csr_matrix) -> sp.csc_matrix:
         raise ValueError(
             f"D-symmetrization failed (max asymmetry {sym_err:.2e}); W is "
             "not of the form D^-1 A with symmetric A. Use "
-            'logdet_method="aaa" for this weights matrix.'
+            "logdet_decomp='lu' for this weights matrix."
         )
     return W_sym
 
@@ -375,7 +375,7 @@ class CholChebContext(_ChebContextBase):
     ------
     ValueError
         If ``W`` admits no symmetrizing diagonal (directed graph); use
-        ``logdet_method="aaa"`` for those.
+        ``logdet_decomp="lu"`` for those.
     """
 
     __slots__ = ("W_sym", "_eye", "_factor", "n")
@@ -454,21 +454,6 @@ def chol_cheb_logdet_precompute(
     return CholChebContext(W).coeffs_on(
         rho_min=rho_min, rho_max=rho_max, order=order, tol=tol
     )
-
-
-def chol_cheb_logdet_eval(pre: CholChebPrecompute, rho: float) -> float:
-    """Evaluate ``log|I - ρW|`` from precomputed Chebyshev coefficients.
-
-    Uses Clenshaw recurrence: ``O(order)`` per evaluation.
-
-    Parameters
-    ----------
-    pre : CholChebPrecompute
-        Precomputed coefficients from :func:`chol_cheb_logdet_precompute`.
-    rho : float
-        Spatial autoregressive parameter.
-    """
-    return clenshaw_scalar(pre.coeffs, rho, pre.rho_min, pre.rho_max)
 
 
 def chol_cheb_logdet_eval_vec(

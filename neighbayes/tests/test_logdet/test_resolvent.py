@@ -23,11 +23,8 @@ import scipy.sparse as sp
 from neighbayes._logdet import (
     aaa_logdet_eval,
     aaa_logdet_precompute,
-    chebyshev,
     make_logdet_grad_numpy_fn,
     make_logdet_numpy_fn,
-    slq_logdet_eval,
-    slq_logdet_precompute,
 )
 from neighbayes._logdet._chol_cheb import (
     chol_cheb_logdet_precompute,
@@ -38,8 +35,8 @@ from neighbayes._logdet._resolvent import (
     logdet_grad_aaa,
     logdet_grad_chebyshev,
     logdet_grad_eigenvalue,
-    logdet_grad_slq,
 )
+from neighbayes.tests.helpers import eigen_cheb_coeffs
 
 _HAS_JAX = importlib.util.find_spec("jax") is not None
 
@@ -143,7 +140,7 @@ class TestEigenvalueGrad:
 class TestChebyshevGrad:
     def test_chebyshev_matches_value_fd(self):
         W = _rook(5)
-        out = chebyshev(W, order=20, rmin=-0.9, rmax=0.9)
+        out = eigen_cheb_coeffs(W, order=20, rmin=-0.9, rmax=0.9)
         coeffs, rmin, rmax = out["coeffs"], out["rmin"], out["rmax"]
         for rho in [-0.5, 0.0, 0.4, 0.7]:
             g = float(logdet_grad_chebyshev(rho, coeffs, rmin, rmax))
@@ -208,39 +205,6 @@ class TestAAAGrad:
 
 
 # ---------------------------------------------------------------------------
-# SLQ — real (Lanczos) and complex (Arnoldi), matches FD of the SLQ value form
-# ---------------------------------------------------------------------------
-
-
-class TestSLQGrad:
-    def test_slq_lanczos_matches_value_fd(self):
-        W = sp.csr_matrix(_rook(5))
-        pre = slq_logdet_precompute(W)
-        assert pre.method == "lanczos"
-        for rho in [-0.3, 0.0, 0.3, 0.6]:
-            g = float(
-                logdet_grad_slq(
-                    rho, pre.nodes, pre.weights, pre.n_probes, cv_coeffs=pre.cv_coeffs
-                )
-            )
-            fd = _fd(lambda r: slq_logdet_eval(pre, r), rho)
-            np.testing.assert_allclose(g, fd, rtol=1e-5, atol=1e-6)
-
-    def test_slq_arnoldi_matches_value_fd(self):
-        W = sp.csr_matrix(_knn(14, k=3))
-        pre = slq_logdet_precompute(W)
-        assert pre.method == "arnoldi"
-        for rho in [0.0, 0.2, 0.4]:
-            g = float(
-                logdet_grad_slq(
-                    rho, pre.nodes, pre.weights, pre.n_probes, cv_coeffs=pre.cv_coeffs
-                )
-            )
-            fd = _fd(lambda r: slq_logdet_eval(pre, r), rho)
-            np.testing.assert_allclose(g, fd, rtol=1e-5, atol=1e-6)
-
-
-# ---------------------------------------------------------------------------
 # make_logdet_grad_numpy_fn — matched pair with make_logdet_numpy_fn
 # ---------------------------------------------------------------------------
 
@@ -276,29 +240,19 @@ class TestNumpyGradFactory:
             [-0.4, 0.0, 0.3, 0.6],
         )
 
-    def test_chebyshev(self):
-        W = _rook(5)
-        self._check(sp.csr_matrix(W), None, "chebyshev", -0.9, 0.9, [-0.5, 0.0, 0.4])
-
     def test_cheb_cholesky(self):
         W = _rook(5)
         self._check(
-            sp.csr_matrix(W), None, "cheb_cholesky", 0.1, 0.8, [0.2, 0.4, 0.6, 0.75]
+            sp.csr_matrix(W), None, "chol_cheb", 0.1, 0.8, [0.2, 0.4, 0.6, 0.75]
         )
 
     def test_cheb_stochastic(self):
         W = _rook(6)
-        self._check(
-            sp.csr_matrix(W), None, "cheb_stochastic", -0.9, 0.9, [-0.4, 0.0, 0.4]
-        )
+        self._check(sp.csr_matrix(W), None, "stoch_cheb", -0.9, 0.9, [-0.4, 0.0, 0.4])
 
     def test_aaa(self):
         W = _knn(20, k=4)
-        self._check(sp.csr_matrix(W), None, "aaa", 0.1, 0.8, [0.2, 0.4, 0.6, 0.75])
-
-    def test_slq(self):
-        W = _rook(6)
-        self._check(sp.csr_matrix(W), None, "slq", -0.9, 0.9, [-0.4, 0.0, 0.4])
+        self._check(sp.csr_matrix(W), None, "lu_aaa", 0.1, 0.8, [0.2, 0.4, 0.6, 0.75])
 
     def test_panel_multiplier(self):
         """T scales the gradient (gradient of T·logdet)."""
@@ -347,7 +301,7 @@ class TestAutodiffParity:
         pre = chol_cheb_logdet_precompute(
             sp.csr_matrix(W), order=None, rho_min=0.1, rho_max=0.8
         )
-        fn = make_logdet_jax_fn(W, method="cheb_cholesky", rho_min=0.1, rho_max=0.8)
+        fn = make_logdet_jax_fn(W, method="chol_cheb", rho_min=0.1, rho_max=0.8)
         for rho in [0.2, 0.5, 0.7]:
             g_core = float(
                 logdet_grad_chebyshev(rho, pre.coeffs, pre.rho_min, pre.rho_max)
@@ -364,30 +318,12 @@ class TestAutodiffParity:
         W = _knn(20, k=4)
         pre = aaa_logdet_precompute(sp.csr_matrix(W), rho_min=0.1, rho_max=0.8)
         fn = make_logdet_jax_fn(
-            sp.csr_matrix(W), method="aaa", rho_min=0.1, rho_max=0.8
+            sp.csr_matrix(W), method="lu_aaa", rho_min=0.1, rho_max=0.8
         )
         for rho in [0.2, 0.5, 0.7]:
             g_core = float(
                 logdet_grad_aaa(
                     rho, pre.support_points, pre.support_values, pre.weights
-                )
-            )
-            g_ad = float(jax.grad(fn)(jnp.float64(rho)))
-            np.testing.assert_allclose(g_core, g_ad, rtol=1e-9, atol=1e-10)
-
-    def test_slq_matches_jax_grad(self):
-        jax = self._setup_jax()
-        import jax.numpy as jnp
-
-        from neighbayes._logdet import make_logdet_jax_fn
-
-        W = sp.csr_matrix(_rook(5))
-        pre = slq_logdet_precompute(W)
-        fn = make_logdet_jax_fn(W, method="slq")
-        for rho in [-0.3, 0.0, 0.3, 0.6]:
-            g_core = float(
-                logdet_grad_slq(
-                    rho, pre.nodes, pre.weights, pre.n_probes, cv_coeffs=pre.cv_coeffs
                 )
             )
             g_ad = float(jax.grad(fn)(jnp.float64(rho)))
@@ -399,7 +335,7 @@ class TestAutodiffParity:
         import jax.numpy as jnp
 
         W = _rook(5)
-        out = chebyshev(W, order=20, rmin=-0.9, rmax=0.9)
+        out = eigen_cheb_coeffs(W, order=20, rmin=-0.9, rmax=0.9)
         coeffs, rmin, rmax = out["coeffs"], out["rmin"], out["rmax"]
         pre = aaa_logdet_precompute(
             sp.csr_matrix(_knn(20, k=4)), rho_min=0.1, rho_max=0.8

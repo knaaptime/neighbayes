@@ -25,23 +25,13 @@ def test_make_logdet_fn_unknown_method_raises():
         logdet.make_logdet_fn(W, method="not-a-method")
 
 
-def test_chebyshev_parameter_validation():
-    W = _toy_w(4)
-    with pytest.raises(ValueError, match="order must be positive"):
-        logdet.chebyshev(W, order=0)
-    with pytest.raises(ValueError, match="rmax must be greater than rmin"):
-        logdet.chebyshev(W, order=10, rmin=0.5, rmax=0.5)
-    with pytest.raises(ValueError, match="rmax must be greater than rmin"):
-        logdet.chebyshev(W, order=10, rmin=0.5, rmax=0.3)
-
-
 def test_resolve_logdet_bounds_uses_prior_by_default():
     out = logdet.resolve_logdet_bounds(
-        "chebyshev",
+        "eigenvalue",
         n=5,
         priors={"rho_lower": -0.7, "rho_upper": 0.8},
     )
-    assert out.method == "chebyshev"
+    assert out.method == "eigenvalue"
     assert out.source == "prior"
     assert out.rho_min <= -0.6
     assert out.rho_max >= 0.7
@@ -50,7 +40,7 @@ def test_resolve_logdet_bounds_uses_prior_by_default():
 def test_resolve_logdet_bounds_rejects_bad_override_pair():
     with pytest.raises(ValueError, match="provided together"):
         logdet.resolve_logdet_bounds(
-            "chebyshev",
+            "eigenvalue",
             n=5,
             rho_min=-0.5,
             rho_max=None,

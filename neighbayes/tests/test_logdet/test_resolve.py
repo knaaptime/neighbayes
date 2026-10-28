@@ -10,16 +10,12 @@ from neighbayes._logdet import (
 
 CANONICAL_METHODS = {
     "eigenvalue",
-    "slq",
-    "chebyshev",
-    "cheb_stochastic",
-    "cheb_cholesky",
+    "stoch_cheb",
+    "chol_cheb",
     "lu_cheb",
-    "aaa",
+    "lu_aaa",
     "chol_aaa",
-    "grid_spline",
-    "traces",
-    "cholmod",
+    "lu_spline",
 }
 
 
@@ -33,9 +29,6 @@ def test_valid_logdet_methods_constant():
 
 def test_enum_str_equality():
     assert LogDetMethod.EIGENVALUE == "eigenvalue"
-    assert LogDetMethod.SLQ == "slq"
-    assert LogDetMethod.CHEBYSHEV == "chebyshev"
-    assert LogDetMethod.TRACES == "traces"
 
 
 @pytest.mark.parametrize("name", sorted(CANONICAL_METHODS))
@@ -48,7 +41,7 @@ def test_resolve_none_auto_selects():
     assert resolve_logdet_method(None, n=1000) == "chol_aaa"
     assert resolve_logdet_method(None, n=10000) == "chol_aaa"
     assert resolve_logdet_method(None, n=50000) == "chol_aaa"
-    assert resolve_logdet_method(None, n=200000) == "cheb_stochastic"
+    assert resolve_logdet_method(None, n=200000) == "stoch_cheb"
 
 
 def test_resolve_none_auto_selects_nonsymmetric_W():
@@ -64,7 +57,7 @@ def test_resolve_none_auto_selects_nonsymmetric_W():
     vals = np.ones(len(rows))
     W_nonsym = sp.csr_matrix((vals, (rows, cols)), shape=(n, n))
 
-    assert resolve_logdet_method(None, n=n, W=W_nonsym) == "aaa"
+    assert resolve_logdet_method(None, n=n, W=W_nonsym) == "lu_aaa"
 
     # Symmetric W should select chol_aaa (Cholesky-based AAA)
     W_sym = sp.csr_matrix((vals, (rows, cols)), shape=(n, n))
@@ -104,7 +97,7 @@ def _knn_graph(n: int, k: int, seed: int = 42):
 
 
 def test_fillin_guard_routes_dense_to_stochastic():
-    """Dense W at medium n should auto-select cheb_stochastic with a warning."""
+    """Dense W at medium n should auto-select stoch_cheb with a warning."""
     import numpy as np
     import scipy.sparse as sp
 
@@ -112,7 +105,7 @@ def test_fillin_guard_routes_dense_to_stochastic():
     W_dense = np.ones((n, n)) - np.eye(n)  # fully dense, symmetric
     with pytest.warns(UserWarning, match="fill-in ratio"):
         result = resolve_logdet_method(None, n=n, W=W_dense)
-    assert result == "cheb_stochastic"
+    assert result == "stoch_cheb"
 
 
 def test_fillin_guard_routes_high_degree_sparse_to_stochastic():
@@ -121,7 +114,7 @@ def test_fillin_guard_routes_high_degree_sparse_to_stochastic():
     W = _knn_graph(n, k=50)
     with pytest.warns(UserWarning, match="fill-in ratio"):
         result = resolve_logdet_method(None, n=n, W=W)
-    assert result == "cheb_stochastic"
+    assert result == "stoch_cheb"
 
 
 def test_fillin_guard_preserves_low_degree_sparse():
@@ -210,9 +203,9 @@ def test_grid_spline_matches_exact_and_across_backends():
     deg = np.asarray(A.sum(axis=1)).ravel()
     W = sp.csr_matrix(sp.diags(1.0 / deg) @ A)
 
-    f = make_logdet_numpy_fn(W, None, "grid_spline", -0.99, 0.99)
-    fv = make_logdet_numpy_vec_fn(W, None, "grid_spline", -0.99, 0.99)
-    fg = make_logdet_grad_numpy_fn(W, None, "grid_spline", -0.99, 0.99)
+    f = make_logdet_numpy_fn(W, None, "lu_spline", -0.99, 0.99)
+    fv = make_logdet_numpy_vec_fn(W, None, "lu_spline", -0.99, 0.99)
+    fg = make_logdet_grad_numpy_fn(W, None, "lu_spline", -0.99, 0.99)
 
     rhos = np.linspace(-0.9, 0.9, 11)
     eigs = np.linalg.eigvals(W.toarray())

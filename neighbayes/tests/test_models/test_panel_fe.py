@@ -14,14 +14,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from neighbayes.models import (
-    OLSPanelFE,
-    SARPanelFE,
-    SDEMPanelFE,
-    SDMPanelFE,
-    SEMPanelFE,
-    SLXPanelFE,
-)
+from neighbayes.models import OLS, SAR, SDEM, SDM, SEM, SLX
 from neighbayes.tests.helpers import (
     PANEL_N,
     PANEL_T,
@@ -77,7 +70,7 @@ def test_ols_panel_fe_recovers_beta_and_sigma(rng, W_panel_dense, W_panel_graph)
         sigma=SIGMA_TRUE,
         sigma_alpha=0.0,
     )
-    model = OLSPanelFE(y=y, X=X, W=W_panel_graph, N=PANEL_N, T=PANEL_T, effects=1)
+    model = OLS(unit_effects="fixed", y=y, X=X, W=W_panel_graph, N=PANEL_N, T=PANEL_T)
     idata = model.fit(**SAMPLE_KWARGS)
     _assert_slope(idata, "OLSPanelFE")
     _assert_scalar(idata, "sigma", SIGMA_TRUE, ABS_TOL_SIGMA, "OLSPanelFE")
@@ -93,7 +86,7 @@ def test_sar_panel_fe_recovers_rho_and_beta(rng, W_panel_dense, W_panel_graph):
         beta=BETA_TRUE,
         sigma=SIGMA_TRUE,
     )
-    model = SARPanelFE(y=y, X=X, W=W_panel_graph, N=PANEL_N, T=PANEL_T, effects=1)
+    model = SAR(unit_effects="fixed", y=y, X=X, W=W_panel_graph, N=PANEL_N, T=PANEL_T)
     idata = model.fit(**SAMPLE_KWARGS)
     _assert_scalar(idata, "rho", RHO_TRUE, ABS_TOL_SPATIAL, "SARPanelFE")
     _assert_slope(idata, "SARPanelFE")
@@ -109,7 +102,7 @@ def test_sem_panel_fe_recovers_lam_and_beta(rng, W_panel_dense, W_panel_graph):
         beta=BETA_TRUE,
         sigma=SIGMA_TRUE,
     )
-    model = SEMPanelFE(y=y, X=X, W=W_panel_graph, N=PANEL_N, T=PANEL_T, effects=1)
+    model = SEM(unit_effects="fixed", y=y, X=X, W=W_panel_graph, N=PANEL_N, T=PANEL_T)
     idata = model.fit(**SAMPLE_KWARGS)
     _assert_scalar(idata, "lam", LAM_TRUE, ABS_TOL_SPATIAL, "SEMPanelFE")
     _assert_slope(idata, "SEMPanelFE")
@@ -126,7 +119,7 @@ def test_sdm_panel_fe_recovers_rho_and_beta(rng, W_panel_dense, W_panel_graph):
         beta2=BETA2_TRUE,
         sigma=SIGMA_TRUE,
     )
-    model = SDMPanelFE(y=y, X=X, W=W_panel_graph, N=PANEL_N, T=PANEL_T, effects=1)
+    model = SDM(unit_effects="fixed", y=y, X=X, W=W_panel_graph, N=PANEL_N, T=PANEL_T)
     idata = model.fit(**SAMPLE_KWARGS)
     _assert_scalar(idata, "rho", RHO_TRUE, ABS_TOL_SPATIAL, "SDMPanelFE")
     _assert_slope(idata, "SDMPanelFE")
@@ -143,7 +136,7 @@ def test_sdem_panel_fe_recovers_lam_and_beta(rng, W_panel_dense, W_panel_graph):
         beta2=BETA2_TRUE,
         sigma=SIGMA_TRUE,
     )
-    model = SDEMPanelFE(y=y, X=X, W=W_panel_graph, N=PANEL_N, T=PANEL_T, effects=1)
+    model = SDEM(unit_effects="fixed", y=y, X=X, W=W_panel_graph, N=PANEL_N, T=PANEL_T)
     idata = model.fit(**SAMPLE_KWARGS)
     _assert_scalar(idata, "lam", LAM_TRUE, ABS_TOL_SPATIAL, "SDEMPanelFE")
     _assert_slope(idata, "SDEMPanelFE")
@@ -161,6 +154,6 @@ def test_slx_panel_fe_recovers_beta(rng, W_panel_dense, W_panel_graph):
         beta2=BETA2_TRUE,
         sigma=SIGMA_TRUE,
     )
-    model = SLXPanelFE(y=y, X=X, W=W_panel_graph, N=PANEL_N, T=PANEL_T, effects=1)
+    model = SLX(unit_effects="fixed", y=y, X=X, W=W_panel_graph, N=PANEL_N, T=PANEL_T)
     idata = model.fit(**SAMPLE_KWARGS)
     _assert_slope(idata, "SLXPanelFE")

@@ -58,7 +58,7 @@ SIDE = 4  # 16 cross-sectional units (small for speed)
 
 def _make_sar_data(side=SIDE, rho_true=0.4, beta_true=None, sigma_true=1.0, seed=42):
     """Create a small synthetic SAR dataset using the DGP module."""
-    from neighbayes.dgp.cross_sectional import simulate_sar
+    from neighbayes.dgp import simulate_sar
 
     rng = np.random.default_rng(seed)
     W_dense = make_rook_W(side)
@@ -74,7 +74,7 @@ def _make_sar_data(side=SIDE, rho_true=0.4, beta_true=None, sigma_true=1.0, seed
 
 def _make_sem_data(side=SIDE, lam_true=0.4, beta_true=None, sigma_true=1.0, seed=42):
     """Create a small synthetic SEM dataset using the DGP module."""
-    from neighbayes.dgp.cross_sectional import simulate_sem
+    from neighbayes.dgp import simulate_sem
 
     rng = np.random.default_rng(seed)
     W_dense = make_rook_W(side)
@@ -865,7 +865,7 @@ class TestRobustGibbsVsNUTS:
         kw = dict(draws=3000, tune=1000, chains=4, random_seed=3, progressbar=False)
         nuts = Model(y=y, X=X, W=W, robust=True).fit(sampler="nuts", **kw)
         gibbs = Model(y=y, X=X, W=W, robust=True).fit(
-            sampler="gibbs", gibbs_backend=backend, **kw
+            sampler="gibbs", backend=backend, **kw
         )
         # The NUTS run is the reference, so check it before blaming Gibbs.
         rhat = az.rhat(nuts, var_names=[param, "sigma", "beta"])
@@ -918,9 +918,7 @@ class TestGibbsJointVsNUTS:
 
         kw = dict(draws=3000, tune=1000, chains=4, random_seed=7, progressbar=False)
         nuts = _stats(Model(y=y, X=X, W=W).fit(sampler="nuts", **kw))
-        gibbs = _stats(
-            Model(y=y, X=X, W=W).fit(sampler="gibbs", gibbs_backend=backend, **kw)
-        )
+        gibbs = _stats(Model(y=y, X=X, W=W).fit(sampler="gibbs", backend=backend, **kw))
         np.testing.assert_allclose(gibbs[:2], nuts[:2], atol=0.08)
         np.testing.assert_allclose(gibbs[2], nuts[2], atol=0.02)
         np.testing.assert_allclose(gibbs[3], nuts[3], rtol=0.15)
@@ -1009,7 +1007,7 @@ class TestJAXGaussianGibbs:
             random_seed=42,
             n_jobs=1,
             progressbar=False,
-            gibbs_backend="jax",
+            backend="jax",
         )
         assert "posterior" in idata.children
         assert "rho" in idata.posterior.data_vars
@@ -1030,7 +1028,7 @@ class TestJAXGaussianGibbs:
             random_seed=42,
             n_jobs=1,
             progressbar=False,
-            gibbs_backend="jax",
+            backend="jax",
         )
         assert "lam" in idata.posterior.data_vars
 
@@ -1048,7 +1046,7 @@ class TestJAXGaussianGibbs:
             random_seed=42,
             n_jobs=1,
             progressbar=False,
-            gibbs_backend="jax",
+            backend="jax",
         )
         assert "rho" in idata.posterior.data_vars
         assert idata.posterior["beta"].shape[-1] == 3  # intercept + x + W*x
@@ -1067,7 +1065,7 @@ class TestJAXGaussianGibbs:
             random_seed=42,
             n_jobs=1,
             progressbar=False,
-            gibbs_backend="jax",
+            backend="jax",
         )
         assert "lam" in idata.posterior.data_vars
 
@@ -1086,7 +1084,7 @@ class TestJAXGaussianGibbs:
             random_seed=42,
             n_jobs=1,
             progressbar=False,
-            gibbs_backend="jax",
+            backend="jax",
             idata_kwargs={"log_likelihood": True},
         )
         loo = az.loo(idata)
@@ -1098,7 +1096,7 @@ class TestJAXGaussianGibbs:
 
         y, X, W_dense, n = _make_sar_data()
         W = W_to_graph(W_dense)
-        model = SAR(y=y, X=X, W=W, logdet_method="chebyshev")
+        model = SAR(y=y, X=X, W=W, logdet_method="cheb")
         idata = model.fit(
             sampler="gibbs",
             draws=50,
@@ -1107,7 +1105,7 @@ class TestJAXGaussianGibbs:
             random_seed=42,
             n_jobs=1,
             progressbar=False,
-            gibbs_backend="jax",
+            backend="jax",
         )
         assert "rho" in idata.posterior.data_vars
 
@@ -1133,7 +1131,7 @@ class TestEdgeCases:
         model = Model(y=y, X=X, W=W_to_graph(W_dense), robust=True)
         idata = model.fit(
             sampler="gibbs",
-            gibbs_backend=backend,
+            backend=backend,
             draws=30,
             tune=20,
             chains=2,
@@ -1211,14 +1209,16 @@ class TestEdgeCases:
         with pytest.raises(ValueError, match="sampler"):
             model.fit(sampler="invalid")
 
-    def test_invalid_gibbs_backend_raises(self):
-        """An invalid gibbs_backend value raises (strict; no silent fallback)."""
+    def test_invalid_backend_raises(self):
+        """An invalid Gibbs backend raises (strict; no silent fallback)."""
         from neighbayes.models.cross_section.sar import SAR
 
         y, X, W_dense, n = _make_sar_data()
         W = W_to_graph(W_dense)
         model = SAR(y=y, X=X, W=W)
-        with pytest.raises(ValueError, match="gibbs_backend must be one of"):
+        with pytest.raises(
+            ValueError, match="backend for sampler='gibbs' must be one of"
+        ):
             model.fit(
                 sampler="gibbs",
                 draws=10,
@@ -1227,7 +1227,7 @@ class TestEdgeCases:
                 random_seed=42,
                 n_jobs=1,
                 progressbar=False,
-                gibbs_backend="invalid",
+                backend="invalid",
             )
 
     def test_removed_gibbs_method_kwarg_rejected(self):
@@ -1374,14 +1374,14 @@ class TestInformativeOutput:
                 random_seed=42,
                 n_jobs=1,
                 progressbar=False,
-                gibbs_backend="jax",
+                backend="jax",
             )
         assert "JAX Gibbs sampling" in caplog.text
         assert "slice" in caplog.text
 
 
 class TestChainParallelism:
-    """Tests for chain parallelism (n_jobs for NumPy, chain_method for JAX)."""
+    """Tests for chain parallelism (n_jobs for NumPy, vectorized chains for JAX)."""
 
     def test_sequential_numpy(self):
         """n_jobs=1 runs NumPy chains sequentially."""
@@ -1441,7 +1441,7 @@ class TestChainParallelism:
         assert idata.posterior["beta"].shape[0] == 2  # 2 chains
 
     def test_vectorized_jax(self):
-        """chain_method='vectorized' works for JAX path."""
+        """The JAX path runs every chain, vectorized."""
         pytest.importorskip("jax")
         from neighbayes.models.cross_section.sar import SAR
 
@@ -1455,51 +1455,10 @@ class TestChainParallelism:
             chains=2,
             random_seed=42,
             progressbar=False,
-            gibbs_backend="jax",
-            chain_method="vectorized",
+            backend="jax",
         )
         assert "posterior" in idata.children
         assert idata.posterior["beta"].shape[0] == 2  # 2 chains
-
-    def test_jax_default_is_vectorized(self):
-        """JAX path defaults to chain_method='vectorized'."""
-        pytest.importorskip("jax")
-        from neighbayes.models.cross_section.sar import SAR
-
-        y, X, W_dense, n = _make_sar_data()
-        W = W_to_graph(W_dense)
-        model = SAR(y=y, X=X, W=W)
-        idata = model.fit(
-            sampler="gibbs",
-            draws=10,
-            tune=5,
-            chains=2,
-            random_seed=42,
-            progressbar=False,
-            gibbs_backend="jax",
-        )
-        assert "posterior" in idata.children
-        assert idata.posterior["beta"].shape[0] == 2  # 2 chains
-
-    def test_parallel_jax_raises(self):
-        """chain_method='parallel' raises NotImplementedError for JAX."""
-        pytest.importorskip("jax")
-        from neighbayes.models.cross_section.sar import SAR
-
-        y, X, W_dense, n = _make_sar_data()
-        W = W_to_graph(W_dense)
-        model = SAR(y=y, X=X, W=W)
-        with pytest.raises(NotImplementedError, match="vectorized"):
-            model.fit(
-                sampler="gibbs",
-                draws=10,
-                tune=5,
-                chains=2,
-                random_seed=42,
-                progressbar=False,
-                gibbs_backend="jax",
-                chain_method="parallel",
-            )
 
     def test_vectorized_runner_valid_results(self):
         """JAX vectorized runner returns valid multi-chain slice results."""

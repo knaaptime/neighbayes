@@ -9,7 +9,7 @@ Target posterior
     \eta = (I - \rho W)^{-1} X \beta.
 
 Parameters are :math:`(\beta, \rho, \alpha)`.  Unlike
-:mod:`neighbayes.samplers.negbin`, the latent field :math:`\eta` is a
+:mod:`neighbayes.samplers.negbin`, the latent index :math:`\eta` is a
 *deterministic* function of :math:`(\beta, \rho)` — there is no
 :math:`\sigma`-noise term and no n-dimensional augmentation step.
 
@@ -168,6 +168,10 @@ class _CholmodNormalEqSolver:
         # CHOLMOD solve: A^T A x = A^T b
         return self._cholmod.solve(Atb)
 
+    def logdet(self) -> float:
+        """``log|det(I − ρW)|``, half that of the factored ``AᵀA``."""
+        return 0.5 * self._cholmod.logdet()
+
 
 class _DSymCholSolver:
     r"""Solve :math:`(I-\rho W)x = b` by Cholesky on the D-symmetrized twin.
@@ -199,7 +203,7 @@ class _DSymCholSolver:
         Row-standardized weights, known to be D-symmetrizable.
     d : ndarray, shape (n,)
         Symmetrizing diagonal from
-        :func:`neighbayes._logdet._slq._recover_symmetrizing_diagonal`.
+        :func:`neighbayes._logdet._symmetrize._recover_symmetrizing_diagonal`.
     n : int
         Matrix dimension.
     """
@@ -331,18 +335,15 @@ def _symmetrizing_diagonal(W_csc: sp.csc_matrix) -> np.ndarray | None:
     """Return a positive ``D`` with ``D^{1/2}WD^{-1/2}`` symmetric, else ``None``.
 
     Thin guard around
-    :func:`neighbayes._logdet._slq._recover_symmetrizing_diagonal`: that
+    :func:`neighbayes._logdet._symmetrize._recover_symmetrizing_diagonal`: that
     routine returns ``None`` for directed graphs and can return a
     sign-inconsistent ``D`` for weights that are not of the form ``D⁻¹A``, so
     we additionally require ``D > 0`` and verify the resulting similarity is
     symmetric before trusting it.
     """
-    from ..._logdet._slq import _recover_symmetrizing_diagonal
+    from ..._logdet._symmetrize import _recover_symmetrizing_diagonal
 
-    try:
-        d = _recover_symmetrizing_diagonal(sp.csr_matrix(W_csc))
-    except Exception:
-        return None
+    d = _recover_symmetrizing_diagonal(sp.csr_matrix(W_csc))
     if d is None or not np.all(np.isfinite(d)) or np.any(d <= 0.0):
         return None
     sq = np.sqrt(d)
@@ -697,8 +698,9 @@ class ReducedGibbsCache(NamedTuple):
         behavior).
     krylov_reuse_threshold : float
         Maximum |Δρ| for which the previous sweep's Krylov basis is
-        reused.  Must be ≤ ``krylov_dmax`` to stay within the
-        polynomial's accuracy radius.  Default 0.15.
+        reused, and never beyond the basis' own series radius
+        (``safe_dmax``), outside which its Horner evaluation diverges.
+        Default 0.15.
     """
 
     W_sparse: sp.csr_matrix
@@ -730,6 +732,51 @@ class ReducedGibbsCache(NamedTuple):
 # ---------------------------------------------------------------------------
 # Gibbs block samplers
 # ---------------------------------------------------------------------------
+
+
+#: Ratio of the Pólya–Gamma working precision to the negative binomial's
+#: Fisher information above which :func:`warn_pg_information` warns.
+PG_INFORMATION_RATIO_WARN = 10.0
+
+
+def pg_information_ratio(y, eta, alpha: float) -> float:
+    r"""``Σ E[ω | y, η] / Σ I(η)``: the PG working precision over the NB's information.
+
+    Given ``ω ~ PG(y + α, ψ)``, ``ψ = η − log α``, the working model's
+    precision for ``η_i`` is ``E ω_i = (y_i + α) tanh(ψ_i/2) / (2ψ_i)``; the
+    negative binomial's Fisher information is ``μ_i α / (μ_i + α)``.  Near one
+    when ``α`` is near the counts' scale, the ratio grows as ``α`` leaves it
+    in either direction, and with it the information the augmentation adds
+    and the sweeps it takes to mix.
+    """
+    y = np.asarray(y, dtype=np.float64).ravel()
+    eta = np.asarray(eta, dtype=np.float64).ravel()
+    psi = np.clip(eta - np.log(alpha), -20.0, 20.0)
+    small = np.abs(psi) < 1e-6
+    tilt = np.where(small, 0.25, np.tanh(0.5 * psi) / (2.0 * np.where(small, 1.0, psi)))
+    mu = np.exp(np.clip(eta, -30.0, 30.0))
+    return float(np.sum((y + alpha) * tilt) / np.sum(mu * alpha / (mu + alpha)))
+
+
+def warn_pg_information(ratios, alpha: float, mean_count: float) -> None:
+    """Warn when the chains' largest :func:`pg_information_ratio` is high."""
+    import warnings
+
+    ratio = float(np.max(ratios))
+    if ratio <= PG_INFORMATION_RATIO_WARN:
+        return
+    warnings.warn(
+        f"The Pólya–Gamma augmentation carries {ratio:.0f} times the negative "
+        f"binomial's information about the log-means (at the end of warmup, "
+        f"alpha = {alpha:.3g} against a mean count of {mean_count:.3g}), so the "
+        "sampler will mix slowly.  The augmentation is tightest when alpha is "
+        "near the counts' scale: with alpha far above the mean (counts close "
+        "to Poisson) hold it with priors={'alpha_fixed': ...} at 10 to 20 times "
+        "the mean; far below, the latent model (latent=True) has no Pólya–Gamma "
+        "step.",
+        UserWarning,
+        stacklevel=3,
+    )
 
 
 def _sample_omega(
@@ -1166,7 +1213,9 @@ def run_chain(
     -------
     dict[str, np.ndarray]
         Posterior samples with keys ``rho``, ``beta``, ``alpha``,
-        ``log_lik`` (each indexed by post-warmup draw).
+        ``log_lik`` (each indexed by post-warmup draw), and
+        ``pg_information_ratio`` at the end of warmup
+        (:func:`pg_information_ratio`).
     """
     if rng is None:
         rng = np.random.default_rng()
@@ -1243,7 +1292,10 @@ def run_chain(
             if (
                 cache.krylov_reuse
                 and _prev_basis is not None
-                and abs(state.rho - _prev_rho) < cache.krylov_reuse_threshold
+                # Only inside the basis' own series radius: beyond it the
+                # Horner evaluation of U(ρ) diverges.
+                and abs(state.rho - _prev_rho)
+                < min(cache.krylov_reuse_threshold, _prev_basis.safe_dmax)
             ):
                 basis = _prev_basis
             else:
@@ -1383,12 +1435,13 @@ def run_chain(
         alpha_state = _StructuralState(
             eta=eta,
             beta=state.beta,
-            sigma2=1.0,  # unused by _sample_alpha
             rho=state.rho,
             alpha=state.alpha,
             omega=state.omega,
         )
         state.alpha = _sample_alpha(alpha_state, y, priors, rng=rng)
+        if i == max(tune, 1) - 1:
+            info_ratio = pg_information_ratio(y, eta, state.alpha)
 
         # --- Store post-warmup draw ---
         if i >= tune and (i - tune) % thin == 0:
@@ -1408,4 +1461,5 @@ def run_chain(
         "beta": beta_samples,
         "alpha": alpha_samples,
         "log_lik": log_lik_samples,
+        "pg_information_ratio": info_ratio,
     }

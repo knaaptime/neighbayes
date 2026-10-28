@@ -1,10 +1,10 @@
-"""Bayesian spatial panel models with unit random effects.
+"""The random-effects design of the Gaussian process classes.
 
 Analogues of the legacy ``prandom`` (non-spatial GLS random effects) and the
 LeSage/Pace spatial panel routines, cast as hierarchical Bayesian models.
 
-Model structure for all three classes
---------------------------------------
+Model structure
+---------------
 .. math::
     y_{it} = \\mu_{it} + \\alpha_i + \\varepsilon_{it}
 
@@ -41,13 +41,6 @@ from pytensor import sparse as pts
 from ..._backends.sampler_helpers import use_jax_likelihood
 from ..._lazy_deps import pm, xr
 from ...samplers._registry import register
-from ..panel_base import SpatialPanelModel
-from ..priors import (
-    PanelOLSREPriors,
-    PanelSARREPriors,
-    PanelSDEMREPriors,
-    PanelSEMREPriors,
-)
 
 
 def _re_prior_values(model, Z: np.ndarray) -> dict:
@@ -55,7 +48,7 @@ def _re_prior_values(model, Z: np.ndarray) -> dict:
 
     ``Z`` is the design ``beta`` multiplies (``[X, WX]`` for SDEM); the
     ``beta`` default is the data-scaled Gelman et al. (2008) prior on it.
-    ``sigma_alpha_scale`` defaults to ``sd(y)``, so the half-t prior on
+    ``unit_effect_sd_scale`` defaults to ``sd(y)``, so the half-t prior on
     :math:`\\sigma_\\alpha` means the same thing whatever units ``y`` is in.
     """
     names = list(model._model_coords()["coefficient"])
@@ -66,28 +59,30 @@ def _re_prior_values(model, Z: np.ndarray) -> dict:
         "beta_sigma": p.get("beta_sigma", beta_sigma),
         "sigma2_alpha": float(p.get("sigma2_alpha", 2.0)),
         "sigma2_beta": float(p.get("sigma2_beta", np.var(model._y))),
-        "sigma_alpha_nu": float(p.get("sigma_alpha_nu", 1.0)),
-        "sigma_alpha_scale": float(p.get("sigma_alpha_scale", np.std(model._y))),
+        "unit_effect_sd_nu": float(p.get("unit_effect_sd_nu", 1.0)),
+        "unit_effect_sd_scale": float(p.get("unit_effect_sd_scale", np.std(model._y))),
     }
 
 
 def _random_effects(pv: dict, centered: bool):
-    """``sigma_alpha`` and the unit effects ``alpha``, inside a model context.
+    """``unit_effect_sd`` and the unit effects ``unit_effect``, inside a model context.
 
     The half-t prior is ``HalfCauchy`` when ``nu == 1``.  Non-centered,
-    ``alpha`` is a ``Deterministic`` of the standardized ``alpha_z``, so the
-    posterior carries ``alpha`` under either parameterization.
+    ``unit_effect`` is a ``Deterministic`` of the standardized ``unit_effect_raw``,
+    so the posterior carries ``unit_effect`` under either parameterization.
     """
-    nu, scale = pv["sigma_alpha_nu"], pv["sigma_alpha_scale"]
+    nu, scale = pv["unit_effect_sd_nu"], pv["unit_effect_sd_scale"]
     if nu == 1.0:
-        sigma_alpha = pm.HalfCauchy("sigma_alpha", beta=scale)
+        sigma_alpha = pm.HalfCauchy("unit_effect_sd", beta=scale)
     else:
-        sigma_alpha = pm.HalfStudentT("sigma_alpha", nu=nu, sigma=scale)
+        sigma_alpha = pm.HalfStudentT("unit_effect_sd", nu=nu, sigma=scale)
     if centered:
-        alpha = pm.Normal("alpha", mu=0.0, sigma=sigma_alpha, dims="unit")
+        alpha = pm.Normal("unit_effect", mu=0.0, sigma=sigma_alpha, dims="unit")
     else:
-        alpha_z = pm.Normal("alpha_z", mu=0.0, sigma=1.0, dims="unit")
-        alpha = pm.Deterministic("alpha", sigma_alpha * alpha_z, dims="unit")
+        unit_effect_raw = pm.Normal("unit_effect_raw", mu=0.0, sigma=1.0, dims="unit")
+        alpha = pm.Deterministic(
+            "unit_effect", sigma_alpha * unit_effect_raw, dims="unit"
+        )
     return sigma_alpha, alpha
 
 
@@ -102,124 +97,62 @@ def _re_gibbs_priors(pv: dict, rho_lower: float, rho_upper: float):
         rho_upper=rho_upper,
         sigma2_alpha=pv["sigma2_alpha"],
         sigma2_beta=pv["sigma2_beta"],
-        sigma_alpha_nu=pv["sigma_alpha_nu"],
-        sigma_alpha_scale=pv["sigma_alpha_scale"],
+        unit_effect_sd_nu=pv["unit_effect_sd_nu"],
+        unit_effect_sd_scale=pv["unit_effect_sd_scale"],
     )
 
 
 class _RandomEffectsMixin:
-    """Adds the ``centered`` switch for the unit effects' parameterization."""
+    """The random-effects design: a normal effect per unit on pooled data.
 
-    def __init__(self, *, centered: bool = False, **kwargs):
-        self.centered = bool(centered)
-        super().__init__(**kwargs)
+    Construction (``_init_random``), the ``unit`` coordinate and the impacts
+    are shared; each process's mixin supplies its model, fitted mean and, for
+    SAR and SEM, its Gibbs sampler.
+    """
+
+    def _init_random(self) -> None:
+        # obs i → unit i % N  (time-first stacking)
+        self._unit_idx = np.arange(self._N * self._T) % self._N
+
+    def _model_coords_random(self, extra=None) -> dict:
+        coords = super()._model_coords(extra)
+        coords["unit"] = list(range(self._N))
+        return coords
+
+    def _compute_impacts_posterior_random(
+        self,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Compute posterior samples of direct, indirect, and total effects."""
+        from ...diagnostics.lmtests import _get_posterior_draws
+
+        idata = self.inference_data
+        ni = self._nonintercept_indices
+        beta_draws = _get_posterior_draws(idata, "beta")[:, ni]
+        if self._model_type == "sar":
+            rho_draws = _get_posterior_draws(idata, "rho")
+            mean_diag = self._batch_mean_diag(rho_draws)
+            mean_row_sum = self._batch_mean_row_sum(rho_draws)
+            direct_samples = mean_diag[:, None] * beta_draws
+            total_samples = mean_row_sum[:, None] * beta_draws
+            indirect_samples = total_samples - direct_samples
+        else:
+            direct_samples = beta_draws.copy()
+            indirect_samples = np.zeros_like(beta_draws)
+            total_samples = beta_draws.copy()
+        return direct_samples, indirect_samples, total_samples
 
 
-class OLSPanelRE(_RandomEffectsMixin, SpatialPanelModel):
-    """Bayesian random effects panel regression (non-spatial).
+class _OLSRandomEffects(_RandomEffectsMixin):
+    """The random-effects design of :class:`~neighbayes.models.OLS`.
 
     .. math::
         y_{it} = X_{it}\\beta + \\alpha_i + \\varepsilon_{it}
 
     where :math:`\\alpha_i \\sim N(0, \\sigma_\\alpha^2)` are unit-level
     random effects and :math:`\\varepsilon_{it} \\sim N(0, \\sigma^2)`.
-
-    Parameters
-    ----------
-    formula : str, optional
-        Wilkinson-style formula, e.g. ``"y ~ x1 + x2"``. Requires
-        ``data``, ``unit_col``, and ``time_col``.
-    data : pandas.DataFrame, optional
-        Long-format panel data when using formula mode.
-    y : array-like, optional
-        Stacked response of shape ``(N*T,)``. Required in matrix mode.
-    X : array-like or pandas.DataFrame, optional
-        Stacked design matrix. Required in matrix mode.
-    W : libpysal.graph.Graph or scipy.sparse matrix
-        Spatial weights of shape ``(N, N)``. Accepts a
-        :class:`libpysal.graph.Graph` or any :class:`scipy.sparse`
-        matrix; legacy ``libpysal.weights.W`` is not accepted (use
-        ``w.sparse``). Should be row-standardized. Unused in the RE
-        likelihood but required by the base class for consistency
-        (e.g. computing spatial lags for SDM/SDEM variants).
-    unit_col : str, optional
-        Column in ``data`` identifying the cross-sectional unit.
-        Required in formula mode.
-    time_col : str, optional
-        Column in ``data`` identifying the time period. Required in
-        formula mode.
-    N : int, optional
-        Number of cross-sectional units. Required in matrix mode.
-    T : int, optional
-        Number of time periods. Required in matrix mode.
-    priors : dict, optional
-        Override default priors. Supported keys:
-
-        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal
-          prior on :math:`\\beta`, data-scaled (see
-          :class:`~neighbayes.models.priors.BasePriors`).
-        - ``sigma2_alpha`` (float, default 2.0): InverseGamma prior alpha for sigma2
-        - ``sigma2_beta`` (float, default var(y)): InverseGamma prior beta for sigma2
-          for :math:`\\sigma`.
-        - ``sigma_alpha_nu`` (float, default 1.0): degrees of freedom of the
-          half-t prior on :math:`\\sigma_\\alpha`; 1 is the half-Cauchy.
-        - ``sigma_alpha_scale`` (float, default sd(y)): scale of that prior.
-          See :class:`~neighbayes.models.priors.PanelREMixinPriors`.
-        - ``nu`` (float, default 4.0): Fixed Student-t degrees of
-          freedom (only used when ``robust=True``).
-
-    centered : bool, default False
-        Parameterization of the unit effects under NUTS.  The default samples
-        them non-centered, :math:`\\alpha_i = \\sigma_\\alpha z_i`, which
-        avoids the funnel between :math:`\\sigma_\\alpha` and
-        :math:`\\alpha` when the effects are weakly identified (few periods,
-        small :math:`\\sigma_\\alpha`).  ``True`` samples :math:`\\alpha`
-        directly, which mixes better when every unit has many observations.
-        The prior and the posterior are the same either way.
-    robust : bool, default False
-        If True, replace the Normal error with Student-t. See
-        *Robust regression* below.
-
-    Notes
-    -----
-    Data are **not** demeaned — the random effects absorb the unit-level
-    mean structure probabilistically.  This is the Bayesian analogue of
-    the classical GLS random-effects estimator in ``prandom.m``.
-
-    The base-class ``model`` argument is not exposed; pooled mean
-    structure (``model=0``) is used because unit heterogeneity is
-    captured by the random effect rather than by within-unit demeaning.
-
-    **Robust regression**
-
-    When ``robust=True``, the error distribution is changed from Normal
-    to Student-t, yielding a model that is robust to heavy-tailed outliers:
-
-    .. math::
-
-        \\varepsilon_{it} \\sim t_\\nu(0, \\sigma^2)
-
-    where :math:`\\nu` is a **fixed** hyperparameter set by ``priors={"nu": value}``
-    (default 4, LeSage's ``rval``); larger values approach the Normal.  Values
-    must exceed 2 so the variance exists.
     """
 
-    _priors_cls = PanelOLSREPriors
-    _likelihood: str = "gaussian"  # NUTS-only (no _gibbs_key)
-
-    def __init__(self, **kwargs):
-        kwargs.pop("model", None)  # RE always uses raw (pooled) data
-        kwargs["effects"] = 0  # pooled — no FE transform
-        super().__init__(**kwargs)
-        # obs i → unit i % N  (time-first stacking)
-        self._unit_idx = np.arange(self._N * self._T) % self._N
-
-    def _model_coords(self) -> dict:
-        coords = super()._model_coords()
-        coords["unit"] = list(range(self._N))
-        return coords
-
-    def _build_pymc_model(self) -> pm.Model:
+    def _build_pymc_model_random(self) -> pm.Model:
         """Construct the PyMC model for non-spatial random effects panel.
 
         Returns
@@ -247,7 +180,7 @@ class OLSPanelRE(_RandomEffectsMixin, SpatialPanelModel):
 
         return model
 
-    def _fitted_mean_from_posterior(self) -> np.ndarray:
+    def _fitted_mean_from_posterior_random(self) -> np.ndarray:
         """Posterior-mean fitted values including unit random effects.
 
         Returns
@@ -255,147 +188,21 @@ class OLSPanelRE(_RandomEffectsMixin, SpatialPanelModel):
         np.ndarray
         """
         beta = self._posterior_mean("beta")
-        alpha = self._posterior_mean("alpha")
+        alpha = self._posterior_mean("unit_effect")
         return self._X @ beta + alpha[self._unit_idx]
 
-    def _compute_spatial_effects_posterior(
-        self,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Compute posterior samples of direct, indirect, and total effects."""
-        from ...diagnostics.lmtests import _get_posterior_draws
 
-        idata = self.inference_data
-        ni = self._nonintercept_indices
-
-        if isinstance(self, SARPanelRE):
-            rho_draws = _get_posterior_draws(idata, "rho")
-            beta_draws = _get_posterior_draws(idata, "beta")[:, ni]
-            mean_diag = self._batch_mean_diag(rho_draws)
-            mean_row_sum = self._batch_mean_row_sum(rho_draws)
-            direct_samples = mean_diag[:, None] * beta_draws
-            total_samples = mean_row_sum[:, None] * beta_draws
-            indirect_samples = total_samples - direct_samples
-
-        elif isinstance(self, SEMPanelRE):
-            beta_draws = _get_posterior_draws(idata, "beta")[:, ni]
-            direct_samples = beta_draws.copy()
-            indirect_samples = np.zeros_like(beta_draws)
-            total_samples = beta_draws.copy()
-
-        elif isinstance(self, OLSPanelRE):
-            beta_draws = _get_posterior_draws(idata, "beta")[:, ni]
-            direct_samples = beta_draws.copy()
-            indirect_samples = np.zeros_like(beta_draws)
-            total_samples = beta_draws.copy()
-
-        return direct_samples, indirect_samples, total_samples
-
-
-class SARPanelRE(_RandomEffectsMixin, SpatialPanelModel):
-    """Bayesian spatial lag panel model with unit random effects.
+class _SARRandomEffects(_RandomEffectsMixin):
+    """The random-effects design of :class:`~neighbayes.models.SAR`.
 
     .. math::
         y_{it} = \\rho (Wy)_{it} + X_{it}\\beta + \\alpha_i + \\varepsilon_{it}
 
     where :math:`\\alpha_i \\sim N(0, \\sigma_\\alpha^2)` are unit-level
     random effects and :math:`\\varepsilon_{it} \\sim N(0, \\sigma^2)`.
-
-    Parameters
-    ----------
-    formula : str, optional
-        Wilkinson-style formula, e.g. ``"y ~ x1 + x2"``. Requires
-        ``data``, ``unit_col``, and ``time_col``.
-    data : pandas.DataFrame, optional
-        Long-format panel data when using formula mode.
-    y : array-like, optional
-        Stacked response of shape ``(N*T,)``. Required in matrix mode.
-    X : array-like or pandas.DataFrame, optional
-        Stacked design matrix. Required in matrix mode.
-    W : libpysal.graph.Graph or scipy.sparse matrix
-        Spatial weights of shape ``(N, N)``. Should be row-standardized.
-    unit_col : str, optional
-        Column in ``data`` identifying the cross-sectional unit.
-        Required in formula mode.
-    time_col : str, optional
-        Column in ``data`` identifying the time period. Required in
-        formula mode.
-    N : int, optional
-        Number of cross-sectional units. Required in matrix mode.
-    T : int, optional
-        Number of time periods. Required in matrix mode.
-    priors : dict, optional
-        Override default priors. Supported keys:
-
-        - ``rho_lower`` (float, default -1.0): Lower bound of Uniform
-          prior on :math:`\\rho`.
-        - ``rho_upper`` (float, default 1.0): Upper bound of Uniform
-          prior on :math:`\\rho`.
-        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal
-          prior on :math:`\\beta`, data-scaled (see
-          :class:`~neighbayes.models.priors.BasePriors`).
-        - ``sigma2_alpha`` (float, default 2.0): InverseGamma prior alpha for sigma2
-        - ``sigma2_beta`` (float, default var(y)): InverseGamma prior beta for sigma2
-          for :math:`\\sigma`.
-        - ``sigma_alpha_nu`` (float, default 1.0): degrees of freedom of the
-          half-t prior on :math:`\\sigma_\\alpha`; 1 is the half-Cauchy.
-        - ``sigma_alpha_scale`` (float, default sd(y)): scale of that prior.
-          See :class:`~neighbayes.models.priors.PanelREMixinPriors`.
-        - ``nu`` (float, default 4.0): Fixed Student-t degrees of
-          freedom (only used when ``robust=True``).
-
-    centered : bool, default False
-        Parameterization of the unit effects under NUTS.  The default samples
-        them non-centered, :math:`\\alpha_i = \\sigma_\\alpha z_i`, which
-        avoids the funnel between :math:`\\sigma_\\alpha` and
-        :math:`\\alpha` when the effects are weakly identified (few periods,
-        small :math:`\\sigma_\\alpha`).  ``True`` samples :math:`\\alpha`
-        directly, which mixes better when every unit has many observations.
-        The prior and the posterior are the same either way.
-    logdet_method : str, optional
-        How to compute :math:`\\log|I - \\rho W|`; auto-selected
-        (``"eigenvalue"`` for ``N <= 2000`` else ``"chebyshev"``) when
-        ``None`` (default).
-    robust : bool, default False
-        If True, replace the Normal error with Student-t. See
-        *Robust regression* below.
-
-    Notes
-    -----
-    The base-class ``model`` argument is not exposed; pooled mean
-    structure (``model=0``) is used because unit heterogeneity is
-    captured by the random effect rather than by within-unit demeaning.
-
-    **Robust regression**
-
-    When ``robust=True``, the error distribution is changed from Normal
-    to Student-t, yielding a model that is robust to heavy-tailed outliers:
-
-    .. math::
-
-        \\varepsilon_{it} \\sim t_\\nu(0, \\sigma^2)
-
-    where :math:`\\nu` is a **fixed** hyperparameter set by ``priors={"nu": value}``
-    (default 4, LeSage's ``rval``); larger values approach the Normal.  Values
-    must exceed 2 so the variance exists.
     """
 
-    _priors_cls = PanelSARREPriors
-    _jacobian_param: str | None = "rho"
-    _likelihood: str = "gaussian"
-    _gibbs_key: tuple[str, str] | None = ("gaussian", "panel_re")
-
-    def __init__(self, **kwargs):
-        kwargs.pop("model", None)
-        kwargs["effects"] = 0  # pooled
-        super().__init__(**kwargs)
-        self._unit_idx = np.arange(self._N * self._T) % self._N
-
-    def _model_coords(self) -> dict:
-        coords = super()._model_coords()
-        coords["unit"] = list(range(self._N))
-        return coords
-
-    def _build_pymc_model(self) -> pm.Model:
+    def _build_pymc_model_random(self) -> pm.Model:
         """Construct the PyMC model for SAR panel with random effects.
 
         Returns
@@ -428,7 +235,7 @@ class SARPanelRE(_RandomEffectsMixin, SpatialPanelModel):
 
         return model
 
-    def _fit_gibbs(
+    def _fit_gibbs_random(
         self,
         draws: int = 2000,
         tune: int = 1000,
@@ -478,20 +285,24 @@ class SARPanelRE(_RandomEffectsMixin, SpatialPanelModel):
             self._logdet_bounds.rho_max,
         )
 
+        probes = self.logdet_adapt and self._logdet_bounds.method == "stoch_cheb"
         gibbs = GaussianSARREGibbs(
             y=self._y,
             X=self._X,
             W_sparse=self._W_sparse_NT,
             Wy=self._Wy,
             priors=priors,
-            logdet_fn=self._logdet_numpy_fn,
-            logdet_vec_fn=self._logdet_numpy_vec_fn,
+            # A stochastic log-determinant is built by the sampler, which sizes
+            # its probe pool in warmup.
+            logdet_fn=None if probes else self._logdet_numpy_fn,
+            logdet_vec_fn=None if probes else self._logdet_numpy_vec_fn,
             feature_names=list(self._feature_names),
             N=self._N,
             T=self._T,
             unit_idx=self._unit_idx,
             W_eigs=self._logdet_eigs,
             logdet_method=self._logdet_bounds.method,
+            logdet_adapt=self.logdet_adapt,
         )
 
         self._idata = gibbs.fit(
@@ -504,9 +315,10 @@ class SARPanelRE(_RandomEffectsMixin, SpatialPanelModel):
             progressbar=progressbar,
             log_likelihood=log_likelihood,
         )
+        self._fitted_probes = gibbs.warmup_probes
         return self._idata
 
-    def _fitted_mean_from_posterior(self) -> np.ndarray:
+    def _fitted_mean_from_posterior_random(self) -> np.ndarray:
         """Posterior-mean fitted values.
 
         Returns
@@ -515,44 +327,12 @@ class SARPanelRE(_RandomEffectsMixin, SpatialPanelModel):
         """
         rho = float(self._posterior_mean("rho"))
         beta = self._posterior_mean("beta")
-        alpha = self._posterior_mean("alpha")
+        alpha = self._posterior_mean("unit_effect")
         return rho * self._Wy + self._X @ beta + alpha[self._unit_idx]
 
-    def _compute_spatial_effects_posterior(
-        self,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Compute posterior samples of direct, indirect, and total effects."""
-        from ...diagnostics.lmtests import _get_posterior_draws
 
-        idata = self.inference_data
-        ni = self._nonintercept_indices
-
-        if isinstance(self, SARPanelRE):
-            rho_draws = _get_posterior_draws(idata, "rho")
-            beta_draws = _get_posterior_draws(idata, "beta")[:, ni]
-            mean_diag = self._batch_mean_diag(rho_draws)
-            mean_row_sum = self._batch_mean_row_sum(rho_draws)
-            direct_samples = mean_diag[:, None] * beta_draws
-            total_samples = mean_row_sum[:, None] * beta_draws
-            indirect_samples = total_samples - direct_samples
-
-        elif isinstance(self, SEMPanelRE):
-            beta_draws = _get_posterior_draws(idata, "beta")[:, ni]
-            direct_samples = beta_draws.copy()
-            indirect_samples = np.zeros_like(beta_draws)
-            total_samples = beta_draws.copy()
-
-        elif isinstance(self, OLSPanelRE):
-            beta_draws = _get_posterior_draws(idata, "beta")[:, ni]
-            direct_samples = beta_draws.copy()
-            indirect_samples = np.zeros_like(beta_draws)
-            total_samples = beta_draws.copy()
-
-        return direct_samples, indirect_samples, total_samples
-
-
-class SEMPanelRE(_RandomEffectsMixin, SpatialPanelModel):
-    """Bayesian spatial error panel model with unit random effects.
+class _SEMRandomEffects(_RandomEffectsMixin):
+    """The random-effects design of :class:`~neighbayes.models.SEM`.
 
     .. math::
         y_{it} = X_{it}\\beta + \\alpha_i + u_{it}, \\quad
@@ -563,122 +343,9 @@ class SEMPanelRE(_RandomEffectsMixin, SpatialPanelModel):
     .. math::
         \\varepsilon_{it} = (I - \\lambda W)(y - X\\beta - \\alpha)_{it}
         \\sim N(0, \\sigma^2)
-
-    Parameters
-    ----------
-    formula : str, optional
-        Wilkinson-style formula, e.g. ``"y ~ x1 + x2"``. Requires
-        ``data``, ``unit_col``, and ``time_col``.
-    data : pandas.DataFrame, optional
-        Long-format panel data when using formula mode.
-    y : array-like, optional
-        Stacked response of shape ``(N*T,)``. Required in matrix mode.
-    X : array-like or pandas.DataFrame, optional
-        Stacked design matrix. Required in matrix mode.
-    W : libpysal.graph.Graph or scipy.sparse matrix
-        Spatial weights of shape ``(N, N)``. Should be row-standardized.
-    unit_col : str, optional
-        Column in ``data`` identifying the cross-sectional unit.
-        Required in formula mode.
-    time_col : str, optional
-        Column in ``data`` identifying the time period. Required in
-        formula mode.
-    N : int, optional
-        Number of cross-sectional units. Required in matrix mode.
-    T : int, optional
-        Number of time periods. Required in matrix mode.
-    priors : dict, optional
-        Override default priors. Supported keys:
-
-        - ``lam_lower`` (float, default -1.0): Lower bound of Uniform
-          prior on :math:`\\lambda`.
-        - ``lam_upper`` (float, default 1.0): Upper bound of Uniform
-          prior on :math:`\\lambda`.
-        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal
-          prior on :math:`\\beta`, data-scaled (see
-          :class:`~neighbayes.models.priors.BasePriors`).
-        - ``sigma2_alpha`` (float, default 2.0): InverseGamma prior alpha for sigma2
-        - ``sigma2_beta`` (float, default var(y)): InverseGamma prior beta for sigma2
-          for :math:`\\sigma`.
-        - ``sigma_alpha_nu`` (float, default 1.0): degrees of freedom of the
-          half-t prior on :math:`\\sigma_\\alpha`; 1 is the half-Cauchy.
-        - ``sigma_alpha_scale`` (float, default sd(y)): scale of that prior.
-          See :class:`~neighbayes.models.priors.PanelREMixinPriors`.
-        - ``nu`` (float, default 4.0): Fixed Student-t degrees of
-          freedom (only used when ``robust=True``).
-
-    centered : bool, default False
-        Parameterization of the unit effects under NUTS.  The default samples
-        them non-centered, :math:`\\alpha_i = \\sigma_\\alpha z_i`, which
-        avoids the funnel between :math:`\\sigma_\\alpha` and
-        :math:`\\alpha` when the effects are weakly identified (few periods,
-        small :math:`\\sigma_\\alpha`).  ``True`` samples :math:`\\alpha`
-        directly, which mixes better when every unit has many observations.
-        The prior and the posterior are the same either way.
-    logdet_method : str, optional
-        How to compute :math:`\\log|I - \\lambda W|`; auto-selected
-        when ``None`` (default).
-    robust : bool, default False
-        If True, replace the Normal innovation with Student-t. See
-        *Robust regression* below.
-
-    Notes
-    -----
-    The base-class ``model`` argument is not exposed; pooled mean
-    structure (``model=0``) is used because unit heterogeneity is
-    captured by the random effect rather than by within-unit demeaning.
-
-    **Identification of λ in SEM-RE models**
-
-    The spatial error parameter :math:`\\lambda` is **weakly identified**
-    when random effects :math:`\\alpha_i` are present.  The random effects
-    absorb spatial correlation across units, making it difficult for the
-    data to distinguish between :math:`\\lambda` (spatial error dependence)
-    and :math:`\\sigma_\\alpha^2` (between-unit variance).  Both Gibbs and
-    NUTS samplers will tend to estimate :math:`\\lambda` near zero even when
-    the true value is moderate, because the posterior genuinely
-    concentrates there.  This is a model identification issue, not a
-    sampler bug.
-
-    Possible remedies include:
-
-    - Use fixed effects (``SEMPanelFE``) instead of random effects
-    - Use the spatial Durbin error model (``SDEMPanelRE``), which adds WX terms
-    - Use longer panels (:math:`T \\to \\infty`) which provide more
-      information to separate :math:`\\lambda` from :math:`\\alpha`
-
-    **Robust regression**
-
-    When ``robust=True``, the spatially-filtered error distribution is
-    changed from Normal to Student-t, yielding a model that is robust to
-    heavy-tailed outliers:
-
-    .. math::
-
-        \\varepsilon_{it} = (I - \\lambda W)(y - X\\beta - \\alpha_i) \\sim t_\\nu(0, \\sigma^2)
-
-    where :math:`\\nu` is a **fixed** hyperparameter set by ``priors={"nu": value}``
-    (default 4, LeSage's ``rval``); larger values approach the Normal.  Values
-    must exceed 2 so the variance exists.
     """
 
-    _priors_cls = PanelSEMREPriors
-    _jacobian_param: str | None = "lam"
-    _likelihood: str = "gaussian"
-    _gibbs_key: tuple[str, str] | None = ("gaussian", "panel_re")
-
-    def __init__(self, **kwargs):
-        kwargs.pop("model", None)
-        kwargs["effects"] = 0  # pooled
-        super().__init__(**kwargs)
-        self._unit_idx = np.arange(self._N * self._T) % self._N
-
-    def _model_coords(self) -> dict:
-        coords = super()._model_coords()
-        coords["unit"] = list(range(self._N))
-        return coords
-
-    def _build_pymc_model(self, nuts_sampler: str = "pymc") -> pm.Model:
+    def _build_pymc_model_random(self, nuts_sampler: str = "pymc") -> pm.Model:
         """Construct the PyMC model for SEM panel with random effects.
 
         Parameters
@@ -779,7 +446,7 @@ class SEMPanelRE(_RandomEffectsMixin, SpatialPanelModel):
 
         return model
 
-    def _fit_gibbs(
+    def _fit_gibbs_random(
         self,
         draws: int = 2000,
         tune: int = 1000,
@@ -829,19 +496,23 @@ class SEMPanelRE(_RandomEffectsMixin, SpatialPanelModel):
             self._logdet_bounds.rho_max,
         )
 
+        probes = self.logdet_adapt and self._logdet_bounds.method == "stoch_cheb"
         gibbs = GaussianSEMREGibbs(
             y=self._y,
             X=self._X,
             W_sparse=self._W_sparse_NT,
             priors=priors,
-            logdet_fn=self._logdet_numpy_fn,
-            logdet_vec_fn=self._logdet_numpy_vec_fn,
+            # A stochastic log-determinant is built by the sampler, which sizes
+            # its probe pool in warmup.
+            logdet_fn=None if probes else self._logdet_numpy_fn,
+            logdet_vec_fn=None if probes else self._logdet_numpy_vec_fn,
             feature_names=list(self._feature_names),
             N=self._N,
             T=self._T,
             unit_idx=self._unit_idx,
             W_eigs=self._logdet_eigs,
             logdet_method=self._logdet_bounds.method,
+            logdet_adapt=self.logdet_adapt,
         )
 
         self._idata = gibbs.fit(
@@ -854,9 +525,10 @@ class SEMPanelRE(_RandomEffectsMixin, SpatialPanelModel):
             progressbar=progressbar,
             log_likelihood=log_likelihood,
         )
+        self._fitted_probes = gibbs.warmup_probes
         return self._idata
 
-    def _fitted_mean_from_posterior(self) -> np.ndarray:
+    def _fitted_mean_from_posterior_random(self) -> np.ndarray:
         """Posterior-mean fitted values (on the observed y scale).
 
         Returns
@@ -864,44 +536,12 @@ class SEMPanelRE(_RandomEffectsMixin, SpatialPanelModel):
         np.ndarray
         """
         beta = self._posterior_mean("beta")
-        alpha = self._posterior_mean("alpha")
+        alpha = self._posterior_mean("unit_effect")
         return self._X @ beta + alpha[self._unit_idx]
 
-    def _compute_spatial_effects_posterior(
-        self,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Compute posterior samples of direct, indirect, and total effects."""
-        from ...diagnostics.lmtests import _get_posterior_draws
 
-        idata = self.inference_data
-        ni = self._nonintercept_indices
-
-        if isinstance(self, SARPanelRE):
-            rho_draws = _get_posterior_draws(idata, "rho")
-            beta_draws = _get_posterior_draws(idata, "beta")[:, ni]
-            mean_diag = self._batch_mean_diag(rho_draws)
-            mean_row_sum = self._batch_mean_row_sum(rho_draws)
-            direct_samples = mean_diag[:, None] * beta_draws
-            total_samples = mean_row_sum[:, None] * beta_draws
-            indirect_samples = total_samples - direct_samples
-
-        elif isinstance(self, SEMPanelRE):
-            beta_draws = _get_posterior_draws(idata, "beta")[:, ni]
-            direct_samples = beta_draws.copy()
-            indirect_samples = np.zeros_like(beta_draws)
-            total_samples = beta_draws.copy()
-
-        elif isinstance(self, OLSPanelRE):
-            beta_draws = _get_posterior_draws(idata, "beta")[:, ni]
-            direct_samples = beta_draws.copy()
-            indirect_samples = np.zeros_like(beta_draws)
-            total_samples = beta_draws.copy()
-
-        return direct_samples, indirect_samples, total_samples
-
-
-class SDEMPanelRE(_RandomEffectsMixin, SpatialPanelModel):
-    """Bayesian spatial Durbin error panel model with unit random effects.
+class _SDEMRandomEffects(_RandomEffectsMixin):
+    """The random-effects design of :class:`~neighbayes.models.SDEM`.
 
     .. math::
         y_{it} = X_{it}\\beta + (WX)_{it}\\theta + \\alpha_i + u_{it}, \\quad
@@ -910,103 +550,18 @@ class SDEMPanelRE(_RandomEffectsMixin, SpatialPanelModel):
     Combines the SDEM mean structure (covariates plus their spatial lags)
     with random unit effects :math:`\\alpha_i \\sim N(0, \\sigma_\\alpha^2)`
     and a spatially-correlated error term governed by :math:`\\lambda`.
-
-    Parameters
-    ----------
-    formula : str, optional
-        Wilkinson-style formula, e.g. ``"y ~ x1 + x2"``. Requires
-        ``data``, ``unit_col``, and ``time_col``.
-    data : pandas.DataFrame, optional
-        Long-format panel data when using formula mode.
-    y : array-like, optional
-        Stacked response of shape ``(N*T,)``. Required in matrix mode.
-    X : array-like or pandas.DataFrame, optional
-        Stacked design matrix. Required in matrix mode.
-    W : libpysal.graph.Graph or scipy.sparse matrix
-        Spatial weights of shape ``(N, N)``. Used to construct the
-        ``WX`` block and the spatial filter on the disturbance.
-        Should be row-standardized.
-    unit_col : str, optional
-        Column in ``data`` identifying the cross-sectional unit.
-        Required in formula mode.
-    time_col : str, optional
-        Column in ``data`` identifying the time period. Required in
-        formula mode.
-    N : int, optional
-        Number of cross-sectional units. Required in matrix mode.
-    T : int, optional
-        Number of time periods. Required in matrix mode.
-    priors : dict, optional
-        Override default priors. Supported keys:
-
-        - ``lam_lower`` (float, default -1.0): Lower bound of Uniform
-          prior on :math:`\\lambda`.
-        - ``lam_upper`` (float, default 1.0): Upper bound of Uniform
-          prior on :math:`\\lambda`.
-        - ``beta_mu``, ``beta_sigma`` (array, default Gelman 2008): Normal
-          prior on :math:`[\\beta, \\theta]`, data-scaled (see
-          :class:`~neighbayes.models.priors.BasePriors`).
-        - ``sigma2_alpha`` (float, default 2.0): InverseGamma prior alpha for sigma2
-        - ``sigma2_beta`` (float, default var(y)): InverseGamma prior beta for sigma2
-          for :math:`\\sigma`.
-        - ``sigma_alpha_nu`` (float, default 1.0): degrees of freedom of the
-          half-t prior on :math:`\\sigma_\\alpha`; 1 is the half-Cauchy.
-        - ``sigma_alpha_scale`` (float, default sd(y)): scale of that prior.
-          See :class:`~neighbayes.models.priors.PanelREMixinPriors`.
-        - ``nu`` (float, default 4.0): Fixed Student-t degrees of
-          freedom (only used when ``robust=True``).
-
-    centered : bool, default False
-        Parameterization of the unit effects under NUTS.  The default samples
-        them non-centered, :math:`\\alpha_i = \\sigma_\\alpha z_i`, which
-        avoids the funnel between :math:`\\sigma_\\alpha` and
-        :math:`\\alpha` when the effects are weakly identified (few periods,
-        small :math:`\\sigma_\\alpha`).  ``True`` samples :math:`\\alpha`
-        directly, which mixes better when every unit has many observations.
-        The prior and the posterior are the same either way.
-    logdet_method : str, optional
-        How to compute :math:`\\log|I - \\lambda W|`; auto-selected
-        when ``None`` (default).
-    robust : bool, default False
-        If True, replace the Normal innovation with Student-t.
-    w_vars : list of str, optional
-        Names of X columns to spatially lag. By default all
-        non-constant columns are lagged. At least one column must be
-        lagged; if no WX columns remain a :class:`ValueError` is
-        raised. Pass a subset to restrict which variables receive a
-        spatial lag.
-
-    Notes
-    -----
-    The base-class ``model`` argument is not exposed; pooled mean
-    structure (``model=0``) is used because unit heterogeneity is
-    captured by the random effect rather than by within-unit demeaning.
     """
 
-    _has_wx_in_beta = True
-    _jacobian_param: str | None = "lam"
-    _likelihood: str = "gaussian"  # NUTS-only (no _gibbs_key)
-
-    _priors_cls = PanelSDEMREPriors
-
-    def __init__(self, **kwargs):
-        kwargs.pop("model", None)
-        kwargs["effects"] = 0  # pooled
-        super().__init__(**kwargs)
+    def _init_random(self) -> None:
         if not self._wx_column_indices:
             raise ValueError(
-                "SDEMPanelRE requires at least one WX column. Pass "
-                "`w_vars=[...]` to choose which regressors receive a spatial "
-                "lag, or fit an SEMPanelRE model instead."
+                "SDEM with random unit effects requires at least one WX column. "
+                "Pass `durbin_vars=[...]` to choose which regressors receive a "
+                "spatial lag, or fit SEM(unit_effects='random') instead."
             )
-        self._unit_idx = np.arange(self._N * self._T) % self._N
+        super()._init_random()
 
-    def _model_coords(self) -> dict:
-        coords = super()._model_coords()
-        coords["unit"] = list(range(self._N))
-        return coords
-
-    def _build_pymc_model(self, nuts_sampler: str = "pymc") -> pm.Model:
+    def _build_pymc_model_random(self, nuts_sampler: str = "pymc") -> pm.Model:
         """Construct the PyMC model for SDEM panel with random effects.
 
         Parameters
@@ -1103,13 +658,13 @@ class SDEMPanelRE(_RandomEffectsMixin, SpatialPanelModel):
 
         return model
 
-    def _fitted_mean_from_posterior(self) -> np.ndarray:
+    def _fitted_mean_from_posterior_random(self) -> np.ndarray:
         beta = self._posterior_mean("beta")
-        alpha = self._posterior_mean("alpha")
+        alpha = self._posterior_mean("unit_effect")
         Z = np.hstack([self._X, self._WX])
         return Z @ beta + alpha[self._unit_idx]
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior_random(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Posterior samples of direct/indirect/total effects (SDEM form)."""
@@ -1154,7 +709,7 @@ def _run_gaussian_re(
 
     Thin adapter over the per-class ``_fit_gibbs`` (SAR/SEM RE own their own
     5-block sampler).  RE Gibbs is NumPy-only — there is no JAX kernel and no
-    ``slice_width``/``chain_method`` options — so ``backend`` is always
+    ``slice_width`` option — so ``backend`` is always
     ``"numpy"`` and no family options are threaded.
     """
     return model._fit_gibbs(

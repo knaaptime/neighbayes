@@ -3,8 +3,8 @@
 For the separable constraint ``rho_w = -rho_d * rho_o`` the flow system logdet
 factors exactly as ``n*log|I - rho_d W| + n*log|I - rho_o W|``.  The factories in
 :mod:`neighbayes._logdet._flow` delegate each single-parameter half to the general
-factories, so every method (``eigenvalue``/``chebyshev``/``cheb_cholesky``/``aaa``/
-``cheb_stochastic``) and ``None``-auto is available — with ``aaa`` the auto choice
+factories, so every method (``eigenvalue``/``chebyshev``/``chol_cheb``/``aaa``/
+``stoch_cheb``) and ``None``-auto is available — with ``aaa`` the auto choice
 for directed (non-symmetric) flow ``W``.
 """
 
@@ -48,27 +48,27 @@ def test_numpy_aaa_matches_eigenvalue(_weights):
     rd = rng.uniform(0.05, 0.9, 9)
     ro = rng.uniform(0.05, 0.9, 9)
     for W in (Wsym, Wdir):
-        val = make_flow_separable_logdet_numpy(W, n, method="aaa")(rd, ro)
+        val = make_flow_separable_logdet_numpy(W, n, method="lu_aaa")(rd, ro)
         ref = _eig_reference(W, n, rd, ro)
         np.testing.assert_allclose(val, ref, atol=1e-6, rtol=1e-6)
 
 
 def test_numpy_cheb_cholesky_symmetric(_weights):
-    """cheb_cholesky matches the reference for symmetric W (to its ~1e-3 accuracy)."""
+    """chol_cheb matches the reference for symmetric W (to its ~1e-3 accuracy)."""
     n, Wsym, _ = _weights
     rng = np.random.default_rng(2)
     rd = rng.uniform(0.05, 0.9, 9)
     ro = rng.uniform(0.05, 0.9, 9)
-    val = make_flow_separable_logdet_numpy(Wsym, n, method="cheb_cholesky")(rd, ro)
+    val = make_flow_separable_logdet_numpy(Wsym, n, method="chol_cheb")(rd, ro)
     ref = _eig_reference(Wsym, n, rd, ro)
     np.testing.assert_allclose(val, ref, atol=5e-2, rtol=1e-2)
 
 
 def test_numpy_cheb_cholesky_rejects_directed(_weights):
-    """cheb_cholesky is symmetric-only; directed flow W must raise (steer to aaa)."""
+    """chol_cheb is symmetric-only; directed flow W must raise (steer to aaa)."""
     n, _, Wdir = _weights
     with pytest.raises(ValueError, match="aaa|symmetr|D-symmetr"):
-        make_flow_separable_logdet_numpy(Wdir, n, method="cheb_cholesky")(
+        make_flow_separable_logdet_numpy(Wdir, n, method="chol_cheb")(
             np.array([0.3]), np.array([0.2])
         )
 
@@ -90,10 +90,10 @@ def test_separable_factorization_identity(_weights):
     n, Wsym, _ = _weights
     from neighbayes._logdet._factories import make_logdet_numpy_vec_fn
 
-    single = make_logdet_numpy_vec_fn(Wsym, eigs=None, method="aaa")
+    single = make_logdet_numpy_vec_fn(Wsym, eigs=None, method="lu_aaa")
     rd = np.array([0.4, 0.55])
     ro = np.array([0.2, 0.7])
-    val = make_flow_separable_logdet_numpy(Wsym, n, method="aaa")(rd, ro)
+    val = make_flow_separable_logdet_numpy(Wsym, n, method="lu_aaa")(rd, ro)
     expected = n * (single(rd) + single(ro))
     np.testing.assert_allclose(val, expected, atol=1e-12)
 
@@ -111,6 +111,6 @@ def test_pytensor_factory_builds_graph(_weights):
     import pytensor.tensor as pt
 
     n, Wsym, _ = _weights
-    fn = make_flow_separable_logdet(Wsym, n, method="cheb_cholesky")
+    fn = make_flow_separable_logdet(Wsym, n, method="chol_cheb")
     expr = fn(pt.scalar("rd"), pt.scalar("ro"))
     assert expr.ndim == 0  # scalar Jacobian expression

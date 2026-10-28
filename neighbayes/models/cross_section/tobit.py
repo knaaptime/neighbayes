@@ -17,8 +17,10 @@ import scipy.sparse as sp
 import scipy.sparse.linalg as spla
 from pytensor import sparse as pts
 
+from ..._backends.sampler_helpers import use_jax_likelihood
 from ..._lazy_deps import pm, xr
 from .._base._shared import _tobit_pointwise_loglik, _write_log_likelihood_to_idata
+from .._design import _is_panel, _pop_design
 from ..base import SpatialModel
 from ..priors import SARTobitPriors, SDMTobitPriors, SEMTobitPriors
 
@@ -81,7 +83,7 @@ def _batched_sar_mean(W_sp, rho_f, rhs, n):
         Aj = jnp.asarray(const_coo.col, dtype=jnp.int32)
         const_vals = jnp.asarray(const_coo.data, dtype=jnp.float64)
         w_vals = jnp.asarray(w_coo.data, dtype=jnp.float64)
-        lu_solve = sparsax_lu(Ai, Aj, const_vals - 0.5 * w_vals, n).solve
+        lu_solve = sparsax_lu(Ai, Aj, n).solve
         for i in range(s):
             Ax = const_vals - float(rho_f[i]) * w_vals
             mu[i] = np.asarray(
@@ -99,13 +101,60 @@ def _batched_sar_mean(W_sp, rho_f, rhs, n):
 
 
 class _SpatialTobitBase(SpatialModel):
-    """Shared helpers for spatial Tobit models."""
+    """Shared helpers for spatial Tobit models.
 
-    def __init__(self, *args, censoring: float = 0.0, **kwargs):
+    A Tobit panel is pooled: a within transformation would mix censored and
+    uncensored values inside the likelihood on the observed scale, so the
+    panel takes no unit or time effects, and no dynamics.
+    """
+
+    #: Whether the class has a panel (``SDMTobit`` does not).
+    _has_panel = True
+
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        from .._mixins._designs import _constructor_signature
+
+        cls.__signature__ = _constructor_signature(_SpatialTobitBase.__init__)
+
+    def __init__(
+        self,
+        *args,
+        censoring: float = 0.0,
+        unit_effects=None,
+        time_effects: bool = False,
+        dynamic=False,
+        **kwargs,
+    ):
+        kwargs = self._resolve_design(
+            dict(
+                kwargs,
+                unit_effects=unit_effects,
+                time_effects=time_effects,
+                dynamic=dynamic,
+            )
+        )[1]
         self.censoring = float(censoring)
         super().__init__(*args, **kwargs)
         self._censored_mask = self._y <= self.censoring
         self._censored_idx = np.where(self._censored_mask)[0]
+
+    @classmethod
+    def _resolve_design(cls, kw: dict) -> tuple[str, dict]:
+        """``"static"`` — a cross-section or a pooled panel — and the base's arguments."""
+        name = cls.__name__
+        unit, time, dynamic = _pop_design(kw)
+        if unit is not None or time or dynamic:
+            raise NotImplementedError(f"{name} takes no effects and no dynamics.")
+        if _is_panel(kw) and not cls._has_panel:
+            raise NotImplementedError(f"{name} is not implemented with a panel.")
+        return "static", kw
+
+    def _tobit_beta_prior(self):
+        """Gelman et al. (2008) ``beta`` prior, scaled to the observed ``y``."""
+        return self._resolved_beta_prior(
+            self._X, list(self._model_coords()["coefficient"])
+        )
 
     def _tobit_sigma(self):
         """``σ² ~ IG(sigma2_alpha, sigma2_beta)`` (default ``IG(2, Var y)``); σ recorded."""
@@ -149,7 +198,7 @@ class _SpatialTobitBase(SpatialModel):
             )
         return y_lat
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Posterior samples of direct, indirect, and total effects.
@@ -205,7 +254,7 @@ class _SpatialTobitBase(SpatialModel):
 
         else:
             raise NotImplementedError(
-                f"Spatial effects not implemented for {type(self).__name__}."
+                f"Impacts not implemented for {type(self).__name__}."
             )
 
         return direct_samples, indirect_samples, total_samples
@@ -260,13 +309,35 @@ class SARTobit(_SpatialTobitBase):
         - ``nu`` (float, default 4.0): Fixed Student-t degrees of
           freedom (only used when ``robust=True``).
 
-    logdet_method : str, optional
-        How to compute :math:`\\log|I - \\rho W|`. ``None`` (default)
-        auto-selects ``"eigenvalue"`` for ``n <= 2000`` else
-        ``"chebyshev"``.
+    logdet_method : {"eigenvalue", "cheb", "aaa", "spline", "stochastic"}, optional
+        How ``log|I - rho*W|`` is computed over rho: summed over the
+        eigenvalues of ``W``; interpolated (Chebyshev, AAA rational, or cubic
+        spline) through values from a sparse factorization, exact to the
+        interpolant's tolerance; or expanded stochastically with no
+        factorization, the one method with sampling error.  ``None`` (default)
+        selects from the size and symmetry of ``W``: ``"eigenvalue"`` for
+        ``n <= 500``; ``"aaa"`` up to ``n = 60000``
+        (``NEIGHBAYES_LOGDET_FACTOR_MAX_N``) unless the factorization's fill-in
+        would dominate; ``"stochastic"`` beyond.
+    logdet_decomp : {"auto", "chol", "lu"}, default "auto"
+        The factorization an interpolating method uses: sparse Cholesky
+        (undirected ``W``; scikit-sparse CHOLMOD) or sparse LU (KLU or UMFPACK,
+        chosen by the sparsity pattern).  ``"auto"`` takes ``"chol"`` where the
+        method has it and ``W`` is undirected, else ``"lu"``.  Ignored by
+        ``"eigenvalue"`` and ``"stochastic"``; ``"spline"`` on ``"chol"``
+        raises.
     robust : bool, default False
         If True, replace the Normal innovation with Student-t. See
         *Robust regression* below.
+
+    time_col, unit_col : str, optional
+        Formula-mode panel: the period and unit columns of ``data``.  Given
+        time, the model is a pooled panel, stacked by period, then unit.  A
+        Tobit panel takes no unit or time effects: a within transformation
+        would mix censored and uncensored values in the likelihood.
+    N, T : int, optional
+        Matrix-mode panel: the numbers of units and periods; ``T=1`` is the
+        cross-section.
 
     Notes
     -----
@@ -296,9 +367,7 @@ class SARTobit(_SpatialTobitBase):
     def _build_pymc_model(self) -> pm.Model:
         rho_lower = self.priors.get("rho_lower", -1.0)
         rho_upper = self.priors.get("rho_upper", 1.0)
-        beta_mu, beta_sigma = self._resolved_beta_prior(
-            self._X, list(self._model_coords()["coefficient"])
-        )
+        beta_mu, beta_sigma = self._tobit_beta_prior()
         logdet_fn = self._logdet_pytensor_fn
         W_pt = self._W_pt_sparse
         with pm.Model(coords=self._model_coords()) as model:
@@ -325,7 +394,7 @@ class SARTobit(_SpatialTobitBase):
     def _fitted_mean_from_posterior(self) -> np.ndarray:
         """Reported fitted mean: ``max(c, E[y* | X, params])``.
 
-        The structural latent mean for SAR-Tobit is
+        The latent mean for SARTobit is
         :math:`E[y^* \\mid X] = (I - \\rho W)^{-1} X \\beta`, evaluated at the
         posterior mean of :math:`(\\rho, \\beta)`. Censored observations are
         reported at the censoring point ``c`` (consistent with the
@@ -333,10 +402,14 @@ class SARTobit(_SpatialTobitBase):
         """
         rho = float(self._posterior_mean("rho"))
         beta = self._posterior_mean("beta")
+        if self._is_panel:
+            # A panel reports the mean given the latent outcome: ρWy* + Xβ.
+            y_lat = self._posterior_latent_y_mean()
+            return rho * self._sparse_panel_lag(y_lat) + self._X @ beta
         n = self._y.shape[0]
         A = sp.eye(n, format="csc") - rho * sp.csc_matrix(self._W_sparse)
-        structural = spla.spsolve(A, self._X @ beta)
-        return np.maximum(self.censoring, structural)
+        mean = spla.spsolve(A, self._X @ beta)
+        return np.maximum(self.censoring, mean)
 
     def _postprocess_idata(self, idata: xr.DataTree) -> xr.DataTree:
         """Attach the complete pointwise Tobit log-likelihood for IC metrics.
@@ -345,11 +418,15 @@ class SARTobit(_SpatialTobitBase):
         Jacobian via ``pm.Potential``, so PyMC captures no pointwise
         ``log_likelihood``.  We rebuild it here from the Tobit censoring
         formula (Normal or Student-t density for uncensored observations, the
-        matching left-tail log-CDF for censored ones) with the structural
-        latent mean :math:`\\mu = (I - \\rho W)^{-1} X\\beta`.
+        matching left-tail log-CDF for censored ones) with the latent
+        mean :math:`\\mu = (I - \\rho W)^{-1} X\\beta`; a panel's uses the
+        mean given the latent outcome, :math:`\\rho W y^* + X\\beta`, and its
+        Jacobian applies once per period.
         """
         if "log_likelihood" in idata.children and "obs" in idata.log_likelihood:
             return idata
+        if self._is_panel:
+            return self._postprocess_idata_panel(idata)
         rho = idata.posterior["rho"].values
         beta = idata.posterior["beta"].values
         sigma = idata.posterior["sigma"].values
@@ -367,6 +444,31 @@ class SARTobit(_SpatialTobitBase):
         ll = _tobit_pointwise_loglik(
             self._y, mu, sigma_f, self._censored_mask, self.censoring, nu_f
         )
+        jac = self._logdet_numpy_vec_fn(rho_f)
+        ll = (ll + jac[:, None] / n).reshape(c, d, n)
+        _write_log_likelihood_to_idata(idata, ll)
+        return idata
+
+    def _postprocess_idata_panel(self, idata: xr.DataTree) -> xr.DataTree:
+        """The panel log-likelihood given the latent outcome (see above)."""
+        rho = idata.posterior["rho"].values
+        beta = idata.posterior["beta"].values
+        sigma = idata.posterior["sigma"].values
+        c, d = rho.shape
+        s = c * d
+        n = self._y.shape[0]
+        rho_f = rho.reshape(s)
+        beta_f = beta.reshape(s, beta.shape[-1])
+        sigma_f = sigma.reshape(s)
+        y_lat = self._posterior_latent_y_mean()
+        Wy_lat = self._sparse_panel_lag(y_lat)
+        mu = rho_f[:, None] * Wy_lat[None, :] + beta_f @ self._X.T
+        nu_f = np.full(s, self._nu) if self.robust else None
+        ll = _tobit_pointwise_loglik(
+            self._y, mu, sigma_f, self._censored_mask, self.censoring, nu_f
+        )
+        # ``_logdet_numpy_vec_fn`` is built with ``T=self._T`` and already
+        # returns T·log|I_N - ρW_N|; scaling by T again squared the Jacobian.
         jac = self._logdet_numpy_vec_fn(rho_f)
         ll = (ll + jac[:, None] / n).reshape(c, d, n)
         _write_log_likelihood_to_idata(idata, ll)
@@ -413,11 +515,34 @@ class SEMTobit(_SpatialTobitBase):
         - ``nu`` (float, default 4.0): Fixed Student-t degrees of
           freedom (only used when ``robust=True``).
 
-    logdet_method : str, optional
-        How to compute :math:`\\log|I - \\lambda W|`; auto-selected when
-        ``None`` (default).
+    logdet_method : {"eigenvalue", "cheb", "aaa", "spline", "stochastic"}, optional
+        How ``log|I - rho*W|`` is computed over rho: summed over the
+        eigenvalues of ``W``; interpolated (Chebyshev, AAA rational, or cubic
+        spline) through values from a sparse factorization, exact to the
+        interpolant's tolerance; or expanded stochastically with no
+        factorization, the one method with sampling error.  ``None`` (default)
+        selects from the size and symmetry of ``W``: ``"eigenvalue"`` for
+        ``n <= 500``; ``"aaa"`` up to ``n = 60000``
+        (``NEIGHBAYES_LOGDET_FACTOR_MAX_N``) unless the factorization's fill-in
+        would dominate; ``"stochastic"`` beyond.
+    logdet_decomp : {"auto", "chol", "lu"}, default "auto"
+        The factorization an interpolating method uses: sparse Cholesky
+        (undirected ``W``; scikit-sparse CHOLMOD) or sparse LU (KLU or UMFPACK,
+        chosen by the sparsity pattern).  ``"auto"`` takes ``"chol"`` where the
+        method has it and ``W`` is undirected, else ``"lu"``.  Ignored by
+        ``"eigenvalue"`` and ``"stochastic"``; ``"spline"`` on ``"chol"``
+        raises.
     robust : bool, default False
         If True, replace the Normal innovation with Student-t.
+
+    time_col, unit_col : str, optional
+        Formula-mode panel: the period and unit columns of ``data``.  Given
+        time, the model is a pooled panel, stacked by period, then unit.  A
+        Tobit panel takes no unit or time effects: a within transformation
+        would mix censored and uncensored values in the likelihood.
+    N, T : int, optional
+        Matrix-mode panel: the numbers of units and periods; ``T=1`` is the
+        cross-section.
 
     Notes
     -----
@@ -443,41 +568,138 @@ class SEMTobit(_SpatialTobitBase):
 
     _priors_cls = SEMTobitPriors
 
-    def _build_pymc_model(self) -> pm.Model:
+    def _build_pymc_model(self, nuts_sampler: str = "pymc") -> pm.Model:
         lam_lower = self.priors.get("lam_lower", -1.0)
         lam_upper = self.priors.get("lam_upper", 1.0)
-        beta_mu, beta_sigma = self._resolved_beta_prior(
-            self._X, list(self._model_coords()["coefficient"])
-        )
+        beta_mu, beta_sigma = self._tobit_beta_prior()
         logdet_fn = self._logdet_pytensor_fn
         W_pt = self._W_pt_sparse
+        n_obs = int(self._y.shape[0])
+        inv_n = 1.0 / n_obs
+        jax_logp = use_jax_likelihood(nuts_sampler)
+        n_cens = int(self._censored_idx.size)
         with pm.Model(coords=self._model_coords()) as model:
             lam = pm.Uniform("lam", lower=lam_lower, upper=lam_upper)
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
             sigma = self._tobit_sigma()
-            y_lat = self._latent_y_tensor()
-            resid = y_lat - pt.dot(self._X, beta)
-            eps = resid - lam * pts.structured_dot(W_pt, resid[:, None]).flatten()
-            if self.robust:
-                nu = self._nu
-                logp_eps = pm.logp(
-                    pm.StudentT.dist(nu=nu, mu=0.0, sigma=sigma), eps
-                ).sum()
+            if jax_logp:
+                if n_cens > 0:
+                    y_cens_gap = self._censored_gap(n_cens)
+                else:
+                    y_cens_gap = None
+                X_const = pt.as_tensor_variable(self._X)
+                cens_idx_const = (
+                    pt.as_tensor_variable(self._censored_idx) if n_cens > 0 else None
+                )
+                censoring_const = self.censoring
+
+                def _eps(value, lam_, beta_, gap_):
+                    y_lat = value
+                    if gap_ is not None:
+                        y_cens = censoring_const - gap_
+                        y_lat = pt.set_subtensor(y_lat[cens_idx_const], y_cens)
+                    resid = y_lat - pt.dot(X_const, beta_)
+                    return (
+                        resid
+                        - lam_ * pts.structured_dot(W_pt, resid[:, None]).flatten()
+                    )
+
+                if self.robust:
+                    nu = self._nu
+                    if n_cens > 0:
+
+                        def sempanel_tobit_logp(value, lam_, beta_, sigma_, gap_, nu_):
+                            eps = _eps(value, lam_, beta_, gap_)
+                            log_dens = pm.logp(
+                                pm.StudentT.dist(nu=nu_, mu=0.0, sigma=sigma_), eps
+                            )
+                            return log_dens + logdet_fn(lam_) * inv_n
+
+                        pm.CustomDist(
+                            "obs",
+                            lam,
+                            beta,
+                            sigma,
+                            y_cens_gap,
+                            nu,
+                            logp=sempanel_tobit_logp,
+                            observed=self._y,
+                        )
+                    else:
+
+                        def sempanel_tobit_logp(value, lam_, beta_, sigma_, nu_):
+                            eps = _eps(value, lam_, beta_, None)
+                            log_dens = pm.logp(
+                                pm.StudentT.dist(nu=nu_, mu=0.0, sigma=sigma_), eps
+                            )
+                            return log_dens + logdet_fn(lam_) * inv_n
+
+                        pm.CustomDist(
+                            "obs",
+                            lam,
+                            beta,
+                            sigma,
+                            nu,
+                            logp=sempanel_tobit_logp,
+                            observed=self._y,
+                        )
+                elif n_cens > 0:
+
+                    def sempanel_tobit_logp(value, lam_, beta_, sigma_, gap_):
+                        eps = _eps(value, lam_, beta_, gap_)
+                        log_dens = pm.logp(pm.Normal.dist(mu=0.0, sigma=sigma_), eps)
+                        return log_dens + logdet_fn(lam_) * inv_n
+
+                    pm.CustomDist(
+                        "obs",
+                        lam,
+                        beta,
+                        sigma,
+                        y_cens_gap,
+                        logp=sempanel_tobit_logp,
+                        observed=self._y,
+                    )
+                else:
+
+                    def sempanel_tobit_logp(value, lam_, beta_, sigma_):
+                        eps = _eps(value, lam_, beta_, None)
+                        log_dens = pm.logp(pm.Normal.dist(mu=0.0, sigma=sigma_), eps)
+                        return log_dens + logdet_fn(lam_) * inv_n
+
+                    pm.CustomDist(
+                        "obs",
+                        lam,
+                        beta,
+                        sigma,
+                        logp=sempanel_tobit_logp,
+                        observed=self._y,
+                    )
             else:
-                logp_eps = pm.logp(pm.Normal.dist(mu=0.0, sigma=sigma), eps).sum()
-            pm.Potential("eps_loglik", logp_eps)
-            pm.Potential("jacobian", logdet_fn(lam))
+                y_lat = self._latent_y_tensor()
+                resid = y_lat - pt.dot(self._X, beta)
+                eps = resid - lam * pts.structured_dot(W_pt, resid[:, None]).flatten()
+                if self.robust:
+                    nu = self._nu
+                    logp_eps = pm.logp(
+                        pm.StudentT.dist(nu=nu, mu=0.0, sigma=sigma), eps
+                    ).sum()
+                else:
+                    logp_eps = pm.logp(pm.Normal.dist(mu=0.0, sigma=sigma), eps).sum()
+                pm.Potential("eps_loglik", logp_eps)
+                pm.Potential("jacobian", logdet_fn(lam))
         return model
 
     def _fitted_mean_from_posterior(self) -> np.ndarray:
         """Reported fitted mean: ``max(c, E[y* | X, params])``.
 
-        For SEM-Tobit the structural latent mean is
+        For SEMTobit the latent mean is
         :math:`E[y^* \\mid X] = X\\beta` (the spatial filter operates on the
         error term and integrates out). Censored entries are reported at
-        the censoring point.
+        the censoring point; a panel reports :math:`X\\beta` unclipped.
         """
         beta = self._posterior_mean("beta")
+        if self._is_panel:
+            return self._X @ beta
         return np.maximum(self.censoring, self._X @ beta)
 
     def _postprocess_idata(self, idata: xr.DataTree) -> xr.DataTree:
@@ -485,9 +707,11 @@ class SEMTobit(_SpatialTobitBase):
 
         The SEM Tobit model expresses both the error log-likelihood and the
         Jacobian via ``pm.Potential``, so PyMC captures no pointwise
-        ``log_likelihood``.  We rebuild it here from the Tobit censoring
-        formula with structural latent mean :math:`\\mu = X\\beta` (the spatial
-        filter operates on the error term and is absorbed into the Jacobian).
+        ``log_likelihood`` (on JAX backends the ``obs`` CustomDist already
+        carries it, and we return early).  We rebuild it here from the Tobit
+        censoring formula with latent mean :math:`\\mu = X\\beta` (the
+        spatial filter operates on the error term and is absorbed into the
+        Jacobian, once per period in a panel).
         """
         if "log_likelihood" in idata.children and "obs" in idata.log_likelihood:
             return idata
@@ -550,12 +774,26 @@ class SDMTobit(_SpatialTobitBase):
         - ``nu`` (float, default 4.0): Fixed Student-t degrees of
           freedom (only used when ``robust=True``).
 
-    logdet_method : str, optional
-        How to compute :math:`\\log|I - \\rho W|`; auto-selected when
-        ``None`` (default).
+    logdet_method : {"eigenvalue", "cheb", "aaa", "spline", "stochastic"}, optional
+        How ``log|I - rho*W|`` is computed over rho: summed over the
+        eigenvalues of ``W``; interpolated (Chebyshev, AAA rational, or cubic
+        spline) through values from a sparse factorization, exact to the
+        interpolant's tolerance; or expanded stochastically with no
+        factorization, the one method with sampling error.  ``None`` (default)
+        selects from the size and symmetry of ``W``: ``"eigenvalue"`` for
+        ``n <= 500``; ``"aaa"`` up to ``n = 60000``
+        (``NEIGHBAYES_LOGDET_FACTOR_MAX_N``) unless the factorization's fill-in
+        would dominate; ``"stochastic"`` beyond.
+    logdet_decomp : {"auto", "chol", "lu"}, default "auto"
+        The factorization an interpolating method uses: sparse Cholesky
+        (undirected ``W``; scikit-sparse CHOLMOD) or sparse LU (KLU or UMFPACK,
+        chosen by the sparsity pattern).  ``"auto"`` takes ``"chol"`` where the
+        method has it and ``W`` is undirected, else ``"lu"``.  Ignored by
+        ``"eigenvalue"`` and ``"stochastic"``; ``"spline"`` on ``"chol"``
+        raises.
     robust : bool, default False
         If True, replace the Normal innovation with Student-t.
-    w_vars : list of str, optional
+    durbin_vars : list of str, optional
         Names of X columns to spatially lag. By default all
         non-constant columns are lagged.
 
@@ -582,6 +820,7 @@ class SDMTobit(_SpatialTobitBase):
     """
 
     _priors_cls = SDMTobitPriors
+    _has_panel = False
     _has_wx_in_beta: bool = True
 
     def _build_pymc_model(self) -> pm.Model:
@@ -617,7 +856,7 @@ class SDMTobit(_SpatialTobitBase):
     def _fitted_mean_from_posterior(self) -> np.ndarray:
         """Reported fitted mean: ``max(c, E[y* | X, params])``.
 
-        The structural latent mean for SDM-Tobit is
+        The latent mean for SDMTobit is
         :math:`E[y^* \\mid X] = (I - \\rho W)^{-1} (X\\beta + WX\\theta)`,
         evaluated at posterior means; censored entries are reported at
         the censoring point.
@@ -627,8 +866,8 @@ class SDMTobit(_SpatialTobitBase):
         Z = np.hstack([self._X, self._WX])
         n = self._y.shape[0]
         A = sp.eye(n, format="csc") - rho * sp.csc_matrix(self._W_sparse)
-        structural = spla.spsolve(A, Z @ beta)
-        return np.maximum(self.censoring, structural)
+        mean = spla.spsolve(A, Z @ beta)
+        return np.maximum(self.censoring, mean)
 
     def _postprocess_idata(self, idata: xr.DataTree) -> xr.DataTree:
         """Attach the complete pointwise Tobit log-likelihood for IC metrics.
@@ -636,7 +875,7 @@ class SDMTobit(_SpatialTobitBase):
         The SDM Tobit model expresses both the residual log-likelihood and the
         Jacobian via ``pm.Potential``, so PyMC captures no pointwise
         ``log_likelihood``.  We rebuild it here from the Tobit censoring
-        formula with structural latent mean
+        formula with latent mean
         :math:`\\mu = (I - \\rho W)^{-1} (X\\beta + WX\\theta)`, where the
         stacked design ``Z = [X, WX]`` carries the Durbin lags.
         """

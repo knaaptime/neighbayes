@@ -38,9 +38,9 @@ Two independent families live here:
 
 * **Internal Gibbs-sampler structs** — resolved-hyperparameter containers
   the numpy/JAX kernels consume (``GibbsBasePriors`` →
-  ``GaussianGibbsPriors`` / ``LogitGibbsPriors`` / ``REGibbsPriors``;
+  ``GaussianGibbsPriors`` / ``BinaryGibbsPriors`` / ``REGibbsPriors``;
   standalone ``GibbsPriors``, ``ReducedGibbsPriors``,
-  ``FlowReducedGibbsPriors``, ``ZINBGibbsPriors``, ``SEMLogitGibbsPriors``).  Models build these internally in
+  ``FlowReducedGibbsPriors``, ``ZINBGibbsPriors``).  Models build these internally in
   ``_fit_gibbs``; they are not part of the user-facing ``priors=`` API.
 """
 
@@ -154,11 +154,16 @@ class SDEMPriors(SEMPriors):
 class NegBinPriors(BasePriors):
     """Priors for :class:`neighbayes.models.NegBin`.
 
-    Adds overdispersion parameters for the NB2 likelihood.
+    Adds overdispersion parameters for the NB2 likelihood: a
+    Half-Student-t(``alpha_nu``, ``alpha_sigma``) prior on α, or
+    ``alpha_fixed`` to hold α at a value.  A large fixed α (say 10-20 times
+    the typical mean count) makes the NB a Poisson stand-in that keeps the
+    exact Pólya–Gamma sampler; very large values (≳ 1000) mix poorly.
     """
 
     alpha_sigma: float = 2.5
     alpha_nu: float = 3.0
+    alpha_fixed: float | None = None
 
 
 @dataclass(frozen=True)
@@ -167,6 +172,109 @@ class SARNegBinPriors(SARPriors, NegBinPriors):
 
     Combines SAR spatial bounds with NB overdispersion parameters.
     """
+
+
+@dataclass(frozen=True)
+class SEMNegBinPriors(SEMPriors, NegBinPriors):
+    """Priors for :class:`neighbayes.models.SEMNegBin` and :class:`SDEMNegBin`.
+
+    Combines SEM spatial bounds with NB overdispersion parameters.
+    """
+
+
+@dataclass(frozen=True)
+class SARZINBPriors(NegBinPriors):
+    """Priors for :class:`neighbayes.models.SARZINB` and the ZINB panels.
+
+    Attributes
+    ----------
+    beta_mu_zero, beta_sigma_zero
+        Normal prior on the zero part's coefficients; default Gelman et al.
+        (2008) on the logit scale, centred at even odds.
+    rho_lower, rho_upper, rho_lower_zero, rho_upper_zero
+        Uniform bounds on the count and zero parts' ρ; default the stability
+        bounds of the weights.
+    alpha_sigma, alpha_nu, alpha_fixed
+        The NB dispersion, as :class:`NegBinPriors`.
+    """
+
+    beta_mu_zero: float | Any = None
+    beta_sigma_zero: float | Any = None
+    rho_lower: float | None = None
+    rho_upper: float | None = None
+    rho_lower_zero: float | None = None
+    rho_upper_zero: float | None = None
+
+
+@dataclass(frozen=True)
+class SARHurdlePriors(NegBinPriors):
+    """Priors for :class:`neighbayes.models.SARHurdleNegBin`.
+
+    Attributes
+    ----------
+    beta_mu, beta_sigma
+        Normal prior on the count coefficients β; default Gelman et al. (2008)
+        on the log scale, the intercept centred at ``log mean(y | y > 0)``.
+    beta_mu_zero, beta_sigma_zero
+        Normal prior on the zero part's coefficients; default Gelman et al.
+        (2008) on the logit scale, the intercept centred at
+        ``logit(mean(y > 0))``.
+    rho_lower, rho_upper, rho_lower_zero, rho_upper_zero
+        Uniform bounds on the count and zero parts' ρ; default the stability
+        bounds of the weights.
+    alpha_sigma, alpha_nu, alpha_fixed
+        The NB dispersion of the truncated count, as :class:`NegBinPriors`.
+    """
+
+    beta_mu_zero: float | Any = None
+    beta_sigma_zero: float | Any = None
+    rho_lower: float | None = None
+    rho_upper: float | None = None
+    rho_lower_zero: float | None = None
+    rho_upper_zero: float | None = None
+
+
+@dataclass(frozen=True)
+class MultilevelPriors(BasePriors):
+    r"""Priors for :class:`neighbayes.models.Multilevel`.
+
+    Attributes
+    ----------
+    beta_mu, beta_sigma
+        Normal prior on the units' coefficients :math:`\beta_0`; default
+        Gelman et al. (2008).
+    sigma2_alpha, sigma2_beta
+        :math:`\sigma_0^2 \sim \text{Inv-}\Gamma`, the data-informed prior
+        of the single-level models (LeSage).  ``sigma2_beta`` defaults to the
+        pooled variance of ``y`` within level-1 groups, the units' share of
+        ``Var(y)``: ``Var(y)`` itself also counts the upper levels' variance,
+        and the prior shifts the posterior mean of :math:`\sigma_0^2` by about
+        ``2 * sigma2_beta / n``, which with strong upper levels was several
+        posterior standard deviations.
+    rho_lower, rho_upper
+        Uniform bounds on every level's autoregressive parameter (ρ or λ);
+        default each graph's stability bounds, ``(-1, 1)`` when
+        row-standardized.
+    sigma_nu, sigma_scale
+        Half-t prior on each upper level's innovation sd,
+        :math:`\sigma_\ell \sim \text{half-}t_\nu(0, A)`.  ``sigma_scale``
+        (``A``) defaults to ``sd(y)``: every level's effects are in the
+        outcome's units.  ``nu = 3`` regularizes more than the half-Cauchy
+        when a level has few groups (a few dozen states, say).  NUTS and
+        Gibbs use the same prior.
+    level_beta_mu, level_beta_sigma
+        Overrides of the Normal prior on an upper level's coefficients,
+        keyed by level number or name, e.g. ``{"county": 1.0}``.  The
+        default is Gelman et al. (2008) with the outcome's scale and each
+        level's covariates.
+    """
+
+    rho_lower: float | None = None
+    rho_upper: float | None = None
+    sigma_nu: float = 3.0
+    sigma_scale: float | None = None
+    level_beta_mu: dict | None = None
+    level_beta_sigma: dict | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -197,28 +305,27 @@ class SDMTobitPriors(SDMPriors):
 
 
 @dataclass(frozen=True)
-class SARProbitPriors:
-    """Priors for :class:`neighbayes.models.SARProbit`.
+class SEMProbitREPriors:
+    """Priors for ``SEMProbit(unit_effects="random")``.
 
-    Differs from :class:`SARPriors`: there is no ``sigma`` parameter (the
-    probit link absorbs the noise scale) and the regional random-effect
-    variance ``sigma_a`` has its own half-normal scale.
+    Differs from :class:`SEMPriors`: there is no ``sigma`` parameter (the
+    probit link absorbs the noise scale) and the unit effects' sd
+    ``unit_effect_sd`` has its own half-normal scale.
     """
 
-    rho_lower: float = -0.95
-    rho_upper: float = 0.95
+    lam_lower: float = -0.95
+    lam_upper: float = 0.95
     beta_mu: float | Any = None  # Gelman et al. (2008), link scale
     beta_sigma: float | Any = None
-    sigma_a_sigma: float = 2.0
+    unit_effect_sd_sigma: float = 2.0
 
 
 @dataclass(frozen=True)
 class SARLogitPriors:
     """Priors for :class:`neighbayes.models.SARLogit`.
 
-    Like :class:`SARProbitPriors` but without ``sigma_a_sigma``
-    (the logit model has no regional random effect).  There is no
-    ``sigma`` parameter because the logit link absorbs the noise scale.
+    There is no ``sigma`` parameter because the logit link absorbs the noise
+    scale.
     """
 
     rho_lower: float = -0.999
@@ -231,12 +338,44 @@ class SARLogitPriors:
 LogitPriors = SARLogitPriors
 
 
-@dataclass
+@dataclass(frozen=True)
 class SEMLogitPriors:
-    """Priors for :class:`neighbayes.models.SEMLogit`.
+    """Priors for :class:`neighbayes.models.SEMLogit`, the latent SEM logit.
 
-    Like :class:`SARLogitPriors` but with ``lam_lower``/``lam_upper``
-    instead of ``rho_lower``/``rho_upper``.
+    :class:`SARLogitPriors` with the bounds on the spatial error parameter
+    ``lam`` in place of ``rho``'s.
+    """
+
+    lam_lower: float = -0.999
+    lam_upper: float = 0.999
+    beta_mu: float | Any = None  # Gelman et al. (2008), link scale
+    beta_sigma: float | Any = None
+
+
+@dataclass(frozen=True)
+class SARProbitPriors:
+    """Priors for :class:`neighbayes.models.SARProbit`.
+
+    :class:`SARLogitPriors` on the probit scale: the probit link fixes the
+    disturbance's scale, so there is no ``sigma``.
+    """
+
+    rho_lower: float = -0.999
+    rho_upper: float = 0.999
+    beta_mu: float | Any = None  # Gelman et al. (2008), link scale
+    beta_sigma: float | Any = None
+
+
+# Alias — the non-spatial Probit model uses the same prior structure.
+ProbitPriors = SARProbitPriors
+
+
+@dataclass(frozen=True)
+class SEMProbitPriors:
+    """Priors for :class:`neighbayes.models.SEMProbit`, the latent SEM probit.
+
+    :class:`SARProbitPriors` with the bounds on the spatial error parameter
+    ``lam`` in place of ``rho``'s.
     """
 
     lam_lower: float = -0.999
@@ -254,6 +393,8 @@ PriorsLike = Union[
     Mapping[str, Any],
     BasePriors,
     "SARProbitPriors",
+    "SEMProbitPriors",
+    "SEMProbitREPriors",
     "SARLogitPriors",
     "SEMLogitPriors",
     None,
@@ -352,38 +493,156 @@ class PanelBasePriors:
 
 @dataclass(frozen=True)
 class PanelOLSPriors(PanelBasePriors):
-    """Priors for :class:`neighbayes.models.OLSPanelFE`."""
-
-
-@dataclass(frozen=True)
-class PanelSLXPriors(PanelBasePriors):
-    """Priors for :class:`neighbayes.models.SLXPanelFE`."""
+    """The base of :class:`PanelOLSREPriors`: the panel keys with no spatial bounds."""
 
 
 @dataclass(frozen=True)
 class PanelSARPriors(PanelBasePriors):
-    """Priors for :class:`neighbayes.models.SARPanelFE` (adds rho bounds)."""
+    """Panel priors with ``rho`` bounds: the base of the SAR random-effects and
+    count panel priors."""
 
     rho_lower: float = -1.0
     rho_upper: float = 1.0
 
 
 @dataclass(frozen=True)
+class _PanelCountBasePriors(PanelSARPriors):
+    """The count panels' shared priors: the NB dispersion and the period effects.
+
+    Attributes
+    ----------
+    alpha_sigma, alpha_nu
+        Half-Student-t prior on the NB2 dispersion.
+    alpha_fixed
+        Hold the dispersion at this value instead (see :class:`NegBinPriors`).
+    time_effect_mu, time_effect_sigma
+        Normal prior on each period effect; the mean defaults to zero beside
+        unit (pair) effects (a shift from the baseline period) and to
+        ``log(mean(y))`` without them (each period's level).
+
+    The ``sigma2_*`` and ``nu`` fields inherited from the Gaussian panels are
+    unused.
+    """
+
+    alpha_sigma: float = 2.5
+    alpha_nu: float = 3.0
+    alpha_fixed: float | None = None
+    time_effect_mu: float | None = None
+    time_effect_sigma: float = 2.5
+
+
+@dataclass(frozen=True)
+class PanelCountPriors(_PanelCountBasePriors):
+    """Priors for the count panels (:class:`neighbayes.models.SARNegBin` & co).
+
+    The dispersion and period-effect priors of :class:`_PanelCountBasePriors`,
+    plus the unit effects':
+
+    Attributes
+    ----------
+    unit_effect_mu
+        Mean of the unit effects: 0 when the design keeps an intercept (it
+        carries the level), else ``log(mean(y))``.
+    unit_effect_sd_scale
+        Scale of the half-Student-t(3) prior on the effects' sd, which is
+        learned (the effects are partially pooled).  Default 1.
+    """
+
+    unit_effect_mu: float | None = None
+    unit_effect_sd_scale: float = 1.0
+
+
+@dataclass(frozen=True)
+class PanelZINBPriors(PanelCountPriors):
+    """Priors for the ZINB panels (:class:`neighbayes.models.SARZINB` & co).
+
+    The count part's priors of :class:`PanelCountPriors` (β, ρ, α, the unit
+    and period effects), plus the zero part's, named as the count part's with
+    a ``_zero`` suffix:
+
+    Attributes
+    ----------
+    beta_mu_zero, beta_sigma_zero
+        Normal prior on the zero part's coefficients; default Gelman et al.
+        (2008) on the logit scale, centred at even odds.
+    rho_lower_zero, rho_upper_zero
+        Uniform bounds on the zero part's ρ; default the count part's.
+    """
+
+    beta_mu_zero: float | Any = None
+    beta_sigma_zero: float | Any = None
+    rho_lower_zero: float | None = None
+    rho_upper_zero: float | None = None
+
+
+@dataclass(frozen=True)
+class PanelHurdlePriors(PanelCountPriors):
+    """Priors for the hurdle panels (:class:`neighbayes.models.SARHurdleNegBin` & co).
+
+    The count part takes the priors of :class:`PanelCountPriors` (β, ρ, α,
+    the unit and period effects), centred on the positive counts: the
+    intercept defaults to ``log mean(y | y > 0)``.  The zero part's are named
+    as the count part's with a ``_zero`` suffix:
+
+    Attributes
+    ----------
+    beta_mu_zero, beta_sigma_zero
+        Normal prior on the zero part's coefficients; default Gelman et al.
+        (2008) on the logit scale, the intercept centred at
+        ``logit(mean(y > 0))``.
+    rho_lower_zero, rho_upper_zero
+        Uniform bounds on the zero part's ρ; default the count part's.
+    unit_effect_mu_zero, unit_effect_sd_scale_zero
+        Mean of the zero part's unit effects (0 when its design keeps an
+        intercept, else ``logit(mean(y > 0))``) and the scale of the half-t(3)
+        prior on their learned sd (default 1).
+    time_effect_mu_zero, time_effect_sigma_zero
+        Normal prior on each of the zero part's period effects: mean zero
+        beside unit effects, ``logit(mean(y > 0))`` without them.
+    """
+
+    beta_mu_zero: float | Any = None
+    beta_sigma_zero: float | Any = None
+    rho_lower_zero: float | None = None
+    rho_upper_zero: float | None = None
+    unit_effect_mu_zero: float | None = None
+    unit_effect_sd_scale_zero: float = 1.0
+    time_effect_mu_zero: float | None = None
+    time_effect_sigma_zero: float = 2.5
+
+
+@dataclass(frozen=True)
+class FlowPanelHurdlePriors(_PanelCountBasePriors):
+    """Priors for the hurdle flow panels (:class:`neighbayes.models.SARHurdleNegBinFlow`).
+
+    As :class:`PanelHurdlePriors`, with pair effects in place of unit effects:
+    ``pair_effect_mu``, ``pair_effect_sd_scale`` and their ``_zero`` twins.
+    """
+
+    pair_effect_mu: float | None = None
+    pair_effect_sd_scale: float = 1.0
+    beta_mu_zero: float | Any = None
+    beta_sigma_zero: float | Any = None
+    rho_lower_zero: float | None = None
+    rho_upper_zero: float | None = None
+    pair_effect_mu_zero: float | None = None
+    pair_effect_sd_scale_zero: float = 1.0
+    time_effect_mu_zero: float | None = None
+    time_effect_sigma_zero: float = 2.5
+
+
+@dataclass(frozen=True)
 class PanelSEMPriors(PanelBasePriors):
-    """Priors for :class:`neighbayes.models.SEMPanelFE` (adds lam bounds)."""
+    """Panel priors with ``lam`` bounds: the base of the SEM and SDEM
+    random-effects priors."""
 
     lam_lower: float = -1.0
     lam_upper: float = 1.0
 
 
 @dataclass(frozen=True)
-class PanelSDMPriors(PanelSARPriors):
-    """Priors for :class:`neighbayes.models.SDMPanelFE`."""
-
-
-@dataclass(frozen=True)
 class PanelSDEMPriors(PanelSEMPriors):
-    """Priors for :class:`neighbayes.models.SDEMPanelFE`."""
+    """The base of :class:`PanelSDEMREPriors`."""
 
 
 # -- Panel random-effects ----------------------------------------------------
@@ -395,14 +654,14 @@ class PanelREMixinPriors:
 
     Attributes
     ----------
-    sigma_alpha_nu, sigma_alpha_scale
+    unit_effect_sd_nu, unit_effect_sd_scale
         Half-t prior on the random-effect scale,
         :math:`\sigma_\alpha \sim \text{half-}t_\nu(0, A)`.  The default
         ``nu = 1`` is the half-Cauchy of Gelman (2006) and Polson & Scott
         (2012), the weakly informative choice for a hierarchical variance;
         the inverse gamma, conjugate or near-improper, pulls
         :math:`\sigma_\alpha` toward zero and over-shrinks the unit effects
-        when units are few or weakly identified.  ``sigma_alpha_scale``
+        when units are few or weakly identified.  ``unit_effect_sd_scale``
         (``A``) defaults to ``sd(y)`` at construction, so the prior is
         scale-aware like the Gelman et al. (2008) default for
         :math:`\beta`.  NUTS and Gibbs use the same prior; the Gibbs
@@ -410,41 +669,31 @@ class PanelREMixinPriors:
         scale mixture of Huang & Wand (2013).
     """
 
-    sigma_alpha_nu: float = 1.0
-    sigma_alpha_scale: float | None = None
+    unit_effect_sd_nu: float = 1.0
+    unit_effect_sd_scale: float | None = None
 
 
 @dataclass(frozen=True)
 class PanelOLSREPriors(PanelOLSPriors, PanelREMixinPriors):
-    """Priors for :class:`neighbayes.models.OLSPanelRE`."""
+    """Priors for :class:`neighbayes.models.OLS` with random unit effects."""
 
 
 @dataclass(frozen=True)
 class PanelSARREPriors(PanelSARPriors, PanelREMixinPriors):
-    """Priors for :class:`neighbayes.models.SARPanelRE`."""
+    """Priors for :class:`neighbayes.models.SAR` with random unit effects."""
 
 
 @dataclass(frozen=True)
 class PanelSEMREPriors(PanelSEMPriors, PanelREMixinPriors):
-    """Priors for :class:`neighbayes.models.SEMPanelRE`."""
+    """Priors for :class:`neighbayes.models.SEM` with random unit effects."""
 
 
 @dataclass(frozen=True)
 class PanelSDEMREPriors(PanelSDEMPriors, PanelREMixinPriors):
-    """Priors for :class:`neighbayes.models.SDEMPanelRE`."""
+    """Priors for :class:`neighbayes.models.SDEM` with random unit effects."""
 
 
 # -- Panel Tobit -------------------------------------------------------------
-
-
-@dataclass(frozen=True)
-class PanelSARTobitPriors(PanelSARPriors):
-    """Priors for :class:`neighbayes.models.SARPanelTobit`."""
-
-
-@dataclass(frozen=True)
-class PanelSEMTobitPriors(PanelSEMPriors):
-    """Priors for :class:`neighbayes.models.SEMPanelTobit`."""
 
 
 # -- Panel dynamic (tighter [-0.95, 0.95] bounds; adds phi) -----------------
@@ -464,17 +713,17 @@ class PanelDynamicBasePriors(PanelBasePriors):
 
 @dataclass(frozen=True)
 class PanelOLSDynamicPriors(PanelDynamicBasePriors):
-    """Priors for :class:`neighbayes.models.OLSPanelDynamic`."""
+    """Priors for the dynamic panel of :class:`neighbayes.models.OLS`."""
 
 
 @dataclass(frozen=True)
 class PanelSLXDynamicPriors(PanelDynamicBasePriors):
-    """Priors for :class:`neighbayes.models.SLXPanelDynamic`."""
+    """Priors for the dynamic panel of :class:`neighbayes.models.SLX`."""
 
 
 @dataclass(frozen=True)
 class PanelSARDynamicPriors(PanelDynamicBasePriors):
-    """Priors for :class:`neighbayes.models.SARPanelDynamic`."""
+    """Priors for the dynamic panel of :class:`neighbayes.models.SAR`."""
 
     rho_lower: float = -0.95
     rho_upper: float = 0.95
@@ -482,7 +731,7 @@ class PanelSARDynamicPriors(PanelDynamicBasePriors):
 
 @dataclass(frozen=True)
 class PanelSEMDynamicPriors(PanelDynamicBasePriors):
-    """Priors for :class:`neighbayes.models.SEMPanelDynamic`."""
+    """Priors for the dynamic panel of :class:`neighbayes.models.SEM`."""
 
     lam_lower: float = -0.95
     lam_upper: float = 0.95
@@ -490,12 +739,12 @@ class PanelSEMDynamicPriors(PanelDynamicBasePriors):
 
 @dataclass(frozen=True)
 class PanelSDMRDynamicPriors(PanelSARDynamicPriors):
-    """Priors for :class:`neighbayes.models.SDMRPanelDynamic`."""
+    """Priors for the restricted dynamic panel of :class:`neighbayes.models.SDM`."""
 
 
 @dataclass(frozen=True)
 class PanelSDMUDynamicPriors(PanelSARDynamicPriors):
-    """Priors for :class:`neighbayes.models.SDMUPanelDynamic`.
+    """Priors for the dynamic panel of :class:`neighbayes.models.SDM`.
 
     Adds bounds on the time-space cross-term coefficient ``theta``.
     """
@@ -506,7 +755,7 @@ class PanelSDMUDynamicPriors(PanelSARDynamicPriors):
 
 @dataclass(frozen=True)
 class PanelSDEMDynamicPriors(PanelSEMDynamicPriors):
-    """Priors for :class:`neighbayes.models.SDEMPanelDynamic`."""
+    """Priors for the dynamic panel of :class:`neighbayes.models.SDEM`."""
 
 
 # ---------------------------------------------------------------------------
@@ -569,38 +818,17 @@ class GaussianGibbsPriors:
 
 
 @dataclass
-class GibbsPriors:
-    """Prior hyperparameters for the SAR-NB Gibbs sampler.
-
-    All priors are weakly informative by default, matching the
-    ``GaussianGibbsPriors`` convention.
-    """
-
-    beta_mu: np.ndarray | float = 0.0
-    beta_sigma: np.ndarray | float = 1e6
-    sigma2_alpha: float = 2.0  # InverseGamma shape for σ²
-    sigma2_beta: float = 1.0  # InverseGamma scale for σ²
-    alpha_sigma: float = 10.0  # HalfNormal scale for α
-    alpha_nu: float = 3.0  # Half-Student-t degrees of freedom for α
-    rho_lower: float = -0.999
-    rho_upper: float = 0.999
-
-
-@dataclass
 class ReducedGibbsPriors:
     """Prior hyperparameters for the reduced-form SAR-NB sampler.
 
-    Notes
-    -----
-    The ``sigma2_*`` fields present on the structural-form
-    :class:`GibbsPriors` are intentionally absent — this sampler has no
-    :math:`\\sigma` parameter.
+    The NB samplers' shared α step reads its ``alpha_*`` fields.
     """
 
     beta_mu: np.ndarray | float = 0.0
     beta_sigma: np.ndarray | float = 1e6
     alpha_sigma: float = 2.5  # Half-Student-t scale for α
     alpha_nu: float = 3.0  # Half-Student-t degrees of freedom for α
+    alpha_fixed: float | None = None  # hold α here instead of sampling it
     rho_lower: float = -0.999
     rho_upper: float = 0.999
 
@@ -613,6 +841,7 @@ class FlowReducedGibbsPriors:
     beta_sigma: np.ndarray | float = 1e6
     alpha_sigma: float = 2.5
     alpha_nu: float = 3.0
+    alpha_fixed: float | None = None
     rho_lower: float = -0.999
     rho_upper: float = 0.999
 
@@ -637,29 +866,17 @@ class ZINBGibbsPriors:
     rho_upper: float = 0.999
     alpha_sigma: float = 2.5
     alpha_nu: float = 3.0
+    alpha_fixed: float | None = None  # hold α here instead of sampling it
 
 
 @dataclass
-class LogitGibbsPriors(GibbsBasePriors):
+class BinaryGibbsPriors(GibbsBasePriors):
     """Prior hyperparameters for the SAR-logit Gibbs sampler.
 
     All priors are weakly informative by default.  There is no σ²
     parameter (the logit link absorbs the error scale) and no α
     parameter (binary response is always Bernoulli).
     """
-
-
-@dataclass
-class SEMLogitGibbsPriors:
-    """Prior hyperparameters for the SEM-logit Gibbs sampler.
-
-    No σ² parameter (logit link absorbs error scale).
-    """
-
-    beta_mu: np.ndarray | float = 0.0
-    beta_sigma: np.ndarray | float = 1e6
-    lam_lower: float = -0.999
-    lam_upper: float = 0.999
 
 
 @dataclass
@@ -673,15 +890,15 @@ class REGibbsPriors(GibbsBasePriors):
 
     * ``sigma2_alpha``, ``sigma2_beta``: σ² ~ Inv-Γ(sigma2_alpha,
       sigma2_beta), the models' default ``Inv-Γ(2, Var(y))``.
-    * ``sigma_alpha_nu``, ``sigma_alpha_scale``: σ_α ~ half-t_ν(0, A),
+    * ``unit_effect_sd_nu``, ``unit_effect_sd_scale``: σ_α ~ half-t_ν(0, A),
       half-Cauchy by default (see :class:`PanelREMixinPriors`), sampled
       through the Huang & Wand (2013) inverse-gamma mixture.
     """
 
     sigma2_alpha: float = 2.0
     sigma2_beta: float = 1.0
-    sigma_alpha_nu: float = 1.0
-    sigma_alpha_scale: float = 1.0
+    unit_effect_sd_nu: float = 1.0
+    unit_effect_sd_scale: float = 1.0
 
 
 __all__ = [
@@ -694,25 +911,25 @@ __all__ = [
     "SDEMPriors",
     "NegBinPriors",
     "SARNegBinPriors",
+    "SEMNegBinPriors",
     "SARTobitPriors",
     "SEMTobitPriors",
     "SDMTobitPriors",
     "SARProbitPriors",
+    "SEMProbitPriors",
+    "SEMProbitREPriors",
     "SARLogitPriors",
     "SEMLogitPriors",
+    "MultilevelPriors",
     "PanelBasePriors",
     "PanelOLSPriors",
-    "PanelSLXPriors",
     "PanelSARPriors",
     "PanelSEMPriors",
-    "PanelSDMPriors",
     "PanelSDEMPriors",
     "PanelOLSREPriors",
     "PanelSARREPriors",
     "PanelSEMREPriors",
     "PanelSDEMREPriors",
-    "PanelSARTobitPriors",
-    "PanelSEMTobitPriors",
     "PanelDynamicBasePriors",
     "PanelOLSDynamicPriors",
     "PanelSLXDynamicPriors",
@@ -724,12 +941,10 @@ __all__ = [
     # Gibbs sampler prior structs
     "GibbsBasePriors",
     "GaussianGibbsPriors",
-    "GibbsPriors",
     "ReducedGibbsPriors",
     "FlowReducedGibbsPriors",
     "ZINBGibbsPriors",
-    "LogitGibbsPriors",
-    "SEMLogitGibbsPriors",
+    "BinaryGibbsPriors",
     "REGibbsPriors",
     "PriorsLike",
     "resolve_priors",

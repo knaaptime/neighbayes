@@ -1,0 +1,307 @@
+r"""Reduced-form SAR hurdle negative binomial (cross-section).
+
+.. math::
+
+    P(y_i > 0) &= \mathrm{logit}^{-1}(\eta_{z,i}), \qquad
+    \eta_z = (I - \rho_z W_z)^{-1} X_z\beta_z, \\
+    y_i \mid y_i > 0 &\sim \mathrm{NB2}(e^{\eta^{\mathrm{c}}_i}, \alpha)
+    \text{ truncated at } 0, \qquad
+    \eta^{\mathrm{c}} = (I - \rho W)^{-1} X\beta .
+
+A hurdle separates *whether* a count is positive from *how large* it is when
+it is.  Unlike a zero-inflated model it has no latent allocation: the zero
+part is a reduced-form spatial logit on the observed ``d = 1(y > 0)`` and the
+count part a zero-truncated reduced-form spatial NB on the positive counts, so
+both parts are identified from observed data even when the counts are sparse.
+Both parts are reduced-form SARs (the spatial lag acts on the linear
+predictor, with no latent disturbance), so no Jacobian enters either.
+``ρ_z``, ``β_z`` are the posterior's ``rho_zero``, ``beta_zero``.
+"""
+
+from __future__ import annotations
+
+from typing import Optional
+
+import numpy as np
+import scipy.sparse as sp
+
+from ..._lazy_deps import xr
+from ...samplers import hurdle as _hurdle  # noqa: F401  (registers the runners)
+from .._base._nb import nb_alpha_rv
+from .._mixins._designs import CountDesigns
+from .._mixins._hurdle import HurdleMixin
+from .._mixins._zero_part import ZeroPartMixin
+from ..base import SpatialModel
+from ..panel._hurdle import _HurdlePanel
+from ..priors import PanelHurdlePriors, SARHurdlePriors
+from ._latent_two_part import LatentHurdleMixin
+
+
+class SARHurdleNegBin(
+    CountDesigns,
+    _HurdlePanel,
+    ZeroPartMixin,
+    LatentHurdleMixin,
+    HurdleMixin,
+    SpatialModel,
+):
+    """Bayesian reduced-form SAR hurdle NB2 with a Pólya–Gamma Gibbs sampler.
+
+    Parameters
+    ----------
+    formula : str, optional
+        Count-part formula, e.g. ``"y ~ x1 + x2"``. Requires ``data``.
+    data : pandas.DataFrame or geopandas.GeoDataFrame, optional
+        Data source for formula mode.
+    y : array-like, optional
+        Non-negative integer counts of shape ``(n,)`` (matrix mode).
+    X : array-like, optional
+        Count-part design of shape ``(n, k)`` (matrix mode).
+    X_zero : array-like or pandas.DataFrame, optional
+        Zero-part design of shape ``(n, p)``; a DataFrame's column names
+        label ``beta_zero``.  Default: ``X``.
+    formula_zero : str, optional
+        Zero-part right-hand side, e.g. ``"~ z1 + z2"`` (formula mode).
+    W : libpysal.graph.Graph or scipy.sparse matrix
+        Count-part weights, ``n × n`` (``N × N`` in a panel).
+    W_zero : libpysal.graph.Graph or scipy.sparse matrix, optional
+        Zero-part weights. Default: ``W``.
+    priors : dict, optional
+        ``beta_mu``/``beta_sigma`` (default Gelman et al. 2008 on the log
+        scale, the intercept at ``log mean(y | y > 0)``), ``beta_mu_zero``/
+        ``beta_sigma_zero`` (logit scale, the intercept at
+        ``logit(mean(y > 0))``), ``rho_lower``/``rho_upper``,
+        ``rho_lower_zero``/``rho_upper_zero``,
+        ``alpha_sigma``/``alpha_nu`` and ``alpha_fixed``.  See
+        :class:`~neighbayes.models.priors.SARHurdlePriors`.
+    logdet_method : {"eigenvalue", "cheb", "aaa", "spline", "stochastic"}, optional
+        How ``log|I - rho*W|`` is computed over rho: summed over the
+        eigenvalues of ``W``; interpolated (Chebyshev, AAA rational, or cubic
+        spline) through values from a sparse factorization, exact to the
+        interpolant's tolerance; or expanded stochastically with no
+        factorization, the one method with sampling error.  ``None`` (default)
+        selects from the size and symmetry of ``W``: ``"eigenvalue"`` for
+        ``n <= 500``; ``"aaa"`` up to ``n = 60000``
+        (``NEIGHBAYES_LOGDET_FACTOR_MAX_N``) unless the factorization's fill-in
+        would dominate; ``"stochastic"`` beyond.
+    logdet_decomp : {"auto", "chol", "lu"}, default "auto"
+        The factorization an interpolating method uses: sparse Cholesky
+        (undirected ``W``; scikit-sparse CHOLMOD) or sparse LU (KLU or UMFPACK,
+        chosen by the sparsity pattern).  ``"auto"`` takes ``"chol"`` where the
+        method has it and ``W`` is undirected, else ``"lu"``.  Ignored by
+        ``"eigenvalue"`` and ``"stochastic"``; ``"spline"`` on ``"chol"``
+        raises.
+    time_col, unit_col : str, optional
+        Formula-mode panel: the period and unit columns of ``data``.  Given
+        time, the model is a panel (:mod:`neighbayes.models.panel._hurdle`),
+        stacked by period, then unit.  A panel's priors are
+        :class:`~neighbayes.models.priors.PanelHurdlePriors`.
+    N, T : int, optional
+        Matrix-mode panel: the numbers of units and periods.
+    unit_effects : {None, "random"}, default None
+        A panel's random unit effects in **both** parts, each inside its own
+        filter.  In the zero part a unit effect absorbs each unit's baseline
+        chance of a positive count, so ``beta_zero`` is identified from
+        within-unit switches between zero and positive periods.
+    time_effects : bool, default False
+        A panel's fixed time effects in both parts.
+    mundlak : bool, default False
+        Add the unit means of the time-varying columns to both of a panel's
+        designs.  Needs unit effects.
+    latent : bool, default False
+        The latent model instead of the reduced form: each part a latent SAR
+        propagating its own disturbance, a count positive when its logistic
+        utility is, and then Poisson given the log-mean, truncated at zero
+        (:mod:`neighbayes.samplers.two_part_latent`).  As a panel both parts
+        take the effects above, each inside its own filter.
+
+    Notes
+    -----
+    ``fit()`` runs the Gibbs sampler of :mod:`neighbayes.samplers.hurdle._generic`:
+    a Pólya–Gamma logit for the zero part; for the count part a Pólya–Gamma
+    NB with the truncation augmented exactly (geometric counts of the zeros it
+    hid), plus a joint slice on the count level and ``log α``, which otherwise
+    trade off along a ridge when the positive counts are mostly ones.
+    ``sampler="nuts"`` fits the same model and priors in PyMC
+    (``HurdleNegativeBinomial``).
+
+    The zero part is ``impacts(equation="zero")``, with parameters
+    ``beta_zero`` and ``rho_zero``; :meth:`activation_probabilities` gives
+    ``P(y > 0)``, :meth:`positive_mean` ``E[y | y > 0]``.
+    """
+
+    _DESIGNS = {
+        "static": {},
+        "latent": {"_gibbs_key": ("hurdle_latent", "cross_section")},
+        "panel": {
+            "_priors_cls": PanelHurdlePriors,
+            "_gibbs_key": ("hurdle", "panel"),
+        },
+    }
+    _zero_part = True
+    _latent_panel = True
+    _needs_positive = True
+
+    _spatial_params: tuple[str, ...] = ("rho", "rho_zero")
+    _model_type: str = "hurdle_sar"
+    _gibbs_key: tuple[str, str] | None = ("hurdle", "cross_section")
+    _priors_cls = SARHurdlePriors
+
+    def _model_coords_static(self, extra: Optional[dict] = None) -> dict:
+        coords = SpatialModel._model_coords(self, extra)
+        coords["coefficient_zero"] = list(self._sel_feature_names)
+        return coords
+
+    # ------------------------------------------------------------------
+    # Sampling
+    # ------------------------------------------------------------------
+
+    def _fit_gibbs_static(
+        self,
+        *,
+        draws: int = 2000,
+        tune: int = 1000,
+        chains: int = 4,
+        random_seed: Optional[int] = None,
+        thin: int = 1,
+        n_jobs: int = -1,
+        progressbar: bool = True,
+        log_likelihood: bool = False,
+    ) -> xr.DataTree:
+        """Sample via the generic hurdle kernel (registry ``("hurdle", "cross_section")``)."""
+        from ...samplers._utils._idata import gibbs_to_inference_data
+        from ...samplers._utils._seeds import spawn_chain_seeds
+        from ...samplers.count_panel import CountPanelFE
+        from ...samplers.count_panel._filters import SARFilter
+        from ...samplers.gaussian._chain_runner import run_chains
+        from ...samplers.hurdle._generic import HurdlePriors, run_chain
+
+        beta_mu, beta_sigma = self._hurdle_beta_prior(self._X, self._feature_names)
+        gamma_mu, gamma_sigma = self._hurdle_gamma_prior(
+            self._Z, self._sel_feature_names
+        )
+        a_sigma, a_nu, a_fixed = self._hurdle_alpha()
+        priors = HurdlePriors(
+            gamma_mu=gamma_mu,
+            gamma_sigma=gamma_sigma,
+            theta_mu=beta_mu,
+            theta_sigma=beta_sigma,
+            alpha_sigma=a_sigma,
+            alpha_nu=a_nu,
+            alpha_fixed=a_fixed,
+        )
+        filt_cnt = SARFilter(self._W_sparse, 1, *self._bounds())
+        filt_bin = SARFilter(self._W_zero_sparse, 1, *self._bounds(zero=True))
+        y = self._y.astype(np.float64)
+        X = np.asarray(self._X, dtype=np.float64)
+        Z = np.asarray(self._Z, dtype=np.float64)
+
+        def _chain_fn(chain_id, seed, progress_manager=None, chain_id_kw=0):
+            return run_chain(
+                y,
+                X,
+                Z,
+                filt_cnt,
+                filt_bin,
+                CountPanelFE(),
+                CountPanelFE(),
+                priors,
+                draws,
+                tune,
+                thin=thin,
+                rng=np.random.default_rng(seed),
+                chain_id=chain_id,
+                progress_manager=progress_manager,
+                store_log_lik=log_likelihood,
+            )
+
+        seeds = (
+            spawn_chain_seeds(random_seed, chains) if random_seed is not None else None
+        )
+        results = run_chains(
+            chain_fn=_chain_fn,
+            n_chains=chains,
+            seeds=seeds,
+            n_jobs=n_jobs,
+            progressbar=progressbar,
+            parallel=n_jobs != 1,
+            draws=draws,
+            tune=tune,
+            model_type=type(self).__name__,
+            timeout=None,
+        )
+        stack = lambda key: np.stack([r[key] for r in results], axis=0)  # noqa: E731
+        post = {
+            name: stack(name)
+            for name in ("rho_zero", "beta_zero", "rho", "beta", "alpha")
+        }
+        idata = gibbs_to_inference_data(
+            posterior_samples=post,
+            log_likelihood={"obs": stack("log_lik")} if log_likelihood else None,
+            observed_data={"obs": self._y_int},
+            coords={
+                "coefficient_zero": list(self._sel_feature_names),
+                "coefficient": list(self._feature_names),
+                "obs_id": list(range(len(self._y))),
+            },
+            dims={
+                "beta_zero": ["coefficient_zero"],
+                "beta": ["coefficient"],
+                "obs": ["obs_id"],
+            },
+        )
+        self._idata = idata
+        return idata
+
+    def _build_pymc_model_static(self):
+        r"""The same reduced-form hurdle and priors as the Gibbs path, in PyMC.
+
+        ``y ~ HurdleNB(ψ = π, μ = exp(η_c), α)``, where PyMC's ``ψ`` is
+        ``P(y > 0)``.  No ``log|I − ρW|`` terms: neither half transforms ``y``.
+        """
+        import pytensor.tensor as pt
+
+        from ..._lazy_deps import pm
+        from ..._ops import SparseSARSolveOp
+
+        beta_mu, beta_sigma = self._hurdle_beta_prior(self._X, self._feature_names)
+        gamma_mu, gamma_sigma = self._hurdle_gamma_prior(
+            self._Z, self._sel_feature_names
+        )
+        a_sigma, a_nu, a_fixed = self._hurdle_alpha()
+        with pm.Model(coords=self._model_coords()) as model:
+            lam = pm.Uniform("rho_zero", *self._bounds(zero=True))
+            gamma = pm.Normal(
+                "beta_zero", mu=gamma_mu, sigma=gamma_sigma, dims="coefficient_zero"
+            )
+            rho = pm.Uniform("rho", *self._bounds())
+            beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
+            alpha = nb_alpha_rv(a_fixed, a_nu, a_sigma)
+            eta_b = SparseSARSolveOp(self._W_zero_sparse)(
+                lam, pt.dot(pt.as_tensor_variable(self._Z), gamma)
+            )
+            eta_c = SparseSARSolveOp(self._W_sparse)(
+                rho, pt.dot(pt.as_tensor_variable(self._X), beta)
+            )
+            pm.HurdleNegativeBinomial(
+                "obs",
+                psi=pm.math.sigmoid(eta_b),
+                mu=pt.exp(eta_c),
+                alpha=alpha,
+                observed=self._y_int,
+            )
+        return model
+
+    def _part_etas_static(self, g: int) -> tuple[np.ndarray, np.ndarray]:
+        """``(η_b, η_c)`` at posterior draw ``g``."""
+        n = self._X.shape[0]
+        lam = float(self._flat_draw("rho_zero")[g])
+        rho = float(self._flat_draw("rho")[g])
+        eye = sp.eye(n, format="csc", dtype=np.float64)
+        eta_b = sp.linalg.splu((eye - lam * self._W_zero_sparse).tocsc()).solve(
+            self._Z @ self._flat_draw("beta_zero")[g]
+        )
+        eta_c = sp.linalg.splu((eye - rho * self._W_sparse).tocsc()).solve(
+            self._X @ self._flat_draw("beta")[g]
+        )
+        return eta_b, eta_c

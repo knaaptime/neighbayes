@@ -15,11 +15,8 @@ import arviz as az
 import numpy as np
 import pytest
 
-from neighbayes.dgp.flows import (
-    generate_negbin_flow_data_separable,
-    generate_panel_negbin_flow_data_separable,
-)
-from neighbayes.models import SARNegBinFlowSeparable, SARNegBinFlowSeparablePanel
+from neighbayes.dgp import simulate_sar_negbin_flow
+from neighbayes.models import SARNegBinFlow
 from neighbayes.models._base._shared import gelman_default_beta_prior
 from neighbayes.models.priors import FlowReducedGibbsPriors
 from neighbayes.samplers.negbin_reduced._flow import (
@@ -34,14 +31,16 @@ DRAWS, TUNE, CHAINS = 4000, 800, 4
 
 @pytest.fixture(scope="module")
 def data():
-    return generate_negbin_flow_data_separable(
-        n=N_REGIONS, rho_d=0.35, rho_o=0.25, seed=3
+    return simulate_sar_negbin_flow(
+        n=N_REGIONS, rho_d=0.35, rho_o=0.25, seed=3, separable=True
     )
 
 
 def _model(data):
     y = data["y_vec"] if "y_vec" in data else data["y"]
-    return SARNegBinFlowSeparable(y, data["X"], data["G"], col_names=data["col_names"])
+    return SARNegBinFlow(
+        y, data["X"], data["G"], separable=True, col_names=data["col_names"]
+    )
 
 
 def _exact_reference(m, n, T=1):
@@ -110,11 +109,11 @@ PANEL_N, PANEL_T = 20, 4
 
 @pytest.fixture(scope="module")
 def panel_model():
-    d = generate_panel_negbin_flow_data_separable(
-        n=PANEL_N, T=PANEL_T, rho_d=0.35, rho_o=0.25, seed=5
+    d = simulate_sar_negbin_flow(
+        n=PANEL_N, T=PANEL_T, rho_d=0.35, rho_o=0.25, seed=5, separable=True
     )
-    return SARNegBinFlowSeparablePanel(
-        d["y"], d["X"], d["G"], T=PANEL_T, col_names=d["col_names"]
+    return SARNegBinFlow(
+        d["y"], d["X"], d["G"], separable=True, T=PANEL_T, col_names=d["col_names"]
     )
 
 
@@ -135,7 +134,7 @@ def test_separable_posterior_matches_exact_reference(data, reference, backend):
         chains=CHAINS,
         random_seed=11,
         progressbar=False,
-        gibbs_backend=backend,
+        backend=backend,
     )
     _assert_matches(idata, reference)
 
@@ -151,6 +150,6 @@ def test_separable_panel_posterior_matches_exact_reference(
         chains=CHAINS,
         random_seed=11,
         progressbar=False,
-        gibbs_backend=backend,
+        backend=backend,
     )
     _assert_matches(idata, panel_reference)

@@ -1,16 +1,10 @@
 """Log-determinant computation for spatial econometric models.
 
-Five methods:
-
-* ``"eigenvalue"`` — exact, O(n) per call after O(n³) setup.
-* ``"slq"`` — Stochastic Lanczos Quadrature; 300 matvecs, ρ-independent.
-* ``"chebyshev"`` — Barry-Pace MC traces → Chebyshev; O(m) per call.
-* ``"cheb_stochastic"`` — stochastic Chebyshev expansion (Han et al. 2015);
-  geometric convergence, same matvec cost as ``chebyshev``.
-* ``"traces"`` — multinomial trace expansion for unrestricted 3-parameter
-  flow models (the only option when the system matrix doesn't factor).
-
-Auto-selection: ``"eigenvalue"`` for n ≤ 500, ``"cheb_stochastic"`` otherwise.
+A model names its log-determinant by ``logdet_method`` (the approximation over
+ρ: ``exact``, ``cheb``, ``aaa``, ``spline``, ``stochastic``, or the unrestricted
+flows' ``trace_series`` and ``resolvent``) and ``logdet_decomp`` (what supplies
+the exact values: ``eig``, ``chol`` or ``lu``).  :mod:`._config` documents the
+names, the auto-selection and the internal keys the factories dispatch on.
 """
 
 from ._aaa import (
@@ -25,26 +19,26 @@ from ._aaa import (
 from ._cheb_stochastic import (
     ChebStochasticPrecompute,
     cheb_stochastic_logdet_eval,
-    cheb_stochastic_logdet_eval_vec,
     cheb_stochastic_logdet_precompute,
 )
-from ._chebyshev import chebyshev
 from ._chol_cheb import (
     CholChebPrecompute,
-    chol_cheb_logdet_eval,
     chol_cheb_logdet_eval_vec,
     chol_cheb_logdet_precompute,
 )
 from ._config import (
+    FLOW_LOGDET_METHODS,
+    LOGDET_DECOMPS,
+    LOGDET_METHODS,
     VALID_LOGDET_METHODS,
     LogdetBounds,
     LogDetMethod,
-    LogDetMethodName,
+    logdet_key,
+    logdet_label,
     resolve_logdet_bounds,
     resolve_logdet_method,
 )
 from ._factories import (
-    clear_logdet_fn_cache,
     get_cached_logdet_fn,
     make_logdet_fn,
     make_logdet_grad_numpy_fn,
@@ -63,13 +57,9 @@ from ._flow import (
 _FLOW_RESOLVENT_EXPORTS = frozenset(
     {
         "FlowKron",
-        "FlowKronJax",
         "flow_logdet_grad",
-        "flow_logdet_grad_exact",
-        "flow_logdet_grad_jax",
         "flow_logdet_value",
         "flow_logdet_value_and_grad",
-        "flow_logdet_value_and_grad_jax",
     }
 )
 
@@ -88,22 +78,18 @@ from ._resolvent import (
     logdet_grad_aaa,
     logdet_grad_chebyshev,
     logdet_grad_eigenvalue,
-    logdet_grad_slq,
-)
-from ._slq import (
-    SLQPrecompute,
-    slq_logdet_eval,
-    slq_logdet_eval_vec,
-    slq_logdet_precompute,
-    slq_to_chebyshev_coeffs,
 )
 
 __all__ = [
     # Config
     "LogDetMethod",
-    "LogDetMethodName",
     "LogdetBounds",
     "VALID_LOGDET_METHODS",
+    "LOGDET_METHODS",
+    "FLOW_LOGDET_METHODS",
+    "LOGDET_DECOMPS",
+    "logdet_key",
+    "logdet_label",
     "resolve_logdet_method",
     "resolve_logdet_bounds",
     # PyTensor primitives
@@ -119,32 +105,20 @@ __all__ = [
     "make_logdet_grad_numpy_fn",
     "make_logdet_grad_numpy_vec_fn",
     "get_cached_logdet_fn",
-    "clear_logdet_fn_cache",
     # Resolvent trace / logdet gradient core
     "logdet_grad_eigenvalue",
     "logdet_grad_chebyshev",
     "logdet_grad_aaa",
-    "logdet_grad_slq",
     # Flow (separable factorization)
     "make_flow_separable_logdet",
     "make_flow_separable_logdet_numpy",
     # Flow resolvent-Kronecker gradient (scalable, eigenvalue-free)
     "FlowKron",
     "flow_logdet_grad",
-    "flow_logdet_grad_exact",
     "flow_logdet_value",
     "flow_logdet_value_and_grad",
-    # Chebyshev
-    "chebyshev",
-    # SLQ
-    "SLQPrecompute",
-    "slq_logdet_precompute",
-    "slq_logdet_eval",
-    "slq_logdet_eval_vec",
-    "slq_to_chebyshev_coeffs",
     # Stochastic Chebyshev
     "ChebStochasticPrecompute",
     "cheb_stochastic_logdet_precompute",
     "cheb_stochastic_logdet_eval",
-    "cheb_stochastic_logdet_eval_vec",
 ]

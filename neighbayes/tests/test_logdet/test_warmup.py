@@ -36,10 +36,8 @@ def W():
 
 def test_sampler_builds_evaluators():
     assert sampler_builds_evaluators("chol_aaa", True, refit=False, aaa_check=True)
-    assert sampler_builds_evaluators("cheb_cholesky", True, refit=True, aaa_check=False)
-    assert not sampler_builds_evaluators(
-        "cheb_cholesky", True, refit=False, aaa_check=True
-    )
+    assert sampler_builds_evaluators("chol_cheb", True, refit=True, aaa_check=False)
+    assert not sampler_builds_evaluators("chol_cheb", True, refit=False, aaa_check=True)
     assert not sampler_builds_evaluators("eigenvalue", True, refit=True, aaa_check=True)
     assert not sampler_builds_evaluators("chol_aaa", False, refit=True, aaa_check=True)
 
@@ -47,23 +45,23 @@ def test_sampler_builds_evaluators():
 def test_check_keeps_the_pilot_away_from_the_singularity(W):
     wj = WarmupJacobian(W, "chol_aaa", refit=False)
     wj.initial(tune=100)
-    assert wj.adapt(_draws(0.5)) is None
+    assert wj.adapt(_draws(0.5), draws=1000, chains=4) is None
     assert wj.check.nodes == AAA_PILOT_NODES and wj.check.passed
 
 
 def test_check_adds_nodes_near_the_singularity(W):
     wj = WarmupJacobian(W, "chol_aaa", refit=False)
     wj.initial(tune=100)
-    ev = wj.adapt(_draws(0.955, sd=0.002))
+    ev = wj.adapt(_draws(0.955, sd=0.002), draws=1000, chains=4)
     assert ev is not None
     assert wj.check.passed and wj.check.nodes > AAA_PILOT_NODES
     assert (ev.rho_min, ev.rho_max) == wj.prior
 
 
 def test_refit_narrows_the_support(W):
-    wj = WarmupJacobian(W, "cheb_cholesky", aaa_check=False)
+    wj = WarmupJacobian(W, "chol_cheb", aaa_check=False)
     wj.initial(tune=100)
-    ev = wj.adapt(_draws(0.5))
+    ev = wj.adapt(_draws(0.5), draws=1000, chains=4)
     assert ev is not None and wj.window is not None
     assert wj.prior[0] < ev.rho_min < 0.5 < ev.rho_max < wj.prior[1]
     assert wj.check is None
@@ -72,7 +70,7 @@ def test_refit_narrows_the_support(W):
 def test_refit_then_check_runs_on_the_window(W):
     wj = WarmupJacobian(W, "chol_aaa")
     wj.initial(tune=100)
-    ev = wj.adapt(_draws(0.5))
+    ev = wj.adapt(_draws(0.5), draws=1000, chains=4)
     assert ev is not None and wj.window is not None
     assert wj.check.passed
     assert wj.check.region[0] >= ev.rho_min and wj.check.region[1] <= ev.rho_max
@@ -92,10 +90,13 @@ def test_unsupported_method_is_inactive(W):
     assert not wj.active and not wj.adapts(1000)
 
 
-def test_record_writes_attrs_and_warns_at_a_truncated_edge(W):
-    wj = WarmupJacobian(W, "chol_aaa", refit_pad_sd=0.05)
+def test_record_writes_attrs_and_warns_at_a_truncated_edge(W, monkeypatch):
+    from neighbayes._logdet import _refit
+
+    monkeypatch.setattr(_refit, "DEFAULT_PAD_SD", 0.05)
+    wj = WarmupJacobian(W, "chol_aaa")
     wj.initial(tune=100)
-    wj.adapt(_draws(0.5))
+    wj.adapt(_draws(0.5), draws=1000, chains=4)
     idata = _Idata()
     with pytest.warns(RuntimeWarning, match="truncated"):
         wj.record(idata, _draws(0.5, sd=0.05, n=2000))
@@ -119,7 +120,7 @@ def test_panel_uses_the_per_period_block(W):
 def test_jax_params_keep_their_shape_across_the_adaptation(W):
     wj = WarmupJacobian(W, "chol_aaa", refit=False)
     first = wj.initial(tune=100, jax=True)
-    later = wj.adapt(_draws(0.955, sd=0.002), jax=True)
+    later = wj.adapt(_draws(0.955, sd=0.002), draws=1000, chains=4, jax=True)
     assert [np.shape(a) for a in first.params] == [np.shape(a) for a in later.params]
     f = wj.param_fn()
     assert float(f(0.4, later.params)) == pytest.approx(later.scalar_fn(0.4), rel=1e-9)
@@ -129,7 +130,7 @@ def test_pickles_without_the_factorization(W):
     """Chain closures reach worker processes by pickling; a live factor cannot go."""
     import pickle
 
-    for method in ("chol_aaa", "cheb_cholesky"):
+    for method in ("chol_aaa", "chol_cheb"):
         wj = WarmupJacobian(W, method)
         wj.initial(tune=100)
         assert wj._fitter._context is not None

@@ -1,8 +1,8 @@
-"""Numba dispatch registrations for selected custom Ops in :mod:`neighbayes._ops`.
+"""Numba dispatch registrations for selected custom Ops.
 
 Targets the cross-sectional SAR sparse solve family
-(:class:`~neighbayes._ops.SparseSARSolveOp`, :class:`~neighbayes._ops._SparseSARVJPOp`)
-and the Kronecker-factored NB flow Ops
+(:class:`~neighbayes._ops.SparseSARSolveOp`, :class:`~neighbayes._ops._SparseSARVJPOp`),
+the Kronecker-factored NB flow Ops
 (:class:`~neighbayes._ops.KroneckerFlowSolveOp`,
 :class:`~neighbayes._ops._KroneckerFlowVJPOp`,
 :class:`~neighbayes._ops.KroneckerFlowSolveMatrixOp`,

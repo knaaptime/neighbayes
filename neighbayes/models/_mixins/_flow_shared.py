@@ -1,8 +1,4 @@
-r"""Shared methods for cross-sectional and panel flow models.
-
-Centralises the verbatim-duplicate methods that were previously copy-pasted
-between :class:`~neighbayes.models.flow.FlowModel` and
-:class:`~neighbayes.models.flow_panel.FlowPanelModel`:
+r"""Shared methods of the flow models (:class:`~neighbayes.models.flow.FlowModel`):
 
 * ``fit`` — NUTS sampling dispatch
 * ``_posterior_var_names`` — filter free_RVs / deterministics
@@ -13,13 +9,8 @@ between :class:`~neighbayes.models.flow.FlowModel` and
 * ``_compute_jacobian_log_det`` — default ``None`` (subclasses override)
 * ``_fitted_mean_from_posterior`` — default ``NotImplementedError``
 
-The only cross-section vs panel difference is:
-
-1. **System size**: cross-section uses ``self._N`` (= n²), panel uses
-   ``self._N_flow`` (= n²).  The ``_flow_system_size`` property unifies these.
-2. **Decision-tree spec lookup**: cross-section uses ``get_flow_spec``,
-   panel uses ``get_panel_flow_spec``.  The ``_flow_spec_fn`` property
-   returns the appropriate callable.
+The decision tree differs between a cross-section (``get_flow_spec``) and a
+panel (``get_panel_flow_spec``); ``_flow_spec_fn`` returns the one that applies.
 """
 
 from __future__ import annotations
@@ -32,24 +23,52 @@ import scipy.sparse as sp
 
 from ..._backends.sampler_helpers import (
     enforce_c_backend,
+    jax_available,
     prepare_compile_kwargs,
     prepare_idata_kwargs,
+    select_backend,
 )
 from ..._lazy_deps import pm, xr
 
 
 class FlowSharedMethods:
-    """Mixin with shared methods for flow and flow-panel models.
+    """Mixin with the flow models' shared methods.
 
-    Both :class:`FlowModel` and :class:`FlowPanelModel` inherit from this
-    mixin.  Subclasses are expected to set ``self._W_sparse`` (the ``n × n``
-    weights; the ``N × N`` flow weights are derived lazily) and either
-    ``self._N`` (cross-section)
-    or ``self._N_flow`` (panel) before calling any mixin method.
+    The model sets ``self._W_sparse`` (the ``n × n`` weights; the ``N × N``
+    flow weights are derived lazily) and ``self._N`` (the ``n²`` pairs) before
+    calling any mixin method.
     """
 
-    # Subclasses override these as needed.
-    _panel_diagnostics: bool = False
+    def _flow_logdet_choice(self, backend: str | None, sample_kwargs: dict) -> str:
+        """The unrestricted flow log-determinant the resolvent sampler runs.
+
+        ``"kron_traces"`` for the exact trace series (``logdet_method=
+        "trace_series"`` or ``None``; a directed ``W``'s falls back on the
+        resolvent estimator near the stability wall), else the resolvent
+        estimator on ``"jax"`` or ``"numpy"`` (``backend``; ``"auto"`` takes JAX
+        when it is installed).
+        """
+        backend = select_backend("gibbs", backend, sample_kwargs)
+        method = self.logdet_method
+        if method is None:
+            method = "trace_series"
+        if method == "trace_series":
+            return "kron_traces"
+        if backend == "auto":
+            return "jax" if jax_available() else "numpy"
+        return backend
+
+    def _resolve_gibbs_backend(self, requested: str, *, jax: bool) -> str:
+        """The Gibbs ``backend`` resolved for this flow configuration.
+
+        ``jax`` says whether the configuration has a JAX Gibbs kernel.
+        ``"auto"`` takes it when JAX is installed and NumPy otherwise; an
+        explicit ``"jax"`` without one raises.
+        """
+        from ...samplers._registry import resolve_backend_for
+
+        backends = {"jax", "numpy"} if jax else {"numpy"}
+        return resolve_backend_for(requested, backends, jax_ok=jax_available())
 
     # ------------------------------------------------------------------
     # Properties that abstract cross-section vs panel differences
@@ -78,13 +97,13 @@ class FlowSharedMethods:
 
     @property
     def _Ww(self) -> sp.csr_matrix:
-        return self._flow_kron_weights["network"]
+        return self._flow_kron_weights["od"]
 
     @cached_property
     def _flow_effect_moments(self):
         """W-only moments for the exact LeSage effects breakdown.
 
-        Built on first use, only when spatial effects are computed; see
+        Built on first use, only when impacts are computed; see
         :class:`~neighbayes.models.flow._flow._FlowEffectMoments`.
         """
         from ..flow._flow import _FlowEffectMoments
@@ -99,20 +118,11 @@ class FlowSharedMethods:
         return _compute_flow_effects(sums, beta_d, beta_o, beta_intra)
 
     @property
-    def _flow_system_size(self) -> int:
-        """Return the flow system dimension n².
-
-        Cross-section models store this as ``self._N``; panel models
-        store it as ``self._N_flow``.
-        """
-        return getattr(self, "_N_flow", getattr(self, "_N", 0))
-
-    @property
     def _flow_spec_fn(self):
         """Return the decision-tree spec lookup function for this model."""
         from ...diagnostics import _decision_trees as _dt
 
-        if self._panel_diagnostics:
+        if self._is_panel:
             return _dt.get_panel_flow_spec
         return _dt.get_flow_spec
 
@@ -143,6 +153,8 @@ class FlowSharedMethods:
         store_lambda: bool = False,
         idata_kwargs: Optional[dict] = None,
         progressbar: bool = True,
+        sampler: str | None = None,
+        backend: str | None = None,
         **sample_kwargs,
     ) -> "xr.DataTree":
         """Draw samples from the posterior via PyMC NUTS.
@@ -170,6 +182,10 @@ class FlowSharedMethods:
             default, as in PyMC: it holds one value per draw, chain, and flow.
         progressbar : bool, default True
             Show progress bar during sampling.
+        sampler : {"nuts", None}, default None
+            The only sampler here is NUTS.
+        backend : {"pymc", "nutpie", "numpyro", "blackjax"}, optional
+            What executes NUTS; ``"pymc"`` by default.
         **sample_kwargs
             Additional keyword arguments forwarded to ``pm.sample``.
             Pass ``target_accept=0.95`` to adjust the NUTS acceptance rate.
@@ -180,7 +196,11 @@ class FlowSharedMethods:
         """
         idata_kwargs = dict(idata_kwargs) if idata_kwargs else {}
         compute_log_likelihood = bool(idata_kwargs.get("log_likelihood", False))
-        nuts_sampler = sample_kwargs.pop("nuts_sampler", "pymc")
+        if sampler not in (None, "nuts"):
+            raise NotImplementedError(
+                f"{type(self).__name__} has no Gibbs sampler; use sampler='nuts'."
+            )
+        nuts_sampler = select_backend("nuts", backend, sample_kwargs)
         target_accept = sample_kwargs.pop("target_accept", 0.9)
         nuts_sampler = enforce_c_backend(
             nuts_sampler,
@@ -310,8 +330,11 @@ class FlowSharedMethods:
         ``beta`` gets the Gelman et al. (2008) default on the log scale: the
         intercept is centred on ``log(mean(y))`` with scale 2.5 and each slope
         has scale ``2.5 / sd(x_j)``.  The NB2 dispersion ``alpha`` gets a
-        half-t(``alpha_nu``, ``alpha_sigma``), default half-t(3, 2.5).
+        half-t(``alpha_nu``, ``alpha_sigma``), default half-t(3, 2.5), unless
+        ``alpha_fixed`` holds it (see :mod:`neighbayes.models._base._nb`).
         """
+        from .._base._nb import nb_alpha_fixed
+
         k = self._X.shape[1]
         names = list(self._feature_names) or [f"x{j}" for j in range(k)]
         mu, sd = self._resolved_beta_prior(self._X, names, link="log")
@@ -320,6 +343,7 @@ class FlowSharedMethods:
             "beta_sigma": sd,
             "alpha_sigma": float(self.priors.get("alpha_sigma", 2.5)),
             "alpha_nu": float(self.priors.get("alpha_nu", 3.0)),
+            "alpha_fixed": nb_alpha_fixed(self.priors),
         }
 
     def _flow_sigma(self, pv: dict):
@@ -392,15 +416,37 @@ class FlowSharedMethods:
         Used by the count (NB) flow models: the discrete likelihood carries no
         ``|A|`` change-of-variables term (so it must not enter the LOO
         ``log_likelihood``), but the spatial-filter log-determinant is still
-        exposed for inspection — computed with the scalable resolvent value
-        estimator and scaled by the panel length ``T``.
+        exposed for inspection, scaled by the panel length ``T``.  Separable
+        classes use the closed form :math:`n\\log|L_o| + n\\log|L_d|`; the
+        unrestricted classes use the scalable resolvent value estimator.
         """
+        import xarray as xr
+
+        T = int(getattr(self, "_T", 1))
+        if (
+            self._flow_filter == "separable"
+            and self._separable_logdet_numpy_fn is not None
+        ):
+            # log|L_o ⊗ L_d| = n log|L_o| + n log|L_d|: n × n work, exact up to
+            # the single-W logdet method.  The resolvent route below would
+            # factor the N × N system, which runs out of memory at metro scale.
+            post = idata.posterior
+            rd = np.asarray(post["rho_d"].values)
+            ro = np.asarray(post["rho_o"].values)
+            vals = self._separable_logdet_numpy_fn(rd, ro).reshape(rd.shape[:2])
+            da = xr.DataArray(T * vals, dims=("chain", "draw"), name="log_abs_det")
+            if "sample_stats" in idata.children:
+                idata.sample_stats["log_abs_det"] = da
+            else:
+                idata["sample_stats"] = xr.DataTree(xr.Dataset({"log_abs_det": da}))
+            return idata
+
         from ...samplers.gaussian._flow_resolvent import attach_flow_log_abs_det
 
         attach_flow_log_abs_det(
             idata,
             self._W_sparse,
-            T=int(getattr(self, "_T", 1)),
+            T=T,
             n_probes=n_probes,
             n_quad=n_quad,
         )
@@ -417,7 +463,7 @@ class FlowSharedMethods:
         rho_w: float,
     ) -> sp.csr_matrix:
         """Assemble ``A = I - ρ_d W_d - ρ_o W_o - ρ_w W_w`` (sparse n²×n²)."""
-        I_N = sp.eye(self._flow_system_size, format="csr", dtype=np.float64)
+        I_N = sp.eye(self._N, format="csr", dtype=np.float64)
         return I_N - rho_d * self._Wd - rho_o * self._Wo - rho_w * self._Ww
 
     @property
@@ -435,9 +481,7 @@ class FlowSharedMethods:
         if cached is None:
             from ...samplers._utils._sparsax_utils import CachedSparseSolver
 
-            cached = CachedSparseSolver(
-                [self._Wd, self._Wo, self._Ww], self._flow_system_size
-            )
+            cached = CachedSparseSolver([self._Wd, self._Wo, self._Ww], self._N)
             self._cached_A_solver = cached
         return cached
 

@@ -15,8 +15,6 @@ storage site, and for the ZINB arm that stored ``NB(y)·1(z=1) + logit(d)``
 
 from __future__ import annotations
 
-import importlib.util
-
 import numpy as np
 import pytest
 from scipy.stats import nbinom, poisson
@@ -24,9 +22,6 @@ from scipy.stats import nbinom, poisson
 from neighbayes.samplers.negbin._core import _nb_loglik_pointwise
 from neighbayes.samplers.poisson_reduced._core import _poisson_loglik_pointwise
 from neighbayes.samplers.zinb._core import _zinb_loglik_pointwise
-
-_HAS_JAX = importlib.util.find_spec("jax") is not None
-requires_jax = pytest.mark.skipif(not _HAS_JAX, reason="JAX not installed")
 
 
 def _case(seed=0, n=40):
@@ -62,31 +57,7 @@ def test_poisson_pointwise_matches_scipy():
 
 def _nb_storage_fns():
     """(id, callable) for every function whose output is *stored* as log_lik."""
-    fns = [("numpy:_nb_loglik_pointwise", _nb_loglik_pointwise)]
-    if _HAS_JAX:
-        import jax.numpy as jnp
-
-        from neighbayes.samplers.negbin._jax import (
-            _nb_loglik_pointwise_jax,
-            _nb_loglik_pointwise_jax_op,
-        )
-
-        def _as_np(fn):
-            def _wrapped(y, eta, alpha):
-                return np.asarray(
-                    fn(jnp.asarray(y), jnp.asarray(eta), jnp.float64(alpha))
-                )
-
-            return _wrapped
-
-        fns += [
-            ("jax:negbin._nb_loglik_pointwise_jax", _nb_loglik_pointwise_jax),
-            (
-                "jax:negbin._nb_loglik_pointwise_jax_op",
-                _as_np(_nb_loglik_pointwise_jax_op),
-            ),
-        ]
-    return fns
+    return [("numpy:_nb_loglik_pointwise", _nb_loglik_pointwise)]
 
 
 @pytest.mark.parametrize("alpha", [0.3, 1.0, 7.5])

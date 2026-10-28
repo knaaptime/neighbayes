@@ -83,3 +83,15 @@ def test_unstable_parameters_raise():
     W, _ = rook_grid_weights(5)
     with pytest.raises(ValueError, match="stability"):
         FlowKronTraceLogdet(W)(0.6, 0.5, 0.0)
+
+
+@pytest.mark.parametrize("kind", ["undirected", "directed", "raw"])
+def test_an_evaluation_does_not_depend_on_the_ones_before_it(kind):
+    """A fit's draws must not depend on which chain, or fit, evaluated first."""
+    W = _graphs()[kind]
+    fresh, used = FlowKronTraceLogdet(W), FlowKronTraceLogdet(W)
+    used(0.6, 0.3, 0.09)  # converges at a high order
+    for params in PARAMS:
+        a, b = fresh(*params), used(*params)
+        assert a[0] == b[0]
+        np.testing.assert_array_equal(a[1], b[1])

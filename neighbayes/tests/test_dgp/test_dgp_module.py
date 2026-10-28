@@ -120,20 +120,20 @@ def test_panel_generators_run_with_sparse_W() -> None:
     W = sp.csr_matrix(make_rook_W(3))
 
     panel_outs = [
-        dgp.simulate_panel_ols_fe(N=N, T=T, W=W, rng=rng),
-        dgp.simulate_panel_sar_fe(N=N, T=T, W=W, rng=rng),
-        dgp.simulate_panel_sem_fe(N=N, T=T, W=W, rng=rng),
-        dgp.simulate_panel_sdm_fe(N=N, T=T, W=W, rng=rng),
-        dgp.simulate_panel_sdem_fe(N=N, T=T, W=W, rng=rng),
-        dgp.simulate_panel_ols_re(N=N, T=T, W=W, rng=rng),
-        dgp.simulate_panel_sar_re(N=N, T=T, W=W, rng=rng),
-        dgp.simulate_panel_sem_re(N=N, T=T, W=W, rng=rng),
-        dgp.simulate_panel_dlm_fe(N=N, T=T, W=W, rng=rng),
-        dgp.simulate_panel_sdmr_fe(N=N, T=T, W=W, rng=rng),
-        dgp.simulate_panel_sdmu_fe(N=N, T=T, W=W, rng=rng),
-        dgp.simulate_panel_sar_tobit_fe(N=N, T=T, W=W, rng=rng),
-        dgp.simulate_panel_sem_tobit_fe(N=N, T=T, W=W, rng=rng),
-        dgp.simulate_panel_slx_fe(N=N, T=T, W=W, rng=rng),
+        dgp.simulate_ols(N=N, T=T, W=W, rng=rng, unit_effects="fixed"),
+        dgp.simulate_sar(N=N, T=T, W=W, rng=rng, unit_effects="fixed"),
+        dgp.simulate_sem(N=N, T=T, W=W, rng=rng, unit_effects="fixed"),
+        dgp.simulate_sdm(N=N, T=T, W=W, rng=rng, unit_effects="fixed"),
+        dgp.simulate_sdem(N=N, T=T, W=W, rng=rng, unit_effects="fixed"),
+        dgp.simulate_ols(N=N, T=T, W=W, rng=rng, unit_effects="random"),
+        dgp.simulate_sar(N=N, T=T, W=W, rng=rng, unit_effects="random"),
+        dgp.simulate_sem(N=N, T=T, W=W, rng=rng, unit_effects="random"),
+        dgp.simulate_ols(N=N, T=T, W=W, rng=rng, dynamic=True),
+        dgp.simulate_sdm(N=N, T=T, W=W, rng=rng, dynamic="restricted"),
+        dgp.simulate_sdm(N=N, T=T, W=W, rng=rng, dynamic=True),
+        dgp.simulate_sar_tobit(N=N, T=T, W=W, rng=rng),
+        dgp.simulate_sem_tobit(N=N, T=T, W=W, rng=rng),
+        dgp.simulate_slx(N=N, T=T, W=W, rng=rng, unit_effects="fixed"),
     ]
 
     for out in panel_outs:
@@ -151,7 +151,7 @@ def test_nonlinear_generators_run_with_sparse_W() -> None:
     out_sar_tobit = dgp.simulate_sar_tobit(W=W, rng=rng)
     out_sem_tobit = dgp.simulate_sem_tobit(W=W, rng=rng)
     out_sdm_tobit = dgp.simulate_sdm_tobit(W=W, rng=rng)
-    out_probit = dgp.simulate_spatial_probit(W=W, rng=rng)
+    out_probit = dgp.simulate_sem_probit(W=W, rng=rng, unit_effects="random")
 
     for out in (out_sar_tobit, out_sem_tobit, out_sdm_tobit):
         assert "y_latent" in out and "censored_mask" in out
@@ -159,7 +159,7 @@ def test_nonlinear_generators_run_with_sparse_W() -> None:
         assert out["censored_mask"].shape == out["y"].shape
 
     assert out_probit["y"].shape[0] == out_probit["X"].shape[0]
-    assert out_probit["region_ids"].shape[0] == out_probit["y"].shape[0]
+    assert out_probit["units"].shape[0] == out_probit["y"].shape[0]
 
 
 def test_gdf_input_path_for_representative_generators() -> None:
@@ -176,8 +176,8 @@ def test_gdf_input_path_for_representative_generators() -> None:
     gdf = gpd.GeoDataFrame({"id": range(9)}, geometry=polys)
 
     out_sar = dgp.simulate_sar(gdf=gdf, rng=rng)
-    out_panel = dgp.simulate_panel_sar_fe(N=9, T=3, gdf=gdf, rng=rng)
-    out_probit = dgp.simulate_spatial_probit(gdf=gdf, rng=rng)
+    out_panel = dgp.simulate_sar(N=9, T=3, gdf=gdf, rng=rng, unit_effects="fixed")
+    out_probit = dgp.simulate_sem_probit(gdf=gdf, rng=rng, unit_effects="random")
 
     assert isinstance(out_sar, gpd.GeoDataFrame)
     assert len(out_sar) == 9
@@ -185,7 +185,7 @@ def test_gdf_input_path_for_representative_generators() -> None:
     assert isinstance(out_panel, tuple)
     _, panel_long = out_panel
     assert panel_long["y"].shape[0] == 27
-    assert out_probit["region_ids"].max() == 8
+    assert out_probit["units"].max() == 8
 
 
 def test_cross_sectional_create_gdf_reuses_input_geometry() -> None:
@@ -251,7 +251,9 @@ def test_panel_create_gdf_returns_tuple() -> None:
     gpd = pytest.importorskip("geopandas")
     N, T = 9, 3
     W = sp.csr_matrix(make_rook_W(3))
-    result = dgp.simulate_panel_sar_fe(N=N, T=T, W=W, seed=42, create_gdf=True)
+    result = dgp.simulate_sar(
+        N=N, T=T, W=W, seed=42, create_gdf=True, unit_effects="fixed"
+    )
     assert isinstance(result, tuple)
     unit_gdf, long_df = result
     assert isinstance(unit_gdf, gpd.GeoDataFrame)
@@ -269,7 +271,9 @@ def test_panel_create_gdf_reuses_input_geometry() -> None:
     polys = [box(j, i, j + 1, i + 1) for i in range(3) for j in range(3)]
     input_gdf = gpd.GeoDataFrame({"extra_col": range(N)}, geometry=polys)
 
-    unit_gdf, long_df = dgp.simulate_panel_sar_fe(N=N, T=T, gdf=input_gdf, seed=42)
+    unit_gdf, long_df = dgp.simulate_sar(
+        N=N, T=T, gdf=input_gdf, seed=42, unit_effects="fixed"
+    )
     assert isinstance(unit_gdf, gpd.GeoDataFrame)
     assert len(unit_gdf) == N
     # geometry is reused; extra non-geometry columns are NOT carried over
@@ -283,7 +287,7 @@ def test_panel_wide_returns_single_geodataframe() -> None:
     gpd = pytest.importorskip("geopandas")
     N, T = 9, 3
     W = sp.csr_matrix(make_rook_W(3))
-    result = dgp.simulate_panel_sar_fe(N=N, T=T, W=W, seed=42, wide=True)
+    result = dgp.simulate_sar(N=N, T=T, W=W, seed=42, wide=True, unit_effects="fixed")
     assert isinstance(result, gpd.GeoDataFrame)
     assert len(result) == N
     assert "y_t0" in result.columns
@@ -294,7 +298,7 @@ def test_panel_wide_returns_single_geodataframe() -> None:
 def test_panel_default_backward_compatible() -> None:
     """Panel functions still return a plain dict when create_gdf=False and gdf=None."""
     W = sp.csr_matrix(make_rook_W(3))
-    out = dgp.simulate_panel_sar_fe(N=9, T=3, W=W, seed=42)
+    out = dgp.simulate_sar(N=9, T=3, W=W, seed=42, unit_effects="fixed")
     assert isinstance(out, dict)
     assert "y" in out and "W_graph" in out
 
@@ -304,7 +308,7 @@ def test_panel_tobit_create_gdf() -> None:
     gpd = pytest.importorskip("geopandas")
     N, T = 9, 3
     W = sp.csr_matrix(make_rook_W(3))
-    result = dgp.simulate_panel_sar_tobit_fe(
+    result = dgp.simulate_sar_tobit(
         N=N, T=T, W=W, seed=42, create_gdf=True, censoring=0.0
     )
     assert isinstance(result, tuple)
@@ -386,11 +390,11 @@ def test_panel_fe_err_hetero_runs_and_preserves_shape() -> None:
     W = sp.csr_matrix(make_rook_W(3))
 
     for sim_fn in [
-        dgp.simulate_panel_ols_fe,
-        dgp.simulate_panel_sar_fe,
-        dgp.simulate_panel_sem_fe,
-        dgp.simulate_panel_sdm_fe,
-        dgp.simulate_panel_sdem_fe,
+        dgp.simulate_ols,
+        dgp.simulate_sar,
+        dgp.simulate_sem,
+        dgp.simulate_sdm,
+        dgp.simulate_sdem,
     ]:
         out_homo = sim_fn(N=N, T=T, W=W, rng=rng, err_hetero=False)
         out_hetero = sim_fn(N=N, T=T, W=W, rng=rng, err_hetero=True)
@@ -406,9 +410,9 @@ def test_panel_re_err_hetero_forwarded() -> None:
     W = sp.csr_matrix(make_rook_W(3))
 
     for sim_fn in [
-        dgp.simulate_panel_ols_re,
-        dgp.simulate_panel_sar_re,
-        dgp.simulate_panel_sem_re,
+        dgp.simulate_ols,
+        dgp.simulate_sar,
+        dgp.simulate_sem,
     ]:
         out = sim_fn(N=N, T=T, W=W, rng=rng, err_hetero=True)
         assert out["y"].shape == (N * T,)
@@ -421,13 +425,13 @@ def test_dynamic_panel_err_hetero_runs_and_preserves_shape() -> None:
     W = sp.csr_matrix(make_rook_W(3))
 
     for sim_fn in [
-        dgp.simulate_panel_dlm_fe,
-        dgp.simulate_panel_sdmr_fe,
-        dgp.simulate_panel_sdmu_fe,
-        dgp.simulate_panel_sar_dynamic_fe,
-        dgp.simulate_panel_sem_dynamic_fe,
-        dgp.simulate_panel_sdem_dynamic_fe,
-        dgp.simulate_panel_slx_dynamic_fe,
+        dgp.simulate_ols,
+        dgp.simulate_sdm,
+        dgp.simulate_sdm,
+        dgp.simulate_sar,
+        dgp.simulate_sem,
+        dgp.simulate_sdem,
+        dgp.simulate_slx,
     ]:
         out_homo = sim_fn(N=N, T=T, W=W, rng=rng, err_hetero=False)
         out_hetero = sim_fn(N=N, T=T, W=W, rng=rng, err_hetero=True)
@@ -452,7 +456,7 @@ def test_tobit_err_hetero_forwarded() -> None:
 
     # Panel tobit
     N, T = 9, 3
-    for sim_fn in [dgp.simulate_panel_sar_tobit_fe, dgp.simulate_panel_sem_tobit_fe]:
+    for sim_fn in [dgp.simulate_sar_tobit, dgp.simulate_sem_tobit]:
         out = sim_fn(N=N, T=T, W=W, rng=rng, err_hetero=True)
         assert "y_latent" in out
         assert "censored_mask" in out
@@ -463,7 +467,11 @@ def test_spatial_probit_err_hetero_runs() -> None:
     rng = np.random.default_rng(42)
     W = sp.csr_matrix(make_rook_W(3))
 
-    out_homo = dgp.simulate_spatial_probit(W=W, rng=rng, err_hetero=False)
-    out_hetero = dgp.simulate_spatial_probit(W=W, rng=rng, err_hetero=True)
+    out_homo = dgp.simulate_sem_probit(
+        W=W, rng=rng, err_hetero=False, unit_effects="random"
+    )
+    out_hetero = dgp.simulate_sem_probit(
+        W=W, rng=rng, err_hetero=True, unit_effects="random"
+    )
     assert out_homo.keys() == out_hetero.keys()
     assert out_homo["y"].shape == out_hetero["y"].shape

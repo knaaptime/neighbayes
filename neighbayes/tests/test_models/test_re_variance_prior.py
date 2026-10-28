@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 from scipy import stats
 
-from neighbayes.models import SARPanelRE
+from neighbayes.models import SAR
 from neighbayes.models.priors import REGibbsPriors
 from neighbayes.samplers.panel._re_core import _sample_sigma_alpha2
 from neighbayes.tests.helpers import (
@@ -32,7 +32,7 @@ def test_gibbs_mixture_targets_the_half_t_prior(nu, scale):
     its quantiles must match the half-t's.
     """
     rng = np.random.default_rng(0)
-    priors = REGibbsPriors(sigma_alpha_nu=nu, sigma_alpha_scale=scale)
+    priors = REGibbsPriors(unit_effect_sd_nu=nu, unit_effect_sd_scale=scale)
     no_effects = np.zeros(0)
     s2, draws = scale**2, np.empty(200_000)
     for i in range(draws.size):
@@ -51,7 +51,8 @@ def test_old_half_normal_key_is_rejected():
         np.random.default_rng(0), W, PANEL_N, PANEL_T, rho=0.3
     )
     with pytest.raises(TypeError, match="sigma_alpha_sigma"):
-        SARPanelRE(
+        SAR(
+            unit_effects="random",
             y=y,
             X=X,
             W=W_to_graph(W),
@@ -73,14 +74,14 @@ def test_nuts_and_gibbs_share_the_posterior():
     )
     kw = dict(draws=3000, tune=1500, chains=4, random_seed=7, progressbar=False)
     fits = {
-        sampler: SARPanelRE(y=y, X=X, W=W_to_graph(W), N=N, T=T).fit(
+        sampler: SAR(unit_effects="random", y=y, X=X, W=W_to_graph(W), N=N, T=T).fit(
             sampler=sampler, **kw
         )
         for sampler in ("nuts", "gibbs")
     }
     nuts, gibbs = fits["nuts"], fits["gibbs"]
     assert int(nuts.sample_stats["diverging"].sum()) == 0
-    for name in ("sigma_alpha", "rho", "beta"):
+    for name in ("unit_effect_sd", "rho", "beta"):
         a = nuts.posterior[name].values.reshape(4 * 3000, -1)
         b = gibbs.posterior[name].values.reshape(a.shape)
         ess = min(

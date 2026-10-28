@@ -1,36 +1,23 @@
-"""Bayesian spatial flow (origin-destination) models.
+"""The flow (origin-destination) model base and the count flow families.
 
-Implements fully Bayesian SAR-type flow models following
-:cite:t:`lesage2008SpatialEconometric`.  The observed variable is an
-:math:`n \\times n` flow matrix (or its vectorized form), and the weight
-structure uses three Kronecker-product matrices:
-
-.. math::
-
-    W_d = I_n \\otimes W, \\quad W_o = W \\otimes I_n, \\quad W_w = W \\otimes W
-
-so that the model is:
+:class:`FlowModel` carries the flow structure every family shares: an
+:math:`n \\times n` flow matrix per period (or its vectorized form), periods
+stacked time-first, and three Kronecker-product weight matrices
 
 .. math::
 
-    y = \\rho_d W_d y + \\rho_o W_o y + \\rho_w W_w y + X\\beta + \\varepsilon,
-    \\quad \\varepsilon \\sim \\mathcal{N}(0, \\sigma^2 I_N)
+    W_d = I_n \\otimes W, \\quad W_o = W \\otimes I_n, \\quad W_w = W \\otimes W,
 
-where :math:`N = n^2`.
-
-Two variants are provided:
-
-* :class:`SARFlow` — three free ρ parameters with a Dirichlet stability
-  constraint (default) or a quadratic-wall potential when competitive effects
-  are needed (``restrict_positive=False``).
-* :class:`SARFlowSeparable` — constrained :math:`\\rho_w = -\\rho_d \\rho_o`,
-  enabling exact eigenvalue-based log-determinant.
+following :cite:t:`lesage2008SpatialEconometric`, with :math:`N = n^2`
+pairs.  The families are in :mod:`._gaussian`, :mod:`._count`, :mod:`._zinb`
+and :mod:`._hurdle`.
 """
 
 from __future__ import annotations
 
+import warnings
 from abc import abstractmethod
-from typing import Any, Optional, Union
+from typing import Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -39,15 +26,16 @@ import scipy.sparse as sp
 
 from ..._lazy_deps import pm, xr
 from ..._logdet import (
+    FLOW_LOGDET_METHODS,
     make_flow_separable_logdet,
     make_flow_separable_logdet_numpy,
 )
-from ..._ops import kron_solve_vec
-from ...graph import _weights_to_csr, flow_lags, flow_trace_blocks
+from ...graph import _weights_to_csr, flow_lags
+from .._base._panel import _absorbed_columns, _demean_panel
 from .._mixins._flow_shared import FlowSharedMethods
 from ..base import SpatialModel
 
-_EFFECT_KEYS = ("origin", "destination", "intra", "network", "total")
+_EFFECT_KEYS = ("origin", "destination", "intraunit", "network", "total")
 
 
 class _FlowEffectMoments:
@@ -230,7 +218,7 @@ def _compute_flow_effects(
     for side, arr in (("dest", dest), ("orig", orig)):
         total, intra, origin, destination = (arr[..., i] for i in range(4))
         out[f"{side}_total"] = total
-        out[f"{side}_intra"] = intra
+        out[f"{side}_intraunit"] = intra
         out[f"{side}_origin"] = origin
         out[f"{side}_destination"] = destination
         out[f"{side}_network"] = total - origin - destination - intra
@@ -246,29 +234,30 @@ class FlowModel(FlowSharedMethods, SpatialModel):
     """Abstract base class for Bayesian spatial flow regression models.
 
     Unlike :class:`~neighbayes.models.base.SpatialModel`, this class works
-    with an :math:`N = n^2` vectorized response and three Kronecker-product
-    weight matrices constructed from a single n×n graph.  The API mirrors
-    :class:`~neighbayes.models.base.SpatialModel` (``fit``, ``summary``,
-    ``inference_data``) but the internals are tailored to the flow structure.
+    with an :math:`N = n^2` vectorized response per period and three
+    Kronecker-product weight matrices constructed from a single ``n x n``
+    graph.  The API mirrors :class:`~neighbayes.models.base.SpatialModel`
+    (``fit``, ``summary``, ``inference_data``) but the internals are tailored
+    to the flow structure.  A panel stacks ``T`` periods time-first; ``T=1``
+    is the cross-section.
 
-    The model accepts a full O-D design matrix *X* of shape ``(n², p)``,
+    The model accepts a full O-D design matrix *X* of shape ``(N T, p)``,
     typically produced by :func:`~neighbayes.graph.flow_design_matrix` or
     :func:`~neighbayes.graph.flow_design_matrix_with_orig`.
 
     Parameters
     ----------
-    y : array-like, shape (n, n) or (N,)
-        Observed O-D flow matrix (or its vec-form).  Must be a square
-        matrix or a flat vector of length :math:`N = n^2`.
-    W : libpysal.graph.Graph or scipy.sparse / dense (n×n) matrix
-        Row-standardized regional weights on *n* units (Graph or matrix).  Validated by
-        :func:`~neighbayes.graph._graph_to_csr`.
-    X : np.ndarray or pandas.DataFrame, shape (N, p)
-        Full origin-destination design matrix with :math:`N = n^2` rows.
-        This is typically produced by
-        :func:`~neighbayes.graph.flow_design_matrix` or
-        :func:`~neighbayes.graph.flow_design_matrix_with_orig`.
+    y : array-like
+        The flows: shape ``(n, n)`` or ``(N,)`` for a cross-section, and
+        ``(T, n, n)``, ``(T, N)`` or ``(N T,)`` for a panel.
+    X : np.ndarray or pandas.DataFrame, shape (N T, p)
+        Full origin-destination design matrix, periods stacked time-first.
         If a DataFrame, column names are inferred automatically.
+    W : libpysal.graph.Graph or scipy.sparse / dense (n×n) matrix
+        Row-standardized regional weights on *n* units (Graph or matrix).
+        Validated by :func:`~neighbayes.graph._graph_to_csr`.
+    T : int, default 1
+        Number of periods; ``1`` is the cross-section.
     col_names : list[str], optional
         Column labels for *X*.  If *X* is a DataFrame, column names are
         inferred automatically.  Defaults to ``["x0", "x1", ...]``.
@@ -282,45 +271,72 @@ class FlowModel(FlowSharedMethods, SpatialModel):
     priors : dict, optional
         Override default priors.  Supported keys vary by subclass.
     logdet_method : str, optional
-        How to compute :math:`\\log|I_N - \\rho_d W_d - \\rho_o W_o - \\rho_w W_w|`.
-        ``None`` (default) auto-selects.  Concrete subclasses override the
-        default with their recommended method: the unrestricted SAR/SEM flow
-        classes use the resolvent-gradient sampler (``"resolvent"``), the
-        separable classes accept any single-``W`` method (``"eigenvalue"``,
-        ``"chebyshev"``, ``"cheb_cholesky"``, ``"aaa"``,
-        ``"cheb_stochastic"``) via the exact Kronecker factorization, and
-        aspatial classes skip the log-determinant entirely.
-    restrict_positive : bool, default True
+        The flow log-determinant; ``None`` (default) auto-selects.  The
+        unrestricted classes take ``"trace_series"`` (the default: exact, a
+        directed ``W``'s falling back on the resolvent estimator near the
+        stability wall) or ``"resolvent"``; the
+        separable classes factor it into ``n x n`` terms and take the
+        single-``W`` methods with ``logdet_decomp``; the aspatial classes have
+        none.
+    nonnegative_dependence : bool, default True
         If True, use a ``pm.Dirichlet`` prior that restricts :math:`\\rho_d,
         \\rho_o, \\rho_w \\geq 0` with :math:`\\rho_d + \\rho_o + \\rho_w \\leq 1`.
         This is NUTS-safe and appropriate for most flow applications.
         If False, use three independent ``pm.Uniform(-1, 1)`` priors with a
         differentiable quadratic-wall stability potential.
-    symmetric_xo_xd : bool, optional
+    robust : bool, default False
+        Student-t observation errors, on the classes whose NUTS model has them.
+    shared_od_covariates : bool, optional
         If ``None`` (default), the destination and origin design blocks are
         compared and symmetry is auto-detected.  Set explicitly to override
         the heuristic — for example, when using
         :func:`~neighbayes.graph.flow_design_matrix_with_orig` with distinct
         attributes for the origin and destination sides.  Controls the default
-        behavior of :meth:`spatial_effects` when ``mode="auto"``.
+        behavior of :meth:`impacts` when ``mode="auto"``.
+    effects : int, default 0
+        The panel's fixed effects: ``0`` none, ``1`` pair, ``2`` time, ``3``
+        both.  A cross-section takes none.
     """
+
+    #: The flow filter: ``"unrestricted"`` (three free ρ, whose log-determinant
+    #: is the trace series or the resolvent estimator), ``"separable"``
+    #: (``ρ_w = -ρ_d ρ_o``, so ``A = L_o ⊗ L_d``) or ``None`` (``A = I``).
+    _flow_filter: Optional[str] = None
+    #: Prefix of the spatial parameters' posterior names (``rho_d``, ``lam_d``);
+    #: ``None`` for an aspatial family.
+    _spatial_prefix: Optional[str] = "rho"
+    #: Whether the class's NUTS model has Student-t errors (``robust=True``).
+    _robust_nuts = False
 
     def __init__(
         self,
         y: Union[np.ndarray, pd.Series],
         X: Union[np.ndarray, pd.DataFrame],
         W,
+        *,
+        T: int = 1,
         col_names: Optional[list] = None,
         k: Optional[int] = None,
         priors: Optional[dict] = None,
         logdet_method: Optional[str] = None,
-        restrict_positive: bool = True,
-        symmetric_xo_xd: Optional[bool] = None,
+        nonnegative_dependence: bool = True,
+        robust: bool = False,
+        shared_od_covariates: Optional[bool] = None,
+        effects: int = 0,
+        logdet_decomp: str = "auto",
     ):
         self.priors = priors or {}
         self.logdet_method = logdet_method
-        self.restrict_positive = restrict_positive
-        self.robust = False
+        self.logdet_decomp = logdet_decomp
+        self.nonnegative_dependence = nonnegative_dependence
+        self.robust = bool(robust)
+        if self.robust and not self._robust_nuts:
+            raise NotImplementedError(
+                f"robust=True is not supported for {type(self).__name__}."
+            )
+        self.effects = int(effects)
+        if self.effects not in (0, 1, 2, 3):
+            raise ValueError("effects must be one of {0,1,2,3}.")
         self._is_row_std = True  # W is assumed row-standardized
         self._idata: Optional[xr.DataTree] = None
         self._pymc_model: Optional[pm.Model] = None
@@ -330,22 +346,14 @@ class FlowModel(FlowSharedMethods, SpatialModel):
         self._n: int = self._W_sparse.shape[0]
         self._N: int = self._n * self._n
 
-        # Validate y
-        y_arr = np.asarray(y, dtype=np.float64)
-        if y_arr.ndim == 2:
-            if y_arr.shape != (self._n, self._n):
-                raise ValueError(
-                    f"y matrix must be ({self._n}, {self._n}), got {y_arr.shape}."
-                )
-            self._y = y_arr.ravel()
-        elif y_arr.ndim == 1:
-            if len(y_arr) != self._N:
-                raise ValueError(
-                    f"y vector must have length N={self._N} (= n²), got {len(y_arr)}."
-                )
-            self._y = y_arr
-        else:
-            raise ValueError("y must be a 1-D or 2-D array.")
+        self._T: int = int(T)
+        if self._T <= 0:
+            raise ValueError(f"T must be positive, got {T}.")
+        if self._T == 1 and self.effects:
+            raise ValueError("Fixed effects need a panel (T > 1).")
+        self._is_panel = self._T > 1
+
+        self._y_raw = self._flow_vector(y)
 
         # Validate X and build design matrix
         if isinstance(X, pd.DataFrame):
@@ -354,15 +362,14 @@ class FlowModel(FlowSharedMethods, SpatialModel):
             X_arr = X.to_numpy(dtype=np.float64)
         else:
             X_arr = np.asarray(X, dtype=np.float64)
-
         if X_arr.ndim == 1:
             X_arr = X_arr[:, None]
-        if X_arr.shape[0] != self._N:
+        if X_arr.shape[0] != self._N * self._T:
             raise ValueError(
-                f"X must have {self._N} rows (= n² = {self._n}²), got {X_arr.shape[0]}."
+                f"X must have n^2*T={self._N * self._T} rows, got {X_arr.shape[0]}."
             )
+        self._X_raw = X_arr
 
-        self._X: np.ndarray = X_arr  # (N, p)
         if col_names is not None:
             self._feature_names: list[str] = list(col_names)
         elif X_arr.shape[1] == 0:
@@ -373,23 +380,14 @@ class FlowModel(FlowSharedMethods, SpatialModel):
         # Infer k_d and k_o (number of regional attribute columns) for effects computation.
         # Standard LeSage layout: [intercept, intra_indicator, dest_*, orig_*, intra_*, (dist)]
         if k is not None:
-            self._k: int = k
-            self._k_d: int = k
-            self._k_o: int = k
+            self._k: int = int(k)
+            self._k_d: int = int(k)
+            self._k_o: int = int(k)
         else:
-            dest_cols = [
-                name for name in self._feature_names if name.startswith("dest_")
-            ]
-            orig_cols = [
-                name for name in self._feature_names if name.startswith("orig_")
-            ]
-            self._k_d = len(dest_cols)
-            self._k_o = len(orig_cols)
-            self._k = self._k_d  # backward compat alias
-            if self._k_d == 0 and self._k_o == 0:
-                # Fallback: cannot infer k from column names; effects decomposition
-                # will not be available.  Set k=0 as a sentinel.
-                self._k = 0
+            self._k_d = sum(n.startswith("dest_") for n in self._feature_names)
+            self._k_o = sum(n.startswith("orig_") for n in self._feature_names)
+            # 0 when there are no destination columns: no effects breakdown.
+            self._k = self._k_d
 
         # Locate β_intra slice (Thomas-Agnan & LeSage 2014, §83.4): coefficients
         # on the `intra_*` block contribute to the intraregional shock.  When
@@ -407,79 +405,125 @@ class FlowModel(FlowSharedMethods, SpatialModel):
             self._intra_idx = None
 
         # Detect whether the destination and origin design blocks are
-        # identical (the symmetric Xo = Xd case).  When asymmetric the
-        # Thomas-Agnan & LeSage (2014, §83.5.2) shortcut of summing dest and
-        # orig effects is not appropriate, and `spatial_effects(mode="auto")`
-        # falls back to reporting both sides separately.
+        # identical (the symmetric Xo = Xd case), on the raw design.  When
+        # asymmetric the Thomas-Agnan & LeSage (2014, §83.5.2) shortcut of
+        # summing dest and orig effects is not appropriate, and
+        # `impacts(mode="auto")` falls back to reporting both sides separately.
         if (
-            symmetric_xo_xd is None
+            shared_od_covariates is None
             and self._k_d > 0
             and self._k_d == self._k_o
             and X_arr.shape[1] >= 2 + self._k_d + self._k_o
         ):
             dest_block = X_arr[:, 2 : 2 + self._k_d]
             orig_block = X_arr[:, 2 + self._k_d : 2 + self._k_d + self._k_o]
-            self._symmetric_xo_xd: bool = bool(np.array_equal(dest_block, orig_block))
+            self._shared_od_covariates: bool = bool(
+                np.array_equal(dest_block, orig_block)
+            )
         else:
-            self._symmetric_xo_xd = (
-                bool(symmetric_xo_xd)
-                if symmetric_xo_xd is not None
+            self._shared_od_covariates = (
+                bool(shared_od_covariates)
+                if shared_od_covariates is not None
                 else (self._k_d == self._k_o)
             )
 
+        # Demean the panel over its N origin-destination pairs.
+        self._y, self._X = _demean_panel(
+            self._y_raw, self._X_raw, self._N, self._T, self.effects
+        )
+
+        # Columns fixed within the demeaning groups (intercept, intra indicator
+        # and log distance under pair effects; any time-invariant attribute)
+        # are zero after demeaning: absorbed by the fixed effects, not
+        # identified.  Drop them from the sampled design, as SpatialModel
+        # does; effects read beta in the full layout via _beta_layout, with NaN
+        # for absorbed columns.
+        self._design_feature_names = list(self._feature_names)
+        self._beta_keep: Optional[np.ndarray] = None
+        if self.effects != 0:
+            absorbed = _absorbed_columns(self._X, X_arr)
+            if absorbed.any():
+                keep = np.flatnonzero(~absorbed)
+                self._beta_keep = keep
+                self._X = self._X[:, keep]
+                self._feature_names = [self._feature_names[j] for j in keep]
+                slopes = [
+                    name
+                    for name, a in zip(self._design_feature_names, absorbed)
+                    if a and name.startswith(("dest_", "orig_", "intra_x"))
+                ]
+                if slopes:
+                    warnings.warn(
+                        f"{slopes} do not vary within the fixed-effect groups and "
+                        "are absorbed; their effects are not identified (NaN).",
+                        UserWarning,
+                        stacklevel=2,
+                    )
+
         # Pre-compute logdet data for separable constraint: log|Lo⊗Ld| = n*f(ρ_d) + n*f(ρ_o).
-        # Also keep _W_eigs for backward compatibility.  ``_W_eigs`` is
-        # populated only by the eigenvalue logdet path.
-        # exposed as a property below that returns ``None`` when eigenvalues
-        # were not pre-computed (mirroring :class:`SpatialModel`).
+        # ``_W_eigs`` is populated only by the eigenvalue logdet path.
         self._W_eigs: Optional[np.ndarray] = None
         self._separable_logdet_fn = None
         self._separable_logdet_numpy_fn = None
-        _SEPARABLE_METHODS = {
-            "eigenvalue",
-            "chebyshev",
-            "cheb_cholesky",
-            "aaa",
-            "cheb_stochastic",
-        }
-        if logdet_method is None or logdet_method in _SEPARABLE_METHODS:
-            from ..._logdet._config import resolve_logdet_method
+        if self._flow_filter == "unrestricted":
+            if self.logdet_method not in (None, "none", *FLOW_LOGDET_METHODS):
+                raise ValueError(
+                    f"{type(self).__name__} takes logdet_method 'trace_series', "
+                    f"'resolvent' or None, got {self.logdet_method!r}."
+                )
+        elif self._flow_filter == "separable" and self.logdet_method != "none":
+            from ..._logdet._config import logdet_key, resolve_logdet_method
 
+            key = logdet_key(self.logdet_method, self.logdet_decomp, W=self._W_sparse)
             self._separable_logdet_fn = make_flow_separable_logdet(
                 self._W_sparse,
                 self._n,
-                method=logdet_method,
+                method=key,
             )
             self._separable_logdet_numpy_fn = make_flow_separable_logdet_numpy(
                 self._W_sparse,
                 self._n,
-                method=logdet_method,
+                method=key,
             )
-            # Populate ``_W_eigs`` only when the resolved method is eigenvalue
+            # Populate ``_W_eigs`` only when the resolved key is eigenvalue
             # (auto-selection may resolve None to eigenvalue for small n).
-            resolved = resolve_logdet_method(logdet_method, n=self._n, W=self._W_sparse)
-            if resolved == "eigenvalue":
+            if resolve_logdet_method(key, n=self._n, W=self._W_sparse) == "eigenvalue":
                 self._W_eigs = np.linalg.eigvals(
                     self._W_sparse.toarray().astype(np.float64)
                 ).real
 
-        # Pre-compute spatial lags: Wd_y, Wo_y, Ww_y
+        # Spatial lags of the (demeaned) flows, period by period.
         # Matrix-free: W⊗W alone would hold nnz(W)² entries.
-        self._Wd_y, self._Wo_y, self._Ww_y = flow_lags(self._W_sparse, self._y)
-
-        # Aliases used by some downstream code and tests
-        self._y_vec = self._y
-        self._spatial_lag = self._Wd_y
-
-        # Cache the symmetric 3x3 Kronecker trace matrix used by Bayesian
-        # LM diagnostics: T[i,j] = tr(W_i' W_j) + tr(W_i W_j) for
-        # (W_d, W_o, W_w).  Computed in O(nnz) from the base n x n graph.
-        self._T_flow_traces: np.ndarray = flow_trace_blocks(self._W_sparse)
+        self._Wd_y, self._Wo_y, self._Ww_y = flow_lags(
+            self._W_sparse, self._y, T=self._T
+        )
 
         # The unrestricted 3-parameter flow log-determinant is handled by the
         # resolvent-Kronecker gradient sampler; the old "traces" value method was
         # removed (it amplifies stochastic-moment noise for large directed W).
         self._traces = None
+
+    def _flow_vector(self, y) -> np.ndarray:
+        """The flows as one time-first vector of length ``N T``."""
+        y_arr = np.asarray(y, dtype=np.float64)
+        n, N, T = self._n, self._N, self._T
+        shapes = {(T, n, n), (T, N), (N * T,)} | ({(n, n)} if T == 1 else set())
+        if y_arr.shape not in shapes:
+            expected = (
+                "(n, n) or (n^2,)" if T == 1 else "(T, n, n), (T, n^2) or (n^2*T,)"
+            )
+            raise ValueError(
+                f"y must have shape {expected} with n={n}, T={T}; got {y_arr.shape}."
+            )
+        return y_arr.reshape(-1)
+
+    def __repr__(self) -> str:
+        panel = f", T={self._T}, effects={self.effects}" if self._is_panel else ""
+        separable = ", separable=True" if self._flow_filter == "separable" else ""
+        return (
+            f"{type(self).__name__}(n={self._n}, N={self._N}{panel}{separable}, "
+            f"k={self._X.shape[1]}, features={self._feature_names})"
+        )
 
     # ------------------------------------------------------------------
     # Abstract interface
@@ -490,10 +534,10 @@ class FlowModel(FlowSharedMethods, SpatialModel):
         """Construct and return the PyMC model.  Implemented by subclasses."""
 
     @abstractmethod
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self, draws: Optional[int] = None
     ) -> dict[str, np.ndarray]:
-        """Compute posterior spatial effects.  Implemented by subclasses."""
+        """Compute posterior impacts.  Implemented by subclasses."""
 
     # ------------------------------------------------------------------
     # Public API (fit, spatial_diagnostics_decision, etc.) inherited from
@@ -510,15 +554,72 @@ class FlowModel(FlowSharedMethods, SpatialModel):
         return self._W_eigs
 
     # ------------------------------------------------------------------
-    # Pointwise log-likelihood and sparse filter helpers inherited from
-    # FlowSharedMethods — see .._mixins._flow_shared
+    # Fixed-effects likelihood (Lee & Yu 2010; see SpatialModel)
     # ------------------------------------------------------------------
+    # The panel units are the N origin-destination pairs.  With time effects
+    # and a row-standardized W, each of W_d, W_o, W_w has unit row sums, so
+    # the flow filter removes the eigenvalue 1 - ρ_d - ρ_o - ρ_w
+    # ((1 - ρ_d)(1 - ρ_o) when separable).
+
+    @property
+    def _fe_unit(self) -> bool:
+        return self._lee_yu and self.effects in (1, 3)
+
+    @property
+    def _fe_time(self) -> bool:
+        return self._lee_yu and self.effects in (2, 3)
+
+    @property
+    def _flow_jacobian_shift(self) -> float:
+        if not self._fe_time or not self._W_row_standardized():
+            return 0.0
+        return float(self._jacobian_T)
+
+    @property
+    def _flow_fe_dims(self) -> dict:
+        """Likelihood dimensions for the flow resolvent samplers."""
+        return {
+            "jacobian_T": self._jacobian_T,
+            "n_eff": self._n_effective,
+            "jacobian_shift": self._flow_jacobian_shift,
+        }
+
+    def _flow_jacobian(self, logdet, one_minus_rowsum, lib):
+        """``jacobian_T·log|A|``, less the time-effects term (``lib``: np or pt)."""
+        val = self._jacobian_T * logdet
+        m = self._flow_jacobian_shift
+        if m:
+            val = val - m * lib.log(one_minus_rowsum)
+        return val
+
+    def _fe_dof_sigma(self, sigma) -> None:
+        """Count ``_n_effective`` observations in a Normal over all rows (σ prior)."""
+        surplus = int(np.asarray(self._y).shape[0]) - int(self._n_effective)
+        if surplus:
+            pm.Potential("fe_dof", surplus * pt.log(sigma))
+
+    def _beta_layout(self, posterior) -> np.ndarray:
+        """Posterior ``beta`` draws in the full design layout.
+
+        The effects code indexes the design by position (intercept, intra
+        indicator, dest, orig, intra blocks).  Columns absorbed by the fixed
+        effects were not sampled and come back as NaN.
+        """
+        beta = posterior["beta"].values.reshape(-1, len(self._feature_names))
+        n_mundlak = len(getattr(self, "_mundlak_names", ()))
+        if n_mundlak:
+            beta = beta[:, : beta.shape[1] - n_mundlak]
+        if getattr(self, "_beta_keep", None) is None:
+            return beta
+        full = np.full((beta.shape[0], len(self._design_feature_names)), np.nan)
+        full[:, self._beta_keep] = beta
+        return full
 
     # ------------------------------------------------------------------
     # Public diagnostics
     # ------------------------------------------------------------------
 
-    def spatial_effects(
+    def impacts(
         self,
         draws: Optional[int] = None,
         return_posterior_samples: bool = False,
@@ -527,7 +628,7 @@ class FlowModel(FlowSharedMethods, SpatialModel):
     ) -> "pd.DataFrame | tuple[pd.DataFrame, dict[str, np.ndarray]]":
         """Summarize posterior origin/destination/intra/network/total effects.
 
-        Wraps :meth:`_compute_spatial_effects_posterior` to produce a tidy
+        Wraps :meth:`_compute_impacts_posterior` to produce a tidy
         DataFrame indexed by predictor with posterior means, credible-interval
         bounds, and Bayesian p-values for each effect type (origin,
         destination, intra, network, total).  Following Thomas-Agnan & LeSage
@@ -546,7 +647,7 @@ class FlowModel(FlowSharedMethods, SpatialModel):
             Controls whether destination- and origin-side effects are summed
             or reported separately.  ``"auto"`` collapses to combined when
             the destination and origin design blocks are identical
-            (``self._symmetric_xo_xd``) and reports both sides otherwise.
+            (``self._shared_od_covariates``) and reports both sides otherwise.
             ``"combined"`` always sums; ``"separate"`` always reports both.
 
         Returns
@@ -555,13 +656,13 @@ class FlowModel(FlowSharedMethods, SpatialModel):
             Long-format summary indexed by ``(predictor, side, effect)`` where
             ``side`` is one of ``"combined"``, ``"dest"``, ``"orig"``.
         """
-        from ...diagnostics.spatial_effects import _compute_bayesian_pvalue
+        from ...diagnostics.impacts import _compute_bayesian_pvalue
 
         if self._idata is None:
             raise RuntimeError("Model has not been fit yet.  Call fit() first.")
         if self._k == 0:
             raise RuntimeError(
-                "Cannot compute spatial effects: no `dest_*` columns detected "
+                "Cannot compute impacts: no `dest_*` columns detected "
                 "in the design matrix.  Pass `k=` explicitly when constructing "
                 "the model."
             )
@@ -570,10 +671,10 @@ class FlowModel(FlowSharedMethods, SpatialModel):
                 f"mode must be 'auto', 'combined', or 'separate'; got {mode!r}."
             )
 
-        posterior = self._compute_spatial_effects_posterior(draws=draws)
+        posterior = self._compute_impacts_posterior(draws=draws)
 
         if mode == "auto":
-            effective_mode = "combined" if self._symmetric_xo_xd else "separate"
+            effective_mode = "combined" if self._shared_od_covariates else "separate"
         else:
             effective_mode = mode
 
@@ -582,18 +683,19 @@ class FlowModel(FlowSharedMethods, SpatialModel):
         else:
             display = [(side, eff) for side in ("dest", "orig") for eff in _EFFECT_KEYS]
 
-        # Predictor names: prefer dest_* and orig_* labels stripped of the prefix.
+        # Predictor names: dest_* and orig_* labels stripped of the prefix, from
+        # the full design (absorbed columns included).
         dest_feature_names = [
-            name[len("dest_") :] if name.startswith("dest_") else name
-            for name in self._feature_names
+            name[len("dest_") :]
+            for name in self._design_feature_names
             if name.startswith("dest_")
         ][: self._k_d]
         if len(dest_feature_names) != self._k_d:
             dest_feature_names = [f"x{i}" for i in range(self._k_d)]
 
         orig_feature_names = [
-            name[len("orig_") :] if name.startswith("orig_") else name
-            for name in self._feature_names
+            name[len("orig_") :]
+            for name in self._design_feature_names
             if name.startswith("orig_")
         ][: self._k_o]
         if len(orig_feature_names) != self._k_o:
@@ -649,16 +751,22 @@ class FlowModel(FlowSharedMethods, SpatialModel):
         sigma: Optional[float],
         rng: np.random.Generator,
     ) -> np.ndarray:
-        """Draw a single posterior-predictive replicate.
+        """Draw a single posterior-predictive replicate of every period.
 
-        Default implementation: Gaussian SAR flow,
-        ``y_rep = A^{-1} (X β + σ ε)`` with ``ε ~ N(0, I_N)``.
-        Subclasses (SARNegBinFlow, SARNegBinFlowSeparable) override this.
+        Default Gaussian implementation: :math:`y_{rep,t} = A^{-1}(X_t \\beta
+        + \\sigma\\varepsilon_t)` for each period ``t``, with one sparse
+        :math:`LU` factorization of :math:`A` reused across periods.
+        Subclasses (OLS, SEM and count variants) override this method.
         """
-        Xb = self._X @ beta
-        eps = rng.normal(scale=float(sigma), size=self._N) if sigma is not None else 0.0
-        rhs = Xb + eps
-        return self._solve_A(rho_d, rho_o, rho_w, rhs)
+        N, T = self._N, self._T
+        rhs = (self._X @ beta).reshape(T, N).T  # (N, T)
+        if sigma is not None:
+            rhs = rhs + rng.normal(scale=float(sigma), size=(N, T))
+        # Cached symbolic analysis: A = I - ρ_d W_d - ρ_o W_o - ρ_w W_w
+        # shares its sparsity pattern across draws, so sparsax reuses one
+        # fill-reducing analysis; scipy fallback still avoids re-symbolic work.
+        out = self._solve_A(rho_d, rho_o, rho_w, rhs)  # (N, T)
+        return out.T.reshape(-1)  # back to time-first stacked vector
 
     def posterior_predictive(
         self,
@@ -667,262 +775,84 @@ class FlowModel(FlowSharedMethods, SpatialModel):
     ) -> np.ndarray:
         """Draw posterior-predictive samples ``y_rep``.
 
-        For each (subsampled) posterior draw, simulates a new flow vector
-        ``y_rep`` from the implied data-generating process by solving the
-        sparse system ``A(rho) y_rep = X β + ε`` (Gaussian) or
-        ``y_rep ~ NegBin(exp(A^{-1} X β), α)`` (NB variants).
+        For each (subsampled) posterior draw, simulates every period's flows
+        from the implied data-generating process (:meth:`_simulate_y_rep`).
 
         Parameters
         ----------
         n_draws : int, optional
-            Number of posterior draws to use.  Defaults to all available.
+            Number of posterior draws to use.  Defaults to all.
         random_seed : int, optional
             Seed for the posterior-predictive sampler.
 
         Returns
         -------
         np.ndarray
-            Array of shape ``(n_draws, N)`` with posterior-predictive flows.
+            Array of shape ``(n_draws, N * T)`` with posterior-predictive
+            flows in time-first stacked order.
         """
         if self._idata is None:
             raise RuntimeError("Model has not been fit yet.  Call fit() first.")
 
         post = self._idata.posterior
-        rho_d = post["rho_d"].values.reshape(-1)
-        rho_o = post["rho_o"].values.reshape(-1)
-        rho_w = post["rho_w"].values.reshape(-1)
         beta_draws = post["beta"].values.reshape(-1, len(self._feature_names))
         sigma_draws = (
             post["sigma"].values.reshape(-1) if "sigma" in post.data_vars else None
         )
-
-        total = len(rho_d)
+        total = beta_draws.shape[0]
+        if self._spatial_prefix is None:
+            spatial = np.zeros((total, 3))
+        else:
+            spatial = np.column_stack(
+                [
+                    post[f"{self._spatial_prefix}_{k}"].values.reshape(-1)
+                    for k in ("d", "o", "w")
+                ]
+            )
         if n_draws is not None:
             total = min(int(n_draws), total)
-            rho_d = rho_d[:total]
-            rho_o = rho_o[:total]
-            rho_w = rho_w[:total]
-            beta_draws = beta_draws[:total]
-            if sigma_draws is not None:
-                sigma_draws = sigma_draws[:total]
 
         rng = np.random.default_rng(random_seed)
-        out = np.empty((total, self._N), dtype=np.float64)
+        out = np.empty((total, self._N * self._T), dtype=np.float64)
         for g in range(total):
             sigma_g = float(sigma_draws[g]) if sigma_draws is not None else None
-            out[g] = self._simulate_y_rep(
-                float(rho_d[g]),
-                float(rho_o[g]),
-                float(rho_w[g]),
-                beta_draws[g],
-                sigma_g,
-                rng,
-            )
+            out[g] = self._simulate_y_rep(*spatial[g], beta_draws[g], sigma_g, rng)
         return out
 
+    # ------------------------------------------------------------------
+    # Internal effects helpers
+    # ------------------------------------------------------------------
 
-# ---------------------------------------------------------------------------
-# Model 1: SARFlow — unrestricted 3-ρ
-# ---------------------------------------------------------------------------
-
-
-class SARFlow(FlowModel):
-    """Bayesian SAR flow model with three free spatial autoregressive parameters.
-
-    .. math::
-
-        y = \\rho_d W_d y + \\rho_o W_o y + \\rho_w W_w y + X\\beta + \\varepsilon,
-        \\quad \\varepsilon \\sim \\mathcal{N}(0, \\sigma^2 I_N)
-
-    where :math:`W_d = I_n \\otimes W`, :math:`W_o = W \\otimes I_n`,
-    :math:`W_w = W \\otimes W`.
-
-    Parameters
-    ----------
-    y : array-like, shape (n, n) or (N,)
-        Observed origin-destination flow matrix or its vec-form. Must be
-        a square matrix or a flat vector of length :math:`N = n^2`.
-    W : libpysal.graph.Graph or scipy.sparse / dense (n×n) matrix
-        Row-standardized regional weights on *n* units (Graph or matrix).
-    X : np.ndarray or pandas.DataFrame, shape (N, p)
-        Full origin-destination design matrix with :math:`N = n^2` rows.
-        Typically produced by :func:`~neighbayes.graph.flow_design_matrix`
-        or :func:`~neighbayes.graph.flow_design_matrix_with_orig`.
-        DataFrame columns are preserved as feature names.
-    col_names : list of str, optional
-        Column labels for ``X``. Inferred from a DataFrame if omitted;
-        otherwise defaults to ``["x0", "x1", ...]``.
-    k : int, optional
-        Number of regional attribute columns (destination/origin variable
-        pairs). Inferred from ``dest_*``/``orig_*`` column names when the
-        standard LeSage layout is used.
-    logdet_method : str, default "resolvent"
-        Log-determinant method.  The default ``"resolvent"`` samples via the
-        resolvent-Kronecker gradient sampler (recommended).
-    restrict_positive : bool, default True
-        If True, use ``pm.Dirichlet("rho_simplex", a=ones(4))`` to enforce
-        :math:`\\rho_d, \\rho_o, \\rho_w \\geq 0` and
-        :math:`\\rho_d + \\rho_o + \\rho_w \\leq 1`. NUTS-safe via the
-        stick-breaking bijection and appropriate when competitive
-        (negative) spillovers are not expected. If False, three
-        independent ``pm.Uniform(rho_lower, rho_upper)`` priors are used
-        together with a differentiable quadratic-wall stability potential.
-    symmetric_xo_xd : bool, optional
-        If ``None`` (default), origin and destination design blocks are
-        compared and symmetry is auto-detected. Set explicitly to override
-        the heuristic.
-    priors : dict, optional
-        Override default priors. Supported keys:
-
-        - ``beta_mu`` : float or array, default Gelman et al. (2008) — Normal prior mean for ``beta`` (``mean(y)`` on the intercept, 0 otherwise).
-        - ``beta_sigma`` : float or array, default Gelman et al. (2008) — Normal prior std for ``beta``, scaled to ``sd(y)`` and each column's sd.
-        - ``sigma2_alpha``, ``sigma2_beta`` : float, default 2 and ``Var(y)`` — InverseGamma prior on ``sigma**2``.
-        - ``rho_lower`` : float, default -1.0 — Lower bound of Uniform prior on each ρ (only when ``restrict_positive=False``).
-        - ``rho_upper`` : float, default 1.0 — Upper bound of Uniform prior on each ρ (only when ``restrict_positive=False``).
-
-    Notes
-    -----
-    The unrestricted flow log-determinant is sampled with the scalable
-    resolvent-Kronecker gradient (see
-    :mod:`neighbayes.samplers.gaussian._flow_resolvent`), whose accuracy improves
-    with the flow sample size ``N``.  The legacy ``"traces"`` value method — which
-    amplifies stochastic-moment noise for large directed ``W`` — is retired but
-    remains reachable via ``logdet_method="traces"`` (PyMC/NUTS path).
-    """
-
-    def __init__(self, y, X, W, **kwargs):
-        # Default to the resolvent-gradient sampler; "traces" stays as an
-        # explicit (deprecated) opt-in routed through the legacy PyMC path.
-        kwargs.setdefault("logdet_method", "resolvent")
-        super().__init__(y, X, W, **kwargs)
-
-    def fit(
+    def _compute_flow_effects_from_draws(
         self,
-        draws: int = 2000,
-        tune: int = 1000,
-        chains: int = 4,
-        random_seed: Optional[int] = None,
-        *,
-        step_size: float = 5e-4,
-        n_probes: int = 48,
-        logdet_method: str = "auto",
-        n_quad: int = 8,
-        progressbar: bool = True,
-        n_jobs: int = -1,
-        idata_kwargs: Optional[dict] = None,
-        **sample_kwargs,
-    ) -> xr.DataTree:
-        """Sample the posterior with the resolvent-Kronecker gradient sampler.
-
-        MALA-on-ρ within conjugate Gibbs for ``β, σ²``; the flow log-determinant
-        gradient and value come from the scalable, eigenvalue-free resolvent
-        estimator (whose accuracy improves with the flow sample size ``N``).
-
-        Parameters
-        ----------
-        logdet_method : {"auto", "kron_traces", "jax", "numpy"}, default "auto"
-            Flow log-determinant backend.  ``"auto"`` is exact (trace moments of
-            ``W``, no ``N × N`` work) for undirected ``W`` and the stochastic
-            resolvent estimator for directed ``W``; see
-            :func:`~neighbayes.samplers.gaussian._flow_resolvent.resolve_flow_logdet`.
-        idata_kwargs : dict, optional
-            ``{"log_likelihood": True}`` stores the pointwise log-likelihood
-            (one value per draw, chain, and flow) for ``az.loo``.
-            Off by default, as in PyMC.
-        """
-        from ...samplers.gaussian._flow_resolvent import sample_flow_resolvent
-
-        self._pymc_model = None
-        self._idata = sample_flow_resolvent(
-            self._W_sparse,
-            self._y,
-            self._X,
-            draws=draws,
-            tune=tune,
-            chains=chains,
-            step_size=step_size,
-            n_probes=n_probes,
-            coord_names=list(self._feature_names) or None,
-            random_seed=random_seed,
-            logdet_method=logdet_method,
-            n_quad=n_quad,
-            progressbar=progressbar,
-            n_jobs=n_jobs,
-            restrict_positive=self.restrict_positive,
-            priors=self._flow_gaussian_priors(),
-            compute_log_likelihood=bool(
-                (idata_kwargs or {}).get("log_likelihood", False)
-            ),
-        )
-        return self._idata
-
-    def _build_pymc_model(self) -> pm.Model:
-        # The unrestricted flow no longer uses a PyMC/NUTS model; ``fit`` samples
-        # via the resolvent-Kronecker gradient sampler
-        # (:func:`neighbayes.samplers.gaussian._flow_resolvent.sample_flow_resolvent`).
-        raise NotImplementedError(
-            "SARFlow samples via the resolvent-gradient sampler, not PyMC; "
-            "the legacy 'traces' Jacobian was removed. Use SARFlow.fit()."
-        )
-
-    def _compute_spatial_effects_posterior(
-        self, draws: Optional[int] = None
+        rho_d_draws: np.ndarray,
+        rho_o_draws: np.ndarray,
+        rho_w_draws: np.ndarray,
+        beta_draws: np.ndarray,
+        draws: Optional[int] = None,
     ) -> dict[str, np.ndarray]:
-        """Compute posterior origin / destination / intra / network / total effects.
+        """LeSage flow effects from posterior draws of ``ρ`` and ``β`` (full layout).
 
-        Implements the LeSage (2008) effects decomposition: for each posterior
-        draw of :math:`(\\rho_d, \\rho_o, \\rho_w, \\beta_d, \\beta_o)` and each
-        regional predictor *p*, builds an :math:`N\\times n` shock matrix whose
-        column ``j`` contains :math:`\\beta_d^{(p)}` at flows with destination
-        ``j``, :math:`\\beta_o^{(p)}` at flows with origin ``j``, and
-        :math:`\\beta_d^{(p)} + \\beta_o^{(p)}` at the intra flow ``(j, j)``.
-        The system :math:`A\\,T = \\text{shock}` is solved with one sparse
-        :math:`LU` factorization per draw (re-used for all ``n`` columns and all
-        ``k`` predictors), and scalar effects are obtained by averaging
-        :math:`T` over the appropriate masks.  Mirrors LeSage's
-        ``calc_effects.m`` reference implementation.
-
-        Parameters
-        ----------
-        draws : int, optional
-            Number of posterior draws to use.  Defaults to all draws.
-
-        Returns
-        -------
-        dict[str, np.ndarray]
-            Keys: ``"origin"``, ``"destination"``, ``"intra"``, ``"network"``,
-            ``"total"``.  Each value has shape ``(draws, k)``.
+        Effects are those of one period's ``n^2 x n^2`` system, which is
+        time-invariant under static panel parameters; see
+        :func:`~neighbayes.models.flow._compute_flow_effects` for the
+        decomposition, computed from W-only moments with no ``n^2``-sized
+        arrays.
         """
-        if self._idata is None:
-            raise RuntimeError("Model has not been fit yet.  Call fit() first.")
-
-        idata = self._idata
         k_d = self._k_d
         k_o = self._k_o
-
-        rho_d_draws = idata.posterior["rho_d"].values.reshape(-1)
-        rho_o_draws = idata.posterior["rho_o"].values.reshape(-1)
-        rho_w_draws = idata.posterior["rho_w"].values.reshape(-1)
-        beta_draws = idata.posterior["beta"].values.reshape(
-            -1, len(self._feature_names)
-        )
-
         dest_start = 2
         orig_start = 2 + k_d
         intra_start = 2 + k_d + k_o
         has_intra = (
             self._intra_idx is not None and beta_draws.shape[1] >= intra_start + k_d
         )
-
-        n_draws_total = len(rho_d_draws)
         if draws is not None:
-            n_draws_total = min(draws, n_draws_total)
-            rho_d_draws = rho_d_draws[:n_draws_total]
-            rho_o_draws = rho_o_draws[:n_draws_total]
-            rho_w_draws = rho_w_draws[:n_draws_total]
-            beta_draws = beta_draws[:n_draws_total]
-
-        # Exact LeSage decomposition from W-only moments (no n²-sized arrays).
+            keep = min(draws, len(rho_d_draws))
+            rho_d_draws = rho_d_draws[:keep]
+            rho_o_draws = rho_o_draws[:keep]
+            rho_w_draws = rho_w_draws[:keep]
+            beta_draws = beta_draws[:keep]
         return self._flow_effects_for_draws(
             rho_d_draws,
             rho_o_draws,
@@ -932,189 +862,109 @@ class SARFlow(FlowModel):
             beta_draws[:, intra_start : intra_start + k_d] if has_intra else None,
         )
 
+    def _compute_flow_effects_kron(
+        self,
+        rho_d_draws: np.ndarray,
+        rho_o_draws: np.ndarray,
+        beta_draws: np.ndarray,
+        draws: Optional[int] = None,
+    ) -> dict[str, np.ndarray]:
+        """:meth:`_compute_flow_effects_from_draws` under ``ρ_w = −ρ_d ρ_o``."""
+        return self._compute_flow_effects_from_draws(
+            rho_d_draws,
+            rho_o_draws,
+            -rho_d_draws * rho_o_draws,
+            beta_draws,
+            draws=draws,
+        )
 
-# ---------------------------------------------------------------------------
-# Model 2: SARFlowSeparable — constrained ρ_w = −ρ_d·ρ_o
-# ---------------------------------------------------------------------------
-
-
-class SARFlowSeparable(FlowModel):
-    """Bayesian separable SAR flow model with ρ_w = −ρ_d · ρ_o.
-
-    The separability constraint :math:`\\rho_w = -\\rho_d \\rho_o` reduces
-    the flow weight matrix to a Kronecker structure whose log-determinant
-    factors as:
-
-    .. math::
-
-        \\log|I_N - \\rho_d W_d - \\rho_o W_o + \\rho_d \\rho_o W_w|
-        = n \\log|I_n - \\rho_d W| + n \\log|I_n - \\rho_o W|
-
-    enabling exact O(n) log-det evaluation via eigenvalues — no trace
-    estimation required.
-
-    Parameters
-    ----------
-    y : array-like, shape (n, n) or (N,)
-        Observed origin-destination flow matrix or its vec-form. Must be
-        a square matrix or a flat vector of length :math:`N = n^2`.
-    W : libpysal.graph.Graph or scipy.sparse / dense (n×n) matrix
-        Row-standardized regional weights on *n* units (Graph or matrix).
-    X : np.ndarray or pandas.DataFrame, shape (N, p)
-        Full origin-destination design matrix with :math:`N = n^2` rows.
-        Typically produced by :func:`~neighbayes.graph.flow_design_matrix`
-        or :func:`~neighbayes.graph.flow_design_matrix_with_orig`.
-        DataFrame columns are preserved as feature names.
-    col_names : list of str, optional
-        Column labels for ``X``. Inferred from a DataFrame if omitted;
-        otherwise defaults to ``["x0", "x1", ...]``.
-    k : int, optional
-        Number of regional attribute columns (destination/origin variable
-        pairs). Inferred from ``dest_*``/``orig_*`` column names when the
-        standard LeSage layout is used.
-    logdet_method : {"eigenvalue", "chebyshev", "cheb_cholesky", "aaa", "cheb_stochastic"} or None, default None
-        Method for the :math:`n \\times n` log-determinant used via the exact
-        Kronecker factorization.  ``None`` (default) auto-selects
-        (``"aaa"`` for directed/non-symmetric ``W``).
-    symmetric_xo_xd : bool, optional
-        If ``None`` (default), origin and destination design blocks are
-        compared and symmetry is auto-detected. Set explicitly to override
-        the heuristic.
-    priors : dict, optional
-        Override default priors. Supported keys:
-
-        - ``beta_mu`` : float or array, default Gelman et al. (2008) — Normal prior mean for ``beta`` (``mean(y)`` on the intercept, 0 otherwise).
-        - ``beta_sigma`` : float or array, default Gelman et al. (2008) — Normal prior std for ``beta``, scaled to ``sd(y)`` and each column's sd.
-        - ``sigma2_alpha``, ``sigma2_beta`` : float, default 2 and ``Var(y)`` — InverseGamma prior on ``sigma**2``.
-        - ``rho_lower`` : float, default -0.999 — Lower bound of Uniform prior on ``rho_d`` and ``rho_o``.
-        - ``rho_upper`` : float, default 0.999 — Upper bound of Uniform prior on ``rho_d`` and ``rho_o``.
-
-    Notes
-    -----
-    The ``restrict_positive`` argument inherited from :class:`FlowModel`
-    has no effect on this class — separable variants always use Uniform
-    priors on the individual :math:`\rho` components.
-    """
-
-    def __init__(self, y, X, W, **kwargs):
-        method = kwargs.pop("logdet_method", None)
-        _VALID = {"eigenvalue", "chebyshev", "cheb_cholesky", "aaa", "cheb_stochastic"}
-        if method is not None and method not in _VALID:
-            raise ValueError(
-                f"SARFlowSeparable logdet_method must be None (auto) or one of "
-                f"{sorted(_VALID)}; got {method!r}."
+    def _spatial_draws(self, posterior, keys: str = "dow") -> list[np.ndarray]:
+        """The flattened draws of the spatial parameters ``keys`` (``d``, ``o``, ``w``)."""
+        return [
+            np.asarray(
+                posterior[f"{self._spatial_prefix}_{k}"].values.reshape(-1),
+                dtype=np.float64,
             )
-        kwargs["logdet_method"] = method
-        super().__init__(y, X, W, **kwargs)
+            for k in keys
+        ]
 
-    def _build_pymc_model(self) -> pm.Model:
-        pv = self._flow_gaussian_priors()
-        beta_mu, beta_sigma = pv["beta_mu"], pv["beta_sigma"]
-        rho_lower = self.priors.get("rho_lower", -0.999)
-        rho_upper = self.priors.get("rho_upper", 0.999)
+    def _require_idata(self):
+        if self._idata is None:
+            raise RuntimeError("Model has not been fit yet.  Call fit() first.")
+        return self._idata.posterior
 
-        if self._separable_logdet_fn is None:
-            raise RuntimeError(
-                "SARFlowSeparable requires precomputed logdet data; "
-                "initialize with a separable logdet_method (None/auto, "
-                "eigenvalue, chebyshev, cheb_cholesky, aaa, or cheb_stochastic)"
-            )
-        Wd_y_t = pt.as_tensor_variable(self._Wd_y.astype(np.float64))
-        Wo_y_t = pt.as_tensor_variable(self._Wo_y.astype(np.float64))
-        Ww_y_t = pt.as_tensor_variable(self._Ww_y.astype(np.float64))
-        X_t = pt.as_tensor_variable(self._X.astype(np.float64))
-        y_t = pt.as_tensor_variable(self._y.astype(np.float64))
+    def _effects_unrestricted(self, draws: Optional[int] = None) -> dict:
+        """LeSage effects under the unrestricted filter."""
+        post = self._require_idata()
+        return self._compute_flow_effects_from_draws(
+            *self._spatial_draws(post), self._beta_layout(post), draws=draws
+        )
 
-        with pm.Model(coords=self._model_coords()) as model:
-            rho_d = pm.Uniform("rho_d", lower=rho_lower, upper=rho_upper)
-            rho_o = pm.Uniform("rho_o", lower=rho_lower, upper=rho_upper)
-            # rho_w is deterministic: -rho_d * rho_o  (must appear in posterior)
-            rho_w = pm.Deterministic("rho_w", -rho_d * rho_o)
+    def _effects_separable(self, draws: Optional[int] = None) -> dict:
+        """LeSage effects under the separable filter."""
+        post = self._require_idata()
+        return self._compute_flow_effects_kron(
+            *self._spatial_draws(post, "do"), self._beta_layout(post), draws=draws
+        )
 
-            beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            sigma = self._flow_sigma(pv)
+    def _effects_aspatial(self, draws: Optional[int] = None) -> dict:
+        """Closed-form effects of a mean ``X β`` (no ``X``-mediated spillovers)."""
+        post = self._require_idata()
+        return _compute_ols_flow_effects(
+            self._idata,
+            beta_draws=self._beta_layout(post),
+            n=self._n,
+            k_d=self._k_d,
+            k_o=self._k_o,
+            feature_names=self._design_feature_names,
+            intra_idx=self._intra_idx,
+            draws=draws,
+        )
 
-            mu = rho_d * Wd_y_t + rho_o * Wo_y_t + rho_w * Ww_y_t + pt.dot(X_t, beta)
-            pm.Normal("obs", mu=mu, sigma=sigma, observed=y_t)
+    def _trace_logdet(self):
+        """Exact ``log|A(ρ)|`` value-and-gradient on the ``n²`` flow system."""
+        if getattr(self, "_trace_logdet_obj", None) is None:
+            from ..._logdet._flow_kron_traces import FlowKronTraceLogdet
 
-            # Jacobian: n*log|I_n - rho_d*W| + n*log|I_n - rho_o*W|
-            # factorization holds exactly for the separable constraint.
-            pm.Potential(
-                "jacobian",
-                self._separable_logdet_fn(rho_d, rho_o),
-            )
+            self._trace_logdet_obj = FlowKronTraceLogdet(self._W_sparse)
+        return self._trace_logdet_obj
 
-        return model
+    def _jacobian_unrestricted(self, posterior) -> np.ndarray:
+        """Per-draw Jacobian term of the unrestricted filter (exact trace series)."""
+        ld = self._trace_logdet()
+        d, o, w = self._spatial_draws(posterior)
+        logdet = np.array([ld(*r)[0] for r in zip(d, o, w)])
+        return self._flow_jacobian(logdet, 1 - d - o - w, np)
 
-    def _compute_jacobian_log_det(self, posterior) -> np.ndarray:
-        rho_d = np.asarray(posterior["rho_d"].values.reshape(-1), dtype=np.float64)
-        rho_o = np.asarray(posterior["rho_o"].values.reshape(-1), dtype=np.float64)
+    def _jacobian_separable(self, posterior) -> np.ndarray:
+        """Per-draw Jacobian term of the separable filter, ``n log|L_d| + n log|L_o|``."""
         if self._separable_logdet_numpy_fn is None:
             raise RuntimeError(
                 "Missing separable numeric logdet evaluator. "
                 "Initialize with a separable logdet_method (None/auto, "
-                "eigenvalue, chebyshev, cheb_cholesky, aaa, or cheb_stochastic)"
+                "eigenvalue, cheb, aaa, spline, or stochastic)."
             )
-        return self._separable_logdet_numpy_fn(rho_d, rho_o)
-
-    def _compute_spatial_effects_posterior(
-        self, draws: Optional[int] = None
-    ) -> dict[str, np.ndarray]:
-        """Compute posterior effects using Kronecker-factored solve.
-
-        Implements the LeSage (2008) effects decomposition (see
-        :meth:`SARFlow._compute_spatial_effects_posterior`) but exploits
-        :math:`A = L_o \\otimes L_d` to replace the
-        :math:`N\\times N` sparse factorization with two :math:`n\\times n`
-        sparse solves per predictor via
-        :func:`~neighbayes._ops.kron_solve_matrix`.
-
-        Parameters
-        ----------
-        draws : int, optional
-            Number of posterior draws to use.  Defaults to all.
-
-        Returns
-        -------
-        dict[str, np.ndarray]
-            Same keys and shapes as :meth:`SARFlow._compute_spatial_effects_posterior`.
-        """
-        if self._idata is None:
-            raise RuntimeError("Model has not been fit yet.  Call fit() first.")
-
-        idata = self._idata
-        k_d = self._k_d
-        k_o = self._k_o
-
-        rho_d_draws = idata.posterior["rho_d"].values.reshape(-1)
-        rho_o_draws = idata.posterior["rho_o"].values.reshape(-1)
-        beta_draws = idata.posterior["beta"].values.reshape(
-            -1, len(self._feature_names)
+        d, o = self._spatial_draws(posterior, "do")
+        return self._flow_jacobian(
+            self._separable_logdet_numpy_fn(d, o), (1 - d) * (1 - o), np
         )
 
-        dest_start = 2
-        orig_start = 2 + k_d
-        intra_start = 2 + k_d + k_o
-        has_intra = (
-            self._intra_idx is not None and beta_draws.shape[1] >= intra_start + k_d
-        )
 
-        n_draws_total = len(rho_d_draws)
-        if draws is not None:
-            n_draws_total = min(draws, n_draws_total)
-            rho_d_draws = rho_d_draws[:n_draws_total]
-            rho_o_draws = rho_o_draws[:n_draws_total]
-            beta_draws = beta_draws[:n_draws_total]
+class _Aspatial:
+    """No filter, ``A = I``: the gravity baselines."""
 
-        # Exact LeSage decomposition from W-only moments (no n²-sized arrays).
-        return self._flow_effects_for_draws(
-            rho_d_draws,
-            rho_o_draws,
-            -rho_d_draws * rho_o_draws,  # separable: ρ_w = −ρ_d·ρ_o
-            beta_draws[:, dest_start : dest_start + k_d],
-            beta_draws[:, orig_start : orig_start + k_o],
-            beta_draws[:, intra_start : intra_start + k_d] if has_intra else None,
-        )
+    _flow_filter = None
+    _spatial_prefix = None
+
+    def _compute_impacts_posterior(self, draws: Optional[int] = None) -> dict:
+        return self._effects_aspatial(draws)
+
+    def _simulate_y_rep(self, rho_d, rho_o, rho_w, beta, sigma, rng) -> np.ndarray:
+        """``y_rep = X β + σ ε`` (every period)."""
+        Xb = self._X @ beta
+        if sigma is None:
+            return Xb
+        return Xb + rng.normal(scale=float(sigma), size=Xb.shape[0])
 
 
 def _compute_ols_flow_effects(
@@ -1130,11 +980,8 @@ def _compute_ols_flow_effects(
 ) -> dict[str, np.ndarray]:
     """Closed-form Thomas-Agnan & LeSage (2014, Table 83.1) effects.
 
-    Shared between :class:`OLSFlow`, :class:`SEMFlow`,
-    :class:`SEMFlowSeparable` (cross-section), and :class:`OLSFlowPanel`,
-    :class:`SEMFlowPanel`, :class:`SEMFlowSeparablePanel` (panel) — all of
-    which have :math:`\\mathbb{E}[y] = X\\beta` (no :math:`X`-mediated
-    spillovers).
+    The effects of :class:`OLSFlow` and :class:`SEMFlow`, whose mean is
+    :math:`\\mathbb{E}[y] = X\\beta` (no :math:`X`-mediated spillovers).
     """
     if beta_draws is None:
         beta_draws = idata.posterior["beta"].values.reshape(-1, len(feature_names))
@@ -1162,13 +1009,13 @@ def _compute_ols_flow_effects(
     out: dict[str, np.ndarray] = {}
     out["dest_total"] = bd + bi / n
     out["dest_destination"] = bd * (n - 1) / n
-    out["dest_intra"] = (bd + bi) / n
+    out["dest_intraunit"] = (bd + bi) / n
     out["dest_origin"] = zeros_d.copy()
     out["dest_network"] = zeros_d.copy()
 
     out["orig_total"] = bo
     out["orig_origin"] = bo * (n - 1) / n
-    out["orig_intra"] = bo / n
+    out["orig_intraunit"] = bo / n
     out["orig_destination"] = zeros_o.copy()
     out["orig_network"] = zeros_o.copy()
 
@@ -1180,1361 +1027,3 @@ def _compute_ols_flow_effects(
             out[eff] = np.concatenate([out[f"dest_{eff}"], out[f"orig_{eff}"]], axis=1)
 
     return out
-
-
-# ---------------------------------------------------------------------------
-# Model 3: OLSFlow — non-spatial gravity baseline (Thomas-Agnan & LeSage 2014)
-# ---------------------------------------------------------------------------
-
-
-class OLSFlow(FlowModel):
-    r"""Non-spatial Bayesian OD-flow gravity model (independence baseline).
-
-    Implements the conventional log-linear gravity model from
-    :cite:t:`thomas-agnan2014SpatialEconometric` (eq. 83.2):
-
-    .. math::
-
-        y = \alpha \iota_{N} + X_o \beta_o + X_d \beta_d + g\gamma + \varepsilon,
-        \quad \varepsilon \sim \mathcal{N}(0, \sigma^{2} I_{N})
-
-    with no spatial-lag terms.  Provided as a baseline for comparison with
-    :class:`SARFlow` / :class:`SARFlowSeparable` and to reproduce Table 83.1
-    of the chapter.
-
-    Parameters
-    ----------
-    y : array-like, shape (n, n) or (N,)
-        Observed O-D flow matrix (or its vec-form). Must be a square
-        matrix or a flat vector of length :math:`N = n^2`.
-    W : libpysal.graph.Graph or scipy.sparse / dense (n×n) matrix
-        Row-standardized regional weights on *n* units (Graph or matrix). Required for API
-        symmetry with the spatial flow models, but the graph weights
-        are not used in estimation.
-    X : np.ndarray or pandas.DataFrame, shape (N, p)
-        Full origin-destination design matrix.
-    col_names : list[str], optional
-        Column labels for *X*. Defaults to ``["x0", "x1", ...]`` when
-        not provided and *X* is not a DataFrame.
-    k : int, optional
-        Number of regional attribute columns. Inferred from column names
-        when they follow the ``dest_*``/``orig_*`` convention.
-    priors : dict, optional
-        Override default priors. Supported keys:
-
-        - ``beta_mu`` : float or array, default Gelman et al. (2008) — Normal prior mean for ``beta`` (``mean(y)`` on the intercept, 0 otherwise).
-        - ``beta_sigma`` : float or array, default Gelman et al. (2008) — Normal prior std for ``beta``, scaled to ``sd(y)`` and each column's sd.
-        - ``sigma2_alpha``, ``sigma2_beta`` : float, default 2 and ``Var(y)`` — InverseGamma prior on ``sigma**2``.
-
-        Spatial keys (``rho_*``) are ignored.
-    symmetric_xo_xd : bool, optional
-        If ``None`` (default), origin/destination design symmetry is
-        auto-detected. Set explicitly to override.
-
-    Notes
-    -----
-    No spatial-lag term enters the likelihood, so no log-determinant
-    is required and ``logdet_method`` is ignored if passed.
-    """
-
-    def __init__(self, y, X, W, **kwargs):
-        # Skip log-determinant precomputation: A = I_N has |A| = 1.
-        kwargs.pop("logdet_method", None)
-        kwargs.pop("restrict_positive", None)
-        super().__init__(y, X, W, logdet_method="none", **kwargs)
-
-    def _build_pymc_model(self) -> pm.Model:
-        pv = self._flow_gaussian_priors()
-        beta_mu, beta_sigma = pv["beta_mu"], pv["beta_sigma"]
-
-        X_t = pt.as_tensor_variable(self._X.astype(np.float64))
-        y_t = pt.as_tensor_variable(self._y.astype(np.float64))
-
-        with pm.Model(coords=self._model_coords()) as model:
-            beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            sigma = self._flow_sigma(pv)
-            mu = pt.dot(X_t, beta)
-            pm.Normal("obs", mu=mu, sigma=sigma, observed=y_t)
-
-        return model
-
-    def _simulate_y_rep(
-        self,
-        rho_d: float,  # unused
-        rho_o: float,  # unused
-        rho_w: float,  # unused
-        beta: np.ndarray,
-        sigma: Optional[float],
-        rng: np.random.Generator,
-    ) -> np.ndarray:
-        Xb = self._X @ beta
-        if sigma is None:
-            return Xb
-        return Xb + rng.normal(scale=float(sigma), size=self._N)
-
-    def posterior_predictive(
-        self,
-        n_draws: Optional[int] = None,
-        random_seed: Optional[int] = None,
-    ) -> np.ndarray:
-        """Draw posterior-predictive flows for the OLS gravity model."""
-        if self._idata is None:
-            raise RuntimeError("Model has not been fit yet.  Call fit() first.")
-
-        post = self._idata.posterior
-        beta_draws = post["beta"].values.reshape(-1, len(self._feature_names))
-        sigma_draws = (
-            post["sigma"].values.reshape(-1) if "sigma" in post.data_vars else None
-        )
-
-        total = beta_draws.shape[0]
-        if n_draws is not None:
-            total = min(int(n_draws), total)
-            beta_draws = beta_draws[:total]
-            if sigma_draws is not None:
-                sigma_draws = sigma_draws[:total]
-
-        rng = np.random.default_rng(random_seed)
-        out = np.empty((total, self._N), dtype=np.float64)
-        for g in range(total):
-            sigma_g = float(sigma_draws[g]) if sigma_draws is not None else None
-            out[g] = self._simulate_y_rep(0.0, 0.0, 0.0, beta_draws[g], sigma_g, rng)
-        return out
-
-    def _compute_spatial_effects_posterior(
-        self, draws: Optional[int] = None
-    ) -> dict[str, np.ndarray]:
-        r"""Closed-form Thomas-Agnan & LeSage (2014, Table 83.1) effects.
-
-        With :math:`A = I_N` the response to any shock equals the shock
-        itself, so the Thomas-Agnan decomposition simplifies analytically to:
-
-        .. math::
-
-            \mathrm{TE} = \beta_d + \beta_o, \qquad
-            \mathrm{NE} = 0, \qquad
-            \mathrm{IE} = (\beta_d + \beta_o + \beta_{\text{intra}}) / n,
-
-        with :math:`\mathrm{OE} = \beta_o (n-1)/n` and
-        :math:`\mathrm{DE} = \beta_d (n-1)/n`, and the symmetric
-        contributions ``β_intra / n`` distributed to the destination side.
-        """
-        if self._idata is None:
-            raise RuntimeError("Model has not been fit yet.  Call fit() first.")
-
-        return _compute_ols_flow_effects(
-            self._idata,
-            n=self._n,
-            k_d=self._k_d,
-            k_o=self._k_o,
-            feature_names=self._feature_names,
-            intra_idx=self._intra_idx,
-            draws=draws,
-        )
-
-
-# ---------------------------------------------------------------------------
-# Model 4: NegBin SAR/OLS flow variants
-# ---------------------------------------------------------------------------
-
-
-class _NegBinFlowMixin:
-    """Shared ``fit`` dispatch for Negative-Binomial flow models.
-
-    The NB flow classes share a single ``fit`` wrapper — the reduced-form
-    Pólya–Gamma Gibbs sampler by default, or PyMC NUTS on the exact count
-    likelihood via ``sampler="nuts"`` (much slower).  Only the
-    per-class :meth:`_fit_gibbs` (unrestricted 3-ρ vs. separable 2-ρ
-    reduced-form sampler) differs, so it stays on each subclass.  The mixin is
-    listed first in the bases so its ``fit`` wins and ``super().fit`` resolves
-    to the Gaussian :class:`FlowModel.fit` NUTS path.
-    """
-
-    def fit(
-        self,
-        draws: int = 2000,
-        tune: int = 1000,
-        chains: int = 4,
-        random_seed: Optional[int] = None,
-        sampler: str = "gibbs",
-        gibbs_backend: str = "numpy",
-        store_lambda: bool = False,
-        idata_kwargs: Optional[dict] = None,
-        progressbar: bool = True,
-        attach_log_abs_det: bool = True,
-        n_jobs: int = -1,
-        **sample_kwargs,
-    ) -> xr.DataTree:
-        """Draw samples from the posterior.
-
-        Parameters
-        ----------
-        draws : int, default 2000
-            Number of posterior samples per chain (after tuning).
-        tune : int, default 1000
-            Number of tuning (warm-up) steps per chain.
-        chains : int, default 4
-            Number of parallel chains.
-        random_seed : int, optional
-            Seed for reproducibility.
-        sampler : {"gibbs", "nuts"}, default "gibbs"
-            Sampling method: ``"gibbs"`` (default) for the reduced-form
-            Pólya–Gamma Gibbs sampler, or ``"nuts"`` for PyMC NUTS on the
-            exact count likelihood (much slower).
-        gibbs_backend : {"numpy", "jax", "auto"}, default "numpy"
-            Execution backend for the Gibbs sampler (only used when
-            ``sampler="gibbs"``).  ``"jax"`` compiles the sweep with JAX and
-            sparsax sparse LU solves, chains on threads; ``"numpy"`` uses the
-            host CHOLMOD/KLU path.  ``"auto"`` currently resolves to
-            ``"numpy"``.
-        store_lambda : bool, default False
-            If True, include the high-dimensional fitted mean ``lambda`` in the
-            stored posterior (NUTS only).
-        idata_kwargs : dict, optional
-            ``{"log_likelihood": True}`` stores the pointwise log-likelihood
-            (one value per draw, chain, and flow) for ``az.loo``,
-            on either sampler.  Off by default, as in PyMC.  For NUTS the dict
-            is also forwarded to ``pm.sample``.
-        progressbar : bool, default True
-            Show progress bar during sampling.
-        attach_log_abs_det : bool, default True
-            If True, record the per-draw spatial-filter Jacobian ``log|A(ρ)|`` in
-            ``idata.sample_stats["log_abs_det"]`` (a diagnostic — it is *not* folded
-            into the count model's ``log_likelihood``).  Computed with the resolvent
-            value estimator; set ``False`` to skip its per-draw cost at very large
-            ``N``.
-        **sample_kwargs
-            Additional keyword arguments forwarded to ``pm.sample`` (NUTS
-            only).  Pass ``target_accept=0.95`` to adjust the NUTS acceptance
-            rate.
-
-        Returns
-        -------
-        xarray.DataTree
-        """
-        if sampler == "gibbs":
-            if gibbs_backend not in {"numpy", "jax", "auto"}:
-                raise ValueError(
-                    "Negative-Binomial flow Gibbs supports "
-                    "gibbs_backend in {'numpy', 'jax', 'auto'}; "
-                    f"got {gibbs_backend!r}."
-                )
-            idata = self._fit_gibbs(
-                draws=draws,
-                tune=tune,
-                chains=chains,
-                random_seed=random_seed,
-                progressbar=progressbar,
-                n_jobs=n_jobs,
-                gibbs_backend=gibbs_backend,
-                sample_kwargs=sample_kwargs,
-                log_likelihood=bool((idata_kwargs or {}).get("log_likelihood", False)),
-            )
-        elif sampler == "nuts":
-            # Call FlowModel.fit explicitly: SARFlow's own ``fit`` is the
-            # Gaussian resolvent sampler, which must never see count data.
-            idata = FlowModel.fit(
-                self,
-                draws=draws,
-                tune=tune,
-                chains=chains,
-                random_seed=random_seed,
-                store_lambda=store_lambda,
-                idata_kwargs=idata_kwargs,
-                progressbar=progressbar,
-                **sample_kwargs,
-            )
-        else:
-            raise ValueError(f"sampler must be 'nuts' or 'gibbs', got {sampler!r}")
-        if attach_log_abs_det:
-            self._attach_flow_log_abs_det(idata)
-        return idata
-
-
-class SARNegBinFlow(_NegBinFlowMixin, SARFlow):
-    r"""Bayesian SAR flow model with NB2 observation noise.
-
-    This class extends :class:`SARFlow` with a Negative Binomial likelihood:
-
-    .. math::
-
-        y_{ij} \sim \operatorname{NegBin}(\mu_{ij}, \alpha),
-
-    where ``alpha`` is an overdispersion parameter sampled from a
-    HalfNormal prior.
-    """
-
-    def __init__(self, y, X, W, **kwargs):
-        y_arr = np.asarray(y)
-        if not np.issubdtype(y_arr.dtype, np.integer):
-            y_rounded = np.round(y_arr).astype(np.int64)
-            if not np.allclose(y_arr, y_rounded):
-                raise ValueError(
-                    "SARNegBinFlow requires integer-valued "
-                    f"observations; got dtype {y_arr.dtype} with non-integer "
-                    "values."
-                )
-            y_arr = y_rounded
-        if np.any(y_arr < 0):
-            raise ValueError(
-                "SARNegBinFlow requires non-negative integer observations."
-            )
-        super().__init__(y_arr.astype(np.float64), X, W, **kwargs)
-        self._y_int_vec: np.ndarray = y_arr.ravel().astype(np.int64)
-
-    def _compute_jacobian_log_det(self, posterior) -> Optional[np.ndarray]:
-        return None
-
-    def _build_pymc_model(self) -> pm.Model:
-        from ..._ops import SparseFlowSolveOp
-
-        pv = self._flow_count_priors()
-        beta_mu, beta_sigma = pv["beta_mu"], pv["beta_sigma"]
-        alpha_sigma, alpha_nu = pv["alpha_sigma"], pv["alpha_nu"]
-
-        X_t = pt.as_tensor_variable(self._X.astype(np.float64))
-
-        with pm.Model(coords=self._model_coords()) as model:
-            if self.restrict_positive:
-                rho_simplex = pm.Dirichlet("rho_simplex", a=np.ones(4))
-                rho_d = pm.Deterministic("rho_d", rho_simplex[0])
-                rho_o = pm.Deterministic("rho_o", rho_simplex[1])
-                rho_w = pm.Deterministic("rho_w", rho_simplex[2])
-            else:
-                rho_lower = self.priors.get("rho_lower", -1.0)
-                rho_upper = self.priors.get("rho_upper", 1.0)
-                rho_d = pm.Uniform("rho_d", lower=rho_lower, upper=rho_upper)
-                rho_o = pm.Uniform("rho_o", lower=rho_lower, upper=rho_upper)
-                rho_w = pm.Uniform("rho_w", lower=rho_lower, upper=rho_upper)
-                slack = 1.0 - rho_d - rho_o - rho_w
-                pm.Potential(
-                    "stability",
-                    pt.switch(slack > 0.0, 0.0, -1e6 * slack**2),
-                )
-
-            beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            alpha = pm.HalfStudentT("alpha", nu=alpha_nu, sigma=alpha_sigma)
-
-            Xb = pt.dot(X_t, beta)
-            solve_op = SparseFlowSolveOp(self._Wd, self._Wo, self._Ww)
-            eta = solve_op(rho_d, rho_o, rho_w, Xb)
-            lam = pm.Deterministic("lambda", pt.exp(eta))
-
-            pm.NegativeBinomial("obs", mu=lam, alpha=alpha, observed=self._y_int_vec)
-
-            # No |A| change-of-variables Jacobian for the count likelihood: the
-            # NB mean is η = A⁻¹Xβ and y is modelled directly, so the spatial
-            # log-determinant does not enter (adding it biases β).
-
-        return model
-
-    def posterior_predictive(
-        self,
-        n_draws: Optional[int] = None,
-        random_seed: Optional[int] = None,
-    ) -> np.ndarray:
-        """Draw posterior-predictive flow counts for NB SAR flow model."""
-        if self._idata is None:
-            raise RuntimeError("Model has not been fit yet.  Call fit() first.")
-
-        post = self._idata.posterior
-        beta_draws = post["beta"].values.reshape(-1, len(self._feature_names))
-        rho_d_draws = post["rho_d"].values.reshape(-1)
-        rho_o_draws = post["rho_o"].values.reshape(-1)
-        rho_w_draws = post["rho_w"].values.reshape(-1)
-        alpha_draws = post["alpha"].values.reshape(-1)
-
-        total = beta_draws.shape[0]
-        if n_draws is not None:
-            total = min(int(n_draws), total)
-            beta_draws = beta_draws[:total]
-            rho_d_draws = rho_d_draws[:total]
-            rho_o_draws = rho_o_draws[:total]
-            rho_w_draws = rho_w_draws[:total]
-            alpha_draws = alpha_draws[:total]
-
-        rng = np.random.default_rng(random_seed)
-        out = np.empty((total, self._N), dtype=np.float64)
-        for g in range(total):
-            eta = self._solve_A(
-                rho_d_draws[g], rho_o_draws[g], rho_w_draws[g], self._X @ beta_draws[g]
-            )
-            lam = np.exp(np.clip(eta, -50.0, 50.0))
-            alpha = float(alpha_draws[g])
-            p = alpha / (alpha + lam)
-            out[g] = rng.negative_binomial(alpha, p).astype(np.float64)
-        return out
-
-    def _fit_gibbs(
-        self,
-        draws: int = 2000,
-        tune: int = 1000,
-        chains: int = 4,
-        random_seed: Optional[int] = None,
-        progressbar: bool = True,
-        n_jobs: int = -1,
-        gibbs_backend: str = "numpy",
-        krylov_reuse: bool = True,
-        sample_kwargs: dict[str, Any] | None = None,
-        log_likelihood: bool = False,
-    ) -> xr.DataTree:
-        """Sample posterior via reduced-form PG-Gibbs (unrestricted 3-ρ)."""
-        from ._nb_gibbs import run_negbin_flow_gibbs
-
-        return run_negbin_flow_gibbs(
-            self,
-            separable=False,
-            gibbs_backend=gibbs_backend,
-            model_type="nb_sar_flow",
-            omega_size=self._N,
-            draws=draws,
-            tune=tune,
-            chains=chains,
-            random_seed=random_seed,
-            progressbar=progressbar,
-            n_jobs=n_jobs,
-            krylov_reuse=krylov_reuse,
-            log_likelihood=log_likelihood,
-        )
-
-
-class SARNegBinFlowSeparable(_NegBinFlowMixin, SARFlowSeparable):
-    """Separable SAR flow model with NB2 observation noise."""
-
-    def __init__(self, y, X, W, **kwargs):
-        y_arr = np.asarray(y)
-        if not np.issubdtype(y_arr.dtype, np.integer):
-            y_rounded = np.round(y_arr).astype(np.int64)
-            if not np.allclose(y_arr, y_rounded):
-                raise ValueError(
-                    "SARNegBinFlowSeparable requires integer-valued "
-                    f"observations; got dtype {y_arr.dtype} with non-integer "
-                    "values."
-                )
-            y_arr = y_rounded
-        if np.any(y_arr < 0):
-            raise ValueError(
-                "SARNegBinFlowSeparable requires non-negative integer observations."
-            )
-        super().__init__(y_arr.astype(np.float64), X, W, **kwargs)
-        self._y_int_vec: np.ndarray = y_arr.ravel().astype(np.int64)
-
-    def _compute_jacobian_log_det(self, posterior) -> Optional[np.ndarray]:
-        return None
-
-    def _build_pymc_model(self) -> pm.Model:
-        from ..._ops import KroneckerFlowSolveOp
-
-        pv = self._flow_count_priors()
-        beta_mu, beta_sigma = pv["beta_mu"], pv["beta_sigma"]
-        alpha_sigma, alpha_nu = pv["alpha_sigma"], pv["alpha_nu"]
-        rho_lower = self.priors.get("rho_lower", -0.999)
-        rho_upper = self.priors.get("rho_upper", 0.999)
-
-        n = self._n
-        if self._separable_logdet_fn is None:
-            raise RuntimeError(
-                "SARNegBinFlowSeparable requires precomputed logdet data; "
-                "initialize with a separable logdet_method (None/auto, "
-                "eigenvalue, chebyshev, cheb_cholesky, aaa, or cheb_stochastic)"
-            )
-        X_t = pt.as_tensor_variable(self._X.astype(np.float64))
-
-        with pm.Model(coords=self._model_coords()) as model:
-            rho_d = pm.Uniform("rho_d", lower=rho_lower, upper=rho_upper)
-            rho_o = pm.Uniform("rho_o", lower=rho_lower, upper=rho_upper)
-            pm.Deterministic("rho_w", -rho_d * rho_o)
-
-            beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            alpha = pm.HalfStudentT("alpha", nu=alpha_nu, sigma=alpha_sigma)
-
-            Xb = pt.dot(X_t, beta)
-            solve_op = KroneckerFlowSolveOp(self._W_sparse, n)
-            eta = solve_op(rho_d, rho_o, Xb)
-            lam = pm.Deterministic("lambda", pt.exp(eta))
-
-            pm.NegativeBinomial("obs", mu=lam, alpha=alpha, observed=self._y_int_vec)
-
-            # No |A| change-of-variables Jacobian for the count likelihood:
-            # the NB mean is η = A⁻¹Xβ and y is modelled directly, so the
-            # spatial filter enters only through the mean.  (The Gaussian
-            # separable model keeps the Jacobian; copying it here biases
-            # ρ toward the negative-logdet region.)
-
-        return model
-
-    def posterior_predictive(
-        self,
-        n_draws: Optional[int] = None,
-        random_seed: Optional[int] = None,
-    ) -> np.ndarray:
-        """Draw posterior-predictive flow counts for separable NB SAR flow."""
-        if self._idata is None:
-            raise RuntimeError("Model has not been fit yet.  Call fit() first.")
-
-        post = self._idata.posterior
-        beta_draws = post["beta"].values.reshape(-1, len(self._feature_names))
-        rho_d_draws = post["rho_d"].values.reshape(-1)
-        rho_o_draws = post["rho_o"].values.reshape(-1)
-        alpha_draws = post["alpha"].values.reshape(-1)
-
-        total = beta_draws.shape[0]
-        if n_draws is not None:
-            total = min(int(n_draws), total)
-            beta_draws = beta_draws[:total]
-            rho_d_draws = rho_d_draws[:total]
-            rho_o_draws = rho_o_draws[:total]
-            alpha_draws = alpha_draws[:total]
-
-        rng = np.random.default_rng(random_seed)
-        out = np.empty((total, self._N), dtype=np.float64)
-        n = self._n
-        I_n = sp.eye(n, format="csr", dtype=np.float64)
-        for g in range(total):
-            Ld = I_n - float(rho_d_draws[g]) * self._W_sparse
-            Lo = I_n - float(rho_o_draws[g]) * self._W_sparse
-            eta = kron_solve_vec(Lo, Ld, self._X @ beta_draws[g], n)
-            lam = np.exp(np.clip(eta, -50.0, 50.0))
-            alpha = float(alpha_draws[g])
-            p = alpha / (alpha + lam)
-            out[g] = rng.negative_binomial(alpha, p).astype(np.float64)
-        return out
-
-    def _fit_gibbs(
-        self,
-        draws: int = 2000,
-        tune: int = 1000,
-        chains: int = 4,
-        random_seed: Optional[int] = None,
-        progressbar: bool = True,
-        n_jobs: int = -1,
-        gibbs_backend: str = "numpy",
-        krylov_reuse: bool = True,
-        sample_kwargs: dict[str, Any] | None = None,
-        log_likelihood: bool = False,
-    ) -> xr.DataTree:
-        """Sample posterior via reduced-form PG-Gibbs (separable 2-ρ)."""
-        from ._nb_gibbs import run_negbin_flow_gibbs
-
-        return run_negbin_flow_gibbs(
-            self,
-            separable=True,
-            gibbs_backend=gibbs_backend,
-            model_type="nb_sar_flow_sep",
-            omega_size=self._N,
-            draws=draws,
-            tune=tune,
-            chains=chains,
-            random_seed=random_seed,
-            progressbar=progressbar,
-            n_jobs=n_jobs,
-            krylov_reuse=krylov_reuse,
-            log_likelihood=log_likelihood,
-        )
-
-
-class NegBinFlow(_NegBinFlowMixin, OLSFlow):
-    """Aspatial OD-flow Negative Binomial gravity baseline."""
-
-    def __init__(self, y, X, W, **kwargs):
-        y_arr = np.asarray(y)
-        if not np.issubdtype(y_arr.dtype, np.integer):
-            y_rounded = np.round(y_arr).astype(np.int64)
-            if not np.allclose(y_arr, y_rounded):
-                raise ValueError(
-                    "NegBinFlow requires integer-valued "
-                    f"observations; got dtype {y_arr.dtype} with non-integer "
-                    "values."
-                )
-            y_arr = y_rounded
-        if np.any(y_arr < 0):
-            raise ValueError("NegBinFlow requires non-negative integer observations.")
-        super().__init__(y_arr.astype(np.float64), X, W, **kwargs)
-        self._y_int_vec: np.ndarray = y_arr.ravel().astype(np.int64)
-
-    def _compute_jacobian_log_det(self, posterior) -> Optional[np.ndarray]:
-        return None
-
-    def _build_pymc_model(self) -> pm.Model:
-        pv = self._flow_count_priors()
-        beta_mu, beta_sigma = pv["beta_mu"], pv["beta_sigma"]
-        alpha_sigma, alpha_nu = pv["alpha_sigma"], pv["alpha_nu"]
-
-        X_t = pt.as_tensor_variable(self._X.astype(np.float64))
-
-        with pm.Model(coords=self._model_coords()) as model:
-            beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            alpha = pm.HalfStudentT("alpha", nu=alpha_nu, sigma=alpha_sigma)
-            eta = pt.dot(X_t, beta)
-            lam = pm.Deterministic("lambda", pt.exp(eta))
-            pm.NegativeBinomial("obs", mu=lam, alpha=alpha, observed=self._y_int_vec)
-
-        return model
-
-    def posterior_predictive(
-        self,
-        n_draws: Optional[int] = None,
-        random_seed: Optional[int] = None,
-    ) -> np.ndarray:
-        """Draw posterior-predictive flow counts for NB gravity baseline."""
-        if self._idata is None:
-            raise RuntimeError("Model has not been fit yet.  Call fit() first.")
-
-        post = self._idata.posterior
-        beta_draws = post["beta"].values.reshape(-1, len(self._feature_names))
-        alpha_draws = post["alpha"].values.reshape(-1)
-
-        total = beta_draws.shape[0]
-        if n_draws is not None:
-            total = min(int(n_draws), total)
-            beta_draws = beta_draws[:total]
-            alpha_draws = alpha_draws[:total]
-
-        rng = np.random.default_rng(random_seed)
-        out = np.empty((total, self._N), dtype=np.float64)
-        for g in range(total):
-            eta = self._X @ beta_draws[g]
-            lam = np.exp(np.clip(eta, -50.0, 50.0))
-            alpha = float(alpha_draws[g])
-            p = alpha / (alpha + lam)
-            out[g] = rng.negative_binomial(alpha, p).astype(np.float64)
-        return out
-
-    def _fit_gibbs(
-        self,
-        draws: int = 2000,
-        tune: int = 1000,
-        chains: int = 4,
-        random_seed: Optional[int] = None,
-        progressbar: bool = True,
-        n_jobs: int = -1,
-        gibbs_backend: str = "numpy",
-        sample_kwargs: dict[str, Any] | None = None,
-        log_likelihood: bool = False,
-    ) -> xr.DataTree:
-        """Sample posterior via aspatial PG-Gibbs (no spatial parameters).
-
-        Three blocks per sweep: ω (Pólya–Gamma), β (conjugate normal),
-        α (slice on log(α)).
-        """
-        from ...samplers._utils._idata import gibbs_to_inference_data
-        from ...samplers.gaussian._chain_runner import run_chains
-        from ...samplers.negbin._core import GibbsState
-        from ...samplers.negbin_reduced._core import (
-            ReducedGibbsPriors,
-            _nb_loglik_pointwise,
-            _sample_alpha,
-            _sample_beta,
-            _sample_omega,
-        )
-
-        X = self._X
-        y = self._y_int_vec.astype(np.float64)
-        N, k = X.shape
-
-        # --- Build priors ---
-        pv = self._flow_count_priors()
-        priors = ReducedGibbsPriors(
-            beta_mu=pv["beta_mu"],
-            beta_sigma=pv["beta_sigma"],
-            alpha_sigma=pv["alpha_sigma"],
-            alpha_nu=pv["alpha_nu"],
-            rho_lower=-0.999,
-            rho_upper=0.999,
-        )
-
-        # --- Aspatial chain runner ---
-        def _run_chain_aspatial(
-            y: np.ndarray,
-            X: np.ndarray,
-            priors: ReducedGibbsPriors,
-            beta0: np.ndarray,
-            alpha0: float,
-            draws: int,
-            tune: int,
-            rng: np.random.Generator | None = None,
-            chain_id: int = 0,
-            progress_manager: object | None = None,
-        ) -> dict[str, np.ndarray]:
-            if rng is None:
-                rng = np.random.default_rng()
-            total = tune + draws
-            n_keep = draws
-            beta_samples = np.empty((n_keep, k), dtype=np.float64)
-            alpha_samples = np.empty(n_keep, dtype=np.float64)
-            log_lik_samples = (
-                np.empty((n_keep, N), dtype=np.float64) if log_likelihood else None
-            )
-
-            beta = beta0.copy()
-            alpha = alpha0
-            omega = np.ones(N, dtype=np.float64) * 0.5
-
-            for i in range(total):
-                eta = X @ beta
-                psi = eta - np.log(alpha)
-                omega = _sample_omega(y, alpha, psi, rng=rng)
-                # X̃ = X (no spatial solve)
-                beta = _sample_beta(
-                    beta_current=beta,
-                    Xtilde=X,
-                    omega=omega,
-                    y=y,
-                    alpha=alpha,
-                    priors=priors,
-                    rng=rng,
-                    rho=0.0,
-                    intercept_col=-1,
-                )
-                eta = X @ beta
-                state = GibbsState(
-                    eta=eta,
-                    beta=beta,
-                    sigma2=1.0,
-                    rho=0.0,
-                    alpha=alpha,
-                    omega=omega,
-                )
-                alpha = _sample_alpha(state, y, priors, rng=rng)
-
-                if i >= tune:
-                    idx = i - tune
-                    if idx < n_keep:
-                        beta_samples[idx] = beta
-                        alpha_samples[idx] = alpha
-                        if log_likelihood:
-                            log_lik_samples[idx] = _nb_loglik_pointwise(y, eta, alpha)
-
-                if progress_manager is not None:
-                    progress_manager.update(chain_id, i, tuning=i < tune)
-
-            return {
-                "beta": beta_samples,
-                "alpha": alpha_samples,
-                "log_lik": log_lik_samples,
-            }
-
-        # --- Chain function ---
-        def _chain_fn(chain_id, seed, progress_manager=None, chain_id_kw=0):
-            rng = np.random.default_rng(seed)
-            beta0 = rng.normal(0.0, 0.1, size=k)
-            alpha0 = 1.0
-            return _run_chain_aspatial(
-                y=y,
-                X=X,
-                priors=priors,
-                beta0=beta0,
-                alpha0=alpha0,
-                draws=draws,
-                tune=tune,
-                rng=rng,
-                chain_id=chain_id,
-                progress_manager=progress_manager,
-            )
-
-        # --- Run chains ---
-        from ...samplers._utils._seeds import spawn_chain_seeds
-
-        np_seeds = (
-            spawn_chain_seeds(random_seed, chains) if random_seed is not None else None
-        )
-        chain_results = run_chains(
-            chain_fn=_chain_fn,
-            n_chains=chains,
-            seeds=np_seeds,
-            n_jobs=n_jobs,
-            progressbar=progressbar,
-            parallel=n_jobs != 1,
-            draws=draws,
-            tune=tune,
-            model_type="nb_flow",
-        )
-
-        # --- Assemble DataTree ---
-        posterior_samples = {
-            "beta": np.stack([c["beta"] for c in chain_results], axis=0),
-            "alpha": np.stack([c["alpha"] for c in chain_results], axis=0),
-        }
-        ll = None
-        if log_likelihood:
-            ll = {"obs": np.stack([c["log_lik"] for c in chain_results], axis=0)}
-        coords = {"coefficient": list(self._feature_names)}
-        dims = {"beta": ["coefficient"]}
-
-        self._idata = gibbs_to_inference_data(
-            posterior_samples=posterior_samples,
-            log_likelihood=ll,
-            observed_data={"obs": self._y_int_vec},
-            coords=coords,
-            dims=dims,
-        )
-        return self._idata
-
-
-# ---------------------------------------------------------------------------
-# Model 5: SEMFlow — Spatial-error analogue of SARFlow (unrestricted 3-rho)
-# ---------------------------------------------------------------------------
-
-
-class _PoissonFlowMixin:
-    """Shared ``fit`` dispatch for Poisson flow models.
-
-    Mirrors :class:`_NegBinFlowMixin`, but dispatches to the auxiliary-mixture
-    Gibbs sampler (Frühwirth-Schnatter & Wagner 2006) rather than Pólya–Gamma.
-    Poisson admits no exact PG representation, and the NB-with-large-alpha
-    approximation degenerates precisely in the Poisson limit — the PG working
-    precision outruns the Fisher information without bound, collapsing ESS.
-
-    Gibbs-only: unlike the NB classes there is no ``sampler="nuts"`` path yet.
-    """
-
-    def fit(
-        self,
-        draws: int = 2000,
-        tune: int = 1000,
-        chains: int = 4,
-        random_seed: Optional[int] = None,
-        sampler: str = "gibbs",
-        progressbar: bool = True,
-        n_jobs: int = -1,
-        idata_kwargs: Optional[dict] = None,
-        **sample_kwargs,
-    ) -> xr.DataTree:
-        """Draw samples from the posterior.
-
-        Parameters
-        ----------
-        draws, tune, chains : int
-            Post-warmup draws, warmup sweeps, and number of chains.
-        random_seed : int, optional
-            Seed for reproducibility.
-        sampler : {"gibbs"}, default "gibbs"
-            Only the auxiliary-mixture Gibbs sampler is implemented.
-        progressbar : bool, default True
-            Show a progress bar.
-        n_jobs : int, default -1
-            Chain-level parallelism.
-        idata_kwargs : dict, optional
-            ``{"log_likelihood": True}`` stores the pointwise log-likelihood
-            (one value per draw, chain, and flow) for ``az.loo``.
-            Off by default, as in PyMC.
-        """
-        if sampler != "gibbs":
-            raise NotImplementedError(
-                f"{type(self).__name__} supports sampler='gibbs' only; "
-                f"got {sampler!r}.  There is no NUTS path for the "
-                "auxiliary-mixture Poisson flow models yet."
-            )
-        if sample_kwargs:
-            raise TypeError(f"Unexpected keyword arguments: {sorted(sample_kwargs)}")
-        return self._fit_gibbs(
-            draws=draws,
-            tune=tune,
-            chains=chains,
-            random_seed=random_seed,
-            progressbar=progressbar,
-            n_jobs=n_jobs,
-            log_likelihood=bool((idata_kwargs or {}).get("log_likelihood", False)),
-        )
-
-
-def _require_counts(y, cls_name: str) -> np.ndarray:
-    """Validate and coerce a response vector to non-negative integer counts."""
-    y_arr = np.asarray(y)
-    if not np.issubdtype(y_arr.dtype, np.integer):
-        y_rounded = np.round(y_arr).astype(np.int64)
-        if not np.allclose(y_arr, y_rounded):
-            raise ValueError(
-                f"{cls_name} requires integer-valued observations; got dtype "
-                f"{y_arr.dtype} with non-integer values."
-            )
-        y_arr = y_rounded
-    if np.any(y_arr < 0):
-        raise ValueError(f"{cls_name} requires non-negative integer observations.")
-    return y_arr
-
-
-class SARPoissonFlow(_PoissonFlowMixin, SARFlow):
-    """Unrestricted 3-ρ SAR flow model with Poisson observation noise.
-
-    .. warning::
-
-       The unrestricted 3-ρ parameterization mixes poorly at moderate ``n`` for
-       *both* likelihoods — ρ_d, ρ_o and ρ_w trade off along a ridge that
-       one-at-a-time slice updates cannot traverse.  Measured at n=36
-       (N=1296): ESS ≈ 4 of 2000 draws with rhat ≈ 1.4 for this sampler *and*
-       for :class:`SARNegBinFlow` on the same data.  Prefer
-       :class:`SARPoissonFlowSeparable` unless ρ_w is genuinely of interest.
-    """
-
-    def __init__(self, y, X, W, **kwargs):
-        y_arr = _require_counts(y, "SARPoissonFlow")
-        super().__init__(y_arr.astype(np.float64), X, W, **kwargs)
-        self._y_int_vec: np.ndarray = y_arr.ravel().astype(np.int64)
-
-    def _compute_jacobian_log_det(self, posterior) -> Optional[np.ndarray]:
-        return None
-
-    def posterior_predictive(
-        self,
-        n_draws: Optional[int] = None,
-        random_seed: Optional[int] = None,
-    ) -> np.ndarray:
-        """Draw posterior-predictive flow counts for Poisson SAR flow model."""
-        if self._idata is None:
-            raise RuntimeError("Model has not been fit yet.  Call fit() first.")
-
-        post = self._idata.posterior
-        beta_draws = post["beta"].values.reshape(-1, len(self._feature_names))
-        rho_d_draws = post["rho_d"].values.reshape(-1)
-        rho_o_draws = post["rho_o"].values.reshape(-1)
-        rho_w_draws = post["rho_w"].values.reshape(-1)
-
-        total = beta_draws.shape[0]
-        if n_draws is not None:
-            total = min(int(n_draws), total)
-            beta_draws = beta_draws[:total]
-            rho_d_draws = rho_d_draws[:total]
-            rho_o_draws = rho_o_draws[:total]
-            rho_w_draws = rho_w_draws[:total]
-
-        rng = np.random.default_rng(random_seed)
-        out = np.empty((total, self._N), dtype=np.float64)
-        for g in range(total):
-            eta = self._solve_A(
-                rho_d_draws[g], rho_o_draws[g], rho_w_draws[g], self._X @ beta_draws[g]
-            )
-            lam = np.exp(np.clip(eta, -50.0, 50.0))
-            out[g] = rng.poisson(lam).astype(np.float64)
-        return out
-
-    def _fit_gibbs(
-        self,
-        draws: int = 2000,
-        tune: int = 1000,
-        chains: int = 4,
-        random_seed: Optional[int] = None,
-        progressbar: bool = True,
-        n_jobs: int = -1,
-        log_likelihood: bool = False,
-    ) -> xr.DataTree:
-        """Sample via reduced-form auxiliary-mixture Gibbs (unrestricted 3-ρ)."""
-        from ._poisson_gibbs import run_poisson_flow_gibbs
-
-        return run_poisson_flow_gibbs(
-            self,
-            separable=False,
-            model_type="pois_sar_flow",
-            draws=draws,
-            tune=tune,
-            chains=chains,
-            random_seed=random_seed,
-            progressbar=progressbar,
-            n_jobs=n_jobs,
-            log_likelihood=log_likelihood,
-        )
-
-
-class SARPoissonFlowSeparable(_PoissonFlowMixin, SARFlowSeparable):
-    """Separable SAR flow model with Poisson observation noise.
-
-    ``rho_w = -rho_d * rho_o`` is deterministic, which removes the ρ ridge that
-    makes the unrestricted variant intractable.  This is the recommended
-    Poisson flow model.
-    """
-
-    def __init__(self, y, X, W, **kwargs):
-        y_arr = _require_counts(y, "SARPoissonFlowSeparable")
-        super().__init__(y_arr.astype(np.float64), X, W, **kwargs)
-        self._y_int_vec: np.ndarray = y_arr.ravel().astype(np.int64)
-
-    def _compute_jacobian_log_det(self, posterior) -> Optional[np.ndarray]:
-        return None
-
-    def posterior_predictive(
-        self,
-        n_draws: Optional[int] = None,
-        random_seed: Optional[int] = None,
-    ) -> np.ndarray:
-        """Draw posterior-predictive flow counts for separable Poisson SAR flow."""
-        if self._idata is None:
-            raise RuntimeError("Model has not been fit yet.  Call fit() first.")
-
-        post = self._idata.posterior
-        beta_draws = post["beta"].values.reshape(-1, len(self._feature_names))
-        rho_d_draws = post["rho_d"].values.reshape(-1)
-        rho_o_draws = post["rho_o"].values.reshape(-1)
-
-        total = beta_draws.shape[0]
-        if n_draws is not None:
-            total = min(int(n_draws), total)
-            beta_draws = beta_draws[:total]
-            rho_d_draws = rho_d_draws[:total]
-            rho_o_draws = rho_o_draws[:total]
-
-        rng = np.random.default_rng(random_seed)
-        out = np.empty((total, self._N), dtype=np.float64)
-        n = self._n
-        I_n = sp.eye(n, format="csr", dtype=np.float64)
-        for g in range(total):
-            Ld = I_n - float(rho_d_draws[g]) * self._W_sparse
-            Lo = I_n - float(rho_o_draws[g]) * self._W_sparse
-            eta = kron_solve_vec(Lo, Ld, self._X @ beta_draws[g], n)
-            lam = np.exp(np.clip(eta, -50.0, 50.0))
-            out[g] = rng.poisson(lam).astype(np.float64)
-        return out
-
-    def _fit_gibbs(
-        self,
-        draws: int = 2000,
-        tune: int = 1000,
-        chains: int = 4,
-        random_seed: Optional[int] = None,
-        progressbar: bool = True,
-        n_jobs: int = -1,
-        log_likelihood: bool = False,
-    ) -> xr.DataTree:
-        """Sample via reduced-form auxiliary-mixture Gibbs (separable 2-ρ)."""
-        from ._poisson_gibbs import run_poisson_flow_gibbs
-
-        return run_poisson_flow_gibbs(
-            self,
-            separable=True,
-            model_type="pois_sar_flow_sep",
-            draws=draws,
-            tune=tune,
-            chains=chains,
-            random_seed=random_seed,
-            progressbar=progressbar,
-            n_jobs=n_jobs,
-            log_likelihood=log_likelihood,
-        )
-
-
-class SEMFlow(FlowModel):
-    r"""Bayesian spatial-error flow model with three free spatial parameters.
-
-    .. math::
-
-        y = X\beta + u, \qquad
-        B u = \varepsilon, \qquad
-        B = I_N - \lambda_d W_d - \lambda_o W_o - \lambda_w W_w,
-        \quad \varepsilon \sim \mathcal{N}(0, \sigma^2 I_N)
-
-    where :math:`W_d = I_n \otimes W`, :math:`W_o = W \otimes I_n`,
-    :math:`W_w = W \otimes W`.  The Kronecker spatial structure is identical
-    to :class:`SARFlow`, but the spatial filter acts on the *disturbance*
-    rather than the dependent variable.  Equivalently the model implies a
-    Gaussian likelihood with covariance :math:`\sigma^2 (B^\top B)^{-1}`.
-
-    Marginal mean is :math:`\mathbb{E}[y] = X\beta`, so there are no
-    :math:`X`-mediated spatial spillovers — the LeSage / Thomas-Agnan
-    decomposition reduces to the closed-form expressions used by
-    :class:`OLSFlow` (direct effect equals :math:`\beta`, network effect
-    equals zero).  Use :class:`SARFlow` if spillovers from observed
-    covariates are of interest.
-
-    Parameters
-    ----------
-    y : array-like, shape (n, n) or (N,)
-        Observed origin-destination flow matrix or its vec-form.
-    W : libpysal.graph.Graph or scipy.sparse / dense (n×n) matrix
-        Row-standardized regional weights on *n* units (Graph or matrix).
-    X : np.ndarray or pandas.DataFrame, shape (N, p)
-        Full origin-destination design matrix with :math:`N = n^2` rows.
-        DataFrame columns are preserved as feature names.
-    col_names : list of str, optional
-        Column labels for ``X``. Inferred from a DataFrame if omitted;
-        otherwise defaults to ``["x0", "x1", ...]``.
-    k : int, optional
-        Number of regional attribute columns (destination/origin variable
-        pairs). Inferred from ``dest_*``/``orig_*`` column names when the
-        standard LeSage layout is used.
-    logdet_method : str, default "resolvent"
-        Log-determinant method.  The default ``"resolvent"`` samples via the
-        resolvent-gradient sampler (recommended).
-    restrict_positive : bool, default True
-        If True, use ``pm.Dirichlet("lam_simplex", a=ones(4))`` to enforce
-        :math:`\\lambda_d, \\lambda_o, \\lambda_w \\geq 0` and
-        :math:`\\lambda_d + \\lambda_o + \\lambda_w \\leq 1`. If False,
-        three independent ``pm.Uniform(lam_lower, lam_upper)`` priors are
-        used with a differentiable quadratic-wall stability potential.
-    symmetric_xo_xd : bool, optional
-        If ``None`` (default), origin and destination design blocks are
-        compared and symmetry is auto-detected.
-    priors : dict, optional
-        Override default priors. Supported keys:
-
-        - ``beta_mu`` : float or array, default Gelman et al. (2008) — Normal prior mean for ``beta`` (``mean(y)`` on the intercept, 0 otherwise).
-        - ``beta_sigma`` : float or array, default Gelman et al. (2008) — Normal prior std for ``beta``, scaled to ``sd(y)`` and each column's sd.
-        - ``sigma2_alpha``, ``sigma2_beta`` : float, default 2 and ``Var(y)`` — InverseGamma prior on ``sigma**2``.
-        - ``lam_lower`` : float, default -1.0 — Lower bound of Uniform prior on each λ (only when ``restrict_positive=False``).
-        - ``lam_upper`` : float, default 1.0 — Upper bound of Uniform prior on each λ (only when ``restrict_positive=False``).
-
-    Notes
-    -----
-    Implementation: PyMC body uses precomputed lags of both ``y`` and
-    ``X`` (``self._Wd``, ``self._Wo``, ``self._Ww`` applied to
-    ``self._X``) so that the residual
-    :math:`B u = B y - B X \\beta` is expressible as a linear combination
-    of fixed quantities — no symbolic sparse mat-vec is required. The
-    Jacobian :math:`\\log|B|` reuses the same trace-based polynomial as
-    :class:`SARFlow`.
-    """
-
-    def __init__(self, y, X, W, **kwargs):
-        # Default to the resolvent-gradient SEM sampler (separable subclasses pass
-        # their own separable logdet_method and route to the PyMC path).
-        kwargs.setdefault("logdet_method", "resolvent")
-        super().__init__(y, X, W, **kwargs)
-        # Precompute lags of the design matrix (constant — no parameter dependence).
-        self._Wd_X, self._Wo_X, self._Ww_X = flow_lags(self._W_sparse, self._X)
-
-    def fit(
-        self,
-        draws: int = 2000,
-        tune: int = 1000,
-        chains: int = 4,
-        random_seed: Optional[int] = None,
-        *,
-        step_size: float = 5e-4,
-        n_probes: int = 48,
-        logdet_method: str = "auto",
-        n_quad: int = 8,
-        progressbar: bool = True,
-        n_jobs: int = -1,
-        idata_kwargs: Optional[dict] = None,
-        **sample_kwargs,
-    ) -> xr.DataTree:
-        """Sample the SEM-flow posterior.
-
-        Uses the resolvent-Kronecker gradient sampler (MALA-on-λ within GLS Gibbs
-        for ``β, σ²``) by default; the separable subclass (which sets a separable
-        ``logdet_method``) routes to the PyMC/NUTS path instead.
-
-        Parameters
-        ----------
-        logdet_method : {"auto", "kron_traces", "jax", "numpy"}, default "auto"
-            Flow log-determinant backend.  ``"auto"`` is exact (trace moments of
-            ``W``, no ``N × N`` work) for undirected ``W`` and the stochastic
-            resolvent estimator for directed ``W``; see
-            :func:`~neighbayes.samplers.gaussian._flow_resolvent.resolve_flow_logdet`.
-        idata_kwargs : dict, optional
-            ``{"log_likelihood": True}`` stores the pointwise log-likelihood
-            (one value per draw, chain, and flow) for ``az.loo``.
-            Off by default, as in PyMC.
-        """
-        if self.logdet_method != "resolvent":
-            return super().fit(
-                draws=draws,
-                tune=tune,
-                chains=chains,
-                random_seed=random_seed,
-                progressbar=progressbar,
-                idata_kwargs=idata_kwargs,
-                **sample_kwargs,
-            )
-        from ...samplers.gaussian._flow_resolvent import sample_sem_flow_resolvent
-
-        self._pymc_model = None
-        self._idata = sample_sem_flow_resolvent(
-            self._W_sparse,
-            self._y,
-            self._X,
-            draws=draws,
-            tune=tune,
-            chains=chains,
-            step_size=step_size,
-            n_probes=n_probes,
-            coord_names=list(self._feature_names) or None,
-            random_seed=random_seed,
-            logdet_method=logdet_method,
-            n_quad=n_quad,
-            progressbar=progressbar,
-            n_jobs=n_jobs,
-            restrict_positive=self.restrict_positive,
-            priors=self._flow_gaussian_priors(),
-            compute_log_likelihood=bool(
-                (idata_kwargs or {}).get("log_likelihood", False)
-            ),
-        )
-        return self._idata
-
-    def _build_pymc_model(self) -> pm.Model:
-        # The unrestricted SEM flow samples via the resolvent-gradient sampler
-        # (``fit`` → ``sample_sem_flow_resolvent``); the legacy "traces" Jacobian
-        # was removed.  Only reached if a non-resolvent, non-separable
-        # ``logdet_method`` is forced.
-        raise NotImplementedError(
-            "SEMFlow samples via the resolvent-gradient sampler (the default "
-            "logdet_method='resolvent'); the legacy 'traces' PyMC path was removed."
-        )
-
-    def _simulate_y_rep(
-        self,
-        lam_d: float,
-        lam_o: float,
-        lam_w: float,
-        beta: np.ndarray,
-        sigma: Optional[float],
-        rng: np.random.Generator,
-    ) -> np.ndarray:
-        """SEM posterior-predictive: ``y_rep = X β + B^{-1} ε``."""
-        Xb = self._X @ beta
-        if sigma is None:
-            return Xb
-        eps = rng.normal(scale=float(sigma), size=self._N)
-        u = self._solve_A(lam_d, lam_o, lam_w, eps)
-        return Xb + u
-
-    def _compute_spatial_effects_posterior(
-        self, draws: Optional[int] = None
-    ) -> dict[str, np.ndarray]:
-        r"""Closed-form Thomas-Agnan & LeSage (2014, Table 83.1) effects.
-
-        The marginal mean :math:`\mathbb{E}[y] = X\beta` is unaffected by the
-        spatial-error filter, so the LeSage decomposition collapses to the
-        same closed form used by :class:`OLSFlow`: direct effect equals
-        :math:`\beta`, network effect equals zero, intra/origin/destination
-        contributions split :math:`\beta` per Table 83.1.
-        """
-        if self._idata is None:
-            raise RuntimeError("Model has not been fit yet.  Call fit() first.")
-
-        return _compute_ols_flow_effects(
-            self._idata,
-            n=self._n,
-            k_d=self._k_d,
-            k_o=self._k_o,
-            feature_names=self._feature_names,
-            intra_idx=self._intra_idx,
-            draws=draws,
-        )
-
-
-# ---------------------------------------------------------------------------
-# Model 6: SEMFlowSeparable — separable SEM with lam_w = -lam_d * lam_o
-# ---------------------------------------------------------------------------
-
-
-class SEMFlowSeparable(SEMFlow):
-    r"""Bayesian separable spatial-error flow model with :math:`\lambda_w = -\lambda_d \lambda_o`.
-
-    Spatial-error analogue of :class:`SARFlowSeparable`.  The separability
-    constraint reduces :math:`\log|B|` to the eigenvalue / Chebyshev factored
-    form
-
-    .. math::
-
-        \log|B| = n \log|I_n - \lambda_d W| + n \log|I_n - \lambda_o W|
-
-    enabling :math:`O(n)` log-determinant evaluation per draw.  All other
-    properties (no :math:`X`-mediated spillovers, closed-form effects, etc.)
-    are identical to :class:`SEMFlow`.
-
-    Parameters
-    ----------
-    y : array-like, shape (n, n) or (N,)
-        Observed origin-destination flow matrix or its vec-form.
-    W : libpysal.graph.Graph or scipy.sparse / dense (n×n) matrix
-        Row-standardized regional weights on *n* units (Graph or matrix).
-    X : np.ndarray or pandas.DataFrame, shape (N, p)
-        Full origin-destination design matrix with :math:`N = n^2` rows.
-        DataFrame columns are preserved as feature names.
-    col_names : list of str, optional
-        Column labels for ``X``. Inferred from a DataFrame if omitted.
-    k : int, optional
-        Number of regional attribute columns. Inferred from
-        ``dest_*``/``orig_*`` column names when the standard LeSage
-        layout is used.
-    logdet_method : {"eigenvalue", "chebyshev", "cheb_cholesky", "aaa", "cheb_stochastic"} or None, default None
-        ``None`` auto-selects (``aaa`` for directed W, ``cheb_cholesky`` for
-        symmetric, ``eigenvalue`` for small n).
-        Method for the Kronecker-factored log-determinant.
-    symmetric_xo_xd : bool, optional
-        If ``None`` (default), origin and destination design blocks are
-        compared and symmetry is auto-detected.
-    priors : dict, optional
-        Override default priors. Supported keys:
-
-        - ``beta_mu`` : float or array, default Gelman et al. (2008) — Normal prior mean for ``beta`` (``mean(y)`` on the intercept, 0 otherwise).
-        - ``beta_sigma`` : float or array, default Gelman et al. (2008) — Normal prior std for ``beta``, scaled to ``sd(y)`` and each column's sd.
-        - ``sigma2_alpha``, ``sigma2_beta`` : float, default 2 and ``Var(y)`` — InverseGamma prior on ``sigma**2``.
-        - ``lam_lower`` : float, default -0.999 — Lower bound of Uniform prior on ``lam_d`` and ``lam_o``.
-        - ``lam_upper`` : float, default 0.999 — Upper bound of Uniform prior on ``lam_d`` and ``lam_o``.
-
-    Notes
-    -----
-    The ``restrict_positive`` argument inherited from :class:`FlowModel`
-    has no effect on this class — separable variants always use Uniform
-    priors on the individual :math:`\\lambda` components.
-    """
-
-    def __init__(self, y, X, W, **kwargs):
-        method = kwargs.pop("logdet_method", None)
-        _VALID = {"eigenvalue", "chebyshev", "cheb_cholesky", "aaa", "cheb_stochastic"}
-        if method is not None and method not in _VALID:
-            raise ValueError(
-                f"SEMFlowSeparable logdet_method must be None (auto) or one of "
-                f"{sorted(_VALID)}; got {method!r}."
-            )
-        kwargs["logdet_method"] = method
-        super().__init__(y, X, W, **kwargs)
-
-    def _build_pymc_model(self) -> pm.Model:
-        pv = self._flow_gaussian_priors()
-        beta_mu, beta_sigma = pv["beta_mu"], pv["beta_sigma"]
-        lam_lower = self.priors.get("lam_lower", -0.999)
-        lam_upper = self.priors.get("lam_upper", 0.999)
-
-        if self._separable_logdet_fn is None:
-            raise RuntimeError(
-                "SEMFlowSeparable requires precomputed logdet data; "
-                "initialize with a separable logdet_method (None/auto, "
-                "eigenvalue, chebyshev, cheb_cholesky, aaa, or cheb_stochastic)"
-            )
-        Wd_y_t = pt.as_tensor_variable(self._Wd_y.astype(np.float64))
-        Wo_y_t = pt.as_tensor_variable(self._Wo_y.astype(np.float64))
-        Ww_y_t = pt.as_tensor_variable(self._Ww_y.astype(np.float64))
-        Wd_X_t = pt.as_tensor_variable(self._Wd_X.astype(np.float64))
-        Wo_X_t = pt.as_tensor_variable(self._Wo_X.astype(np.float64))
-        Ww_X_t = pt.as_tensor_variable(self._Ww_X.astype(np.float64))
-        X_t = pt.as_tensor_variable(self._X.astype(np.float64))
-        y_t = pt.as_tensor_variable(self._y.astype(np.float64))
-
-        with pm.Model(coords=self._model_coords()) as model:
-            lam_d = pm.Uniform("lam_d", lower=lam_lower, upper=lam_upper)
-            lam_o = pm.Uniform("lam_o", lower=lam_lower, upper=lam_upper)
-            lam_w = pm.Deterministic("lam_w", -lam_d * lam_o)
-
-            beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            sigma = self._flow_sigma(pv)
-
-            mu = (
-                lam_d * Wd_y_t
-                + lam_o * Wo_y_t
-                + lam_w * Ww_y_t
-                + pt.dot(X_t, beta)
-                - lam_d * pt.dot(Wd_X_t, beta)
-                - lam_o * pt.dot(Wo_X_t, beta)
-                - lam_w * pt.dot(Ww_X_t, beta)
-            )
-            pm.Normal("obs", mu=mu, sigma=sigma, observed=y_t)
-
-            pm.Potential(
-                "jacobian",
-                self._separable_logdet_fn(lam_d, lam_o),
-            )
-
-        return model
-
-    def _compute_jacobian_log_det(self, posterior) -> np.ndarray:
-        lam_d = np.asarray(posterior["lam_d"].values.reshape(-1), dtype=np.float64)
-        lam_o = np.asarray(posterior["lam_o"].values.reshape(-1), dtype=np.float64)
-        if self._separable_logdet_numpy_fn is None:
-            raise RuntimeError(
-                "Missing separable numeric logdet evaluator. "
-                "Initialize with a separable logdet_method (None/auto, "
-                "eigenvalue, chebyshev, cheb_cholesky, aaa, or cheb_stochastic)"
-            )
-        return self._separable_logdet_numpy_fn(lam_d, lam_o)

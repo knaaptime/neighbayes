@@ -67,11 +67,11 @@ def test_logit_fit_recovers_coefficients():
     assert np.allclose(beta_post, beta_true, atol=0.4)
 
 
-def test_logit_spatial_effects_raises():
+def test_logit_impacts_raises():
     y, X, _ = _binary_data()
     m = Logit(y=y, X=X)
     with pytest.raises(NotImplementedError, match="no spatial structure"):
-        m._compute_spatial_effects_posterior()
+        m._compute_impacts_posterior()
 
 
 # ---------------------------------------------------------------------------
@@ -130,8 +130,8 @@ def test_negbin_fit_recovers_coefficients_and_alpha():
     assert 0.5 * alpha_true < alpha_post < 2.0 * alpha_true
 
 
-def test_negbin_spatial_effects_raises():
+def test_negbin_impacts_raises():
     y, X, _, _ = _count_data()
     m = NegBin(y=y, X=X)
     with pytest.raises(NotImplementedError, match="no spatial structure"):
-        m._compute_spatial_effects_posterior()
+        m._compute_impacts_posterior()

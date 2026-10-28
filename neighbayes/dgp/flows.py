@@ -23,8 +23,10 @@ from ..graph import (
     flow_design_matrix_asymmetric,
     flow_design_matrix_with_orig,
 )
+from ._design import aspatial, flow, simulator
 from .utils import (
     _resolve_flow_geometry,
+    _time_effects,
     pairwise_distance_matrix,
     spatial_filter_factor,
 )
@@ -76,10 +78,12 @@ class _FlowFilter:
         self.separable = abs(self.r_w + self.r_d * self.r_o) <= 1e-12 * max(
             1.0, abs(self.r_w)
         )
+        from ..samplers._utils._spatial_normal import FACTORIZATION_ERRORS
+
         try:
             self._solve_o = spatial_filter_factor(self.W, self.r_o)
             self._solve_d = spatial_filter_factor(self.W, self.r_d)
-        except Exception as exc:
+        except FACTORIZATION_ERRORS as exc:
             raise ValueError(_singular_flow_message(letter, prefix)) from exc
 
     def _right_W(self, Y: np.ndarray) -> np.ndarray:
@@ -230,7 +234,8 @@ def _hetero_flow_eps(
     return rng.standard_normal(N) * scale_vec
 
 
-def generate_flow_data(
+@simulator(flow)
+def simulate_sar_flow(
     n: Optional[int] = None,
     G: Optional[Graph] = None,
     rho_d: float = 0.3,
@@ -272,9 +277,8 @@ def generate_flow_data(
     Gaussian-on-y behavior).
 
     To recover the SAR parameters with the existing
-    :class:`~neighbayes.models.flow.SARFlow` /
-    :class:`~neighbayes.models.flow.SARFlowSeparable`, fit on
-    ``np.log(y_vec)`` (which by construction equals ``eta_vec``).
+    :class:`~neighbayes.models.SARFlow` (unrestricted or ``separable=True``),
+    fit on ``np.log(y_vec)`` (which by construction equals ``eta_vec``).
 
     Parameters
     ----------
@@ -487,7 +491,8 @@ def generate_flow_data(
     }
 
 
-def generate_negbin_flow_data(
+@simulator(flow)
+def simulate_sar_negbin_flow(
     n: int | None = None,
     k: int = 2,
     k_d: int | None = None,
@@ -679,7 +684,7 @@ def generate_negbin_flow_data(
     }
 
 
-def generate_negbin_flow_data_separable(
+def _simulate_sar_negbin_flow_separable(
     n: int | None = None,
     rho_d: float = 0.3,
     rho_o: float = 0.2,
@@ -687,7 +692,7 @@ def generate_negbin_flow_data_separable(
 ) -> dict:
     """NB2 flow DGP with separability constraint ``rho_w = -rho_d * rho_o``."""
     rho_w = -rho_d * rho_o
-    return generate_negbin_flow_data(
+    return simulate_sar_negbin_flow(
         n=n,
         rho_d=rho_d,
         rho_o=rho_o,
@@ -696,7 +701,7 @@ def generate_negbin_flow_data_separable(
     )
 
 
-def generate_panel_flow_data(
+def _simulate_sar_flow_panel_fe(
     n: Optional[int] = None,
     T: int = 5,
     G: Optional[Graph] = None,
@@ -707,6 +712,7 @@ def generate_panel_flow_data(
     beta_o: Union[np.ndarray, list, None] = None,
     sigma: float = 1.0,
     sigma_alpha: float = 0.5,
+    time_effect_sd: float = 0.0,
     gamma_dist: float = -0.5,
     seed: Optional[int] = None,
     k: Optional[int] = None,
@@ -737,10 +743,8 @@ def generate_panel_flow_data(
     observation at index :math:`t \cdot n^2 + k` is O-D pair :math:`k`
     at time :math:`t`.
 
-    To recover the SAR parameters with the existing
-    :class:`~neighbayes.models.flow_panel.SARFlowPanel` /
-    :class:`~neighbayes.models.flow_panel.SARFlowSeparablePanel`,
-    fit on ``np.log(y)``.
+    To recover the SAR parameters with a :class:`~neighbayes.models.SARFlow`
+    panel, fit on ``np.log(y)``.
 
     Parameters
     ----------
@@ -799,7 +803,7 @@ def generate_panel_flow_data(
         - ``"col_names"`` list[str]: feature names.
         - ``"G"`` libpysal.graph.Graph: spatial graph.
         - ``"rho_d"``, ``"rho_o"``, ``"rho_w"``, ``"sigma"``,
-          ``"sigma_alpha"``: true parameters.
+          ``"pair_effect_sd"``: true parameters.
         - ``"beta_d"``, ``"beta_o"``: true coefficient vectors.
         - ``"params_true"`` dict: nested dict of all true parameters
           (including ``"distribution"``).
@@ -835,6 +839,7 @@ def generate_panel_flow_data(
 
     # Draw O-D-pair random effects once
     alpha = rng.normal(0.0, sigma_alpha, N) if sigma_alpha > 0 else np.zeros(N)
+    tau = _time_effects(rng, T, time_effect_sd)
 
     # Distance matrix (time-invariant)
     dist = pairwise_distance_matrix(gdf)
@@ -842,7 +847,7 @@ def generate_panel_flow_data(
     y_list, X_list, eta_list = [], [], []
     col_names = None
 
-    for _ in range(T):
+    for t in range(T):
         # Generate fresh regional attributes each period
         X_d_reg = rng.standard_normal((n, k_d_val))
         X_o_reg = rng.standard_normal((n, k_o_val))
@@ -861,7 +866,7 @@ def generate_panel_flow_data(
 
         Xbeta = design.combined @ beta_full  # (N,)
         eps = rng.normal(scale=sigma, size=N)
-        rhs = Xbeta + alpha + eps
+        rhs = Xbeta + alpha + tau[t] + eps
 
         eta_t = solve_A(rhs)
         if distribution == "lognormal":
@@ -889,7 +894,7 @@ def generate_panel_flow_data(
         "rho_o": rho_o,
         "rho_w": rho_w,
         "sigma": sigma,
-        "sigma_alpha": sigma_alpha,
+        "pair_effect_sd": sigma_alpha,
         "beta_d": beta_d_arr,
         "beta_o": beta_o_arr,
         "gamma_dist": gamma_dist,
@@ -898,7 +903,7 @@ def generate_panel_flow_data(
             "rho_o": rho_o,
             "rho_w": rho_w,
             "sigma": sigma,
-            "sigma_alpha": sigma_alpha,
+            "pair_effect_sd": sigma_alpha,
             "beta_d": beta_d_arr,
             "beta_o": beta_o_arr,
             "gamma_dist": gamma_dist,
@@ -907,7 +912,7 @@ def generate_panel_flow_data(
     }
 
 
-def generate_panel_negbin_flow_data(
+def _simulate_sar_negbin_flow_panel_re(
     n: int | None = None,
     T: int = 5,
     G: Graph | None = None,
@@ -925,6 +930,9 @@ def generate_panel_negbin_flow_data(
     err_hetero: bool = False,
     gdf: object = None,
     knn_k: int = 4,
+    pair_effect_sd: float = 0.0,
+    time_effect_sd: float = 0.0,
+    fe_x_corr: float = 0.0,
 ) -> dict:
     r"""Generate panel NB2 flow counts from a spatial autoregressive DGP.
 
@@ -980,6 +988,19 @@ def generate_panel_negbin_flow_data(
     gdf : object, optional
         Accepted for API parity with other DGP functions; not used
         (pass *G* directly instead).
+    pair_effect_sd : float, default 0.0
+        Standard deviation of the random origin-destination pair effects
+        ``c_od``, which enter inside the filter with the covariates,
+        :math:`\eta_t = A^{-1}(X_t\beta + c) + \tau_t`.  Zero (the default)
+        gives the DGP without effects.
+    time_effect_sd : float, default 0.0
+        Standard deviation of the period effects ``τ_t`` (``τ_0 = 0``).
+    fe_x_corr : float, default 0.0
+        Correlation, in ``[0, 1)``, between the pair effects and the first
+        destination and origin attributes: each attribute gets a persistent
+        unit-level component of this weight, and ``c_od`` loads on the
+        persistent components of origin ``o`` and destination ``d``.  Makes a
+        pooled fit biased, so fixed-effects recovery tests have power.
 
     Returns
     -------
@@ -995,6 +1016,8 @@ def generate_panel_negbin_flow_data(
         - ``"beta_d"``, ``"beta_o"``: true coefficient vectors.
         - ``"alpha"``: true NB2 dispersion parameter.
         - ``"params_true"`` dict: nested dict of all true parameters.
+        - ``"pair_effect"`` (n²,), ``"time_effect"`` (T,): the fixed effects
+          (zeros when their sd is zero).
 
     Raises
     ------
@@ -1003,6 +1026,8 @@ def generate_panel_negbin_flow_data(
     """
     if alpha <= 0:
         raise ValueError("alpha must be strictly positive.")
+    if not 0.0 <= fe_x_corr < 1.0:
+        raise ValueError("fe_x_corr must lie in [0, 1).")
 
     from .utils import _resolve_flow_geometry
 
@@ -1025,10 +1050,31 @@ def generate_panel_negbin_flow_data(
     # Distance matrix (time-invariant)
     dist = pairwise_distance_matrix(gdf)
 
-    for _ in range(T):
+    # Fixed effects.  No extra random draws when every knob is zero, so the
+    # pooled DGP's stream (and every test pinned to it) is unchanged.
+    pair_effect = np.zeros(n * n)
+    time_effect = np.zeros(T)
+    u_d = u_o = None
+    if fe_x_corr > 0.0:
+        u_d = rng.standard_normal((n, k_d_val))
+        u_o = rng.standard_normal((n, k_o_val))
+    if pair_effect_sd > 0.0:
+        e_od = rng.standard_normal((n, n))
+        if u_d is not None:
+            common = (u_o[:, :1] + u_d[:, :1].T) / np.sqrt(2.0)
+            e_od = fe_x_corr * common + np.sqrt(1.0 - fe_x_corr**2) * e_od
+        pair_effect = pair_effect_sd * e_od.ravel()
+    if time_effect_sd > 0.0 and T > 1:
+        time_effect[1:] = time_effect_sd * rng.standard_normal(T - 1)
+
+    for t in range(T):
         # Generate fresh regional attributes each period
         Xd_raw = rng.standard_normal((n, k_d_val))
         Xo_raw = rng.standard_normal((n, k_o_val))
+        if u_d is not None:
+            keep = np.sqrt(1.0 - fe_x_corr**2)
+            Xd_raw = fe_x_corr * u_d + keep * Xd_raw
+            Xo_raw = fe_x_corr * u_o + keep * Xo_raw
 
         design = flow_design_matrix_with_orig(
             Xd_raw,
@@ -1046,8 +1092,8 @@ def generate_panel_negbin_flow_data(
 
         Xbeta = design.combined @ beta_full  # (N,)
 
-        # Solve A eta = Xbeta  (reduced form: no sigma, no noise)
-        eta_t = solve_A(Xbeta)
+        # Solve A eta = Xbeta + c  (reduced form: no sigma, no noise)
+        eta_t = solve_A(Xbeta + pair_effect) + time_effect[t]
         lambda_t = np.exp(eta_t)
         p_nb = alpha / (alpha + lambda_t)
         y_t = rng.negative_binomial(alpha, p_nb).astype(np.int64)
@@ -1075,6 +1121,8 @@ def generate_panel_negbin_flow_data(
         "beta_o": beta_o_arr,
         "gamma_dist": gamma_dist,
         "alpha": float(alpha),
+        "pair_effect": pair_effect,
+        "time_effect": time_effect,
         "params_true": {
             "rho_d": rho_d,
             "rho_o": rho_o,
@@ -1087,7 +1135,7 @@ def generate_panel_negbin_flow_data(
     }
 
 
-def generate_flow_data_separable(
+def _simulate_sar_flow_separable(
     n: Optional[int] = None,
     G: Optional[Graph] = None,
     rho_d: float = 0.3,
@@ -1098,11 +1146,11 @@ def generate_flow_data_separable(
 ) -> dict:
     """Simulate flow data from a *separable* SAR flow model.
 
-    Identical to :func:`generate_flow_data` except the network parameter is
+    Identical to :func:`simulate_sar_flow` except the network parameter is
     derived from the separability constraint
     :math:`\\rho_w = -\\rho_d \\rho_o`, so it is **not** a free argument.
     Use this function to generate training data for
-    :class:`~neighbayes.models.flow.SARFlowSeparable`.
+    :class:`~neighbayes.models.SARFlow` with ``separable=True``.
 
     Parameters
     ----------
@@ -1119,17 +1167,17 @@ def generate_flow_data_separable(
     beta_o : array-like, shape (k,)
         Origin-side regression coefficients.
     **kwargs
-        Forwarded to :func:`generate_flow_data` (e.g. ``sigma``, ``seed``,
+        Forwarded to :func:`simulate_sar_flow` (e.g. ``sigma``, ``seed``,
         ``X``, ``col_names``).
 
     Returns
     -------
     dict
-        Same as :func:`generate_flow_data`.  The ``"rho_w"`` entry will equal
+        Same as :func:`simulate_sar_flow`.  The ``"rho_w"`` entry will equal
         ``-rho_d * rho_o``.
     """
     rho_w = -rho_d * rho_o
-    return generate_flow_data(
+    return simulate_sar_flow(
         n=n,
         G=G,
         rho_d=rho_d,
@@ -1141,7 +1189,7 @@ def generate_flow_data_separable(
     )
 
 
-def generate_panel_flow_data_separable(
+def _simulate_sar_flow_separable_panel_fe(
     n: Optional[int] = None,
     T: int = 5,
     G: Optional[Graph] = None,
@@ -1153,10 +1201,10 @@ def generate_panel_flow_data_separable(
 ) -> dict:
     """Simulate panel flow data from a *separable* SAR flow model.
 
-    Identical to :func:`generate_panel_flow_data` except the network parameter
+    Identical to :func:`_simulate_sar_flow_panel_fe` except the network parameter
     is derived as :math:`\\rho_w = -\\rho_d \\rho_o`.  Use this function to
     generate training data for
-    :class:`~neighbayes.models.flow_panel.SARFlowSeparablePanel`.
+    a :class:`~neighbayes.models.SARFlow` panel with ``separable=True``.
 
     Parameters
     ----------
@@ -1175,17 +1223,17 @@ def generate_panel_flow_data_separable(
     beta_o : array-like, shape (k,)
         Origin-side regression coefficients.
     **kwargs
-        Forwarded to :func:`generate_panel_flow_data` (e.g. ``sigma``,
+        Forwarded to :func:`_simulate_sar_flow_panel_fe` (e.g. ``sigma``,
         ``sigma_alpha``, ``seed``).
 
     Returns
     -------
     dict
-        Same as :func:`generate_panel_flow_data`.  The ``"rho_w"`` entry will
+        Same as :func:`_simulate_sar_flow_panel_fe`.  The ``"rho_w"`` entry will
         equal ``-rho_d * rho_o``.
     """
     rho_w = -rho_d * rho_o
-    return generate_panel_flow_data(
+    return _simulate_sar_flow_panel_fe(
         n=n,
         T=T,
         G=G,
@@ -1198,7 +1246,7 @@ def generate_panel_flow_data_separable(
     )
 
 
-def generate_panel_negbin_flow_data_separable(
+def _simulate_sar_negbin_flow_separable_panel_re(
     n: int | None = None,
     T: int = 5,
     G: Graph | None = None,
@@ -1208,7 +1256,7 @@ def generate_panel_negbin_flow_data_separable(
 ) -> dict:
     """Panel NB2 flow DGP with separability constraint ``rho_w=-rho_d*rho_o``."""
     rho_w = -rho_d * rho_o
-    return generate_panel_negbin_flow_data(
+    return _simulate_sar_negbin_flow_panel_re(
         n=n,
         T=T,
         G=G,
@@ -1219,12 +1267,249 @@ def generate_panel_negbin_flow_data_separable(
     )
 
 
+def _simulate_sar_zinb_flow_separable(
+    n: int | None = None,
+    T: int = 1,
+    rho_d: float = 0.3,
+    rho_o: float = 0.2,
+    rho_d_zero: float = 0.2,
+    rho_o_zero: float = 0.1,
+    beta_zero: np.ndarray | None = None,
+    target_pi: float | None = None,
+    seed: int = 42,
+    **kwargs,
+) -> dict:
+    r"""Zero-inflated separable SAR flow counts, cross-section (``T=1``) or panel.
+
+    The count part is :func:`_simulate_sar_negbin_flow_separable_panel_re`
+    (its ``pair_effect_sd``, ``time_effect_sd`` and ``fe_x_corr`` included);
+    the zero part uses the same flow design ``X``:
+
+    .. math::
+
+        \eta_{z,t} = (L_{z,o} \otimes L_{z,d})^{-1} X_t\beta_z,
+        \qquad d \sim \mathrm{Bernoulli}(\mathrm{logit}^{-1}(\eta_z)),
+        \qquad y = d \cdot y_{\mathrm{NB}},
+
+    with :math:`L_{z,k} = I_n - \rho_{z,k} W`.  Matches
+    :class:`~neighbayes.models.SARZINBFlow` (``separable=True``).
+
+    Parameters
+    ----------
+    rho_d_zero, rho_o_zero : float
+        The zero part's destination and origin dependence.
+    beta_zero : array-like, optional
+        Zero-part coefficients on the columns of ``X``.  Default: 0.5 on the
+        intercept, −0.5 on log distance, 0.4 on the destination and origin
+        attributes, 0 elsewhere.
+    target_pi : float, optional
+        Shift the zero part's intercept so the mean activation probability is
+        ``target_pi``.
+    n, T, rho_d, rho_o, seed, **kwargs
+        As for :func:`_simulate_sar_negbin_flow_separable_panel_re`.
+
+    Returns
+    -------
+    dict
+        The NB flow output with ``y`` zero-inflated (``y_vec`` too when
+        ``T=1``), plus ``d``, ``eta_zero``, ``beta_zero``, ``rho_d_zero`` and
+        ``rho_o_zero``.
+    """
+    out = _simulate_sar_negbin_flow_separable_panel_re(
+        n=n, T=T, rho_d=rho_d, rho_o=rho_o, seed=seed, **kwargs
+    )
+    X, names = out["X"], list(out["col_names"])
+    if beta_zero is None:
+        beta_zero = np.zeros(X.shape[1])
+        for j, name in enumerate(names):
+            lname = name.lower()
+            if lname == "intercept":
+                beta_zero[j] = 0.5
+            elif "distance" in lname:
+                beta_zero[j] = -0.5
+            elif lname.startswith(("dest_", "orig_")):
+                beta_zero[j] = 0.4
+    beta_zero = np.asarray(beta_zero, dtype=float)
+    W = _graph_to_csr(out["G"])
+    nn = W.shape[0]
+    solve_d = spatial_filter_factor(W, rho_d_zero)
+    solve_o = spatial_filter_factor(W, rho_o_zero)
+
+    def filt(v):
+        B = np.asarray(v, dtype=float).reshape(T, nn, nn)
+        return np.stack(
+            [solve_d(np.asarray(solve_o(B[t])).T).T for t in range(T)]
+        ).ravel()
+
+    eta_sel = filt(X @ beta_zero)
+    if target_pi is not None:
+        # The shift moves the intercept inside the filter, so η moves by
+        # shift·A⁻¹1, not by shift.
+        icpt = [j for j, nm in enumerate(names) if nm.lower() == "intercept"]
+        if not icpt:
+            raise ValueError("target_pi needs an 'intercept' column in X")
+        a0 = filt(X[:, icpt[0]])
+        lo, hi = -50.0, 50.0
+        for _ in range(60):
+            mid = 0.5 * (lo + hi)
+            if np.mean(1.0 / (1.0 + np.exp(-(eta_sel + mid * a0)))) < target_pi:
+                lo = mid
+            else:
+                hi = mid
+        shift = 0.5 * (lo + hi)
+        eta_sel = eta_sel + shift * a0
+        beta_zero = beta_zero.copy()
+        beta_zero[icpt[0]] += shift
+    rng = np.random.default_rng(seed + 7919)
+    d = rng.binomial(1, 1.0 / (1.0 + np.exp(-eta_sel)))
+    out["y"] = (out["y"] * d).astype(np.int64)
+    if T == 1:
+        out["y_vec"] = out["y"]
+    out.update(
+        d=d,
+        eta_zero=eta_sel,
+        beta_zero=beta_zero,
+        rho_d_zero=rho_d_zero,
+        rho_o_zero=rho_o_zero,
+    )
+    out["params_true"].update(
+        beta_zero=beta_zero, rho_d_zero=rho_d_zero, rho_o_zero=rho_o_zero
+    )
+    return out
+
+
+def _simulate_sar_hurdle_negbin_flow_separable(
+    n: int | None = None,
+    T: int = 1,
+    rho_d: float = 0.3,
+    rho_o: float = 0.2,
+    rho_d_zero: float = 0.2,
+    rho_o_zero: float = 0.1,
+    beta_zero: np.ndarray | None = None,
+    target_pi: float | None = None,
+    pair_effect_sd_zero: float = 0.0,
+    time_effect_sd_zero: float = 0.0,
+    seed: int = 42,
+    **kwargs,
+) -> dict:
+    r"""Separable SAR hurdle NB flows, cross-section (``T=1``) or panel.
+
+    The count part's log-mean is that of
+    :func:`_simulate_sar_negbin_flow_separable_panel_re` (its ``pair_effect_sd``,
+    ``time_effect_sd`` and ``fe_x_corr`` included), truncated at zero; the
+    zero part uses the same flow design ``X``:
+
+    .. math::
+
+        \eta_{z,t} = (L_{z,o} \otimes L_{z,d})^{-1} (X_t\beta_z + C_z)
+        + \tau_{z,t},
+        \qquad d \sim \mathrm{Bernoulli}(\mathrm{logit}^{-1}(\eta_z)),
+        \qquad y = d \cdot \mathrm{tNB}(\mu, \alpha).
+
+    Matches :class:`~neighbayes.models.SARHurdleNegBinFlow` (``separable=True``).
+
+    Parameters
+    ----------
+    rho_d_zero, rho_o_zero : float
+        The zero part's destination and origin dependence.
+    beta_zero : array-like, optional
+        Zero-part coefficients on the columns of ``X``; default as
+        :func:`_simulate_sar_zinb_flow_separable`.
+    target_pi : float, optional
+        Shift the zero part's intercept (inside the filter) so
+        ``mean P(y > 0)`` is ``target_pi``.
+    pair_effect_sd_zero, time_effect_sd_zero : float, default 0.0
+        Standard deviations of the zero part's pair effects ``C_z`` and period
+        effects ``τ_z`` (``τ_{z,0} = 0``).
+    n, T, rho_d, rho_o, seed, **kwargs
+        As for :func:`_simulate_sar_negbin_flow_separable_panel_re`.
+
+    Returns
+    -------
+    dict
+        The NB flow output with ``y`` replaced by the hurdle counts (``y_vec``
+        too when ``T=1``), plus ``d``, ``eta_zero``, ``beta_zero``,
+        ``rho_d_zero``, ``rho_o_zero``, ``pair_effect_zero`` and
+        ``time_effect_zero``.
+    """
+    from .hurdle import _intercept_shift, truncated_negative_binomial
+
+    out = _simulate_sar_negbin_flow_separable_panel_re(
+        n=n, T=T, rho_d=rho_d, rho_o=rho_o, seed=seed, **kwargs
+    )
+    X, names = out["X"], list(out["col_names"])
+    if beta_zero is None:
+        beta_zero = np.zeros(X.shape[1])
+        for j, name in enumerate(names):
+            lname = name.lower()
+            if lname == "intercept":
+                beta_zero[j] = 0.5
+            elif "distance" in lname:
+                beta_zero[j] = -0.5
+            elif lname.startswith(("dest_", "orig_")):
+                beta_zero[j] = 0.4
+    beta_zero = np.asarray(beta_zero, dtype=float)
+    W = _graph_to_csr(out["G"])
+    nn = W.shape[0]
+    solve_d = spatial_filter_factor(W, rho_d_zero)
+    solve_o = spatial_filter_factor(W, rho_o_zero)
+
+    def filt(v):
+        B = np.asarray(v, dtype=float).reshape(T, nn, nn)
+        return np.stack(
+            [solve_d(np.asarray(solve_o(B[t])).T).T for t in range(T)]
+        ).ravel()
+
+    rng = np.random.default_rng(seed + 7919)
+    sel_pair = pair_effect_sd_zero * rng.standard_normal(nn * nn)
+    sel_time = np.zeros(T)
+    if T > 1:
+        sel_time[1:] = time_effect_sd_zero * rng.standard_normal(T - 1)
+    eta_bin = filt(X @ beta_zero + np.tile(sel_pair, T)) + np.repeat(sel_time, nn * nn)
+    if target_pi is not None:
+        icpt = [j for j, nm in enumerate(names) if nm.lower() == "intercept"]
+        if not icpt:
+            raise ValueError("target_pi needs an 'intercept' column in X")
+        a0 = filt(X[:, icpt[0]])
+        shift = _intercept_shift(eta_bin, a0, float(target_pi))
+        eta_bin = eta_bin + shift * a0
+        beta_zero = beta_zero.copy()
+        beta_zero[icpt[0]] += shift
+    d = rng.binomial(1, 1.0 / (1.0 + np.exp(-eta_bin)))
+    y = np.zeros(d.size, dtype=np.int64)
+    pos = d == 1
+    alpha = float(out["params_true"]["alpha"])
+    if pos.any():
+        y[pos] = truncated_negative_binomial(rng, out["lambda"][pos], alpha)
+    out["y"] = y
+    if T == 1:
+        out["y_vec"] = y
+    out.update(
+        d=d,
+        eta_zero=eta_bin,
+        beta_zero=beta_zero,
+        rho_d_zero=rho_d_zero,
+        rho_o_zero=rho_o_zero,
+        pair_effect_zero=sel_pair,
+        time_effect_zero=sel_time,
+    )
+    out["params_true"].update(
+        beta_zero=beta_zero,
+        rho_d_zero=rho_d_zero,
+        rho_o_zero=rho_o_zero,
+        pair_effect_zero=sel_pair,
+        time_effect_zero=sel_time,
+    )
+    return out
+
+
 # ---------------------------------------------------------------------------
 # Spatial-error (SEM) flow DGPs
 # ---------------------------------------------------------------------------
 
 
-def generate_sem_flow_data(
+@simulator(flow)
+def simulate_sem_flow(
     n: Optional[int] = None,
     G: Optional[Graph] = None,
     lam_d: float = 0.3,
@@ -1246,7 +1531,7 @@ def generate_sem_flow_data(
 ) -> dict:
     r"""Simulate flow data from a *spatial-error* (SEM) flow model.
 
-    Spatial-error analogue of :func:`generate_flow_data`.  The latent
+    Spatial-error analogue of :func:`simulate_sar_flow`.  The latent
     additive linear predictor is
 
     .. math::
@@ -1259,7 +1544,7 @@ def generate_sem_flow_data(
     or :math:`y = \eta` (``"normal"``).  Use to generate training data for
     :class:`~neighbayes.models.flow.SEMFlow`.
 
-    Parameters and return dict mirror :func:`generate_flow_data`.
+    Parameters and return dict mirror :func:`simulate_sar_flow`.
     """
     rng = np.random.default_rng(seed)
 
@@ -1375,7 +1660,7 @@ def generate_sem_flow_data(
     }
 
 
-def generate_sem_flow_data_separable(
+def _simulate_sem_flow_separable(
     n: Optional[int] = None,
     G: Optional[Graph] = None,
     lam_d: float = 0.3,
@@ -1386,10 +1671,10 @@ def generate_sem_flow_data_separable(
 ) -> dict:
     r"""Simulate SEM flow data with the separability constraint :math:`\lambda_w = -\lambda_d \lambda_o`.
 
-    Spatial-error analogue of :func:`generate_flow_data_separable`.
+    Spatial-error analogue of :func:`_simulate_sar_flow_separable`.
     """
     lam_w = -lam_d * lam_o
-    return generate_sem_flow_data(
+    return simulate_sem_flow(
         n=n,
         G=G,
         lam_d=lam_d,
@@ -1401,7 +1686,7 @@ def generate_sem_flow_data_separable(
     )
 
 
-def generate_panel_sem_flow_data(
+def _simulate_sem_flow_panel_fe(
     n: Optional[int] = None,
     T: int = 5,
     G: Optional[Graph] = None,
@@ -1412,6 +1697,7 @@ def generate_panel_sem_flow_data(
     beta_o: Union[np.ndarray, list, None] = None,
     sigma: float = 1.0,
     sigma_alpha: float = 0.5,
+    time_effect_sd: float = 0.0,
     gamma_dist: float = -0.5,
     seed: Optional[int] = None,
     k: Optional[int] = None,
@@ -1429,9 +1715,9 @@ def generate_panel_sem_flow_data(
         \eta_t = X_t\beta + \alpha + B^{-1}\varepsilon_t, \quad
         \varepsilon_t \sim \mathcal{N}(0, \sigma^2 I_N).
 
-    Panel analogue of :func:`generate_panel_flow_data` for SEM.  Use to
+    Panel analogue of :func:`_simulate_sar_flow_panel_fe` for SEM.  Use to
     generate training data for
-    :class:`~neighbayes.models.flow_panel.SEMFlowPanel`.
+    a :class:`~neighbayes.models.SEMFlow` panel.
     """
     rng = np.random.default_rng(seed)
 
@@ -1457,11 +1743,12 @@ def generate_panel_sem_flow_data(
     solve_B = _factorized_flow(B, letter="B", prefix="lam")
 
     alpha = rng.normal(0.0, sigma_alpha, N) if sigma_alpha > 0 else np.zeros(N)
+    tau = _time_effects(rng, T, time_effect_sd)
     dist = pairwise_distance_matrix(gdf)
 
     y_list, X_list, eta_list = [], [], []
     col_names = None
-    for _ in range(T):
+    for t in range(T):
         X_d_reg = rng.standard_normal((n, k_d_val))
         X_o_reg = rng.standard_normal((n, k_o_val))
         if k_d_val == k_o_val:
@@ -1480,7 +1767,7 @@ def generate_panel_sem_flow_data(
         Xbeta = design.combined @ beta_full
         eps = rng.normal(scale=sigma, size=N)
         u = solve_B(eps)
-        eta_t = Xbeta + alpha + u
+        eta_t = Xbeta + alpha + tau[t] + u
         y_t = np.exp(eta_t) if distribution == "lognormal" else eta_t
         eta_list.append(eta_t)
         y_list.append(y_t)
@@ -1503,7 +1790,7 @@ def generate_panel_sem_flow_data(
         "lam_o": lam_o,
         "lam_w": lam_w,
         "sigma": sigma,
-        "sigma_alpha": sigma_alpha,
+        "pair_effect_sd": sigma_alpha,
         "beta_d": beta_d_arr,
         "beta_o": beta_o_arr,
         "gamma_dist": gamma_dist,
@@ -1512,7 +1799,7 @@ def generate_panel_sem_flow_data(
             "lam_o": lam_o,
             "lam_w": lam_w,
             "sigma": sigma,
-            "sigma_alpha": sigma_alpha,
+            "pair_effect_sd": sigma_alpha,
             "beta_d": beta_d_arr,
             "beta_o": beta_o_arr,
             "gamma_dist": gamma_dist,
@@ -1521,7 +1808,7 @@ def generate_panel_sem_flow_data(
     }
 
 
-def generate_panel_sem_flow_data_separable(
+def _simulate_sem_flow_separable_panel_fe(
     n: Optional[int] = None,
     T: int = 5,
     G: Optional[Graph] = None,
@@ -1533,7 +1820,7 @@ def generate_panel_sem_flow_data_separable(
 ) -> dict:
     r"""Panel SEM flow DGP with separability constraint :math:`\lambda_w = -\lambda_d \lambda_o`."""
     lam_w = -lam_d * lam_o
-    return generate_panel_sem_flow_data(
+    return _simulate_sem_flow_panel_fe(
         n=n,
         T=T,
         G=G,
@@ -1570,7 +1857,8 @@ def _poissonize_flow(out: dict, mean_count: float, seed: int) -> dict:
     return out
 
 
-def generate_poisson_flow_data(
+@simulator(flow)
+def simulate_sar_poisson_flow(
     n: int | None = None,
     rho_d: float = 0.3,
     rho_o: float = 0.2,
@@ -1597,31 +1885,35 @@ def generate_poisson_flow_data(
         Target mean of the simulated counts.
     signal : float, default 0.3
         Magnitude of the regression coefficients, which sets the spread of
-        ``eta``.  The default gives ``sd(eta) ~ 1`` and roughly 5-10% zeros —
-        realistic gravity data.  Raising it past ~0.5 produces the very
-        heavy-tailed, mostly-zero designs on which *no* flow sampler in this
-        package recovers (``sd(eta) ~ 3``, 60-70% zeros); those are a bad
-        test bed, not a hard one.
+        ``eta``.  The default gives ``sd(eta) ~ 1`` and roughly 5-10% zeros.
+        Larger values give heavy-tailed designs with many zeros
+        (``signal=0.9``: ``sd(eta) ~ 3``, 40-50% zeros, counts in the
+        hundreds), which the Poisson flow samplers recover.  An earlier note
+        here said they could not; that was the last-arrival augmentation bug
+        fixed on 2026-10-03, which biased large counts.  Sparsity itself is
+        not the obstacle: what limits ρ is the total information, so a
+        low ``mean_count`` on a small ``n`` gives a correct but wide
+        posterior (Gibbs matches NUTS there).
     seed : int, default 42
         Random seed.
     **kwargs
-        Forwarded to :func:`generate_negbin_flow_data`.
+        Forwarded to :func:`simulate_sar_negbin_flow`.
 
     Returns
     -------
     dict
-        As :func:`generate_negbin_flow_data`, without ``alpha``.
+        As :func:`simulate_sar_negbin_flow`, without ``alpha``.
     """
     kwargs.setdefault("beta_d", [signal, signal])
     kwargs.setdefault("beta_o", [signal, signal])
     kwargs.setdefault("gamma_dist", -signal)
-    out = generate_negbin_flow_data(
+    out = simulate_sar_negbin_flow(
         n=n, rho_d=rho_d, rho_o=rho_o, rho_w=rho_w, alpha=2.0, seed=seed, **kwargs
     )
     return _poissonize_flow(out, mean_count, seed)
 
 
-def generate_poisson_flow_data_separable(
+def _simulate_sar_poisson_flow_separable(
     n: int | None = None,
     rho_d: float = 0.3,
     rho_o: float = 0.2,
@@ -1632,12 +1924,91 @@ def generate_poisson_flow_data_separable(
 ) -> dict:
     r"""Separable Poisson flow DGP (:math:`\rho_w = -\rho_d \rho_o`).
 
-    See :func:`generate_poisson_flow_data` for the parameters.
+    See :func:`simulate_sar_poisson_flow` for the parameters.
     """
     kwargs.setdefault("beta_d", [signal, signal])
     kwargs.setdefault("beta_o", [signal, signal])
     kwargs.setdefault("gamma_dist", -signal)
-    out = generate_negbin_flow_data_separable(
+    out = _simulate_sar_negbin_flow_separable(
         n=n, rho_d=rho_d, rho_o=rho_o, alpha=2.0, seed=seed, **kwargs
     )
     return _poissonize_flow(out, mean_count, seed)
+
+
+@aspatial(simulate_sar_flow, {"rho_d": 0.0, "rho_o": 0.0, "rho_w": 0.0})
+def simulate_ols_flow():
+    """Simulate an aspatial Gaussian flow model: :func:`simulate_sar_flow` with every ρ at 0."""
+
+
+@aspatial(simulate_sar_negbin_flow, {"rho_d": 0.0, "rho_o": 0.0, "rho_w": 0.0})
+def simulate_negbin_flow():
+    """Simulate an aspatial NB flow model: :func:`simulate_sar_negbin_flow` with every ρ at 0."""
+
+
+@simulator(flow)
+def simulate_sar_zinb_flow(
+    n: int | None = None,
+    rho_d: float = 0.3,
+    rho_o: float = 0.2,
+    rho_d_zero: float = 0.2,
+    rho_o_zero: float = 0.1,
+    beta_zero: np.ndarray | None = None,
+    target_pi: float | None = None,
+    seed: int = 42,
+    **kwargs,
+) -> dict:
+    """Simulate the ZINB flow model with SAR dependence.
+
+    Draws from :class:`~neighbayes.models.SARZINBFlow`, which is implemented as
+    the separable flow only: pass ``separable=True``.  Pass ``T`` for a flow
+    panel, with ``pair_effects="random"`` and ``time_effects=True`` for its
+    effects.  Other keywords are as for :func:`simulate_sar_negbin_flow`.
+    """
+    return _simulate_sar_zinb_flow_separable(
+        n=n,
+        rho_d=rho_d,
+        rho_o=rho_o,
+        rho_d_zero=rho_d_zero,
+        rho_o_zero=rho_o_zero,
+        beta_zero=beta_zero,
+        target_pi=target_pi,
+        seed=seed,
+        **kwargs,
+    )
+
+
+@simulator(flow)
+def simulate_sar_hurdle_negbin_flow(
+    n: int | None = None,
+    rho_d: float = 0.3,
+    rho_o: float = 0.2,
+    rho_d_zero: float = 0.2,
+    rho_o_zero: float = 0.1,
+    beta_zero: np.ndarray | None = None,
+    target_pi: float | None = None,
+    pair_effect_sd_zero: float = 0.0,
+    time_effect_sd_zero: float = 0.0,
+    seed: int = 42,
+    **kwargs,
+) -> dict:
+    """Simulate the hurdle NB flow model with SAR dependence.
+
+    Draws from :class:`~neighbayes.models.SARHurdleNegBinFlow`, which is
+    implemented as the separable flow only: pass ``separable=True``.  Pass ``T``
+    for a flow panel, with ``pair_effects="random"`` and ``time_effects=True``
+    for the count part's effects.  Other keywords are as for
+    :func:`simulate_sar_negbin_flow`.
+    """
+    return _simulate_sar_hurdle_negbin_flow_separable(
+        n=n,
+        rho_d=rho_d,
+        rho_o=rho_o,
+        rho_d_zero=rho_d_zero,
+        rho_o_zero=rho_o_zero,
+        beta_zero=beta_zero,
+        target_pi=target_pi,
+        pair_effect_sd_zero=pair_effect_sd_zero,
+        time_effect_sd_zero=time_effect_sd_zero,
+        seed=seed,
+        **kwargs,
+    )

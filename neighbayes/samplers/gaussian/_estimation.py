@@ -26,7 +26,6 @@ import scipy.sparse as sp
 
 from ..._lazy_deps import xr
 from ..._logdet._probe_check import WarmupProbes
-from ..._logdet._refit import DEFAULT_PAD_SD
 from ..._logdet._warmup import WarmupJacobian
 
 _log = logging.getLogger(__name__)
@@ -87,10 +86,7 @@ class GibbsEstimation:
         W_eigs: np.ndarray | None = None,
         logdet_method: str | None = None,
         T: int = 1,
-        logdet_refit: bool = False,
-        logdet_refit_pad_sd: float = DEFAULT_PAD_SD,
-        logdet_aaa_check: bool = False,
-        logdet_probe_check: bool = False,
+        logdet_adapt: bool = False,
         nu: float | None = None,
         jacobian_T: int | None = None,
         jacobian_shift: float = 0.0,
@@ -108,10 +104,7 @@ class GibbsEstimation:
         self.W_eigs = W_eigs
         self.logdet_method = logdet_method
         self.T = int(T)
-        self.logdet_refit = bool(logdet_refit)
-        self.logdet_refit_pad_sd = float(logdet_refit_pad_sd)
-        self.logdet_aaa_check = bool(logdet_aaa_check)
-        self.logdet_probe_check = bool(logdet_probe_check)
+        self.logdet_adapt = bool(logdet_adapt)
         self.nu = None if nu is None else float(nu)
         self.warmup_jacobian = None
         self.n, self.k = X.shape
@@ -144,7 +137,6 @@ class GibbsEstimation:
         progressbar: bool = True,
         gibbs_method: str = "jax",
         slice_width: float | None = None,
-        chain_method: str | None = None,
         log_likelihood: bool = False,
     ) -> xr.DataTree:
         """Run Gibbs chains and assemble DataTree.
@@ -166,7 +158,8 @@ class GibbsEstimation:
             ``-1`` uses all CPUs.  When ``n_jobs=1``, chains run
             sequentially with progress bars.  When ``n_jobs>1``
             (or ``-1``), chains run in parallel via ``joblib``.
-            Ignored for the JAX path (use ``chain_method`` instead).
+            Ignored for the JAX path, whose chains run vectorized under
+            ``jax.vmap``.
         progressbar : bool, default True
             Show per-chain progress bars.
         gibbs_method : str, default "jax"
@@ -179,11 +172,6 @@ class GibbsEstimation:
             path.  If None, defaults to ``(rho_upper - rho_lower) * 0.1``.
             Ignored when ``gibbs_method="numpy"`` (the NumPy path adapts
             its own slice width).
-        chain_method : str or None, default None
-            How to run multiple chains for the JAX path.  Chains always run
-            in parallel, vectorized under ``jax.vmap`` on one device, so
-            ``"vectorized"`` is the only value.  Ignored for the NumPy path
-            (use ``n_jobs`` to control parallelism instead).
         log_likelihood : bool, default False
             Store the pointwise log-likelihood (one value per draw and
             observation) for LOO/WAIC, as PyMC's
@@ -196,10 +184,6 @@ class GibbsEstimation:
             ``log_likelihood`` when requested.
         """
         self.log_likelihood = bool(log_likelihood)
-        # Default chain_method for JAX path
-        if chain_method is None:
-            chain_method = "vectorized" if gibbs_method == "jax" else None
-
         if gibbs_method == "jax":
             return self._fit_jax(
                 draws=draws,
@@ -210,7 +194,6 @@ class GibbsEstimation:
                 n_jobs=n_jobs,
                 progressbar=progressbar,
                 slice_width=slice_width,
-                chain_method=chain_method,
             )
 
         # ── NumPy path (default) ──
@@ -314,7 +297,9 @@ class GibbsEstimation:
             # window back to the initial value and defeat the refit; the
             # second half is what the chains have actually settled on.
             adapted = wj.adapt(
-                np.concatenate([c[spatial_param][tune_a // 2 :] for c in warm])
+                np.stack([c[spatial_param][tune_a // 2 :] for c in warm]),
+                draws=draws,
+                chains=chains,
             )
             if adapted is not None:
                 cache.logdet_fn, cache.logdet_vec_fn = adapted.scalar_fn, adapted.vec_fn
@@ -360,7 +345,6 @@ class GibbsEstimation:
         n_jobs: int = 1,
         progressbar: bool = True,
         slice_width: float | None = None,
-        chain_method: str = "vectorized",
     ) -> xr.DataTree:
         """Run JAX JIT Gibbs chains and assemble DataTree.
 
@@ -386,25 +370,12 @@ class GibbsEstimation:
         slice_width : float or None, default None
             Initial step-out width for the ρ/λ slice sampler.  If None,
             defaults to ``(rho_upper - rho_lower) * 0.1``.
-        chain_method : str, default "vectorized"
-            Chains always run in parallel, vectorized under ``jax.vmap`` on
-            one device.  ``"parallel"`` is not supported.
 
         Returns
         -------
         xr.DataTree
         """
         from ._jax import run_chains_jax_gibbs_vectorized
-
-        if chain_method == "parallel":
-            raise NotImplementedError(
-                "chain_method='parallel' is not supported for the JAX path. "
-                "Use chain_method='vectorized' for JAX-native parallelism."
-            )
-        if chain_method != "vectorized":
-            raise ValueError(
-                f"Unknown chain_method {chain_method!r}; use 'vectorized'."
-            )
 
         self.warmup_jacobian = None
         # Build JAX-native logdet function
@@ -414,7 +385,7 @@ class GibbsEstimation:
         # The refit and the AAA node check pool ρ across chains halfway through
         # warmup, inside the vectorized runner.
         wj = self._warmup_jacobian()
-        param_fn = params0 = refit_hook = None
+        param_fn = params0 = refit_hook = kind_params = None
         if wj is not None:
             param_fn = wj.param_fn()
             start = wj.initial(tune, jax=True)
@@ -432,7 +403,9 @@ class GibbsEstimation:
                 "sampler_builds_evaluators and GibbsEstimation._warmup_jacobian disagree."
             )
         else:
-            logdet_jax = self._build_logdet_jax()
+            # As parameters, so the compiled program is reused by later fits.
+            kind_params = self._build_logdet_jax_params()
+            logdet_jax = self._build_logdet_jax() if kind_params is None else None
         # A refit that replaces the interpolant must also replace the evaluator
         # the post-chain pointwise log-likelihood uses, and that evaluator is
         # passed to the runner before the refit happens — so pass a late-binding
@@ -498,6 +471,7 @@ class GibbsEstimation:
             nu=self.nu,
             n_eff=self.n_eff,
             jacobian_shift=self.jacobian_shift,
+            logdet_kind_params=kind_params,
         )
 
         # Assemble DataTree
@@ -521,27 +495,22 @@ class GibbsEstimation:
         Construction is lazy, with no factorization until evaluators are built, so
         this is cheap to call unconditionally.
         """
-        if self.W_sparse is None:
+        if self.W_sparse is None or not self.logdet_adapt:
             return None
-        if self.logdet_probe_check:
-            from ..._logdet._config import resolve_logdet_method
+        from ..._logdet._config import resolve_logdet_method
 
-            n_units = self.W_sparse.shape[0] // self.T
-            W = self.W_sparse[:n_units, :n_units] if self.T > 1 else self.W_sparse
-            if resolve_logdet_method(self.logdet_method, n=n_units, W=W) == (
-                "cheb_stochastic"
-            ):
-                wp = WarmupProbes.for_sampler(
-                    self.W_sparse,
-                    T=self.T,
-                    jacobian_T=self.jacobian_T,
-                    rho_min=self.priors.rho_lower,
-                    rho_max=self.priors.rho_upper,
-                )
-                self.warmup_jacobian = wp
-                return wp
-        if not (self.logdet_refit or self.logdet_aaa_check):
-            return None
+        n_units = self.W_sparse.shape[0] // self.T
+        W = self.W_sparse[:n_units, :n_units] if self.T > 1 else self.W_sparse
+        if resolve_logdet_method(self.logdet_method, n=n_units, W=W) == ("stoch_cheb"):
+            wp = WarmupProbes.for_sampler(
+                self.W_sparse,
+                T=self.T,
+                jacobian_T=self.jacobian_T,
+                rho_min=self.priors.rho_lower,
+                rho_max=self.priors.rho_upper,
+            )
+            self.warmup_jacobian = wp
+            return wp
         wj = WarmupJacobian.for_sampler(
             self.W_sparse,
             self.logdet_method,
@@ -549,9 +518,6 @@ class GibbsEstimation:
             jacobian_T=self.jacobian_T,
             rho_min=self.priors.rho_lower,
             rho_max=self.priors.rho_upper,
-            refit=self.logdet_refit,
-            refit_pad_sd=self.logdet_refit_pad_sd,
-            aaa_check=self.logdet_aaa_check,
         )
         if not wj.active:
             return None
@@ -571,7 +537,7 @@ class GibbsEstimation:
         return None if wj is None else wj.check
 
     def _jax_adaptation_hook(self, wj: WarmupJacobian):
-        """The hook a JAX runner calls halfway through warmup, with ρ pooled across chains.
+        """The hook a JAX runner calls halfway through warmup, with ρ by chain.
 
         Returns ``(params, rho_min, rho_max)`` for the adapted fit, or ``None`` to keep
         the installed one.  The parameters keep the shape of the warmup fit's, so the
@@ -579,8 +545,8 @@ class GibbsEstimation:
         fit, so their pointwise log-likelihood switches to its NumPy evaluator.
         """
 
-        def _hook(pooled_rho):
-            adapted = wj.adapt(pooled_rho, jax=True)
+        def _hook(rho_by_chain, *, draws, chains):
+            adapted = wj.adapt(rho_by_chain, draws=draws, chains=chains, jax=True)
             if adapted is None:
                 return None
             self._active_logdet_vec_fn = adapted.vec_fn
@@ -633,6 +599,30 @@ class GibbsEstimation:
             rho_max=self.priors.rho_upper,
             T=self.jacobian_T,
         )
+
+    def _build_logdet_jax_params(self):
+        """``(kind, params, T)`` of the JAX log-determinant, or ``None``.
+
+        The same function :meth:`_build_logdet_jax` builds, as parameters the
+        compiled sweep takes as data (:func:`neighbayes._logdet._jax.
+        logdet_jax_params`).  ``None`` for a method with no array form.
+        """
+        from ..._logdet._jax import logdet_jax_params
+
+        W = self.W_sparse
+        n_units = W.shape[0] // self.T  # per-period unit count
+        W_input = W[:n_units, :n_units] if self.T > 1 else W
+        method = "eigenvalue" if self.W_eigs is not None else self.logdet_method
+        kind, params = logdet_jax_params(
+            W_input,
+            method,
+            self.priors.rho_lower,
+            self.priors.rho_upper,
+            eigs=self.W_eigs,
+        )
+        if kind == "closure":
+            return None
+        return kind, params, self.jacobian_T
 
     def _build_cache(self) -> GaussianGibbsCache:
         """Build the GibbsCache from model data."""
@@ -815,10 +805,7 @@ class GaussianSARGibbs(GibbsEstimation):
         W_eigs: np.ndarray | None = None,
         logdet_method: str | None = None,
         T: int = 1,
-        logdet_refit: bool = False,
-        logdet_refit_pad_sd: float = DEFAULT_PAD_SD,
-        logdet_aaa_check: bool = False,
-        logdet_probe_check: bool = False,
+        logdet_adapt: bool = False,
         nu: float | None = None,
         jacobian_T: int | None = None,
         jacobian_shift: float = 0.0,
@@ -837,10 +824,7 @@ class GaussianSARGibbs(GibbsEstimation):
             W_eigs=W_eigs,
             logdet_method=logdet_method,
             T=T,
-            logdet_refit=logdet_refit,
-            logdet_refit_pad_sd=logdet_refit_pad_sd,
-            logdet_aaa_check=logdet_aaa_check,
-            logdet_probe_check=logdet_probe_check,
+            logdet_adapt=logdet_adapt,
             nu=nu,
             jacobian_T=jacobian_T,
             jacobian_shift=jacobian_shift,
@@ -896,10 +880,7 @@ class GaussianSEMGibbs(GibbsEstimation):
         W_eigs: np.ndarray | None = None,
         logdet_method: str | None = None,
         T: int = 1,
-        logdet_refit: bool = False,
-        logdet_refit_pad_sd: float = DEFAULT_PAD_SD,
-        logdet_aaa_check: bool = False,
-        logdet_probe_check: bool = False,
+        logdet_adapt: bool = False,
         nu: float | None = None,
         jacobian_T: int | None = None,
         jacobian_shift: float = 0.0,
@@ -918,10 +899,7 @@ class GaussianSEMGibbs(GibbsEstimation):
             W_eigs=W_eigs,
             logdet_method=logdet_method,
             T=T,
-            logdet_refit=logdet_refit,
-            logdet_refit_pad_sd=logdet_refit_pad_sd,
-            logdet_aaa_check=logdet_aaa_check,
-            logdet_probe_check=logdet_probe_check,
+            logdet_adapt=logdet_adapt,
             nu=nu,
             jacobian_T=jacobian_T,
             jacobian_shift=jacobian_shift,

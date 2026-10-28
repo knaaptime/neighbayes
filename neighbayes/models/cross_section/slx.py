@@ -10,12 +10,21 @@ from __future__ import annotations
 
 import numpy as np
 
+from .._base._shared import SharedSpatialMethods
 from .._mixins import GaussianLikelihoodMixin, GaussianPredictionMixin
+from .._mixins._designs import GaussianDesigns
 from ..base import SpatialModel
-from ..priors import SLXPriors
+from ..panel._dynamic import _SLXDynamic
+from ..priors import PanelSLXDynamicPriors, SLXPriors
 
 
-class SLX(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
+class SLX(
+    GaussianDesigns,
+    _SLXDynamic,
+    GaussianPredictionMixin,
+    GaussianLikelihoodMixin,
+    SpatialModel,
+):
     """Bayesian SLX (Spatial Lag X) model.
 
     Adds spatial lags of the regressors :math:`X` to a standard linear
@@ -66,19 +75,49 @@ class SLX(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
         - ``nu`` (float, default 4.0): Fixed Student-t degrees of
           freedom (only used when ``robust=True``).
 
-    logdet_method : str, optional
-        Accepted for API consistency with the spatial-lag/error models
-        but unused (SLX has no spatial Jacobian).
+    logdet_method : {"eigenvalue", "cheb", "aaa", "spline", "stochastic"}, optional
+        How ``log|I - rho*W|`` is computed over rho: summed over the
+        eigenvalues of ``W``; interpolated (Chebyshev, AAA rational, or cubic
+        spline) through values from a sparse factorization, exact to the
+        interpolant's tolerance; or expanded stochastically with no
+        factorization, the one method with sampling error.  ``None`` (default)
+        selects from the size and symmetry of ``W``: ``"eigenvalue"`` for
+        ``n <= 500``; ``"aaa"`` up to ``n = 60000``
+        (``NEIGHBAYES_LOGDET_FACTOR_MAX_N``) unless the factorization's fill-in
+        would dominate; ``"stochastic"`` beyond.
+    logdet_decomp : {"auto", "chol", "lu"}, default "auto"
+        The factorization an interpolating method uses: sparse Cholesky
+        (undirected ``W``; scikit-sparse CHOLMOD) or sparse LU (KLU or UMFPACK,
+        chosen by the sparsity pattern).  ``"auto"`` takes ``"chol"`` where the
+        method has it and ``W`` is undirected, else ``"lu"``.  Ignored by
+        ``"eigenvalue"`` and ``"stochastic"``; ``"spline"`` on ``"chol"``
+        raises.
     robust : bool, default False
         If True, replace the Normal error with Student-t. See *Robust
         regression* below.
-    w_vars : list of str, optional
+    durbin_vars : list of str, optional
         Names of X columns to spatially lag. By default all
         non-constant columns are lagged. Pass a subset to restrict
         which variables receive a spatial lag, e.g.
-        ``w_vars=["income", "density"]``. SLX requires at least one
+        ``durbin_vars=["income", "density"]``. SLX requires at least one
         WX column; if filtering eliminates all of them a ValueError is
         raised.
+
+    time_col, unit_col : str, optional
+        Formula-mode panel: the period and unit columns of ``data``.  Given
+        time, the model is a panel, stacked by period, then unit.
+    N, T : int, optional
+        Matrix-mode panel: the numbers of units and periods; ``T=1`` is the
+        cross-section.
+    unit_effects : {None, "fixed"}, default None
+        Panel unit effects: ``"fixed"`` applies the within transformation
+        (with Lee and Yu's 2010 likelihood dimensions).
+    time_effects : bool, default False
+        Fixed time effects (panels).
+    dynamic : bool, default False
+        Add the time lag :math:`\\phi y_{t-1}` (priors ``phi_lower``,
+        ``phi_upper``).  A dynamic panel takes no unit effects (Nickell
+        1981).
 
     Notes
     -----
@@ -100,6 +139,15 @@ class SLX(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     must exceed 2 so the variance exists.
     """
 
+    _DESIGNS = {
+        "static": {},
+        "dynamic": {
+            "_priors_cls": PanelSLXDynamicPriors,
+            "_likelihood": "",
+            "_lee_yu": False,
+        },
+    }
+
     _priors_cls = SLXPriors
     _spatial_params: tuple[str, ...] = ()
     _lag_terms: tuple[str, ...] = ("WX",)
@@ -109,7 +157,7 @@ class SLX(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
     _model_type: str = "slx"
     _likelihood: str = "gaussian"  # NUTS-only (no _gibbs_key)
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior_static(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute direct, indirect, and total effects for each posterior draw.
@@ -128,7 +176,7 @@ class SLX(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
         """
         return self._slx_effects()
 
-    def _fitted_mean_from_posterior(self) -> np.ndarray:
+    def _fitted_mean_from_posterior_static(self) -> np.ndarray:
         """Compute fitted values at posterior mean coefficients.
 
         Returns
@@ -136,6 +184,9 @@ class SLX(GaussianPredictionMixin, GaussianLikelihoodMixin, SpatialModel):
         np.ndarray
             Posterior-mean fitted values.
         """
+        if self._is_panel:
+            # A fixed-effects panel may have dropped its intercept.
+            return SharedSpatialMethods._fitted_mean_from_posterior(self)
         k = self._X.shape[1]
         beta = self._posterior_mean("beta")
         Z = np.hstack([self._X, self._WX])

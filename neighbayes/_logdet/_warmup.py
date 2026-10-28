@@ -33,10 +33,10 @@ from typing import Any, Callable
 
 import numpy as np
 
+from . import _refit
 from ._refit import (
     AAA_METHODS,
     AAA_PILOT_NODES,
-    DEFAULT_PAD_SD,
     REFITTABLE_METHODS,
     AAACheck,
     LogdetRefitter,
@@ -60,14 +60,14 @@ def sampler_builds_evaluators(
     """Whether a Gibbs sampler with these settings builds its own log-determinant evaluators.
 
     When it does, evaluators a model built for it would never be evaluated.  The
-    probe check (:mod:`._probe_check`) builds its own for ``cheb_stochastic``.
+    probe check (:mod:`._probe_check`) builds its own for ``stoch_cheb``.
     """
     if not has_W or method is None:
         return False
     return bool(
         (refit and method in REFITTABLE_METHODS)
         or (aaa_check and method in AAA_METHODS)
-        or (probe_check and method == "cheb_stochastic")
+        or (probe_check and method == "stoch_cheb")
     )
 
 
@@ -103,8 +103,6 @@ class WarmupJacobian:
     refit : bool, default True
         Rebuild the interpolant on the warmup range.  Applies to the refittable
         methods only.
-    refit_pad_sd : float
-        Padding of the refit window, in warmup standard deviations.
     aaa_check : bool, default True
         Set an AAA fit's node count from where the warmup posterior lies.  Applies
         to the AAA methods only.
@@ -127,7 +125,6 @@ class WarmupJacobian:
         rho_min: float = -0.99,
         rho_max: float = 0.99,
         refit: bool = True,
-        refit_pad_sd: float = DEFAULT_PAD_SD,
         aaa_check: bool = True,
     ):
         from ._chol_cheb import _clamp_interval
@@ -148,7 +145,8 @@ class WarmupJacobian:
         self.aaa_check = (
             bool(aaa_check) and self._fitter is not None and self.method in AAA_METHODS
         )
-        self.refit_pad_sd = float(refit_pad_sd)
+        # Read at construction so the module constant can be patched in tests.
+        self.refit_pad_sd = float(_refit.DEFAULT_PAD_SD)
         self.window: RefitWindow | None = None
         self.check: AAACheck | None = None
         self._interval = self.prior
@@ -247,16 +245,21 @@ class WarmupJacobian:
             pre, _, _ = fitter._fit(lo, hi, cap=cap)
         return self._evaluators(pre, cap, jax)
 
-    def adapt(self, warmup_draws, *, jax: bool = False) -> Evaluators | None:
+    def adapt(
+        self, warmup_draws, *, draws: int, chains: int, jax: bool = False
+    ) -> Evaluators | None:
         """Adapt the installed fit to the warmup posterior; ``None`` keeps it.
 
-        ``warmup_draws`` are the settled draws of the spatial parameter pooled across
-        every chain.  The refit runs first, when it applies and its window is
+        ``warmup_draws`` is ``(chains, iters)``, the settled draws of the spatial
+        parameter, pooled here across every chain; ``draws`` and ``chains``, the
+        run's, are the interface :class:`._probe_check.WarmupProbes` shares and
+        are unused.  The refit runs first, when it applies and its window is
         materially narrower than the interval in use; the returned interval is then
         the sampler's new support.  The AAA node check runs next, on whichever fit
         is installed.  Each adaptation runs once per fit, so the factorization
         context is released afterwards.
         """
+        warmup_draws = np.ravel(np.asarray(warmup_draws, dtype=np.float64))
         fitter, cap = self._fitter, self.capacity
         lo_p, hi_p = self.prior
         new = None

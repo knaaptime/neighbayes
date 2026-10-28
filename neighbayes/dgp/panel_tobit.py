@@ -6,11 +6,11 @@ with fixed-effects transformations.
 
 from __future__ import annotations
 
-from .panel_fe import simulate_panel_sar_fe, simulate_panel_sem_fe
+from .panel_fe import _simulate_sar_panel_fe, _simulate_sem_panel_fe
 from .utils import _left_censor, make_panel_output_geodataframe
 
 
-def simulate_panel_sar_tobit_fe(
+def _simulate_sar_tobit_panel(
     *, censoring: float = 0.0, err_hetero: bool = False, **kwargs
 ) -> dict:
     """Simulate left-censored panel SAR FE data.
@@ -21,9 +21,9 @@ def simulate_panel_sar_tobit_fe(
         Left-censoring threshold ``c`` where observed ``y = max(c, y*)``.
     err_hetero : bool, default=False
         If True, generate heteroskedastic innovations. Forwarded to
-        :func:`neighbayes.dgp.panel_fe.simulate_panel_sar_fe`.
+        :func:`neighbayes.dgp.panel_fe._simulate_sar_panel_fe`.
     **kwargs
-        Forwarded to :func:`neighbayes.dgp.panel_fe.simulate_panel_sar_fe`.
+        Forwarded to :func:`neighbayes.dgp.panel_fe._simulate_sar_panel_fe`.
 
     Returns
     -------
@@ -34,7 +34,7 @@ def simulate_panel_sar_tobit_fe(
     wide = kwargs.pop("wide", False)
     geometry_type = kwargs.pop("geometry_type", "polygon")
     gdf = kwargs.get("gdf", None)
-    out = simulate_panel_sar_fe(err_hetero=err_hetero, **kwargs)
+    out = _simulate_sar_panel_fe(err_hetero=err_hetero, **kwargs)
     y_obs, mask = _left_censor(out["y"], censoring)
     out["y_latent"] = out["y"]
     out["y"] = y_obs
@@ -57,7 +57,7 @@ def simulate_panel_sar_tobit_fe(
     return out
 
 
-def simulate_panel_sem_tobit_fe(
+def _simulate_sem_tobit_panel(
     *, censoring: float = 0.0, err_hetero: bool = False, **kwargs
 ) -> dict:
     """Simulate left-censored panel SEM FE data.
@@ -68,9 +68,9 @@ def simulate_panel_sem_tobit_fe(
         Left-censoring threshold ``c`` where observed ``y = max(c, y*)``.
     err_hetero : bool, default=False
         If True, generate heteroskedastic innovations. Forwarded to
-        :func:`neighbayes.dgp.panel_fe.simulate_panel_sem_fe`.
+        :func:`neighbayes.dgp.panel_fe._simulate_sem_panel_fe`.
     **kwargs
-        Forwarded to :func:`neighbayes.dgp.panel_fe.simulate_panel_sem_fe`.
+        Forwarded to :func:`neighbayes.dgp.panel_fe._simulate_sem_panel_fe`.
 
     Returns
     -------
@@ -81,7 +81,7 @@ def simulate_panel_sem_tobit_fe(
     wide = kwargs.pop("wide", False)
     geometry_type = kwargs.pop("geometry_type", "polygon")
     gdf = kwargs.get("gdf", None)
-    out = simulate_panel_sem_fe(err_hetero=err_hetero, **kwargs)
+    out = _simulate_sem_panel_fe(err_hetero=err_hetero, **kwargs)
     y_obs, mask = _left_censor(out["y"], censoring)
     out["y_latent"] = out["y"]
     out["y"] = y_obs

@@ -16,6 +16,19 @@ import xarray as xr
 from libpysal.graph import Graph
 
 from neighbayes import dgp
+from neighbayes._logdet._chebyshev import chebyshev_coeffs_dct1
+
+# These helpers draw unit effects into dynamic panels (sigma_alpha), which the
+# public simulators refuse, so they call the private dynamic simulators.
+from neighbayes.dgp.panel_dynamic import (
+    _simulate_ols_panel_dynamic,
+    _simulate_sar_panel_dynamic,
+    _simulate_sdem_panel_dynamic,
+    _simulate_sdm_panel_dynamic,
+    _simulate_sdm_panel_dynamic_restricted,
+    _simulate_sem_panel_dynamic,
+    _simulate_slx_panel_dynamic,
+)
 
 # ---------------------------------------------------------------------------
 # Optional-dependency skip helpers
@@ -212,14 +225,15 @@ def make_panel_ols_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate panel OLS data with unit random effects."""
-    out = dgp.simulate_panel_ols_fe(
+    out = dgp.simulate_ols(
         N=N,
         T=T,
         beta=beta,
         sigma=sigma,
-        sigma_alpha=sigma_alpha,
         W=_as_sparse(W),
         rng=rng,
+        unit_effects="fixed",
+        unit_effect_sd=sigma_alpha,
     )
     y, X = out["y"], out["X"]
     units = out["unit"]
@@ -239,15 +253,16 @@ def make_panel_sar_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate SAR panel data with unit random effects."""
-    out = dgp.simulate_panel_sar_fe(
+    out = dgp.simulate_sar(
         N=N,
         T=T,
         rho=rho,
         beta=beta,
         sigma=sigma,
-        sigma_alpha=sigma_alpha,
         W=_as_sparse(W),
         rng=rng,
+        unit_effects="fixed",
+        unit_effect_sd=sigma_alpha,
     )
     y, X = out["y"], out["X"]
     units = out["unit"]
@@ -267,15 +282,16 @@ def make_panel_sem_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate SEM panel data with unit random effects."""
-    out = dgp.simulate_panel_sem_fe(
+    out = dgp.simulate_sem(
         N=N,
         T=T,
         lam=lam,
         beta=beta,
         sigma=sigma,
-        sigma_alpha=sigma_alpha,
         W=_as_sparse(W),
         rng=rng,
+        unit_effects="fixed",
+        unit_effect_sd=sigma_alpha,
     )
     y, X = out["y"], out["X"]
     units = out["unit"]
@@ -295,7 +311,7 @@ def make_panel_dlm_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate dynamic non-spatial panel data with unit effects."""
-    out = dgp.simulate_panel_dlm_fe(
+    out = _simulate_ols_panel_dynamic(
         N=N,
         T=T,
         phi=phi,
@@ -324,7 +340,7 @@ def make_panel_sdmr_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate dynamic restricted SDM panel data with unit effects."""
-    out = dgp.simulate_panel_sdmr_fe(
+    out = _simulate_sdm_panel_dynamic_restricted(
         N=N,
         T=T,
         rho=rho,
@@ -355,7 +371,7 @@ def make_panel_sdmu_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate dynamic unrestricted SDM panel data with unit effects."""
-    out = dgp.simulate_panel_sdmu_fe(
+    out = _simulate_sdm_panel_dynamic(
         N=N,
         T=T,
         rho=rho,
@@ -372,41 +388,6 @@ def make_panel_sdmu_data(
     times = out["time"]
     df = pd.DataFrame({"y": y, "x1": X[:, 1], "unit": units, "time": times})
     return y, X, df
-
-
-# ---------------------------------------------------------------------------
-# Spatial probit data generator
-# ---------------------------------------------------------------------------
-
-
-def make_spatial_probit_data(
-    rng: np.random.Generator,
-    W: np.ndarray,
-    rho: float = 0.35,
-    beta: np.ndarray | None = None,
-    sigma_a: float = 0.8,
-    n_per_region: int = 25,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Generate SARProbit data in matrix mode.
-
-    Returns
-    -------
-    y : np.ndarray
-        Binary outcomes, shape ``(nobs,)``.
-    X : np.ndarray
-        Covariates including intercept, shape ``(nobs, k)``.
-    region_ids : np.ndarray
-        Region code for each observation, shape ``(nobs,)``.
-    """
-    out = dgp.simulate_spatial_probit(
-        W=_as_sparse(W),
-        rho=rho,
-        beta=beta,
-        sigma_a=sigma_a,
-        n_per_region=n_per_region,
-        rng=rng,
-    )
-    return out["y"], out["X"], out["region_ids"]
 
 
 # ---------------------------------------------------------------------------
@@ -431,9 +412,6 @@ def make_sar_logit_data(
     ``eta = (I - rho W)^{-1} X beta`` (no latent noise field),
     ``y ~ Bernoulli(logit^{-1}(eta))``.
 
-    Unlike ``dgp.simulate_sar_logit`` (which adds ``nu ~ N(0, I)`` and
-    matches the *structural* model), this generator omits the noise term
-    so the DGP matches the reduced-form ``SARLogit`` model exactly.
     """
     import scipy.sparse as sp
 
@@ -447,36 +425,6 @@ def make_sar_logit_data(
     probs = 1.0 / (1.0 + np.exp(-eta))
     y = (rng.uniform(size=n_obs) < probs).astype(float)
     return y, X
-
-
-def make_sar_logit_structural_data(
-    rng: np.random.Generator,
-    W: np.ndarray,
-    rho: float = 0.35,
-    beta: np.ndarray | None = None,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Generate structural-form SAR-logit binary data (with latent noise).
-
-    DGP: ``eta = (I - rho W)^{-1}(X beta + nu)``, ``nu ~ N(0, I)``,
-    ``y ~ Bernoulli(logit^{-1}(eta))``.  Matches the structural
-    ``SARLogitStructural`` model (latent field with noise).
-    """
-    out = dgp.simulate_sar_logit(W=_as_sparse(W), rho=rho, beta=beta, rng=rng)
-    return out["y"], out["X"]
-
-
-def make_sem_logit_data(
-    rng: np.random.Generator,
-    W: np.ndarray,
-    lam: float = 0.35,
-    beta: np.ndarray | None = None,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Generate SEM-logit binary data.
-
-    DGP: ``eta = X beta + (I - lam W)^{-1} nu``, ``y ~ Bernoulli(logit^{-1}(eta))``.
-    """
-    out = dgp.simulate_sem_logit(W=_as_sparse(W), lam=lam, beta=beta, rng=rng)
-    return out["y"], out["X"]
 
 
 def make_sar_tobit_data(
@@ -552,7 +500,7 @@ def make_panel_sar_tobit_data(
     censoring: float = 0.0,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Generate left-censored panel SAR FE Tobit data using the dgp module."""
-    out = dgp.simulate_panel_sar_tobit_fe(
+    out = dgp.simulate_sar_tobit(
         N=N,
         T=T,
         W=_as_sparse(W),
@@ -576,7 +524,7 @@ def make_panel_sem_tobit_data(
     censoring: float = 0.0,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Generate left-censored panel SEM FE Tobit data using the dgp module."""
-    out = dgp.simulate_panel_sem_tobit_fe(
+    out = dgp.simulate_sem_tobit(
         N=N,
         T=T,
         W=_as_sparse(W),
@@ -606,7 +554,7 @@ def make_panel_sar_dynamic_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate dynamic SAR panel FE data."""
-    out = dgp.simulate_panel_sar_dynamic_fe(
+    out = _simulate_sar_panel_dynamic(
         N=N,
         T=T,
         W=_as_sparse(W),
@@ -635,7 +583,7 @@ def make_panel_sem_dynamic_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate dynamic SEM panel FE data."""
-    out = dgp.simulate_panel_sem_dynamic_fe(
+    out = _simulate_sem_panel_dynamic(
         N=N,
         T=T,
         W=_as_sparse(W),
@@ -664,7 +612,7 @@ def make_panel_sdem_dynamic_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate dynamic SDEM panel FE data."""
-    out = dgp.simulate_panel_sdem_dynamic_fe(
+    out = _simulate_sdem_panel_dynamic(
         N=N,
         T=T,
         W=_as_sparse(W),
@@ -692,7 +640,7 @@ def make_panel_slx_dynamic_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate dynamic SLX panel FE data."""
-    out = dgp.simulate_panel_slx_dynamic_fe(
+    out = _simulate_slx_panel_dynamic(
         N=N,
         T=T,
         W=_as_sparse(W),
@@ -725,7 +673,7 @@ def make_panel_sdm_fe_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate SDM panel FE data with WX terms."""
-    out = dgp.simulate_panel_sdm_fe(
+    out = dgp.simulate_sdm(
         N=N,
         T=T,
         W=_as_sparse(W),
@@ -733,8 +681,9 @@ def make_panel_sdm_fe_data(
         beta1=beta1,
         beta2=beta2,
         sigma=sigma,
-        sigma_alpha=sigma_alpha,
         rng=rng,
+        unit_effects="fixed",
+        unit_effect_sd=sigma_alpha,
     )
     y, X = out["y"], out["X"]
     units, times = out["unit"], out["time"]
@@ -754,7 +703,7 @@ def make_panel_sdem_fe_data(
     sigma_alpha: float = 0.5,
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Generate SDEM panel FE data with WX terms."""
-    out = dgp.simulate_panel_sdem_fe(
+    out = dgp.simulate_sdem(
         N=N,
         T=T,
         W=_as_sparse(W),
@@ -762,8 +711,9 @@ def make_panel_sdem_fe_data(
         beta1=beta1,
         beta2=beta2,
         sigma=sigma,
-        sigma_alpha=sigma_alpha,
         rng=rng,
+        unit_effects="fixed",
+        unit_effect_sd=sigma_alpha,
     )
     y, X = out["y"], out["X"]
     units, times = out["unit"], out["time"]
@@ -794,3 +744,118 @@ def make_idata(samples_by_var: dict[str, np.ndarray]) -> xr.DataTree:
             arr = arr[None, ...]
         posterior[k] = arr
     return az.from_dict({"posterior": posterior})
+
+
+def effects_kwargs(
+    code: int, index: str = "unit_effects", treatment: str = "fixed"
+) -> dict:
+    """Design keywords for a legacy effects code: 0 none, 1 unit or pair, 2 time, 3 both."""
+    return {
+        index: treatment if code in (1, 3) else None,
+        "time_effects": code in (2, 3),
+    }
+
+
+def flow_form(cls, **design):
+    """A constructor of the flow family ``cls`` with ``design`` keywords fixed.
+
+    It takes a legacy ``effects`` code (0 none, 1 pair, 2 time, 3 both), the
+    pair effects being the family's treatment.
+    """
+
+    def make(*args, effects: int = 0, **kw):
+        if effects:
+            kw.update(effects_kwargs(effects, "pair_effects", cls._pair_effects))
+        return cls(*args, **design, **kw)
+
+    make.__name__ = cls.__name__ + ("(separable)" if design.get("separable") else "")
+    make.family = cls
+    return make
+
+
+# ---------------------------------------------------------------------------
+# Log-determinant oracles: exact references the package itself no longer needs
+# ---------------------------------------------------------------------------
+
+
+def eigen_cheb_coeffs(
+    W,
+    order: int = 20,
+    rmin: float = -1.0,
+    rmax: float = 1.0,
+    eigs: np.ndarray | None = None,
+) -> dict:
+    """Chebyshev coefficients in ρ of log|I - ρW| from W's eigenvalues (a test oracle).
+
+    Near-minimax polynomial approximation over ``[rmin, rmax]``.
+
+    Parameters
+    ----------
+    W : array-like
+        Spatial weights matrix (dense or sparse).
+    order : int, default 20
+        Polynomial degree.  15–30 is usually sufficient.
+    rmin : float, default -1.0
+        Lower bound of the rho interval.
+    rmax : float, default 1.0
+        Upper bound of the rho interval.
+    eigs : np.ndarray, optional
+        Pre-computed eigenvalues of W (skips the O(n³) decomposition).
+
+    Returns
+    -------
+    dict
+        ``{"coeffs", "rmin", "rmax", "order", "method"}`` with ``method``
+        ``"eigenvalue"``.
+    """
+    if order <= 0:
+        raise ValueError("order must be positive.")
+    if rmax <= rmin:
+        raise ValueError("rmax must be greater than rmin.")
+
+    if eigs is not None:
+        eigs_arr = np.asarray(eigs, dtype=np.complex128)
+    else:
+        W_dense = W.toarray() if sp.issparse(W) else np.asarray(W, dtype=np.float64)
+        eigs_arr = np.linalg.eigvals(W_dense)
+
+    # Chebyshev nodes on [-1, 1], mapped to [rmin, rmax]
+    k = np.arange(1, order + 1)
+    nodes_cos = np.cos((2 * k - 1) * np.pi / (2 * order))
+    rho_nodes = 0.5 * (rmax - rmin) * nodes_cos + 0.5 * (rmax + rmin)
+
+    logdet_at_nodes = np.sum(
+        np.log(np.abs(1.0 - rho_nodes[:, None] * eigs_arr[None, :])), axis=1
+    ).real
+
+    # Chebyshev coefficients via DCT-I
+    coeffs = chebyshev_coeffs_dct1(logdet_at_nodes)
+
+    result = {
+        "coeffs": coeffs,
+        "rmin": rmin,
+        "rmax": rmax,
+        "order": order,
+        "method": "eigenvalue",
+    }
+
+    return result
+
+
+def flow_logdet_grad_exact(W, rho_d: float, rho_o: float, rho_w: float) -> np.ndarray:
+    r"""Exact ``∇_ρ log|I_N − W_F|`` from the spectrum of ``W`` (reference; small ``n``).
+
+    Uses the shared Kronecker eigenbasis: ``μ_ij = ρ_o λ_i + ρ_d λ_j + ρ_w λ_i λ_j``
+    and ``g_d = −Σ_ij λ_j/(1−μ_ij)`` etc.  Only for testing / small ``n`` — forms
+    the ``n`` eigenvalues of ``W`` (``O(n³)``), never the ``N×N`` matrix.
+    """
+    Wd = sp.csr_matrix(W).toarray()
+    lam = np.linalg.eigvals(Wd)
+    li = lam[:, None]
+    lj = lam[None, :]
+    mu = rho_o * li + rho_d * lj + rho_w * (li * lj)
+    inv = 1.0 / (1.0 - mu)
+    g_d = -np.sum(lj * inv).real
+    g_o = -np.sum(li * inv).real
+    g_w = -np.sum(li * lj * inv).real
+    return np.array([g_d, g_o, g_w], dtype=np.float64)

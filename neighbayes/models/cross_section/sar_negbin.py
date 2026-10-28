@@ -1,10 +1,8 @@
 r"""Reduced-form spatial autoregressive Negative Binomial (SAR-NB) model.
 
-This is the **canonical** Bayesian SAR-NB model in
-:mod:`neighbayes`: spatial dependence enters purely through the mean
-propagator :math:`(I - \rho W)^{-1}` and overdispersion is captured by
-the Negative Binomial dispersion parameter :math:`\alpha`.  There is no
-latent spatial random effect (no :math:`\sigma`).
+Spatial dependence enters purely through the mean propagator
+:math:`(I - \rho W)^{-1}` and overdispersion is captured by the Negative
+Binomial dispersion parameter :math:`\alpha`; no disturbance propagates.
 
 .. math::
 
@@ -12,10 +10,10 @@ latent spatial random effect (no :math:`\sigma`).
     \mu = \exp(\eta), \qquad
     \eta = (I - \rho W)^{-1} X \beta.
 
-This is the reduced form that the spatial-econometrics literature
-(LeSage & Pace 2009) writes down by default and is the preferred
-specification when there is no substantive reason to model an
-additional unobserved spatially-smoothed latent field.
+This is the field's spatial lag model of counts (Lambert, Brown and Florax
+2010).  ``latent=True`` is the latent SAR instead, which propagates the
+negative binomial's own gamma disturbance
+(:mod:`._latent_negbin`).
 
 Sampling
 --------
@@ -33,11 +31,8 @@ Two samplers are available:
   log-determinant Jacobian :math:`\log|I - \rho W|`, then samples
   with NUTS.
 
-See also
---------
-SARNegBinStructural
-    P\u00f3lya-Gamma Gibbs sampler for the structural form (with
-    :math:`\sigma`).
+Given time it is a panel (:mod:`..panel._count`), which takes random unit
+effects inside the filter.
 """
 
 from __future__ import annotations
@@ -60,43 +55,129 @@ from ...samplers.negbin_reduced import (  # noqa: F401 — import side-effect re
 from ...samplers.negbin_reduced._core import (
     _KRYLOV_DEGREE_DEFAULT,
     _KRYLOV_DMAX_DEFAULT,
+    pg_information_ratio,
+    warn_pg_information,
 )
+from .._base._nb import nb_alpha_fixed, nb_alpha_rv
+from .._mixins._designs import CountDesigns
 from ..base import SpatialModel
-from ..priors import SARNegBinPriors
+from ..panel._count import _CountPanel
+from ..priors import PanelCountPriors, SARNegBinPriors
+from ._latent_negbin import LatentNegBinMixin
 
 
-class SARNegBin(SpatialModel):
+class SARNegBin(CountDesigns, LatentNegBinMixin, _CountPanel, SpatialModel):
+    r"""Bayesian reduced-form spatial autoregressive negative binomial (SAR-NB).
+
+    .. math::
+
+        y_i \sim \mathrm{NegBin}(\mu_i, \alpha), \qquad
+        \mu = \exp(\eta), \qquad
+        \eta = (I - \rho W)^{-1} X \beta .
+
+    The spatial lag acts on the log-mean; ``y`` is not transformed, so the
+    likelihood carries no :math:`\log|I - \rho W|` Jacobian.  ``fit()``
+    defaults to Pólya–Gamma Gibbs; ``sampler="nuts"`` fits the same model in
+    PyMC.
+
+    With ``latent=True`` it is the latent SAR, whose multiplier propagates the
+    negative binomial's own disturbance as well as the covariates:
+
+    .. math::
+
+        y_i \sim \mathrm{Poisson}(e^{\eta_i}), \qquad
+        (I - \rho W)\eta = X\beta + \varepsilon, \qquad
+        \varepsilon_i = \log\gamma_i,\;
+        \gamma_i \sim \mathrm{Gamma}(\alpha, \alpha),
+
+    so that :math:`\rho = 0` is :class:`NegBin`.  It is sampled by an exact
+    Gibbs sweep over the log-means (:mod:`neighbayes.samplers.negbin_latent`),
+    on JAX by default; there is no NUTS path.  Its pointwise
+    log-likelihood integrates each log-mean out given the rest, and its
+    impacts are on the log-mean or, ``impacts(scale="count")``, the expected
+    count.
+
+    Parameters
+    ----------
+    formula : str, optional
+        Wilkinson-style formula, e.g. ``"y ~ x1 + x2"``.  Requires ``data``.
+    data : pandas.DataFrame or geopandas.GeoDataFrame, optional
+        Data source for formula mode.
+    y : array-like, optional
+        Non-negative integer counts of shape ``(n,)`` (matrix mode).
+    X : array-like or pandas.DataFrame, optional
+        Design matrix (matrix mode).
+    W : libpysal.graph.Graph or scipy.sparse matrix
+        Spatial weights, ``n × n`` (``N × N`` in a panel), row-standardized.
+    priors : dict, optional
+        Override default priors: ``beta_mu``, ``beta_sigma`` (default Gelman
+        et al. 2008 on the log scale), ``rho_lower``, ``rho_upper``,
+        ``alpha_sigma``, ``alpha_nu`` (Half-Student-t on α) and
+        ``alpha_fixed`` (hold α; a large value is essentially Poisson).  See
+        :class:`~neighbayes.models.priors.SARNegBinPriors`; a panel's are
+        :class:`~neighbayes.models.priors.PanelCountPriors`, which add the
+        effects' ``unit_effect_mu``, ``unit_effect_sd_scale``,
+        ``time_effect_mu`` and ``time_effect_sigma``.
+    logdet_method : {"eigenvalue", "cheb", "aaa", "spline", "stochastic"}, optional
+        How ``log|I - rho*W|`` is computed over rho: summed over the
+        eigenvalues of ``W``; interpolated (Chebyshev, AAA rational, or cubic
+        spline) through values from a sparse factorization, exact to the
+        interpolant's tolerance; or expanded stochastically with no
+        factorization, the one method with sampling error.  ``None`` (default)
+        selects from the size and symmetry of ``W``: ``"eigenvalue"`` for
+        ``n <= 500``; ``"aaa"`` up to ``n = 60000``
+        (``NEIGHBAYES_LOGDET_FACTOR_MAX_N``) unless the factorization's fill-in
+        would dominate; ``"stochastic"`` beyond.
+    logdet_decomp : {"auto", "chol", "lu"}, default "auto"
+        The factorization an interpolating method uses: sparse Cholesky
+        (undirected ``W``; scikit-sparse CHOLMOD) or sparse LU (KLU or UMFPACK,
+        chosen by the sparsity pattern).  ``"auto"`` takes ``"chol"`` where the
+        method has it and ``W`` is undirected, else ``"lu"``.  Ignored by
+        ``"eigenvalue"`` and ``"stochastic"``; ``"spline"`` on ``"chol"``
+        raises.
+    time_col, unit_col : str, optional
+        Formula-mode panel: the period and unit columns of ``data``.  Given
+        time, the model is a panel (:mod:`neighbayes.models.panel._count`),
+        stacked by period, then unit, whose Gibbs sampler integrates β, the
+        period effects and the unit effects out of every ρ update.
+    N, T : int, optional
+        Matrix-mode panel: the numbers of units and periods.
+    unit_effects : {None, "random"}, default None
+        A panel's random unit effects inside the filter, ``unit_effect``.  A
+        cross-section takes none: one draw per observation is a disturbance,
+        not a unit effect.
+    time_effects : bool, default False
+        A panel's fixed time effects, ``time_effect``.
+    mundlak : bool, default False
+        Add the unit means of the time-varying columns to a panel's design
+        (inside the filter), absorbing a correlation between the unit effects
+        and ``X``.  Needs unit effects.
+    latent : bool, default False
+        The latent SAR instead of the reduced form.  As a panel it takes random
+        unit effects and period effects, both inside the filter with the
+        covariates and each period's gamma disturbance.
+    """
+
+    _DESIGNS = {
+        "static": {},
+        "latent": {"_gibbs_key": ("count_latent", "cross_section")},
+        "panel": {"_priors_cls": PanelCountPriors, "_gibbs_key": ("count", "panel")},
+    }
+    # The latent SAR's log-mean impacts and coordinates are the reduced form's.
+    _FALLBACK = {"latent": "static"}
+    _latent_panel = True
+
     _priors_cls = SARNegBinPriors
-    _likelihood: str = "count"
     _gibbs_key: tuple[str, str] | None = ("count", "cross_section")
 
-    #: Maximum n for which the JAX dense backend is used automatically.
-    _JAX_DENSE_THRESHOLD: int = 10000
-
-    #: Threshold above which count-scale spatial effects use the sparse
+    #: Threshold above which count-scale impacts use the sparse
     #: Hutchinson path instead of the eigendecomposition path.
     _COUNT_EFFECTS_EIGEN_MAX_N: int = 2000
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        if self.robust:
-            raise NotImplementedError("robust=True is not supported for SARNegBin.")
-
-        y_round = np.round(self._y).astype(np.int64)
-        if not np.allclose(self._y, y_round):
-            raise ValueError("SARNegBin requires integer-valued observations.")
-        if np.any(y_round < 0):
-            raise ValueError("SARNegBin requires non-negative integer observations.")
-
-        self._y_int = y_round
-        self._y = y_round.astype(np.float64)
-        self._Wy = np.asarray(self._W_sparse @ self._y, dtype=np.float64)
 
     # ------------------------------------------------------------------
     # PyMC graph (reduced-form NUTS)
     # ------------------------------------------------------------------
-    def _build_pymc_model(self) -> pm.Model:
+    def _build_pymc_model_static(self) -> pm.Model:
         r"""Build the reduced-form PyMC model for NUTS sampling.
 
         The model is
@@ -107,8 +188,7 @@ class SARNegBin(SpatialModel):
             \mu = \exp(\eta), \quad
             \eta = (I - \rho W)^{-1} X \beta,
 
-        No latent :math:`\sigma` or :math:`z` appears — this is the reduced
-        form, not the structural form.
+        No disturbance propagates: this is the reduced form.
 
         **No log-determinant Jacobian.**  :math:`\log|I - \rho W|` belongs in
         the Gaussian SAR because there :math:`y` itself is transformed,
@@ -129,7 +209,7 @@ class SARNegBin(SpatialModel):
         with pm.Model(coords=self._model_coords()) as model:
             rho = pm.Uniform("rho", lower=rho_lower, upper=rho_upper)
             beta = pm.Normal("beta", mu=beta_mu, sigma=beta_sigma, dims="coefficient")
-            alpha = pm.HalfStudentT("alpha", nu=alpha_nu, sigma=alpha_sigma)
+            alpha = nb_alpha_rv(nb_alpha_fixed(self.priors), alpha_nu, alpha_sigma)
 
             # Reduced form: η = (I - ρW)⁻¹ Xβ
             from ..._ops import SparseSARSolveOp
@@ -149,7 +229,7 @@ class SARNegBin(SpatialModel):
     # ------------------------------------------------------------------
     # Fitting
     # ------------------------------------------------------------------
-    def _fit_gibbs(
+    def _fit_gibbs_static(
         self,
         *,
         draws: int = 2000,
@@ -242,6 +322,7 @@ class SARNegBin(SpatialModel):
             beta_sigma=beta_sigma,
             alpha_sigma=self.priors.get("alpha_sigma", 2.5),
             alpha_nu=self.priors.get("alpha_nu", 3.0),
+            alpha_fixed=nb_alpha_fixed(self.priors),
             rho_lower=rho_lower,
             rho_upper=rho_upper,
         )
@@ -269,14 +350,11 @@ class SARNegBin(SpatialModel):
                 np.clip(_best_rho, rho_lower + 0.05, rho_upper - 0.05)
             )
             _beta_init_mle = _best_beta
-            try:
-                _init_solver = CachedSparseSolver([W_csc], n)
-                _Xtilde_init = _init_solver.solve([-_rho_init_mle], X)
-                _eta_init = _Xtilde_init @ _beta_init_mle
-                _resid2 = float(np.mean((_log_y - _eta_init) ** 2))
-                _alpha_init_mle = float(np.clip(1.0 / max(_resid2, 0.01), 0.5, 50.0))
-            except Exception:
-                _alpha_init_mle = 1.0
+            _init_solver = CachedSparseSolver([W_csc], n)
+            _Xtilde_init = _init_solver.solve([-_rho_init_mle], X)
+            _eta_init = _Xtilde_init @ _beta_init_mle
+            _resid2 = float(np.mean((_log_y - _eta_init) ** 2))
+            _alpha_init_mle = float(np.clip(1.0 / max(_resid2, 0.01), 0.5, 50.0))
 
             # Detect intercept column
             intercept_col = -1
@@ -340,6 +418,22 @@ class SARNegBin(SpatialModel):
                 "beta": np.stack([s["beta"] for s in chain_results], axis=0),
                 "alpha": np.stack([s["alpha"] for s in chain_results], axis=0),
             }
+            # The PG augmentation's tightness, at each chain's first kept draw.
+            eye = sp.identity(n, format="csc")
+            self._warn_pg_information(
+                [
+                    pg_information_ratio(
+                        self._y,
+                        sp.linalg.spsolve(
+                            (eye - s["rho"][0] * self._W_sparse).tocsc(),
+                            X @ s["beta"][0],
+                        ),
+                        float(s["alpha"][0]),
+                    )
+                    for s in chain_results
+                ],
+                stacked["alpha"],
+            )
             log_lik = (
                 np.stack([s["log_lik"] for s in chain_results], axis=0)
                 if log_likelihood
@@ -415,14 +509,11 @@ class SARNegBin(SpatialModel):
         # log-likelihood gives the dispersion on the log scale.
         # For NB data: Var(log y) ≈ 1/α + 1/(2μ) (delta method), so
         # α ≈ 1/σ² when μ is large.  Cap at a reasonable range.
-        try:
-            _init_solver = CachedSparseSolver([W_csc], n)
-            _Xtilde_init = _init_solver.solve([-_rho_init_mle], X)
-            _eta_init = _Xtilde_init @ _beta_init_mle
-            _resid2 = float(np.mean((_log_y - _eta_init) ** 2))
-            _alpha_init_mle = float(np.clip(1.0 / max(_resid2, 0.01), 0.5, 50.0))
-        except Exception:
-            _alpha_init_mle = 1.0
+        _init_solver = CachedSparseSolver([W_csc], n)
+        _Xtilde_init = _init_solver.solve([-_rho_init_mle], X)
+        _eta_init = _Xtilde_init @ _beta_init_mle
+        _resid2 = float(np.mean((_log_y - _eta_init) ** 2))
+        _alpha_init_mle = float(np.clip(1.0 / max(_resid2, 0.01), 0.5, 50.0))
 
         def _run_one_chain(chain_id, seed, progress_manager=None, chain_id_kw=None):
             chain_rng = np.random.default_rng(seed)
@@ -507,6 +598,9 @@ class SARNegBin(SpatialModel):
             "beta": np.stack([s["beta"] for s in chain_samples], axis=0),
             "alpha": np.stack([s["alpha"] for s in chain_samples], axis=0),
         }
+        self._warn_pg_information(
+            [s["pg_information_ratio"] for s in chain_samples], stacked["alpha"]
+        )
         log_lik = (
             np.stack([s["log_lik"] for s in chain_samples], axis=0)
             if log_likelihood
@@ -529,10 +623,16 @@ class SARNegBin(SpatialModel):
         self._idata = idata
         return idata
 
+    def _warn_pg_information(self, ratios, alpha_draws) -> None:
+        """Warn when the PG augmentation over-states the data (see the sampler)."""
+        warn_pg_information(
+            ratios, float(np.median(alpha_draws[:, 0])), float(np.mean(self._y))
+        )
+
     # ------------------------------------------------------------------
     # Posterior-mean fitted values
     # ------------------------------------------------------------------
-    def _fitted_mean_from_posterior(self) -> np.ndarray:
+    def _fitted_mean_from_posterior_static(self) -> np.ndarray:
         r"""Posterior-mean fitted expected counts.
 
         Computes :math:`\exp(\eta)` where
@@ -548,10 +648,10 @@ class SARNegBin(SpatialModel):
         return np.exp(eta)
 
     # ------------------------------------------------------------------
-    # Spatial effects (log-mean and count scales)
+    # Impacts (log-mean and count scales)
     # ------------------------------------------------------------------
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior_static(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Compute posterior impacts on the log-mean scale for each draw."""
@@ -571,7 +671,7 @@ class SARNegBin(SpatialModel):
 
         return direct_samples, indirect_samples, total_samples
 
-    def _compute_count_scale_spatial_effects_posterior(
+    def _compute_count_scale_impacts_posterior(
         self,
         method: str = "auto",
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -630,7 +730,7 @@ class SARNegBin(SpatialModel):
         if use_sparse:
             # Sparse solves + Hutchinson diagonal estimation; avoids the
             # O(n³) eigendecomposition and O(n²) per-draw matmuls.
-            return self._compute_count_scale_spatial_effects_posterior_sparse(
+            return self._compute_count_scale_impacts_posterior_sparse(
                 rho_draws=rho_draws,
                 beta_draws=beta_draws,
                 n=n,
@@ -739,7 +839,7 @@ class SARNegBin(SpatialModel):
         AinvZ = np.asarray(A_solve(Z), dtype=np.float64)
         return np.mean(Z * AinvZ, axis=1)
 
-    def _compute_count_scale_spatial_effects_posterior_sparse(
+    def _compute_count_scale_impacts_posterior_sparse(
         self,
         rho_draws: np.ndarray,
         beta_draws: np.ndarray,
@@ -748,7 +848,7 @@ class SARNegBin(SpatialModel):
         n_draws: int,
         n_effects: int,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        r"""Count-scale spatial effects via sparse solves + Hutchinson.
+        r"""Count-scale impacts via sparse solves + Hutchinson.
 
         For large W where eigendecomposition is infeasible, this method uses:
 
@@ -846,7 +946,7 @@ class SARNegBin(SpatialModel):
         indirect_samples = total_samples - direct_samples
         return direct_samples, indirect_samples, total_samples
 
-    def spatial_effects(
+    def impacts(
         self,
         return_posterior_samples: bool = False,
         scale: str = "logmean",
@@ -876,48 +976,20 @@ class SARNegBin(SpatialModel):
             when :math:`n` exceeds
             :attr:`_COUNT_EFFECTS_EIGEN_MAX_N` (default 2000).
         """
-        from ...diagnostics.spatial_effects import _build_effects_dataframe
-
         if scale == "logmean":
-            return super().spatial_effects(
-                return_posterior_samples=return_posterior_samples
-            )
+            return super().impacts(return_posterior_samples=return_posterior_samples)
         if scale != "count":
             raise ValueError("scale must be either 'logmean' or 'count'.")
+        if self._design == "latent":
+            return self._latent_impacts(scale, return_posterior_samples)
+        if self._design != "static":
+            raise NotImplementedError(
+                "Count-scale impacts are implemented for the cross-section only."
+            )
 
         self._require_fit()
-        direct_samples, indirect_samples, total_samples = (
-            self._compute_count_scale_spatial_effects_posterior(method=method)
+        return self._effects_frame(
+            *self._compute_count_scale_impacts_posterior(method=method),
+            return_posterior_samples=return_posterior_samples,
+            scale=scale,
         )
-
-        k_effects = direct_samples.shape[1]
-        if (
-            hasattr(self, "_wx_feature_names")
-            and len(self._wx_feature_names) == k_effects
-        ):
-            feature_names = list(self._wx_feature_names)
-        elif (
-            hasattr(self, "_nonintercept_feature_names")
-            and len(self._nonintercept_feature_names) == k_effects
-        ):
-            feature_names = list(self._nonintercept_feature_names)
-        else:
-            feature_names = list(self._feature_names[:k_effects])
-
-        df = _build_effects_dataframe(
-            direct_samples=direct_samples,
-            indirect_samples=indirect_samples,
-            total_samples=total_samples,
-            feature_names=feature_names,
-            model_type=self.__class__.__name__,
-        )
-        df.attrs["scale"] = scale
-
-        if return_posterior_samples:
-            posterior_samples = {
-                "direct": direct_samples,
-                "indirect": indirect_samples,
-                "total": total_samples,
-            }
-            return df, posterior_samples
-        return df

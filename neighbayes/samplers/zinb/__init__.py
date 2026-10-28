@@ -24,8 +24,7 @@ __all__ = [
 #
 # Gibbs-only (no NUTS build).  Both backends fit the *same* reduced-form ZINB
 # (reduced-form SAR-logit selection + reduced-form SAR-NB count): "numpy"
-# (CHOLMOD) and "jax" (thread-parallel, sparsax-KLU + pgjax).  ``auto``
-# prefers jax (fastest for cross-section).
+# (CHOLMOD) and "jax" (thread-parallel, sparsax-KLU + augax), the default.
 
 
 def _run_zinb_gibbs(
@@ -62,7 +61,6 @@ register(
     "cross_section",
     run=_run_zinb_gibbs,
     backends={"numpy", "jax"},
-    auto_backend="jax",
     options={"timeout"},
     skips_log_likelihood=True,
 )

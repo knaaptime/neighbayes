@@ -15,11 +15,12 @@ import numpy as np
 import pytensor.tensor as pt
 
 from ..._lazy_deps import pm
+from .._mixins._designs import BinaryDesigns
 from ..base import SpatialModel
 from ..priors import SARLogitPriors
 
 
-class Logit(SpatialModel):
+class Logit(BinaryDesigns, SpatialModel):
     r"""Bayesian (non-spatial) logistic regression.
 
     .. math::
@@ -62,15 +63,7 @@ class Logit(SpatialModel):
     _has_wx_in_beta: bool = False
     _gibbs_class: str | None = None
     _model_type: str = "logit"
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        if self.robust:
-            raise NotImplementedError("robust=True is not supported for Logit.")
-
-        if not np.isin(self._y, [0.0, 1.0]).all():
-            raise ValueError("Logit requires binary y with values in {0, 1}.")
+    _link: str = "logit"
 
     def _build_pymc_model(self) -> pm.Model:
         X = self._X
@@ -88,14 +81,14 @@ class Logit(SpatialModel):
         return model
 
     # ------------------------------------------------------------------
-    # Spatial-effects hooks (not applicable for non-spatial model)
+    # Impacts hooks (not applicable for non-spatial model)
     # ------------------------------------------------------------------
 
-    def _compute_spatial_effects_posterior(
+    def _compute_impacts_posterior(
         self,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         raise NotImplementedError(
-            "Logit has no spatial structure and therefore no spatial effects. "
+            "Logit has no spatial structure and therefore no impacts. "
             "Use Bayesian LM diagnostics to assess whether a spatial binary "
             "model (e.g. SARLogit) is appropriate."
         )

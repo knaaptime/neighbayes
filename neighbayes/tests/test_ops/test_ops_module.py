@@ -18,6 +18,12 @@ import pytest
 import scipy.sparse as sp
 from pytensor.gradient import verify_grad
 
+from neighbayes.models import SARNegBinFlow
+from neighbayes.tests.helpers import flow_form
+
+sar_negbin_separable = flow_form(SARNegBinFlow, separable=True)
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -348,7 +354,7 @@ class TestKroneckerFlowSolveMatrixOpVJP:
 
 
 # ---------------------------------------------------------------------------
-# Smoke test: logp compiles for SARNegBinFlowSeparable at moderate n
+# Smoke test: logp compiles for sar_negbin_separable at moderate n
 # ---------------------------------------------------------------------------
 
 
@@ -357,7 +363,6 @@ class TestSeparableNegBinLogpCompiles:
     def test_logp_compiles_n20(self):
         """Check that the Kronecker op compiles inside PyMC at n=20."""
         from neighbayes.graph import flow_weight_matrices
-        from neighbayes.models.flow._flow import SARNegBinFlowSeparable
 
         n = 20
         rng = np.random.default_rng(6)
@@ -372,7 +377,7 @@ class TestSeparableNegBinLogpCompiles:
         y = rng.poisson(5.0, size=(n, n)).astype(np.int64)
         X = rng.normal(size=(n * n, 2))
 
-        model_obj = SARNegBinFlowSeparable(y, X, graph)
+        model_obj = SARNegBinFlow(y, X, graph, separable=True)
         pm_model = model_obj._build_pymc_model()
 
         # Just test that logp can be evaluated at the initial point
@@ -857,7 +862,7 @@ class TestSparseFactorCache:
         # The copy handed out earlier still solves at its own values.
         np.testing.assert_allclose(A(0.3) @ held.solve(b), b, atol=1e-12)
 
-    def test_auto_probe_returns_a_working_factor(self, monkeypatch):
+    def test_auto_route_returns_a_working_factor(self, monkeypatch):
         pytest.importorskip("sksparse.klu")
         pytest.importorskip("sksparse.umfpack")
         from neighbayes._ops import _backend

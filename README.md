@@ -29,7 +29,7 @@ print(ols.spatial_diagnostics_decision(format="ascii"))
 sar = SAR(formula=form, W=G, data=gdf)
 sar.fit(draws=2000, chains=4, random_seed=42)
 sar.summary()
-sar.spatial_effects()
+sar.impacts()
 ```
 
 `neighbayes` provides roughly fifty model classes behind one formula interface, each

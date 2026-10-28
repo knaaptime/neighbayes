@@ -1,7 +1,7 @@
-"""Fast unit tests for neighbayes.models.panel_base helpers and input validation.
+"""Fast unit tests for the panel helpers and panel input validation.
 
 These tests exercise _demean_panel, resolve_W, _as_dense_W,
-SpatialPanelModel.__init__ (formula mode, error paths), and
+SpatialModel.__init__ for panels (formula mode, error paths), and
 spatial_diagnostics_decision branches without running MCMC.
 """
 
@@ -13,11 +13,12 @@ import pytest
 import scipy.sparse as sp
 from libpysal.graph import Graph
 
-from neighbayes.models._base._shared import resolve_W
-from neighbayes.models.panel_base import (
+from neighbayes.models import OLS, SAR, SDEM, SDM, SEM, SLX
+from neighbayes.models._base._panel import (
     _as_dense_W,
     _demean_panel,
 )
+from neighbayes.models._base._shared import resolve_W
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -225,34 +226,26 @@ class TestAsDenseW:
 
 
 # ---------------------------------------------------------------------------
-# SpatialPanelModel.__init__ error paths
+# SpatialModel.__init__ panel error paths
 # ---------------------------------------------------------------------------
 
 
-class TestSpatialPanelModelInit:
-    """Test SpatialPanelModel constructor validation (no MCMC)."""
+class TestPanelInit:
+    """Test the panel constructor's validation (no MCMC)."""
 
     @pytest.fixture
     def W_graph(self):
         return _W_to_graph(_rook_W(4))
 
     def test_W_required(self, W_graph):
-        from neighbayes.models.panel._fe import OLSPanelFE
-
         with pytest.raises(ValueError, match="W is required"):
-            OLSPanelFE(y=np.ones(12), X=np.ones((12, 2)), W=None, N=4, T=3)
+            OLS(y=np.ones(12), X=np.ones((12, 2)), W=None, N=4, T=3)
 
     def test_formula_mode_requires_data(self, W_graph):
-        from neighbayes.models.panel._fe import OLSPanelFE
-
         with pytest.raises(ValueError, match="data is required"):
-            OLSPanelFE(
-                formula="y ~ x1", data=None, W=W_graph, unit_col="u", time_col="t"
-            )
+            OLS(formula="y ~ x1", data=None, W=W_graph, unit_col="u", time_col="t")
 
     def test_chebyshev_init_does_not_eagerly_compute_eigs(self, W_graph, monkeypatch):
-        from neighbayes.models.panel._fe import OLSPanelFE
-
         rng = np.random.default_rng(0)
 
         def _boom(*args, **kwargs):
@@ -260,19 +253,17 @@ class TestSpatialPanelModelInit:
 
         monkeypatch.setattr(np.linalg, "eigvals", _boom)
 
-        model = OLSPanelFE(
+        model = OLS(
             y=rng.standard_normal(12),
             X=rng.standard_normal((12, 2)),
             W=W_graph,
             N=4,
             T=3,
-            logdet_method="chebyshev",
+            logdet_method="cheb",
         )
         assert "_W_eigs" not in model.__dict__
 
     def test_sparse_grid_init_does_not_eagerly_compute_eigs(self, W_graph, monkeypatch):
-        from neighbayes.models.panel._fe import OLSPanelFE
-
         rng = np.random.default_rng(0)
 
         def _boom(*args, **kwargs):
@@ -280,7 +271,7 @@ class TestSpatialPanelModelInit:
 
         monkeypatch.setattr(np.linalg, "eigvals", _boom)
 
-        model = OLSPanelFE(
+        model = OLS(
             y=rng.standard_normal(12),
             X=rng.standard_normal((12, 2)),
             W=W_graph,
@@ -291,8 +282,6 @@ class TestSpatialPanelModelInit:
         assert "_W_eigs" not in model.__dict__
 
     def test_formula_mode_requires_unit_and_time_cols(self, W_graph):
-        from neighbayes.models.panel._fe import OLSPanelFE
-
         df = pd.DataFrame(
             {
                 "y": [1, 2, 3, 4],
@@ -302,34 +291,28 @@ class TestSpatialPanelModelInit:
             }
         )
         with pytest.raises(ValueError, match="unit_col and time_col"):
-            OLSPanelFE(formula="y ~ x1", data=df, W=W_graph)
+            OLS(formula="y ~ x1", data=df, W=W_graph, time_col="t")
 
     def test_matrix_mode_requires_N_and_T(self, W_graph):
-        from neighbayes.models.panel._fe import OLSPanelFE
-
         with pytest.raises(ValueError, match="N and T are required"):
-            OLSPanelFE(y=np.ones(12), X=np.ones((12, 2)), W=W_graph)
+            OLS(y=np.ones(12), X=np.ones((12, 2)), W=W_graph, N=4)
+        with pytest.raises(ValueError, match="N and T are required"):
+            OLS(y=np.ones(12), X=np.ones((12, 2)), W=W_graph, T=3)
 
     def test_matrix_mode_NT_mismatch(self, W_graph):
-        from neighbayes.models.panel._fe import OLSPanelFE
-
         with pytest.raises(ValueError, match="N\\*T must equal"):
-            OLSPanelFE(y=np.ones(12), X=np.ones((12, 2)), W=W_graph, N=5, T=3)
+            OLS(y=np.ones(12), X=np.ones((12, 2)), W=W_graph, N=5, T=3)
 
     def test_formula_mode_balanced_panel_check(self, W_graph):
-        from neighbayes.models.panel._fe import OLSPanelFE
-
         # 3 rows but N=2, T=2 => 4 expected
         df = pd.DataFrame(
             {"y": [1, 2, 3], "x1": [4, 5, 6], "u": [1, 1, 2], "t": [1, 2, 1]}
         )
         with pytest.raises(ValueError, match="balanced panel"):
-            OLSPanelFE(formula="y ~ x1", data=df, W=W_graph, unit_col="u", time_col="t")
+            OLS(formula="y ~ x1", data=df, W=W_graph, unit_col="u", time_col="t")
 
     def test_matrix_mode_creates_model(self, W_graph):
-        from neighbayes.models.panel._fe import OLSPanelFE
-
-        model = OLSPanelFE(
+        model = OLS(
             y=np.random.default_rng(0).standard_normal(12),
             X=np.random.default_rng(1).standard_normal((12, 2)),
             W=W_graph,
@@ -341,8 +324,6 @@ class TestSpatialPanelModelInit:
         assert model._y.shape == (12,)
 
     def test_formula_mode_creates_model(self, W_graph):
-        from neighbayes.models.panel._fe import OLSPanelFE
-
         rng = np.random.default_rng(42)
         df = pd.DataFrame(
             {
@@ -353,16 +334,14 @@ class TestSpatialPanelModelInit:
                 "time": np.tile(range(3), 4),
             }
         )
-        model = OLSPanelFE(
+        model = OLS(
             formula="y ~ x1 + x2", data=df, W=W_graph, unit_col="unit", time_col="time"
         )
         assert model._N == 4
         assert model._T == 3
         assert model._panel_index is not None
 
-    def test_w_vars_subsets_lagged_columns(self, W_graph):
-        from neighbayes.models.panel._fe import SDMPanelFE
-
+    def test_durbin_vars_subsets_lagged_columns(self, W_graph):
         rng = np.random.default_rng(2)
         df = pd.DataFrame(
             {
@@ -373,7 +352,7 @@ class TestSpatialPanelModelInit:
                 "time": np.tile(range(3), 4),
             }
         )
-        full = SDMPanelFE(
+        full = SDM(
             formula="y ~ x1 + x2",
             data=df,
             W=W_graph,
@@ -383,29 +362,27 @@ class TestSpatialPanelModelInit:
         # By default both x1 and x2 are lagged (intercept excluded).
         assert full._wx_feature_names == ["x1", "x2"]
 
-        subset = SDMPanelFE(
+        subset = SDM(
             formula="y ~ x1 + x2",
             data=df,
             W=W_graph,
             unit_col="unit",
             time_col="time",
-            w_vars=["x1"],
+            durbin_vars=["x1"],
         )
         assert subset._wx_feature_names == ["x1"]
         assert subset._WX.shape == (12, 1)
 
-    def test_w_vars_unknown_raises(self, W_graph):
-        from neighbayes.models.panel._fe import SDMPanelFE
-
+    def test_durbin_vars_unknown_raises(self, W_graph):
         rng = np.random.default_rng(3)
-        with pytest.raises(ValueError, match="w_vars contains names not found"):
-            SDMPanelFE(
+        with pytest.raises(ValueError, match="durbin_vars contains names not found"):
+            SDM(
                 y=rng.standard_normal(12),
                 X=rng.standard_normal((12, 2)),
                 W=W_graph,
                 N=4,
                 T=3,
-                w_vars=["nonexistent"],
+                durbin_vars=["nonexistent"],
             )
 
 
@@ -418,10 +395,8 @@ class TestPanelDiagnosticsDecision:
 
     @pytest.fixture
     def panel_model(self, W_graph):
-        from neighbayes.models.panel._fe import OLSPanelFE
-
         rng = np.random.default_rng(0)
-        return OLSPanelFE(
+        return OLS(
             y=rng.standard_normal(12),
             X=rng.standard_normal((12, 2)),
             W=W_graph,
@@ -438,7 +413,7 @@ class TestPanelDiagnosticsDecision:
         monkeypatch.setattr(panel_model, "spatial_diagnostics", lambda: df)
         assert (
             panel_model.spatial_diagnostics_decision(alpha=0.05, format="model")
-            == "SARPanelFE"
+            == "SAR"
         )
 
     def test_ols_panel_fe_only_error(self, panel_model, monkeypatch):
@@ -450,7 +425,7 @@ class TestPanelDiagnosticsDecision:
         monkeypatch.setattr(panel_model, "spatial_diagnostics", lambda: df)
         assert (
             panel_model.spatial_diagnostics_decision(alpha=0.05, format="model")
-            == "SEMPanelFE"
+            == "SEM"
         )
 
     def test_ols_panel_fe_neither(self, panel_model, monkeypatch):
@@ -462,7 +437,7 @@ class TestPanelDiagnosticsDecision:
         monkeypatch.setattr(panel_model, "spatial_diagnostics", lambda: df)
         assert (
             panel_model.spatial_diagnostics_decision(alpha=0.05, format="model")
-            == "OLSPanelFE"
+            == "OLS"
         )
 
     def test_ols_panel_fe_both_with_robust_lag(self, panel_model, monkeypatch):
@@ -480,7 +455,7 @@ class TestPanelDiagnosticsDecision:
         monkeypatch.setattr(panel_model, "spatial_diagnostics", lambda: df)
         assert (
             panel_model.spatial_diagnostics_decision(alpha=0.05, format="model")
-            == "SARPanelFE"
+            == "SAR"
         )
 
     def test_ols_panel_fe_both_with_robust_error(self, panel_model, monkeypatch):
@@ -498,7 +473,7 @@ class TestPanelDiagnosticsDecision:
         monkeypatch.setattr(panel_model, "spatial_diagnostics", lambda: df)
         assert (
             panel_model.spatial_diagnostics_decision(alpha=0.05, format="model")
-            == "SEMPanelFE"
+            == "SEM"
         )
 
     def test_ols_panel_fe_both_robust_both(self, panel_model, monkeypatch):
@@ -521,14 +496,12 @@ class TestPanelDiagnosticsDecision:
         monkeypatch.setattr(panel_model, "spatial_diagnostics", lambda: df)
         assert (
             panel_model.spatial_diagnostics_decision(alpha=0.05, format="model")
-            == "SARPanelFE"
+            == "SAR"
         )
 
     def test_sdm_panel_fe_error_sdm(self, W_graph, monkeypatch):
-        from neighbayes.models.panel._fe import SDMPanelFE
-
         rng = np.random.default_rng(0)
-        model = SDMPanelFE(
+        model = SDM(
             y=rng.standard_normal(12),
             X=rng.standard_normal((12, 2)),
             W=W_graph,
@@ -539,16 +512,11 @@ class TestPanelDiagnosticsDecision:
 
         df = pd.DataFrame({"p_value": [0.001]}, index=["Panel-LM-Error-SDM"])
         monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert (
-            model.spatial_diagnostics_decision(alpha=0.05, format="model")
-            == "MANSARPanelFE"
-        )
+        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "GNS"
 
     def test_sdem_panel_fe_lag_sdem(self, W_graph, monkeypatch):
-        from neighbayes.models.panel._fe import SDEMPanelFE
-
         rng = np.random.default_rng(0)
-        model = SDEMPanelFE(
+        model = SDEM(
             y=rng.standard_normal(12),
             X=rng.standard_normal((12, 2)),
             W=W_graph,
@@ -559,16 +527,11 @@ class TestPanelDiagnosticsDecision:
 
         df = pd.DataFrame({"p_value": [0.001]}, index=["Panel-LM-Lag-SDEM"])
         monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert (
-            model.spatial_diagnostics_decision(alpha=0.05, format="model")
-            == "MANSARPanelFE"
-        )
+        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "GNS"
 
     def test_slx_panel_fe_robust_lag_sdm(self, W_graph, monkeypatch):
-        from neighbayes.models.panel._fe import SLXPanelFE
-
         rng = np.random.default_rng(0)
-        model = SLXPanelFE(
+        model = SLX(
             y=rng.standard_normal(12),
             X=rng.standard_normal((12, 2)),
             W=W_graph,
@@ -587,16 +550,11 @@ class TestPanelDiagnosticsDecision:
             ],
         )
         monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert (
-            model.spatial_diagnostics_decision(alpha=0.05, format="model")
-            == "SDMPanelFE"
-        )
+        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SDM"
 
     def test_slx_panel_fe_robust_error_sdem(self, W_graph, monkeypatch):
-        from neighbayes.models.panel._fe import SLXPanelFE
-
         rng = np.random.default_rng(0)
-        model = SLXPanelFE(
+        model = SLX(
             y=rng.standard_normal(12),
             X=rng.standard_normal((12, 2)),
             W=W_graph,
@@ -615,17 +573,12 @@ class TestPanelDiagnosticsDecision:
             ],
         )
         monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert (
-            model.spatial_diagnostics_decision(alpha=0.05, format="model")
-            == "SDEMPanelFE"
-        )
+        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SDEM"
 
     def test_slx_panel_fe_robust_both_lag_wins(self, W_graph, monkeypatch):
         """When both robust tests fire, the smaller-p side wins (Lag-SDM here)."""
-        from neighbayes.models.panel._fe import SLXPanelFE
-
         rng = np.random.default_rng(0)
-        model = SLXPanelFE(
+        model = SLX(
             y=rng.standard_normal(12),
             X=rng.standard_normal((12, 2)),
             W=W_graph,
@@ -644,17 +597,12 @@ class TestPanelDiagnosticsDecision:
             ],
         )
         monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert (
-            model.spatial_diagnostics_decision(alpha=0.05, format="model")
-            == "SDMPanelFE"
-        )
+        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SDM"
 
     def test_slx_panel_fe_robust_both_error_wins(self, W_graph, monkeypatch):
         """When both robust tests fire, the smaller-p side wins (Error-SDEM here)."""
-        from neighbayes.models.panel._fe import SLXPanelFE
-
         rng = np.random.default_rng(0)
-        model = SLXPanelFE(
+        model = SLX(
             y=rng.standard_normal(12),
             X=rng.standard_normal((12, 2)),
             W=W_graph,
@@ -673,17 +621,12 @@ class TestPanelDiagnosticsDecision:
             ],
         )
         monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert (
-            model.spatial_diagnostics_decision(alpha=0.05, format="model")
-            == "SDEMPanelFE"
-        )
+        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SDEM"
 
     def test_slx_panel_fe_neither_robust(self, W_graph, monkeypatch):
         """When neither robust test fires, SLX is the terminal model."""
-        from neighbayes.models.panel._fe import SLXPanelFE
-
         rng = np.random.default_rng(0)
-        model = SLXPanelFE(
+        model = SLX(
             y=rng.standard_normal(12),
             X=rng.standard_normal((12, 2)),
             W=W_graph,
@@ -697,17 +640,12 @@ class TestPanelDiagnosticsDecision:
             index=["Panel-Robust-LM-Lag-SDM", "Panel-Robust-LM-Error-SDEM"],
         )
         monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert (
-            model.spatial_diagnostics_decision(alpha=0.05, format="model")
-            == "SLXPanelFE"
-        )
+        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SLX"
 
     def test_sar_panel_fe_error_and_wx(self, W_graph, monkeypatch):
         """SAR panel: LM-Error significant, Robust-LM-WX significant → SDM."""
-        from neighbayes.models.panel._fe import SARPanelFE
-
         rng = np.random.default_rng(0)
-        model = SARPanelFE(
+        model = SAR(
             y=rng.standard_normal(12),
             X=rng.standard_normal((12, 2)),
             W=W_graph,
@@ -721,17 +659,12 @@ class TestPanelDiagnosticsDecision:
             index=["Panel-LM-Error", "Panel-LM-WX", "Panel-Robust-LM-WX"],
         )
         monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert (
-            model.spatial_diagnostics_decision(alpha=0.05, format="model")
-            == "SDMPanelFE"
-        )
+        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SDM"
 
     def test_sem_panel_fe_lag_and_wx(self, W_graph, monkeypatch):
         """SEM panel: LM-Lag significant, LM-WX significant → SDEM."""
-        from neighbayes.models.panel._fe import SEMPanelFE
-
         rng = np.random.default_rng(0)
-        model = SEMPanelFE(
+        model = SEM(
             y=rng.standard_normal(12),
             X=rng.standard_normal((12, 2)),
             W=W_graph,
@@ -745,10 +678,7 @@ class TestPanelDiagnosticsDecision:
             index=["Panel-LM-Lag", "Panel-LM-WX"],
         )
         monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert (
-            model.spatial_diagnostics_decision(alpha=0.05, format="model")
-            == "SDEMPanelFE"
-        )
+        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SDEM"
 
 
 # ---------------------------------------------------------------------------
@@ -769,10 +699,8 @@ class TestBatchSparseLag:
 
     @pytest.fixture
     def model(self, W_graph):
-        from neighbayes.models.panel._fe import OLSPanelFE
-
         rng = np.random.default_rng(7)
-        return OLSPanelFE(
+        return OLS(
             y=rng.standard_normal(12),
             X=rng.standard_normal((12, 2)),
             W=W_graph,
@@ -782,7 +710,7 @@ class TestBatchSparseLag:
 
     def _dense_lag(self, model, resid):
         """Reference: full Kronecker dense W_NT @ resid.T then transpose."""
-        from neighbayes.models.panel_base import _as_dense_W
+        from neighbayes.models._base._panel import _as_dense_W
 
         W_dense = _as_dense_W(model._W_sparse, model._N, model._T)
         return (W_dense @ resid.T).T
@@ -834,10 +762,8 @@ class TestWDenseMemoryWarning:
         import warnings
 
         W_graph = _W_to_graph(_rook_W(4))
-        from neighbayes.models.panel._fe import OLSPanelFE
-
         rng = np.random.default_rng(0)
-        model = OLSPanelFE(
+        model = OLS(
             y=rng.standard_normal(12),
             X=rng.standard_normal((12, 2)),
             W=W_graph,
@@ -854,11 +780,10 @@ class TestWDenseMemoryWarning:
         import warnings
 
         W_graph = _W_to_graph(_rook_W(4))
-        from neighbayes.models.panel._fe import OLSPanelFE
-        from neighbayes.models.panel_base import SpatialPanelModel
+        from neighbayes.models.base import SpatialModel
 
         rng = np.random.default_rng(0)
-        model = OLSPanelFE(
+        model = OLS(
             y=rng.standard_normal(12),
             X=rng.standard_normal((12, 2)),
             W=W_graph,
@@ -866,10 +791,10 @@ class TestWDenseMemoryWarning:
             T=3,
         )
         # Force the threshold to 0 so any materialization triggers the warning.
-        original = SpatialPanelModel._DENSE_W_WARN_BYTES
+        original = SpatialModel._DENSE_W_WARN_BYTES
         try:
-            SpatialPanelModel._DENSE_W_WARN_BYTES = 0
+            SpatialModel._DENSE_W_WARN_BYTES = 0
             with pytest.warns(ResourceWarning, match="dense panel weight matrix"):
                 _ = model._W_dense
         finally:
-            SpatialPanelModel._DENSE_W_WARN_BYTES = original
+            SpatialModel._DENSE_W_WARN_BYTES = original

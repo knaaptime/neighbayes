@@ -1,4 +1,4 @@
-"""End-to-end tests for ``logdet_refit`` on the Gaussian Gibbs samplers.
+"""End-to-end tests for the warmup Jacobian refit on the Gaussian Gibbs samplers.
 
 Rebuilding the Jacobian interpolant partway through warmup changes the
 transition kernel, so the thing that has to be established is that it does not
@@ -61,14 +61,16 @@ PRIORS = {"rho_lower": 0.0, "rho_upper": 0.95}
 
 def _fit(data, backend, **kw):
     y, X, W = data
-    model = SAR(y=y, X=X, W=W, priors=PRIORS, logdet_method="cheb_cholesky", **kw)
+    model = SAR(
+        y=y, X=X, W=W, priors=PRIORS, logdet_method="cheb", logdet_decomp="chol", **kw
+    )
     idata = model.fit(
         draws=1500,
         tune=1000,
         chains=4,
         random_seed=7,
         progressbar=False,
-        gibbs_backend=backend,
+        backend=backend,
     )
     return idata, np.asarray(idata.posterior["rho"]).ravel()
 
@@ -79,8 +81,8 @@ class TestRefitDoesNotMoveThePosterior:
         """Any shift must be inside Monte Carlo error."""
         import arviz as az
 
-        base_idata, base = _fit(data, backend, logdet_refit=False)
-        ref_idata, ref = _fit(data, backend, logdet_refit=True)
+        base_idata, base = _fit(data, backend, logdet_adapt=False)
+        ref_idata, ref = _fit(data, backend, logdet_adapt=True)
 
         ess_b = float(az.ess(base_idata, var_names=["rho"])["rho"])
         ess_r = float(az.ess(ref_idata, var_names=["rho"])["rho"])
@@ -91,14 +93,14 @@ class TestRefitDoesNotMoveThePosterior:
 
     def test_window_contains_the_unrefitted_posterior(self, data, backend):
         """A window that clipped real mass would bias the answer."""
-        _, base = _fit(data, backend, logdet_refit=False)
-        idata, _ = _fit(data, backend, logdet_refit=True)
+        _, base = _fit(data, backend, logdet_adapt=False)
+        idata, _ = _fit(data, backend, logdet_adapt=True)
         lo, hi = idata.attrs["logdet_refit_window"]
         q_lo, q_hi = np.quantile(base, [0.0005, 0.9995])
         assert lo < q_lo and hi > q_hi
 
     def test_refit_is_recorded(self, data, backend):
-        idata, _ = _fit(data, backend, logdet_refit=True)
+        idata, _ = _fit(data, backend, logdet_adapt=True)
         assert "logdet_refit_window" in idata.attrs
         assert idata.attrs["logdet_refit_order"] > 0
         assert idata.attrs["logdet_refit_pad_sd"] == 10.0
@@ -113,7 +115,7 @@ class TestRefitDoesNotMoveThePosterior:
         """
         from neighbayes._logdet._refit import MIN_NARROWING
 
-        idata, _ = _fit(data, backend, logdet_refit=True)
+        idata, _ = _fit(data, backend, logdet_adapt=True)
         lo, hi = idata.attrs["logdet_refit_window"]
         prior_width = PRIORS["rho_upper"] - PRIORS["rho_lower"]
         assert prior_width / (hi - lo) >= MIN_NARROWING
@@ -123,15 +125,18 @@ class TestRefitDoesNotMoveThePosterior:
         assert "logdet_refit_window" in idata.attrs
 
     def test_off_records_nothing(self, data, backend):
-        idata, _ = _fit(data, backend, logdet_refit=False)
+        idata, _ = _fit(data, backend, logdet_adapt=False)
         assert "logdet_refit_window" not in idata.attrs
 
 
 @pytest.mark.parametrize("backend", BACKENDS)
-def test_too_tight_a_window_warns(data, backend):
+def test_too_tight_a_window_warns(data, backend, monkeypatch):
     """A window the chain runs into must be reported, not silently truncated."""
+    from neighbayes._logdet import _refit
+
+    monkeypatch.setattr(_refit, "DEFAULT_PAD_SD", 0.05)
     with pytest.warns(RuntimeWarning, match="truncated"):
-        _fit(data, backend, logdet_refit=True, logdet_refit_pad_sd=0.05)
+        _fit(data, backend, logdet_adapt=True)
 
 
 @pytest.mark.parametrize("backend", BACKENDS)
@@ -141,7 +146,12 @@ def test_unsupported_method_falls_back_quietly(data, backend, caplog):
 
     y, X, W = data
     model = SAR(
-        y=y, X=X, W=W, priors=PRIORS, logdet_method="eigenvalue", logdet_refit=True
+        y=y,
+        X=X,
+        W=W,
+        priors=PRIORS,
+        logdet_method="eigenvalue",
+        logdet_adapt=True,
     )
     with caplog.at_level(logging.INFO, logger="neighbayes"):
         idata = model.fit(
@@ -150,7 +160,7 @@ def test_unsupported_method_falls_back_quietly(data, backend, caplog):
             chains=2,
             random_seed=7,
             progressbar=False,
-            gibbs_backend=backend,
+            backend=backend,
         )
     assert "logdet_refit_window" not in idata.attrs
     assert np.isfinite(np.asarray(idata.posterior["rho"]).mean())
@@ -164,8 +174,9 @@ def test_sem_refits_on_lambda(data):
         X=X,
         W=W,
         priors={"lam_lower": 0.0, "lam_upper": 0.95},
-        logdet_method="cheb_cholesky",
-        logdet_refit=True,
+        logdet_method="cheb",
+        logdet_decomp="chol",
+        logdet_adapt=True,
     )
     idata = model.fit(
         draws=800,
@@ -173,7 +184,7 @@ def test_sem_refits_on_lambda(data):
         chains=2,
         random_seed=7,
         progressbar=False,
-        gibbs_backend="numpy",
+        backend="numpy",
     )
     lo, hi = idata.attrs["logdet_refit_window"]
     lam = np.asarray(idata.posterior["lam"]).ravel()

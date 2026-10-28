@@ -5,7 +5,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from neighbayes.models import SARPanelTobit, SEMPanelTobit
+from neighbayes.models import SARTobit, SEMTobit
 from neighbayes.tests.helpers import (
     PANEL_N,
     PANEL_T,
@@ -37,7 +37,7 @@ def test_sar_panel_tobit_recovers_rho_and_beta(rng, W_panel_dense, W_panel_graph
         sigma=SIGMA_TRUE,
         censoring=CENSOR_TRUE,
     )
-    model = SARPanelTobit(
+    model = SARTobit(
         y=y, X=X, W=W_panel_graph, N=PANEL_N, T=PANEL_T, censoring=CENSOR_TRUE
     )
     idata = model.fit(**SAMPLE_KWARGS)
@@ -61,7 +61,7 @@ def test_sem_panel_tobit_recovers_lam_and_beta(rng, W_panel_dense, W_panel_graph
         sigma=SIGMA_TRUE,
         censoring=CENSOR_TRUE,
     )
-    model = SEMPanelTobit(
+    model = SEMTobit(
         y=y, X=X, W=W_panel_graph, N=PANEL_N, T=PANEL_T, censoring=CENSOR_TRUE
     )
     idata = model.fit(**SAMPLE_KWARGS)

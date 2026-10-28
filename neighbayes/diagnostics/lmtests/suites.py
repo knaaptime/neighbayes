@@ -107,15 +107,6 @@ SAR_SUITE = DiagnosticSuite(
     ),
 )
 
-SAR_NEGBIN_SUITE = DiagnosticSuite(
-    name="SAR-NegBin",
-    tests=_suite(
-        ("bayesian_lm_error_test", "LM-Error"),
-        ("bayesian_lm_wx_test", "LM-WX"),
-        ("bayesian_robust_lm_wx_test", "Robust-LM-WX"),
-    ),
-)
-
 SEM_SUITE = DiagnosticSuite(
     name="SEM",
     tests=_suite(
@@ -147,7 +138,7 @@ SDEM_SUITE = DiagnosticSuite(
 # variants, matching the pre-suite behavior preserved verbatim here.
 
 SAR_TOBIT_SUITE = DiagnosticSuite(
-    name="SAR-Tobit",
+    name="SARTobit",
     tests=_suite(
         ("bayesian_lm_error_test", "LM-Error"),
         ("bayesian_lm_wx_test", "LM-WX"),
@@ -156,26 +147,34 @@ SAR_TOBIT_SUITE = DiagnosticSuite(
     ),
 )
 
-LOGIT_SUITE = DiagnosticSuite(
-    name="Logit",
-    tests=_suite(
-        ("bayesian_glm_lm_lag_test", "LM-Lag"),
-        ("bayesian_glm_lm_error_test", "LM-Error"),
-        ("bayesian_glm_lm_wx_test", "LM-WX"),
-    ),
+# The logit, probit and NB at the GLM null: the latent SAR's and SEM's score
+# tests (``cross_sectional_glm``), the WX score, and the Moran diagnostic on
+# the working residuals.
+_GLM_NULL_TESTS = (
+    ("bayesian_glm_lm_lag_test", "LM-Lag"),
+    ("bayesian_glm_lm_error_test", "LM-Error"),
+    ("bayesian_glm_robust_lm_lag_test", "Robust-LM-Lag"),
+    ("bayesian_glm_robust_lm_error_test", "Robust-LM-Error"),
+    ("bayesian_glm_lm_sarma_test", "LM-SARMA"),
+    ("bayesian_glm_lm_wx_test", "LM-WX"),
+    ("bayesian_glm_moran_working_test", "Moran-Working"),
+)
+# At a reduced-form SAR null the error and WX scores are uncorrelated with
+# every other score, so their robust forms are these.
+_GLM_SAR_TESTS = (
+    ("bayesian_glm_lm_error_test", "LM-Error"),
+    ("bayesian_glm_lm_wx_test", "LM-WX"),
 )
 
-NEGBIN_SUITE = DiagnosticSuite(
-    name="NegBin",
-    tests=_suite(
-        ("bayesian_glm_lm_lag_test", "LM-Lag"),
-        ("bayesian_glm_lm_error_test", "LM-Error"),
-        ("bayesian_glm_lm_wx_test", "LM-WX"),
-    ),
-)
+LOGIT_SUITE = DiagnosticSuite(name="Logit", tests=_suite(*_GLM_NULL_TESTS))
+PROBIT_SUITE = DiagnosticSuite(name="Probit", tests=_suite(*_GLM_NULL_TESTS))
+NEGBIN_SUITE = DiagnosticSuite(name="NegBin", tests=_suite(*_GLM_NULL_TESTS))
+SAR_LOGIT_SUITE = DiagnosticSuite(name="SARLogit", tests=_suite(*_GLM_SAR_TESTS))
+SAR_PROBIT_SUITE = DiagnosticSuite(name="SARProbit", tests=_suite(*_GLM_SAR_TESTS))
+SAR_NEGBIN_SUITE = DiagnosticSuite(name="SARNegBin", tests=_suite(*_GLM_SAR_TESTS))
 
 SDM_TOBIT_SUITE = DiagnosticSuite(
-    name="SDM-Tobit",
+    name="SDMTobit",
     tests=_suite(
         ("bayesian_lm_error_test", "LM-Error"),
         ("bayesian_robust_lm_error_sdm_test", "Robust-LM-Error"),
@@ -190,21 +189,13 @@ SDM_TOBIT_SUITE = DiagnosticSuite(
 FLOW_SUITE = DiagnosticSuite(
     name="Flow",
     tests=_suite(
-        ("bayesian_robust_lm_flow_dest_test", "Robust-LM-Flow-Dest"),
-        ("bayesian_robust_lm_flow_orig_test", "Robust-LM-Flow-Orig"),
-        ("bayesian_robust_lm_flow_network_test", "Robust-LM-Flow-Network"),
-        ("bayesian_lm_flow_intra_test", "LM-Flow-Intra"),
-    ),
-)
-
-FLOW_INTRA_SUITE = DiagnosticSuite(
-    name="Flow-Intra",
-    tests=_suite(
-        ("bayesian_lm_flow_dest_test", "LM-Flow-Dest"),
-        ("bayesian_lm_flow_orig_test", "LM-Flow-Orig"),
-        ("bayesian_lm_flow_network_test", "LM-Flow-Network"),
+        ("bayesian_lm_flow_destination_test", "LM-Flow-Destination"),
+        ("bayesian_lm_flow_origin_test", "LM-Flow-Origin"),
+        ("bayesian_lm_flow_od_test", "LM-Flow-OD"),
         ("bayesian_lm_flow_joint_test", "LM-Flow-Joint"),
-        ("bayesian_lm_flow_intra_test", "LM-Flow-Intra"),
+        ("bayesian_robust_lm_flow_destination_test", "Robust-LM-Flow-Destination"),
+        ("bayesian_robust_lm_flow_origin_test", "Robust-LM-Flow-Origin"),
+        ("bayesian_robust_lm_flow_od_test", "Robust-LM-Flow-OD"),
     ),
 )
 
@@ -295,11 +286,16 @@ SLX_PANEL_DYNAMIC_SUITE = DiagnosticSuite(
 FLOW_PANEL_SUITE = DiagnosticSuite(
     name="Flow-Panel",
     tests=_suite(
-        ("bayesian_panel_lm_flow_dest_test", "Panel-LM-Flow-Dest"),
-        ("bayesian_panel_lm_flow_orig_test", "Panel-LM-Flow-Orig"),
-        ("bayesian_panel_lm_flow_network_test", "Panel-LM-Flow-Network"),
+        ("bayesian_panel_lm_flow_destination_test", "Panel-LM-Flow-Destination"),
+        ("bayesian_panel_lm_flow_origin_test", "Panel-LM-Flow-Origin"),
+        ("bayesian_panel_lm_flow_od_test", "Panel-LM-Flow-OD"),
         ("bayesian_panel_lm_flow_joint_test", "Panel-LM-Flow-Joint"),
-        ("bayesian_panel_lm_flow_intra_test", "Panel-LM-Flow-Intra"),
+        (
+            "bayesian_panel_robust_lm_flow_destination_test",
+            "Panel-Robust-LM-Flow-Destination",
+        ),
+        ("bayesian_panel_robust_lm_flow_origin_test", "Panel-Robust-LM-Flow-Origin"),
+        ("bayesian_panel_robust_lm_flow_od_test", "Panel-Robust-LM-Flow-OD"),
     ),
 )
 
@@ -309,16 +305,18 @@ __all__ = [
     "OLS_SUITE",
     "SLX_SUITE",
     "SAR_SUITE",
-    "SAR_NEGBIN_SUITE",
     "SEM_SUITE",
     "SDM_SUITE",
     "SDEM_SUITE",
     "SAR_TOBIT_SUITE",
     "LOGIT_SUITE",
+    "PROBIT_SUITE",
     "NEGBIN_SUITE",
+    "SAR_LOGIT_SUITE",
+    "SAR_PROBIT_SUITE",
+    "SAR_NEGBIN_SUITE",
     "SDM_TOBIT_SUITE",
     "FLOW_SUITE",
-    "FLOW_INTRA_SUITE",
     "OLS_PANEL_SUITE",
     "SAR_PANEL_SUITE",
     "SEM_PANEL_SUITE",

@@ -1,23 +1,10 @@
-"""Shared helpers for sparsax integration in JAX Gibbs samplers.
+"""Sparse solves of ``I - rho W`` shared by the samplers and models.
 
-Provides the COO sparsity-pattern precomputation and value-assembly
-utilities needed to use :mod:`sparsax` (JAX-native sparse CHOLMOD)
-inside JIT-compiled Gibbs steps.
-
-The precision matrix
-
-.. math::
-
-    P = I + \\mathrm{diag}(\\omega) - \\rho (W + W^T) + \\rho^2 W^T W
-
-is symmetric positive definite for any valid ``ρ`` and ``ω ≥ 0``.
-Its sparsity pattern is **fixed** (independent of ``ρ`` and ``ω``),
-so we precompute the COO indices ``(Ai, Aj)`` once on the host and
-assemble only the values ``Ax(ρ, ω)`` inside the JIT boundary.
-
-This mirrors the NumPy-CHOLMOD pattern in
-:func:`neighbayes.samplers.negbin_reduced._core._make_cholmod_pattern`
-but returns int32 COO arrays suitable for ``sparsax``.
+:class:`CachedSparseSolver` solves :math:`(I - \\sum_k \theta_k W_k)x = b`
+with one symbolic analysis reused across values, :class:`KluSarSolver` holds
+one KLU factor of :math:`I - \rho W` for many right-hand sides, and
+:func:`profile_loglik_rho_grid` gives the reduced-form samplers their starting
+:math:`(\rho, \beta)`.
 """
 
 from __future__ import annotations
@@ -26,228 +13,6 @@ import warnings
 
 import numpy as np
 import scipy.sparse as sp
-
-
-def precompute_sparsax_pattern(
-    W_csc: sp.csc_matrix,
-    n: int,
-) -> dict:
-    """Precompute the fixed COO sparsity pattern for the precision matrix.
-
-    The pattern covers all fill-in positions of
-    ``P = I + diag(ω) − ρ(W+Wᵀ) + ρ²WᵀW`` for any valid ``ρ`` and ``ω ≥ 0``.
-    Built as ``I + 0.5*(W+Wᵀ) + 0.25*WᵀW`` so every possible nonzero is present.
-
-    Parameters
-    ----------
-    W_csc : scipy.sparse.csc_matrix
-        The **raw** (row-standardized) spatial weights matrix ``W`` in CSC
-        format — *not* ``W+Wᵀ``.  This function derives ``W+Wᵀ`` and ``WᵀW``
-        from it internally; passing an already-symmetrized matrix would double
-        the symmetric part and corrupt ``WᵀW``.
-    n : int
-        Matrix dimension.
-
-    Returns
-    -------
-    dict with keys:
-        ``Ai`` : np.ndarray, shape (nnz,), dtype int32 — COO row indices.
-        ``Aj`` : np.ndarray, shape (nnz,), dtype int32 — COO column indices.
-        ``W_sym_vals`` : np.ndarray, shape (nnz,), dtype float64 —
-            Values of ``W + Wᵀ`` at the pattern positions (0 where pattern
-            has entries but W+Wᵀ does not).
-        ``WtW_vals`` : np.ndarray, shape (nnz,), dtype float64 —
-            Values of ``WᵀW`` at the pattern positions.
-        ``is_diag`` : np.ndarray, shape (nnz,), dtype bool —
-            Boolean mask for diagonal entries (``Ai == Aj``).
-        ``diag_idx`` : np.ndarray, shape (n,), dtype int32 —
-            Indices into the pattern arrays where the diagonal entries live.
-            Used to scatter ``1 + ω`` into ``Ax``.
-        ``n`` : int — Matrix dimension.
-    """
-    W_sym = (W_csc + W_csc.T).tocsc()
-    WtW = (W_csc.T @ W_csc).tocsc()
-    pattern = (sp.eye(n, format="csc") + 0.5 * W_sym + 0.25 * WtW).tocoo()
-
-    # sparsax reads only the upper triangle, so carrying the lower one would
-    # be ~2x the COO entries for no effect.  Restrict the pattern up front.
-    keep = pattern.row <= pattern.col
-    Ai = pattern.row[keep].astype(np.int32)
-    Aj = pattern.col[keep].astype(np.int32)
-    nnz = Ai.size
-
-    # Align W_sym / WtW values onto the pattern by matching linearized
-    # (row, col) keys.  A Python dict over nnz entries would cost hundreds of
-    # MB and seconds at realistic n; searchsorted is O(nnz log nnz) and stays
-    # in numpy.
-    pattern_keys = Ai.astype(np.int64) * n + Aj.astype(np.int64)
-    key_order = np.argsort(pattern_keys, kind="stable")
-    sorted_keys = pattern_keys[key_order]
-
-    def _align_upper(M):
-        M_coo = M.tocoo()
-        vals = np.zeros(nnz, dtype=np.float64)
-        if M_coo.nnz == 0:
-            return vals
-        upper = M_coo.row <= M_coo.col
-        mk = M_coo.row[upper].astype(np.int64) * n + M_coo.col[upper].astype(np.int64)
-        pos = np.searchsorted(sorted_keys, mk)
-        np.clip(pos, 0, max(nnz - 1, 0), out=pos)
-        found = sorted_keys[pos] == mk
-        vals[key_order[pos[found]]] = M_coo.data[upper][found]
-        return vals
-
-    W_sym_vals = _align_upper(W_sym)
-    WtW_vals = _align_upper(WtW)
-
-    is_diag = Ai == Aj
-    # For each diagonal position i, find its index in the pattern.
-    diag_idx = np.full(n, -1, dtype=np.int32)
-    diag_pos = np.flatnonzero(is_diag)
-    diag_idx[Ai[diag_pos]] = diag_pos.astype(np.int32)
-
-    return {
-        "Ai": Ai,
-        "Aj": Aj,
-        "W_sym_vals": W_sym_vals,
-        "WtW_vals": WtW_vals,
-        "is_diag": is_diag,
-        "diag_idx": diag_idx,
-        "n": n,
-    }
-
-
-def make_sparsax_ops(Ai, Aj, n: int):
-    """Return ``(eta_sample, solve_logdet)`` factor-once closures over a fixed pattern.
-
-    Both do **one** numeric factorization per call (matching numpy's
-    ``CholmodFactor`` reuse), using sparsax 0.4's factor-once primitives when
-    available and falling back to the 0.3 idiom otherwise:
-
-    - ``eta_sample(Ax, mean_term, z) -> N(P⁻¹ mean_term, P⁻¹)`` draw — 0.4:
-      :func:`sparsax.sample_gaussian` (one factorization); 0.3: mean solve +
-      ``MODE_LT`` + ``MODE_PT`` (three solves ≈ three factorizations under vmap).
-    - ``solve_logdet(Ax, b) -> (P⁻¹ b, log|P|)`` — 0.4:
-      :func:`sparsax.factor_solve` with ``want_logdet=True`` (one factorization,
-      no working-copy); 0.3: :func:`sparsax.update_solve` with a zero update
-      column and ``return_logdet=True``.
-
-    ``Ai``/``Aj`` are the fixed COO indices (int32); ``b`` may be ``(n,)`` or
-    ``(n, n_rhs)``.
-    """
-    import jax.numpy as jnp
-    import sparsax as _chj
-
-    Ai = jnp.asarray(Ai, dtype=jnp.int32)
-    Aj = jnp.asarray(Aj, dtype=jnp.int32)
-
-    if hasattr(_chj, "sample_gaussian"):  # sparsax >= 0.4
-        _MODE_A = getattr(_chj, "MODE_A", 0)
-
-        def eta_sample(Ax, mean_term, z):
-            eta, _mean = _chj.sample_gaussian(Ai, Aj, Ax, mean_term, z)
-            return eta
-
-        def solve_logdet(Ax, b):
-            sols, ld = _chj.factor_solve(Ai, Aj, Ax, [(b, _MODE_A)], want_logdet=True)
-            return sols[0], ld
-
-    else:  # sparsax 0.3 fallback
-        _Czero = jnp.zeros((n, 1), dtype=jnp.float64)
-        _MODE_LT, _MODE_PT = _chj.MODE_LT, _chj.MODE_PT
-
-        def eta_sample(Ax, mean_term, z):
-            m = _chj.solve(Ai, Aj, Ax, mean_term)
-            w = _chj.solve(Ai, Aj, Ax, z, mode=_MODE_LT)
-            w = _chj.solve(Ai, Aj, Ax, w, mode=_MODE_PT)
-            return m + w
-
-        def solve_logdet(Ax, b):
-            x, ld = _chj.update_solve(Ai, Aj, Ax, _Czero, b, return_logdet=True)
-            return x, ld
-
-    return eta_sample, solve_logdet
-
-
-def resolve_pg_jax_backend(backend, *, W_sparse, W_sym, WtW, n, logdet_bounds):
-    """Resolve the PG-Gibbs backend method and its JAX precomputes.
-
-    Shared by the SAR-logit / SEM-logit / structural SAR-NB Gibbs fits, which
-    previously each carried this ~40-line block verbatim.
-
-    Parameters
-    ----------
-    backend : {"jax", "numpy"}
-        Resolved execution backend.
-    W_sparse, W_sym, WtW : scipy.sparse matrices
-        Raw row-standardized ``W``, ``W + Wᵀ`` and ``WᵀW``.
-    n : int
-        Number of observations.
-    logdet_bounds : LogdetBounds
-        The model's resolved logdet bounds (method, rho_min, rho_max).
-
-    Returns
-    -------
-    method : str
-        One of ``"cholmod"`` (numpy), ``"jax_dense"``, ``"cholmod_jax"`` —
-        used for all three of the cache's solve/logdet_P/sample methods.
-    jax_parts : dict
-        ``W_sym_dense``, ``WtW_dense``, ``logdet_jax``, ``sparsax_pattern``
-        (all ``None`` on the numpy path).
-    """
-    jax_parts = {
-        "W_sym_dense": None,
-        "WtW_dense": None,
-        "logdet_jax": None,
-        "sparsax_pattern": None,
-    }
-    if backend != "jax":
-        return "cholmod", jax_parts
-
-    from ..._jax_dispatch import (
-        _sparsax_available,
-        _sparsax_jax_enabled,
-        ensure_x64,
-    )
-
-    method = (
-        "cholmod_jax"
-        if _sparsax_jax_enabled() and _sparsax_available()
-        else "jax_dense"
-    )
-
-    import jax.numpy as jnp
-
-    ensure_x64()
-
-    # Only the dense-Cholesky fallback needs the dense (W+Wᵀ) and WᵀW; the
-    # cholmod_jax path assembles P from the sparse COO pattern and does its
-    # matvecs via BCOO, so we never densify W there.
-    if method == "jax_dense":
-        jax_parts["W_sym_dense"] = jnp.asarray(W_sym.toarray(), dtype=jnp.float64)
-        jax_parts["WtW_dense"] = jnp.asarray(WtW.toarray(), dtype=jnp.float64)
-
-    from ..._logdet import make_logdet_jax_fn
-
-    jax_parts["logdet_jax"] = make_logdet_jax_fn(
-        W_sparse,
-        method=logdet_bounds.method,
-        rho_min=logdet_bounds.rho_min,
-        rho_max=logdet_bounds.rho_max,
-    )
-
-    if method == "cholmod_jax":
-        # Pass the raw (row-standardized) W; the helper derives W+Wᵀ and WᵀW
-        # internally.  Passing W_sym here would double the symmetric part and
-        # corrupt WᵀW.
-        jax_parts["sparsax_pattern"] = precompute_sparsax_pattern(W_sparse.tocsc(), n)
-
-    return method, jax_parts
-
-
-# ---------------------------------------------------------------------------
-# NumPy-side cached-pattern sparse solve (host loops, no JIT)
-# ---------------------------------------------------------------------------
 
 
 class CachedSparseSolver:
@@ -402,12 +167,8 @@ class CachedSparseSolver:
             self._has_lu_factor = hasattr(sparsax_mod, "lu_factor") and hasattr(
                 sparsax_mod, "lu_solve_factor"
             )
-            # KLU or UMFPACK, whichever is faster on this pattern, probed at
-            # A = I - Σ_k (0.5 / K) W_k, inside the stable region.
-            probe_coeffs = [-0.5 / max(len(mats), 1)] * len(mats)
-            self._lu = sparsax_lu(
-                self._Ai_jax, self._Aj_jax, self._assemble_Ax(probe_coeffs), self.n
-            )
+            # KLU or UMFPACK, routed by the merged pattern.
+            self._lu = sparsax_lu(self._Ai_jax, self._Aj_jax, self.n)
         # Last (coeffs -> LU token) pair, so back-to-back solves at the same
         # θ (e.g. several RHS blocks per posterior draw) skip the refactor.
         self._last_coeffs = None
@@ -441,7 +202,7 @@ class CachedSparseSolver:
         """
         try:
             return use(self._last_token)
-        except Exception as exc:  # noqa: BLE001 - re-raised unless stale
+        except ValueError as exc:  # sparsax's INVALID_ARGUMENT, as JAX raises it
             if "stale factor token" not in str(exc):
                 raise
             coeffs, self._last_token = self._last_coeffs, None
@@ -468,6 +229,10 @@ class CachedSparseSolver:
         single = rhs_np.ndim == 1
         if single:
             rhs_np = rhs_np[:, None]
+        # sparsax does not check the row count: KLU fails and UMFPACK reads
+        # past the right-hand side.
+        if rhs_np.ndim != 2 or rhs_np.shape[0] != self.n:
+            raise ValueError(f"rhs must have {self.n} rows, got shape {np.shape(rhs)}")
         if self._use_sparsax:
             import jax.numpy as jnp
 
@@ -580,7 +345,7 @@ class KluSarSolver:
     ``W`` it squares the condition number and :math:`W^\top W` carries
     several times the nonzeros of ``W`` (two-hop fill-in), so the Cholesky
     is both slower and less accurate than an LU of ``A`` itself.  A sparse LU
-    (KLU or UMFPACK, whichever measures faster) factorizes the unsymmetric
+    (KLU or UMFPACK, routed by the pattern) factorizes the unsymmetric
     ``A`` once per ρ and additionally hands back :math:`\log\det A` for free
     via :meth:`logdet`.
 
@@ -623,6 +388,7 @@ def profile_loglik_rho_grid(
     rho_min: float = 0.05,
     rho_max: float = 0.95,
     rho_step: float = 0.05,
+    rows=None,
 ):
     r"""Profile-log-likelihood ρ-grid search with cached sparse solves.
 
@@ -643,12 +409,16 @@ def profile_loglik_rho_grid(
 
     Parameters
     ----------
-    y, X : ndarray, shapes (n,) and (n, k)
-        Response and design matrix.
+    y, X : ndarray, shapes (m,) and (n, k)
+        Response and design matrix; ``m = n`` unless ``rows`` is given.
     W_sparse : scipy.sparse matrix, shape (n, n)
         Row-standardized spatial weights.
     rho_min, rho_max, rho_step : float
         Grid definition.
+    rows : boolean ndarray of shape (n,), optional
+        Fit only these rows of :math:`\tilde X`, as when ``y`` is observed on a
+        subset.  The filter is applied to all of ``X`` first, since it mixes
+        every row.
 
     Returns
     -------
@@ -663,6 +433,7 @@ def profile_loglik_rho_grid(
     y = np.asarray(y, dtype=np.float64)
     X = np.asarray(X, dtype=np.float64)
     n, k = X.shape
+    m = len(y)
     solver = CachedSparseSolver([W_sparse], n)
     # Inclusive of rho_max (up to floating-point slack): np.arange would drop
     # the endpoint, silently truncating the default grid at 0.90.
@@ -673,6 +444,8 @@ def profile_loglik_rho_grid(
     for rho_g in grid:
         try:
             Xtilde = solver.solve([-float(rho_g)], X)
+            if rows is not None:
+                Xtilde = Xtilde[rows]
         except (RuntimeError, ValueError, np.linalg.LinAlgError) as exc:
             # A singular / indefinite A_ρ means this ρ is outside the valid
             # range for W; skip it but keep a record so an all-failed grid
@@ -683,7 +456,7 @@ def profile_loglik_rho_grid(
         eta_g = Xtilde @ beta_g
         sig2_g = float(np.mean((y - eta_g) ** 2))
         if sig2_g > 1e-10:
-            ll_g = -0.5 * n * np.log(sig2_g) - 0.5 * n
+            ll_g = -0.5 * m * np.log(sig2_g) - 0.5 * m
             if ll_g > best_ll:
                 best_ll, best_rho, best_beta = ll_g, float(rho_g), beta_g.copy()
     if not np.isfinite(best_ll) and failures:
@@ -695,14 +468,3 @@ def profile_loglik_rho_grid(
             stacklevel=2,
         )
     return best_rho, best_beta, best_ll
-
-
-def cached_sar_solve(W_sparse, n, rho, rhs):
-    """Solve :math:`(I - \\rho W) x = b` with one cached symbolic analysis.
-
-    Thin convenience wrapper over :class:`CachedSparseSolver` for the common
-    one-off case: build the solver, solve once, return the result.  Callers
-    doing many solves should construct a :class:`CachedSparseSolver` once
-    and call ``solve([-ρ], rhs)`` per draw to amortise the pattern build.
-    """
-    return CachedSparseSolver([W_sparse], n).solve([-float(rho)], rhs)

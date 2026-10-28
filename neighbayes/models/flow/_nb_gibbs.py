@@ -27,7 +27,6 @@ def run_negbin_flow_gibbs(
     progressbar: bool = True,
     n_jobs: int = -1,
     gibbs_backend: str = "numpy",
-    krylov_reuse: bool = True,
     log_likelihood: bool = False,
 ) -> xr.DataTree:
     """Run the reduced-form PG-Gibbs sampler for an NB SAR flow model.
@@ -40,10 +39,10 @@ def run_negbin_flow_gibbs(
 
     Parameters
     ----------
-    model : FlowModel or FlowPanelModel
+    model : FlowModel
         NB flow model instance providing ``_X``, ``_y_int_vec``,
         ``_W_sparse``, ``_Wd``/``_Wo``/``_Ww``, ``_n``, ``priors``, and
-        (unrestricted only) ``restrict_positive``.
+        (unrestricted only) ``nonnegative_dependence``.
     separable : bool
         If True use the separable Kronecker kernel (``rho_w = -rho_d rho_o``,
         box prior); otherwise the unrestricted 3-rho kernel.
@@ -86,10 +85,9 @@ def run_negbin_flow_gibbs(
         rho_lower=model.priors.get("rho_lower", -0.999),
         rho_upper=model.priors.get("rho_upper", 0.999),
         T=T,
-        krylov_reuse=krylov_reuse,
     )
     if not separable:
-        cache_kwargs["positive"] = model.restrict_positive
+        cache_kwargs["positive"] = model.nonnegative_dependence
     cache = FlowReducedGibbsCache(**cache_kwargs)
 
     # --- Build priors ---
@@ -99,6 +97,7 @@ def run_negbin_flow_gibbs(
         beta_sigma=pv["beta_sigma"],
         alpha_sigma=pv["alpha_sigma"],
         alpha_nu=pv["alpha_nu"],
+        alpha_fixed=pv["alpha_fixed"],
         rho_lower=model.priors.get("rho_lower", -0.999),
         rho_upper=model.priors.get("rho_upper", 0.999),
     )
@@ -111,16 +110,16 @@ def run_negbin_flow_gibbs(
             rho_o0 = rng.uniform(-0.1, 0.1)
             rho_w0 = None
         else:
-            rho_lo = 0.0 if model.restrict_positive else -0.1
+            rho_lo = 0.0 if model.nonnegative_dependence else -0.1
             rho_d0 = rng.uniform(rho_lo, 0.1)
             rho_o0 = rng.uniform(rho_lo, 0.1)
-            rho_w0 = rng.uniform(0.0 if model.restrict_positive else -0.05, 0.05)
+            rho_w0 = rng.uniform(0.0 if model.nonnegative_dependence else -0.05, 0.05)
         return FlowReducedGibbsState(
             beta=beta0,
             rho_d=rho_d0,
             rho_o=rho_o0,
             rho_w=rho_w0,
-            alpha=1.0,
+            alpha=1.0 if pv["alpha_fixed"] is None else pv["alpha_fixed"],
             omega=np.ones(omega_size, dtype=np.float64) * 0.5,
         )
 
@@ -176,7 +175,7 @@ def run_negbin_flow_gibbs(
     if gibbs_backend == "jax" and T > 1 and not separable:
         raise NotImplementedError(
             "The unrestricted JAX flow Gibbs kernel is cross-section only; fit "
-            "unrestricted panels with gibbs_backend='numpy'."
+            "unrestricted panels with backend='numpy'."
         )
     if gibbs_backend == "jax":
         from ...samplers._utils._seeds import seed_sequence_to_int, spawn_chain_seeds
@@ -203,6 +202,7 @@ def run_negbin_flow_gibbs(
                 struct=struct,
                 jax_seeds=seeds,
                 store_log_lik=log_likelihood,
+                progressbar=progressbar,
             )
         else:
             from ...samplers.negbin_reduced._flow_jax import run_chains_jax_flow
@@ -217,11 +217,10 @@ def run_negbin_flow_gibbs(
                 inits=inits,
                 draws=draws,
                 tune=tune,
-                positive=model.restrict_positive,
+                positive=model.nonnegative_dependence,
                 n_cycles=cache.n_rho_omega_cycles,
                 jax_seeds=seeds,
                 progressbar=progressbar,
-                krylov_reuse=krylov_reuse,
                 store_log_lik=log_likelihood,
             )
     else:

@@ -2,7 +2,7 @@
 
 The log-odds / log-mean / count-equation direct-effect trace
 ``(1/n) tr((I − ρW)⁻¹)`` is the logdet gradient in disguise, so the
-SAR-GLMs (logit, neg-bin, structural neg-bin, ZINB) share the same
+SAR-GLMs (logit, neg-bin, ZINB) share the same
 resolvent route as the Gaussian SAR and must never trigger the O(n³)
 eigendecomposition on a row-standardized, surrogate-logdet model.
 """
@@ -15,10 +15,9 @@ import pytest
 import scipy.sparse as sp
 from libpysal.graph import Graph
 
-from neighbayes.diagnostics.spatial_effects import _chunked_eig_means
+from neighbayes.diagnostics.impacts import _chunked_eig_means
 from neighbayes.models.cross_section.sar_logit import SARLogit
 from neighbayes.models.cross_section.sar_negbin import SARNegBin
-from neighbayes.models.cross_section.sar_negbin_structural import SARNegBinStructural
 from neighbayes.models.cross_section.sar_zinb import SARZINB
 
 
@@ -53,7 +52,6 @@ def _design():
     [
         (SARLogit, "binary"),
         (SARNegBin, "count"),
-        (SARNegBinStructural, "count"),
     ],
 )
 def test_direct_effect_trace_matches_eigen_reference(model_cls, y_kind, _design):
@@ -64,7 +62,7 @@ def test_direct_effect_trace_matches_eigen_reference(model_cls, y_kind, _design)
         if y_kind == "binary"
         else rng.poisson(2.0, size=n).astype(float)
     )
-    model = model_cls(y=y, X=X, W=_graph(W), logdet_method="cheb_cholesky")
+    model = model_cls(y=y, X=X, W=_graph(W), logdet_method="cheb", logdet_decomp="chol")
     rho = rng.uniform(0.05, 0.9, size=1500)
 
     md_res = model._batch_mean_diag(rho)
@@ -76,7 +74,7 @@ def test_zinb_selection_direct_effect_same_W(_design):
     """ZINB with shared weights reuses the count-equation resolvent helper."""
     W, n, X, rng = _design
     y = rng.poisson(2.0, size=n).astype(float)
-    model = SARZINB(y=y, X=X, W=_graph(W), logdet_method="cheb_cholesky")
+    model = SARZINB(y=y, X=X, W=_graph(W), logdet_method="cheb", logdet_decomp="chol")
     assert model._same_W is True
 
     lam = rng.uniform(0.05, 0.9, size=1500)
@@ -89,14 +87,19 @@ def test_zinb_selection_direct_effect_distinct_W(_design):
     """A distinct selection W gets its own resolvent evaluator."""
     W, n, X, rng = _design
     y = rng.poisson(2.0, size=n).astype(float)
-    W_sel = _rook_W(8)  # same structure, distinct object → _same_W False
+    W_zero = _rook_W(8)  # same structure, distinct object → _same_W False
     model = SARZINB(
-        y=y, X=X, W=_graph(W), W_sel=_graph(W_sel), logdet_method="cheb_cholesky"
+        y=y,
+        X=X,
+        W=_graph(W),
+        W_zero=_graph(W_zero),
+        logdet_method="cheb",
+        logdet_decomp="chol",
     )
     assert model._same_W is False
 
     lam = rng.uniform(0.05, 0.9, size=1500)
-    sel_eigs = np.linalg.eigvals(model._W_sel_sparse.toarray().astype(np.float64))
+    sel_eigs = np.linalg.eigvals(model._W_zero_sparse.toarray().astype(np.float64))
     md_res = model._sel_batch_mean_diag(lam)
     md_eig = _chunked_eig_means(lam, sel_eigs)
     np.testing.assert_allclose(md_res, md_eig, atol=1e-4, rtol=1e-4)
@@ -113,7 +116,7 @@ def test_linear_scale_impacts_use_no_eigendecomposition(model_cls, y_kind, _desi
         if y_kind == "binary"
         else rng.poisson(2.0, size=n).astype(float)
     )
-    model = model_cls(y=y, X=X, W=_graph(W), logdet_method="cheb_cholesky")
+    model = model_cls(y=y, X=X, W=_graph(W), logdet_method="cheb", logdet_decomp="chol")
 
     G = 200
     beta_draws = rng.standard_normal((1, G, X.shape[1]))
@@ -128,7 +131,7 @@ def test_linear_scale_impacts_use_no_eigendecomposition(model_cls, y_kind, _desi
     np.linalg.eig = _boom
     np.linalg.eigvals = _boom
     try:
-        result = model.spatial_effects()
+        result = model.impacts()
     finally:
         np.linalg.eig, np.linalg.eigvals = orig_eig, orig_eigvals
 
