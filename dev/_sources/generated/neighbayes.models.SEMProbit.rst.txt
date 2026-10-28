@@ -1,0 +1,38 @@
+﻿neighbayes.models.SEMProbit
+===========================
+
+.. currentmodule:: neighbayes.models
+
+.. autoclass:: SEMProbit
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SEMProbit.__init__
+      ~SEMProbit.fit
+      ~SEMProbit.fitted_probabilities
+      ~SEMProbit.fitted_values
+      ~SEMProbit.impacts
+      ~SEMProbit.random_effects_mean
+      ~SEMProbit.residuals
+      ~SEMProbit.spatial_diagnostics
+      ~SEMProbit.spatial_diagnostics_decision
+      ~SEMProbit.summary
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SEMProbit.inference_data
+      ~SEMProbit.pymc_model
+   
+   

@@ -1,0 +1,39 @@
+﻿neighbayes.models.SARHurdleNegBin
+=================================
+
+.. currentmodule:: neighbayes.models
+
+.. autoclass:: SARHurdleNegBin
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SARHurdleNegBin.__init__
+      ~SARHurdleNegBin.activation_probabilities
+      ~SARHurdleNegBin.fit
+      ~SARHurdleNegBin.fitted_values
+      ~SARHurdleNegBin.impacts
+      ~SARHurdleNegBin.positive_mean
+      ~SARHurdleNegBin.posterior_predictive
+      ~SARHurdleNegBin.residuals
+      ~SARHurdleNegBin.spatial_diagnostics
+      ~SARHurdleNegBin.spatial_diagnostics_decision
+      ~SARHurdleNegBin.summary
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SARHurdleNegBin.inference_data
+      ~SARHurdleNegBin.pymc_model
+   
+   

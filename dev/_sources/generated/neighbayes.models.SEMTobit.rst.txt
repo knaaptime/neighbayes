@@ -16,10 +16,10 @@
       ~SEMTobit.__init__
       ~SEMTobit.fit
       ~SEMTobit.fitted_values
+      ~SEMTobit.impacts
       ~SEMTobit.residuals
       ~SEMTobit.spatial_diagnostics
       ~SEMTobit.spatial_diagnostics_decision
-      ~SEMTobit.spatial_effects
       ~SEMTobit.summary
    
    

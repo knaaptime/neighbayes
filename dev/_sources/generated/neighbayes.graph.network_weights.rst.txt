@@ -1,6 +1,0 @@
-﻿neighbayes.graph.network\_weights
-=================================
-
-.. currentmodule:: neighbayes.graph
-
-.. autofunction:: network_weights

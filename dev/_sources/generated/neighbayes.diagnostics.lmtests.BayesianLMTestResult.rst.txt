@@ -27,6 +27,7 @@
    
       ~BayesianLMTestResult.details
       ~BayesianLMTestResult.df
+      ~BayesianLMTestResult.statistic
       ~BayesianLMTestResult.lm_samples
       ~BayesianLMTestResult.mean
       ~BayesianLMTestResult.median

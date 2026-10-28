@@ -16,11 +16,11 @@
       ~OLSFlow.__init__
       ~OLSFlow.fit
       ~OLSFlow.fitted_values
+      ~OLSFlow.impacts
       ~OLSFlow.posterior_predictive
       ~OLSFlow.residuals
       ~OLSFlow.spatial_diagnostics
       ~OLSFlow.spatial_diagnostics_decision
-      ~OLSFlow.spatial_effects
       ~OLSFlow.summary
    
    

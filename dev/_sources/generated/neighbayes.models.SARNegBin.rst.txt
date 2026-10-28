@@ -16,10 +16,11 @@
       ~SARNegBin.__init__
       ~SARNegBin.fit
       ~SARNegBin.fitted_values
+      ~SARNegBin.impacts
+      ~SARNegBin.posterior_predictive
       ~SARNegBin.residuals
       ~SARNegBin.spatial_diagnostics
       ~SARNegBin.spatial_diagnostics_decision
-      ~SARNegBin.spatial_effects
       ~SARNegBin.summary
    
    

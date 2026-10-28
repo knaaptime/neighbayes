@@ -1,0 +1,6 @@
+﻿neighbayes.dgp.simulate\_logit
+==============================
+
+.. currentmodule:: neighbayes.dgp
+
+.. autofunction:: simulate_logit

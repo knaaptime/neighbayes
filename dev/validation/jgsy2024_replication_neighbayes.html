@@ -42,7 +42,7 @@
         <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
       
     
-        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.74c816e3f9967dd6e.min.css?v=6cfe2491" />
+        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.6efbe22605a23fcd6.min.css?v=b2ceb110" />
         <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
         <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
         <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=93c5fc88" />
@@ -530,7 +530,7 @@
   
   
   <span class="md-ellipsis">
-    <span>How to fit spatial logit models</span>
+    <span>How to fit a spatial logit model</span>
     
   </span>
   
@@ -1520,8 +1520,8 @@
 <p>Important scope notes:</p>
 <ul class="simple">
 <li><p>JGSY2024 original estimation uses legacy routines (<code class="docutils literal notranslate"><span class="pre">sar_panelE_FE</span></code>) with classical asymptotics.</p></li>
-<li><p>This notebook uses <strong>Bayesian</strong> estimation (<code class="docutils literal notranslate"><span class="pre">neighbayes.SDMPanelFE</span></code>) with posterior means for comparison.</p></li>
-<li><p>We mirror two-way FE behavior via <code class="docutils literal notranslate"><span class="pre">model=3</span></code> (unit and time demeaning), which is equivalent to including unit FE and time dummies in balanced panels.</p></li>
+<li><p>This notebook uses <strong>Bayesian</strong> estimation (<code class="docutils literal notranslate"><span class="pre">neighbayes.models.SDM</span></code> with unit and time fixed effects) with posterior means for comparison.</p></li>
+<li><p>We mirror two-way FE behavior via <code class="docutils literal notranslate"><span class="pre">unit_effects=&quot;fixed&quot;,</span> <span class="pre">time_effects=True</span></code> (unit and time demeaning), which is equivalent to including unit FE and time dummies in balanced panels.</p></li>
 <li><p>Parameterized-weight robustness specifications from <code class="docutils literal notranslate"><span class="pre">parameterized_W</span></code> are not estimated here because those routines are not currently part of <code class="docutils literal notranslate"><span class="pre">neighbayes</span></code>.</p></li>
 </ul>
 <div class="cell docutils container">
@@ -1532,7 +1532,7 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">IPython.display</span><span class="w"> </span><span class="kn">import</span> <span class="n">display</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">libpysal.graph</span><span class="w"> </span><span class="kn">import</span> <span class="n">Graph</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">SDMPanelFE</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">SDM</span>
 
 <span class="n">az</span><span class="o">.</span><span class="n">style</span><span class="o">.</span><span class="n">use</span><span class="p">(</span><span class="s2">"arviz-variat"</span><span class="p">)</span>
 <span class="n">pd</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">display</span><span class="o">.</span><span class="n">float_format</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">x</span><span class="p">:</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">x</span><span class="si">:</span><span class="s2">,.6f</span><span class="si">}</span><span class="s2">"</span>
@@ -1725,13 +1725,14 @@ W_ed row sums: 0.999999999999998 1.0000000000000016
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit_sdm_fe</span><span class="p">(</span><span class="n">y_vec</span><span class="p">,</span> <span class="n">X_df</span><span class="p">,</span> <span class="n">W_np</span><span class="p">,</span> <span class="n">draws</span><span class="o">=</span><span class="mi">600</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">600</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">):</span>
-    <span class="n">model</span> <span class="o">=</span> <span class="n">SDMPanelFE</span><span class="p">(</span>
+    <span class="n">model</span> <span class="o">=</span> <span class="n">SDM</span><span class="p">(</span>
+        <span class="n">unit_effects</span><span class="o">=</span><span class="s2">"fixed"</span><span class="p">,</span>
+        <span class="n">time_effects</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
         <span class="n">y</span><span class="o">=</span><span class="n">y_vec</span><span class="p">,</span>
         <span class="n">X</span><span class="o">=</span><span class="n">X_df</span><span class="p">,</span>
         <span class="n">W</span><span class="o">=</span><span class="n">graph_from_dense</span><span class="p">(</span><span class="n">W_np</span><span class="p">),</span>
         <span class="n">N</span><span class="o">=</span><span class="n">N</span><span class="p">,</span>
         <span class="n">T</span><span class="o">=</span><span class="n">T</span><span class="p">,</span>
-        <span class="n">effects</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
     <span class="p">)</span>
 
     <span class="n">idata</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
@@ -1755,12 +1756,6 @@ W_ed row sums: 0.999999999999998 1.0000000000000016
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Fit complete for both specifications.
-</code></pre></div>
-</div>
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
-  W_arr = np.asarray(W, dtype=np.float64)
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
-  W_arr = np.asarray(W, dtype=np.float64)
 </code></pre></div>
 </div>
 </div>
@@ -1845,7 +1840,7 @@ W_ed row sums: 0.999999999999998 1.0000000000000016
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">compare_effects</span><span class="p">(</span><span class="n">spec_name</span><span class="p">,</span> <span class="n">model</span><span class="p">):</span>
-    <span class="n">eff</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">spatial_effects</span><span class="p">()</span>
+    <span class="n">eff</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">impacts</span><span class="p">()</span>
     <span class="n">be</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
         <span class="p">{</span>
             <span class="s2">"feature"</span><span class="p">:</span> <span class="n">eff</span><span class="o">.</span><span class="n">index</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
@@ -1917,18 +1912,18 @@ Effects comparison: ED
     <tr>
       <th>inv</th>
       <td>0.002422</td>
-      <td>0.002192</td>
-      <td>-0.000230</td>
-      <td>0.000230</td>
-      <td>9.502571</td>
+      <td>0.002191</td>
+      <td>-0.000231</td>
+      <td>0.000231</td>
+      <td>9.552526</td>
     </tr>
     <tr>
       <th>pop</th>
       <td>-0.008074</td>
-      <td>-0.008043</td>
-      <td>0.000031</td>
-      <td>0.000031</td>
-      <td>0.380790</td>
+      <td>-0.008042</td>
+      <td>0.000032</td>
+      <td>0.000032</td>
+      <td>0.401695</td>
     </tr>
     <tr>
       <th>initial_gdp</th>
@@ -1936,55 +1931,55 @@ Effects comparison: ED
       <td>-0.093906</td>
       <td>-0.000074</td>
       <td>0.000074</td>
-      <td>0.078514</td>
+      <td>0.078509</td>
     </tr>
     <tr>
       <th>lagged_growth</th>
       <td>0.013879</td>
-      <td>0.012166</td>
-      <td>-0.001713</td>
-      <td>0.001713</td>
-      <td>12.342667</td>
+      <td>0.012093</td>
+      <td>-0.001786</td>
+      <td>0.001786</td>
+      <td>12.868133</td>
     </tr>
     <tr>
       <th>W*inv</th>
       <td>0.008933</td>
-      <td>0.008729</td>
-      <td>-0.000204</td>
-      <td>0.000204</td>
-      <td>2.282116</td>
+      <td>0.008702</td>
+      <td>-0.000231</td>
+      <td>0.000231</td>
+      <td>2.583625</td>
     </tr>
     <tr>
       <th>W*pop</th>
       <td>-0.002317</td>
-      <td>-0.002134</td>
-      <td>0.000183</td>
-      <td>0.000183</td>
-      <td>7.900941</td>
+      <td>-0.002106</td>
+      <td>0.000211</td>
+      <td>0.000211</td>
+      <td>9.110073</td>
     </tr>
     <tr>
       <th>W*initial_gdp</th>
       <td>0.065751</td>
-      <td>0.066115</td>
-      <td>0.000364</td>
-      <td>0.000364</td>
-      <td>0.554278</td>
+      <td>0.066186</td>
+      <td>0.000435</td>
+      <td>0.000435</td>
+      <td>0.660912</td>
     </tr>
     <tr>
       <th>W*lagged_growth</th>
       <td>0.191021</td>
-      <td>0.189849</td>
-      <td>-0.001172</td>
-      <td>0.001172</td>
-      <td>0.613467</td>
+      <td>0.189442</td>
+      <td>-0.001579</td>
+      <td>0.001579</td>
+      <td>0.826747</td>
     </tr>
     <tr>
       <th>rho</th>
       <td>0.534381</td>
-      <td>0.542785</td>
-      <td>0.008404</td>
-      <td>0.008404</td>
-      <td>1.572648</td>
+      <td>0.544153</td>
+      <td>0.009772</td>
+      <td>0.009772</td>
+      <td>1.828579</td>
     </tr>
   </tbody>
 </table>
@@ -2128,15 +2123,15 @@ Effects comparison: ED
       <td>0.003500</td>
       <td>0.021200</td>
       <td>0.024700</td>
-      <td>0.003280</td>
-      <td>0.020596</td>
-      <td>0.023876</td>
-      <td>-0.000220</td>
-      <td>0.000220</td>
-      <td>-0.000604</td>
-      <td>0.000604</td>
-      <td>-0.000824</td>
-      <td>0.000824</td>
+      <td>0.003281</td>
+      <td>0.020603</td>
+      <td>0.023883</td>
+      <td>-0.000219</td>
+      <td>0.000219</td>
+      <td>-0.000597</td>
+      <td>0.000597</td>
+      <td>-0.000817</td>
+      <td>0.000817</td>
     </tr>
     <tr>
       <th>1</th>
@@ -2145,14 +2140,14 @@ Effects comparison: ED
       <td>-0.013500</td>
       <td>-0.022300</td>
       <td>-0.008756</td>
-      <td>-0.013490</td>
-      <td>-0.022245</td>
+      <td>-0.013496</td>
+      <td>-0.022252</td>
       <td>0.000044</td>
       <td>0.000044</td>
-      <td>0.000010</td>
-      <td>0.000010</td>
-      <td>0.000055</td>
-      <td>0.000055</td>
+      <td>0.000004</td>
+      <td>0.000004</td>
+      <td>0.000048</td>
+      <td>0.000048</td>
     </tr>
     <tr>
       <th>2</th>
@@ -2161,14 +2156,14 @@ Effects comparison: ED
       <td>0.032200</td>
       <td>-0.059900</td>
       <td>-0.092243</td>
-      <td>0.031463</td>
-      <td>-0.060780</td>
+      <td>0.031428</td>
+      <td>-0.060815</td>
       <td>-0.000143</td>
       <td>0.000143</td>
-      <td>-0.000737</td>
-      <td>0.000737</td>
-      <td>-0.000880</td>
-      <td>0.000880</td>
+      <td>-0.000772</td>
+      <td>0.000772</td>
+      <td>-0.000915</td>
+      <td>0.000915</td>
     </tr>
     <tr>
       <th>3</th>
@@ -2176,15 +2171,15 @@ Effects comparison: ED
       <td>0.035100</td>
       <td>0.402900</td>
       <td>0.438000</td>
-      <td>0.033744</td>
-      <td>0.408228</td>
-      <td>0.441972</td>
-      <td>-0.001356</td>
-      <td>0.001356</td>
-      <td>0.005328</td>
-      <td>0.005328</td>
-      <td>0.003972</td>
-      <td>0.003972</td>
+      <td>0.033715</td>
+      <td>0.408513</td>
+      <td>0.442228</td>
+      <td>-0.001385</td>
+      <td>0.001385</td>
+      <td>0.005613</td>
+      <td>0.005613</td>
+      <td>0.004228</td>
+      <td>0.004228</td>
     </tr>
   </tbody>
 </table>
@@ -2355,11 +2350,11 @@ Effects comparison: ED
     <tr>
       <th>0</th>
       <td>Table 1 col[1] 6NN</td>
-      <td>0.001375</td>
-      <td>1.572648</td>
-      <td>0.000441</td>
-      <td>0.001670</td>
-      <td>0.001433</td>
+      <td>0.001595</td>
+      <td>1.828579</td>
+      <td>0.000448</td>
+      <td>0.001747</td>
+      <td>0.001502</td>
     </tr>
     <tr>
       <th>1</th>
@@ -2405,42 +2400,42 @@ Top absolute coefficient gaps (ED):
     <tr>
       <th>rho</th>
       <td>0.534381</td>
-      <td>0.542785</td>
-      <td>0.008404</td>
-      <td>0.008404</td>
-      <td>1.572648</td>
+      <td>0.544153</td>
+      <td>0.009772</td>
+      <td>0.009772</td>
+      <td>1.828579</td>
     </tr>
     <tr>
       <th>lagged_growth</th>
       <td>0.013879</td>
-      <td>0.012166</td>
-      <td>-0.001713</td>
-      <td>0.001713</td>
-      <td>12.342667</td>
+      <td>0.012093</td>
+      <td>-0.001786</td>
+      <td>0.001786</td>
+      <td>12.868133</td>
     </tr>
     <tr>
       <th>W*lagged_growth</th>
       <td>0.191021</td>
-      <td>0.189849</td>
-      <td>-0.001172</td>
-      <td>0.001172</td>
-      <td>0.613467</td>
+      <td>0.189442</td>
+      <td>-0.001579</td>
+      <td>0.001579</td>
+      <td>0.826747</td>
     </tr>
     <tr>
       <th>W*initial_gdp</th>
       <td>0.065751</td>
-      <td>0.066115</td>
-      <td>0.000364</td>
-      <td>0.000364</td>
-      <td>0.554278</td>
+      <td>0.066186</td>
+      <td>0.000435</td>
+      <td>0.000435</td>
+      <td>0.660912</td>
     </tr>
     <tr>
       <th>inv</th>
       <td>0.002422</td>
-      <td>0.002192</td>
-      <td>-0.000230</td>
-      <td>0.000230</td>
-      <td>9.502571</td>
+      <td>0.002191</td>
+      <td>-0.000231</td>
+      <td>0.000231</td>
+      <td>9.552526</td>
     </tr>
   </tbody>
 </table>
@@ -2596,7 +2591,7 @@ Top absolute coefficient gaps (ED):
   
     Created using
     <a href="https://www.sphinx-doc.org/" target="_blank" rel="noopener">Sphinx</a>
-    8.2.3.
+    9.2.0.
      and
     <a href="https://github.com/jbms/sphinx-immaterial/" target="_blank" rel="noopener">Sphinx-Immaterial</a>
   

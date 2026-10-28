@@ -1,0 +1,37 @@
+﻿neighbayes.models.SARPoissonFlow
+================================
+
+.. currentmodule:: neighbayes.models
+
+.. autoclass:: SARPoissonFlow
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SARPoissonFlow.__init__
+      ~SARPoissonFlow.fit
+      ~SARPoissonFlow.fitted_values
+      ~SARPoissonFlow.impacts
+      ~SARPoissonFlow.posterior_predictive
+      ~SARPoissonFlow.residuals
+      ~SARPoissonFlow.spatial_diagnostics
+      ~SARPoissonFlow.spatial_diagnostics_decision
+      ~SARPoissonFlow.summary
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SARPoissonFlow.inference_data
+      ~SARPoissonFlow.pymc_model
+   
+   

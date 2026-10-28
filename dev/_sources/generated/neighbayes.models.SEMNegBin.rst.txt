@@ -1,0 +1,37 @@
+﻿neighbayes.models.SEMNegBin
+===========================
+
+.. currentmodule:: neighbayes.models
+
+.. autoclass:: SEMNegBin
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SEMNegBin.__init__
+      ~SEMNegBin.fit
+      ~SEMNegBin.fitted_values
+      ~SEMNegBin.impacts
+      ~SEMNegBin.posterior_predictive
+      ~SEMNegBin.residuals
+      ~SEMNegBin.spatial_diagnostics
+      ~SEMNegBin.spatial_diagnostics_decision
+      ~SEMNegBin.summary
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SEMNegBin.inference_data
+      ~SEMNegBin.pymc_model
+   
+   

@@ -1,0 +1,39 @@
+﻿neighbayes.models.ZINB
+======================
+
+.. currentmodule:: neighbayes.models
+
+.. autoclass:: ZINB
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~ZINB.__init__
+      ~ZINB.activation_probabilities
+      ~ZINB.fit
+      ~ZINB.fitted_values
+      ~ZINB.impacts
+      ~ZINB.posterior_predictive
+      ~ZINB.residuals
+      ~ZINB.spatial_diagnostics
+      ~ZINB.spatial_diagnostics_decision
+      ~ZINB.summary
+      ~ZINB.zero_attribution
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~ZINB.inference_data
+      ~ZINB.pymc_model
+   
+   

@@ -14,13 +14,14 @@
    .. autosummary::
    
       ~SARZINB.__init__
-      ~SARZINB.corridor_probabilities
+      ~SARZINB.activation_probabilities
       ~SARZINB.fit
       ~SARZINB.fitted_values
+      ~SARZINB.impacts
+      ~SARZINB.posterior_predictive
       ~SARZINB.residuals
       ~SARZINB.spatial_diagnostics
       ~SARZINB.spatial_diagnostics_decision
-      ~SARZINB.spatial_effects
       ~SARZINB.summary
       ~SARZINB.zero_attribution
    

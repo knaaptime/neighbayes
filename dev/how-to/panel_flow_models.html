@@ -42,7 +42,7 @@
         <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
       
     
-        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.74c816e3f9967dd6e.min.css?v=6cfe2491" />
+        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.6efbe22605a23fcd6.min.css?v=b2ceb110" />
         <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
         <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
         <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=93c5fc88" />
@@ -532,7 +532,7 @@
   
   
   <span class="md-ellipsis">
-    <span>How to fit spatial logit models</span>
+    <span>How to fit a spatial logit model</span>
     
   </span>
   
@@ -1440,9 +1440,9 @@
 
 <h1 id="how-to-estimate-panel-flow-models">How to estimate panel flow models<a class="headerlink" href="#how-to-estimate-panel-flow-models" title="Link to this heading">¶</a></h1>
 <p>Origin–destination flows observed over several periods — trade by year,
-commuting by quarter. Four classes: <code class="docutils literal notranslate"><span class="pre">SARFlowPanel</span></code> and <code class="docutils literal notranslate"><span class="pre">SARFlowSeparablePanel</span></code>
-for continuous flows, <code class="docutils literal notranslate"><span class="pre">SARNegBinFlowPanel</span></code> and <code class="docutils literal notranslate"><span class="pre">SARNegBinFlowSeparablePanel</span></code>
-for counts.</p>
+commuting by quarter. Two classes, each unrestricted or separable and each made
+a panel by passing <code class="docutils literal notranslate"><span class="pre">T</span></code>: <code class="docutils literal notranslate"><span class="pre">SARFlow</span></code> for continuous flows, <code class="docutils literal notranslate"><span class="pre">SARNegBinFlow</span></code> for
+counts.</p>
 <p>Two things differ from the cross-sectional case and both will bite if missed:
 you must pass <code class="docutils literal notranslate"><span class="pre">T</span></code>, and the Gaussian classes expect the outcome on the <strong>latent
 SAR scale</strong>, so a lognormal outcome goes in as <code class="docutils literal notranslate"><span class="pre">log(y)</span></code>. Equations and
@@ -1457,18 +1457,8 @@ constructor arguments are in <a class="reference internal" href="../models.html"
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.dgp.flows</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-    <span class="n">generate_panel_flow_data</span><span class="p">,</span>
-    <span class="n">generate_panel_flow_data_separable</span><span class="p">,</span>
-    <span class="n">generate_panel_negbin_flow_data</span><span class="p">,</span>
-    <span class="n">generate_panel_negbin_flow_data_separable</span><span class="p">,</span>
-<span class="p">)</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-    <span class="n">SARFlowPanel</span><span class="p">,</span>
-    <span class="n">SARFlowSeparablePanel</span><span class="p">,</span>
-    <span class="n">SARNegBinFlowPanel</span><span class="p">,</span>
-    <span class="n">SARNegBinFlowSeparablePanel</span><span class="p">,</span>
-<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.dgp</span><span class="w"> </span><span class="kn">import</span> <span class="n">simulate_sar_flow</span><span class="p">,</span> <span class="n">simulate_sar_negbin_flow</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">SARFlow</span><span class="p">,</span> <span class="n">SARNegBinFlow</span>
 
 <span class="n">T</span> <span class="o">=</span> <span class="mi">3</span>
 <span class="n">RHO_D</span><span class="p">,</span> <span class="n">RHO_O</span><span class="p">,</span> <span class="n">RHO_W</span> <span class="o">=</span> <span class="mf">0.20</span><span class="p">,</span> <span class="mf">0.15</span><span class="p">,</span> <span class="mf">0.05</span>
@@ -1506,21 +1496,20 @@ constructor arguments are in <a class="reference internal" href="../models.html"
 </div>
 </div>
 <h2 id="fit-continuous-flows">Fit continuous flows<a class="headerlink" href="#fit-continuous-flows" title="Link to this heading">¶</a></h2>
-<p>The DGP returns lognormal flows, so the model gets <code class="docutils literal notranslate"><span class="pre">log(y)</span></code>. <code class="docutils literal notranslate"><span class="pre">effects=0</span></code> fits a
-pooled panel; the flow panel classes take the same <code class="docutils literal notranslate"><span class="pre">effects</span></code> argument as the
-other panel families.</p>
+<p>The DGP returns lognormal flows, so the model gets <code class="docutils literal notranslate"><span class="pre">log(y)</span></code>. Without
+<code class="docutils literal notranslate"><span class="pre">pair_effects</span></code> or <code class="docutils literal notranslate"><span class="pre">time_effects</span></code> the panel has no effects; the flow panel
+classes take <code class="docutils literal notranslate"><span class="pre">pair_effects</span></code> where the other panel families take
+<code class="docutils literal notranslate"><span class="pre">unit_effects</span></code>.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">data</span> <span class="o">=</span> <span class="n">generate_panel_flow_data</span><span class="p">(</span><span class="n">rho_w</span><span class="o">=</span><span class="n">RHO_W</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="o">**</span><span class="n">DGP</span><span class="p">)</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">data</span> <span class="o">=</span> <span class="n">simulate_sar_flow</span><span class="p">(</span><span class="n">rho_w</span><span class="o">=</span><span class="n">RHO_W</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="o">**</span><span class="n">DGP</span><span class="p">,</span> <span class="n">pair_effects</span><span class="o">=</span><span class="s2">"fixed"</span><span class="p">)</span>
 <span class="n">G</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">names</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">"G"</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="s2">"X"</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="s2">"col_names"</span><span class="p">]</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"periods      : </span><span class="si">{</span><span class="n">T</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"flows/period : </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s1">'y'</span><span class="p">])</span><span class="w"> </span><span class="o">//</span><span class="w"> </span><span class="n">T</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"true rho     : rho_d=</span><span class="si">{</span><span class="n">RHO_D</span><span class="si">}</span><span class="s2">, rho_o=</span><span class="si">{</span><span class="n">RHO_O</span><span class="si">}</span><span class="s2">, rho_w=</span><span class="si">{</span><span class="n">RHO_W</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
-<span class="n">model_free</span> <span class="o">=</span> <span class="n">SARFlowPanel</span><span class="p">(</span>
-    <span class="n">y</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">"y"</span><span class="p">]),</span> <span class="n">W</span><span class="o">=</span><span class="n">G</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">T</span><span class="o">=</span><span class="n">T</span><span class="p">,</span> <span class="n">col_names</span><span class="o">=</span><span class="n">names</span><span class="p">,</span> <span class="n">effects</span><span class="o">=</span><span class="mi">0</span>
-<span class="p">)</span>
+<span class="n">model_free</span> <span class="o">=</span> <span class="n">SARFlow</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">data</span><span class="p">[</span><span class="s2">"y"</span><span class="p">]),</span> <span class="n">W</span><span class="o">=</span><span class="n">G</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">T</span><span class="o">=</span><span class="n">T</span><span class="p">,</span> <span class="n">col_names</span><span class="o">=</span><span class="n">names</span><span class="p">)</span>
 <span class="n">idata_free</span><span class="p">,</span> <span class="n">secs_free</span> <span class="o">=</span> <span class="n">fit_timed</span><span class="p">(</span><span class="n">model_free</span><span class="p">,</span> <span class="o">**</span><span class="n">FIT</span><span class="p">)</span>
 
 <span class="n">az</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="n">idata_free</span><span class="p">,</span> <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s2">"rho_d"</span><span class="p">,</span> <span class="s2">"rho_o"</span><span class="p">,</span> <span class="s2">"rho_w"</span><span class="p">,</span> <span class="s2">"sigma"</span><span class="p">])</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
@@ -1554,48 +1543,48 @@ true rho     : rho_d=0.2, rho_o=0.15, rho_w=0.05
       <td>0.2</td>
       <td>0.055</td>
       <td>0.11</td>
-      <td>0.28</td>
-      <td>43</td>
-      <td>131</td>
-      <td>1.08</td>
-      <td>0.0085</td>
-      <td>0.0031</td>
+      <td>0.29</td>
+      <td>228</td>
+      <td>345</td>
+      <td>1.02</td>
+      <td>0.0036</td>
+      <td>0.0019</td>
     </tr>
     <tr>
       <th>rho_o</th>
-      <td>0.25</td>
-      <td>0.055</td>
-      <td>0.16</td>
-      <td>0.34</td>
-      <td>62</td>
-      <td>165</td>
-      <td>1.05</td>
-      <td>0.0069</td>
-      <td>0.0026</td>
+      <td>0.238</td>
+      <td>0.058</td>
+      <td>0.14</td>
+      <td>0.33</td>
+      <td>196</td>
+      <td>340</td>
+      <td>1.02</td>
+      <td>0.0041</td>
+      <td>0.0025</td>
     </tr>
     <tr>
       <th>rho_w</th>
       <td>0.038</td>
-      <td>0.035</td>
-      <td>0.0022</td>
-      <td>0.11</td>
-      <td>191</td>
-      <td>189</td>
-      <td>1.02</td>
-      <td>0.0027</td>
-      <td>0.0026</td>
+      <td>0.032</td>
+      <td>0.0041</td>
+      <td>0.098</td>
+      <td>674</td>
+      <td>539</td>
+      <td>1.01</td>
+      <td>0.0012</td>
+      <td>0.001</td>
     </tr>
     <tr>
       <th>sigma</th>
       <td>0.6968</td>
-      <td>0.0239</td>
+      <td>0.0248</td>
       <td>0.66</td>
-      <td>0.73</td>
-      <td>2768</td>
-      <td>2794</td>
+      <td>0.74</td>
+      <td>2902</td>
+      <td>3041</td>
       <td>1.00</td>
       <td>0.00046</td>
-      <td>0.0003</td>
+      <td>0.00034</td>
     </tr>
   </tbody>
 </table></div></div>
@@ -1605,25 +1594,25 @@ will be poor, and that is the model rather than the sampler: with <span class="m
 <span class="math notranslate nohighlight">\(\rho_o\)</span> and <span class="math notranslate nohighlight">\(\rho_w\)</span> all free they trade off along a nearly flat ridge that
 one-at-a-time updates cannot traverse.</p>
 <h2 id="prefer-the-separable-model">Prefer the separable model<a class="headerlink" href="#prefer-the-separable-model" title="Link to this heading">¶</a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">SARFlowSeparablePanel</span></code> pins <span class="math notranslate nohighlight">\(\rho_w = -\rho_d\rho_o\)</span>, which removes the ridge
+<p><code class="docutils literal notranslate"><span class="pre">SARFlow(separable=True)</span></code> pins <span class="math notranslate nohighlight">\(\rho_w = -\rho_d\rho_o\)</span>, which removes the ridge
 outright. Same data, same draws.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">data_sep</span> <span class="o">=</span> <span class="n">generate_panel_flow_data_separable</span><span class="p">(</span><span class="n">sigma</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="o">**</span><span class="n">DGP</span><span class="p">)</span>
-<span class="n">model_sep</span> <span class="o">=</span> <span class="n">SARFlowSeparablePanel</span><span class="p">(</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">data_sep</span> <span class="o">=</span> <span class="n">simulate_sar_flow</span><span class="p">(</span><span class="n">sigma</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="o">**</span><span class="n">DGP</span><span class="p">,</span> <span class="n">separable</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">pair_effects</span><span class="o">=</span><span class="s2">"fixed"</span><span class="p">)</span>
+<span class="n">model_sep</span> <span class="o">=</span> <span class="n">SARFlow</span><span class="p">(</span>
+    <span class="n">separable</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">y</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">data_sep</span><span class="p">[</span><span class="s2">"y"</span><span class="p">]),</span>
     <span class="n">W</span><span class="o">=</span><span class="n">data_sep</span><span class="p">[</span><span class="s2">"G"</span><span class="p">],</span>
     <span class="n">X</span><span class="o">=</span><span class="n">data_sep</span><span class="p">[</span><span class="s2">"X"</span><span class="p">],</span>
     <span class="n">T</span><span class="o">=</span><span class="n">T</span><span class="p">,</span>
     <span class="n">col_names</span><span class="o">=</span><span class="n">data_sep</span><span class="p">[</span><span class="s2">"col_names"</span><span class="p">],</span>
-    <span class="n">effects</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="n">idata_sep</span><span class="p">,</span> <span class="n">secs_sep</span> <span class="o">=</span> <span class="n">fit_timed</span><span class="p">(</span><span class="n">model_sep</span><span class="p">,</span> <span class="o">**</span><span class="n">FIT</span><span class="p">)</span>
 
 <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
     <span class="p">[</span>
-        <span class="n">report</span><span class="p">(</span><span class="s2">"SARFlowPanel (3 free rho)"</span><span class="p">,</span> <span class="n">idata_free</span><span class="p">,</span> <span class="n">secs_free</span><span class="p">),</span>
-        <span class="n">report</span><span class="p">(</span><span class="s2">"SARFlowSeparablePanel"</span><span class="p">,</span> <span class="n">idata_sep</span><span class="p">,</span> <span class="n">secs_sep</span><span class="p">),</span>
+        <span class="n">report</span><span class="p">(</span><span class="s2">"SARFlow panel (3 free rho)"</span><span class="p">,</span> <span class="n">idata_free</span><span class="p">,</span> <span class="n">secs_free</span><span class="p">),</span>
+        <span class="n">report</span><span class="p">(</span><span class="s2">"SARFlow panel (separable)"</span><span class="p">,</span> <span class="n">idata_sep</span><span class="p">,</span> <span class="n">secs_sep</span><span class="p">),</span>
     <span class="p">]</span>
 <span class="p">)</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
 </code></pre></div>
@@ -1657,20 +1646,20 @@ outright. Same data, same draws.</p>
   </thead>
   <tbody>
     <tr>
-      <th>SARFlowPanel (3 free rho)</th>
-      <td>16.296</td>
-      <td>0.197</td>
-      <td>0.251</td>
-      <td>43.128</td>
-      <td>1.080</td>
+      <th>SARFlow panel (3 free rho)</th>
+      <td>7.691</td>
+      <td>0.200</td>
+      <td>0.238</td>
+      <td>196.287</td>
+      <td>1.022</td>
     </tr>
     <tr>
-      <th>SARFlowSeparablePanel</th>
-      <td>11.371</td>
-      <td>0.229</td>
-      <td>0.271</td>
-      <td>1925.852</td>
-      <td>1.002</td>
+      <th>SARFlow panel (separable)</th>
+      <td>11.161</td>
+      <td>0.228</td>
+      <td>0.269</td>
+      <td>1999.833</td>
+      <td>1.001</td>
     </tr>
   </tbody>
 </table>
@@ -1707,32 +1696,33 @@ encouraged:</p>
 <h2 id="fit-flow-counts">Fit flow counts<a class="headerlink" href="#fit-flow-counts" title="Link to this heading">¶</a></h2>
 <p>The negative binomial panel classes take integer counts directly — no log
 transform — and add a dispersion parameter <code class="docutils literal notranslate"><span class="pre">alpha</span></code>. They default to the
-reduced-form Pólya–Gamma Gibbs sampler, and are currently <strong>pooled-only</strong>
-(<code class="docutils literal notranslate"><span class="pre">effects=0</span></code>).</p>
+reduced-form Pólya–Gamma Gibbs sampler. <code class="docutils literal notranslate"><span class="pre">pair_effects=&quot;random&quot;</span></code> adds
+partially pooled pair effects (inside the filter in the unrestricted panel);
+the fits below have none.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">nb</span> <span class="o">=</span> <span class="n">generate_panel_negbin_flow_data</span><span class="p">(</span><span class="n">rho_w</span><span class="o">=</span><span class="n">RHO_W</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span> <span class="o">**</span><span class="n">DGP</span><span class="p">)</span>
-<span class="n">nb_sep</span> <span class="o">=</span> <span class="n">generate_panel_negbin_flow_data_separable</span><span class="p">(</span><span class="n">alpha</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span> <span class="o">**</span><span class="n">DGP</span><span class="p">)</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">nb</span> <span class="o">=</span> <span class="n">simulate_sar_negbin_flow</span><span class="p">(</span><span class="n">rho_w</span><span class="o">=</span><span class="n">RHO_W</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span> <span class="o">**</span><span class="n">DGP</span><span class="p">)</span>
+<span class="n">nb_sep</span> <span class="o">=</span> <span class="n">simulate_sar_negbin_flow</span><span class="p">(</span><span class="n">alpha</span><span class="o">=</span><span class="mf">2.0</span><span class="p">,</span> <span class="o">**</span><span class="n">DGP</span><span class="p">,</span> <span class="n">separable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-<span class="n">model_nb</span> <span class="o">=</span> <span class="n">SARNegBinFlowPanel</span><span class="p">(</span>
-    <span class="n">y</span><span class="o">=</span><span class="n">nb</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">W</span><span class="o">=</span><span class="n">nb</span><span class="p">[</span><span class="s2">"G"</span><span class="p">],</span> <span class="n">X</span><span class="o">=</span><span class="n">nb</span><span class="p">[</span><span class="s2">"X"</span><span class="p">],</span> <span class="n">T</span><span class="o">=</span><span class="n">T</span><span class="p">,</span> <span class="n">col_names</span><span class="o">=</span><span class="n">nb</span><span class="p">[</span><span class="s2">"col_names"</span><span class="p">],</span> <span class="n">effects</span><span class="o">=</span><span class="mi">0</span>
+<span class="n">model_nb</span> <span class="o">=</span> <span class="n">SARNegBinFlow</span><span class="p">(</span>
+    <span class="n">y</span><span class="o">=</span><span class="n">nb</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">W</span><span class="o">=</span><span class="n">nb</span><span class="p">[</span><span class="s2">"G"</span><span class="p">],</span> <span class="n">X</span><span class="o">=</span><span class="n">nb</span><span class="p">[</span><span class="s2">"X"</span><span class="p">],</span> <span class="n">T</span><span class="o">=</span><span class="n">T</span><span class="p">,</span> <span class="n">col_names</span><span class="o">=</span><span class="n">nb</span><span class="p">[</span><span class="s2">"col_names"</span><span class="p">]</span>
 <span class="p">)</span>
 <span class="n">idata_nb</span><span class="p">,</span> <span class="n">secs_nb</span> <span class="o">=</span> <span class="n">fit_timed</span><span class="p">(</span><span class="n">model_nb</span><span class="p">,</span> <span class="o">**</span><span class="n">FIT</span><span class="p">)</span>
 
-<span class="n">model_nb_sep</span> <span class="o">=</span> <span class="n">SARNegBinFlowSeparablePanel</span><span class="p">(</span>
+<span class="n">model_nb_sep</span> <span class="o">=</span> <span class="n">SARNegBinFlow</span><span class="p">(</span>
+    <span class="n">separable</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">y</span><span class="o">=</span><span class="n">nb_sep</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span>
     <span class="n">W</span><span class="o">=</span><span class="n">nb_sep</span><span class="p">[</span><span class="s2">"G"</span><span class="p">],</span>
     <span class="n">X</span><span class="o">=</span><span class="n">nb_sep</span><span class="p">[</span><span class="s2">"X"</span><span class="p">],</span>
     <span class="n">T</span><span class="o">=</span><span class="n">T</span><span class="p">,</span>
     <span class="n">col_names</span><span class="o">=</span><span class="n">nb_sep</span><span class="p">[</span><span class="s2">"col_names"</span><span class="p">],</span>
-    <span class="n">effects</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="n">idata_nb_sep</span><span class="p">,</span> <span class="n">secs_nb_sep</span> <span class="o">=</span> <span class="n">fit_timed</span><span class="p">(</span><span class="n">model_nb_sep</span><span class="p">,</span> <span class="o">**</span><span class="n">FIT</span><span class="p">)</span>
 
 <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
     <span class="p">[</span>
-        <span class="n">report</span><span class="p">(</span><span class="s2">"SARNegBinFlowPanel"</span><span class="p">,</span> <span class="n">idata_nb</span><span class="p">,</span> <span class="n">secs_nb</span><span class="p">),</span>
-        <span class="n">report</span><span class="p">(</span><span class="s2">"SARNegBinFlowSeparablePanel"</span><span class="p">,</span> <span class="n">idata_nb_sep</span><span class="p">,</span> <span class="n">secs_nb_sep</span><span class="p">),</span>
+        <span class="n">report</span><span class="p">(</span><span class="s2">"SARNegBinFlow panel"</span><span class="p">,</span> <span class="n">idata_nb</span><span class="p">,</span> <span class="n">secs_nb</span><span class="p">),</span>
+        <span class="n">report</span><span class="p">(</span><span class="s2">"SARNegBinFlow panel (separable)"</span><span class="p">,</span> <span class="n">idata_nb_sep</span><span class="p">,</span> <span class="n">secs_nb_sep</span><span class="p">),</span>
     <span class="p">]</span>
 <span class="p">)</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
 </code></pre></div>
@@ -1766,19 +1756,19 @@ reduced-form Pólya–Gamma Gibbs sampler, and are currently <strong>pooled-only
   </thead>
   <tbody>
     <tr>
-      <th>SARNegBinFlowPanel</th>
-      <td>38.960</td>
+      <th>SARNegBinFlow panel</th>
+      <td>39.737</td>
       <td>0.127</td>
       <td>0.132</td>
       <td>1255.466</td>
       <td>1.007</td>
     </tr>
     <tr>
-      <th>SARNegBinFlowSeparablePanel</th>
-      <td>93.557</td>
-      <td>0.181</td>
-      <td>-0.275</td>
-      <td>1396.602</td>
+      <th>SARNegBinFlow panel (separable)</th>
+      <td>5.309</td>
+      <td>0.183</td>
+      <td>-0.294</td>
+      <td>1530.368</td>
       <td>1.002</td>
     </tr>
   </tbody>
@@ -1844,23 +1834,23 @@ accordingly — the count flow models want thousands of flows per period before
   <tbody>
     <tr>
       <th>Gaussian, 3 free rho</th>
-      <td>16.296</td>
-      <td>0.197</td>
-      <td>0.251</td>
-      <td>43.128</td>
-      <td>1.080</td>
+      <td>7.691</td>
+      <td>0.200</td>
+      <td>0.238</td>
+      <td>196.287</td>
+      <td>1.022</td>
     </tr>
     <tr>
       <th>Gaussian, separable</th>
-      <td>11.371</td>
-      <td>0.229</td>
-      <td>0.271</td>
-      <td>1925.852</td>
-      <td>1.002</td>
+      <td>11.161</td>
+      <td>0.228</td>
+      <td>0.269</td>
+      <td>1999.833</td>
+      <td>1.001</td>
     </tr>
     <tr>
       <th>NegBin, 3 free rho</th>
-      <td>38.960</td>
+      <td>39.737</td>
       <td>0.127</td>
       <td>0.132</td>
       <td>1255.466</td>
@@ -1868,10 +1858,10 @@ accordingly — the count flow models want thousands of flows per period before
     </tr>
     <tr>
       <th>NegBin, separable</th>
-      <td>93.557</td>
-      <td>0.181</td>
-      <td>-0.275</td>
-      <td>1396.602</td>
+      <td>5.309</td>
+      <td>0.183</td>
+      <td>-0.294</td>
+      <td>1530.368</td>
       <td>1.002</td>
     </tr>
   </tbody>
@@ -1933,7 +1923,7 @@ cross-sectional versions, with the effects decomposition in full</p></li>
   
     Created using
     <a href="https://www.sphinx-doc.org/" target="_blank" rel="noopener">Sphinx</a>
-    8.2.3.
+    9.2.0.
      and
     <a href="https://github.com/jbms/sphinx-immaterial/" target="_blank" rel="noopener">Sphinx-Immaterial</a>
   

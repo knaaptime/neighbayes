@@ -28,7 +28,7 @@
       ~PanelOLSREPriors.nu
       ~PanelOLSREPriors.sigma2_alpha
       ~PanelOLSREPriors.sigma2_beta
-      ~PanelOLSREPriors.sigma_alpha_nu
-      ~PanelOLSREPriors.sigma_alpha_scale
+      ~PanelOLSREPriors.unit_effect_sd_nu
+      ~PanelOLSREPriors.unit_effect_sd_scale
    
    

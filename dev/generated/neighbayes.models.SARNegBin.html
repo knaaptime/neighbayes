@@ -11,10 +11,10 @@
       
       
       
-        <link rel="prev" href="neighbayes.models.SDMTobit.html">
+        <link rel="prev" href="neighbayes.models.NegBin.html">
       
       
-        <link rel="next" href="neighbayes.models.SARNegBinStructural.html">
+        <link rel="next" href="neighbayes.models.SEMNegBin.html">
       
       
       <link rel="icon" href="../_static/pysal_favicon.ico">
@@ -42,7 +42,7 @@
         <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
       
     
-        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.74c816e3f9967dd6e.min.css?v=6cfe2491" />
+        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.6efbe22605a23fcd6.min.css?v=b2ceb110" />
         <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
         <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
         <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=93c5fc88" />
@@ -530,7 +530,7 @@
   
   
   <span class="md-ellipsis">
-    <span>How to fit spatial logit models</span>
+    <span>How to fit a spatial logit model</span>
     
   </span>
   
@@ -1004,16 +1004,63 @@
                 
   
   
+    
+  
+  
+  
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_2_1" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../api.html#models" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    <span>Models</span>
+    
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6_2_1" id="__nav_6_2_1_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_6_2_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6_2_1">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Models</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
   
   
   
     <li class="md-nav__item">
-      <a href="../api.html#cross-sectional-spatial-models" class="md-nav__link">
+      <a href="../api.html#gaussian" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    <span>Cross-<wbr>Sectional Spatial Models</span>
+    <span>Gaussian</span>
     
   </span>
   
@@ -1032,60 +1079,12 @@
   
   
     <li class="md-nav__item">
-      <a href="../api.html#panel-spatial-models-fixed-effects" class="md-nav__link">
+      <a href="../api.html#censored-and-binary" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    <span>Panel Spatial Models <wbr>(Fixed Effects)</span>
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../api.html#panel-spatial-models-random-effects" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    <span>Panel Spatial Models <wbr>(Random Effects)</span>
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../api.html#dynamic-panel-spatial-models" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    <span>Dynamic Panel Spatial Models</span>
+    <span>Censored and binary</span>
     
   </span>
   
@@ -1113,16 +1112,16 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_2_5" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_2_1_3" checked>
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../api.html#non-linear-spatial-models" class="md-nav__link ">
+            <a href="../api.html#counts" class="md-nav__link ">
               
   
   
   <span class="md-ellipsis">
-    <span>Non-<wbr>Linear Spatial Models</span>
+    <span>Counts</span>
     
   </span>
   
@@ -1130,16 +1129,16 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_6_2_5" id="__nav_6_2_5_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_6_2_1_3" id="__nav_6_2_1_3_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_6_2_5_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_6_2_5">
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_6_2_1_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6_2_1_3">
             <span class="md-nav__icon md-icon"></span>
-            <span>Non-<wbr>Linear Spatial Models</span>
+            <span>Counts</span>
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -1151,84 +1150,12 @@
   
   
     <li class="md-nav__item">
-      <a href="neighbayes.models.SARProbit.html" class="md-nav__link">
+      <a href="neighbayes.models.NegBin.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    <span>neighbayes.<wbr>models.<wbr>SARProbit</span>
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="neighbayes.models.SARTobit.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    <span>neighbayes.<wbr>models.<wbr>SARTobit</span>
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="neighbayes.models.SEMTobit.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    <span>neighbayes.<wbr>models.<wbr>SEMTobit</span>
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="neighbayes.models.SDMTobit.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    <span>neighbayes.<wbr>models.<wbr>SDMTobit</span>
+    <span>neighbayes.<wbr>models.<wbr>Neg<wbr>Bin</span>
     
   </span>
   
@@ -1299,12 +1226,220 @@
       <span aria-label="Python class" class="objinfo-icon objinfo-icon__data" title="Python class">C</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SARNegBin (Python class) — __init__(*args, **kwargs)"><span>neighbayes.<wbr>models.<wbr>SARNeg<wbr>Bin</span></span>
+      <span title="neighbayes.models.SARNegBin (Python class) — Bayesian reduced-form spatial autoregressive negative binomial (SAR-NB)."><span>neighbayes.<wbr>models.<wbr>SARNeg<wbr>Bin</span></span>
     </span>
   </a>
   
     <nav class="md-nav" aria-label="neighbayes.models.SARNegBin">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin-parameters" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Parameters</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.formula" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.formula (Python parameter) — Wilkinson-style formula, e.g."><span>formula</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.data" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.data (Python parameter) — Data source for formula mode."><span>data</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.y" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.y (Python parameter) — Non-negative integer counts of shape (n,) (matrix mode)."><span>y</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.X" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.X (Python parameter) — Design matrix (matrix mode)."><span>X</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.W" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.W (Python parameter) — Spatial weights, n × n (N × N in a panel), row-standardized."><span>W</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.priors" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.priors (Python parameter) — Override default priors: beta_mu, beta_sigma (default Gelman et al."><span>priors</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.logdet_method" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.logdet_method (Python parameter) — How log|I - rho*W| is computed over rho: summed over the eigenvalues of W; interpolated (Chebyshev, AAA rational, or cubic spline) through values from a sparse factorization, exact to the interpolant&#39;s tolerance; or expanded stochastically with no factorization, the one method with sampling error."><span>logdet_<wbr>method</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.logdet_decomp" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.logdet_decomp (Python parameter) — The factorization an interpolating method uses: sparse Cholesky (undirected W; scikit-sparse CHOLMOD) or sparse LU (KLU or UMFPACK, chosen by the sparsity pattern)."><span>logdet_<wbr>decomp</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.time_col" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.time_col (Python parameter) — Formula-mode panel: the period and unit columns of data."><span>time_<wbr>col</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.unit_col" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.unit_col (Python parameter) — Formula-mode panel: the period and unit columns of data."><span>unit_<wbr>col</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.N" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.N (Python parameter) — Matrix-mode panel: the numbers of units and periods."><span>N</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.T" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.T (Python parameter) — Matrix-mode panel: the numbers of units and periods."><span>T</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.unit_effects" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.unit_effects (Python parameter) — A panel&#39;s random unit effects inside the filter, unit_effect."><span>unit_<wbr>effects</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.time_effects" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.time_effects (Python parameter) — A panel&#39;s fixed time effects, time_effect."><span>time_<wbr>effects</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.mundlak" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.mundlak (Python parameter) — Add the unit means of the time-varying columns to a panel&#39;s design (inside the filter), absorbing a correlation between the unit effects and X."><span>mundlak</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.latent" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.latent (Python parameter) — The latent SAR instead of the reduced form."><span>latent</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#neighbayes.models.SARNegBin.__init__" class="md-nav__link">
@@ -1427,12 +1562,12 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#neighbayes.models.SARNegBin.fit.gibbs_backend" class="md-nav__link">
+  <a href="#neighbayes.models.SARNegBin.fit.backend" class="md-nav__link">
     
       <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SARNegBin.fit.gibbs_backend (Python parameter) — Execution backend for the Gibbs sampler."><span>gibbs_<wbr>backend</span></span>
+      <span title="neighbayes.models.SARNegBin.fit.backend (Python parameter) — What executes the sampler."><span>backend</span></span>
     </span>
   </a>
   
@@ -1480,7 +1615,7 @@
       <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SARNegBin.fit.sample_kwargs (Python parameter) — For NUTS, forwarded to pm.sample (nuts_sampler=...); for Gibbs, the family&#39;s declared options (an unsupported key raises)."><span>sample_<wbr>kwargs</span></span>
+      <span title="neighbayes.models.SARNegBin.fit.sample_kwargs (Python parameter) — For NUTS, forwarded to pm.sample; for Gibbs, the family&#39;s declared options (an unsupported key raises)."><span>sample_<wbr>kwargs</span></span>
     </span>
   </a>
   
@@ -1545,6 +1680,76 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.impacts" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.impacts (Python method) — Compute Bayesian inference for direct, indirect, and total impacts."><span>impacts</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="impacts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.impacts-parameters" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Parameters</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.impacts.return_posterior_samples" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.impacts.return_posterior_samples (Python parameter) — If True, also return the posterior draws for each effect type."><span>return_<wbr>posterior_<wbr>samples</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.impacts.scale" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.impacts.scale (Python parameter) — Scale on which impacts are reported."><span>scale</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.impacts.method" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.impacts.method (Python parameter) — Only used when scale=&#34;count&#34;."><span>method</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#neighbayes.models.SARNegBin.inference_data" class="md-nav__link">
     
       <span aria-label="Python property" class="objinfo-icon objinfo-icon__alias" title="Python property">P</span>
@@ -1572,6 +1777,34 @@
     
     <span class="md-ellipsis">
       <span>Return type</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.posterior_predictive" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.posterior_predictive (Python method) — Posterior-predictive counts, shape (n_draws, n_obs)."><span>posterior_<wbr>predictive</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="posterior_predictive">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.posterior_predictive-parameters" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Parameters</span>
     </span>
   </a>
   
@@ -1785,76 +2018,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#neighbayes.models.SARNegBin.spatial_effects" class="md-nav__link">
-    
-      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
-    
-    <span class="md-ellipsis">
-      <span title="neighbayes.models.SARNegBin.spatial_effects (Python method) — Compute Bayesian inference for direct, indirect, and total impacts."><span>spatial_<wbr>effects</span></span>
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="spatial_effects">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.SARNegBin.spatial_effects-parameters" class="md-nav__link">
-    
-    <span class="md-ellipsis">
-      <span>Parameters</span>
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Parameters">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.SARNegBin.spatial_effects.return_posterior_samples" class="md-nav__link">
-    
-      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
-    
-    <span class="md-ellipsis">
-      <span title="neighbayes.models.SARNegBin.spatial_effects.return_posterior_samples (Python parameter) — If True, also return the posterior draws for each effect type."><span>return_<wbr>posterior_<wbr>samples</span></span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.SARNegBin.spatial_effects.scale" class="md-nav__link">
-    
-      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
-    
-    <span class="md-ellipsis">
-      <span title="neighbayes.models.SARNegBin.spatial_effects.scale (Python parameter) — Scale on which impacts are reported."><span>scale</span></span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.SARNegBin.spatial_effects.method" class="md-nav__link">
-    
-      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
-    
-    <span class="md-ellipsis">
-      <span title="neighbayes.models.SARNegBin.spatial_effects.method (Python parameter) — Only used when scale=&#34;count&#34;."><span>method</span></span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#neighbayes.models.SARNegBin.summary" class="md-nav__link">
     
       <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
@@ -1954,12 +2117,60 @@
   
   
     <li class="md-nav__item">
-      <a href="neighbayes.models.SARNegBinStructural.html" class="md-nav__link">
+      <a href="neighbayes.models.SEMNegBin.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    <span>neighbayes.<wbr>models.<wbr>SARNeg<wbr>Bin<wbr>Structural</span>
+    <span>neighbayes.<wbr>models.<wbr>SEMNeg<wbr>Bin</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="neighbayes.models.SDEMNegBin.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>neighbayes.<wbr>models.<wbr>SDEMNeg<wbr>Bin</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="neighbayes.models.ZINB.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>neighbayes.<wbr>models.<wbr>ZINB</span>
     
   </span>
   
@@ -2002,12 +2213,12 @@
   
   
     <li class="md-nav__item">
-      <a href="neighbayes.models.Logit.html" class="md-nav__link">
+      <a href="neighbayes.models.HurdleNegBin.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    <span>neighbayes.<wbr>models.<wbr>Logit</span>
+    <span>neighbayes.<wbr>models.<wbr>Hurdle<wbr>Neg<wbr>Bin</span>
     
   </span>
   
@@ -2026,60 +2237,12 @@
   
   
     <li class="md-nav__item">
-      <a href="neighbayes.models.NegBin.html" class="md-nav__link">
+      <a href="neighbayes.models.SARHurdleNegBin.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    <span>neighbayes.<wbr>models.<wbr>Neg<wbr>Bin</span>
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="neighbayes.models.SARLogit.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    <span>neighbayes.<wbr>models.<wbr>SARLogit</span>
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="neighbayes.models.SEMLogit.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    <span>neighbayes.<wbr>models.<wbr>SEMLogit</span>
+    <span>neighbayes.<wbr>models.<wbr>SARHurdle<wbr>Neg<wbr>Bin</span>
     
   </span>
   
@@ -2107,12 +2270,12 @@
   
   
     <li class="md-nav__item">
-      <a href="../api.html#panel-spatial-models-tobit" class="md-nav__link">
+      <a href="../api.html#flows" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    <span>Panel Spatial Models <wbr>(Tobit)</span>
+    <span>Flows</span>
     
   </span>
   
@@ -2131,18 +2294,27 @@
   
   
     <li class="md-nav__item">
-      <a href="../api.html#flow-models" class="md-nav__link">
+      <a href="../api.html#multilevel" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    <span>Flow Models</span>
+    <span>Multilevel</span>
     
   </span>
   
 
       </a>
     </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
   
 
               
@@ -2257,6 +2429,30 @@
   
   <span class="md-ellipsis">
     <span>Graph Utilities</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api.html#runtime-configuration" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Runtime Configuration</span>
     
   </span>
   
@@ -2580,12 +2776,220 @@
       <span aria-label="Python class" class="objinfo-icon objinfo-icon__data" title="Python class">C</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SARNegBin (Python class) — __init__(*args, **kwargs)"><span>neighbayes.<wbr>models.<wbr>SARNeg<wbr>Bin</span></span>
+      <span title="neighbayes.models.SARNegBin (Python class) — Bayesian reduced-form spatial autoregressive negative binomial (SAR-NB)."><span>neighbayes.<wbr>models.<wbr>SARNeg<wbr>Bin</span></span>
     </span>
   </a>
   
     <nav class="md-nav" aria-label="neighbayes.models.SARNegBin">
       <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin-parameters" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Parameters</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.formula" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.formula (Python parameter) — Wilkinson-style formula, e.g."><span>formula</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.data" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.data (Python parameter) — Data source for formula mode."><span>data</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.y" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.y (Python parameter) — Non-negative integer counts of shape (n,) (matrix mode)."><span>y</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.X" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.X (Python parameter) — Design matrix (matrix mode)."><span>X</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.W" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.W (Python parameter) — Spatial weights, n × n (N × N in a panel), row-standardized."><span>W</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.priors" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.priors (Python parameter) — Override default priors: beta_mu, beta_sigma (default Gelman et al."><span>priors</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.logdet_method" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.logdet_method (Python parameter) — How log|I - rho*W| is computed over rho: summed over the eigenvalues of W; interpolated (Chebyshev, AAA rational, or cubic spline) through values from a sparse factorization, exact to the interpolant&#39;s tolerance; or expanded stochastically with no factorization, the one method with sampling error."><span>logdet_<wbr>method</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.logdet_decomp" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.logdet_decomp (Python parameter) — The factorization an interpolating method uses: sparse Cholesky (undirected W; scikit-sparse CHOLMOD) or sparse LU (KLU or UMFPACK, chosen by the sparsity pattern)."><span>logdet_<wbr>decomp</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.time_col" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.time_col (Python parameter) — Formula-mode panel: the period and unit columns of data."><span>time_<wbr>col</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.unit_col" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.unit_col (Python parameter) — Formula-mode panel: the period and unit columns of data."><span>unit_<wbr>col</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.N" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.N (Python parameter) — Matrix-mode panel: the numbers of units and periods."><span>N</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.T" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.T (Python parameter) — Matrix-mode panel: the numbers of units and periods."><span>T</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.unit_effects" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.unit_effects (Python parameter) — A panel&#39;s random unit effects inside the filter, unit_effect."><span>unit_<wbr>effects</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.time_effects" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.time_effects (Python parameter) — A panel&#39;s fixed time effects, time_effect."><span>time_<wbr>effects</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.mundlak" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.mundlak (Python parameter) — Add the unit means of the time-varying columns to a panel&#39;s design (inside the filter), absorbing a correlation between the unit effects and X."><span>mundlak</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.__init__.latent" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.__init__.latent (Python parameter) — The latent SAR instead of the reduced form."><span>latent</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
         
           <li class="md-nav__item">
   <a href="#neighbayes.models.SARNegBin.__init__" class="md-nav__link">
@@ -2708,12 +3112,12 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#neighbayes.models.SARNegBin.fit.gibbs_backend" class="md-nav__link">
+  <a href="#neighbayes.models.SARNegBin.fit.backend" class="md-nav__link">
     
       <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SARNegBin.fit.gibbs_backend (Python parameter) — Execution backend for the Gibbs sampler."><span>gibbs_<wbr>backend</span></span>
+      <span title="neighbayes.models.SARNegBin.fit.backend (Python parameter) — What executes the sampler."><span>backend</span></span>
     </span>
   </a>
   
@@ -2761,7 +3165,7 @@
       <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SARNegBin.fit.sample_kwargs (Python parameter) — For NUTS, forwarded to pm.sample (nuts_sampler=...); for Gibbs, the family&#39;s declared options (an unsupported key raises)."><span>sample_<wbr>kwargs</span></span>
+      <span title="neighbayes.models.SARNegBin.fit.sample_kwargs (Python parameter) — For NUTS, forwarded to pm.sample; for Gibbs, the family&#39;s declared options (an unsupported key raises)."><span>sample_<wbr>kwargs</span></span>
     </span>
   </a>
   
@@ -2826,6 +3230,76 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.impacts" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.impacts (Python method) — Compute Bayesian inference for direct, indirect, and total impacts."><span>impacts</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="impacts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.impacts-parameters" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Parameters</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.impacts.return_posterior_samples" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.impacts.return_posterior_samples (Python parameter) — If True, also return the posterior draws for each effect type."><span>return_<wbr>posterior_<wbr>samples</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.impacts.scale" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.impacts.scale (Python parameter) — Scale on which impacts are reported."><span>scale</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.impacts.method" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.impacts.method (Python parameter) — Only used when scale=&#34;count&#34;."><span>method</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#neighbayes.models.SARNegBin.inference_data" class="md-nav__link">
     
       <span aria-label="Python property" class="objinfo-icon objinfo-icon__alias" title="Python property">P</span>
@@ -2853,6 +3327,34 @@
     
     <span class="md-ellipsis">
       <span>Return type</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.posterior_predictive" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARNegBin.posterior_predictive (Python method) — Posterior-predictive counts, shape (n_draws, n_obs)."><span>posterior_<wbr>predictive</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="posterior_predictive">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARNegBin.posterior_predictive-parameters" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Parameters</span>
     </span>
   </a>
   
@@ -3066,76 +3568,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#neighbayes.models.SARNegBin.spatial_effects" class="md-nav__link">
-    
-      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
-    
-    <span class="md-ellipsis">
-      <span title="neighbayes.models.SARNegBin.spatial_effects (Python method) — Compute Bayesian inference for direct, indirect, and total impacts."><span>spatial_<wbr>effects</span></span>
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="spatial_effects">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.SARNegBin.spatial_effects-parameters" class="md-nav__link">
-    
-    <span class="md-ellipsis">
-      <span>Parameters</span>
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Parameters">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.SARNegBin.spatial_effects.return_posterior_samples" class="md-nav__link">
-    
-      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
-    
-    <span class="md-ellipsis">
-      <span title="neighbayes.models.SARNegBin.spatial_effects.return_posterior_samples (Python parameter) — If True, also return the posterior draws for each effect type."><span>return_<wbr>posterior_<wbr>samples</span></span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.SARNegBin.spatial_effects.scale" class="md-nav__link">
-    
-      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
-    
-    <span class="md-ellipsis">
-      <span title="neighbayes.models.SARNegBin.spatial_effects.scale (Python parameter) — Scale on which impacts are reported."><span>scale</span></span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.SARNegBin.spatial_effects.method" class="md-nav__link">
-    
-      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
-    
-    <span class="md-ellipsis">
-      <span title="neighbayes.models.SARNegBin.spatial_effects.method (Python parameter) — Only used when scale=&#34;count&#34;."><span>method</span></span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#neighbayes.models.SARNegBin.summary" class="md-nav__link">
     
       <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
@@ -3244,17 +3676,109 @@
 
 <h1 id="neighbayes-models-sarnegbin">neighbayes.models.SARNegBin<a class="headerlink" href="#neighbayes-models-sarnegbin" title="Link to this heading">¶</a></h1>
 <dl class="py class objdesc">
-<dt class="sig sig-object highlight py" id="neighbayes.models.SARNegBin">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neighbayes.models.</span></span><span class="sig-name descname"><span class="pre">SARNegBin</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">*</span></span><a class="n reference internal" href="#neighbayes.models.SARNegBin" title="neighbayes.models.SARNegBin.__init__.args (Python parameter)"><span class="n"><span class="pre">args</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">**</span></span><a class="n reference internal" href="#neighbayes.models.SARNegBin" title="neighbayes.models.SARNegBin.__init__.kwargs (Python parameter)"><span class="n"><span class="pre">kwargs</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/cross_section/sar_negbin.py#L68-L923"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARNegBin" title="Link to this definition">¶</a></dt>
-<dd><dl class="py method objdesc">
-<dt class="sig sig-object highlight py" id="neighbayes.models.SARNegBin.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">*</span></span><a class="n reference internal" href="#neighbayes.models.SARNegBin" title="neighbayes.models.SARNegBin.__init__.args (Python parameter)"><span class="n"><span class="pre">args</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">**</span></span><a class="n reference internal" href="#neighbayes.models.SARNegBin" title="neighbayes.models.SARNegBin.__init__.kwargs (Python parameter)"><span class="n"><span class="pre">kwargs</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/cross_section/sar_negbin.py#L80-L94"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARNegBin.__init__" title="Link to this definition">¶</a></dt>
+<dt class="sig sig-object highlight sig-wrap py" id="neighbayes.models.SARNegBin">
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">neighbayes.models.</span></span><span class="sig-name descname"><span class="pre">SARNegBin</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.__init__.formula" title="neighbayes.models.SARNegBin.__init__.formula (Python parameter) — Wilkinson-style formula, e.g."><span class="n"><span class="pre">formula</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.__init__.data" title="neighbayes.models.SARNegBin.__init__.data (Python parameter) — Data source for formula mode."><span class="n"><span class="pre">data</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.__init__.y" title="neighbayes.models.SARNegBin.__init__.y (Python parameter) — Non-negative integer counts of shape (n,) (matrix mode)."><span class="n"><span class="pre">y</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.__init__.X" title="neighbayes.models.SARNegBin.__init__.X (Python parameter) — Design matrix (matrix mode)."><span class="n"><span class="pre">X</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.__init__.W" title="neighbayes.models.SARNegBin.__init__.W (Python parameter) — Spatial weights, n × n (N × N in a panel), row-standardized."><span class="n"><span class="pre">W</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.__init__.unit_effects" title="neighbayes.models.SARNegBin.__init__.unit_effects (Python parameter) — A panel's random unit effects inside the filter, unit_effect."><span class="n"><span class="pre">unit_effects</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.__init__.time_effects" title="neighbayes.models.SARNegBin.__init__.time_effects (Python parameter) — A panel's fixed time effects, time_effect."><span class="n"><span class="pre">time_effects</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin" title="neighbayes.models.SARNegBin.__init__.dynamic (Python parameter)"><span class="n"><span class="pre">dynamic</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.__init__.mundlak" title="neighbayes.models.SARNegBin.__init__.mundlak (Python parameter) — Add the unit means of the time-varying columns to a panel's design (inside the filter), absorbing a correlation between the unit effects and X."><span class="n"><span class="pre">mundlak</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.__init__.latent" title="neighbayes.models.SARNegBin.__init__.latent (Python parameter) — The latent SAR instead of the reduced form."><span class="n"><span class="pre">latent</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.__init__.unit_col" title="neighbayes.models.SARNegBin.__init__.unit_col (Python parameter) — Formula-mode panel: the period and unit columns of data."><span class="n"><span class="pre">unit_col</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.__init__.time_col" title="neighbayes.models.SARNegBin.__init__.time_col (Python parameter) — Formula-mode panel: the period and unit columns of data."><span class="n"><span class="pre">time_col</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.__init__.N" title="neighbayes.models.SARNegBin.__init__.N (Python parameter) — Matrix-mode panel: the numbers of units and periods."><span class="n"><span class="pre">N</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.__init__.T" title="neighbayes.models.SARNegBin.__init__.T (Python parameter) — Matrix-mode panel: the numbers of units and periods."><span class="n"><span class="pre">T</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.__init__.priors" title="neighbayes.models.SARNegBin.__init__.priors (Python parameter) — Override default priors: beta_mu, beta_sigma (default Gelman et al."><span class="n"><span class="pre">priors</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.__init__.logdet_method" title="neighbayes.models.SARNegBin.__init__.logdet_method (Python parameter) — How log|I - rho*W| is computed over rho: summed over the eigenvalues of W; interpolated (Chebyshev, AAA rational, or cubic spline) through values from a sparse factorization, exact to the interpolant's tolerance; or expanded stochastically with no factorization, the one method with sampling error."><span class="n"><span class="pre">logdet_method</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin" title="neighbayes.models.SARNegBin.__init__.robust (Python parameter)"><span class="n"><span class="pre">robust</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin" title="neighbayes.models.SARNegBin.__init__.durbin_vars (Python parameter)"><span class="n"><span class="pre">durbin_vars</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.__init__.logdet_decomp" title="neighbayes.models.SARNegBin.__init__.logdet_decomp (Python parameter) — The factorization an interpolating method uses: sparse Cholesky (undirected W; scikit-sparse CHOLMOD) or sparse LU (KLU or UMFPACK, chosen by the sparsity pattern)."><span class="n"><span class="pre">logdet_decomp</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="s1">'auto'</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin" title="neighbayes.models.SARNegBin.__init__.logdet_adapt (Python parameter)"><span class="n"><span class="pre">logdet_adapt</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">True</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/cross_section/sar_negbin.py#L69-L995"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARNegBin" title="Link to this definition">¶</a></dt>
+<dd><p>Bayesian reduced-form spatial autoregressive negative binomial (SAR-NB).</p>
+<div class="math notranslate nohighlight">
+\[y_i \sim \mathrm{NegBin}(\mu_i, \alpha), \qquad
+\mu = \exp(\eta), \qquad
+\eta = (I - \rho W)^{-1} X \beta .\]</div>
+<p>The spatial lag acts on the log-mean; <code class="docutils literal notranslate"><span class="pre">y</span></code> is not transformed, so the
+likelihood carries no <span class="math notranslate nohighlight">\(\log|I - \rho W|\)</span> Jacobian.  <code class="docutils literal notranslate"><span class="pre">fit()</span></code>
+defaults to Pólya–Gamma Gibbs; <code class="docutils literal notranslate"><span class="pre">sampler=&quot;nuts&quot;</span></code> fits the same model in
+PyMC.</p>
+<p>With <code class="docutils literal notranslate"><span class="pre">latent=True</span></code> it is the latent SAR, whose multiplier propagates the
+negative binomial’s own disturbance as well as the covariates:</p>
+<div class="math notranslate nohighlight">
+\[y_i \sim \mathrm{Poisson}(e^{\eta_i}), \qquad
+(I - \rho W)\eta = X\beta + \varepsilon, \qquad
+\varepsilon_i = \log\gamma_i,\;
+\gamma_i \sim \mathrm{Gamma}(\alpha, \alpha),\]</div>
+<p>so that <span class="math notranslate nohighlight">\(\rho = 0\)</span> is <a class="reference internal" href="neighbayes.models.NegBin.html#neighbayes.models.NegBin" title="neighbayes.models.NegBin (Python class) — Bayesian (non-spatial) Negative Binomial regression."><code class="xref py py-class docutils literal notranslate"><span class="pre">NegBin</span></code></a>.  It is sampled by an exact
+Gibbs sweep over the log-means (<code class="xref py py-mod docutils literal notranslate"><span class="pre">neighbayes.samplers.negbin_latent</span></code>),
+on JAX by default; there is no NUTS path.  Its pointwise
+log-likelihood integrates each log-mean out given the rest, and its
+impacts are on the log-mean or, <code class="docutils literal notranslate"><span class="pre">impacts(scale=&quot;count&quot;)</span></code>, the expected
+count.</p>
+<dl class="field-list simple">
+<dt class="field-odd" id="neighbayes.models.SARNegBin-parameters">Parameters<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARNegBin-parameters" title="Permalink to this headline">¶</a></dt>
+<dd class="field-odd"><dl class="simple api-field highlight">
+<dt id="neighbayes.models.SARNegBin.__init__.formula"><span class="sig-name descname">formula</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)">str</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.__init__.formula" title="Permalink to this definition">¶</a></dt><dd><p>Wilkinson-style formula, e.g. <code class="docutils literal notranslate"><span class="pre">&quot;y</span> <span class="pre">~</span> <span class="pre">x1</span> <span class="pre">+</span> <span class="pre">x2&quot;</span></code>.  Requires <code class="docutils literal notranslate"><span class="pre">data</span></code>.</p>
+</dd>
+<dt id="neighbayes.models.SARNegBin.__init__.data"><span class="sig-name descname">data</span><span class="p"> : </span><span class="desctype"><span class="desctype">pandas.DataFrame or <a class="reference external" href="https://geopandas.org/en/latest/docs/reference/api/geopandas.GeoDataFrame.html#geopandas.GeoDataFrame" title="(in GeoPandas v1.2.1.dev5.dev+gf7883f7fc)">geopandas.GeoDataFrame</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.__init__.data" title="Permalink to this definition">¶</a></dt><dd><p>Data source for formula mode.</p>
+</dd>
+<dt id="neighbayes.models.SARNegBin.__init__.y"><span class="sig-name descname">y</span><span class="p"> : </span><span class="desctype"><span class="desctype">array-like, optional</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.__init__.y" title="Permalink to this definition">¶</a></dt><dd><p>Non-negative integer counts of shape <code class="docutils literal notranslate"><span class="pre">(n,)</span></code> (matrix mode).</p>
+</dd>
+<dt id="neighbayes.models.SARNegBin.__init__.X"><span class="sig-name descname">X</span><span class="p"> : </span><span class="desctype"><span class="desctype">array-like or pandas.DataFrame, optional</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.__init__.X" title="Permalink to this definition">¶</a></dt><dd><p>Design matrix (matrix mode).</p>
+</dd>
+<dt id="neighbayes.models.SARNegBin.__init__.W"><span class="sig-name descname">W</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://pysal.org/libpysal/stable/generated/libpysal.graph.Graph.html#libpysal.graph.Graph" title="(in libpysal v4.15.1)">libpysal.graph.Graph</a> or scipy.sparse matrix</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.__init__.W" title="Permalink to this definition">¶</a></dt><dd><p>Spatial weights, <code class="docutils literal notranslate"><span class="pre">n</span> <span class="pre">×</span> <span class="pre">n</span></code> (<code class="docutils literal notranslate"><span class="pre">N</span> <span class="pre">×</span> <span class="pre">N</span></code> in a panel), row-standardized.</p>
+</dd>
+<dt id="neighbayes.models.SARNegBin.__init__.priors"><span class="sig-name descname">priors</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.15)">dict</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.__init__.priors" title="Permalink to this definition">¶</a></dt><dd><p>Override default priors: <code class="docutils literal notranslate"><span class="pre">beta_mu</span></code>, <code class="docutils literal notranslate"><span class="pre">beta_sigma</span></code> (default Gelman
+et al. 2008 on the log scale), <code class="docutils literal notranslate"><span class="pre">rho_lower</span></code>, <code class="docutils literal notranslate"><span class="pre">rho_upper</span></code>,
+<code class="docutils literal notranslate"><span class="pre">alpha_sigma</span></code>, <code class="docutils literal notranslate"><span class="pre">alpha_nu</span></code> (Half-Student-t on α) and
+<code class="docutils literal notranslate"><span class="pre">alpha_fixed</span></code> (hold α; a large value is essentially Poisson).  See
+<a class="reference internal" href="neighbayes.models.priors.SARNegBinPriors.html#neighbayes.models.priors.SARNegBinPriors" title="neighbayes.models.priors.SARNegBinPriors (Python class) — Priors for neighbayes.models.SARNegBin."><code class="xref py py-class docutils literal notranslate"><span class="pre">SARNegBinPriors</span></code></a>; a panel’s are
+<a class="reference internal" href="neighbayes.models.priors.PanelCountPriors.html#neighbayes.models.priors.PanelCountPriors" title="neighbayes.models.priors.PanelCountPriors (Python class) — Priors for the count panels (neighbayes.models.SARNegBin &amp; co)."><code class="xref py py-class docutils literal notranslate"><span class="pre">PanelCountPriors</span></code></a>, which add the
+effects’ <code class="docutils literal notranslate"><span class="pre">unit_effect_mu</span></code>, <code class="docutils literal notranslate"><span class="pre">unit_effect_sd_scale</span></code>,
+<code class="docutils literal notranslate"><span class="pre">time_effect_mu</span></code> and <code class="docutils literal notranslate"><span class="pre">time_effect_sigma</span></code>.</p>
+</dd>
+<dt id="neighbayes.models.SARNegBin.__init__.logdet_method"><span class="sig-name descname">logdet_method</span><span class="p"> : </span><span class="desctype"><span class="desctype">{&quot;eigenvalue&quot;, &quot;cheb&quot;, &quot;aaa&quot;, &quot;spline&quot;, &quot;stochastic&quot;}, optional</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.__init__.logdet_method" title="Permalink to this definition">¶</a></dt><dd><p>How <code class="docutils literal notranslate"><span class="pre">log|I</span> <span class="pre">-</span> <span class="pre">rho*W|</span></code> is computed over rho: summed over the
+eigenvalues of <code class="docutils literal notranslate"><span class="pre">W</span></code>; interpolated (Chebyshev, AAA rational, or cubic
+spline) through values from a sparse factorization, exact to the
+interpolant’s tolerance; or expanded stochastically with no
+factorization, the one method with sampling error.  <code class="docutils literal notranslate"><span class="pre">None</span></code> (default)
+selects from the size and symmetry of <code class="docutils literal notranslate"><span class="pre">W</span></code>: <code class="docutils literal notranslate"><span class="pre">&quot;eigenvalue&quot;</span></code> for
+<code class="docutils literal notranslate"><span class="pre">n</span> <span class="pre">&lt;=</span> <span class="pre">500</span></code>; <code class="docutils literal notranslate"><span class="pre">&quot;aaa&quot;</span></code> up to <code class="docutils literal notranslate"><span class="pre">n</span> <span class="pre">=</span> <span class="pre">60000</span></code>
+(<code class="docutils literal notranslate"><span class="pre">NEIGHBAYES_LOGDET_FACTOR_MAX_N</span></code>) unless the factorization’s fill-in
+would dominate; <code class="docutils literal notranslate"><span class="pre">&quot;stochastic&quot;</span></code> beyond.</p>
+</dd>
+<dt id="neighbayes.models.SARNegBin.__init__.logdet_decomp"><span class="sig-name descname">logdet_decomp</span><span class="p"> : </span><span class="desctype"><span class="desctype">{&quot;auto&quot;, &quot;chol&quot;, &quot;lu&quot;}, default &quot;auto&quot;</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.__init__.logdet_decomp" title="Permalink to this definition">¶</a></dt><dd><p>The factorization an interpolating method uses: sparse Cholesky
+(undirected <code class="docutils literal notranslate"><span class="pre">W</span></code>; scikit-sparse CHOLMOD) or sparse LU (KLU or UMFPACK,
+chosen by the sparsity pattern).  <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code> takes <code class="docutils literal notranslate"><span class="pre">&quot;chol&quot;</span></code> where the
+method has it and <code class="docutils literal notranslate"><span class="pre">W</span></code> is undirected, else <code class="docutils literal notranslate"><span class="pre">&quot;lu&quot;</span></code>.  Ignored by
+<code class="docutils literal notranslate"><span class="pre">&quot;eigenvalue&quot;</span></code> and <code class="docutils literal notranslate"><span class="pre">&quot;stochastic&quot;</span></code>; <code class="docutils literal notranslate"><span class="pre">&quot;spline&quot;</span></code> on <code class="docutils literal notranslate"><span class="pre">&quot;chol&quot;</span></code>
+raises.</p>
+</dd>
+<dt id="neighbayes.models.SARNegBin.__init__.time_col"><span class="sig-name descname">time_col</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)">str</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.__init__.time_col" title="Permalink to this definition">¶</a></dt><dd><p>Formula-mode panel: the period and unit columns of <code class="docutils literal notranslate"><span class="pre">data</span></code>.  Given
+time, the model is a panel (<code class="xref py py-mod docutils literal notranslate"><span class="pre">neighbayes.models.panel._count</span></code>),
+stacked by period, then unit, whose Gibbs sampler integrates β, the
+period effects and the unit effects out of every ρ update.</p>
+</dd>
+<dt id="neighbayes.models.SARNegBin.__init__.unit_col"><span class="sig-name descname">unit_col</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)">str</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.__init__.unit_col" title="Permalink to this definition">¶</a></dt><dd><p>Formula-mode panel: the period and unit columns of <code class="docutils literal notranslate"><span class="pre">data</span></code>.  Given
+time, the model is a panel (<code class="xref py py-mod docutils literal notranslate"><span class="pre">neighbayes.models.panel._count</span></code>),
+stacked by period, then unit, whose Gibbs sampler integrates β, the
+period effects and the unit effects out of every ρ update.</p>
+</dd>
+<dt id="neighbayes.models.SARNegBin.__init__.N"><span class="sig-name descname">N</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)">int</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.__init__.N" title="Permalink to this definition">¶</a></dt><dd><p>Matrix-mode panel: the numbers of units and periods.</p>
+</dd>
+<dt id="neighbayes.models.SARNegBin.__init__.T"><span class="sig-name descname">T</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)">int</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.__init__.T" title="Permalink to this definition">¶</a></dt><dd><p>Matrix-mode panel: the numbers of units and periods.</p>
+</dd>
+<dt id="neighbayes.models.SARNegBin.__init__.unit_effects"><span class="sig-name descname">unit_effects</span><span class="p"> : </span><span class="desctype"><span class="desctype">{None, &quot;random&quot;}, default None</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.__init__.unit_effects" title="Permalink to this definition">¶</a></dt><dd><p>A panel’s random unit effects inside the filter, <code class="docutils literal notranslate"><span class="pre">unit_effect</span></code>.  A
+cross-section takes none: one draw per observation is a disturbance,
+not a unit effect.</p>
+</dd>
+<dt id="neighbayes.models.SARNegBin.__init__.time_effects"><span class="sig-name descname">time_effects</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)">bool</a>, default False</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.__init__.time_effects" title="Permalink to this definition">¶</a></dt><dd><p>A panel’s fixed time effects, <code class="docutils literal notranslate"><span class="pre">time_effect</span></code>.</p>
+</dd>
+<dt id="neighbayes.models.SARNegBin.__init__.mundlak"><span class="sig-name descname">mundlak</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)">bool</a>, default False</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.__init__.mundlak" title="Permalink to this definition">¶</a></dt><dd><p>Add the unit means of the time-varying columns to a panel’s design
+(inside the filter), absorbing a correlation between the unit effects
+and <code class="docutils literal notranslate"><span class="pre">X</span></code>.  Needs unit effects.</p>
+</dd>
+<dt id="neighbayes.models.SARNegBin.__init__.latent"><span class="sig-name descname">latent</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)">bool</a>, default False</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.__init__.latent" title="Permalink to this definition">¶</a></dt><dd><p>The latent SAR instead of the reduced form.  As a panel it takes random
+unit effects and period effects, both inside the filter with the
+covariates and each period’s gamma disturbance.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+<dl class="py method objdesc">
+<dt class="sig sig-object highlight sig-wrap py" id="neighbayes.models.SARNegBin.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.__init__.formula" title="neighbayes.models.SARNegBin.__init__.formula (Python parameter) — Wilkinson-style formula, e.g."><span class="n"><span class="pre">formula</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.__init__.data" title="neighbayes.models.SARNegBin.__init__.data (Python parameter) — Data source for formula mode."><span class="n"><span class="pre">data</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.__init__.y" title="neighbayes.models.SARNegBin.__init__.y (Python parameter) — Non-negative integer counts of shape (n,) (matrix mode)."><span class="n"><span class="pre">y</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.__init__.X" title="neighbayes.models.SARNegBin.__init__.X (Python parameter) — Design matrix (matrix mode)."><span class="n"><span class="pre">X</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.__init__.W" title="neighbayes.models.SARNegBin.__init__.W (Python parameter) — Spatial weights, n × n (N × N in a panel), row-standardized."><span class="n"><span class="pre">W</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.__init__.unit_effects" title="neighbayes.models.SARNegBin.__init__.unit_effects (Python parameter) — A panel's random unit effects inside the filter, unit_effect."><span class="n"><span class="pre">unit_effects</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.__init__.time_effects" title="neighbayes.models.SARNegBin.__init__.time_effects (Python parameter) — A panel's fixed time effects, time_effect."><span class="n"><span class="pre">time_effects</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin" title="neighbayes.models.SARNegBin.__init__.dynamic (Python parameter)"><span class="n"><span class="pre">dynamic</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.__init__.mundlak" title="neighbayes.models.SARNegBin.__init__.mundlak (Python parameter) — Add the unit means of the time-varying columns to a panel's design (inside the filter), absorbing a correlation between the unit effects and X."><span class="n"><span class="pre">mundlak</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.__init__.latent" title="neighbayes.models.SARNegBin.__init__.latent (Python parameter) — The latent SAR instead of the reduced form."><span class="n"><span class="pre">latent</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">**</span></span><a class="n reference internal" href="#neighbayes.models.SARNegBin.__init__" title="neighbayes.models.SARNegBin.__init__.kwargs (Python parameter)"><span class="n"><span class="pre">kwargs</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_mixins/_designs.py#L323-L371"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARNegBin.__init__" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <p class="rubric">Methods</p>
 <table class="autosummary longtable docutils data align-default">
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="#neighbayes.models.SARNegBin.__init__" title="neighbayes.models.SARNegBin.__init__ (Python method)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>(*args, **kwargs)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#neighbayes.models.SARNegBin.__init__" title="neighbayes.models.SARNegBin.__init__ (Python method)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>([formula, data, y, X, W, ...])</p></td>
 <td><p></p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#neighbayes.models.SARNegBin.fit" title="neighbayes.models.SARNegBin.fit (Python method) — Draw samples from the posterior."><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit</span></code></a>([draws, tune, chains, target_accept, ...])</p></td>
@@ -3262,6 +3786,12 @@
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#neighbayes.models.SARNegBin.fitted_values" title="neighbayes.models.SARNegBin.fitted_values (Python method) — Return fitted values at posterior mean parameters."><code class="xref py py-obj docutils literal notranslate"><span class="pre">fitted_values</span></code></a>()</p></td>
 <td><p>Return fitted values at posterior mean parameters.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#neighbayes.models.SARNegBin.impacts" title="neighbayes.models.SARNegBin.impacts (Python method) — Compute Bayesian inference for direct, indirect, and total impacts."><code class="xref py py-obj docutils literal notranslate"><span class="pre">impacts</span></code></a>([return_posterior_samples, scale, ...])</p></td>
+<td><p>Compute Bayesian inference for direct, indirect, and total impacts.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#neighbayes.models.SARNegBin.posterior_predictive" title="neighbayes.models.SARNegBin.posterior_predictive (Python method) — Posterior-predictive counts, shape (n_draws, n_obs)."><code class="xref py py-obj docutils literal notranslate"><span class="pre">posterior_predictive</span></code></a>(*args, **kwargs)</p></td>
+<td><p>Posterior-predictive counts, shape <code class="docutils literal notranslate"><span class="pre">(n_draws,</span> <span class="pre">n_obs)</span></code>.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#neighbayes.models.SARNegBin.residuals" title="neighbayes.models.SARNegBin.residuals (Python method) — Return residuals y - fitted_values."><code class="xref py py-obj docutils literal notranslate"><span class="pre">residuals</span></code></a>()</p></td>
 <td><p>Return residuals <code class="docutils literal notranslate"><span class="pre">y</span> <span class="pre">-</span> <span class="pre">fitted_values</span></code>.</p></td>
@@ -3272,10 +3802,7 @@
 <tr class="row-even"><td><p><a class="reference internal" href="#neighbayes.models.SARNegBin.spatial_diagnostics_decision" title="neighbayes.models.SARNegBin.spatial_diagnostics_decision (Python method) — Return a model-selection decision from Bayesian LM test results."><code class="xref py py-obj docutils literal notranslate"><span class="pre">spatial_diagnostics_decision</span></code></a>([alpha, format])</p></td>
 <td><p>Return a model-selection decision from Bayesian LM test results.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#neighbayes.models.SARNegBin.spatial_effects" title="neighbayes.models.SARNegBin.spatial_effects (Python method) — Compute Bayesian inference for direct, indirect, and total impacts."><code class="xref py py-obj docutils literal notranslate"><span class="pre">spatial_effects</span></code></a>([return_posterior_samples, ...])</p></td>
-<td><p>Compute Bayesian inference for direct, indirect, and total impacts.</p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#neighbayes.models.SARNegBin.summary" title="neighbayes.models.SARNegBin.summary (Python method) — Return posterior summary table."><code class="xref py py-obj docutils literal notranslate"><span class="pre">summary</span></code></a>([var_names])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#neighbayes.models.SARNegBin.summary" title="neighbayes.models.SARNegBin.summary (Python method) — Return posterior summary table."><code class="xref py py-obj docutils literal notranslate"><span class="pre">summary</span></code></a>([var_names])</p></td>
 <td><p>Return posterior summary table.</p></td>
 </tr>
 </tbody>
@@ -3293,7 +3820,7 @@
 </table>
 <dl class="py method objdesc">
 <dt class="sig sig-object highlight sig-wrap py" id="neighbayes.models.SARNegBin.fit">
-<span class="sig-name descname"><span class="pre">fit</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.fit.draws" title="neighbayes.models.SARNegBin.fit.draws (Python parameter) — Post-warmup draws, warmup steps, and number of chains."><span class="n"><span class="pre">draws</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">2000</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.fit.tune" title="neighbayes.models.SARNegBin.fit.tune (Python parameter) — Post-warmup draws, warmup steps, and number of chains."><span class="n"><span class="pre">tune</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">1000</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.fit.chains" title="neighbayes.models.SARNegBin.fit.chains (Python parameter) — Post-warmup draws, warmup steps, and number of chains."><span class="n"><span class="pre">chains</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">4</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.fit.target_accept" title="neighbayes.models.SARNegBin.fit.target_accept (Python parameter) — Target acceptance rate for NUTS."><span class="n"><span class="pre">target_accept</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.fit.random_seed" title="neighbayes.models.SARNegBin.fit.random_seed (Python parameter) — Seed for reproducibility."><span class="n"><span class="pre">random_seed</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.fit.progressbar" title="neighbayes.models.SARNegBin.fit.progressbar (Python parameter) — Show progress bar(s) during sampling."><span class="n"><span class="pre">progressbar</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">True</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.fit.sampler" title="neighbayes.models.SARNegBin.fit.sampler (Python parameter) — Sampling method."><span class="n"><span class="pre">sampler</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.fit.gibbs_backend" title="neighbayes.models.SARNegBin.fit.gibbs_backend (Python parameter) — Execution backend for the Gibbs sampler."><span class="n"><span class="pre">gibbs_backend</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="s1">'auto'</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.fit.thin" title="neighbayes.models.SARNegBin.fit.thin (Python parameter) — Keep every thin-th post-warmup Gibbs draw (Gibbs only)."><span class="n"><span class="pre">thin</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">1</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.fit.n_jobs" title="neighbayes.models.SARNegBin.fit.n_jobs (Python parameter) — Parallel workers for the NumPy Gibbs path (Gibbs only)."><span class="n"><span class="pre">n_jobs</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="o">-</span><span class="mi">1</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.fit.idata_kwargs" title="neighbayes.models.SARNegBin.fit.idata_kwargs (Python parameter) — {&quot;log_likelihood&quot;: True} stores the complete Jacobian-corrected pointwise log-likelihood that az.loo / az.compare need, for Gibbs and NUTS alike."><span class="n"><span class="pre">idata_kwargs</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">**</span></span><a class="n reference internal" href="#neighbayes.models.SARNegBin.fit.sample_kwargs" title="neighbayes.models.SARNegBin.fit.sample_kwargs (Python parameter) — For NUTS, forwarded to pm.sample (nuts_sampler=...); for Gibbs, the family's declared options (an unsupported key raises)."><span class="n"><span class="pre">sample_kwargs</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/base.py#L263-L394"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARNegBin.fit" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">fit</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.fit.draws" title="neighbayes.models.SARNegBin.fit.draws (Python parameter) — Post-warmup draws, warmup steps, and number of chains."><span class="n"><span class="pre">draws</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">2000</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.fit.tune" title="neighbayes.models.SARNegBin.fit.tune (Python parameter) — Post-warmup draws, warmup steps, and number of chains."><span class="n"><span class="pre">tune</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">1000</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.fit.chains" title="neighbayes.models.SARNegBin.fit.chains (Python parameter) — Post-warmup draws, warmup steps, and number of chains."><span class="n"><span class="pre">chains</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">4</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.fit.target_accept" title="neighbayes.models.SARNegBin.fit.target_accept (Python parameter) — Target acceptance rate for NUTS."><span class="n"><span class="pre">target_accept</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.fit.random_seed" title="neighbayes.models.SARNegBin.fit.random_seed (Python parameter) — Seed for reproducibility."><span class="n"><span class="pre">random_seed</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.fit.progressbar" title="neighbayes.models.SARNegBin.fit.progressbar (Python parameter) — Show progress bar(s) during sampling."><span class="n"><span class="pre">progressbar</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">True</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.fit.sampler" title="neighbayes.models.SARNegBin.fit.sampler (Python parameter) — Sampling method."><span class="n"><span class="pre">sampler</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.fit.backend" title="neighbayes.models.SARNegBin.fit.backend (Python parameter) — What executes the sampler."><span class="n"><span class="pre">backend</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.fit.thin" title="neighbayes.models.SARNegBin.fit.thin (Python parameter) — Keep every thin-th post-warmup Gibbs draw (Gibbs only)."><span class="n"><span class="pre">thin</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">1</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.fit.n_jobs" title="neighbayes.models.SARNegBin.fit.n_jobs (Python parameter) — Parallel workers for the NumPy Gibbs path (Gibbs only)."><span class="n"><span class="pre">n_jobs</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="o">-</span><span class="mi">1</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.fit.idata_kwargs" title="neighbayes.models.SARNegBin.fit.idata_kwargs (Python parameter) — {&quot;log_likelihood&quot;: True} stores the complete Jacobian-corrected pointwise log-likelihood that az.loo / az.compare need, for Gibbs and NUTS alike."><span class="n"><span class="pre">idata_kwargs</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">**</span></span><a class="n reference internal" href="#neighbayes.models.SARNegBin.fit.sample_kwargs" title="neighbayes.models.SARNegBin.fit.sample_kwargs (Python parameter) — For NUTS, forwarded to pm.sample; for Gibbs, the family's declared options (an unsupported key raises)."><span class="n"><span class="pre">sample_kwargs</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/base.py#L584-L724"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARNegBin.fit" title="Link to this definition">¶</a></dt>
 <dd><p>Draw samples from the posterior.</p>
 <p>Dispatches to this model’s Gibbs sampler (<code class="docutils literal notranslate"><span class="pre">sampler=&quot;gibbs&quot;</span></code>) or NUTS
 (<code class="docutils literal notranslate"><span class="pre">sampler=&quot;nuts&quot;</span></code>).  When <code class="docutils literal notranslate"><span class="pre">sampler</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code> (default), Gibbs is
@@ -3301,38 +3828,40 @@ used if the model has a registered Gibbs sampler, otherwise NUTS.</p>
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.models.SARNegBin.fit-parameters">Parameters<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARNegBin.fit-parameters" title="Permalink to this headline">¶</a></dt>
 <dd class="field-odd"><dl class="simple api-field highlight">
-<dt id="neighbayes.models.SARNegBin.fit.draws"><span class="sig-name descname">draws</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)">int</a></span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.fit.draws" title="Permalink to this definition">¶</a></dt><dd><p>Post-warmup draws, warmup steps, and number of chains.</p>
+<dt id="neighbayes.models.SARNegBin.fit.draws"><span class="sig-name descname">draws</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)">int</a></span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.fit.draws" title="Permalink to this definition">¶</a></dt><dd><p>Post-warmup draws, warmup steps, and number of chains.</p>
 </dd>
-<dt id="neighbayes.models.SARNegBin.fit.tune"><span class="sig-name descname">tune</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)">int</a></span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.fit.tune" title="Permalink to this definition">¶</a></dt><dd><p>Post-warmup draws, warmup steps, and number of chains.</p>
+<dt id="neighbayes.models.SARNegBin.fit.tune"><span class="sig-name descname">tune</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)">int</a></span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.fit.tune" title="Permalink to this definition">¶</a></dt><dd><p>Post-warmup draws, warmup steps, and number of chains.</p>
 </dd>
-<dt id="neighbayes.models.SARNegBin.fit.chains"><span class="sig-name descname">chains</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)">int</a></span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.fit.chains" title="Permalink to this definition">¶</a></dt><dd><p>Post-warmup draws, warmup steps, and number of chains.</p>
+<dt id="neighbayes.models.SARNegBin.fit.chains"><span class="sig-name descname">chains</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)">int</a></span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.fit.chains" title="Permalink to this definition">¶</a></dt><dd><p>Post-warmup draws, warmup steps, and number of chains.</p>
 </dd>
-<dt id="neighbayes.models.SARNegBin.fit.target_accept"><span class="sig-name descname">target_accept</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)">float</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.fit.target_accept" title="Permalink to this definition">¶</a></dt><dd><p>Target acceptance rate for NUTS.  NUTS-only: passing it with the
+<dt id="neighbayes.models.SARNegBin.fit.target_accept"><span class="sig-name descname">target_accept</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)">float</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.fit.target_accept" title="Permalink to this definition">¶</a></dt><dd><p>Target acceptance rate for NUTS.  NUTS-only: passing it with the
 Gibbs sampler raises <code class="docutils literal notranslate"><span class="pre">TypeError</span></code>.  Defaults to <code class="docutils literal notranslate"><span class="pre">0.9</span></code> for NUTS.</p>
 </dd>
-<dt id="neighbayes.models.SARNegBin.fit.random_seed"><span class="sig-name descname">random_seed</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)">int</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.fit.random_seed" title="Permalink to this definition">¶</a></dt><dd><p>Seed for reproducibility.</p>
+<dt id="neighbayes.models.SARNegBin.fit.random_seed"><span class="sig-name descname">random_seed</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)">int</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.fit.random_seed" title="Permalink to this definition">¶</a></dt><dd><p>Seed for reproducibility.</p>
 </dd>
-<dt id="neighbayes.models.SARNegBin.fit.progressbar"><span class="sig-name descname">progressbar</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)">bool</a>, default True</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.fit.progressbar" title="Permalink to this definition">¶</a></dt><dd><p>Show progress bar(s) during sampling.</p>
+<dt id="neighbayes.models.SARNegBin.fit.progressbar"><span class="sig-name descname">progressbar</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)">bool</a>, default True</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.fit.progressbar" title="Permalink to this definition">¶</a></dt><dd><p>Show progress bar(s) during sampling.</p>
 </dd>
 <dt id="neighbayes.models.SARNegBin.fit.sampler"><span class="sig-name descname">sampler</span><span class="p"> : </span><span class="desctype"><span class="desctype">{&quot;gibbs&quot;, &quot;nuts&quot;, None}, default None</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.fit.sampler" title="Permalink to this definition">¶</a></dt><dd><p>Sampling method.  <code class="docutils literal notranslate"><span class="pre">None</span></code> auto-selects Gibbs when this model has
 one, else NUTS.</p>
 </dd>
-<dt id="neighbayes.models.SARNegBin.fit.gibbs_backend"><span class="sig-name descname">gibbs_backend</span><span class="p"> : </span><span class="desctype"><span class="desctype">{&quot;auto&quot;, &quot;jax&quot;, &quot;numpy&quot;}, default &quot;auto&quot;</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.fit.gibbs_backend" title="Permalink to this definition">¶</a></dt><dd><p>Execution backend for the Gibbs sampler.  <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code> uses JAX when
-installed and supported by the family, else NumPy.  Ignored for NUTS.</p>
+<dt id="neighbayes.models.SARNegBin.fit.backend"><span class="sig-name descname">backend</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)">str</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.fit.backend" title="Permalink to this definition">¶</a></dt><dd><p>What executes the sampler.  For Gibbs, <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code> (the default),
+<code class="docutils literal notranslate"><span class="pre">&quot;jax&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;numpy&quot;</span></code>; <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code> takes JAX when it is installed
+and supported by the family, else NumPy.  For NUTS, <code class="docutils literal notranslate"><span class="pre">&quot;pymc&quot;</span></code> (the
+default), <code class="docutils literal notranslate"><span class="pre">&quot;nutpie&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;numpyro&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;blackjax&quot;</span></code>.</p>
 </dd>
-<dt id="neighbayes.models.SARNegBin.fit.thin"><span class="sig-name descname">thin</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)">int</a>, default 1</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.fit.thin" title="Permalink to this definition">¶</a></dt><dd><p>Keep every <code class="docutils literal notranslate"><span class="pre">thin</span></code>-th post-warmup Gibbs draw (Gibbs only).</p>
+<dt id="neighbayes.models.SARNegBin.fit.thin"><span class="sig-name descname">thin</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)">int</a>, default 1</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.fit.thin" title="Permalink to this definition">¶</a></dt><dd><p>Keep every <code class="docutils literal notranslate"><span class="pre">thin</span></code>-th post-warmup Gibbs draw (Gibbs only).</p>
 </dd>
-<dt id="neighbayes.models.SARNegBin.fit.n_jobs"><span class="sig-name descname">n_jobs</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)">int</a>, default -1</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.fit.n_jobs" title="Permalink to this definition">¶</a></dt><dd><p>Parallel workers for the NumPy Gibbs path (Gibbs only).</p>
+<dt id="neighbayes.models.SARNegBin.fit.n_jobs"><span class="sig-name descname">n_jobs</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)">int</a>, default -1</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.fit.n_jobs" title="Permalink to this definition">¶</a></dt><dd><p>Parallel workers for the NumPy Gibbs path (Gibbs only).</p>
 </dd>
-<dt id="neighbayes.models.SARNegBin.fit.idata_kwargs"><span class="sig-name descname">idata_kwargs</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.14)">dict</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.fit.idata_kwargs" title="Permalink to this definition">¶</a></dt><dd><p><code class="docutils literal notranslate"><span class="pre">{&quot;log_likelihood&quot;:</span> <span class="pre">True}</span></code> stores the complete Jacobian-corrected
+<dt id="neighbayes.models.SARNegBin.fit.idata_kwargs"><span class="sig-name descname">idata_kwargs</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.15)">dict</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.fit.idata_kwargs" title="Permalink to this definition">¶</a></dt><dd><p><code class="docutils literal notranslate"><span class="pre">{&quot;log_likelihood&quot;:</span> <span class="pre">True}</span></code> stores the complete Jacobian-corrected
 pointwise log-likelihood that <code class="docutils literal notranslate"><span class="pre">az.loo</span></code> /
 <code class="docutils literal notranslate"><span class="pre">az.compare</span></code> need, for Gibbs and NUTS alike.  Off by default, as
 in PyMC: it holds one value per draw, chain, and observation (16 GB
 at n = 250,000 with 4 × 2,000 draws).  For NUTS the dict is also
 passed to <code class="docutils literal notranslate"><span class="pre">pm.sample</span></code>.</p>
 </dd>
-<dt id="neighbayes.models.SARNegBin.fit.sample_kwargs"><span class="o">**</span><span class="n sig-name">sample_kwargs</span><a class="headerlink" href="#neighbayes.models.SARNegBin.fit.sample_kwargs" title="Permalink to this definition">¶</a></dt><dd><p>For NUTS, forwarded to <code class="docutils literal notranslate"><span class="pre">pm.sample</span></code> (<code class="docutils literal notranslate"><span class="pre">nuts_sampler=...</span></code>); for
-Gibbs, the family’s declared options (an unsupported key raises).</p>
+<dt id="neighbayes.models.SARNegBin.fit.sample_kwargs"><span class="o">**</span><span class="n sig-name">sample_kwargs</span><a class="headerlink" href="#neighbayes.models.SARNegBin.fit.sample_kwargs" title="Permalink to this definition">¶</a></dt><dd><p>For NUTS, forwarded to <code class="docutils literal notranslate"><span class="pre">pm.sample</span></code>; for Gibbs, the family’s
+declared options (an unsupported key raises).</p>
 </dd>
 </dl>
 </dd>
@@ -3344,7 +3873,7 @@ Gibbs, the family’s declared options (an unsupported key raises).</p>
 
 <dl class="py method objdesc">
 <dt class="sig sig-object highlight py" id="neighbayes.models.SARNegBin.fitted_values">
-<span class="sig-name descname"><span class="pre">fitted_values</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L984-L994"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARNegBin.fitted_values" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">fitted_values</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L983-L993"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARNegBin.fitted_values" title="Link to this definition">¶</a></dt>
 <dd><p>Return fitted values at posterior mean parameters.</p>
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.models.SARNegBin.fitted_values-returns">Returns<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARNegBin.fitted_values-returns" title="Permalink to this headline">¶</a></dt>
@@ -3357,9 +3886,39 @@ fixed-effects-transformed for panel models).</p>
 </dl>
 </dd></dl>
 
+<dl class="py method objdesc">
+<dt class="sig sig-object highlight sig-wrap py" id="neighbayes.models.SARNegBin.impacts">
+<span class="sig-name descname"><span class="pre">impacts</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.impacts.return_posterior_samples" title="neighbayes.models.SARNegBin.impacts.return_posterior_samples (Python parameter) — If True, also return the posterior draws for each effect type."><span class="n"><span class="pre">return_posterior_samples</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.impacts.scale" title="neighbayes.models.SARNegBin.impacts.scale (Python parameter) — Scale on which impacts are reported."><span class="n"><span class="pre">scale</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="s1">'logmean'</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.impacts.method" title="neighbayes.models.SARNegBin.impacts.method (Python parameter) — Only used when scale=&quot;count&quot;."><span class="n"><span class="pre">method</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="s1">'auto'</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/cross_section/sar_negbin.py#L949-L995"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARNegBin.impacts" title="Link to this definition">¶</a></dt>
+<dd><p>Compute Bayesian inference for direct, indirect, and total impacts.</p>
+<dl class="field-list simple">
+<dt class="field-odd" id="neighbayes.models.SARNegBin.impacts-parameters">Parameters<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARNegBin.impacts-parameters" title="Permalink to this headline">¶</a></dt>
+<dd class="field-odd"><dl class="simple api-field highlight">
+<dt id="neighbayes.models.SARNegBin.impacts.return_posterior_samples"><span class="sig-name descname">return_posterior_samples</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)">bool</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.impacts.return_posterior_samples" title="Permalink to this definition">¶</a></dt><dd><p>If <code class="docutils literal notranslate"><span class="pre">True</span></code>, also return the posterior draws for each effect type.</p>
+</dd>
+<dt id="neighbayes.models.SARNegBin.impacts.scale"><span class="sig-name descname">scale</span><span class="p"> : </span><span class="desctype"><span class="desctype">{&quot;logmean&quot;, &quot;count&quot;}, default &quot;logmean&quot;</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.impacts.scale" title="Permalink to this definition">¶</a></dt><dd><p><p>Scale on which impacts are reported.</p>
+<p><code class="docutils literal notranslate"><span class="pre">&quot;logmean&quot;</span></code> returns the current default impacts on the linear
+predictor scale <span class="math notranslate nohighlight">\(\log \mu\)</span>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">&quot;count&quot;</span></code> returns impacts on the expected-count scale
+<span class="math notranslate nohighlight">\(\mu = \exp(\eta)\)</span>. This is exact but more expensive because
+it requires the diagonal of the spatial multiplier for each
+posterior draw.</p>
+</p>
+</dd>
+<dt id="neighbayes.models.SARNegBin.impacts.method"><span class="sig-name descname">method</span><span class="p"> : </span><span class="desctype"><span class="desctype">{&quot;auto&quot;, &quot;eigen&quot;, &quot;sparse&quot;}, default &quot;auto&quot;</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.impacts.method" title="Permalink to this definition">¶</a></dt><dd><p>Only used when <code class="docutils literal notranslate"><span class="pre">scale=&quot;count&quot;</span></code>. <code class="docutils literal notranslate"><span class="pre">&quot;eigen&quot;</span></code> materializes the
+eigendecomposition of <span class="math notranslate nohighlight">\(W\)</span> (fast for small <span class="math notranslate nohighlight">\(n\)</span> but
+O(n³) memory/time); <code class="docutils literal notranslate"><span class="pre">&quot;sparse&quot;</span></code> uses one sparse LU per draw
+plus a Hutchinson diagonal estimator; <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code> picks sparse
+when <span class="math notranslate nohighlight">\(n\)</span> exceeds
+<code class="xref py py-attr docutils literal notranslate"><span class="pre">_COUNT_EFFECTS_EIGEN_MAX_N</span></code> (default 2000).</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
 <dl class="py property objdesc">
 <dt class="sig sig-object highlight py" id="neighbayes.models.SARNegBin.inference_data">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">inference_data</span></span><span class="p"> <span class="pre">:</span> </span><span class="desctype"><span class="pre">xarray.core.datatree.DataTree</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models.py"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARNegBin.inference_data" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">inference_data</span></span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models.py"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARNegBin.inference_data" title="Link to this definition">¶</a></dt>
 <dd><p>Return the ArviZ DataTree from the most recent fit.</p>
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.models.SARNegBin.inference_data-returns">Returns<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARNegBin.inference_data-returns" title="Permalink to this headline">¶</a></dt>
@@ -3372,15 +3931,31 @@ been fit yet.</p>
 </dl>
 </dd></dl>
 
+<dl class="py method objdesc">
+<dt class="sig sig-object highlight py" id="neighbayes.models.SARNegBin.posterior_predictive">
+<span class="sig-name descname"><span class="pre">posterior_predictive</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">*</span></span><a class="n reference internal" href="#neighbayes.models.SARNegBin.posterior_predictive" title="neighbayes.models.SARNegBin.posterior_predictive.args (Python parameter)"><span class="n"><span class="pre">args</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">**</span></span><a class="n reference internal" href="#neighbayes.models.SARNegBin.posterior_predictive" title="neighbayes.models.SARNegBin.posterior_predictive.kwargs (Python parameter)"><span class="n"><span class="pre">kwargs</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_mixins/_designs.py#L95-L96"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARNegBin.posterior_predictive" title="Link to this definition">¶</a></dt>
+<dd><p>Posterior-predictive counts, shape <code class="docutils literal notranslate"><span class="pre">(n_draws,</span> <span class="pre">n_obs)</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd" id="neighbayes.models.SARNegBin.posterior_predictive-parameters">Parameters<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARNegBin.posterior_predictive-parameters" title="Permalink to this headline">¶</a></dt>
+<dd class="field-odd"><dl class="simple api-field highlight">
+<dt><span class="sig-name descname">n_draws</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)">int</a>, optional</span></span></dt><dd><p>Posterior draws to simulate from; all of them by default.</p>
+</dd>
+<dt><span class="sig-name descname">random_seed</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)">int</a>, optional</span></span></dt><dd><p>Seed for the simulation.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
 <dl class="py property objdesc">
 <dt class="sig sig-object highlight py" id="neighbayes.models.SARNegBin.pymc_model">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">pymc_model</span></span><span class="p"> <span class="pre">:</span> </span><span class="desctype"><a class="reference external" href="https://www.pymc.io/projects/docs/en/stable/api/model/generated/pymc.model.core.Model.html#pymc.model.core.Model" title="(in PyMC v6.3.2)"><span class="pre">pymc.model.core.Model</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models.py"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARNegBin.pymc_model" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">pymc_model</span></span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models.py"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARNegBin.pymc_model" title="Link to this definition">¶</a></dt>
 <dd><p>Return the PyMC model object built for the most recent fit.</p>
-<p>For Gibbs-fitted models the PyMC model is not constructed during
-sampling; it is built lazily on first access so that downstream
-consumers (e.g. bridge sampling for marginal likelihoods) can
-evaluate <code class="docutils literal notranslate"><span class="pre">logp</span></code> and the prior under the same model definition
-used by the NUTS path.</p>
+<p>For a Gibbs-fitted cross-section the PyMC model is not constructed
+during sampling; it is built lazily on first access so that downstream
+consumers (e.g. bridge sampling for marginal likelihoods) can evaluate
+<code class="docutils literal notranslate"><span class="pre">logp</span></code> and the prior under the same model definition used by the
+NUTS path.</p>
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.models.SARNegBin.pymc_model-returns">Returns<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARNegBin.pymc_model-returns" title="Permalink to this headline">¶</a></dt>
 <dd class="field-odd"><p>The model object used by <a class="reference internal" href="#neighbayes.models.SARNegBin.fit" title="neighbayes.models.SARNegBin.fit (Python method) — Draw samples from the posterior."><code class="xref py py-meth docutils literal notranslate"><span class="pre">fit()</span></code></a>, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if the instance
@@ -3394,7 +3969,7 @@ has not been fit yet.</p>
 
 <dl class="py method objdesc">
 <dt class="sig sig-object highlight py" id="neighbayes.models.SARNegBin.residuals">
-<span class="sig-name descname"><span class="pre">residuals</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L996-L1006"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARNegBin.residuals" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">residuals</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L995-L1005"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARNegBin.residuals" title="Link to this definition">¶</a></dt>
 <dd><p>Return residuals <code class="docutils literal notranslate"><span class="pre">y</span> <span class="pre">-</span> <span class="pre">fitted_values</span></code>.</p>
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.models.SARNegBin.residuals-returns">Returns<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARNegBin.residuals-returns" title="Permalink to this headline">¶</a></dt>
@@ -3409,7 +3984,7 @@ has not been fit yet.</p>
 
 <dl class="py method objdesc">
 <dt class="sig sig-object highlight py" id="neighbayes.models.SARNegBin.spatial_diagnostics">
-<span class="sig-name descname"><span class="pre">spatial_diagnostics</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L1679-L1749"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARNegBin.spatial_diagnostics" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">spatial_diagnostics</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L1700-L1770"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARNegBin.spatial_diagnostics" title="Link to this definition">¶</a></dt>
 <dd><p>Run Bayesian LM specification tests and return a summary table.</p>
 <p>Looks up the diagnostic suite registered for this model class
 and calls each test function on this fitted model, collecting the
@@ -3460,8 +4035,8 @@ time.</p>
 </dd>
 <dt class="field-odd" id="neighbayes.models.SARNegBin.spatial_diagnostics-raises">Raises<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARNegBin.spatial_diagnostics-raises" title="Permalink to this headline">¶</a></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the model has not been fit yet.</p></li>
-<li><p><a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If no spatial weights matrix <code class="docutils literal notranslate"><span class="pre">W</span></code> was supplied.</p></li>
+<li><p><a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#RuntimeError" title="(in Python v3.15)"><strong>RuntimeError</strong></a> – If the model has not been fit yet.</p></li>
+<li><p><a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#ValueError" title="(in Python v3.15)"><strong>ValueError</strong></a> – If no spatial weights matrix <code class="docutils literal notranslate"><span class="pre">W</span></code> was supplied.</p></li>
 </ul>
 </dd>
 </dl>
@@ -3470,7 +4045,7 @@ time.</p>
 <dl class="simple">
 <dt><a class="reference internal" href="#neighbayes.models.SARNegBin.spatial_diagnostics_decision" title="neighbayes.models.SARNegBin.spatial_diagnostics_decision (Python method) — Return a model-selection decision from Bayesian LM test results."><code class="xref py py-obj docutils literal notranslate"><span class="pre">spatial_diagnostics_decision</span></code></a></dt><dd><p>Model-selection decision based on the test results.</p>
 </dd>
-<dt><a class="reference internal" href="#neighbayes.models.SARNegBin.spatial_effects" title="neighbayes.models.SARNegBin.spatial_effects (Python method) — Compute Bayesian inference for direct, indirect, and total impacts."><code class="xref py py-obj docutils literal notranslate"><span class="pre">spatial_effects</span></code></a></dt><dd><p>Posterior inference for direct/indirect/total impacts.</p>
+<dt><a class="reference internal" href="#neighbayes.models.SARNegBin.impacts" title="neighbayes.models.SARNegBin.impacts (Python method) — Compute Bayesian inference for direct, indirect, and total impacts."><code class="xref py py-obj docutils literal notranslate"><span class="pre">impacts</span></code></a></dt><dd><p>Posterior inference for direct/indirect/total impacts.</p>
 </dd>
 </dl>
 </div>
@@ -3489,7 +4064,7 @@ time.</p>
 
 <dl class="py method objdesc">
 <dt class="sig sig-object highlight py" id="neighbayes.models.SARNegBin.spatial_diagnostics_decision">
-<span class="sig-name descname"><span class="pre">spatial_diagnostics_decision</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.spatial_diagnostics_decision.alpha" title="neighbayes.models.SARNegBin.spatial_diagnostics_decision.alpha (Python parameter) — Significance level for the Bayesian p-values."><span class="n"><span class="pre">alpha</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">0.05</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.spatial_diagnostics_decision.format" title="neighbayes.models.SARNegBin.spatial_diagnostics_decision.format (Python parameter) — Output format."><span class="n"><span class="pre">format</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="s1">'graphviz'</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L1751-L1866"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARNegBin.spatial_diagnostics_decision" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">spatial_diagnostics_decision</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.spatial_diagnostics_decision.alpha" title="neighbayes.models.SARNegBin.spatial_diagnostics_decision.alpha (Python parameter) — Significance level for the Bayesian p-values."><span class="n"><span class="pre">alpha</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">0.05</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.spatial_diagnostics_decision.format" title="neighbayes.models.SARNegBin.spatial_diagnostics_decision.format (Python parameter) — Output format."><span class="n"><span class="pre">format</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="s1">'graphviz'</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L1772-L1887"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARNegBin.spatial_diagnostics_decision" title="Link to this definition">¶</a></dt>
 <dd><p>Return a model-selection decision from Bayesian LM test results.</p>
 <p>Implements the decision tree from <span class="bibtex-citation" id="id1">Koley and Bera [<a class="reference internal" href="../references.html#id28" title="Malabika Koley and Anil K. Bera. To use, or not to use the spatial Durbin model? – that is the question. Spatial Economic Analysis, 19(1):30–56, 2024. URL: https://doi.org/10.1080/17421772.2023.2256810 (visited on 2025-05-21), doi:10.1080/17421772.2023.2256810.">2024</a>]</span>
 (the Bayesian analogue of the classical <code class="docutils literal notranslate"><span class="pre">stge_kb</span></code> procedure
@@ -3521,21 +4096,21 @@ Robust-LM-WX significant → SDM.</p></li>
 <ul class="simple">
 <li><p>Robust-LM-Lag-SDM significant → SDM;
 Robust-LM-Error-SDEM significant → SDEM;
-both → MANSAR; neither → SLX.</p></li>
+both → GNS; neither → SLX.</p></li>
 </ul>
-<p><strong>From SDM</strong>: LM-Error-SDM significant → MANSAR; else SDM.</p>
-<p><strong>From SDEM</strong>: LM-Lag-SDEM significant → MANSAR; else SDEM.</p>
+<p><strong>From SDM</strong>: LM-Error-SDM significant → GNS; else SDM.</p>
+<p><strong>From SDEM</strong>: LM-Lag-SDEM significant → GNS; else SDEM.</p>
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.models.SARNegBin.spatial_diagnostics_decision-parameters">Parameters<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARNegBin.spatial_diagnostics_decision-parameters" title="Permalink to this headline">¶</a></dt>
 <dd class="field-odd"><dl class="simple api-field highlight">
-<dt id="neighbayes.models.SARNegBin.spatial_diagnostics_decision.alpha"><span class="sig-name descname">alpha</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)">float</a>, default 0.05</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.spatial_diagnostics_decision.alpha" title="Permalink to this definition">¶</a></dt><dd><p>Significance level for the Bayesian p-values.</p>
+<dt id="neighbayes.models.SARNegBin.spatial_diagnostics_decision.alpha"><span class="sig-name descname">alpha</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)">float</a>, default 0.05</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.spatial_diagnostics_decision.alpha" title="Permalink to this definition">¶</a></dt><dd><p>Significance level for the Bayesian p-values.</p>
 </dd>
 <dt id="neighbayes.models.SARNegBin.spatial_diagnostics_decision.format"><span class="sig-name descname">format</span><span class="p"> : </span><span class="desctype"><span class="desctype">{&quot;graphviz&quot;, &quot;ascii&quot;, &quot;model&quot;}, default &quot;graphviz&quot;</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.spatial_diagnostics_decision.format" title="Permalink to this definition">¶</a></dt><dd><p>Output format. <code class="docutils literal notranslate"><span class="pre">&quot;model&quot;</span></code> returns the recommended-model name
 string. <code class="docutils literal notranslate"><span class="pre">&quot;ascii&quot;</span></code> returns an indented box-drawing rendering
 of the full decision tree with the chosen path highlighted.
 <code class="docutils literal notranslate"><span class="pre">&quot;graphviz&quot;</span></code> returns a <code class="xref py py-class docutils literal notranslate"><span class="pre">graphviz.Digraph</span></code> object that
 renders inline in Jupyter; if the optional <code class="docutils literal notranslate"><span class="pre">graphviz</span></code> package
-is not installed a <a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#UserWarning" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">UserWarning</span></code></a> is issued and the
+is not installed a <a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#UserWarning" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">UserWarning</span></code></a> is issued and the
 ASCII rendering is returned instead.</p>
 </dd>
 </dl>
@@ -3546,7 +4121,7 @@ string when <code class="docutils literal notranslate"><span class="pre">format=
 <code class="docutils literal notranslate"><span class="pre">format=&quot;graphviz&quot;</span></code> (with ASCII fallback on missing dep).</p>
 </dd>
 <dt class="field-odd" id="neighbayes.models.SARNegBin.spatial_diagnostics_decision-return-type">Return type<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARNegBin.spatial_diagnostics_decision-return-type" title="Permalink to this headline">¶</a></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)">str</a> or graphviz.Digraph</p>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)">str</a> or graphviz.Digraph</p>
 </dd>
 </dl>
 <div class="seealso admonition">
@@ -3562,43 +4137,13 @@ string when <code class="docutils literal notranslate"><span class="pre">format=
 </dd></dl>
 
 <dl class="py method objdesc">
-<dt class="sig sig-object highlight sig-wrap py" id="neighbayes.models.SARNegBin.spatial_effects">
-<span class="sig-name descname"><span class="pre">spatial_effects</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.spatial_effects.return_posterior_samples" title="neighbayes.models.SARNegBin.spatial_effects.return_posterior_samples (Python parameter) — If True, also return the posterior draws for each effect type."><span class="n"><span class="pre">return_posterior_samples</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.spatial_effects.scale" title="neighbayes.models.SARNegBin.spatial_effects.scale (Python parameter) — Scale on which impacts are reported."><span class="n"><span class="pre">scale</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="s1">'logmean'</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.spatial_effects.method" title="neighbayes.models.SARNegBin.spatial_effects.method (Python parameter) — Only used when scale=&quot;count&quot;."><span class="n"><span class="pre">method</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="s1">'auto'</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/cross_section/sar_negbin.py#L849-L923"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARNegBin.spatial_effects" title="Link to this definition">¶</a></dt>
-<dd><p>Compute Bayesian inference for direct, indirect, and total impacts.</p>
-<dl class="field-list simple">
-<dt class="field-odd" id="neighbayes.models.SARNegBin.spatial_effects-parameters">Parameters<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARNegBin.spatial_effects-parameters" title="Permalink to this headline">¶</a></dt>
-<dd class="field-odd"><dl class="simple api-field highlight">
-<dt id="neighbayes.models.SARNegBin.spatial_effects.return_posterior_samples"><span class="sig-name descname">return_posterior_samples</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)">bool</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.spatial_effects.return_posterior_samples" title="Permalink to this definition">¶</a></dt><dd><p>If <code class="docutils literal notranslate"><span class="pre">True</span></code>, also return the posterior draws for each effect type.</p>
-</dd>
-<dt id="neighbayes.models.SARNegBin.spatial_effects.scale"><span class="sig-name descname">scale</span><span class="p"> : </span><span class="desctype"><span class="desctype">{&quot;logmean&quot;, &quot;count&quot;}, default &quot;logmean&quot;</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.spatial_effects.scale" title="Permalink to this definition">¶</a></dt><dd><p><p>Scale on which impacts are reported.</p>
-<p><code class="docutils literal notranslate"><span class="pre">&quot;logmean&quot;</span></code> returns the current default impacts on the linear
-predictor scale <span class="math notranslate nohighlight">\(\log \mu\)</span>.</p>
-<p><code class="docutils literal notranslate"><span class="pre">&quot;count&quot;</span></code> returns impacts on the expected-count scale
-<span class="math notranslate nohighlight">\(\mu = \exp(\eta)\)</span>. This is exact but more expensive because
-it requires the diagonal of the spatial multiplier for each
-posterior draw.</p>
-</p>
-</dd>
-<dt id="neighbayes.models.SARNegBin.spatial_effects.method"><span class="sig-name descname">method</span><span class="p"> : </span><span class="desctype"><span class="desctype">{&quot;auto&quot;, &quot;eigen&quot;, &quot;sparse&quot;}, default &quot;auto&quot;</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.spatial_effects.method" title="Permalink to this definition">¶</a></dt><dd><p>Only used when <code class="docutils literal notranslate"><span class="pre">scale=&quot;count&quot;</span></code>. <code class="docutils literal notranslate"><span class="pre">&quot;eigen&quot;</span></code> materializes the
-eigendecomposition of <span class="math notranslate nohighlight">\(W\)</span> (fast for small <span class="math notranslate nohighlight">\(n\)</span> but
-O(n³) memory/time); <code class="docutils literal notranslate"><span class="pre">&quot;sparse&quot;</span></code> uses one sparse LU per draw
-plus a Hutchinson diagonal estimator; <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code> picks sparse
-when <span class="math notranslate nohighlight">\(n\)</span> exceeds
-<code class="xref py py-attr docutils literal notranslate"><span class="pre">_COUNT_EFFECTS_EIGEN_MAX_N</span></code> (default 2000).</p>
-</dd>
-</dl>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method objdesc">
 <dt class="sig sig-object highlight py" id="neighbayes.models.SARNegBin.summary">
-<span class="sig-name descname"><span class="pre">summary</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.summary.var_names" title="neighbayes.models.SARNegBin.summary.var_names (Python parameter) — Variable names to include in the summary."><span class="n"><span class="pre">var_names</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">**</span></span><a class="n reference internal" href="#neighbayes.models.SARNegBin.summary.kwargs" title="neighbayes.models.SARNegBin.summary.kwargs (Python parameter) — Additional arguments passed to arviz.summary()."><span class="n"><span class="pre">kwargs</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L965-L982"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARNegBin.summary" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">summary</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARNegBin.summary.var_names" title="neighbayes.models.SARNegBin.summary.var_names (Python parameter) — Variable names to include in the summary."><span class="n"><span class="pre">var_names</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">**</span></span><a class="n reference internal" href="#neighbayes.models.SARNegBin.summary.kwargs" title="neighbayes.models.SARNegBin.summary.kwargs (Python parameter) — Additional arguments passed to arviz.summary()."><span class="n"><span class="pre">kwargs</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L964-L981"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARNegBin.summary" title="Link to this definition">¶</a></dt>
 <dd><p>Return posterior summary table.</p>
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.models.SARNegBin.summary-parameters">Parameters<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARNegBin.summary-parameters" title="Permalink to this headline">¶</a></dt>
 <dd class="field-odd"><dl class="simple api-field highlight">
-<dt id="neighbayes.models.SARNegBin.summary.var_names"><span class="sig-name descname">var_names</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.14)">list</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.summary.var_names" title="Permalink to this definition">¶</a></dt><dd><p>Variable names to include in the summary.</p>
+<dt id="neighbayes.models.SARNegBin.summary.var_names"><span class="sig-name descname">var_names</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.15)">list</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARNegBin.summary.var_names" title="Permalink to this definition">¶</a></dt><dd><p>Variable names to include in the summary.</p>
 </dd>
 <dt id="neighbayes.models.SARNegBin.summary.kwargs"><span class="o">**</span><span class="n sig-name">kwargs</span><a class="headerlink" href="#neighbayes.models.SARNegBin.summary.kwargs" title="Permalink to this definition">¶</a></dt><dd><p>Additional arguments passed to <code class="xref py py-func docutils literal notranslate"><span class="pre">arviz.summary()</span></code>.</p>
 </dd>
@@ -3660,7 +4205,7 @@ when <span class="math notranslate nohighlight">\(n\)</span> exceeds
   
     Created using
     <a href="https://www.sphinx-doc.org/" target="_blank" rel="noopener">Sphinx</a>
-    8.2.3.
+    9.2.0.
      and
     <a href="https://github.com/jbms/sphinx-immaterial/" target="_blank" rel="noopener">Sphinx-Immaterial</a>
   

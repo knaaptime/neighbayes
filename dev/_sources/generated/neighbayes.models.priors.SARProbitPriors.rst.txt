@@ -27,6 +27,5 @@
       ~SARProbitPriors.beta_sigma
       ~SARProbitPriors.rho_lower
       ~SARProbitPriors.rho_upper
-      ~SARProbitPriors.sigma_a_sigma
    
    

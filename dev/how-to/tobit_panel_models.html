@@ -42,7 +42,7 @@
         <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
       
     
-        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.74c816e3f9967dd6e.min.css?v=6cfe2491" />
+        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.6efbe22605a23fcd6.min.css?v=b2ceb110" />
         <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
         <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
         <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=93c5fc88" />
@@ -532,7 +532,7 @@
   
   
   <span class="md-ellipsis">
-    <span>How to fit spatial logit models</span>
+    <span>How to fit a spatial logit model</span>
     
   </span>
   
@@ -1440,8 +1440,9 @@
 
 <h1 id="how-to-fit-spatial-tobit-panel-models">How to fit spatial tobit panel models<a class="headerlink" href="#how-to-fit-spatial-tobit-panel-models" title="Link to this heading">¶</a></h1>
 <p>Censored outcomes observed for the same units over several periods.
-<code class="docutils literal notranslate"><span class="pre">SARPanelTobit</span></code> puts the spatial lag on the latent outcome; <code class="docutils literal notranslate"><span class="pre">SEMPanelTobit</span></code>
-puts the spatial structure in the disturbances.</p>
+A <code class="docutils literal notranslate"><span class="pre">SARTobit</span></code> panel puts the spatial lag on the latent outcome; a <code class="docutils literal notranslate"><span class="pre">SEMTobit</span></code>
+panel puts the spatial structure in the disturbances. Either is a panel when
+<code class="docutils literal notranslate"><span class="pre">time_col</span></code> or <code class="docutils literal notranslate"><span class="pre">T</span></code> is given.</p>
 <p>Both are <strong>NUTS-only</strong>, and both need <code class="docutils literal notranslate"><span class="pre">N</span></code>, <code class="docutils literal notranslate"><span class="pre">T</span></code> and <code class="docutils literal notranslate"><span class="pre">censoring</span></code> stated
 explicitly — the panel shape and the censoring threshold are not inferred.
 Equations and constructor arguments are in
@@ -1453,7 +1454,7 @@ Equations and constructor arguments are in
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes</span><span class="w"> </span><span class="kn">import</span> <span class="n">dgp</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">SARPanelTobit</span><span class="p">,</span> <span class="n">SEMPanelTobit</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">SARTobit</span><span class="p">,</span> <span class="n">SEMTobit</span>
 
 <span class="n">N</span><span class="p">,</span> <span class="n">T</span><span class="p">,</span> <span class="n">SIDE</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">5</span><span class="p">,</span> <span class="mi">10</span>  <span class="c1"># 10x10 rook grid, 5 periods</span>
 <span class="n">RHO</span><span class="p">,</span> <span class="n">LAM</span><span class="p">,</span> <span class="n">SIGMA</span> <span class="o">=</span> <span class="mf">0.35</span><span class="p">,</span> <span class="mf">0.35</span><span class="p">,</span> <span class="mf">0.8</span>
@@ -1469,7 +1470,7 @@ Equations and constructor arguments are in
 model the shape with <code class="docutils literal notranslate"><span class="pre">N</span></code> and <code class="docutils literal notranslate"><span class="pre">T</span></code>.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">sar_data</span> <span class="o">=</span> <span class="n">dgp</span><span class="o">.</span><span class="n">simulate_panel_sar_tobit_fe</span><span class="p">(</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">sar_data</span> <span class="o">=</span> <span class="n">dgp</span><span class="o">.</span><span class="n">simulate_sar_tobit</span><span class="p">(</span>
     <span class="n">N</span><span class="o">=</span><span class="n">N</span><span class="p">,</span>
     <span class="n">T</span><span class="o">=</span><span class="n">T</span><span class="p">,</span>
     <span class="n">n_side</span><span class="o">=</span><span class="n">SIDE</span><span class="p">,</span>
@@ -1485,7 +1486,7 @@ model the shape with <code class="docutils literal notranslate"><span class="pre
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"rows          : </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">y_sar</span><span class="p">)</span><span class="si">}</span><span class="s2">   (</span><span class="si">{</span><span class="n">N</span><span class="si">}</span><span class="s2"> units x </span><span class="si">{</span><span class="n">T</span><span class="si">}</span><span class="s2"> periods)"</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"censored at 0 : </span><span class="si">{</span><span class="p">(</span><span class="n">y_sar</span><span class="w"> </span><span class="o">==</span><span class="w"> </span><span class="mi">0</span><span class="p">)</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span><span class="si">:</span><span class="s2">.1%</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 
-<span class="n">sar_model</span> <span class="o">=</span> <span class="n">SARPanelTobit</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y_sar</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X_sar</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span> <span class="n">N</span><span class="o">=</span><span class="n">N</span><span class="p">,</span> <span class="n">T</span><span class="o">=</span><span class="n">T</span><span class="p">,</span> <span class="n">censoring</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
+<span class="n">sar_model</span> <span class="o">=</span> <span class="n">SARTobit</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y_sar</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X_sar</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span> <span class="n">N</span><span class="o">=</span><span class="n">N</span><span class="p">,</span> <span class="n">T</span><span class="o">=</span><span class="n">T</span><span class="p">,</span> <span class="n">censoring</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
 <span class="n">sar_idata</span> <span class="o">=</span> <span class="n">sar_model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="o">**</span><span class="n">FIT</span><span class="p">)</span>
 
 <span class="n">az</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="n">sar_idata</span><span class="p">,</span> <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s2">"rho"</span><span class="p">,</span> <span class="s2">"beta"</span><span class="p">,</span> <span class="s2">"sigma"</span><span class="p">])</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
@@ -1494,7 +1495,7 @@ model the shape with <code class="docutils literal notranslate"><span class="pre
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>rows          : 500   (100 units x 5 periods)
-censored at 0 : 20.6%
+censored at 0 : 19.2%
 </code></pre></div>
 </div>
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
@@ -1523,51 +1524,51 @@ Sampling 4 chains for 1_000 tune and 1_000 draw iterations (4_000 + 4_000 draws 
   <tbody>
     <tr>
       <th>rho</th>
-      <td>0.304</td>
-      <td>0.042</td>
-      <td>0.24</td>
-      <td>0.37</td>
-      <td>2684</td>
-      <td>2487</td>
+      <td>0.33</td>
+      <td>0.038</td>
+      <td>0.27</td>
+      <td>0.39</td>
+      <td>3025</td>
+      <td>2746</td>
       <td>1.00</td>
-      <td>0.00081</td>
-      <td>0.00071</td>
+      <td>0.0007</td>
+      <td>0.00062</td>
     </tr>
     <tr>
       <th>beta[x0]</th>
-      <td>0.986</td>
-      <td>0.076</td>
-      <td>0.86</td>
+      <td>0.984</td>
+      <td>0.07</td>
+      <td>0.87</td>
       <td>1.1</td>
-      <td>2697</td>
-      <td>2752</td>
+      <td>3089</td>
+      <td>2796</td>
       <td>1.00</td>
-      <td>0.0015</td>
-      <td>0.0012</td>
+      <td>0.0013</td>
+      <td>0.0011</td>
     </tr>
     <tr>
       <th>beta[x1]</th>
-      <td>1.436</td>
-      <td>0.048</td>
-      <td>1.4</td>
+      <td>1.408</td>
+      <td>0.044</td>
+      <td>1.3</td>
       <td>1.5</td>
-      <td>2799</td>
-      <td>2515</td>
+      <td>3428</td>
+      <td>3162</td>
       <td>1.00</td>
-      <td>0.0009</td>
-      <td>0.00071</td>
+      <td>0.00075</td>
+      <td>0.00061</td>
     </tr>
     <tr>
       <th>sigma</th>
-      <td>0.891</td>
-      <td>0.0323</td>
-      <td>0.84</td>
-      <td>0.94</td>
-      <td>3722</td>
-      <td>3085</td>
+      <td>0.8012</td>
+      <td>0.0286</td>
+      <td>0.76</td>
+      <td>0.85</td>
+      <td>4389</td>
+      <td>3188</td>
       <td>1.00</td>
-      <td>0.00053</td>
-      <td>0.00049</td>
+      <td>0.00044</td>
+      <td>0.00048</td>
     </tr>
   </tbody>
 </table></div></div>
@@ -1581,40 +1582,93 @@ wrong, or fit an uncensored model instead, and every coefficient is biased
 toward zero because the pile-up at the limit reads as genuine variation.</p>
 </div>
 <h2 id="interpreting-the-coefficients">Interpreting the coefficients<a class="headerlink" href="#interpreting-the-coefficients" title="Link to this heading">¶</a></h2>
-<div class="warning admonition">
-<p class="admonition-title">Warning</p>
-<p>The effects decomposition is not available for panel tobit
-<code class="docutils literal notranslate"><span class="pre">spatial_effects()</span></code> raises <code class="docutils literal notranslate"><span class="pre">NotImplementedError</span></code> on <code class="docutils literal notranslate"><span class="pre">SARPanelTobit</span></code> and
-<code class="docutils literal notranslate"><span class="pre">SEMPanelTobit</span></code>. That matters for interpretation, because <span class="math notranslate nohighlight">\(\beta\)</span> is <strong>not</strong> a
-marginal effect once the outcome is censored — a unit change in <span class="math notranslate nohighlight">\(x\)</span> moves the
-latent outcome, and only the uncensored part of that reaches the observed one.</p>
-<p>Read the coefficients as latent-scale parameters until the decomposition
-lands. Where the direct/indirect split is central to your argument, the
-cross-sectional <a class="reference internal" href="tobit_models.html"><span class="std std-doc"><code class="docutils literal notranslate"><span class="pre">SARTobit</span></code></span></a> does provide it.</p>
-</div>
+<p><span class="math notranslate nohighlight">\(\beta\)</span> is <strong>not</strong> a marginal effect once the outcome is censored: a unit change
+in <span class="math notranslate nohighlight">\(x\)</span> moves the latent outcome, and only the uncensored part of that reaches the
+observed one. <code class="docutils literal notranslate"><span class="pre">impacts()</span></code> reports the direct, indirect and total effects on the
+latent scale, through the spatial multiplier within each period, as it does for
+the cross-sectional <a class="reference internal" href="tobit_models.html"><span class="std std-doc"><code class="docutils literal notranslate"><span class="pre">SARTobit</span></code></span></a>.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="k">try</span><span class="p">:</span>
-    <span class="n">sar_model</span><span class="o">.</span><span class="n">spatial_effects</span><span class="p">()</span>
-<span class="k">except</span> <span class="ne">NotImplementedError</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"NotImplementedError: </span><span class="si">{</span><span class="n">err</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">sar_model</span><span class="o">.</span><span class="n">impacts</span><span class="p">()</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
 </code></pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>NotImplementedError: Spatial effects not yet implemented for panel Tobit models.
-</code></pre></div>
-</div>
-</div>
+<div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>direct</th>
+      <th>direct_ci_lower</th>
+      <th>direct_ci_upper</th>
+      <th>direct_pvalue</th>
+      <th>indirect</th>
+      <th>indirect_ci_lower</th>
+      <th>indirect_ci_upper</th>
+      <th>indirect_pvalue</th>
+      <th>total</th>
+      <th>total_ci_lower</th>
+      <th>total_ci_upper</th>
+      <th>total_pvalue</th>
+    </tr>
+    <tr>
+      <th>variable</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>x1</th>
+      <td>1.455</td>
+      <td>1.369</td>
+      <td>1.548</td>
+      <td>0.0</td>
+      <td>0.652</td>
+      <td>0.453</td>
+      <td>0.879</td>
+      <td>0.0</td>
+      <td>2.107</td>
+      <td>1.873</td>
+      <td>2.376</td>
+      <td>0.0</td>
+    </tr>
+  </tbody>
+</table>
+</div></div></div>
 </div>
 <h2 id="put-the-spatial-structure-in-the-errors-instead">Put the spatial structure in the errors instead<a class="headerlink" href="#put-the-spatial-structure-in-the-errors-instead" title="Link to this heading">¶</a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">SEMPanelTobit</span></code> treats spatial correlation as a nuisance in the disturbances
+<p>The <code class="docutils literal notranslate"><span class="pre">SEMTobit</span></code> panel treats spatial correlation as a nuisance in the disturbances
 rather than a channel between units. The spatial parameter is <code class="docutils literal notranslate"><span class="pre">lam</span></code>, and
 because there are no covariate-mediated spillovers the effects decomposition
 collapses to the coefficient.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">sem_data</span> <span class="o">=</span> <span class="n">dgp</span><span class="o">.</span><span class="n">simulate_panel_sem_tobit_fe</span><span class="p">(</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">sem_data</span> <span class="o">=</span> <span class="n">dgp</span><span class="o">.</span><span class="n">simulate_sem_tobit</span><span class="p">(</span>
     <span class="n">N</span><span class="o">=</span><span class="n">N</span><span class="p">,</span>
     <span class="n">T</span><span class="o">=</span><span class="n">T</span><span class="p">,</span>
     <span class="n">n_side</span><span class="o">=</span><span class="n">SIDE</span><span class="p">,</span>
@@ -1625,7 +1679,7 @@ collapses to the coefficient.</p>
     <span class="n">censoring</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
     <span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="n">sem_model</span> <span class="o">=</span> <span class="n">SEMPanelTobit</span><span class="p">(</span>
+<span class="n">sem_model</span> <span class="o">=</span> <span class="n">SEMTobit</span><span class="p">(</span>
     <span class="n">y</span><span class="o">=</span><span class="n">sem_data</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span>
     <span class="n">X</span><span class="o">=</span><span class="n">sem_data</span><span class="p">[</span><span class="s2">"X"</span><span class="p">],</span>
     <span class="n">W</span><span class="o">=</span><span class="n">sem_data</span><span class="p">[</span><span class="s2">"W_graph"</span><span class="p">],</span>
@@ -1641,7 +1695,7 @@ collapses to the coefficient.</p>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>censored at 0 : 31.8%
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>censored at 0 : 30.8%
 </code></pre></div>
 </div>
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
@@ -1668,51 +1722,51 @@ Sampling 4 chains for 1_000 tune and 1_000 draw iterations (4_000 + 4_000 draws 
   <tbody>
     <tr>
       <th>lam</th>
-      <td>0.327</td>
-      <td>0.065</td>
-      <td>0.22</td>
-      <td>0.43</td>
-      <td>4425</td>
-      <td>2902</td>
+      <td>0.313</td>
+      <td>0.066</td>
+      <td>0.21</td>
+      <td>0.42</td>
+      <td>4759</td>
+      <td>3306</td>
       <td>1.00</td>
-      <td>0.00098</td>
+      <td>0.00095</td>
       <td>0.001</td>
     </tr>
     <tr>
       <th>beta[x0]</th>
-      <td>0.845</td>
-      <td>0.068</td>
-      <td>0.74</td>
-      <td>0.95</td>
-      <td>4809</td>
-      <td>3107</td>
+      <td>0.868</td>
+      <td>0.058</td>
+      <td>0.77</td>
+      <td>0.96</td>
+      <td>4812</td>
+      <td>3001</td>
       <td>1.00</td>
-      <td>0.00099</td>
-      <td>0.0011</td>
+      <td>0.00084</td>
+      <td>0.001</td>
     </tr>
     <tr>
       <th>beta[x1]</th>
-      <td>1.357</td>
-      <td>0.055</td>
+      <td>1.391</td>
+      <td>0.05</td>
       <td>1.3</td>
-      <td>1.4</td>
-      <td>2988</td>
-      <td>2777</td>
+      <td>1.5</td>
+      <td>2572</td>
+      <td>2763</td>
       <td>1.00</td>
-      <td>0.001</td>
-      <td>0.00072</td>
+      <td>0.00099</td>
+      <td>0.00069</td>
     </tr>
     <tr>
       <th>sigma</th>
-      <td>0.952</td>
-      <td>0.038</td>
-      <td>0.89</td>
-      <td>1</td>
-      <td>5346</td>
-      <td>3530</td>
+      <td>0.8098</td>
+      <td>0.0313</td>
+      <td>0.76</td>
+      <td>0.86</td>
+      <td>5511</td>
+      <td>3146</td>
       <td>1.00</td>
-      <td>0.00052</td>
-      <td>0.00058</td>
+      <td>0.00042</td>
+      <td>0.00046</td>
     </tr>
   </tbody>
 </table></div></div>
@@ -1736,8 +1790,8 @@ matter. Any at all are worth chasing down before you read the posterior.</p>
             <span class="n">name</span><span class="o">=</span><span class="n">n</span><span class="p">,</span>
         <span class="p">)</span>
         <span class="k">for</span> <span class="n">n</span><span class="p">,</span> <span class="n">p</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">i</span> <span class="ow">in</span> <span class="p">(</span>
-            <span class="p">(</span><span class="s2">"SARPanelTobit"</span><span class="p">,</span> <span class="s2">"rho"</span><span class="p">,</span> <span class="n">RHO</span><span class="p">,</span> <span class="n">sar_idata</span><span class="p">),</span>
-            <span class="p">(</span><span class="s2">"SEMPanelTobit"</span><span class="p">,</span> <span class="s2">"lam"</span><span class="p">,</span> <span class="n">LAM</span><span class="p">,</span> <span class="n">sem_idata</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"SARTobit panel"</span><span class="p">,</span> <span class="s2">"rho"</span><span class="p">,</span> <span class="n">RHO</span><span class="p">,</span> <span class="n">sar_idata</span><span class="p">),</span>
+            <span class="p">(</span><span class="s2">"SEMTobit panel"</span><span class="p">,</span> <span class="s2">"lam"</span><span class="p">,</span> <span class="n">LAM</span><span class="p">,</span> <span class="n">sem_idata</span><span class="p">),</span>
         <span class="p">)</span>
     <span class="p">]</span>
 <span class="p">)</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
@@ -1773,22 +1827,22 @@ matter. Any at all are worth chasing down before you read the posterior.</p>
   </thead>
   <tbody>
     <tr>
-      <th>SARPanelTobit</th>
+      <th>SARTobit panel</th>
       <td>rho</td>
-      <td>0.304</td>
+      <td>0.330</td>
       <td>0.35</td>
       <td>0</td>
-      <td>1157.198</td>
-      <td>1.003</td>
+      <td>1182.146</td>
+      <td>1.004</td>
     </tr>
     <tr>
-      <th>SEMPanelTobit</th>
+      <th>SEMTobit panel</th>
       <td>lam</td>
-      <td>0.327</td>
+      <td>0.313</td>
       <td>0.35</td>
       <td>0</td>
-      <td>1636.214</td>
-      <td>1.004</td>
+      <td>2063.679</td>
+      <td>1.006</td>
     </tr>
   </tbody>
 </table>
@@ -1851,7 +1905,7 @@ versions, including the Durbin variant</p></li>
   
     Created using
     <a href="https://www.sphinx-doc.org/" target="_blank" rel="noopener">Sphinx</a>
-    8.2.3.
+    9.2.0.
      and
     <a href="https://github.com/jbms/sphinx-immaterial/" target="_blank" rel="noopener">Sphinx-Immaterial</a>
   

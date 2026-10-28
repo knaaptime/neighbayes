@@ -42,7 +42,7 @@
         <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
       
     
-        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.74c816e3f9967dd6e.min.css?v=6cfe2491" />
+        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.6efbe22605a23fcd6.min.css?v=b2ceb110" />
         <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
         <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
         <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=93c5fc88" />
@@ -651,7 +651,7 @@
   
   
   <span class="md-ellipsis">
-    <span>How to fit spatial logit models</span>
+    <span>How to fit a spatial logit model</span>
     
   </span>
   
@@ -1580,10 +1580,6 @@ A NUTS run carries <code class="docutils literal notranslate"><span class="pre">
 ran Gibbs
 </code></pre></div>
 </div>
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
-  W_arr = np.asarray(W, dtype=np.float64)
-</code></pre></div>
-</div>
 </div>
 </div>
 <h2 id="check-the-gibbs-result-against-nuts">Check the Gibbs result against NUTS<a class="headerlink" href="#check-the-gibbs-result-against-nuts" title="Link to this heading">¶</a></h2>
@@ -1697,20 +1693,20 @@ Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws 
   <tbody>
     <tr>
       <th>Gibbs</th>
-      <td>4.284</td>
+      <td>2.571</td>
       <td>7560.816</td>
-      <td>1764.797</td>
+      <td>2940.440</td>
       <td>6275.383</td>
-      <td>1464.759</td>
+      <td>2440.529</td>
       <td>1.000</td>
     </tr>
     <tr>
       <th>NUTS</th>
-      <td>15.530</td>
+      <td>15.245</td>
       <td>3540.462</td>
-      <td>227.973</td>
+      <td>232.244</td>
       <td>4178.557</td>
-      <td>269.060</td>
+      <td>274.102</td>
       <td>1.001</td>
     </tr>
   </tbody>
@@ -1722,8 +1718,9 @@ fast and half as efficient has bought you nothing. Columbus has <span class="mat
 timings at realistic sizes see
 <a class="reference internal" href="../performance/index.html"><span class="std std-doc">Performance &amp; Profiling</span></a>.</p>
 <p>Two arguments do not cross the sampler boundary: <code class="docutils literal notranslate"><span class="pre">target_accept</span></code> raises
-<code class="docutils literal notranslate"><span class="pre">TypeError</span></code> under Gibbs, and <code class="docutils literal notranslate"><span class="pre">idata_kwargs={&quot;log_likelihood&quot;:</span> <span class="pre">True}</span></code> is
-NUTS-only — Gibbs builds that group unasked.</p>
+<code class="docutils literal notranslate"><span class="pre">TypeError</span></code> under Gibbs, and a backend belongs to its sampler, so
+<code class="docutils literal notranslate"><span class="pre">backend=&quot;numpyro&quot;</span></code> raises under Gibbs as <code class="docutils literal notranslate"><span class="pre">backend=&quot;jax&quot;</span></code> does under NUTS.
+<code class="docutils literal notranslate"><span class="pre">idata_kwargs={&quot;log_likelihood&quot;:</span> <span class="pre">True}</span></code> works with either sampler.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="k">try</span><span class="p">:</span>
@@ -1740,19 +1737,17 @@ NUTS-only — Gibbs builds that group unasked.</p>
 </div>
 </div>
 <h2 id="pin-a-backend">Pin a backend<a class="headerlink" href="#pin-a-backend" title="Link to this heading">¶</a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">gibbs_backend</span></code> defaults to <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code>, which takes JAX when it is installed and
+<p><code class="docutils literal notranslate"><span class="pre">backend</span></code> defaults to <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code>, which takes JAX when it is installed and
 falls back to NumPy. Pin it explicitly when you are benchmarking, or when you
 want the NumPy path’s process-level parallelism (<code class="docutils literal notranslate"><span class="pre">n_jobs</span></code>) instead of the JAX
-path’s vectorised chains (<code class="docutils literal notranslate"><span class="pre">chain_method</span></code>).</p>
+path’s vectorized chains.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
     <span class="p">[</span>
         <span class="n">efficiency</span><span class="p">(</span>
             <span class="n">backend</span><span class="p">,</span>
-            <span class="o">*</span><span class="n">fit_timed</span><span class="p">(</span>
-                <span class="n">SAR</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">),</span> <span class="n">sampler</span><span class="o">=</span><span class="s2">"gibbs"</span><span class="p">,</span> <span class="n">gibbs_backend</span><span class="o">=</span><span class="n">backend</span><span class="p">,</span> <span class="o">**</span><span class="n">COMMON</span>
-            <span class="p">),</span>
+            <span class="o">*</span><span class="n">fit_timed</span><span class="p">(</span><span class="n">SAR</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">),</span> <span class="n">sampler</span><span class="o">=</span><span class="s2">"gibbs"</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="n">backend</span><span class="p">,</span> <span class="o">**</span><span class="n">COMMON</span><span class="p">),</span>
         <span class="p">)</span>
         <span class="k">for</span> <span class="n">backend</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"numpy"</span><span class="p">,</span> <span class="s2">"jax"</span><span class="p">)</span>
     <span class="p">]</span>
@@ -1761,10 +1756,6 @@ path’s vectorised chains (<code class="docutils literal notranslate"><span cla
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
-  W_arr = np.asarray(W, dtype=np.float64)
-</code></pre></div>
-</div>
 <div class="output text_html"><div>
 <style scoped>
     .dataframe tbody tr th:only-of-type {
@@ -1794,30 +1785,31 @@ path’s vectorised chains (<code class="docutils literal notranslate"><span cla
   <tbody>
     <tr>
       <th>numpy</th>
-      <td>2.403</td>
+      <td>2.425</td>
       <td>7387.877</td>
-      <td>3074.813</td>
+      <td>3047.137</td>
       <td>6393.722</td>
-      <td>2661.049</td>
+      <td>2637.097</td>
       <td>1.001</td>
     </tr>
     <tr>
       <th>jax</th>
-      <td>3.123</td>
+      <td>0.184</td>
       <td>7560.816</td>
-      <td>2420.728</td>
+      <td>41082.506</td>
       <td>6275.383</td>
-      <td>2009.174</td>
+      <td>34097.971</td>
       <td>1.000</td>
     </tr>
   </tbody>
 </table>
 </div></div></div>
 </div>
-<p>JAX pays a one-off compilation cost on the first sweep, so a single
-small-<span class="math notranslate nohighlight">\(n\)</span> timing is the wrong basis for choosing — at <span class="math notranslate nohighlight">\(n = 49\)</span> that cost is a
-visible fraction of the total, and at the sizes where you would reach for JAX
-it is amortized to nothing.</p>
+<p>JAX compiles the sweep on the first fit of a model structure, so a single
+small-<span class="math notranslate nohighlight">\(n\)</span> timing is the wrong basis for choosing — at <span class="math notranslate nohighlight">\(n = 49\)</span> compilation is a
+visible fraction of the total. It is paid once per structure: a refit, a longer
+run, or new data of the same dimensions on the same graph reuses the compiled
+program, and at the sizes where you would reach for JAX it is negligible.</p>
 <h2 id="loosen-the-update-when-it-mixes-poorly">Loosen the ρ update when it mixes poorly<a class="headerlink" href="#loosen-the-update-when-it-mixes-poorly" title="Link to this heading">¶</a></h2>
 <p>If <code class="docutils literal notranslate"><span class="pre">ess_bulk</span></code> on ρ or λ is low while β and σ² look fine, the slice sampler’s
 interval is the thing to change. <code class="docutils literal notranslate"><span class="pre">slice_width</span></code> sets its starting width; the
@@ -1827,7 +1819,7 @@ sampler adapts from there during warmup.</p>
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">idata_tuned</span><span class="p">,</span> <span class="n">secs_tuned</span> <span class="o">=</span> <span class="n">fit_timed</span><span class="p">(</span>
     <span class="n">SAR</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">),</span>
     <span class="n">sampler</span><span class="o">=</span><span class="s2">"gibbs"</span><span class="p">,</span>
-    <span class="n">gibbs_backend</span><span class="o">=</span><span class="s2">"numpy"</span><span class="p">,</span>
+    <span class="n">backend</span><span class="o">=</span><span class="s2">"numpy"</span><span class="p">,</span>
     <span class="n">slice_width</span><span class="o">=</span><span class="mf">0.25</span><span class="p">,</span>
     <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
     <span class="n">thin</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
@@ -1842,11 +1834,11 @@ sampler adapts from there during warmup.</p>
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>draws kept per chain with thin=2: 1000
 </code></pre></div>
 </div>
-<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>seconds             2.528
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>seconds             2.832
 ess rho          4130.204
-ess/sec rho      1633.541
+ess/sec rho      1458.573
 ess sigma        3825.296
-ess/sec sigma    1512.947
+ess/sec sigma    1350.895
 max rhat            1.001
 Name: slice_width=0.25, thin=2, dtype: float64
 </code></pre></div>
@@ -1869,7 +1861,7 @@ factorizes cheaply, or that it does not.</p>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Unknown logdet method: 'list-them-please'. Valid options: aaa, cheb_cholesky, cheb_stochastic, chebyshev, chol_aaa, cholmod, eigenvalue, grid_spline, lu_cheb, slq, traces.
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>logdet_method must be one of ('eigenvalue', 'cheb', 'aaa', 'spline', 'stochastic', 'trace_series', 'resolvent') or None, got 'list-them-please'.
 </code></pre></div>
 </div>
 </div>
@@ -1891,12 +1883,18 @@ On a small problem the exact answer is free, so there is no excuse not to.</p>
         <span class="p">)</span>
         <span class="k">for</span> <span class="n">method</span><span class="p">,</span> <span class="p">(</span><span class="n">idata</span><span class="p">,</span> <span class="n">secs</span><span class="p">)</span> <span class="ow">in</span> <span class="p">(</span>
             <span class="p">(</span>
-                <span class="n">m</span><span class="p">,</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">m</span><span class="si">}</span><span class="s2"> on </span><span class="si">{</span><span class="n">d</span><span class="si">}</span><span class="s2">"</span> <span class="k">if</span> <span class="n">d</span> <span class="o">!=</span> <span class="s2">"auto"</span> <span class="k">else</span> <span class="n">m</span><span class="p">,</span>
                 <span class="n">fit_timed</span><span class="p">(</span>
-                    <span class="n">SAR</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span> <span class="n">logdet_method</span><span class="o">=</span><span class="n">m</span><span class="p">),</span> <span class="n">sampler</span><span class="o">=</span><span class="s2">"gibbs"</span><span class="p">,</span> <span class="o">**</span><span class="n">COMMON</span>
+                    <span class="n">SAR</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span> <span class="n">logdet_method</span><span class="o">=</span><span class="n">m</span><span class="p">,</span> <span class="n">logdet_decomp</span><span class="o">=</span><span class="n">d</span><span class="p">),</span>
+                    <span class="n">sampler</span><span class="o">=</span><span class="s2">"gibbs"</span><span class="p">,</span>
+                    <span class="o">**</span><span class="n">COMMON</span><span class="p">,</span>
                 <span class="p">),</span>
             <span class="p">)</span>
-            <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"eigenvalue"</span><span class="p">,</span> <span class="s2">"chebyshev"</span><span class="p">,</span> <span class="s2">"cheb_stochastic"</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">m</span><span class="p">,</span> <span class="n">d</span> <span class="ow">in</span> <span class="p">(</span>
+                <span class="p">(</span><span class="s2">"eigenvalue"</span><span class="p">,</span> <span class="s2">"auto"</span><span class="p">),</span>
+                <span class="p">(</span><span class="s2">"cheb"</span><span class="p">,</span> <span class="s2">"chol"</span><span class="p">),</span>
+                <span class="p">(</span><span class="s2">"stochastic"</span><span class="p">,</span> <span class="s2">"auto"</span><span class="p">),</span>
+            <span class="p">)</span>
         <span class="p">)</span>
     <span class="p">]</span>
 <span class="p">)</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
@@ -1904,10 +1902,6 @@ On a small problem the exact answer is free, so there is no excuse not to.</p>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
-  W_arr = np.asarray(W, dtype=np.float64)
-</code></pre></div>
-</div>
 <div class="output text_html"><div>
 <style scoped>
     .dataframe tbody tr th:only-of-type {
@@ -1937,28 +1931,28 @@ On a small problem the exact answer is free, so there is no excuse not to.</p>
       <th>eigenvalue</th>
       <td>0.4076</td>
       <td>0.1249</td>
-      <td>3.1234</td>
+      <td>0.1868</td>
       <td>7560.8158</td>
     </tr>
     <tr>
-      <th>chebyshev</th>
-      <td>0.4062</td>
-      <td>0.1271</td>
-      <td>3.4683</td>
-      <td>7735.2688</td>
+      <th>cheb on chol</th>
+      <td>0.3710</td>
+      <td>0.1225</td>
+      <td>1.7680</td>
+      <td>7117.5967</td>
     </tr>
     <tr>
-      <th>cheb_stochastic</th>
+      <th>stochastic</th>
       <td>0.4073</td>
       <td>0.1250</td>
-      <td>3.7378</td>
+      <td>1.9663</td>
       <td>7343.7792</td>
     </tr>
   </tbody>
 </table>
 </div></div></div>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">eigenvalue</span></code> is exact at this size, so it is the reference. A method whose
+<p><code class="docutils literal notranslate"><span class="pre">exact</span></code> on <code class="docutils literal notranslate"><span class="pre">eig</span></code> is exact at this size, so it is the reference. A method whose
 ρ posterior drifts from it is trading accuracy for speed — sometimes the right
 trade at scale, never one to make unknowingly.</p>
 <h2 id="apply-it-to-sem-sdm-and-sdem">Apply it to SEM, SDM and SDEM<a class="headerlink" href="#apply-it-to-sem-sdm-and-sdem" title="Link to this heading">¶</a></h2>
@@ -1993,16 +1987,6 @@ parameter changes (<code class="docutils literal notranslate"><span class="pre">
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
-  W_arr = np.asarray(W, dtype=np.float64)
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
-  W_arr = np.asarray(W, dtype=np.float64)
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
-  W_arr = np.asarray(W, dtype=np.float64)
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
-  W_arr = np.asarray(W, dtype=np.float64)
-</code></pre></div>
-</div>
 <div class="output text_html"><div>
 <style scoped>
     .dataframe tbody tr th:only-of-type {
@@ -2137,13 +2121,7 @@ the implied mean of its neighbours through <span class="math notranslate nohighl
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
-  W_arr = np.asarray(W, dtype=np.float64)
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
-  from .autonotebook import tqdm as notebook_tqdm
-</code></pre></div>
-</div>
-<img alt="../_images/31f211cdb7b189f785d7392694d8932af37c8a7f057e9b67f73ea58f12317596.svg" src="../_images/31f211cdb7b189f785d7392694d8932af37c8a7f057e9b67f73ea58f12317596.svg" />
+<img alt="../_images/cf624f6527be888e957d71e27974a3b63ef1c8b356bad11eb338cc362cefec9a.svg" src="../_images/cf624f6527be888e957d71e27974a3b63ef1c8b356bad11eb338cc362cefec9a.svg" />
 </div>
 </div>
 <h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Link to this heading">¶</a></h2>
@@ -2204,7 +2182,7 @@ backend timings at realistic <span class="math notranslate nohighlight">\(n\)</s
   
     Created using
     <a href="https://www.sphinx-doc.org/" target="_blank" rel="noopener">Sphinx</a>
-    8.2.3.
+    9.2.0.
      and
     <a href="https://github.com/jbms/sphinx-immaterial/" target="_blank" rel="noopener">Sphinx-Immaterial</a>
   

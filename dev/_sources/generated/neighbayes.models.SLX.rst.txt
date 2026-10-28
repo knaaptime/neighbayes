@@ -16,12 +16,12 @@
       ~SLX.__init__
       ~SLX.fit
       ~SLX.fitted_values
+      ~SLX.impacts
       ~SLX.predict
       ~SLX.predict_in_sample
       ~SLX.residuals
       ~SLX.spatial_diagnostics
       ~SLX.spatial_diagnostics_decision
-      ~SLX.spatial_effects
       ~SLX.summary
    
    

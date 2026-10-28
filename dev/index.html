@@ -40,7 +40,7 @@
         <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
       
     
-        <link rel="stylesheet" type="text/css" href="_static/sphinx_immaterial_theme.74c816e3f9967dd6e.min.css?v=6cfe2491" />
+        <link rel="stylesheet" type="text/css" href="_static/sphinx_immaterial_theme.6efbe22605a23fcd6.min.css?v=b2ceb110" />
         <link rel="stylesheet" type="text/css" href="_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
         <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
         <link rel="stylesheet" type="text/css" href="_static/custom.css?v=93c5fc88" />
@@ -536,7 +536,7 @@
   
   
   <span class="md-ellipsis">
-    <span>How to fit spatial logit models</span>
+    <span>How to fit a spatial logit model</span>
     
   </span>
   
@@ -1360,7 +1360,7 @@ exercise caution as LOO diagnostics aren’t valid for spatial models).</p>
 <span class="n">sar</span> <span class="o">=</span> <span class="n">SAR</span><span class="p">(</span><span class="n">formula</span><span class="o">=</span><span class="n">form</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">G</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">gdf</span><span class="p">)</span>
 <span class="n">sar</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">2000</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">random_seed</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
 <span class="n">sar</span><span class="o">.</span><span class="n">summary</span><span class="p">()</span>
-<span class="n">sar</span><span class="o">.</span><span class="n">spatial_effects</span><span class="p">()</span>
+<span class="n">sar</span><span class="o">.</span><span class="n">impacts</span><span class="p">()</span>
 </code></pre></div>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">neighbayes</span></code> provides roughly fifty model classes behind one formula interface, each
@@ -1442,7 +1442,7 @@ against maximum likelihood estimators as well as published results (see docs).</
   
     Created using
     <a href="https://www.sphinx-doc.org/" target="_blank" rel="noopener">Sphinx</a>
-    8.2.3.
+    9.2.0.
      and
     <a href="https://github.com/jbms/sphinx-immaterial/" target="_blank" rel="noopener">Sphinx-Immaterial</a>
   

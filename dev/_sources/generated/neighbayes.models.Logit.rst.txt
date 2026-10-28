@@ -15,11 +15,12 @@
    
       ~Logit.__init__
       ~Logit.fit
+      ~Logit.fitted_probabilities
       ~Logit.fitted_values
+      ~Logit.impacts
       ~Logit.residuals
       ~Logit.spatial_diagnostics
       ~Logit.spatial_diagnostics_decision
-      ~Logit.spatial_effects
       ~Logit.summary
    
    

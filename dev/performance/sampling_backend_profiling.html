@@ -42,7 +42,7 @@
         <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
       
     
-        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.74c816e3f9967dd6e.min.css?v=6cfe2491" />
+        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.6efbe22605a23fcd6.min.css?v=b2ceb110" />
         <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
         <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
         <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=93c5fc88" />
@@ -530,7 +530,7 @@
   
   
   <span class="md-ellipsis">
-    <span>How to fit spatial logit models</span>
+    <span>How to fit a spatial logit model</span>
     
   </span>
   
@@ -1590,27 +1590,27 @@
 
 <span class="n">BACKENDS</span> <span class="o">=</span> <span class="p">{</span>
     <span class="s2">"c"</span><span class="p">:</span> <span class="p">{</span>
-        <span class="s2">"nuts_sampler"</span><span class="p">:</span> <span class="s2">"pymc"</span><span class="p">,</span>
+        <span class="s2">"backend"</span><span class="p">:</span> <span class="s2">"pymc"</span><span class="p">,</span>
         <span class="s2">"compile_kwargs"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"mode"</span><span class="p">:</span> <span class="s2">"FAST_RUN"</span><span class="p">},</span>
         <span class="s2">"requires"</span><span class="p">:</span> <span class="p">[],</span>
     <span class="p">},</span>
     <span class="s2">"numba"</span><span class="p">:</span> <span class="p">{</span>
-        <span class="s2">"nuts_sampler"</span><span class="p">:</span> <span class="s2">"pymc"</span><span class="p">,</span>
+        <span class="s2">"backend"</span><span class="p">:</span> <span class="s2">"pymc"</span><span class="p">,</span>
         <span class="s2">"compile_kwargs"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"mode"</span><span class="p">:</span> <span class="s2">"NUMBA"</span><span class="p">},</span>
         <span class="s2">"requires"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"numba"</span><span class="p">],</span>
     <span class="p">},</span>
     <span class="s2">"numpyro"</span><span class="p">:</span> <span class="p">{</span>
-        <span class="s2">"nuts_sampler"</span><span class="p">:</span> <span class="s2">"numpyro"</span><span class="p">,</span>
+        <span class="s2">"backend"</span><span class="p">:</span> <span class="s2">"numpyro"</span><span class="p">,</span>
         <span class="s2">"compile_kwargs"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
         <span class="s2">"requires"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"numpyro"</span><span class="p">],</span>
     <span class="p">},</span>
     <span class="s2">"blackjax"</span><span class="p">:</span> <span class="p">{</span>
-        <span class="s2">"nuts_sampler"</span><span class="p">:</span> <span class="s2">"blackjax"</span><span class="p">,</span>
+        <span class="s2">"backend"</span><span class="p">:</span> <span class="s2">"blackjax"</span><span class="p">,</span>
         <span class="s2">"compile_kwargs"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
         <span class="s2">"requires"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"blackjax"</span><span class="p">],</span>
     <span class="p">},</span>
     <span class="s2">"nutpie"</span><span class="p">:</span> <span class="p">{</span>
-        <span class="s2">"nuts_sampler"</span><span class="p">:</span> <span class="s2">"nutpie"</span><span class="p">,</span>
+        <span class="s2">"backend"</span><span class="p">:</span> <span class="s2">"nutpie"</span><span class="p">,</span>
         <span class="s2">"compile_kwargs"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
         <span class="s2">"requires"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"nutpie"</span><span class="p">],</span>
     <span class="p">},</span>
@@ -1673,6 +1673,7 @@
             <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">,</span>
             <span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span>
             <span class="n">logdet_method</span><span class="o">=</span><span class="n">PROFILE_CFG</span><span class="p">[</span><span class="s2">"logdet_method"</span><span class="p">],</span>
+            <span class="n">logdet_decomp</span><span class="o">=</span><span class="n">PROFILE_CFG</span><span class="p">[</span><span class="s2">"logdet_decomp"</span><span class="p">],</span>
         <span class="p">)</span>
         <span class="n">idata</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
             <span class="n">sampler</span><span class="o">=</span><span class="s2">"nuts"</span><span class="p">,</span>
@@ -1683,7 +1684,7 @@
             <span class="n">random_seed</span><span class="o">=</span><span class="n">PROFILE_CFG</span><span class="p">[</span><span class="s2">"seed"</span><span class="p">],</span>
             <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
             <span class="n">compute_convergence_checks</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-            <span class="n">nuts_sampler</span><span class="o">=</span><span class="n">cfg</span><span class="p">[</span><span class="s2">"nuts_sampler"</span><span class="p">],</span>
+            <span class="n">backend</span><span class="o">=</span><span class="n">cfg</span><span class="p">[</span><span class="s2">"backend"</span><span class="p">],</span>
             <span class="n">compile_kwargs</span><span class="o">=</span><span class="n">cfg</span><span class="p">[</span><span class="s2">"compile_kwargs"</span><span class="p">],</span>
         <span class="p">)</span>
         <span class="n">elapsed_s</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span>
@@ -1761,21 +1762,6 @@
 <div class="cell_output docutils container">
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
   from .autonotebook import tqdm as notebook_tqdm
-Initializing NUTS using jitter+adapt_diag...
-Multiprocess sampling (4 chains in 2 jobs)
-NUTS: [rho, beta, sigma2]
-Sampling 4 chains for 250 tune and 250 draw iterations (1_000 + 1_000 draws total) took 4 seconds.
-Initializing NUTS using jitter+adapt_diag...
-Multiprocess sampling (4 chains in 2 jobs)
-NUTS: [rho, beta, sigma2]
-Sampling 4 chains for 250 tune and 250 draw iterations (1_000 + 1_000 draws total) took 4 seconds.
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_base/_shared.py:839: FutureWarning: `nuts_sampler_kwargs` is deprecated. Pass NUTS keyword arguments via the `nuts={...}` argument to `pm.sample`.
-  self._idata = pm.sample(
-NUTS[numpyro]: [rho, beta, sigma2]
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_base/_shared.py:839: FutureWarning: `nuts_sampler_kwargs` is deprecated. Pass NUTS keyword arguments via the `nuts={...}` argument to `pm.sample`.
-  self._idata = pm.sample(
-NUTS[blackjax]: [rho, beta, sigma2]
-NUTS[nutpie]: [rho, beta, sigma2]
 </code></pre></div>
 </div>
 <img alt="../_images/c3e176b23c1bb76c0b44c239b245e0f85c9c4359111c28d521b410476e3fe5f9.png" src="../_images/c3e176b23c1bb76c0b44c239b245e0f85c9c4359111c28d521b410476e3fe5f9.png" />
@@ -1820,62 +1806,48 @@ Profiling backend=nutpie...
   <tbody>
     <tr>
       <th>0</th>
-      <td>numba</td>
+      <td>c</td>
       <td>True</td>
-      <td>4.558101</td>
-      <td>0.305057</td>
-      <td>1.089754</td>
-      <td>0.770237</td>
-      <td>-0.448078</td>
-      <td>0.0</td>
-      <td></td>
-      <td>0.044943</td>
-      <td>0.062283</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>KeyError: 'logdet_decomp'</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>1</th>
-      <td>nutpie</td>
+      <td>numba</td>
       <td>True</td>
-      <td>5.116990</td>
-      <td>0.307607</td>
-      <td>1.086948</td>
-      <td>0.768769</td>
-      <td>-0.447414</td>
-      <td>0.0</td>
-      <td></td>
-      <td>0.042393</td>
-      <td>0.061375</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>KeyError: 'logdet_decomp'</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>2</th>
-      <td>c</td>
+      <td>numpyro</td>
       <td>True</td>
-      <td>6.438410</td>
-      <td>0.305057</td>
-      <td>1.089754</td>
-      <td>0.770237</td>
-      <td>-0.448078</td>
-      <td>0.0</td>
-      <td></td>
-      <td>0.044943</td>
-      <td>0.062283</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>KeyError: 'logdet_decomp'</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>3</th>
-      <td>numpyro</td>
-      <td>True</td>
-      <td>7.727190</td>
-      <td>0.307253</td>
-      <td>1.085888</td>
-      <td>0.766563</td>
-      <td>-0.447944</td>
-      <td>0.0</td>
-      <td></td>
-      <td>0.042747</td>
-      <td>0.061114</td>
-    </tr>
-    <tr>
-      <th>4</th>
       <td>blackjax</td>
       <td>True</td>
       <td>NaN</td>
@@ -1884,7 +1856,21 @@ Profiling backend=nutpie...
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
-      <td>TypeError: build_kernel.&lt;locals&gt;.kernel() got ...</td>
+      <td>KeyError: 'logdet_decomp'</td>
+      <td>NaN</td>
+      <td>NaN</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>nutpie</td>
+      <td>True</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>KeyError: 'logdet_decomp'</td>
       <td>NaN</td>
       <td>NaN</td>
     </tr>
@@ -1944,50 +1930,39 @@ Profiling backend=nutpie...
   <tbody>
     <tr>
       <th>0</th>
-      <td>numba</td>
+      <td>c</td>
       <td>True</td>
-      <td>4.558</td>
-      <td>0.305</td>
-      <td>0.045</td>
-      <td>0.062</td>
-      <td>0.0</td>
-      <td></td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>KeyError: 'logdet_decomp'</td>
     </tr>
     <tr>
       <th>1</th>
-      <td>nutpie</td>
+      <td>numba</td>
       <td>True</td>
-      <td>5.117</td>
-      <td>0.308</td>
-      <td>0.042</td>
-      <td>0.061</td>
-      <td>0.0</td>
-      <td></td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>KeyError: 'logdet_decomp'</td>
     </tr>
     <tr>
       <th>2</th>
-      <td>c</td>
+      <td>numpyro</td>
       <td>True</td>
-      <td>6.438</td>
-      <td>0.305</td>
-      <td>0.045</td>
-      <td>0.062</td>
-      <td>0.0</td>
-      <td></td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>KeyError: 'logdet_decomp'</td>
     </tr>
     <tr>
       <th>3</th>
-      <td>numpyro</td>
-      <td>True</td>
-      <td>7.727</td>
-      <td>0.307</td>
-      <td>0.043</td>
-      <td>0.061</td>
-      <td>0.0</td>
-      <td></td>
-    </tr>
-    <tr>
-      <th>4</th>
       <td>blackjax</td>
       <td>True</td>
       <td>NaN</td>
@@ -1995,7 +1970,18 @@ Profiling backend=nutpie...
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
-      <td>TypeError: build_kernel.&lt;locals&gt;.kernel() got ...</td>
+      <td>KeyError: 'logdet_decomp'</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>nutpie</td>
+      <td>True</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>KeyError: 'logdet_decomp'</td>
     </tr>
   </tbody>
 </table>
@@ -2034,7 +2020,7 @@ Profiling backend=nutpie...
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/39c340f336e96861f42a9319e16395a3884da6c7ad76aed63b7900c8114ba845.png" src="../_images/39c340f336e96861f42a9319e16395a3884da6c7ad76aed63b7900c8114ba845.png" />
+<img alt="../_images/204b0a3cebcbda278b2d0de9431fd93f9041eba725e2511e66fb999a35046af9.png" src="../_images/204b0a3cebcbda278b2d0de9431fd93f9041eba725e2511e66fb999a35046af9.png" />
 </div>
 </div>
 <div class="cell docutils container">
@@ -2101,23 +2087,6 @@ Profiling backend=blackjax on 40×40 grid...
 Profiling backend=nutpie on 40×40 grid...
 </code></pre></div>
 </div>
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
-Multiprocess sampling (4 chains in 2 jobs)
-NUTS: [rho, beta, sigma2]
-Sampling 4 chains for 250 tune and 250 draw iterations (1_000 + 1_000 draws total) took 4 seconds.
-Initializing NUTS using jitter+adapt_diag...
-Multiprocess sampling (4 chains in 2 jobs)
-NUTS: [rho, beta, sigma2]
-Sampling 4 chains for 250 tune and 250 draw iterations (1_000 + 1_000 draws total) took 4 seconds.
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_base/_shared.py:839: FutureWarning: `nuts_sampler_kwargs` is deprecated. Pass NUTS keyword arguments via the `nuts={...}` argument to `pm.sample`.
-  self._idata = pm.sample(
-NUTS[numpyro]: [rho, beta, sigma2]
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_base/_shared.py:839: FutureWarning: `nuts_sampler_kwargs` is deprecated. Pass NUTS keyword arguments via the `nuts={...}` argument to `pm.sample`.
-  self._idata = pm.sample(
-NUTS[blackjax]: [rho, beta, sigma2]
-NUTS[nutpie]: [rho, beta, sigma2]
-</code></pre></div>
-</div>
 <div class="output text_html"><div>
 <style scoped>
     .dataframe tbody tr th:only-of-type {
@@ -2149,50 +2118,39 @@ NUTS[nutpie]: [rho, beta, sigma2]
   <tbody>
     <tr>
       <th>0</th>
-      <td>nutpie</td>
+      <td>c</td>
       <td>True</td>
-      <td>3.487</td>
-      <td>0.353</td>
-      <td>0.003</td>
-      <td>0.016</td>
-      <td>0.0</td>
-      <td></td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>KeyError: 'logdet_decomp'</td>
     </tr>
     <tr>
       <th>1</th>
       <td>numba</td>
       <td>True</td>
-      <td>5.746</td>
-      <td>0.354</td>
-      <td>0.004</td>
-      <td>0.015</td>
-      <td>0.0</td>
-      <td></td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>KeyError: 'logdet_decomp'</td>
     </tr>
     <tr>
       <th>2</th>
       <td>numpyro</td>
       <td>True</td>
-      <td>6.301</td>
-      <td>0.355</td>
-      <td>0.005</td>
-      <td>0.013</td>
-      <td>0.0</td>
-      <td></td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>KeyError: 'logdet_decomp'</td>
     </tr>
     <tr>
       <th>3</th>
-      <td>c</td>
-      <td>True</td>
-      <td>7.158</td>
-      <td>0.354</td>
-      <td>0.004</td>
-      <td>0.015</td>
-      <td>0.0</td>
-      <td></td>
-    </tr>
-    <tr>
-      <th>4</th>
       <td>blackjax</td>
       <td>True</td>
       <td>NaN</td>
@@ -2200,7 +2158,18 @@ NUTS[nutpie]: [rho, beta, sigma2]
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
-      <td>TypeError: build_kernel.&lt;locals&gt;.kernel() got ...</td>
+      <td>KeyError: 'logdet_decomp'</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>nutpie</td>
+      <td>True</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>KeyError: 'logdet_decomp'</td>
     </tr>
   </tbody>
 </table>
@@ -2239,7 +2208,7 @@ NUTS[nutpie]: [rho, beta, sigma2]
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/43988522e29717a8b15fe84414a7396c7dfa235f1e8891cb382b7235110ed365.png" src="../_images/43988522e29717a8b15fe84414a7396c7dfa235f1e8891cb382b7235110ed365.png" />
+<img alt="../_images/204b0a3cebcbda278b2d0de9431fd93f9041eba725e2511e66fb999a35046af9.png" src="../_images/204b0a3cebcbda278b2d0de9431fd93f9041eba725e2511e66fb999a35046af9.png" />
 </div>
 </div>
 <h2 id="reading-the-results">Reading The Results<a class="headerlink" href="#reading-the-results" title="Link to this heading">¶</a></h2>
@@ -2293,7 +2262,7 @@ NUTS[nutpie]: [rho, beta, sigma2]
   
     Created using
     <a href="https://www.sphinx-doc.org/" target="_blank" rel="noopener">Sphinx</a>
-    8.2.3.
+    9.2.0.
      and
     <a href="https://github.com/jbms/sphinx-immaterial/" target="_blank" rel="noopener">Sphinx-Immaterial</a>
   

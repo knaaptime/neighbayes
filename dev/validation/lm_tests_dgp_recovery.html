@@ -42,7 +42,7 @@
         <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
       
     
-        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.74c816e3f9967dd6e.min.css?v=6cfe2491" />
+        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.6efbe22605a23fcd6.min.css?v=b2ceb110" />
         <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
         <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
         <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=93c5fc88" />
@@ -530,7 +530,7 @@
   
   
   <span class="md-ellipsis">
-    <span>How to fit spatial logit models</span>
+    <span>How to fit a spatial logit model</span>
     
   </span>
   
@@ -1558,7 +1558,7 @@ see <a class="reference internal" href="../how-to/bayesian_lmtests.html"><span c
 <span class="kn">from</span><span class="w"> </span><span class="nn">libpysal.graph</span><span class="w"> </span><span class="kn">import</span> <span class="n">Graph</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">libpysal.weights</span><span class="w"> </span><span class="kn">import</span> <span class="n">Rook</span>
 
-<span class="c1"># Generate data under H0: no spatial effects</span>
+<span class="c1"># Generate data under H0: no spatial dependence</span>
 <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="mi">42</span><span class="p">)</span>
 
 <span class="c1"># Load Columbus dataset for spatial weights</span>
@@ -1599,7 +1599,7 @@ see <a class="reference internal" href="../how-to/bayesian_lmtests.html"><span c
 decision tree from several plausible models, and record where it lands.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.dgp.cross_sectional</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.dgp</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
     <span class="n">simulate_ols</span><span class="p">,</span>
     <span class="n">simulate_sar</span><span class="p">,</span>
     <span class="n">simulate_sdem</span><span class="p">,</span>
@@ -1736,15 +1736,11 @@ Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
 Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
-  W_arr = np.asarray(W, dtype=np.float64)
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 2 seconds.
+Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 3 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
-  W_arr = np.asarray(W, dtype=np.float64)
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
@@ -1862,72 +1858,72 @@ We recommend running at least 4 chains for robust computation of convergence dia
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>=== DGP=OLS | start=OLS | recommended=OLS (yes expected OLS) ===
                     statistic  df  p_value
 test                                      
-LM-Lag                 0.9421   1   0.3317
-LM-Error               0.1455   1   0.7029
-LM-SDM-Joint           2.7057   2   0.2585
-LM-SLX-Error-Joint     1.0512   2   0.5912
-Robust-LM-Lag          0.8982   1   0.3433
-Robust-LM-Error        0.5391   1   0.4628
+LM-Lag                 0.3824   1   0.5363
+LM-Error               0.0399   1   0.8418
+LM-SDM-Joint           0.9035   2   0.6365
+LM-SLX-Error-Joint     0.9035   2   0.6365
+Robust-LM-Lag          0.8636   1   0.3527
+Robust-LM-Error        0.5210   1   0.4704
 
 === DGP=SAR | start=OLS | recommended=SAR (yes expected SAR) ===
                     statistic  df  p_value
 test                                      
-LM-Lag                61.1045   1   0.0000
-LM-Error              25.4791   1   0.0000
-LM-SDM-Joint          64.2955   2   0.0000
-LM-SLX-Error-Joint    60.2682   2   0.0000
-Robust-LM-Lag         36.3646   1   0.0000
-Robust-LM-Error        0.0580   1   0.8097
+LM-Lag                58.4777   1   0.0000
+LM-Error              23.7705   1   0.0000
+LM-SDM-Joint          58.5299   2   0.0000
+LM-SLX-Error-Joint    58.5299   2   0.0000
+Robust-LM-Lag         34.7593   1   0.0000
+Robust-LM-Error        0.0522   1   0.8193
 
 === DGP=SEM | start=OLS | recommended=SEM (yes expected SEM) ===
                     statistic  df  p_value
 test                                      
-LM-Lag                 7.7141   1   0.0055
-LM-Error              28.8128   1   0.0000
-LM-SDM-Joint          30.0061   2   0.0000
-LM-SLX-Error-Joint    30.1095   2   0.0000
-Robust-LM-Lag          1.3070   1   0.2529
-Robust-LM-Error       22.4407   1   0.0000
+LM-Lag                 7.3034   1   0.0069
+LM-Error              27.5617   1   0.0000
+LM-SDM-Joint          28.8153   2   0.0000
+LM-SLX-Error-Joint    28.8153   2   0.0000
+Robust-LM-Lag          1.2535   1   0.2629
+Robust-LM-Error       21.5118   1   0.0000
 
 === DGP=SLX | start=SLX | recommended=SLX (yes expected SLX) ===
                       statistic  df  p_value
 test                                        
-LM-Lag                   3.0257   1   0.0820
-LM-Error                 0.1117   1   0.7382
-Robust-LM-Lag-SDM        1.0495   1   0.3056
-Robust-LM-Error-SDEM     0.9400   1   0.3323
+LM-Lag                   0.1074   1   0.7431
+LM-Error                 0.0061   1   0.9380
+Robust-LM-Lag-SDM        1.0313   1   0.3099
+Robust-LM-Error-SDEM     0.9299   1   0.3349
 
 === DGP=SDM | start=SAR | recommended=SDM (yes expected SDM) ===
                  statistic  df  p_value
 test                                   
-LM-Error            4.5949   1   0.0321
-LM-WX              13.5011   1   0.0002
-Robust-LM-WX       11.2220   1   0.0008
-Robust-LM-Error     8.0599   1   0.0045
+LM-Error            8.4613   1   0.0036
+LM-WX              22.6102   1   0.0000
+Robust-LM-WX       14.2915   1   0.0002
+Robust-LM-Error     0.1426   1   0.7057
 
 === DGP=SDM | start=SLX | recommended=SDM (yes expected SDM) ===
                       statistic  df  p_value
 test                                        
-LM-Lag                  30.5240   1   0.0000
-LM-Error                17.7450   1   0.0000
-Robust-LM-Lag-SDM        9.5178   1   0.0020
-Robust-LM-Error-SDEM     0.2169   1   0.6414
+LM-Lag                  25.7667   1   0.0000
+LM-Error                16.4477   1   0.0001
+Robust-LM-Lag-SDM        9.3376   1   0.0022
+Robust-LM-Error-SDEM     0.0186   1   0.8914
 
 === DGP=SDEM | start=SEM | recommended=SDEM (yes expected SDEM) ===
                statistic  df  p_value
 test                                 
-LM-Lag           69.6001   1   0.0000
-LM-WX            44.1725   1   0.0000
-Robust-LM-Lag     0.3852   1   0.5349
-Robust-LM-WX     25.2116   1   0.0000
+LM-Lag           33.6574   1   0.0000
+LM-WX            39.1422   1   0.0000
+Robust-LM-Lag     0.6374   1   0.4247
+Robust-LM-WX      6.1221   1   0.0133
 
 === DGP=SDEM | start=SLX | recommended=SDEM (yes expected SDEM) ===
                       statistic  df  p_value
 test                                        
-LM-Lag                  12.0932   1   0.0005
-LM-Error                16.2227   1   0.0001
-Robust-LM-Lag-SDM        1.3550   1   0.2444
-Robust-LM-Error-SDEM     6.6657   1   0.0098
+LM-Lag                  10.3930   1   0.0013
+LM-Error                15.1211   1   0.0001
+Robust-LM-Lag-SDM        1.3559   1   0.2443
+Robust-LM-Error-SDEM     6.0840   1   0.0136
 </code></pre></div>
 </div>
 </div>
@@ -1942,9 +1938,9 @@ Robust-LM-Error-SDEM     6.6657   1   0.0098
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>LM-Lag *  (p=0.0000, alpha=0.05)
-├── &lt;sig&gt; LM-Error *  (p=0.0000, alpha=0.05)
-│   ├── &lt;sig&gt; Robust-LM-Lag-SDM *  (p=0.0020, alpha=0.05)
-│   │   ├── &lt;sig&gt; Robust-LM-Error-SDEM *  (p=0.6414, alpha=0.05)
+├── &lt;sig&gt; LM-Error *  (p=0.0001, alpha=0.05)
+│   ├── &lt;sig&gt; Robust-LM-Lag-SDM *  (p=0.0022, alpha=0.05)
+│   │   ├── &lt;sig&gt; Robust-LM-Error-SDEM *  (p=0.8914, alpha=0.05)
 │   │   │   ├── &lt;sig&gt; Robust-LM-Lag-SDM p &lt;= Robust-LM-Error-SDEM p
 │   │   │   │   ├── [SDM]
 │   │   │   │   └── [SDEM]
@@ -1967,9 +1963,9 @@ Robust-LM-Error-SDEM     6.6657   1   0.0098
 <p><strong>Recovery findings.</strong> OLS, SAR, SEM, and SLX scenarios are recovered cleanly
 from their natural starting models.  The SDM and SDEM scenarios are <em>not</em>
 recovered when starting from SAR/SEM/SLX: the tree escalates to <code class="docutils literal notranslate"><span class="pre">SARAR</span></code> (from
-SAR/SEM) or <code class="docutils literal notranslate"><span class="pre">MANSAR</span></code> (from SLX) because both the lag and the error / WX
+SAR/SEM) or <code class="docutils literal notranslate"><span class="pre">GNS</span></code> (from SLX) because both the lag and the error / WX
 channels register significant simultaneously.  This is the <em>expected</em> behaviour
-of the Koley &amp; Bera tree — treat <code class="docutils literal notranslate"><span class="pre">SARAR</span></code>/<code class="docutils literal notranslate"><span class="pre">MANSAR</span></code> as a flag to fit both <code class="docutils literal notranslate"><span class="pre">SDM</span></code>
+of the Koley &amp; Bera tree — treat <code class="docutils literal notranslate"><span class="pre">SARAR</span></code>/<code class="docutils literal notranslate"><span class="pre">GNS</span></code> as a flag to fit both <code class="docutils literal notranslate"><span class="pre">SDM</span></code>
 and <code class="docutils literal notranslate"><span class="pre">SDEM</span></code> and compare with <code class="docutils literal notranslate"><span class="pre">bayes_factor_compare_models</span></code>.</p>
 <p>Other things to keep in mind:</p>
 <ul class="simple">
@@ -1986,20 +1982,15 @@ inspect <code class="docutils literal notranslate"><span class="pre">spatial_dia
 <p>The same sweep over the fixed-effects panel DGPs.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.dgp.panel_fe</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-    <span class="n">simulate_panel_ols_fe</span><span class="p">,</span>
-    <span class="n">simulate_panel_sar_fe</span><span class="p">,</span>
-    <span class="n">simulate_panel_sdem_fe</span><span class="p">,</span>
-    <span class="n">simulate_panel_sdm_fe</span><span class="p">,</span>
-    <span class="n">simulate_panel_sem_fe</span><span class="p">,</span>
-    <span class="n">simulate_panel_slx_fe</span><span class="p">,</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.dgp</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">simulate_ols</span><span class="p">,</span>
+    <span class="n">simulate_sar</span><span class="p">,</span>
+    <span class="n">simulate_sdem</span><span class="p">,</span>
+    <span class="n">simulate_sdm</span><span class="p">,</span>
+    <span class="n">simulate_sem</span><span class="p">,</span>
+    <span class="n">simulate_slx</span><span class="p">,</span>
 <span class="p">)</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-    <span class="n">OLSPanelFE</span><span class="p">,</span>
-    <span class="n">SARPanelFE</span><span class="p">,</span>
-    <span class="n">SEMPanelFE</span><span class="p">,</span>
-    <span class="n">SLXPanelFE</span><span class="p">,</span>
-<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">OLS</span><span class="p">,</span> <span class="n">SAR</span><span class="p">,</span> <span class="n">SEM</span><span class="p">,</span> <span class="n">SLX</span>
 
 <span class="n">PANEL_N_SIDE</span> <span class="o">=</span> <span class="mi">10</span>
 <span class="n">_</span><span class="p">,</span> <span class="n">W_panel_graph</span> <span class="o">=</span> <span class="n">rook_grid_weights</span><span class="p">(</span><span class="n">PANEL_N_SIDE</span><span class="p">)</span>
@@ -2009,12 +2000,16 @@ inspect <code class="docutils literal notranslate"><span class="pre">spatial_dia
 <span class="n">PANEL_SAMPLE_KW</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">400</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">random_seed</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 
 <span class="n">panel_scenarios</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">"OLS"</span><span class="p">:</span> <span class="n">simulate_panel_ols_fe</span><span class="p">(</span><span class="n">beta</span><span class="o">=</span><span class="n">beta</span><span class="p">,</span> <span class="o">**</span><span class="n">PANEL_COMMON</span><span class="p">),</span>
-    <span class="s2">"SAR"</span><span class="p">:</span> <span class="n">simulate_panel_sar_fe</span><span class="p">(</span><span class="n">rho</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="n">beta</span><span class="p">,</span> <span class="o">**</span><span class="n">PANEL_COMMON</span><span class="p">),</span>
-    <span class="s2">"SEM"</span><span class="p">:</span> <span class="n">simulate_panel_sem_fe</span><span class="p">(</span><span class="n">lam</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="n">beta</span><span class="p">,</span> <span class="o">**</span><span class="n">PANEL_COMMON</span><span class="p">),</span>
-    <span class="s2">"SLX"</span><span class="p">:</span> <span class="n">simulate_panel_slx_fe</span><span class="p">(</span><span class="n">beta1</span><span class="o">=</span><span class="n">beta1</span><span class="p">,</span> <span class="n">beta2</span><span class="o">=</span><span class="n">beta2</span><span class="p">,</span> <span class="o">**</span><span class="n">PANEL_COMMON</span><span class="p">),</span>
-    <span class="s2">"SDM"</span><span class="p">:</span> <span class="n">simulate_panel_sdm_fe</span><span class="p">(</span><span class="n">rho</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">beta1</span><span class="o">=</span><span class="n">beta1</span><span class="p">,</span> <span class="n">beta2</span><span class="o">=</span><span class="n">beta2</span><span class="p">,</span> <span class="o">**</span><span class="n">PANEL_COMMON</span><span class="p">),</span>
-    <span class="s2">"SDEM"</span><span class="p">:</span> <span class="n">simulate_panel_sdem_fe</span><span class="p">(</span><span class="n">lam</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">beta1</span><span class="o">=</span><span class="n">beta1</span><span class="p">,</span> <span class="n">beta2</span><span class="o">=</span><span class="n">beta2</span><span class="p">,</span> <span class="o">**</span><span class="n">PANEL_COMMON</span><span class="p">),</span>
+    <span class="s2">"OLS"</span><span class="p">:</span> <span class="n">simulate_ols</span><span class="p">(</span><span class="n">beta</span><span class="o">=</span><span class="n">beta</span><span class="p">,</span> <span class="o">**</span><span class="n">PANEL_COMMON</span><span class="p">,</span> <span class="n">unit_effects</span><span class="o">=</span><span class="s2">"fixed"</span><span class="p">),</span>
+    <span class="s2">"SAR"</span><span class="p">:</span> <span class="n">simulate_sar</span><span class="p">(</span><span class="n">rho</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="n">beta</span><span class="p">,</span> <span class="o">**</span><span class="n">PANEL_COMMON</span><span class="p">,</span> <span class="n">unit_effects</span><span class="o">=</span><span class="s2">"fixed"</span><span class="p">),</span>
+    <span class="s2">"SEM"</span><span class="p">:</span> <span class="n">simulate_sem</span><span class="p">(</span><span class="n">lam</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="n">beta</span><span class="p">,</span> <span class="o">**</span><span class="n">PANEL_COMMON</span><span class="p">,</span> <span class="n">unit_effects</span><span class="o">=</span><span class="s2">"fixed"</span><span class="p">),</span>
+    <span class="s2">"SLX"</span><span class="p">:</span> <span class="n">simulate_slx</span><span class="p">(</span><span class="n">beta1</span><span class="o">=</span><span class="n">beta1</span><span class="p">,</span> <span class="n">beta2</span><span class="o">=</span><span class="n">beta2</span><span class="p">,</span> <span class="o">**</span><span class="n">PANEL_COMMON</span><span class="p">,</span> <span class="n">unit_effects</span><span class="o">=</span><span class="s2">"fixed"</span><span class="p">),</span>
+    <span class="s2">"SDM"</span><span class="p">:</span> <span class="n">simulate_sdm</span><span class="p">(</span>
+        <span class="n">rho</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">beta1</span><span class="o">=</span><span class="n">beta1</span><span class="p">,</span> <span class="n">beta2</span><span class="o">=</span><span class="n">beta2</span><span class="p">,</span> <span class="o">**</span><span class="n">PANEL_COMMON</span><span class="p">,</span> <span class="n">unit_effects</span><span class="o">=</span><span class="s2">"fixed"</span>
+    <span class="p">),</span>
+    <span class="s2">"SDEM"</span><span class="p">:</span> <span class="n">simulate_sdem</span><span class="p">(</span>
+        <span class="n">lam</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">beta1</span><span class="o">=</span><span class="n">beta1</span><span class="p">,</span> <span class="n">beta2</span><span class="o">=</span><span class="n">beta2</span><span class="p">,</span> <span class="o">**</span><span class="n">PANEL_COMMON</span><span class="p">,</span> <span class="n">unit_effects</span><span class="o">=</span><span class="s2">"fixed"</span>
+    <span class="p">),</span>
 <span class="p">}</span>
 </code></pre></div>
 </div>
@@ -2030,21 +2025,22 @@ inspect <code class="docutils literal notranslate"><span class="pre">spatial_dia
         <span class="n">W</span><span class="o">=</span><span class="n">W_panel_graph</span><span class="p">,</span>
         <span class="n">N</span><span class="o">=</span><span class="n">PANEL_N</span><span class="p">,</span>
         <span class="n">T</span><span class="o">=</span><span class="n">PANEL_T</span><span class="p">,</span>
-        <span class="n">effects</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>  <span class="c1"># two-way fixed effects</span>
+        <span class="n">unit_effects</span><span class="o">=</span><span class="s2">"fixed"</span><span class="p">,</span>  <span class="c1"># two-way fixed effects</span>
+        <span class="n">time_effects</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="p">)</span>
     <span class="n">m</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="o">**</span><span class="n">PANEL_SAMPLE_KW</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">m</span>
 
 
 <span class="n">panel_experiments</span> <span class="o">=</span> <span class="p">[</span>
-    <span class="p">(</span><span class="s2">"OLS"</span><span class="p">,</span> <span class="n">OLSPanelFE</span><span class="p">,</span> <span class="s2">"OLSPanelFE"</span><span class="p">),</span>
-    <span class="p">(</span><span class="s2">"SAR"</span><span class="p">,</span> <span class="n">OLSPanelFE</span><span class="p">,</span> <span class="s2">"SARPanelFE"</span><span class="p">),</span>
-    <span class="p">(</span><span class="s2">"SEM"</span><span class="p">,</span> <span class="n">OLSPanelFE</span><span class="p">,</span> <span class="s2">"SEMPanelFE"</span><span class="p">),</span>
-    <span class="p">(</span><span class="s2">"SLX"</span><span class="p">,</span> <span class="n">SLXPanelFE</span><span class="p">,</span> <span class="s2">"SLXPanelFE"</span><span class="p">),</span>
-    <span class="p">(</span><span class="s2">"SDM"</span><span class="p">,</span> <span class="n">SARPanelFE</span><span class="p">,</span> <span class="s2">"SDMPanelFE"</span><span class="p">),</span>
-    <span class="p">(</span><span class="s2">"SDM"</span><span class="p">,</span> <span class="n">SLXPanelFE</span><span class="p">,</span> <span class="s2">"SDMPanelFE"</span><span class="p">),</span>
-    <span class="p">(</span><span class="s2">"SDEM"</span><span class="p">,</span> <span class="n">SEMPanelFE</span><span class="p">,</span> <span class="s2">"SDEMPanelFE"</span><span class="p">),</span>
-    <span class="p">(</span><span class="s2">"SDEM"</span><span class="p">,</span> <span class="n">SLXPanelFE</span><span class="p">,</span> <span class="s2">"SDEMPanelFE"</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">"OLS"</span><span class="p">,</span> <span class="n">OLS</span><span class="p">,</span> <span class="s2">"OLS"</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">"SAR"</span><span class="p">,</span> <span class="n">OLS</span><span class="p">,</span> <span class="s2">"SAR"</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">"SEM"</span><span class="p">,</span> <span class="n">OLS</span><span class="p">,</span> <span class="s2">"SEM"</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">"SLX"</span><span class="p">,</span> <span class="n">SLX</span><span class="p">,</span> <span class="s2">"SLX"</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">"SDM"</span><span class="p">,</span> <span class="n">SAR</span><span class="p">,</span> <span class="s2">"SDM"</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">"SDM"</span><span class="p">,</span> <span class="n">SLX</span><span class="p">,</span> <span class="s2">"SDM"</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">"SDEM"</span><span class="p">,</span> <span class="n">SEM</span><span class="p">,</span> <span class="s2">"SDEM"</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">"SDEM"</span><span class="p">,</span> <span class="n">SLX</span><span class="p">,</span> <span class="s2">"SDEM"</span><span class="p">),</span>
 <span class="p">]</span>
 
 <span class="n">panel_results</span> <span class="o">=</span> <span class="p">[]</span>
@@ -2090,15 +2086,11 @@ Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
 Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
-  W_arr = np.asarray(W, dtype=np.float64)
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
 Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
-  W_arr = np.asarray(W, dtype=np.float64)
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
@@ -2135,65 +2127,65 @@ We recommend running at least 4 chains for robust computation of convergence dia
     <tr>
       <th>0</th>
       <td>OLS</td>
-      <td>OLSPanelFE</td>
-      <td>OLSPanelFE</td>
-      <td>OLSPanelFE</td>
+      <td>OLS</td>
+      <td>OLS</td>
+      <td>OLS</td>
       <td>yes</td>
     </tr>
     <tr>
       <th>1</th>
       <td>SAR</td>
-      <td>OLSPanelFE</td>
-      <td>SARPanelFE</td>
-      <td>SARPanelFE</td>
+      <td>OLS</td>
+      <td>SAR</td>
+      <td>SAR</td>
       <td>yes</td>
     </tr>
     <tr>
       <th>2</th>
       <td>SEM</td>
-      <td>OLSPanelFE</td>
-      <td>SEMPanelFE</td>
-      <td>SEMPanelFE</td>
+      <td>OLS</td>
+      <td>SEM</td>
+      <td>SEM</td>
       <td>yes</td>
     </tr>
     <tr>
       <th>3</th>
       <td>SLX</td>
-      <td>SLXPanelFE</td>
-      <td>SLXPanelFE</td>
-      <td>SLXPanelFE</td>
+      <td>SLX</td>
+      <td>SLX</td>
+      <td>SLX</td>
       <td>yes</td>
     </tr>
     <tr>
       <th>4</th>
       <td>SDM</td>
-      <td>SARPanelFE</td>
-      <td>SDMPanelFE</td>
-      <td>SDMPanelFE</td>
+      <td>SAR</td>
+      <td>SDM</td>
+      <td>SDM</td>
       <td>yes</td>
     </tr>
     <tr>
       <th>5</th>
       <td>SDM</td>
-      <td>SLXPanelFE</td>
-      <td>SDMPanelFE</td>
-      <td>SDMPanelFE</td>
+      <td>SLX</td>
+      <td>SDM</td>
+      <td>SDM</td>
       <td>yes</td>
     </tr>
     <tr>
       <th>6</th>
       <td>SDEM</td>
-      <td>SEMPanelFE</td>
-      <td>SDEMPanelFE</td>
-      <td>SDEMPanelFE</td>
+      <td>SEM</td>
+      <td>SDEM</td>
+      <td>SDEM</td>
       <td>yes</td>
     </tr>
     <tr>
       <th>7</th>
       <td>SDEM</td>
-      <td>SLXPanelFE</td>
-      <td>SDEMPanelFE</td>
-      <td>SDEMPanelFE</td>
+      <td>SLX</td>
+      <td>SDEM</td>
+      <td>SDEM</td>
       <td>yes</td>
     </tr>
   </tbody>
@@ -2215,72 +2207,72 @@ We recommend running at least 4 chains for robust computation of convergence dia
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>=== DGP=OLS | start=OLSPanelFE | recommended=OLSPanelFE (yes expected OLSPanelFE) ===
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>=== DGP=OLS | start=OLS | recommended=OLS (yes expected OLS) ===
                           statistic  df  p_value
 test                                            
-Panel-LM-Lag                 0.2694   1   0.6037
-Panel-LM-Error               0.0020   1   0.9645
-Panel-LM-SDM-Joint           0.4227   2   0.8095
-Panel-LM-SLX-Error-Joint     0.4238   2   0.8091
-Panel-Robust-LM-Lag          0.4072   1   0.5234
-Panel-Robust-LM-Error        0.1439   1   0.7045
+Panel-LM-Lag                 0.2817   1   0.5956
+Panel-LM-Error               0.0006   1   0.9811
+Panel-LM-SDM-Joint           0.4031   2   0.8174
+Panel-LM-SLX-Error-Joint     0.4031   2   0.8174
+Panel-Robust-LM-Lag          0.4026   1   0.5258
+Panel-Robust-LM-Error        0.1215   1   0.7274
 
-=== DGP=SAR | start=OLSPanelFE | recommended=SARPanelFE (yes expected SARPanelFE) ===
+=== DGP=SAR | start=OLS | recommended=SAR (yes expected SAR) ===
                           statistic  df  p_value
 test                                            
-Panel-LM-Lag               112.9169   1   0.0000
-Panel-LM-Error              31.4205   1   0.0000
-Panel-LM-SDM-Joint         117.4424   2   0.0000
-Panel-LM-SLX-Error-Joint   117.6991   2   0.0000
-Panel-Robust-LM-Lag         87.6747   1   0.0000
-Panel-Robust-LM-Error        4.6305   1   0.0314
+Panel-LM-Lag               124.0337   1   0.0000
+Panel-LM-Error              38.8659   1   0.0000
+Panel-LM-SDM-Joint         125.0806   2   0.0000
+Panel-LM-SLX-Error-Joint   125.0806   2   0.0000
+Panel-Robust-LM-Lag         86.2147   1   0.0000
+Panel-Robust-LM-Error        1.0469   1   0.3062
 
-=== DGP=SEM | start=OLSPanelFE | recommended=SEMPanelFE (yes expected SEMPanelFE) ===
+=== DGP=SEM | start=OLS | recommended=SEM (yes expected SEM) ===
                           statistic  df  p_value
 test                                            
-Panel-LM-Lag                12.1460   1   0.0005
-Panel-LM-Error              38.0299   1   0.0000
-Panel-LM-SDM-Joint          38.6526   2   0.0000
-Panel-LM-SLX-Error-Joint    38.6952   2   0.0000
-Panel-Robust-LM-Lag          0.6420   1   0.4230
-Panel-Robust-LM-Error       26.7773   1   0.0000
+Panel-LM-Lag                13.3731   1   0.0003
+Panel-LM-Error              47.4830   1   0.0000
+Panel-LM-SDM-Joint          48.1184   2   0.0000
+Panel-LM-SLX-Error-Joint    48.1184   2   0.0000
+Panel-Robust-LM-Lag          0.6353   1   0.4254
+Panel-Robust-LM-Error       34.7453   1   0.0000
 
-=== DGP=SLX | start=SLXPanelFE | recommended=SLXPanelFE (yes expected SLXPanelFE) ===
+=== DGP=SLX | start=SLX | recommended=SLX (yes expected SLX) ===
                             statistic  df  p_value
 test                                              
-Panel-LM-Lag                   1.5576   1   0.2120
-Panel-LM-Error                 0.0056   1   0.9405
-Panel-Robust-LM-Lag-SDM        7.5278   1   0.0061
-Panel-Robust-LM-Error-SDEM     5.9651   1   0.0146
+Panel-LM-Lag                   0.0218   1   0.8827
+Panel-LM-Error                 0.0017   1   0.9674
+Panel-Robust-LM-Lag-SDM        0.0498   1   0.8234
+Panel-Robust-LM-Error-SDEM     0.0297   1   0.8631
 
-=== DGP=SDM | start=SARPanelFE | recommended=SDMPanelFE (yes expected SDMPanelFE) ===
+=== DGP=SDM | start=SAR | recommended=SDM (yes expected SDM) ===
                     statistic  df  p_value
 test                                      
-Panel-LM-Error       746.1242   1      0.0
-Panel-LM-WX           39.1148   1      0.0
-Panel-Robust-LM-WX    35.3201   1      0.0
+Panel-LM-Error        27.6323   1      0.0
+Panel-LM-WX           76.9247   1      0.0
+Panel-Robust-LM-WX    49.6594   1      0.0
 
-=== DGP=SDM | start=SLXPanelFE | recommended=SDMPanelFE (yes expected SDMPanelFE) ===
+=== DGP=SDM | start=SLX | recommended=SDM (yes expected SDM) ===
                             statistic  df  p_value
 test                                              
-Panel-LM-Lag                  38.6111   1   0.0000
-Panel-LM-Error                13.5990   1   0.0002
-Panel-Robust-LM-Lag-SDM       28.7092   1   0.0000
-Panel-Robust-LM-Error-SDEM     3.6180   1   0.0572
+Panel-LM-Lag                  42.2132   1   0.0000
+Panel-LM-Error                16.8409   1   0.0000
+Panel-Robust-LM-Lag-SDM       26.2594   1   0.0000
+Panel-Robust-LM-Error-SDEM     0.8871   1   0.3463
 
-=== DGP=SDEM | start=SEMPanelFE | recommended=SDEMPanelFE (yes expected SDEMPanelFE) ===
+=== DGP=SDEM | start=SEM | recommended=SDEM (yes expected SDEM) ===
               statistic  df  p_value
 test                                
-Panel-LM-Lag   156.4333   1      0.0
-Panel-LM-WX    152.3167   1      0.0
+Panel-LM-Lag   123.9686   1      0.0
+Panel-LM-WX    140.4812   1      0.0
 
-=== DGP=SDEM | start=SLXPanelFE | recommended=SDEMPanelFE (yes expected SDEMPanelFE) ===
+=== DGP=SDEM | start=SLX | recommended=SDEM (yes expected SDEM) ===
                             statistic  df  p_value
 test                                              
-Panel-LM-Lag                  15.4672   1   0.0001
-Panel-LM-Error                21.5943   1   0.0000
-Panel-Robust-LM-Lag-SDM        8.8652   1   0.0029
-Panel-Robust-LM-Error-SDEM    15.0720   1   0.0001
+Panel-LM-Lag                  17.1584   1   0.0000
+Panel-LM-Error                26.9326   1   0.0000
+Panel-Robust-LM-Lag-SDM        0.7467   1   0.3875
+Panel-Robust-LM-Error-SDEM    10.5209   1   0.0012
 </code></pre></div>
 </div>
 </div>
@@ -2338,7 +2330,7 @@ predicate (smaller p wins).</p>
   
     Created using
     <a href="https://www.sphinx-doc.org/" target="_blank" rel="noopener">Sphinx</a>
-    8.2.3.
+    9.2.0.
      and
     <a href="https://github.com/jbms/sphinx-immaterial/" target="_blank" rel="noopener">Sphinx-Immaterial</a>
   

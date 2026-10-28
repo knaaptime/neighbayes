@@ -16,10 +16,10 @@
       ~SARTobit.__init__
       ~SARTobit.fit
       ~SARTobit.fitted_values
+      ~SARTobit.impacts
       ~SARTobit.residuals
       ~SARTobit.spatial_diagnostics
       ~SARTobit.spatial_diagnostics_decision
-      ~SARTobit.spatial_effects
       ~SARTobit.summary
    
    

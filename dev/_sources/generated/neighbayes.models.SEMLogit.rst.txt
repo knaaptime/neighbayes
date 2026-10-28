@@ -17,10 +17,10 @@
       ~SEMLogit.fit
       ~SEMLogit.fitted_probabilities
       ~SEMLogit.fitted_values
+      ~SEMLogit.impacts
       ~SEMLogit.residuals
       ~SEMLogit.spatial_diagnostics
       ~SEMLogit.spatial_diagnostics_decision
-      ~SEMLogit.spatial_effects
       ~SEMLogit.summary
    
    

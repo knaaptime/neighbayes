@@ -1,0 +1,6 @@
+﻿neighbayes.config.enable\_compile\_cache
+========================================
+
+.. currentmodule:: neighbayes.config
+
+.. autofunction:: enable_compile_cache

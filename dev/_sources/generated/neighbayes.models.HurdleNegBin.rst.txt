@@ -1,0 +1,39 @@
+﻿neighbayes.models.HurdleNegBin
+==============================
+
+.. currentmodule:: neighbayes.models
+
+.. autoclass:: HurdleNegBin
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~HurdleNegBin.__init__
+      ~HurdleNegBin.activation_probabilities
+      ~HurdleNegBin.fit
+      ~HurdleNegBin.fitted_values
+      ~HurdleNegBin.impacts
+      ~HurdleNegBin.positive_mean
+      ~HurdleNegBin.posterior_predictive
+      ~HurdleNegBin.residuals
+      ~HurdleNegBin.spatial_diagnostics
+      ~HurdleNegBin.spatial_diagnostics_decision
+      ~HurdleNegBin.summary
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~HurdleNegBin.inference_data
+      ~HurdleNegBin.pymc_model
+   
+   

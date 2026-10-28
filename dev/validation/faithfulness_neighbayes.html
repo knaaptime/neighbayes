@@ -42,7 +42,7 @@
         <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
       
     
-        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.74c816e3f9967dd6e.min.css?v=6cfe2491" />
+        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.6efbe22605a23fcd6.min.css?v=b2ceb110" />
         <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
         <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
         <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=93c5fc88" />
@@ -530,7 +530,7 @@
   
   
   <span class="md-ellipsis">
-    <span>How to fit spatial logit models</span>
+    <span>How to fit a spatial logit model</span>
     
   </span>
   
@@ -1226,10 +1226,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#example-d-semip-style-spatial-probit-with-spatial-regional-effects" class="md-nav__link">
+  <a href="#example-d-semip-style-sem-probit-with-random-unit-effects" class="md-nav__link">
     
     <span class="md-ellipsis">
-      <span>Example D:<wbr> semip-<wbr>style Spatial Probit with Spatial Regional Effects</span>
+      <span>Example D:<wbr> semip-<wbr>style SEM probit with random unit effects</span>
     </span>
   </a>
   
@@ -1577,10 +1577,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#example-d-semip-style-spatial-probit-with-spatial-regional-effects" class="md-nav__link">
+  <a href="#example-d-semip-style-sem-probit-with-random-unit-effects" class="md-nav__link">
     
     <span class="md-ellipsis">
-      <span>Example D:<wbr> semip-<wbr>style Spatial Probit with Spatial Regional Effects</span>
+      <span>Example D:<wbr> semip-<wbr>style SEM probit with random unit effects</span>
     </span>
   </a>
   
@@ -1633,7 +1633,7 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">scipy.sparse</span><span class="w"> </span><span class="kn">import</span> <span class="n">csr_matrix</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes</span><span class="w"> </span><span class="kn">import</span> <span class="n">dgp</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">SDEM</span><span class="p">,</span> <span class="n">SDM</span><span class="p">,</span> <span class="n">SDEMPanelFE</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">SDEM</span><span class="p">,</span> <span class="n">SDM</span>
 </code></pre></div>
 </div>
 </div>
@@ -1701,13 +1701,14 @@
 <span class="p">)</span>
 <span class="n">y</span> <span class="o">=</span> <span class="n">x</span> <span class="o">@</span> <span class="n">beta_true</span> <span class="o">+</span> <span class="p">(</span><span class="n">Wbig</span> <span class="o">@</span> <span class="n">x</span><span class="p">)</span> <span class="o">@</span> <span class="n">theta_true</span> <span class="o">+</span> <span class="n">SFE</span> <span class="o">+</span> <span class="n">TFE</span> <span class="o">+</span> <span class="n">u</span>
 
-<span class="n">m_panel</span> <span class="o">=</span> <span class="n">SDEMPanelFE</span><span class="p">(</span>
+<span class="n">m_panel</span> <span class="o">=</span> <span class="n">SDEM</span><span class="p">(</span>
+    <span class="n">unit_effects</span><span class="o">=</span><span class="s2">"fixed"</span><span class="p">,</span>
+    <span class="n">time_effects</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span>
     <span class="n">X</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">"x1"</span><span class="p">,</span> <span class="s2">"x2"</span><span class="p">]),</span>
     <span class="n">W</span><span class="o">=</span><span class="n">to_graph</span><span class="p">(</span><span class="n">Wn</span><span class="p">),</span>
     <span class="n">N</span><span class="o">=</span><span class="n">n</span><span class="p">,</span>
     <span class="n">T</span><span class="o">=</span><span class="n">t</span><span class="p">,</span>
-    <span class="n">effects</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span>
     <span class="n">priors</span><span class="o">=</span><span class="p">{</span><span class="s2">"lam_lower"</span><span class="p">:</span> <span class="o">-</span><span class="mf">0.95</span><span class="p">,</span> <span class="s2">"lam_upper"</span><span class="p">:</span> <span class="mf">0.95</span><span class="p">},</span>
 <span class="p">)</span>
 <span class="n">idata_panel</span> <span class="o">=</span> <span class="n">m_panel</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
@@ -1718,10 +1719,6 @@
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
-  W_arr = np.asarray(W, dtype=np.float64)
-</code></pre></div>
-</div>
 <div class="output text_html"><div>
 <style scoped>
     .dataframe tbody tr th:only-of-type {
@@ -1754,37 +1751,37 @@
   <tbody>
     <tr>
       <th>lam</th>
-      <td>0.7136</td>
-      <td>0.0182</td>
-      <td>0.6822</td>
+      <td>0.7141</td>
+      <td>0.0179</td>
+      <td>0.6832</td>
       <td>0.7404</td>
-      <td>300.8924</td>
-      <td>193.1729</td>
-      <td>1.0051</td>
-      <td>0.0011</td>
+      <td>306.4221</td>
+      <td>241.5511</td>
+      <td>0.9987</td>
+      <td>0.0010</td>
       <td>0.0008</td>
     </tr>
     <tr>
       <th>sigma</th>
-      <td>0.3204</td>
+      <td>0.3203</td>
       <td>0.0053</td>
       <td>0.3120</td>
       <td>0.3295</td>
-      <td>285.2170</td>
+      <td>282.2576</td>
       <td>309.6130</td>
-      <td>0.9961</td>
+      <td>0.9962</td>
       <td>0.0003</td>
       <td>0.0002</td>
     </tr>
     <tr>
       <th>sigma2</th>
-      <td>0.1027</td>
+      <td>0.1026</td>
       <td>0.0034</td>
-      <td>0.0974</td>
+      <td>0.0973</td>
       <td>0.1086</td>
-      <td>285.2170</td>
+      <td>282.2576</td>
       <td>309.6130</td>
-      <td>0.9961</td>
+      <td>0.9962</td>
       <td>0.0002</td>
       <td>0.0001</td>
     </tr>
@@ -1794,9 +1791,9 @@
       <td>0.0082</td>
       <td>0.9890</td>
       <td>1.0151</td>
-      <td>401.0421</td>
+      <td>400.3751</td>
       <td>315.7780</td>
-      <td>1.0026</td>
+      <td>1.0025</td>
       <td>0.0004</td>
       <td>0.0003</td>
     </tr>
@@ -1805,20 +1802,20 @@
       <td>1.0136</td>
       <td>0.0087</td>
       <td>1.0006</td>
-      <td>1.0282</td>
-      <td>328.8510</td>
+      <td>1.0277</td>
+      <td>329.2431</td>
       <td>307.3361</td>
-      <td>0.9995</td>
+      <td>0.9987</td>
       <td>0.0005</td>
       <td>0.0003</td>
     </tr>
     <tr>
       <th>W*x1</th>
-      <td>-0.9898</td>
+      <td>-0.9899</td>
       <td>0.0238</td>
       <td>-1.0269</td>
-      <td>-0.9504</td>
-      <td>373.0911</td>
+      <td>-0.9503</td>
+      <td>372.4332</td>
       <td>283.6214</td>
       <td>1.0004</td>
       <td>0.0012</td>
@@ -1826,12 +1823,12 @@
     </tr>
     <tr>
       <th>W*x2</th>
-      <td>-0.9863</td>
+      <td>-0.9862</td>
       <td>0.0247</td>
       <td>-1.0251</td>
-      <td>-0.9468</td>
-      <td>295.4193</td>
-      <td>249.7320</td>
+      <td>-0.9466</td>
+      <td>295.9642</td>
+      <td>262.4585</td>
       <td>0.9979</td>
       <td>0.0014</td>
       <td>0.0011</td>
@@ -1889,45 +1886,45 @@
       <th>0</th>
       <td>lam</td>
       <td>0.7</td>
-      <td>0.713556</td>
-      <td>0.013556</td>
-      <td>1.936531</td>
+      <td>0.714109</td>
+      <td>0.014109</td>
+      <td>2.015531</td>
       <td>True</td>
     </tr>
     <tr>
       <th>1</th>
       <td>x1</td>
       <td>1.0</td>
-      <td>1.002095</td>
-      <td>0.002095</td>
-      <td>0.209496</td>
+      <td>1.002088</td>
+      <td>0.002088</td>
+      <td>0.208798</td>
       <td>True</td>
     </tr>
     <tr>
       <th>2</th>
       <td>x2</td>
       <td>1.0</td>
-      <td>1.013614</td>
-      <td>0.013614</td>
-      <td>1.361407</td>
+      <td>1.013623</td>
+      <td>0.013623</td>
+      <td>1.362327</td>
       <td>True</td>
     </tr>
     <tr>
       <th>3</th>
       <td>W*x1</td>
       <td>-1.0</td>
-      <td>-0.989846</td>
-      <td>0.010154</td>
-      <td>1.015414</td>
+      <td>-0.989870</td>
+      <td>0.010130</td>
+      <td>1.013023</td>
       <td>True</td>
     </tr>
     <tr>
       <th>4</th>
       <td>W*x2</td>
       <td>-1.0</td>
-      <td>-0.986272</td>
-      <td>0.013728</td>
-      <td>1.372829</td>
+      <td>-0.986245</td>
+      <td>0.013755</td>
+      <td>1.375513</td>
       <td>True</td>
     </tr>
   </tbody>
@@ -2610,27 +2607,27 @@
 <ul class="simple">
 <li><p>Convex-combination examples that estimate unknown gamma weights over multiple W matrices (for example <code class="docutils literal notranslate"><span class="pre">*_conv_panel_g</span></code>) are not currently implemented in <code class="docutils literal notranslate"><span class="pre">neighbayes</span></code>. Those are outside current fidelity scope.</p></li>
 </ul>
-<h2 id="example-d-semip-style-spatial-probit-with-spatial-regional-effects">Example D: semip-style Spatial Probit with Spatial Regional Effects<a class="headerlink" href="#example-d-semip-style-spatial-probit-with-spatial-regional-effects" title="Link to this heading">¶</a></h2>
+<h2 id="example-d-semip-style-sem-probit-with-random-unit-effects">Example D: semip-style SEM probit with random unit effects<a class="headerlink" href="#example-d-semip-style-sem-probit-with-random-unit-effects" title="Link to this heading">¶</a></h2>
 <p>This mirrors the core legacy <code class="docutils literal notranslate"><span class="pre">semip_g</span></code> structure:</p>
 <ul class="simple">
 <li><p>binary outcome from latent threshold,</p></li>
-<li><p>region-specific effects,</p></li>
-<li><p>spatial dependence in region effects <code class="docutils literal notranslate"><span class="pre">a</span> <span class="pre">=</span> <span class="pre">rho</span> <span class="pre">*</span> <span class="pre">W</span> <span class="pre">*</span> <span class="pre">a</span> <span class="pre">+</span> <span class="pre">u</span></code>.</p></li>
+<li><p>an effect per unit, each unit observed many times,</p></li>
+<li><p>spatial dependence in the unit effects, <code class="docutils literal notranslate"><span class="pre">a</span> <span class="pre">=</span> <span class="pre">lam</span> <span class="pre">*</span> <span class="pre">W</span> <span class="pre">*</span> <span class="pre">a</span> <span class="pre">+</span> <span class="pre">u</span></code>.</p></li>
 </ul>
 <p>Unlike legacy <code class="docutils literal notranslate"><span class="pre">semip_g</span></code>, this demonstration uses homoskedastic observation-level probit variance (no <code class="docutils literal notranslate"><span class="pre">v_i/r</span></code> hierarchy).</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">SARProbit</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">SEMProbit</span>
 
 <span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">707</span><span class="p">)</span>
 
-<span class="c1"># semip-like setup: m regions with mobs observations each</span>
+<span class="c1"># semip-like setup: m units with mobs observations each</span>
 <span class="n">m</span> <span class="o">=</span> <span class="mi">48</span>
 <span class="n">mobs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="n">m</span><span class="p">,</span> <span class="mi">60</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">int</span><span class="p">)</span>
 <span class="n">n</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">mobs</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
 <span class="n">k</span> <span class="o">=</span> <span class="mi">3</span>
 
-<span class="c1"># Region-level kNN weights and spatial random effects</span>
+<span class="c1"># Unit-level kNN weights and spatial random effects</span>
 <span class="n">Wm</span> <span class="o">=</span> <span class="n">make_knn_w</span><span class="p">(</span><span class="n">rng</span><span class="o">.</span><span class="n">random</span><span class="p">(</span><span class="n">m</span><span class="p">),</span> <span class="n">rng</span><span class="o">.</span><span class="n">random</span><span class="p">(</span><span class="n">m</span><span class="p">),</span> <span class="n">k</span><span class="o">=</span><span class="mi">6</span><span class="p">)</span>
 <span class="n">rho_true</span> <span class="o">=</span> <span class="mf">0.45</span>
 <span class="n">sigma_a_true</span> <span class="o">=</span> <span class="mf">1.2</span>
@@ -2638,21 +2635,22 @@
 <span class="n">u</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">standard_normal</span><span class="p">(</span><span class="n">m</span><span class="p">)</span> <span class="o">*</span> <span class="n">sigma_a_true</span>
 <span class="n">a</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">eye</span><span class="p">(</span><span class="n">m</span><span class="p">)</span> <span class="o">-</span> <span class="n">rho_true</span> <span class="o">*</span> <span class="n">Wm</span><span class="p">,</span> <span class="n">u</span><span class="p">)</span>
 
-<span class="n">region_ids</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">m</span><span class="p">),</span> <span class="n">mobs</span><span class="p">)</span>
+<span class="n">unit_ids</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">repeat</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">m</span><span class="p">),</span> <span class="n">mobs</span><span class="p">)</span>
 <span class="n">X</span> <span class="o">=</span> <span class="n">rng</span><span class="o">.</span><span class="n">standard_normal</span><span class="p">((</span><span class="n">n</span><span class="p">,</span> <span class="n">k</span><span class="p">))</span>
 <span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">([</span><span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">n</span><span class="p">),</span> <span class="n">X</span><span class="p">])</span>
 <span class="n">feature_names</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"Intercept"</span><span class="p">,</span> <span class="s2">"x1"</span><span class="p">,</span> <span class="s2">"x2"</span><span class="p">,</span> <span class="s2">"x3"</span><span class="p">]</span>
 
 <span class="n">beta_true</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.4</span><span class="p">,</span> <span class="mf">0.8</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.6</span><span class="p">,</span> <span class="mf">0.5</span><span class="p">])</span>
-<span class="n">eta</span> <span class="o">=</span> <span class="n">X</span> <span class="o">@</span> <span class="n">beta_true</span> <span class="o">+</span> <span class="n">a</span><span class="p">[</span><span class="n">region_ids</span><span class="p">]</span>
+<span class="n">eta</span> <span class="o">=</span> <span class="n">X</span> <span class="o">@</span> <span class="n">beta_true</span> <span class="o">+</span> <span class="n">a</span><span class="p">[</span><span class="n">unit_ids</span><span class="p">]</span>
 <span class="n">y</span> <span class="o">=</span> <span class="p">(</span><span class="n">eta</span> <span class="o">+</span> <span class="n">rng</span><span class="o">.</span><span class="n">standard_normal</span><span class="p">(</span><span class="n">n</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">0.0</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">float</span><span class="p">)</span>
 
-<span class="n">sp</span> <span class="o">=</span> <span class="n">SARProbit</span><span class="p">(</span>
+<span class="n">sp</span> <span class="o">=</span> <span class="n">SEMProbit</span><span class="p">(</span>
     <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span>
     <span class="n">X</span><span class="o">=</span><span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="n">feature_names</span><span class="p">),</span>
     <span class="n">W</span><span class="o">=</span><span class="n">to_graph</span><span class="p">(</span><span class="n">Wm</span><span class="p">),</span>
-    <span class="n">region_ids</span><span class="o">=</span><span class="n">region_ids</span><span class="p">,</span>
-    <span class="n">priors</span><span class="o">=</span><span class="p">{</span><span class="s2">"rho_lower"</span><span class="p">:</span> <span class="o">-</span><span class="mf">0.95</span><span class="p">,</span> <span class="s2">"rho_upper"</span><span class="p">:</span> <span class="mf">0.95</span><span class="p">,</span> <span class="s2">"beta_sigma"</span><span class="p">:</span> <span class="mf">5.0</span><span class="p">},</span>
+    <span class="n">units</span><span class="o">=</span><span class="n">unit_ids</span><span class="p">,</span>
+    <span class="n">unit_effects</span><span class="o">=</span><span class="s2">"random"</span><span class="p">,</span>
+    <span class="n">priors</span><span class="o">=</span><span class="p">{</span><span class="s2">"lam_lower"</span><span class="p">:</span> <span class="o">-</span><span class="mf">0.95</span><span class="p">,</span> <span class="s2">"lam_upper"</span><span class="p">:</span> <span class="mf">0.95</span><span class="p">,</span> <span class="s2">"beta_sigma"</span><span class="p">:</span> <span class="mf">5.0</span><span class="p">},</span>
 <span class="p">)</span>
 <span class="n">idata_sp</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
     <span class="n">draws</span><span class="o">=</span><span class="mi">220</span><span class="p">,</span>
@@ -2663,14 +2661,14 @@
     <span class="n">random_seed</span><span class="o">=</span><span class="mi">707</span><span class="p">,</span>
 <span class="p">)</span>
 
-<span class="n">display</span><span class="p">(</span><span class="n">sp</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s2">"beta"</span><span class="p">,</span> <span class="s2">"rho"</span><span class="p">,</span> <span class="s2">"sigma_a"</span><span class="p">],</span> <span class="n">round_to</span><span class="o">=</span><span class="mi">4</span><span class="p">))</span>
+<span class="n">display</span><span class="p">(</span><span class="n">sp</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s2">"beta"</span><span class="p">,</span> <span class="s2">"lam"</span><span class="p">,</span> <span class="s2">"unit_effect_sd"</span><span class="p">],</span> <span class="n">round_to</span><span class="o">=</span><span class="mi">4</span><span class="p">))</span>
 </code></pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Sequential sampling (1 chains in 1 job)
-NUTS: [rho, beta, sigma_a, a_raw]
+NUTS: [lam, beta, unit_effect_sd, unit_effect_raw]
 Sampling 1 chain for 220 tune and 220 draw iterations (220 + 220 draws total) took 5 seconds.
 Only one chain was sampled, this makes it impossible to run some convergence checks
 </code></pre></div>
@@ -2707,75 +2705,75 @@ Only one chain was sampled, this makes it impossible to run some convergence che
   <tbody>
     <tr>
       <th>Intercept</th>
-      <td>0.7796</td>
-      <td>0.3936</td>
-      <td>0.3071</td>
-      <td>1.5928</td>
-      <td>14.5670</td>
-      <td>28.7255</td>
+      <td>1.0006</td>
+      <td>0.3839</td>
+      <td>0.4032</td>
+      <td>1.6020</td>
+      <td>22.5393</td>
+      <td>24.3375</td>
       <td>NaN</td>
-      <td>0.1010</td>
-      <td>0.0625</td>
+      <td>0.0805</td>
+      <td>0.0469</td>
     </tr>
     <tr>
       <th>x1</th>
-      <td>0.8584</td>
-      <td>0.0405</td>
-      <td>0.7957</td>
-      <td>0.9236</td>
-      <td>164.8445</td>
-      <td>155.5503</td>
+      <td>0.8680</td>
+      <td>0.0415</td>
+      <td>0.8044</td>
+      <td>0.9359</td>
+      <td>87.8229</td>
+      <td>98.3777</td>
       <td>NaN</td>
-      <td>0.0031</td>
-      <td>0.0020</td>
+      <td>0.0045</td>
+      <td>0.0023</td>
     </tr>
     <tr>
       <th>x2</th>
-      <td>-0.6144</td>
-      <td>0.0374</td>
-      <td>-0.6782</td>
-      <td>-0.5571</td>
-      <td>146.2740</td>
-      <td>199.1243</td>
+      <td>-0.6263</td>
+      <td>0.0372</td>
+      <td>-0.6820</td>
+      <td>-0.5742</td>
+      <td>51.4151</td>
+      <td>116.6438</td>
       <td>NaN</td>
-      <td>0.0031</td>
-      <td>0.0021</td>
+      <td>0.0051</td>
+      <td>0.0024</td>
     </tr>
     <tr>
       <th>x3</th>
-      <td>0.5302</td>
-      <td>0.0385</td>
-      <td>0.4674</td>
-      <td>0.5905</td>
-      <td>202.2612</td>
-      <td>145.1613</td>
+      <td>0.5439</td>
+      <td>0.0395</td>
+      <td>0.4817</td>
+      <td>0.6095</td>
+      <td>96.2179</td>
+      <td>100.2444</td>
       <td>NaN</td>
+      <td>0.0039</td>
       <td>0.0027</td>
-      <td>0.0032</td>
     </tr>
     <tr>
-      <th>rho</th>
-      <td>0.3936</td>
-      <td>0.1889</td>
-      <td>0.0798</td>
-      <td>0.6844</td>
-      <td>20.9151</td>
-      <td>36.3188</td>
+      <th>lam</th>
+      <td>0.4520</td>
+      <td>0.2281</td>
+      <td>-0.0433</td>
+      <td>0.7049</td>
+      <td>21.5789</td>
+      <td>12.8391</td>
       <td>NaN</td>
-      <td>0.0409</td>
-      <td>0.0171</td>
+      <td>0.0541</td>
+      <td>0.0651</td>
     </tr>
     <tr>
-      <th>sigma_a</th>
-      <td>1.4127</td>
-      <td>0.1844</td>
-      <td>1.1382</td>
-      <td>1.7162</td>
-      <td>24.2610</td>
-      <td>45.8249</td>
+      <th>unit_effect_sd</th>
+      <td>1.3406</td>
+      <td>0.1725</td>
+      <td>1.0932</td>
+      <td>1.6689</td>
+      <td>37.4404</td>
+      <td>21.8801</td>
       <td>NaN</td>
-      <td>0.0381</td>
-      <td>0.0120</td>
+      <td>0.0327</td>
+      <td>0.0447</td>
     </tr>
   </tbody>
 </table>
@@ -2784,29 +2782,29 @@ Only one chain was sampled, this makes it impossible to run some convergence che
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">beta_hat</span> <span class="o">=</span> <span class="n">idata_sp</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s2">"beta"</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">((</span><span class="s2">"chain"</span><span class="p">,</span> <span class="s2">"draw"</span><span class="p">))</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span>
-<span class="n">rho_hat</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">idata_sp</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s2">"rho"</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">((</span><span class="s2">"chain"</span><span class="p">,</span> <span class="s2">"draw"</span><span class="p">))</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">())</span>
+<span class="n">rho_hat</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">idata_sp</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s2">"lam"</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">((</span><span class="s2">"chain"</span><span class="p">,</span> <span class="s2">"draw"</span><span class="p">))</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">())</span>
 
 <span class="n">a_mean_hat</span> <span class="o">=</span> <span class="n">sp</span><span class="o">.</span><span class="n">random_effects_mean</span><span class="p">()</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span>
 <span class="n">a_rmse</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">((</span><span class="n">a_mean_hat</span> <span class="o">-</span> <span class="n">a</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)))</span>
 
 <span class="n">faith_sp</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
     <span class="p">{</span>
-        <span class="s2">"term"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"rho"</span><span class="p">]</span> <span class="o">+</span> <span class="n">feature_names</span><span class="p">,</span>
+        <span class="s2">"term"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"lam"</span><span class="p">]</span> <span class="o">+</span> <span class="n">feature_names</span><span class="p">,</span>
         <span class="s2">"truth"</span><span class="p">:</span> <span class="p">[</span><span class="n">rho_true</span><span class="p">]</span> <span class="o">+</span> <span class="n">beta_true</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
         <span class="s2">"estimate"</span><span class="p">:</span> <span class="p">[</span><span class="n">rho_hat</span><span class="p">]</span> <span class="o">+</span> <span class="n">beta_hat</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
     <span class="p">}</span>
 <span class="p">)</span>
 <span class="n">faith_sp</span> <span class="o">=</span> <span class="n">summarize_recovery</span><span class="p">(</span><span class="n">faith_sp</span><span class="p">,</span> <span class="n">abs_tol</span><span class="o">=</span><span class="mf">0.30</span><span class="p">)</span>
 
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Regional-effects RMSE: </span><span class="si">{</span><span class="n">a_rmse</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Unit-effects RMSE: </span><span class="si">{</span><span class="n">a_rmse</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 <span class="n">display</span><span class="p">(</span><span class="n">faith_sp</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">"SpatialProbit semip-style pass rate:"</span><span class="p">,</span> <span class="n">faith_sp</span><span class="p">[</span><span class="s2">"within_tol"</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"SEMProbit semip-style pass rate:"</span><span class="p">,</span> <span class="n">faith_sp</span><span class="p">[</span><span class="s2">"within_tol"</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span>
 </code></pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Regional-effects RMSE: 0.4560
-SpatialProbit semip-style pass rate: 0.8
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Unit-effects RMSE: 0.6403
+SEMProbit semip-style pass rate: 0.8
 </code></pre></div>
 </div>
 <div class="output text_html"><div>
@@ -2838,47 +2836,47 @@ SpatialProbit semip-style pass rate: 0.8
   <tbody>
     <tr>
       <th>0</th>
-      <td>rho</td>
+      <td>lam</td>
       <td>0.45</td>
-      <td>0.393639</td>
-      <td>0.056361</td>
-      <td>12.524668</td>
+      <td>0.451968</td>
+      <td>0.001968</td>
+      <td>0.437443</td>
       <td>True</td>
     </tr>
     <tr>
       <th>1</th>
       <td>Intercept</td>
       <td>0.40</td>
-      <td>0.779631</td>
-      <td>0.379631</td>
-      <td>94.907632</td>
+      <td>1.000649</td>
+      <td>0.600649</td>
+      <td>150.162273</td>
       <td>False</td>
     </tr>
     <tr>
       <th>2</th>
       <td>x1</td>
       <td>0.80</td>
-      <td>0.858368</td>
-      <td>0.058368</td>
-      <td>7.295976</td>
+      <td>0.868046</td>
+      <td>0.068046</td>
+      <td>8.505772</td>
       <td>True</td>
     </tr>
     <tr>
       <th>3</th>
       <td>x2</td>
       <td>-0.60</td>
-      <td>-0.614397</td>
-      <td>0.014397</td>
-      <td>2.399566</td>
+      <td>-0.626273</td>
+      <td>0.026273</td>
+      <td>4.378877</td>
       <td>True</td>
     </tr>
     <tr>
       <th>4</th>
       <td>x3</td>
       <td>0.50</td>
-      <td>0.530194</td>
-      <td>0.030194</td>
-      <td>6.038796</td>
+      <td>0.543885</td>
+      <td>0.043885</td>
+      <td>8.777078</td>
       <td>True</td>
     </tr>
   </tbody>
@@ -2931,7 +2929,7 @@ SpatialProbit semip-style pass rate: 0.8
   
     Created using
     <a href="https://www.sphinx-doc.org/" target="_blank" rel="noopener">Sphinx</a>
-    8.2.3.
+    9.2.0.
      and
     <a href="https://github.com/jbms/sphinx-immaterial/" target="_blank" rel="noopener">Sphinx-Immaterial</a>
   

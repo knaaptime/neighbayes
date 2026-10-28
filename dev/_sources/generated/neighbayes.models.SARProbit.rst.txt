@@ -17,11 +17,10 @@
       ~SARProbit.fit
       ~SARProbit.fitted_probabilities
       ~SARProbit.fitted_values
-      ~SARProbit.random_effects_mean
+      ~SARProbit.impacts
       ~SARProbit.residuals
       ~SARProbit.spatial_diagnostics
       ~SARProbit.spatial_diagnostics_decision
-      ~SARProbit.spatial_effects
       ~SARProbit.summary
    
    

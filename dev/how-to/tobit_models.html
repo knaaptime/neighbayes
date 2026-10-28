@@ -42,7 +42,7 @@
         <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
       
     
-        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.74c816e3f9967dd6e.min.css?v=6cfe2491" />
+        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.6efbe22605a23fcd6.min.css?v=b2ceb110" />
         <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
         <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
         <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=93c5fc88" />
@@ -532,7 +532,7 @@
   
   
   <span class="md-ellipsis">
-    <span>How to fit spatial logit models</span>
+    <span>How to fit a spatial logit model</span>
     
   </span>
   
@@ -1468,12 +1468,9 @@ uses NUTS and <code class="docutils literal notranslate"><span class="pre">targe
 in <a class="reference internal" href="../models.html"><span class="std std-doc">Supported Models</span></a>.</p>
 <div class="note admonition">
 <p class="admonition-title">Note</p>
-<p>For binary outcomes, use the Pólya–Gamma logit classes
-<code class="docutils literal notranslate"><span class="pre">SARLogit</span></code>, <code class="docutils literal notranslate"><span class="pre">SEMLogit</span></code> and <code class="docutils literal notranslate"><span class="pre">SARLogitStructural</span></code> are the modern route to spatial
-binary outcomes, and they have a conjugate Gibbs sampler — see
-<a class="reference internal" href="spatial_logit.html"><span class="std std-doc">How to fit spatial logit models</span></a>. The package’s
-<code class="docutils literal notranslate"><span class="pre">SARProbit</span></code> is a region-random-effects specification rather than the standard
-spatial probit, so it is not the class to reach for by default.</p>
+<p>For binary outcomes, use <code class="docutils literal notranslate"><span class="pre">SARLogit</span></code> or <code class="docutils literal notranslate"><span class="pre">SARProbit</span></code> (and their SEM and
+SDEM classes), which have exact Gibbs samplers — see
+<a class="reference internal" href="spatial_logit.html"><span class="std std-doc">How to fit a spatial logit model</span></a>.</p>
 </div>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
@@ -1561,24 +1558,24 @@ true parameters: rho=0.4, beta=[1.0, 1.5], sigma=0.8
   <tbody>
     <tr>
       <th>rho</th>
-      <td>0.405</td>
+      <td>0.406</td>
       <td>0.043</td>
       <td>0.33</td>
       <td>0.47</td>
-      <td>2057</td>
-      <td>2306</td>
+      <td>2073</td>
+      <td>2302</td>
       <td>1.00</td>
-      <td>0.00094</td>
-      <td>0.00065</td>
+      <td>0.00096</td>
+      <td>0.00067</td>
     </tr>
     <tr>
       <th>beta[x0]</th>
-      <td>1.038</td>
-      <td>0.078</td>
+      <td>1.036</td>
+      <td>0.079</td>
       <td>0.91</td>
       <td>1.2</td>
-      <td>2054</td>
-      <td>2251</td>
+      <td>2063</td>
+      <td>2303</td>
       <td>1.00</td>
       <td>0.0017</td>
       <td>0.0012</td>
@@ -1586,26 +1583,26 @@ true parameters: rho=0.4, beta=[1.0, 1.5], sigma=0.8
     <tr>
       <th>beta[x1]</th>
       <td>1.542</td>
-      <td>0.058</td>
+      <td>0.057</td>
       <td>1.4</td>
       <td>1.6</td>
-      <td>2365</td>
-      <td>2743</td>
+      <td>1984</td>
+      <td>2210</td>
       <td>1.00</td>
-      <td>0.0012</td>
-      <td>0.00079</td>
+      <td>0.0013</td>
+      <td>0.00084</td>
     </tr>
     <tr>
       <th>sigma</th>
-      <td>0.794</td>
+      <td>0.795</td>
       <td>0.036</td>
       <td>0.74</td>
       <td>0.85</td>
-      <td>2995</td>
-      <td>2671</td>
+      <td>3025</td>
+      <td>2801</td>
       <td>1.00</td>
       <td>0.00066</td>
-      <td>0.00053</td>
+      <td>0.00051</td>
     </tr>
   </tbody>
 </table></div></div>
@@ -1624,11 +1621,11 @@ the outcome.</p>
 marginal effect; under censoring it is not, because a unit change in <span class="math notranslate nohighlight">\(x\)</span> moves
 the <em>latent</em> outcome and only part of that reaches the observed one — the part
 that does depends on how close each observation sits to the threshold.</p>
-<p><code class="docutils literal notranslate"><span class="pre">spatial_effects()</span></code> does the averaging and splits the result into direct,
+<p><code class="docutils literal notranslate"><span class="pre">impacts()</span></code> does the averaging and splits the result into direct,
 indirect and total components.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">model_sar</span><span class="o">.</span><span class="n">spatial_effects</span><span class="p">()</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">model_sar</span><span class="o">.</span><span class="n">impacts</span><span class="p">()</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
 </code></pre></div>
 </div>
 </div>
@@ -1683,17 +1680,17 @@ indirect and total components.</p>
   <tbody>
     <tr>
       <th>x1</th>
-      <td>1.6178</td>
-      <td>1.4985</td>
-      <td>1.7387</td>
+      <td>1.6186</td>
+      <td>1.5005</td>
+      <td>1.7428</td>
       <td>0.0</td>
-      <td>0.9848</td>
-      <td>0.6791</td>
-      <td>1.355</td>
+      <td>0.9912</td>
+      <td>0.6767</td>
+      <td>1.375</td>
       <td>0.0</td>
-      <td>2.6026</td>
-      <td>2.233</td>
-      <td>3.0483</td>
+      <td>2.6098</td>
+      <td>2.2457</td>
+      <td>3.0639</td>
       <td>0.0</td>
     </tr>
   </tbody>
@@ -1743,22 +1740,22 @@ spillovers, the effects decomposition collapses to the coefficient itself.</p>
       <th>lam</th>
       <td>0.441</td>
       <td>0.073</td>
-      <td>0.33</td>
+      <td>0.32</td>
       <td>0.56</td>
-      <td>2940</td>
-      <td>2951</td>
+      <td>2955</td>
+      <td>2835</td>
       <td>1.00</td>
       <td>0.0013</td>
       <td>0.0011</td>
     </tr>
     <tr>
       <th>beta[x0]</th>
-      <td>1.095</td>
-      <td>0.082</td>
-      <td>0.96</td>
+      <td>1.096</td>
+      <td>0.079</td>
+      <td>0.97</td>
       <td>1.2</td>
-      <td>3604</td>
-      <td>2811</td>
+      <td>3332</td>
+      <td>2691</td>
       <td>1.00</td>
       <td>0.0014</td>
       <td>0.0014</td>
@@ -1769,11 +1766,11 @@ spillovers, the effects decomposition collapses to the coefficient itself.</p>
       <td>0.058</td>
       <td>1.4</td>
       <td>1.6</td>
-      <td>1863</td>
-      <td>1957</td>
+      <td>2183</td>
+      <td>2254</td>
       <td>1.00</td>
-      <td>0.0014</td>
-      <td>0.00093</td>
+      <td>0.0012</td>
+      <td>0.00091</td>
     </tr>
     <tr>
       <th>sigma</th>
@@ -1781,11 +1778,11 @@ spillovers, the effects decomposition collapses to the coefficient itself.</p>
       <td>0.037</td>
       <td>0.7</td>
       <td>0.82</td>
-      <td>3472</td>
-      <td>3052</td>
+      <td>3126</td>
+      <td>2771</td>
       <td>1.00</td>
-      <td>0.00063</td>
-      <td>0.00053</td>
+      <td>0.00067</td>
+      <td>0.00057</td>
     </tr>
   </tbody>
 </table></div></div>
@@ -1833,27 +1830,27 @@ error channel register.</p>
   <tbody>
     <tr>
       <th>rho</th>
-      <td>0.385</td>
-      <td>0.061</td>
-      <td>0.29</td>
+      <td>0.384</td>
+      <td>0.062</td>
+      <td>0.28</td>
       <td>0.48</td>
-      <td>1681</td>
-      <td>2135</td>
+      <td>1688</td>
+      <td>2027</td>
       <td>1.00</td>
       <td>0.0015</td>
-      <td>0.00097</td>
+      <td>0.00096</td>
     </tr>
     <tr>
       <th>sigma</th>
-      <td>0.783</td>
-      <td>0.035</td>
+      <td>0.784</td>
+      <td>0.036</td>
       <td>0.73</td>
       <td>0.84</td>
-      <td>3319</td>
-      <td>2835</td>
+      <td>3395</td>
+      <td>2793</td>
       <td>1.00</td>
-      <td>0.00061</td>
-      <td>0.00055</td>
+      <td>0.00062</td>
+      <td>0.00053</td>
     </tr>
   </tbody>
 </table></div></div>
@@ -1914,28 +1911,28 @@ error channel register.</p>
     <tr>
       <th>SARTobit</th>
       <td>rho</td>
-      <td>0.405</td>
+      <td>0.406</td>
       <td>0.043</td>
-      <td>60.964</td>
-      <td>2057.504</td>
-      <td>1.003</td>
+      <td>65.324</td>
+      <td>2073.484</td>
+      <td>1.000</td>
     </tr>
     <tr>
       <th>SEMTobit</th>
       <td>lam</td>
       <td>0.441</td>
       <td>0.073</td>
-      <td>15.408</td>
-      <td>2940.104</td>
+      <td>15.386</td>
+      <td>2955.362</td>
       <td>1.000</td>
     </tr>
     <tr>
       <th>SDMTobit</th>
       <td>rho</td>
-      <td>0.385</td>
-      <td>0.061</td>
-      <td>62.086</td>
-      <td>1681.740</td>
+      <td>0.384</td>
+      <td>0.062</td>
+      <td>73.402</td>
+      <td>1688.627</td>
       <td>1.001</td>
     </tr>
   </tbody>
@@ -1945,7 +1942,7 @@ error channel register.</p>
 <h2 id="what-to-check-before-trusting-the-output">What to check before trusting the output<a class="headerlink" href="#what-to-check-before-trusting-the-output" title="Link to this heading">¶</a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">ess_bulk</span></code> and <code class="docutils literal notranslate"><span class="pre">r_hat</span></code> on the spatial parameter first — it is the slowest-mixing
 quantity in all four models. Then check that the censored share in your data
-matches what you told the model, and look at <code class="docutils literal notranslate"><span class="pre">spatial_effects()</span></code> rather than the
+matches what you told the model, and look at <code class="docutils literal notranslate"><span class="pre">impacts()</span></code> rather than the
 coefficient table.</p>
 <p>Because these are NUTS models, <code class="docutils literal notranslate"><span class="pre">sample_stats</span></code> also carries divergence counts;
 any divergences at all are worth investigating before reading the posterior.</p>
@@ -1999,20 +1996,20 @@ any divergences at all are worth investigating before reading the posterior.</p>
     <tr>
       <th>SARTobit</th>
       <td>0.0</td>
-      <td>1402.682560</td>
-      <td>1.005548</td>
+      <td>1628.278619</td>
+      <td>1.003252</td>
     </tr>
     <tr>
       <th>SEMTobit</th>
       <td>0.0</td>
-      <td>1061.788799</td>
-      <td>1.004480</td>
+      <td>1052.772904</td>
+      <td>1.004616</td>
     </tr>
     <tr>
       <th>SDMTobit</th>
       <td>0.0</td>
-      <td>1476.984900</td>
-      <td>1.004241</td>
+      <td>1400.694856</td>
+      <td>1.005179</td>
     </tr>
   </tbody>
 </table>
@@ -2076,7 +2073,7 @@ choosing between lag, error and Durbin</p></li>
   
     Created using
     <a href="https://www.sphinx-doc.org/" target="_blank" rel="noopener">Sphinx</a>
-    8.2.3.
+    9.2.0.
      and
     <a href="https://github.com/jbms/sphinx-immaterial/" target="_blank" rel="noopener">Sphinx-Immaterial</a>
   

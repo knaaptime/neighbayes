@@ -23,6 +23,7 @@
 
    .. autosummary::
    
+      ~FlowReducedGibbsPriors.alpha_fixed
       ~FlowReducedGibbsPriors.alpha_nu
       ~FlowReducedGibbsPriors.alpha_sigma
       ~FlowReducedGibbsPriors.beta_mu

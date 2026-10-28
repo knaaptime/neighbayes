@@ -42,7 +42,7 @@
         <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
       
     
-        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.74c816e3f9967dd6e.min.css?v=6cfe2491" />
+        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.6efbe22605a23fcd6.min.css?v=b2ceb110" />
         <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
         <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
         <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=93c5fc88" />
@@ -647,7 +647,7 @@
   
   
   <span class="md-ellipsis">
-    <span>How to fit spatial logit models</span>
+    <span>How to fit a spatial logit model</span>
     
   </span>
   
@@ -1498,7 +1498,7 @@
 <li><p>Run Bayesian LM diagnostics to test for spatial dependence</p></li>
 <li><p>Use the decision tree to select a better model</p></li>
 <li><p>Fit the recommended SAR model</p></li>
-<li><p>Compute direct, indirect, and total spatial effects</p></li>
+<li><p>Compute direct, indirect, and total impacts</p></li>
 <li><p>Peek at the underlying PyMC model for customization</p></li>
 </ol>
 <div class="cell docutils container">
@@ -1553,42 +1553,42 @@
   <tbody>
     <tr>
       <th>0</th>
-      <td>8.668872</td>
+      <td>1.310653</td>
       <td>1.0</td>
-      <td>-1.167994</td>
-      <td>1.374588</td>
+      <td>-0.570597</td>
+      <td>-0.757111</td>
       <td>POLYGON ((1 0, 1 1, 0 1, 0 0, 1 0))</td>
     </tr>
     <tr>
       <th>1</th>
-      <td>4.269612</td>
+      <td>0.812616</td>
       <td>1.0</td>
-      <td>-1.919492</td>
-      <td>0.329605</td>
+      <td>-0.427155</td>
+      <td>-0.542974</td>
       <td>POLYGON ((2 0, 2 1, 1 1, 1 0, 2 0))</td>
     </tr>
     <tr>
       <th>2</th>
-      <td>1.120813</td>
+      <td>0.941373</td>
       <td>1.0</td>
-      <td>-1.450289</td>
-      <td>-0.197234</td>
+      <td>-0.857286</td>
+      <td>-0.088591</td>
       <td>POLYGON ((3 0, 3 1, 2 1, 2 0, 3 0))</td>
     </tr>
     <tr>
       <th>3</th>
-      <td>-1.077315</td>
+      <td>-0.009454</td>
       <td>1.0</td>
-      <td>1.432836</td>
-      <td>-0.805560</td>
+      <td>-0.101242</td>
+      <td>-0.860460</td>
       <td>POLYGON ((4 0, 4 1, 3 1, 3 0, 4 0))</td>
     </tr>
     <tr>
       <th>4</th>
-      <td>1.128495</td>
+      <td>8.684136</td>
       <td>1.0</td>
-      <td>-0.487436</td>
-      <td>-0.522589</td>
+      <td>-0.396267</td>
+      <td>2.262027</td>
       <td>POLYGON ((5 0, 5 1, 4 1, 4 0, 5 0))</td>
     </tr>
     <tr>
@@ -1601,42 +1601,42 @@
     </tr>
     <tr>
       <th>395</th>
-      <td>1.729227</td>
+      <td>3.759938</td>
       <td>1.0</td>
-      <td>0.216659</td>
-      <td>-0.065031</td>
+      <td>-0.790127</td>
+      <td>0.595397</td>
       <td>POLYGON ((16 19, 16 20, 15 20, 15 19, 16 19))</td>
     </tr>
     <tr>
       <th>396</th>
-      <td>-0.227996</td>
+      <td>3.929612</td>
       <td>1.0</td>
-      <td>-0.865249</td>
-      <td>-0.291414</td>
+      <td>0.609057</td>
+      <td>0.212833</td>
       <td>POLYGON ((17 19, 17 20, 16 20, 16 19, 17 19))</td>
     </tr>
     <tr>
       <th>397</th>
-      <td>-2.508462</td>
+      <td>2.508526</td>
       <td>1.0</td>
-      <td>-0.122703</td>
-      <td>-0.541823</td>
+      <td>-0.212512</td>
+      <td>0.345443</td>
       <td>POLYGON ((18 19, 18 20, 17 20, 17 19, 18 19))</td>
     </tr>
     <tr>
       <th>398</th>
-      <td>0.928894</td>
+      <td>2.192384</td>
       <td>1.0</td>
-      <td>-1.370523</td>
-      <td>0.021873</td>
+      <td>-0.039013</td>
+      <td>-0.355325</td>
       <td>POLYGON ((19 19, 19 20, 18 20, 18 19, 19 19))</td>
     </tr>
     <tr>
       <th>399</th>
-      <td>5.302012</td>
+      <td>1.038470</td>
       <td>1.0</td>
-      <td>1.564570</td>
-      <td>0.872325</td>
+      <td>0.504582</td>
+      <td>-0.870218</td>
       <td>POLYGON ((20 19, 20 20, 19 20, 19 19, 20 19))</td>
     </tr>
   </tbody>
@@ -1654,7 +1654,7 @@
 <div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Text(0.5, 1.0, 'X1')
 </code></pre></div>
 </div>
-<img alt="../_images/b38ed78daecf4208a67ebd246d70a87f89f7ecafdc0e66821be9050141534b74.png" src="../_images/b38ed78daecf4208a67ebd246d70a87f89f7ecafdc0e66821be9050141534b74.png" />
+<img alt="../_images/ae0a3c6b550553d378d1746633f07132d9fcc233f7ca44645b0321aaac42d576.png" src="../_images/ae0a3c6b550553d378d1746633f07132d9fcc233f7ca44645b0321aaac42d576.png" />
 </div>
 </div>
 <div class="cell docutils container">
@@ -1667,7 +1667,7 @@
 <div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Text(0.5, 1.0, 'y')
 </code></pre></div>
 </div>
-<img alt="../_images/3541ed95e34e01ef3896fc3acb14b12d3a8ca7fd58d65eb3276f1b4cc2f666bb.png" src="../_images/3541ed95e34e01ef3896fc3acb14b12d3a8ca7fd58d65eb3276f1b4cc2f666bb.png" />
+<img alt="../_images/43333c3ad7185af3bd743a6274109045efc7f95d95dae2e8d02540d2ca307128.png" src="../_images/43333c3ad7185af3bd743a6274109045efc7f95d95dae2e8d02540d2ca307128.png" />
 </div>
 </div>
 <h2 id="create-a-spatial-weights-matrix">1. Create a Spatial Weights Matrix<a class="headerlink" href="#create-a-spatial-weights-matrix" title="Link to this heading">¶</a></h2>
@@ -1732,63 +1732,63 @@ for Jupyter support
   <tbody>
     <tr>
       <th>X_0</th>
-      <td>2.251381</td>
-      <td>0.084008</td>
-      <td>2.115804</td>
-      <td>2.392504</td>
-      <td>1932.235303</td>
-      <td>1279.407117</td>
-      <td>0.999534</td>
-      <td>0.001913</td>
-      <td>0.001917</td>
+      <td>2.343911</td>
+      <td>0.076433</td>
+      <td>2.221898</td>
+      <td>2.463687</td>
+      <td>2149.135471</td>
+      <td>1529.323231</td>
+      <td>0.99997</td>
+      <td>0.001648</td>
+      <td>0.001588</td>
     </tr>
     <tr>
       <th>X_1</th>
-      <td>0.474274</td>
-      <td>0.080305</td>
-      <td>0.348452</td>
-      <td>0.599562</td>
-      <td>2222.110827</td>
-      <td>1642.15413</td>
-      <td>1.001455</td>
-      <td>0.001704</td>
-      <td>0.001759</td>
+      <td>0.320432</td>
+      <td>0.079708</td>
+      <td>0.194691</td>
+      <td>0.451572</td>
+      <td>2152.032018</td>
+      <td>1518.402691</td>
+      <td>1.00084</td>
+      <td>0.001721</td>
+      <td>0.00164</td>
     </tr>
     <tr>
       <th>X_2</th>
-      <td>2.8892</td>
-      <td>0.080733</td>
-      <td>2.756167</td>
-      <td>3.014162</td>
-      <td>2168.124538</td>
-      <td>1529.147863</td>
-      <td>1.001796</td>
-      <td>0.001759</td>
-      <td>0.001719</td>
+      <td>2.72109</td>
+      <td>0.07996</td>
+      <td>2.592166</td>
+      <td>2.845356</td>
+      <td>1909.559332</td>
+      <td>1262.444364</td>
+      <td>1.001892</td>
+      <td>0.001833</td>
+      <td>0.001763</td>
     </tr>
     <tr>
       <th>sigma2</th>
-      <td>2.737</td>
-      <td>0.194</td>
-      <td>2.4</td>
-      <td>3.1</td>
-      <td>2281</td>
-      <td>1769</td>
+      <td>2.571</td>
+      <td>0.19</td>
+      <td>2.3</td>
+      <td>2.9</td>
+      <td>2127</td>
+      <td>1638</td>
       <td>1.00</td>
       <td>0.0041</td>
-      <td>0.0039</td>
+      <td>0.004</td>
     </tr>
     <tr>
       <th>sigma</th>
-      <td>1.653</td>
-      <td>0.058</td>
-      <td>1.6</td>
+      <td>1.602</td>
+      <td>0.059</td>
+      <td>1.5</td>
       <td>1.7</td>
-      <td>2281</td>
-      <td>1769</td>
+      <td>2127</td>
+      <td>1638</td>
       <td>1.00</td>
+      <td>0.0013</td>
       <td>0.0012</td>
-      <td>0.0011</td>
     </tr>
   </tbody>
 </table></div></div>
@@ -1805,10 +1805,10 @@ for Jupyter support
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>&lt;arviz_plots.plot_collection.PlotCollection at 0x7f78148546e0&gt;
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>&lt;arviz_plots.plot_collection.PlotCollection at 0x7ac0b2128d70&gt;
 </code></pre></div>
 </div>
-<img alt="../_images/9abb5043ed1459a6e8d9b7dc30564d653f524f1a30d60628edff14d907cb4283.png" src="../_images/9abb5043ed1459a6e8d9b7dc30564d653f524f1a30d60628edff14d907cb4283.png" />
+<img alt="../_images/90c87bb4829da482bc0ed46823f5b936ab5b56f55439f239b7283416e94f97c6.png" src="../_images/90c87bb4829da482bc0ed46823f5b936ab5b56f55439f239b7283416e94f97c6.png" />
 </div>
 </div>
 <div class="cell docutils container">
@@ -1818,10 +1818,10 @@ for Jupyter support
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>&lt;arviz_plots.plot_collection.PlotCollection at 0x7f781353c910&gt;
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>&lt;arviz_plots.plot_collection.PlotCollection at 0x7ac0b1a87d90&gt;
 </code></pre></div>
 </div>
-<img alt="../_images/6b2ca81f149e7dc44dd1693aba0ee442c1053efce1358596db953b9f9fcd5c7b.png" src="../_images/6b2ca81f149e7dc44dd1693aba0ee442c1053efce1358596db953b9f9fcd5c7b.png" />
+<img alt="../_images/0da02f553f03979bcae092b8edf4aaf5398ad15e61e2cde34ebd2939725c58c5.png" src="../_images/0da02f553f03979bcae092b8edf4aaf5398ad15e61e2cde34ebd2939725c58c5.png" />
 </div>
 </div>
 <h2 id="run-bayesian-lm-diagnostics">3. Run Bayesian LM Diagnostics<a class="headerlink" href="#run-bayesian-lm-diagnostics" title="Link to this heading">¶</a></h2>
@@ -1878,57 +1878,57 @@ for Jupyter support
   <tbody>
     <tr>
       <th>LM-Lag</th>
-      <td>385.096211</td>
-      <td>383.764617</td>
+      <td>318.509800</td>
+      <td>320.768121</td>
       <td>1</td>
       <td>0.000000</td>
-      <td>283.608979</td>
-      <td>493.661079</td>
+      <td>240.235841</td>
+      <td>429.095045</td>
     </tr>
     <tr>
       <th>LM-Error</th>
-      <td>213.421008</td>
-      <td>212.070186</td>
+      <td>233.897229</td>
+      <td>237.716223</td>
       <td>1</td>
       <td>0.000000</td>
-      <td>161.387706</td>
-      <td>277.244932</td>
+      <td>172.765494</td>
+      <td>330.169436</td>
     </tr>
     <tr>
       <th>LM-SDM-Joint</th>
-      <td>403.645093</td>
-      <td>397.369215</td>
+      <td>341.539072</td>
+      <td>343.801893</td>
       <td>3</td>
       <td>0.000000</td>
-      <td>287.587267</td>
-      <td>553.116886</td>
+      <td>257.918769</td>
+      <td>460.215056</td>
     </tr>
     <tr>
       <th>LM-SLX-Error-Joint</th>
-      <td>402.840245</td>
-      <td>400.583133</td>
+      <td>341.539072</td>
+      <td>346.083776</td>
       <td>3</td>
       <td>0.000000</td>
-      <td>342.688566</td>
-      <td>476.564908</td>
+      <td>258.068728</td>
+      <td>470.142911</td>
     </tr>
     <tr>
       <th>Robust-LM-Lag</th>
-      <td>189.593593</td>
-      <td>188.052407</td>
+      <td>107.558035</td>
+      <td>107.016079</td>
       <td>1</td>
       <td>0.000000</td>
-      <td>141.936016</td>
-      <td>247.132632</td>
+      <td>76.962739</td>
+      <td>144.550728</td>
     </tr>
     <tr>
       <th>Robust-LM-Error</th>
-      <td>11.918079</td>
-      <td>11.821198</td>
+      <td>22.945463</td>
+      <td>24.204440</td>
       <td>1</td>
-      <td>0.000556</td>
-      <td>8.922267</td>
-      <td>15.535052</td>
+      <td>0.000002</td>
+      <td>11.482332</td>
+      <td>43.113142</td>
     </tr>
   </tbody>
 </table>
@@ -1947,7 +1947,7 @@ for Jupyter support
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>LM-Lag *  (p=0.0000, alpha=0.05)
 ├── &lt;sig&gt; LM-Error *  (p=0.0000, alpha=0.05)
 │   ├── &lt;sig&gt; Robust-LM-Lag *  (p=0.0000, alpha=0.05)
-│   │   ├── &lt;sig&gt; Robust-LM-Error *  (p=0.0006, alpha=0.05)
+│   │   ├── &lt;sig&gt; Robust-LM-Error *  (p=0.0000, alpha=0.05)
 │   │   │   ├── &lt;sig&gt; Robust-LM-Lag p &lt;= Robust-LM-Error p *
 │   │   │   │   ├── [SAR] * ← SELECTED
 │   │   │   │   └── [SEM]
@@ -1972,7 +1972,7 @@ for Jupyter support
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/9227056f5eaf0c261ca0610b834f070e964e40391557c79416a8335aac4a7622.svg" src="../_images/9227056f5eaf0c261ca0610b834f070e964e40391557c79416a8335aac4a7622.svg" />
+<img alt="../_images/1b36d8a642ec3999a5a8bea5fdc31fd2b781fef5d5a9edce07a39210e555f04a.svg" src="../_images/1b36d8a642ec3999a5a8bea5fdc31fd2b781fef5d5a9edce07a39210e555f04a.svg" />
 </div>
 </div>
 <h2 id="fit-the-recommended-sar-model">5. Fit the Recommended SAR Model<a class="headerlink" href="#fit-the-recommended-sar-model" title="Link to this heading">¶</a></h2>
@@ -1991,10 +1991,6 @@ for Jupyter support
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/_logdet/_jax.py:188: ComplexWarning: Casting complex values to real discards the imaginary part
-  W_arr = np.asarray(W, dtype=np.float64)
-</code></pre></div>
-</div>
 <div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Gibbs sampling <span style="font-weight: bold">(</span>sar<span style="font-weight: bold">)</span>: <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span> chains for <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">100</span> tune and <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> draw iterations <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span> x <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">100</span> = <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">8</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">400</span> draws total<span style="font-weight: bold">)</span>
 </pre>
 </div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">/home/runner/micromamba/envs/test/lib/python3.14/site-packages/rich/live.py:260: UserWarning: install "ipywidgets" 
@@ -2002,7 +1998,7 @@ for Jupyter support
   warnings.warn('install "ipywidgets" for Jupyter support')
 </pre>
 </div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 4s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">367</span> draws/s<span style="font-weight: bold">)</span>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 2s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">393</span> draws/s<span style="font-weight: bold">)</span>
 </pre>
 </div><div class="output text_html"><table border="1" class="dataframe">
   <thead>
@@ -2022,75 +2018,75 @@ for Jupyter support
   <tbody>
     <tr>
       <th>rho</th>
-      <td>0.6339</td>
-      <td>0.0271</td>
-      <td>0.59</td>
-      <td>0.68</td>
-      <td>7764</td>
-      <td>5956</td>
+      <td>0.617</td>
+      <td>0.0326</td>
+      <td>0.56</td>
+      <td>0.67</td>
+      <td>8304</td>
+      <td>6039</td>
       <td>1.00</td>
-      <td>0.00031</td>
-      <td>0.00032</td>
+      <td>0.00036</td>
+      <td>0.00036</td>
     </tr>
     <tr>
       <th>sigma</th>
-      <td>1.0678</td>
-      <td>0.0381</td>
-      <td>1</td>
+      <td>1.1479</td>
+      <td>0.0408</td>
       <td>1.1</td>
-      <td>7371</td>
-      <td>7490</td>
+      <td>1.2</td>
+      <td>7306</td>
+      <td>7651</td>
       <td>1.00</td>
-      <td>0.00044</td>
-      <td>0.00031</td>
+      <td>0.00048</td>
+      <td>0.00033</td>
     </tr>
     <tr>
       <th>sigma2</th>
-      <td>1.142</td>
-      <td>0.082</td>
-      <td>1</td>
-      <td>1.3</td>
-      <td>7371</td>
-      <td>7490</td>
+      <td>1.319</td>
+      <td>0.094</td>
+      <td>1.2</td>
+      <td>1.5</td>
+      <td>7306</td>
+      <td>7651</td>
       <td>1.00</td>
-      <td>0.00095</td>
-      <td>0.00068</td>
+      <td>0.0011</td>
+      <td>0.00078</td>
     </tr>
     <tr>
       <th>X_0</th>
-      <td>0.987725</td>
-      <td>0.07699</td>
-      <td>0.865664</td>
-      <td>1.110338</td>
-      <td>7805.288704</td>
-      <td>7686.044627</td>
-      <td>1.000065</td>
-      <td>0.000871</td>
-      <td>0.000694</td>
+      <td>1.004316</td>
+      <td>0.092477</td>
+      <td>0.858986</td>
+      <td>1.154131</td>
+      <td>8295.511981</td>
+      <td>7333.353011</td>
+      <td>1.000647</td>
+      <td>0.001016</td>
+      <td>0.000811</td>
     </tr>
     <tr>
       <th>X_1</th>
-      <td>0.375358</td>
-      <td>0.05203</td>
-      <td>0.291257</td>
-      <td>0.458404</td>
-      <td>7829.660193</td>
-      <td>7815.521619</td>
-      <td>1.000062</td>
-      <td>0.000588</td>
-      <td>0.000396</td>
+      <td>0.352709</td>
+      <td>0.056258</td>
+      <td>0.262893</td>
+      <td>0.442156</td>
+      <td>7826.632437</td>
+      <td>7855.410854</td>
+      <td>1.000222</td>
+      <td>0.000636</td>
+      <td>0.000428</td>
     </tr>
     <tr>
       <th>X_2</th>
-      <td>2.527742</td>
-      <td>0.055764</td>
-      <td>2.438941</td>
-      <td>2.616693</td>
-      <td>7726.152564</td>
-      <td>7294.199983</td>
-      <td>1.000131</td>
-      <td>0.000635</td>
-      <td>0.000454</td>
+      <td>2.571642</td>
+      <td>0.058582</td>
+      <td>2.478609</td>
+      <td>2.66435</td>
+      <td>7856.518051</td>
+      <td>7443.952936</td>
+      <td>0.999946</td>
+      <td>0.000661</td>
+      <td>0.000467</td>
     </tr>
   </tbody>
 </table></div></div>
@@ -2102,10 +2098,10 @@ for Jupyter support
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>&lt;arviz_plots.plot_collection.PlotCollection at 0x7f77f0a0a210&gt;
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>&lt;arviz_plots.plot_collection.PlotCollection at 0x7ac0a9bfb250&gt;
 </code></pre></div>
 </div>
-<img alt="../_images/a0193ea8b2e8121200fe1195b62184c5d88bf5f9671664cb07cf46cc8e87c14c.png" src="../_images/a0193ea8b2e8121200fe1195b62184c5d88bf5f9671664cb07cf46cc8e87c14c.png" />
+<img alt="../_images/f65a943f4f58dfc0641fc2174ed69ef029b1db509e6f49e122c624e3101f51d1.png" src="../_images/f65a943f4f58dfc0641fc2174ed69ef029b1db509e6f49e122c624e3101f51d1.png" />
 </div>
 </div>
 <h2 id="compute-spatial-effects">6. Compute Spatial Effects<a class="headerlink" href="#compute-spatial-effects" title="Link to this heading">¶</a></h2>
@@ -2117,7 +2113,7 @@ for Jupyter support
 </ul>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">effects</span> <span class="o">=</span> <span class="n">sar</span><span class="o">.</span><span class="n">spatial_effects</span><span class="p">()</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">effects</span> <span class="o">=</span> <span class="n">sar</span><span class="o">.</span><span class="n">impacts</span><span class="p">()</span>
 <span class="n">effects</span>
 </code></pre></div>
 </div>
@@ -2173,32 +2169,32 @@ for Jupyter support
   <tbody>
     <tr>
       <th>X_1</th>
-      <td>0.408826</td>
-      <td>0.298984</td>
-      <td>0.517419</td>
+      <td>0.381974</td>
+      <td>0.263136</td>
+      <td>0.500885</td>
       <td>0.0</td>
-      <td>0.621222</td>
-      <td>0.426984</td>
-      <td>0.848547</td>
+      <td>0.546056</td>
+      <td>0.339456</td>
+      <td>0.801132</td>
       <td>0.0</td>
-      <td>1.030047</td>
-      <td>0.740246</td>
-      <td>1.346293</td>
+      <td>0.928030</td>
+      <td>0.612096</td>
+      <td>1.282168</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>X_2</th>
-      <td>2.753324</td>
-      <td>2.637671</td>
-      <td>2.872576</td>
+      <td>2.784807</td>
+      <td>2.654221</td>
+      <td>2.918429</td>
       <td>0.0</td>
-      <td>4.187077</td>
-      <td>3.329343</td>
-      <td>5.213347</td>
+      <td>3.977798</td>
+      <td>3.017299</td>
+      <td>5.167817</td>
       <td>0.0</td>
-      <td>6.940402</td>
-      <td>6.033662</td>
-      <td>8.030454</td>
+      <td>6.762605</td>
+      <td>5.731325</td>
+      <td>8.023413</td>
       <td>0.0</td>
     </tr>
   </tbody>
@@ -2251,7 +2247,7 @@ for Jupyter support
   
     Created using
     <a href="https://www.sphinx-doc.org/" target="_blank" rel="noopener">Sphinx</a>
-    8.2.3.
+    9.2.0.
      and
     <a href="https://github.com/jbms/sphinx-immaterial/" target="_blank" rel="noopener">Sphinx-Immaterial</a>
   

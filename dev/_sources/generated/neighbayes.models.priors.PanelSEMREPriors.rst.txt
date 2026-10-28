@@ -30,7 +30,7 @@
       ~PanelSEMREPriors.nu
       ~PanelSEMREPriors.sigma2_alpha
       ~PanelSEMREPriors.sigma2_beta
-      ~PanelSEMREPriors.sigma_alpha_nu
-      ~PanelSEMREPriors.sigma_alpha_scale
+      ~PanelSEMREPriors.unit_effect_sd_nu
+      ~PanelSEMREPriors.unit_effect_sd_scale
    
    

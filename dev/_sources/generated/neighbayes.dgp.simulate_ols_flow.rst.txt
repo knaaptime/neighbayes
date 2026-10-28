@@ -1,0 +1,6 @@
+﻿neighbayes.dgp.simulate\_ols\_flow
+==================================
+
+.. currentmodule:: neighbayes.dgp
+
+.. autofunction:: simulate_ols_flow

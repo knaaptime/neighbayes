@@ -16,12 +16,12 @@
       ~SDEM.__init__
       ~SDEM.fit
       ~SDEM.fitted_values
+      ~SDEM.impacts
       ~SDEM.predict
       ~SDEM.predict_in_sample
       ~SDEM.residuals
       ~SDEM.spatial_diagnostics
       ~SDEM.spatial_diagnostics_decision
-      ~SDEM.spatial_effects
       ~SDEM.summary
    
    

@@ -16,11 +16,11 @@
       ~NegBinFlow.__init__
       ~NegBinFlow.fit
       ~NegBinFlow.fitted_values
+      ~NegBinFlow.impacts
       ~NegBinFlow.posterior_predictive
       ~NegBinFlow.residuals
       ~NegBinFlow.spatial_diagnostics
       ~NegBinFlow.spatial_diagnostics_decision
-      ~NegBinFlow.spatial_effects
       ~NegBinFlow.summary
    
    

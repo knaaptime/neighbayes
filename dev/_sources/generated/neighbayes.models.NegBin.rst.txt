@@ -16,10 +16,11 @@
       ~NegBin.__init__
       ~NegBin.fit
       ~NegBin.fitted_values
+      ~NegBin.impacts
+      ~NegBin.posterior_predictive
       ~NegBin.residuals
       ~NegBin.spatial_diagnostics
       ~NegBin.spatial_diagnostics_decision
-      ~NegBin.spatial_effects
       ~NegBin.summary
    
    

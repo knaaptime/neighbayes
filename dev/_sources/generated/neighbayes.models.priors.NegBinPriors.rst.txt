@@ -23,6 +23,7 @@
 
    .. autosummary::
    
+      ~NegBinPriors.alpha_fixed
       ~NegBinPriors.alpha_nu
       ~NegBinPriors.alpha_sigma
       ~NegBinPriors.beta_mu

@@ -1,0 +1,39 @@
+﻿neighbayes.models.SARHurdleNegBinFlow
+=====================================
+
+.. currentmodule:: neighbayes.models
+
+.. autoclass:: SARHurdleNegBinFlow
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SARHurdleNegBinFlow.__init__
+      ~SARHurdleNegBinFlow.activation_probabilities
+      ~SARHurdleNegBinFlow.fit
+      ~SARHurdleNegBinFlow.fitted_values
+      ~SARHurdleNegBinFlow.impacts
+      ~SARHurdleNegBinFlow.positive_mean
+      ~SARHurdleNegBinFlow.posterior_predictive
+      ~SARHurdleNegBinFlow.residuals
+      ~SARHurdleNegBinFlow.spatial_diagnostics
+      ~SARHurdleNegBinFlow.spatial_diagnostics_decision
+      ~SARHurdleNegBinFlow.summary
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SARHurdleNegBinFlow.inference_data
+      ~SARHurdleNegBinFlow.pymc_model
+   
+   

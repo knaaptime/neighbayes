@@ -5,126 +5,94 @@
 API reference
 =============
 
-Cross-Sectional Spatial Models
-------------------------------
+Models
+------
+
+A model class names a process and a family: ``SAR``, ``SARLogit``,
+``SARNegBinFlow``. Panel structure, effects, dynamics, and the flow restriction
+are arguments to the same class:
+
+- ``time_col`` (formula mode) or ``T`` (matrix mode) makes the model a panel;
+- ``unit_effects`` (``pair_effects`` for flows) is ``None``, ``"fixed"``, or
+  ``"random"``, and ``time_effects=True`` adds fixed time effects;
+- ``dynamic=True`` adds the time lag :math:`y_{t-1}`, and ``dynamic="restricted"``
+  gives the restricted dynamic SDM;
+- ``separable=True`` pins :math:`\rho_w = -\rho_o \rho_d` in a flow model.
+
+A combination the package does not implement raises when the model is
+constructed.
 
 .. currentmodule:: neighbayes.models
+
+Gaussian
+^^^^^^^^
 
 .. autosummary::
    :toctree: generated/
 
    OLS
+   SLX
    SAR
    SEM
-   SLX
    SDM
    SDEM
 
-
-Panel Spatial Models (Fixed Effects)
-------------------------------------
-
-.. autosummary::
-   :toctree: generated/
-
-   OLSPanelFE
-   SARPanelFE
-   SEMPanelFE
-   SDMPanelFE
-   SDEMPanelFE
-   SLXPanelFE
-
-
-Panel Spatial Models (Random Effects)
--------------------------------------
+Censored and binary
+^^^^^^^^^^^^^^^^^^^
 
 .. autosummary::
    :toctree: generated/
 
-   OLSPanelRE
-   SARPanelRE
-   SEMPanelRE
-   SDEMPanelRE
-
-
-Dynamic Panel Spatial Models
-----------------------------
-
-.. autosummary::
-   :toctree: generated/
-
-   OLSPanelDynamic
-   SDMRPanelDynamic
-   SDMUPanelDynamic
-   SARPanelDynamic
-   SEMPanelDynamic
-   SDEMPanelDynamic
-   SLXPanelDynamic
-
-
-Non-Linear Spatial Models
--------------------------
-
-.. autosummary::
-   :toctree: generated/
-
-   SARProbit
    SARTobit
    SEMTobit
    SDMTobit
-   SARNegBin
-   SARNegBinStructural
-   SARZINB
    Logit
-   NegBin
    SARLogit
    SEMLogit
+   SDEMLogit
+   Probit
+   SARProbit
+   SEMProbit
+   SDEMProbit
 
-
-Panel Spatial Models (Tobit)
-----------------------------
+Counts
+^^^^^^
 
 .. autosummary::
    :toctree: generated/
 
-   SARPanelTobit
-   SEMPanelTobit
+   NegBin
+   SARNegBin
+   SEMNegBin
+   SDEMNegBin
+   ZINB
+   SARZINB
+   HurdleNegBin
+   SARHurdleNegBin
 
-
-Flow Models
------------
-
-.. currentmodule:: neighbayes.models
+Flows
+^^^^^
 
 .. autosummary::
    :toctree: generated/
 
    OLSFlow
    SARFlow
-   SARFlowSeparable
+   SEMFlow
    NegBinFlow
    SARNegBinFlow
-   SARNegBinFlowSeparable
-   SEMFlow
-   SEMFlowSeparable
+   SARPoissonFlow
+   SARZINBFlow
+   SARHurdleNegBinFlow
 
-
-Panel Flow Models
-^^^^^^^^^^^^^^^^^
-
-.. currentmodule:: neighbayes.models
+Multilevel
+^^^^^^^^^^
 
 .. autosummary::
    :toctree: generated/
 
-   OLSFlowPanel
-   SARFlowPanel
-   SARFlowSeparablePanel
-   NegBinFlowPanel
-   SARNegBinFlowPanel
-   SARNegBinFlowSeparablePanel
-   SEMFlowPanel
-   SEMFlowSeparablePanel
+   Multilevel
+   Level
 
 Default Gibbs Priors
 ---------------------
@@ -136,12 +104,10 @@ Default Gibbs Priors
 
    GibbsBasePriors
    GaussianGibbsPriors
-   GibbsPriors
    ReducedGibbsPriors
    FlowReducedGibbsPriors
    ZINBGibbsPriors
-   LogitGibbsPriors
-   SEMLogitGibbsPriors
+   BinaryGibbsPriors
    REGibbsPriors
 
 Default NUTS Priors
@@ -160,25 +126,31 @@ Default NUTS Priors
    SDEMPriors
    NegBinPriors
    SARNegBinPriors
+   SEMNegBinPriors
    SARTobitPriors
    SEMTobitPriors
    SDMTobitPriors
    SARProbitPriors
+   SEMProbitPriors
+   SEMProbitREPriors
    SARLogitPriors
    SEMLogitPriors
    PanelBasePriors
    PanelOLSPriors
-   PanelSLXPriors
    PanelSARPriors
    PanelSEMPriors
-   PanelSDMPriors
    PanelSDEMPriors
    PanelOLSREPriors
    PanelSARREPriors
    PanelSEMREPriors
    PanelSDEMREPriors
-   PanelSARTobitPriors
-   PanelSEMTobitPriors
+   PanelCountPriors
+   PanelZINBPriors
+   SARZINBPriors
+   PanelHurdlePriors
+   FlowPanelHurdlePriors
+   SARHurdlePriors
+   MultilevelPriors
    PanelDynamicBasePriors
    PanelOLSDynamicPriors
    PanelSLXDynamicPriors
@@ -221,14 +193,18 @@ Bayesian Diagnostics
 GLM Bayesian LM Tests
 ^^^^^^^^^^^^^^^^^^^^^
 
-Pólya-Gamma augmented LM tests for non-Gaussian models (Logit, NegBin).
+LM tests for the logit, probit and NB families: the latent SAR and SEM score tests at the GLM null (Logit, Probit, NegBin), the error and WX tests at a reduced-form SAR null (SARLogit, ``SARProbit(latent=False)``, SARNegBin), and a Moran diagnostic on working residuals.
 
 .. autosummary::
    :toctree: generated/
 
    bayesian_glm_lm_lag_test
    bayesian_glm_lm_error_test
+   bayesian_glm_robust_lm_lag_test
+   bayesian_glm_robust_lm_error_test
+   bayesian_glm_lm_sarma_test
    bayesian_glm_lm_wx_test
+   bayesian_glm_moran_working_test
 
 
 Panel Bayesian LM Tests
@@ -246,6 +222,7 @@ Panel Bayesian LM Tests
    bayesian_panel_lm_slx_error_joint_test
    bayesian_panel_lm_error_sdm_test
    bayesian_panel_lm_lag_sdem_test
+   bayesian_panel_robust_lm_lag_sdem_test
    bayesian_panel_lm_wx_sem_test
    bayesian_panel_robust_lm_lag_sdm_test
    bayesian_panel_robust_lm_wx_test
@@ -258,19 +235,20 @@ Flow Bayesian LM Tests
 .. autosummary::
    :toctree: generated/
 
-   bayesian_lm_flow_dest_test
-   bayesian_lm_flow_orig_test
-   bayesian_lm_flow_network_test
-   bayesian_lm_flow_intra_test
+   bayesian_lm_flow_destination_test
+   bayesian_lm_flow_origin_test
+   bayesian_lm_flow_od_test
    bayesian_lm_flow_joint_test
-   bayesian_robust_lm_flow_dest_test
-   bayesian_robust_lm_flow_orig_test
-   bayesian_robust_lm_flow_network_test
-   bayesian_panel_lm_flow_dest_test
-   bayesian_panel_lm_flow_orig_test
-   bayesian_panel_lm_flow_network_test
-   bayesian_panel_lm_flow_intra_test
+   bayesian_robust_lm_flow_destination_test
+   bayesian_robust_lm_flow_origin_test
+   bayesian_robust_lm_flow_od_test
+   bayesian_panel_lm_flow_destination_test
+   bayesian_panel_lm_flow_origin_test
+   bayesian_panel_lm_flow_od_test
    bayesian_panel_lm_flow_joint_test
+   bayesian_panel_robust_lm_flow_destination_test
+   bayesian_panel_robust_lm_flow_origin_test
+   bayesian_panel_robust_lm_flow_od_test
 
 
 Diagnostic Test Suites
@@ -288,7 +266,6 @@ and the decision-tree renderers.
    OLS_PANEL_SUITE
    SAR_SUITE
    SAR_PANEL_SUITE
-   SAR_NEGBIN_SUITE
    SAR_TOBIT_SUITE
    SEM_SUITE
    SEM_PANEL_SUITE
@@ -302,12 +279,11 @@ and the decision-tree renderers.
    SDEM_SUITE
    SDEM_PANEL_SUITE
    FLOW_SUITE
-   FLOW_INTRA_SUITE
    FLOW_PANEL_SUITE
    LOGIT_SUITE
    NEGBIN_SUITE
-   LOGIT_SUITE
-   NEGBIN_SUITE
+   SAR_LOGIT_SUITE
+   SAR_NEGBIN_SUITE
 
 
 Bayesian Model Comparison
@@ -359,41 +335,43 @@ Data Generating Processes
    :func:`~neighbayes.dgp.utils.synth_point_geodataframe` and builds a
    row-standardised KNN graph automatically.
 
+   Each simulator draws from the model class it is named for and takes the
+   same design arguments: ``T`` (with ``N``) for a panel, ``unit_effects`` and
+   ``time_effects`` (scaled by ``unit_effect_sd`` and ``time_effect_sd``,
+   default 0.5), and ``dynamic``.  Fixed and random unit effects draw the same
+   data; the distinction belongs to the model.
+
 .. currentmodule:: neighbayes.dgp
 
 .. autosummary::
    :toctree: generated/
 
    simulate_ols
+   simulate_slx
    simulate_sar
    simulate_sem
-   simulate_slx
    simulate_sdm
    simulate_sdem
-   simulate_sar_negbin
-   simulate_sar_zinb
-   simulate_spatial_probit
    simulate_sar_tobit
    simulate_sem_tobit
    simulate_sdm_tobit
-   simulate_panel_ols_fe
-   simulate_panel_sar_fe
-   simulate_panel_sem_fe
-   simulate_panel_sdm_fe
-   simulate_panel_sdem_fe
-   simulate_panel_slx_fe
-   simulate_panel_ols_re
-   simulate_panel_sar_re
-   simulate_panel_sem_re
-   simulate_panel_dlm_fe
-   simulate_panel_sdmr_fe
-   simulate_panel_sdmu_fe
-   simulate_panel_sar_dynamic_fe
-   simulate_panel_sem_dynamic_fe
-   simulate_panel_sdem_dynamic_fe
-   simulate_panel_slx_dynamic_fe
-   simulate_panel_sar_tobit_fe
-   simulate_panel_sem_tobit_fe
+   simulate_logit
+   simulate_sar_logit
+   simulate_sem_logit
+   simulate_sdem_logit
+   simulate_probit
+   simulate_sar_probit
+   simulate_sem_probit
+   simulate_sdem_probit
+   simulate_negbin
+   simulate_sar_negbin
+   simulate_sem_negbin
+   simulate_sdem_negbin
+   simulate_zinb
+   simulate_sar_zinb
+   simulate_hurdle_negbin
+   simulate_sar_hurdle_negbin
+   simulate_multilevel
 
 
 Flow Data Generating Processes
@@ -403,8 +381,9 @@ Each flow DGP accepts ``n``, ``G``, ``gdf``, and ``knn_k`` as optional
 arguments and (unless ``gamma_dist=0.0``) appends a ``log_distance``
 column ``log(1 + d_{ij})`` with default coefficient ``gamma_dist=-0.5``.
 
-The Gaussian flow DGPs (``generate_flow_data``,
-``generate_panel_flow_data`` and their separable variants) default to
+Each flow simulator takes ``separable``, ``T``, ``pair_effects``, and
+``time_effects`` as its model class does.  The Gaussian flow DGPs
+(``simulate_sar_flow`` and ``simulate_sem_flow``) default to
 ``distribution="lognormal"``, returning strictly-positive flows
 ``y = exp(eta)`` where ``eta`` is the latent SAR-filtered linear
 predictor (also exposed in the result dict as ``"eta_vec"`` /
@@ -417,18 +396,14 @@ Binomial DGPs are unchanged.
 .. autosummary::
    :toctree: generated/
 
-   generate_flow_data
-   generate_flow_data_separable
-   generate_negbin_flow_data
-   generate_negbin_flow_data_separable
-   generate_sem_flow_data
-   generate_sem_flow_data_separable
-   generate_panel_flow_data
-   generate_panel_flow_data_separable
-   generate_panel_negbin_flow_data
-   generate_panel_negbin_flow_data_separable
-   generate_panel_sem_flow_data
-   generate_panel_sem_flow_data_separable
+   simulate_ols_flow
+   simulate_sar_flow
+   simulate_sem_flow
+   simulate_negbin_flow
+   simulate_sar_negbin_flow
+   simulate_sar_poisson_flow
+   simulate_sar_zinb_flow
+   simulate_sar_hurdle_negbin_flow
 
 
 
@@ -447,6 +422,22 @@ Graph Utilities
    flow_weight_matrices
    destination_weights
    origin_weights
-   network_weights
+   od_weights
 
 
+
+
+Runtime Configuration
+---------------------
+
+Opt-in helpers that change how fits run, not what they estimate: a persistent
+compile cache, and on-disk checkpoints that let a long JAX Gibbs fit resume
+after a crash with the draws it would have returned uninterrupted.
+
+.. currentmodule:: neighbayes.config
+
+.. autosummary::
+   :toctree: generated/
+
+   checkpoints
+   enable_compile_cache

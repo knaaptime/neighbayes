@@ -42,7 +42,7 @@
         <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
       
     
-        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.74c816e3f9967dd6e.min.css?v=6cfe2491" />
+        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.6efbe22605a23fcd6.min.css?v=b2ceb110" />
         <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
         <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
         <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=93c5fc88" />
@@ -530,7 +530,7 @@
   
   
   <span class="md-ellipsis">
-    <span>How to fit spatial logit models</span>
+    <span>How to fit a spatial logit model</span>
     
   </span>
   
@@ -1438,20 +1438,20 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#numpy-gibbs-backend-numpy-cholmod-cg-sparse-solves" class="md-nav__link">
+  <a href="#numpy-backend-numpy-cholmod-cg-sparse-solves" class="md-nav__link">
     
     <span class="md-ellipsis">
-      <span>Num<wbr>Py <wbr>(gibbs_<wbr>backend=&#34;numpy&#34;):<wbr> CHOLMOD/CG sparse solves</span>
+      <span>Num<wbr>Py <wbr>(backend=&#34;numpy&#34;):<wbr> CHOLMOD/CG sparse solves</span>
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#jax-gibbs-backend-jax-sparse-solves-jit-compiled" class="md-nav__link">
+  <a href="#jax-backend-jax-sparse-solves-jit-compiled" class="md-nav__link">
     
     <span class="md-ellipsis">
-      <span>JAX <wbr>(gibbs_<wbr>backend=&#34;jax&#34;):<wbr> sparse solves, JIT-<wbr>compiled</span>
+      <span>JAX <wbr>(backend=&#34;jax&#34;):<wbr> sparse solves, JIT-<wbr>compiled</span>
     </span>
   </a>
   
@@ -1770,20 +1770,20 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#numpy-gibbs-backend-numpy-cholmod-cg-sparse-solves" class="md-nav__link">
+  <a href="#numpy-backend-numpy-cholmod-cg-sparse-solves" class="md-nav__link">
     
     <span class="md-ellipsis">
-      <span>Num<wbr>Py <wbr>(gibbs_<wbr>backend=&#34;numpy&#34;):<wbr> CHOLMOD/CG sparse solves</span>
+      <span>Num<wbr>Py <wbr>(backend=&#34;numpy&#34;):<wbr> CHOLMOD/CG sparse solves</span>
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#jax-gibbs-backend-jax-sparse-solves-jit-compiled" class="md-nav__link">
+  <a href="#jax-backend-jax-sparse-solves-jit-compiled" class="md-nav__link">
     
     <span class="md-ellipsis">
-      <span>JAX <wbr>(gibbs_<wbr>backend=&#34;jax&#34;):<wbr> sparse solves, JIT-<wbr>compiled</span>
+      <span>JAX <wbr>(backend=&#34;jax&#34;):<wbr> sparse solves, JIT-<wbr>compiled</span>
     </span>
   </a>
   
@@ -1839,7 +1839,7 @@
   
 
 <h1 id="jax-vs-numpy-gibbs-profiling-logit-negbin">JAX vs NumPy Gibbs Profiling: Logit &amp; Negbin<a class="headerlink" href="#jax-vs-numpy-gibbs-profiling-logit-negbin" title="Link to this heading">¶</a></h1>
-<p>This notebook profiles the JAX and NumPy Gibbs samplers for SAR-logit, SEM-logit, and SAR-Negative Binomial models, comparing wall-clock time, ESS, and posterior agreement.</p>
+<p>This notebook profiles the JAX and NumPy Gibbs samplers for the SAR-logit and SAR-Negative Binomial models, comparing wall-clock time, ESS, and posterior agreement.</p>
 <h2 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Link to this heading">¶</a></h2>
 <p>Both backends use the same Gibbs structure (PG ω → ρ → β → α), but differ in the linear algebra and ρ-update strategy:</p>
 <table class="docutils data align-default">
@@ -1851,12 +1851,12 @@
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p><strong>Gibbs-NumPy</strong> (<code class="docutils literal notranslate"><span class="pre">gibbs_backend=&quot;numpy&quot;</span></code>)</p></td>
+<tr class="row-even"><td><p><strong>Gibbs-NumPy</strong> (<code class="docutils literal notranslate"><span class="pre">backend=&quot;numpy&quot;</span></code>)</p></td>
 <td><p>Slice + Krylov</p></td>
 <td><p>CHOLMOD/CG sparse solves</p></td>
 <td><p>Process-level chain parallelism via <code class="docutils literal notranslate"><span class="pre">joblib</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><p><strong>Gibbs-JAX</strong> (<code class="docutils literal notranslate"><span class="pre">gibbs_backend=&quot;jax&quot;</span></code>)</p></td>
+<tr class="row-odd"><td><p><strong>Gibbs-JAX</strong> (<code class="docutils literal notranslate"><span class="pre">backend=&quot;jax&quot;</span></code>)</p></td>
 <td><p>Slice (all models)</p></td>
 <td><p>Sparse solves via <code class="docutils literal notranslate"><span class="pre">sparsax</span></code></p></td>
 <td><p>Whole sweep JIT-compiled into one XLA kernel</p></td>
@@ -1865,7 +1865,7 @@
 </table>
 <h3 id="model-specific-strategies">Model-specific ρ/λ strategies<a class="headerlink" href="#model-specific-strategies" title="Link to this heading">¶</a></h3>
 <ul class="simple">
-<li><p><strong>SAR/SEM-Logit</strong> (JAX): Stepping-out + shrinkage slice sampling on the collapsed log-density. Each candidate needs only a forward density evaluation — no gradient required. This avoids the O(n³) forward + O(n³) backward cost of <code class="docutils literal notranslate"><span class="pre">jax.value_and_grad</span></code> through <code class="docutils literal notranslate"><span class="pre">jnp.linalg.solve</span></code> that made MALA 3.6× slower than NumPy.</p></li>
+<li><p><strong>SAR-Logit</strong> (JAX): Stepping-out + shrinkage slice sampling on the collapsed log-density. Each candidate needs only a forward density evaluation — no gradient required. This avoids the O(n³) forward + O(n³) backward cost of <code class="docutils literal notranslate"><span class="pre">jax.value_and_grad</span></code> through <code class="docutils literal notranslate"><span class="pre">jnp.linalg.solve</span></code> that made MALA 3.6× slower than NumPy.</p></li>
 <li><p><strong>SAR-NB reduced form</strong> (both backends): Slice sampling with a shift-invert Krylov basis. The β-marginalised density needs <span class="math notranslate nohighlight">\(U = (I-\rho W)^{-1}X\)</span>; the Krylov basis builds U(ρ) as a Horner polynomial in Δρ, giving O(m·n·k) per candidate.</p></li>
 </ul>
 <div class="cell docutils container">
@@ -1878,8 +1878,8 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">libpysal.graph</span><span class="w"> </span><span class="kn">import</span> <span class="n">Graph</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.dgp</span><span class="w"> </span><span class="kn">import</span> <span class="n">simulate_sar_logit</span><span class="p">,</span> <span class="n">simulate_sar_negbin</span><span class="p">,</span> <span class="n">simulate_sem_logit</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">SARLogit</span><span class="p">,</span> <span class="n">SARNegBin</span><span class="p">,</span> <span class="n">SEMLogit</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.dgp</span><span class="w"> </span><span class="kn">import</span> <span class="n">simulate_sar_logit</span><span class="p">,</span> <span class="n">simulate_sar_negbin</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">SARLogit</span><span class="p">,</span> <span class="n">SARNegBin</span>
 
 <span class="k">try</span><span class="p">:</span>
     <span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>
@@ -1972,10 +1972,6 @@
 <span class="n">sar_logit_out</span> <span class="o">=</span> <span class="n">simulate_sar_logit</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">)</span>
 <span class="n">y_sar_logit</span><span class="p">,</span> <span class="n">X_sar_logit</span> <span class="o">=</span> <span class="n">sar_logit_out</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">sar_logit_out</span><span class="p">[</span><span class="s2">"X"</span><span class="p">]</span>
 
-<span class="c1"># SEM-logit data</span>
-<span class="n">sem_logit_out</span> <span class="o">=</span> <span class="n">simulate_sem_logit</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span> <span class="n">lam</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">)</span>
-<span class="n">y_sem_logit</span><span class="p">,</span> <span class="n">X_sem_logit</span> <span class="o">=</span> <span class="n">sem_logit_out</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">sem_logit_out</span><span class="p">[</span><span class="s2">"X"</span><span class="p">]</span>
-
 <span class="c1"># SAR-NB data</span>
 <span class="n">sar_nb_out</span> <span class="o">=</span> <span class="n">simulate_sar_negbin</span><span class="p">(</span>
     <span class="n">rho</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">2.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.5</span><span class="p">]),</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">5.0</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W</span>
@@ -1983,14 +1979,12 @@
 <span class="n">y_sar_nb</span><span class="p">,</span> <span class="n">X_sar_nb</span> <span class="o">=</span> <span class="n">sar_nb_out</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">sar_nb_out</span><span class="p">[</span><span class="s2">"X"</span><span class="p">]</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SAR-logit: y=</span><span class="si">{</span><span class="n">y_sar_logit</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">, X=</span><span class="si">{</span><span class="n">X_sar_logit</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SEM-logit: y=</span><span class="si">{</span><span class="n">y_sem_logit</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">, X=</span><span class="si">{</span><span class="n">X_sem_logit</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SAR-NB:    y=</span><span class="si">{</span><span class="n">y_sar_nb</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">, X=</span><span class="si">{</span><span class="n">X_sar_nb</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </code></pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>SAR-logit: y=(49,), X=(49, 2)
-SEM-logit: y=(49,), X=(49, 2)
 SAR-NB:    y=(49,), X=(49, 3)
 </code></pre></div>
 </div>
@@ -2049,7 +2043,7 @@ SAR-NB:    y=(49,), X=(49, 3)
 </div>
 </div>
 <h2 id="profile-all-models">3. Profile All Models<a class="headerlink" href="#profile-all-models" title="Link to this heading">¶</a></h2>
-<p>We profile each of the 3 models under 2 Gibbs configurations:</p>
+<p>We profile each of the 2 models under 2 Gibbs configurations:</p>
 <table class="docutils data align-default">
 <thead>
 <tr class="row-odd"><th class="head"><p>Config</p></th>
@@ -2078,11 +2072,11 @@ SAR-NB:    y=(49,), X=(49, 3)
 <span class="p">)</span>
 
 <span class="n">configs</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">"Gibbs-NumPy"</span><span class="p">:</span> <span class="nb">dict</span><span class="p">(</span><span class="n">sampler</span><span class="o">=</span><span class="s2">"gibbs"</span><span class="p">,</span> <span class="n">gibbs_backend</span><span class="o">=</span><span class="s2">"numpy"</span><span class="p">,</span> <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="o">**</span><span class="n">COMMON</span><span class="p">),</span>
+    <span class="s2">"Gibbs-NumPy"</span><span class="p">:</span> <span class="nb">dict</span><span class="p">(</span><span class="n">sampler</span><span class="o">=</span><span class="s2">"gibbs"</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">"numpy"</span><span class="p">,</span> <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="o">**</span><span class="n">COMMON</span><span class="p">),</span>
 <span class="p">}</span>
 
 <span class="k">if</span> <span class="n">HAS_JAX</span><span class="p">:</span>
-    <span class="n">configs</span><span class="p">[</span><span class="s2">"Gibbs-JAX"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">sampler</span><span class="o">=</span><span class="s2">"gibbs"</span><span class="p">,</span> <span class="n">gibbs_backend</span><span class="o">=</span><span class="s2">"jax"</span><span class="p">,</span> <span class="o">**</span><span class="n">COMMON</span><span class="p">)</span>
+    <span class="n">configs</span><span class="p">[</span><span class="s2">"Gibbs-JAX"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">sampler</span><span class="o">=</span><span class="s2">"gibbs"</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">"jax"</span><span class="p">,</span> <span class="o">**</span><span class="n">COMMON</span><span class="p">)</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Configs: </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">configs</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
 </code></pre></div>
@@ -2099,12 +2093,11 @@ SAR-NB:    y=(49,), X=(49, 3)
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
 
 <span class="n">models_and_data</span> <span class="o">=</span> <span class="p">[</span>
-    <span class="p">(</span><span class="s2">"SAR-Logit"</span><span class="p">,</span> <span class="n">SARLogit</span><span class="p">,</span> <span class="n">y_sar_logit</span><span class="p">,</span> <span class="n">X_sar_logit</span><span class="p">),</span>
-    <span class="p">(</span><span class="s2">"SEM-Logit"</span><span class="p">,</span> <span class="n">SEMLogit</span><span class="p">,</span> <span class="n">y_sem_logit</span><span class="p">,</span> <span class="n">X_sem_logit</span><span class="p">),</span>
-    <span class="p">(</span><span class="s2">"SAR-NB"</span><span class="p">,</span> <span class="n">SARNegBin</span><span class="p">,</span> <span class="n">y_sar_nb</span><span class="p">,</span> <span class="n">X_sar_nb</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">"SAR-Logit"</span><span class="p">,</span> <span class="n">SARLogit</span><span class="p">,</span> <span class="n">y_sar_logit</span><span class="p">,</span> <span class="n">X_sar_logit</span><span class="p">,</span> <span class="p">{}),</span>
+    <span class="p">(</span><span class="s2">"SAR-NB"</span><span class="p">,</span> <span class="n">SARNegBin</span><span class="p">,</span> <span class="n">y_sar_nb</span><span class="p">,</span> <span class="n">X_sar_nb</span><span class="p">,</span> <span class="p">{}),</span>
 <span class="p">]</span>
 
-<span class="k">for</span> <span class="n">model_name</span><span class="p">,</span> <span class="n">ModelClass</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">X</span> <span class="ow">in</span> <span class="n">models_and_data</span><span class="p">:</span>
+<span class="k">for</span> <span class="n">model_name</span><span class="p">,</span> <span class="n">ModelClass</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">design</span> <span class="ow">in</span> <span class="n">models_and_data</span><span class="p">:</span>
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="se">\n</span><span class="si">{</span><span class="s1">'='</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">60</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Model: </span><span class="si">{</span><span class="n">model_name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
     <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="s1">'='</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">60</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
@@ -2113,7 +2106,7 @@ SAR-NB:    y=(49,), X=(49, 3)
         <span class="n">label</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">model_name</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">config_name</span><span class="si">}</span><span class="s2">"</span>
         <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  Running </span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2">..."</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="s2">" "</span><span class="p">,</span> <span class="n">flush</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 
-        <span class="n">model</span> <span class="o">=</span> <span class="n">ModelClass</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">)</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">ModelClass</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span> <span class="o">**</span><span class="n">design</span><span class="p">)</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">result</span> <span class="o">=</span> <span class="n">profile_model</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">label</span><span class="p">)</span>
             <span class="n">spatial_key</span> <span class="o">=</span> <span class="p">(</span>
@@ -2142,33 +2135,27 @@ SAR-NB:    y=(49,), X=(49, 3)
 Model: SAR-Logit
 ============================================================
   Running SAR-Logit/Gibbs-NumPy...
-11.8s  ρ̂/λ̂=-0.1357  r̂=1.001  ESS=4584
+12.0s  ρ̂/λ̂=-0.2577  r̂=1.001  ESS=2422
   Running SAR-Logit/Gibbs-JAX...
-3.0s  ρ̂/λ̂=-0.1383  r̂=1.001  ESS=4904
-
-============================================================
-Model: SEM-Logit
-============================================================
-  Running SEM-Logit/Gibbs-NumPy...
-16.0s  ρ̂/λ̂=0.0305  r̂=1.004  ESS=541
-  Running SEM-Logit/Gibbs-JAX...
-2.1s  ρ̂/λ̂=0.0338  r̂=1.006  ESS=682
+2.7s  ρ̂/λ̂=-0.2551  r̂=1.002  ESS=2338
 
 ============================================================
 Model: SAR-NB
 ============================================================
   Running SAR-NB/Gibbs-NumPy...
-11.1s  ρ̂/λ̂=0.4166  r̂=1.003  ESS=988
+12.0s  ρ̂/λ̂=0.3603  r̂=1.007  ESS=592
   Running SAR-NB/Gibbs-JAX...
-2.6s  ρ̂/λ̂=0.4163  r̂=1.003  ESS=1190
+2.9s  ρ̂/λ̂=0.3610  r̂=1.007  ESS=681
 
-Done! 6 configurations profiled.
+Done! 4 configurations profiled.
 </code></pre></div>
 </div>
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/samplers/negbin_reduced/__init__.py:85: UserWarning: SAR Negative Binomial models require large samples for reliable spatial parameter recovery. With n=49, posterior estimates of ρ and α may be severely attenuated. n ≥ 900 is recommended.
-  return model._fit_gibbs(
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/samplers/negbin_reduced/__init__.py:85: UserWarning: SAR Negative Binomial models require large samples for reliable spatial parameter recovery. With n=49, posterior estimates of ρ and α may be severely attenuated. n ≥ 900 is recommended.
-  return model._fit_gibbs(
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_mixins/_designs.py:96: UserWarning: SAR Negative Binomial models require large samples for reliable spatial parameter recovery. With n=49, posterior estimates of ρ and α may be severely attenuated. n ≥ 900 is recommended.
+  return self._implementation(name)(*args, **kwargs)
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/cross_section/sar_negbin.py:582: RuntimeWarning: Pólya–Gamma draws on the NumPy backend come from the polyagamma package, whose sampler is biased for shape h &lt; 8 (mean by up to 1%, variance by up to 5%); negative-binomial, ZINB and hurdle samplers draw at h = y + α. Use backend='jax' with augax installed, whose sampler is exact.
+  chain_samples = run_chains(
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_mixins/_designs.py:96: UserWarning: SAR Negative Binomial models require large samples for reliable spatial parameter recovery. With n=49, posterior estimates of ρ and α may be severely attenuated. n ≥ 900 is recommended.
+  return self._implementation(name)(*args, **kwargs)
 </code></pre></div>
 </div>
 </div>
@@ -2220,86 +2207,64 @@ Done! 6 configurations profiled.
 <div class="cell_output docutils container">
 <div class="output text_html"><style type="text/css">
 </style>
-<table id="T_3af00">
+<table id="T_2b17b">
   <thead>
     <tr>
       <th class="blank level0" >&nbsp;</th>
-      <th id="T_3af00_level0_col0" class="col_heading level0 col0" >Model</th>
-      <th id="T_3af00_level0_col1" class="col_heading level0 col1" >Sampler</th>
-      <th id="T_3af00_level0_col2" class="col_heading level0 col2" >Time (s)</th>
-      <th id="T_3af00_level0_col3" class="col_heading level0 col3" >Intercept</th>
-      <th id="T_3af00_level0_col4" class="col_heading level0 col4" >ρ̂/λ̂</th>
-      <th id="T_3af00_level0_col5" class="col_heading level0 col5" >max R̂</th>
-      <th id="T_3af00_level0_col6" class="col_heading level0 col6" >min ESS</th>
-      <th id="T_3af00_level0_col7" class="col_heading level0 col7" >α̂</th>
+      <th id="T_2b17b_level0_col0" class="col_heading level0 col0" >Model</th>
+      <th id="T_2b17b_level0_col1" class="col_heading level0 col1" >Sampler</th>
+      <th id="T_2b17b_level0_col2" class="col_heading level0 col2" >Time (s)</th>
+      <th id="T_2b17b_level0_col3" class="col_heading level0 col3" >Intercept</th>
+      <th id="T_2b17b_level0_col4" class="col_heading level0 col4" >ρ̂/λ̂</th>
+      <th id="T_2b17b_level0_col5" class="col_heading level0 col5" >max R̂</th>
+      <th id="T_2b17b_level0_col6" class="col_heading level0 col6" >min ESS</th>
+      <th id="T_2b17b_level0_col7" class="col_heading level0 col7" >α̂</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <th id="T_3af00_level0_row0" class="row_heading level0 row0" >0</th>
-      <td id="T_3af00_row0_col0" class="data row0 col0" >SAR-Logit</td>
-      <td id="T_3af00_row0_col1" class="data row0 col1" >Gibbs-NumPy</td>
-      <td id="T_3af00_row0_col2" class="data row0 col2" >11.8</td>
-      <td id="T_3af00_row0_col3" class="data row0 col3" >0.7555</td>
-      <td id="T_3af00_row0_col4" class="data row0 col4" >-0.1357</td>
-      <td id="T_3af00_row0_col5" class="data row0 col5" >1.001000</td>
-      <td id="T_3af00_row0_col6" class="data row0 col6" >4584</td>
-      <td id="T_3af00_row0_col7" class="data row0 col7" >nan</td>
+      <th id="T_2b17b_level0_row0" class="row_heading level0 row0" >0</th>
+      <td id="T_2b17b_row0_col0" class="data row0 col0" >SAR-Logit</td>
+      <td id="T_2b17b_row0_col1" class="data row0 col1" >Gibbs-NumPy</td>
+      <td id="T_2b17b_row0_col2" class="data row0 col2" >12.0</td>
+      <td id="T_2b17b_row0_col3" class="data row0 col3" >2.3450</td>
+      <td id="T_2b17b_row0_col4" class="data row0 col4" >-0.2577</td>
+      <td id="T_2b17b_row0_col5" class="data row0 col5" >1.001000</td>
+      <td id="T_2b17b_row0_col6" class="data row0 col6" >2422</td>
+      <td id="T_2b17b_row0_col7" class="data row0 col7" >nan</td>
     </tr>
     <tr>
-      <th id="T_3af00_level0_row1" class="row_heading level0 row1" >1</th>
-      <td id="T_3af00_row1_col0" class="data row1 col0" >SAR-Logit</td>
-      <td id="T_3af00_row1_col1" class="data row1 col1" >Gibbs-JAX</td>
-      <td id="T_3af00_row1_col2" class="data row1 col2" >3.0</td>
-      <td id="T_3af00_row1_col3" class="data row1 col3" >0.7629</td>
-      <td id="T_3af00_row1_col4" class="data row1 col4" >-0.1383</td>
-      <td id="T_3af00_row1_col5" class="data row1 col5" >1.001000</td>
-      <td id="T_3af00_row1_col6" class="data row1 col6" >4904</td>
-      <td id="T_3af00_row1_col7" class="data row1 col7" >nan</td>
+      <th id="T_2b17b_level0_row1" class="row_heading level0 row1" >1</th>
+      <td id="T_2b17b_row1_col0" class="data row1 col0" >SAR-Logit</td>
+      <td id="T_2b17b_row1_col1" class="data row1 col1" >Gibbs-JAX</td>
+      <td id="T_2b17b_row1_col2" class="data row1 col2" >2.7</td>
+      <td id="T_2b17b_row1_col3" class="data row1 col3" >2.3491</td>
+      <td id="T_2b17b_row1_col4" class="data row1 col4" >-0.2551</td>
+      <td id="T_2b17b_row1_col5" class="data row1 col5" >1.002000</td>
+      <td id="T_2b17b_row1_col6" class="data row1 col6" >2338</td>
+      <td id="T_2b17b_row1_col7" class="data row1 col7" >nan</td>
     </tr>
     <tr>
-      <th id="T_3af00_level0_row2" class="row_heading level0 row2" >2</th>
-      <td id="T_3af00_row2_col0" class="data row2 col0" >SEM-Logit</td>
-      <td id="T_3af00_row2_col1" class="data row2 col1" >Gibbs-NumPy</td>
-      <td id="T_3af00_row2_col2" class="data row2 col2" >16.0</td>
-      <td id="T_3af00_row2_col3" class="data row2 col3" >-0.1795</td>
-      <td id="T_3af00_row2_col4" class="data row2 col4" >0.0305</td>
-      <td id="T_3af00_row2_col5" class="data row2 col5" >1.004000</td>
-      <td id="T_3af00_row2_col6" class="data row2 col6" >541</td>
-      <td id="T_3af00_row2_col7" class="data row2 col7" >nan</td>
+      <th id="T_2b17b_level0_row2" class="row_heading level0 row2" >2</th>
+      <td id="T_2b17b_row2_col0" class="data row2 col0" >SAR-NB</td>
+      <td id="T_2b17b_row2_col1" class="data row2 col1" >Gibbs-NumPy</td>
+      <td id="T_2b17b_row2_col2" class="data row2 col2" >12.0</td>
+      <td id="T_2b17b_row2_col3" class="data row2 col3" >2.5995</td>
+      <td id="T_2b17b_row2_col4" class="data row2 col4" >0.3603</td>
+      <td id="T_2b17b_row2_col5" class="data row2 col5" >1.007000</td>
+      <td id="T_2b17b_row2_col6" class="data row2 col6" >592</td>
+      <td id="T_2b17b_row2_col7" class="data row2 col7" >3.79</td>
     </tr>
     <tr>
-      <th id="T_3af00_level0_row3" class="row_heading level0 row3" >3</th>
-      <td id="T_3af00_row3_col0" class="data row3 col0" >SEM-Logit</td>
-      <td id="T_3af00_row3_col1" class="data row3 col1" >Gibbs-JAX</td>
-      <td id="T_3af00_row3_col2" class="data row3 col2" >2.1</td>
-      <td id="T_3af00_row3_col3" class="data row3 col3" >-0.1865</td>
-      <td id="T_3af00_row3_col4" class="data row3 col4" >0.0338</td>
-      <td id="T_3af00_row3_col5" class="data row3 col5" >1.006000</td>
-      <td id="T_3af00_row3_col6" class="data row3 col6" >682</td>
-      <td id="T_3af00_row3_col7" class="data row3 col7" >nan</td>
-    </tr>
-    <tr>
-      <th id="T_3af00_level0_row4" class="row_heading level0 row4" >4</th>
-      <td id="T_3af00_row4_col0" class="data row4 col0" >SAR-NB</td>
-      <td id="T_3af00_row4_col1" class="data row4 col1" >Gibbs-NumPy</td>
-      <td id="T_3af00_row4_col2" class="data row4 col2" >11.1</td>
-      <td id="T_3af00_row4_col3" class="data row4 col3" >2.2282</td>
-      <td id="T_3af00_row4_col4" class="data row4 col4" >0.4166</td>
-      <td id="T_3af00_row4_col5" class="data row4 col5" >1.003000</td>
-      <td id="T_3af00_row4_col6" class="data row4 col6" >988</td>
-      <td id="T_3af00_row4_col7" class="data row4 col7" >4.77</td>
-    </tr>
-    <tr>
-      <th id="T_3af00_level0_row5" class="row_heading level0 row5" >5</th>
-      <td id="T_3af00_row5_col0" class="data row5 col0" >SAR-NB</td>
-      <td id="T_3af00_row5_col1" class="data row5 col1" >Gibbs-JAX</td>
-      <td id="T_3af00_row5_col2" class="data row5 col2" >2.6</td>
-      <td id="T_3af00_row5_col3" class="data row5 col3" >2.2292</td>
-      <td id="T_3af00_row5_col4" class="data row5 col4" >0.4163</td>
-      <td id="T_3af00_row5_col5" class="data row5 col5" >1.003000</td>
-      <td id="T_3af00_row5_col6" class="data row5 col6" >1190</td>
-      <td id="T_3af00_row5_col7" class="data row5 col7" >4.77</td>
+      <th id="T_2b17b_level0_row3" class="row_heading level0 row3" >3</th>
+      <td id="T_2b17b_row3_col0" class="data row3 col0" >SAR-NB</td>
+      <td id="T_2b17b_row3_col1" class="data row3 col1" >Gibbs-JAX</td>
+      <td id="T_2b17b_row3_col2" class="data row3 col2" >2.9</td>
+      <td id="T_2b17b_row3_col3" class="data row3 col3" >2.5953</td>
+      <td id="T_2b17b_row3_col4" class="data row3 col4" >0.3610</td>
+      <td id="T_2b17b_row3_col5" class="data row3 col5" >1.007000</td>
+      <td id="T_2b17b_row3_col6" class="data row3 col6" >681</td>
+      <td id="T_2b17b_row3_col7" class="data row3 col7" >3.80</td>
     </tr>
   </tbody>
 </table>
@@ -2364,24 +2329,17 @@ Done! 6 configurations profiled.
   <tbody>
     <tr>
       <th>SAR-Logit</th>
-      <td>2.99</td>
-      <td>11.77</td>
-      <td>0.25</td>
-      <td>3.94</td>
+      <td>2.72</td>
+      <td>12.03</td>
+      <td>0.23</td>
+      <td>4.42</td>
     </tr>
     <tr>
       <th>SAR-NB</th>
-      <td>2.60</td>
-      <td>11.10</td>
-      <td>0.23</td>
-      <td>4.27</td>
-    </tr>
-    <tr>
-      <th>SEM-Logit</th>
-      <td>2.07</td>
-      <td>15.97</td>
-      <td>0.13</td>
-      <td>7.71</td>
+      <td>2.90</td>
+      <td>11.96</td>
+      <td>0.24</td>
+      <td>4.12</td>
     </tr>
   </tbody>
 </table>
@@ -2393,10 +2351,10 @@ Done! 6 configurations profiled.
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="c1"># Re-fit all models and store idatas for comparison plots</span>
 <span class="n">idatas</span> <span class="o">=</span> <span class="p">{}</span>
-<span class="k">for</span> <span class="n">model_name</span><span class="p">,</span> <span class="n">ModelClass</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">X</span> <span class="ow">in</span> <span class="n">models_and_data</span><span class="p">:</span>
+<span class="k">for</span> <span class="n">model_name</span><span class="p">,</span> <span class="n">ModelClass</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">design</span> <span class="ow">in</span> <span class="n">models_and_data</span><span class="p">:</span>
     <span class="n">idatas</span><span class="p">[</span><span class="n">model_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="k">for</span> <span class="n">config_name</span><span class="p">,</span> <span class="n">config</span> <span class="ow">in</span> <span class="n">configs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-        <span class="n">model</span> <span class="o">=</span> <span class="n">ModelClass</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">)</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">ModelClass</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span> <span class="o">**</span><span class="n">design</span><span class="p">)</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">idata</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="o">**</span><span class="n">config</span><span class="p">)</span>
             <span class="n">idatas</span><span class="p">[</span><span class="n">model_name</span><span class="p">][</span><span class="n">config_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">idata</span>
@@ -2404,11 +2362,11 @@ Done! 6 configurations profiled.
             <span class="k">pass</span>
 
 <span class="c1"># Plot comparison for each model</span>
-<span class="n">spatial_param_map</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"SAR-Logit"</span><span class="p">:</span> <span class="s2">"rho"</span><span class="p">,</span> <span class="s2">"SEM-Logit"</span><span class="p">:</span> <span class="s2">"lam"</span><span class="p">,</span> <span class="s2">"SAR-NB"</span><span class="p">:</span> <span class="s2">"rho"</span><span class="p">}</span>
+<span class="n">spatial_param_map</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"SAR-Logit"</span><span class="p">:</span> <span class="s2">"rho"</span><span class="p">,</span> <span class="s2">"SAR-NB"</span><span class="p">:</span> <span class="s2">"rho"</span><span class="p">}</span>
 
-<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">3</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">14</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
 
-<span class="k">for</span> <span class="n">col</span><span class="p">,</span> <span class="n">model_name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">([</span><span class="s2">"SAR-Logit"</span><span class="p">,</span> <span class="s2">"SEM-Logit"</span><span class="p">,</span> <span class="s2">"SAR-NB"</span><span class="p">]):</span>
+<span class="k">for</span> <span class="n">col</span><span class="p">,</span> <span class="n">model_name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">([</span><span class="s2">"SAR-Logit"</span><span class="p">,</span> <span class="s2">"SAR-NB"</span><span class="p">]):</span>
     <span class="n">param</span> <span class="o">=</span> <span class="n">spatial_param_map</span><span class="p">[</span><span class="n">model_name</span><span class="p">]</span>
     <span class="k">for</span> <span class="n">row</span><span class="p">,</span> <span class="n">param_name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">([</span><span class="n">param</span><span class="p">,</span> <span class="s2">"beta"</span><span class="p">]):</span>
         <span class="n">ax</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="n">row</span><span class="p">,</span> <span class="n">col</span><span class="p">]</span>
@@ -2434,11 +2392,13 @@ Done! 6 configurations profiled.
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/samplers/negbin_reduced/__init__.py:85: UserWarning: SAR Negative Binomial models require large samples for reliable spatial parameter recovery. With n=49, posterior estimates of ρ and α may be severely attenuated. n ≥ 900 is recommended.
-  return model._fit_gibbs(
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_mixins/_designs.py:96: UserWarning: SAR Negative Binomial models require large samples for reliable spatial parameter recovery. With n=49, posterior estimates of ρ and α may be severely attenuated. n ≥ 900 is recommended.
+  return self._implementation(name)(*args, **kwargs)
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/cross_section/sar_negbin.py:582: RuntimeWarning: Pólya–Gamma draws on the NumPy backend come from the polyagamma package, whose sampler is biased for shape h &lt; 8 (mean by up to 1%, variance by up to 5%); negative-binomial, ZINB and hurdle samplers draw at h = y + α. Use backend='jax' with augax installed, whose sampler is exact.
+  chain_samples = run_chains(
 </code></pre></div>
 </div>
-<img alt="../_images/34735fffdb5388f05eaacc4282c2a7cb3913f1b0b7180d3adf2c1ae60841b827.png" src="../_images/34735fffdb5388f05eaacc4282c2a7cb3913f1b0b7180d3adf2c1ae60841b827.png" />
+<img alt="../_images/9029db84545dcbe2f1c593d0cc116438b5ed7f1cabe3d6f6b5e209c518197977.png" src="../_images/9029db84545dcbe2f1c593d0cc116438b5ed7f1cabe3d6f6b5e209c518197977.png" />
 </div>
 </div>
 <h2 id="ess-per-second-comparison">7. ESS per Second Comparison<a class="headerlink" href="#ess-per-second-comparison" title="Link to this heading">¶</a></h2>
@@ -2447,7 +2407,7 @@ Done! 6 configurations profiled.
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="c1"># Compute ESS/sec for the spatial parameter</span>
 <span class="n">ess_per_sec</span> <span class="o">=</span> <span class="p">[]</span>
-<span class="k">for</span> <span class="n">model_name</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"SAR-Logit"</span><span class="p">,</span> <span class="s2">"SEM-Logit"</span><span class="p">,</span> <span class="s2">"SAR-NB"</span><span class="p">]:</span>
+<span class="k">for</span> <span class="n">model_name</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">"SAR-Logit"</span><span class="p">,</span> <span class="s2">"SAR-NB"</span><span class="p">]:</span>
     <span class="n">param</span> <span class="o">=</span> <span class="n">spatial_param_map</span><span class="p">[</span><span class="n">model_name</span><span class="p">]</span>
     <span class="k">for</span> <span class="n">config_name</span> <span class="ow">in</span> <span class="n">configs</span><span class="p">:</span>
         <span class="k">if</span> <span class="n">config_name</span> <span class="ow">in</span> <span class="n">idatas</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">model_name</span><span class="p">,</span> <span class="p">{}):</span>
@@ -2519,21 +2479,15 @@ Done! 6 configurations profiled.
   <tbody>
     <tr>
       <th>SAR-Logit</th>
-      <td>2189.6</td>
-      <td>526.7</td>
-      <td>4.2</td>
-    </tr>
-    <tr>
-      <th>SAR-NB</th>
-      <td>689.8</td>
-      <td>161.4</td>
+      <td>1834.8</td>
+      <td>423.0</td>
       <td>4.3</td>
     </tr>
     <tr>
-      <th>SEM-Logit</th>
-      <td>2457.5</td>
-      <td>341.3</td>
-      <td>7.2</td>
+      <th>SAR-NB</th>
+      <td>308.1</td>
+      <td>49.5</td>
+      <td>6.2</td>
     </tr>
   </tbody>
 </table>
@@ -2553,7 +2507,7 @@ Done! 6 configurations profiled.
 <span class="n">scale_configs</span> <span class="o">=</span> <span class="p">{</span>
     <span class="s2">"Gibbs-NumPy"</span><span class="p">:</span> <span class="nb">dict</span><span class="p">(</span>
         <span class="n">sampler</span><span class="o">=</span><span class="s2">"gibbs"</span><span class="p">,</span>
-        <span class="n">gibbs_backend</span><span class="o">=</span><span class="s2">"numpy"</span><span class="p">,</span>
+        <span class="n">backend</span><span class="o">=</span><span class="s2">"numpy"</span><span class="p">,</span>
         <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
         <span class="n">draws</span><span class="o">=</span><span class="n">SCALE_DRAWS</span><span class="p">,</span>
         <span class="n">tune</span><span class="o">=</span><span class="n">SCALE_TUNE</span><span class="p">,</span>
@@ -2565,7 +2519,7 @@ Done! 6 configurations profiled.
 <span class="k">if</span> <span class="n">HAS_JAX</span><span class="p">:</span>
     <span class="n">scale_configs</span><span class="p">[</span><span class="s2">"Gibbs-JAX"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
         <span class="n">sampler</span><span class="o">=</span><span class="s2">"gibbs"</span><span class="p">,</span>
-        <span class="n">gibbs_backend</span><span class="o">=</span><span class="s2">"jax"</span><span class="p">,</span>
+        <span class="n">backend</span><span class="o">=</span><span class="s2">"jax"</span><span class="p">,</span>
         <span class="n">draws</span><span class="o">=</span><span class="n">SCALE_DRAWS</span><span class="p">,</span>
         <span class="n">tune</span><span class="o">=</span><span class="n">SCALE_TUNE</span><span class="p">,</span>
         <span class="n">chains</span><span class="o">=</span><span class="n">SCALE_CHAINS</span><span class="p">,</span>
@@ -2600,20 +2554,20 @@ Done! 6 configurations profiled.
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>n = 25 (side=5)
-  Gibbs-NumPy: 9.1s
-  Gibbs-JAX: 2.5s
+  Gibbs-NumPy: 9.4s
+  Gibbs-JAX: 2.2s
 
 n = 49 (side=7)
-  Gibbs-NumPy: 9.1s
-  Gibbs-JAX: 2.3s
+  Gibbs-NumPy: 9.7s
+  Gibbs-JAX: 0.5s
 
 n = 100 (side=10)
-  Gibbs-NumPy: 9.6s
-  Gibbs-JAX: 2.9s
+  Gibbs-NumPy: 9.7s
+  Gibbs-JAX: 2.6s
 
 n = 225 (side=15)
-  Gibbs-NumPy: 10.6s
-  Gibbs-JAX: 3.6s
+  Gibbs-NumPy: 12.0s
+  Gibbs-JAX: 3.1s
 
 Scaling benchmark complete.
 </code></pre></div>
@@ -2645,19 +2599,19 @@ Scaling benchmark complete.
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/f5045cf5348bdc7c47a17299d7444c4d215f10ef14b87b13485e915c7efe76de.png" src="../_images/f5045cf5348bdc7c47a17299d7444c4d215f10ef14b87b13485e915c7efe76de.png" />
+<img alt="../_images/8e77af84f7dc45f7bca5efa6ff3741011f57bbd4746c888489980d81fac37d89.png" src="../_images/8e77af84f7dc45f7bca5efa6ff3741011f57bbd4746c888489980d81fac37d89.png" />
 </div>
 </div>
 <h2 id="summary">9. Summary<a class="headerlink" href="#summary" title="Link to this heading">¶</a></h2>
 <p>Both the NumPy and JAX Gibbs backends use <strong>slice sampling</strong> for the ρ/λ update. The key difference is the linear algebra backend:</p>
-<h3 id="numpy-gibbs-backend-numpy-cholmod-cg-sparse-solves">NumPy (<code class="docutils literal notranslate"><span class="pre">gibbs_backend=&quot;numpy&quot;</span></code>): CHOLMOD/CG sparse solves<a class="headerlink" href="#numpy-gibbs-backend-numpy-cholmod-cg-sparse-solves" title="Link to this heading">¶</a></h3>
+<h3 id="numpy-backend-numpy-cholmod-cg-sparse-solves">NumPy (<code class="docutils literal notranslate"><span class="pre">backend=&quot;numpy&quot;</span></code>): CHOLMOD/CG sparse solves<a class="headerlink" href="#numpy-backend-numpy-cholmod-cg-sparse-solves" title="Link to this heading">¶</a></h3>
 <ul class="simple">
 <li><p>Factorises <span class="math notranslate nohighlight">\(A^T A = I - \rho(W+W^T) + \rho^2 W^T W\)</span> via CHOLMOD (when available) or SuperLU.</p></li>
 <li><p>Uses CG iterative solves when CHOLMOD is unavailable or n is large.</p></li>
 <li><p>Exploits sparsity: O(nnz^{1.5}) for CHOLMOD, O(K·nnz) for CG.</p></li>
 <li><p>Best for large, sparse W where the dense O(n³) cost is prohibitive.</p></li>
 </ul>
-<h3 id="jax-gibbs-backend-jax-sparse-solves-jit-compiled">JAX (<code class="docutils literal notranslate"><span class="pre">gibbs_backend=&quot;jax&quot;</span></code>): sparse solves, JIT-compiled<a class="headerlink" href="#jax-gibbs-backend-jax-sparse-solves-jit-compiled" title="Link to this heading">¶</a></h3>
+<h3 id="jax-backend-jax-sparse-solves-jit-compiled">JAX (<code class="docutils literal notranslate"><span class="pre">backend=&quot;jax&quot;</span></code>): sparse solves, JIT-compiled<a class="headerlink" href="#jax-backend-jax-sparse-solves-jit-compiled" title="Link to this heading">¶</a></h3>
 <ul class="simple">
 <li><p>Factorises <span class="math notranslate nohighlight">\(A_\rho = I - \rho W\)</span> once per sweep. The JAX path uses the
 sparse <code class="docutils literal notranslate"><span class="pre">sparsax</span></code> solve and never densifies <span class="math notranslate nohighlight">\(W\)</span>; a dense
@@ -2725,7 +2679,7 @@ unavailable, or on GPU.</p></li>
   
     Created using
     <a href="https://www.sphinx-doc.org/" target="_blank" rel="noopener">Sphinx</a>
-    8.2.3.
+    9.2.0.
      and
     <a href="https://github.com/jbms/sphinx-immaterial/" target="_blank" rel="noopener">Sphinx-Immaterial</a>
   

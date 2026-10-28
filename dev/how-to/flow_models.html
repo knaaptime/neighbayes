@@ -42,7 +42,7 @@
         <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
       
     
-        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.74c816e3f9967dd6e.min.css?v=6cfe2491" />
+        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.6efbe22605a23fcd6.min.css?v=b2ceb110" />
         <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
         <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
         <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=93c5fc88" />
@@ -532,7 +532,7 @@
   
   
   <span class="md-ellipsis">
-    <span>How to fit spatial logit models</span>
+    <span>How to fit a spatial logit model</span>
     
   </span>
   
@@ -861,20 +861,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#robust-neyman-orthogonal-tests" class="md-nav__link">
-    
-    <span class="md-ellipsis">
-      <span>10.<wbr>1  Robust <wbr>(Neyman-<wbr>orthogonal) tests</span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#panel-analogues" class="md-nav__link">
     
     <span class="md-ellipsis">
-      <span>10.<wbr>2  Panel analogues</span>
+      <span>Panel analogues</span>
     </span>
   </a>
   
@@ -1646,20 +1636,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#robust-neyman-orthogonal-tests" class="md-nav__link">
-    
-    <span class="md-ellipsis">
-      <span>10.<wbr>1  Robust <wbr>(Neyman-<wbr>orthogonal) tests</span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#panel-analogues" class="md-nav__link">
     
     <span class="md-ellipsis">
-      <span>10.<wbr>2  Panel analogues</span>
+      <span>Panel analogues</span>
     </span>
   </a>
   
@@ -1718,7 +1698,7 @@
 <p>You have flows between places — trade, migration, commuting, foot traffic — and
 you want to know whether a flow into one destination depends on flows into its
 neighbours, on flows out of neighbouring origins, or both.</p>
-<p><code class="docutils literal notranslate"><span class="pre">SARFlow</span></code> estimates all three spatial parameters freely; <code class="docutils literal notranslate"><span class="pre">SARFlowSeparable</span></code>
+<p><code class="docutils literal notranslate"><span class="pre">SARFlow</span></code> estimates all three spatial parameters freely; <code class="docutils literal notranslate"><span class="pre">SARFlow(separable=True)</span></code>
 pins <span class="math notranslate nohighlight">\(\rho_w = -\rho_d\rho_o\)</span>, which removes a weakly-identified ridge and is
 the better default. Both implement the LeSage–Fischer (2008) SAR flow
 framework. Equations, the full class list and the log-determinant options are
@@ -1733,9 +1713,9 @@ in <a class="reference internal" href="../models.html"><span class="std std-doc"
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.dgp.flows</span><span class="w"> </span><span class="kn">import</span> <span class="n">generate_flow_data</span><span class="p">,</span> <span class="n">generate_flow_data_separable</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.dgp</span><span class="w"> </span><span class="kn">import</span> <span class="n">simulate_sar_flow</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.graph</span><span class="w"> </span><span class="kn">import</span> <span class="n">flow_design_matrix</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">SARFlow</span><span class="p">,</span> <span class="n">SARFlowSeparable</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">SARFlow</span>
 
 <span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">"ignore"</span><span class="p">)</span>
 <span class="n">az</span><span class="o">.</span><span class="n">style</span><span class="o">.</span><span class="n">use</span><span class="p">(</span><span class="s2">"arviz-variat"</span><span class="p">)</span>
@@ -1752,7 +1732,7 @@ in <a class="reference internal" href="../models.html"><span class="std std-doc"
 </div>
 <h2 id="build-the-flow-data-and-design-matrix">Build the flow data and design matrix<a class="headerlink" href="#build-the-flow-data-and-design-matrix" title="Link to this heading">¶</a></h2>
 <p>We simulate flow data on <span class="math notranslate nohighlight">\(n = 12\)</span> spatial units, giving <span class="math notranslate nohighlight">\(N = 144\)</span> O-D pairs.
-When neither <code class="docutils literal notranslate"><span class="pre">G</span></code> nor <code class="docutils literal notranslate"><span class="pre">gdf</span></code> is supplied, <code class="docutils literal notranslate"><span class="pre">generate_flow_data</span></code>
+When neither <code class="docutils literal notranslate"><span class="pre">G</span></code> nor <code class="docutils literal notranslate"><span class="pre">gdf</span></code> is supplied, <code class="docutils literal notranslate"><span class="pre">simulate_sar_flow</span></code>
 synthesises a point grid, builds a row-standardised KNN graph
 (<code class="docutils literal notranslate"><span class="pre">knn_k=4</span></code> by default) and computes the pairwise distance matrix used
 for the gravity-style <code class="docutils literal notranslate"><span class="pre">log_distance</span></code> regressor.</p>
@@ -1798,7 +1778,7 @@ for the gravity-style <code class="docutils literal notranslate"><span class="pr
 <span class="n">SIGMA</span> <span class="o">=</span> <span class="mf">1.0</span>
 
 <span class="c1"># Generate synthetic flow data (auto-builds KNN graph + distance matrix)</span>
-<span class="n">data</span> <span class="o">=</span> <span class="n">generate_flow_data</span><span class="p">(</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">simulate_sar_flow</span><span class="p">(</span>
     <span class="n">n</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span>
     <span class="n">rho_d</span><span class="o">=</span><span class="n">RHO_D</span><span class="p">,</span>
     <span class="n">rho_o</span><span class="o">=</span><span class="n">RHO_O</span><span class="p">,</span>
@@ -1863,9 +1843,9 @@ y (log scale) summary:  min=-5.34  mean=-0.56  max=4.90
 </div>
 </div>
 <blockquote>
-<div><p><strong>Note — lognormal default (since v0.2)</strong>.  <code class="docutils literal notranslate"><span class="pre">generate_flow_data</span></code> now returns strictly-positive flows by default, drawn from
+<div><p><strong>Note — lognormal default (since v0.2)</strong>.  <code class="docutils literal notranslate"><span class="pre">simulate_sar_flow</span></code> now returns strictly-positive flows by default, drawn from
 <span class="math notranslate nohighlight">\(y = \exp(\eta)\)</span> where <span class="math notranslate nohighlight">\(\eta = A^{-1}(X\beta + \varepsilon)\)</span> is the latent SAR-filtered linear predictor (also exposed as
-<code class="docutils literal notranslate"><span class="pre">data[&quot;eta_vec&quot;]</span></code>).  The Gaussian-likelihood flow models in this notebook (<code class="docutils literal notranslate"><span class="pre">OLSFlow</span></code>, <code class="docutils literal notranslate"><span class="pre">SARFlow</span></code>, <code class="docutils literal notranslate"><span class="pre">SARFlowSeparable</span></code>) operate on
+<code class="docutils literal notranslate"><span class="pre">data[&quot;eta_vec&quot;]</span></code>).  The Gaussian-likelihood flow models in this notebook (<code class="docutils literal notranslate"><span class="pre">OLSFlow</span></code>, and <code class="docutils literal notranslate"><span class="pre">SARFlow</span></code> unrestricted or separable) operate on
 the latent scale, so we fit on <code class="docutils literal notranslate"><span class="pre">np.log(data[&quot;y_vec&quot;])</span></code>.  Pass <code class="docutils literal notranslate"><span class="pre">distribution=&quot;normal&quot;</span></code> to recover the legacy Gaussian-on-y behaviour.</p>
 </div></blockquote>
 <div class="cell docutils container">
@@ -1903,7 +1883,7 @@ the latent scale, so we fit on <code class="docutils literal notranslate"><span 
     <span class="n">X</span><span class="p">,</span>
     <span class="n">G</span><span class="p">,</span>
     <span class="n">col_names</span><span class="o">=</span><span class="n">col_names</span><span class="p">,</span>
-    <span class="n">restrict_positive</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># Dirichlet stability prior,</span>
+    <span class="n">nonnegative_dependence</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># Dirichlet stability prior,</span>
 <span class="p">)</span>
 
 <span class="n">idata_sar</span> <span class="o">=</span> <span class="n">sar_flow</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
@@ -1919,11 +1899,21 @@ the latent scale, so we fit on <code class="docutils literal notranslate"><span 
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Gibbs sampling <span style="font-weight: bold">(</span>flow<span style="font-weight: bold">)</span>: <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span> chains for <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> tune and <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> draw iterations <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span> x <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> = <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">8</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> draws total<span style="font-weight: bold">)</span>
-</pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 98s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">81</span> draws/s<span style="font-weight: bold">)</span>
-</pre>
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (4 chains in 2 jobs)
+NUTS: [rho_simplex, beta, sigma2]
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/pytensor/link/numba/dispatch/basic.py:234: UserWarning: Numba will use object mode to run FlowLogdetOp{_op_id=0}'s perform method. Set `pytensor.config.compiler_verbose = True` to see more details.
+  warnings.warn(
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/pytensor/link/numba/dispatch/basic.py:234: UserWarning: Numba will use object mode to run FlowLogdetOp{_op_id=0}'s perform method. Set `pytensor.config.compiler_verbose = True` to see more details.
+  warnings.warn(
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/pytensor/link/numba/dispatch/basic.py:234: UserWarning: Numba will use object mode to run FlowLogdetOp{_op_id=0}'s perform method. Set `pytensor.config.compiler_verbose = True` to see more details.
+  warnings.warn(
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/pytensor/link/numba/dispatch/basic.py:234: UserWarning: Numba will use object mode to run FlowLogdetOp{_op_id=0}'s perform method. Set `pytensor.config.compiler_verbose = True` to see more details.
+  warnings.warn(
+Sampling 4 chains for 1_000 tune and 1_000 draw iterations (4_000 + 4_000 draws total) took 607 seconds.
+</code></pre></div>
+</div>
+<div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
 </div></div>
 </div>
 <div class="cell docutils container">
@@ -1940,10 +1930,10 @@ the latent scale, so we fit on <code class="docutils literal notranslate"><span 
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>=== SARFlow: spatial autoregressive parameters ===
-        mean     sd eti89_lb eti89_ub ess_bulk ess_tail r_hat mcse_mean mcse_sd
-rho_d  0.303  0.063      0.2      0.4      295      541  1.02    0.0037  0.0016
-rho_o  0.152  0.064    0.047     0.26      289      437  1.01    0.0037  0.0018
-rho_w   0.17  0.081    0.044      0.3      195      305  1.02    0.0058  0.0026
+        mean     sd eti89_lb eti89_ub ess_bulk ess_tail r_hat mcse_mean  mcse_sd
+rho_d  0.309  0.063     0.21     0.41     3194     2860  1.00    0.0011  0.00092
+rho_o  0.149  0.064    0.043     0.25     1761     1660  1.00    0.0015    0.001
+rho_w  0.162  0.084    0.033      0.3     1853     1436  1.00    0.0018   0.0012
 
 True values:  rho_d=0.35  rho_o=0.25  rho_w=0.1
 </code></pre></div>
@@ -1962,16 +1952,16 @@ True values:  rho_d=0.35  rho_o=0.25  rho_w=0.1
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>=== SARFlow: regression coefficients ===
                      mean        sd  eti89_lb  eti89_ub     ess_bulk     ess_tail     r_hat mcse_mean   mcse_sd
-intercept        0.312328  0.216673 -0.034002  0.663373  2292.689318  2979.766833  1.001777  0.004529  0.002574
-intra_indicator  0.234519   0.32625 -0.284186  0.756031  2457.552038  3493.860023  1.001177  0.006582  0.003576
-dest_x0          1.109651  0.108161  0.936747  1.285883   401.794564   702.174335  1.005004  0.005397  0.002307
-dest_x1         -0.624824  0.085865 -0.761929 -0.486506   691.225093  1285.604223   1.00189  0.003265  0.001279
-orig_x0          0.511249  0.085867  0.376286  0.653352   509.870138  1019.160042  1.006578  0.003805  0.001424
-orig_x1          0.334378  0.075449  0.215298   0.45725  1930.312125  3278.115606  1.001702  0.001719  0.000817
-intra_x0         0.046194  0.311911 -0.453795  0.544494  4025.338708  3902.932452  0.999907  0.004913  0.003572
-intra_x1        -0.141793   0.33092 -0.676391  0.390152  4050.349203  4001.000881  0.999628  0.005198   0.00372
-log_distance    -0.881517  0.195895 -1.196389 -0.569512  1322.457724  2465.572503   1.00503  0.005382  0.002685
-sigma               1.003    0.0356      0.95       1.1         3670         3958      1.00   0.00059   0.00039
+intercept        0.316174  0.212486 -0.026186  0.659504   2502.73857  2473.188426  1.001202  0.004251  0.003163
+intra_indicator    0.2367   0.32777 -0.287968  0.759657  2813.908203  2993.709422   1.00097  0.006184  0.004416
+dest_x0          1.111434  0.107973  0.941501   1.28235  1937.492743  2009.319342   1.00151  0.002449  0.001717
+dest_x1          -0.62614  0.086428 -0.768697 -0.488239   2430.23206  2581.833658  1.000978  0.001752  0.001301
+orig_x0          0.501442  0.084345  0.365347  0.637198  3425.873419  2911.988862  1.000452   0.00144  0.001258
+orig_x1          0.334928  0.073682  0.216947   0.44967  3825.997749  2801.863278  1.000261  0.001194  0.001195
+intra_x0         0.051175  0.301535 -0.421273  0.536336  3605.863481   2903.50716   1.00046  0.005032  0.004993
+intra_x1        -0.153864  0.320061 -0.678672  0.353463  3030.855781  2734.063789  1.000743  0.005817  0.004869
+log_distance    -0.883734  0.192265 -1.188188 -0.575858  2249.534406  2380.645044  1.001201  0.004059   0.00284
+sigma               1.003     0.036      0.95       1.1         4110         2801      1.00   0.00056   0.00059
 </code></pre></div>
 </div>
 </div>
@@ -1991,7 +1981,7 @@ sigma               1.003    0.0356      0.95       1.1         3670         395
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/f9e7d56d5e58e308cabe5cec3faf1574037f22ad18bc1e31ca0d50ecd418c1b6.png" src="../_images/f9e7d56d5e58e308cabe5cec3faf1574037f22ad18bc1e31ca0d50ecd418c1b6.png" />
+<img alt="../_images/ce27a110bc8400646c90a535059b64824327796104572ad6f335726dcfac1ac0.png" src="../_images/ce27a110bc8400646c90a535059b64824327796104572ad6f335726dcfac1ac0.png" />
 </div>
 </div>
 <div class="cell docutils container">
@@ -2010,11 +2000,11 @@ sigma               1.003    0.0356      0.95       1.1         3670         395
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/f30a09c1c3b3b53e47e93334b0b18e76251b038ac1c05247605a41e59dc832ac.png" src="../_images/f30a09c1c3b3b53e47e93334b0b18e76251b038ac1c05247605a41e59dc832ac.png" />
+<img alt="../_images/0c9d673bb3826f84763176f309a2d39397860a17452943864b0bf40a1a5c087c.png" src="../_images/0c9d673bb3826f84763176f309a2d39397860a17452943864b0bf40a1a5c087c.png" />
 </div>
 </div>
 <h2 id="fit-the-separable-model">Fit the separable model<a class="headerlink" href="#fit-the-separable-model" title="Link to this heading">¶</a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">SARFlowSeparable</span></code> imposes the constraint <span class="math notranslate nohighlight">\(\rho_w = -\rho_d \rho_o\)</span>, yielding:</p>
+<p><code class="docutils literal notranslate"><span class="pre">SARFlow(separable=True)</span></code> imposes the constraint <span class="math notranslate nohighlight">\(\rho_w = -\rho_d \rho_o\)</span>, yielding:</p>
 <ul class="simple">
 <li><p><strong>Exact log-det</strong> via eigenvalues of the small <span class="math notranslate nohighlight">\(n \times n\)</span> matrix <span class="math notranslate nohighlight">\(W\)</span> — no Monte Carlo traces needed.</p></li>
 <li><p><strong>Two free parameters</strong> (<span class="math notranslate nohighlight">\(\rho_d\)</span>, <span class="math notranslate nohighlight">\(\rho_o\)</span>) instead of three.</p></li>
@@ -2033,15 +2023,16 @@ sigma               1.003    0.0356      0.95       1.1         3670         395
     <span class="sa">f</span><span class="s2">"  rho_w=-rho_d*rho_o=</span><span class="si">{</span><span class="n">RHO_W_SEP</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">"</span>
 <span class="p">)</span>
 
-<span class="n">data_sep</span> <span class="o">=</span> <span class="n">generate_flow_data_separable</span><span class="p">(</span>
-    <span class="n">n</span><span class="p">,</span>
-    <span class="n">G</span><span class="p">,</span>
+<span class="n">data_sep</span> <span class="o">=</span> <span class="n">simulate_sar_flow</span><span class="p">(</span>
+    <span class="n">n</span><span class="o">=</span><span class="n">n</span><span class="p">,</span>
+    <span class="n">G</span><span class="o">=</span><span class="n">G</span><span class="p">,</span>
     <span class="n">rho_d</span><span class="o">=</span><span class="n">RHO_D_SEP</span><span class="p">,</span>
     <span class="n">rho_o</span><span class="o">=</span><span class="n">RHO_O_SEP</span><span class="p">,</span>
     <span class="n">beta_d</span><span class="o">=</span><span class="n">BETA_D</span><span class="p">,</span>
     <span class="n">beta_o</span><span class="o">=</span><span class="n">BETA_O</span><span class="p">,</span>
     <span class="n">sigma</span><span class="o">=</span><span class="n">SIGMA</span><span class="p">,</span>
     <span class="n">seed</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span>
+    <span class="n">separable</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
 
 <span class="n">y_sep</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">data_sep</span><span class="p">[</span><span class="s2">"y_vec"</span><span class="p">])</span>  <span class="c1"># latent SAR scale (lognormal default)</span>
@@ -2064,10 +2055,11 @@ y_sep summary:  min=-9.82  mean=-3.48  max=1.70
 </div>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">sep_flow</span> <span class="o">=</span> <span class="n">SARFlowSeparable</span><span class="p">(</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">sep_flow</span> <span class="o">=</span> <span class="n">SARFlow</span><span class="p">(</span>
     <span class="n">y_sep</span><span class="p">,</span>
     <span class="n">X_sep</span><span class="p">,</span>
     <span class="n">G</span><span class="p">,</span>
+    <span class="n">separable</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
     <span class="n">col_names</span><span class="o">=</span><span class="n">cn_sep</span><span class="p">,</span>
     <span class="c1"># logdet_method=None (auto) selects the separable Kronecker method</span>
 <span class="p">)</span>
@@ -2098,7 +2090,7 @@ Sampling 4 chains for 1_000 tune and 1_000 draw iterations (4_000 + 4_000 draws 
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">summary_sep</span> <span class="o">=</span> <span class="n">sep_flow</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s2">"rho_d"</span><span class="p">,</span> <span class="s2">"rho_o"</span><span class="p">])</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">"=== SARFlowSeparable: spatial autoregressive parameters ==="</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"=== SARFlow (separable): spatial autoregressive parameters ==="</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">summary_sep</span><span class="o">.</span><span class="n">to_string</span><span class="p">())</span>
 <span class="nb">print</span><span class="p">(</span>
     <span class="sa">f</span><span class="s2">"</span><span class="se">\n</span><span class="s2">True values:  rho_d=</span><span class="si">{</span><span class="n">RHO_D_SEP</span><span class="si">}</span><span class="s2">  rho_o=</span><span class="si">{</span><span class="n">RHO_O_SEP</span><span class="si">}</span><span class="s2">"</span>
@@ -2108,7 +2100,7 @@ Sampling 4 chains for 1_000 tune and 1_000 draw iterations (4_000 + 4_000 draws 
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>=== SARFlowSeparable: spatial autoregressive parameters ===
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>=== SARFlow (separable): spatial autoregressive parameters ===
         mean     sd eti89_lb eti89_ub ess_bulk ess_tail r_hat mcse_mean  mcse_sd
 rho_d  0.377  0.048      0.3     0.45     3320     3113  1.00   0.00082  0.00074
 rho_o   0.24  0.066     0.13     0.34     2449     2384  1.00    0.0013   0.0011
@@ -2125,14 +2117,14 @@ True values:  rho_d=0.4  rho_o=0.3  (rho_w = -rho_d*rho_o = -0.1200 is derived)
     <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s2">"rho_d"</span><span class="p">,</span> <span class="s2">"rho_o"</span><span class="p">],</span>
     <span class="n">figure_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s2">"figsize"</span><span class="p">:</span> <span class="p">(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">4</span><span class="p">)},</span>
 <span class="p">)</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">"SARFlowSeparable — posterior traces"</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.01</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">"SARFlow (separable) — posterior traces"</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.01</span><span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </code></pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/810d84db7ba266fb172ff9b74808358d0431dd48331adca19284deb13aa548c0.png" src="../_images/810d84db7ba266fb172ff9b74808358d0431dd48331adca19284deb13aa548c0.png" />
+<img alt="../_images/5ea4aeeec776f9d0ca966ce612e07ffefdff87284034d4696282efd0c71847b4.png" src="../_images/5ea4aeeec776f9d0ca966ce612e07ffefdff87284034d4696282efd0c71847b4.png" />
 </div>
 </div>
 <div class="cell docutils container">
@@ -2144,13 +2136,15 @@ True values:  rho_d=0.4  rho_o=0.3  (rho_w = -rho_d*rho_o = -0.1200 is derived)
     <span class="n">figure_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s2">"figsize"</span><span class="p">:</span> <span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">3</span><span class="p">)},</span>
 <span class="p">)</span>
 <span class="n">az</span><span class="o">.</span><span class="n">add_lines</span><span class="p">(</span><span class="n">pc</span><span class="p">,</span> <span class="p">{</span><span class="s2">"rho_d"</span><span class="p">:</span> <span class="n">RHO_D_SEP</span><span class="p">,</span> <span class="s2">"rho_o"</span><span class="p">:</span> <span class="n">RHO_O_SEP</span><span class="p">})</span>
-<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">"SARFlowSeparable — posterior distributions (lines = true values)"</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.02</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span>
+    <span class="s2">"SARFlow (separable) — posterior distributions (lines = true values)"</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.02</span>
+<span class="p">)</span>
 <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
 </code></pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/f5397d433bc29e043a54cb39afa2127dede694fceb6ed925184e12ed65b28dcb.png" src="../_images/f5397d433bc29e043a54cb39afa2127dede694fceb6ed925184e12ed65b28dcb.png" />
+<img alt="../_images/b01ea7aa1bd034c4185789670c95224ccbda89b8fb72ba2dac0753de2921b1ba.png" src="../_images/b01ea7aa1bd034c4185789670c95224ccbda89b8fb72ba2dac0753de2921b1ba.png" />
 </div>
 </div>
 <h2 id="understand-what-is-in-the-design-matrix">Understand what is in the design matrix<a class="headerlink" href="#understand-what-is-in-the-design-matrix" title="Link to this heading">¶</a></h2>
@@ -2353,7 +2347,7 @@ summaries (averaged across the <span class="math notranslate nohighlight">\(n\)<
 </tr>
 </tbody>
 </table>
-<p>The high-level wrapper <code class="docutils literal notranslate"><span class="pre">model.spatial_effects()</span></code> returns a tidy DataFrame.
+<p>The high-level wrapper <code class="docutils literal notranslate"><span class="pre">model.impacts()</span></code> returns a tidy DataFrame.
 Three modes are supported:</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">mode=&quot;auto&quot;</span></code> (default) — combined (sum of dest+orig) when <span class="math notranslate nohighlight">\(X_o = X_d\)</span>, otherwise separate.</p></li>
@@ -2366,7 +2360,7 @@ Three modes are supported:</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="c1"># Combined effects (default for symmetric Xo == Xd designs).</span>
-<span class="n">effects_df</span> <span class="o">=</span> <span class="n">sar_flow</span><span class="o">.</span><span class="n">spatial_effects</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">"combined"</span><span class="p">)</span>
+<span class="n">effects_df</span> <span class="o">=</span> <span class="n">sar_flow</span><span class="o">.</span><span class="n">impacts</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">"combined"</span><span class="p">)</span>
 <span class="n">effects_df</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
 </code></pre></div>
 </div>
@@ -2412,91 +2406,91 @@ Three modes are supported:</p>
       <th>x0</th>
       <th>combined</th>
       <th>origin</th>
-      <td>0.8211</td>
-      <td>0.6104</td>
-      <td>1.0483</td>
-      <td>0.0000</td>
+      <td>0.8112</td>
+      <td>0.5983</td>
+      <td>1.0389</td>
+      <td>0.000</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>combined</th>
       <th>origin</th>
-      <td>0.4355</td>
-      <td>0.2321</td>
-      <td>0.6391</td>
-      <td>0.0000</td>
+      <td>0.4397</td>
+      <td>0.2442</td>
+      <td>0.6402</td>
+      <td>0.000</td>
     </tr>
     <tr>
       <th>x0</th>
       <th>combined</th>
       <th>destination</th>
-      <td>1.3978</td>
-      <td>1.2054</td>
-      <td>1.6169</td>
-      <td>0.0000</td>
+      <td>1.3932</td>
+      <td>1.1991</td>
+      <td>1.6090</td>
+      <td>0.000</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>combined</th>
       <th>destination</th>
-      <td>-0.7507</td>
-      <td>-0.9258</td>
-      <td>-0.5794</td>
-      <td>0.0000</td>
+      <td>-0.7499</td>
+      <td>-0.9326</td>
+      <td>-0.5785</td>
+      <td>0.000</td>
     </tr>
     <tr>
       <th>x0</th>
       <th>combined</th>
-      <th>intra</th>
-      <td>0.1132</td>
-      <td>0.0823</td>
-      <td>0.1456</td>
-      <td>0.0000</td>
+      <th>intraunit</th>
+      <td>0.1128</td>
+      <td>0.0830</td>
+      <td>0.1443</td>
+      <td>0.000</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>combined</th>
-      <th>intra</th>
-      <td>-0.0223</td>
-      <td>-0.0547</td>
-      <td>0.0101</td>
-      <td>0.1795</td>
+      <th>intraunit</th>
+      <td>-0.0227</td>
+      <td>-0.0546</td>
+      <td>0.0093</td>
+      <td>0.155</td>
     </tr>
     <tr>
       <th>x0</th>
       <th>combined</th>
       <th>network</th>
-      <td>2.1277</td>
-      <td>1.0407</td>
-      <td>3.8245</td>
-      <td>0.0000</td>
+      <td>2.0832</td>
+      <td>1.0474</td>
+      <td>3.8710</td>
+      <td>0.000</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>combined</th>
       <th>network</th>
-      <td>-0.4858</td>
-      <td>-1.0267</td>
-      <td>-0.0909</td>
-      <td>0.0125</td>
+      <td>-0.4868</td>
+      <td>-1.0256</td>
+      <td>-0.1065</td>
+      <td>0.009</td>
     </tr>
     <tr>
       <th>x0</th>
       <th>combined</th>
       <th>total</th>
-      <td>4.4598</td>
-      <td>3.1157</td>
-      <td>6.5080</td>
-      <td>0.0000</td>
+      <td>4.4004</td>
+      <td>3.0937</td>
+      <td>6.4840</td>
+      <td>0.000</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>combined</th>
       <th>total</th>
-      <td>-0.8233</td>
-      <td>-1.6083</td>
-      <td>-0.1799</td>
-      <td>0.0120</td>
+      <td>-0.8197</td>
+      <td>-1.5991</td>
+      <td>-0.1950</td>
+      <td>0.009</td>
     </tr>
   </tbody>
 </table>
@@ -2513,15 +2507,15 @@ Three modes are supported:</p>
 </div>
 </div>
 <h3 id="asymmetric-origin-destination-attributes">5.1  Asymmetric origin / destination attributes<a class="headerlink" href="#asymmetric-origin-destination-attributes" title="Link to this heading">¶</a></h3>
-<p>When destination and origin attribute matrices have different numbers of columns (<code class="docutils literal notranslate"><span class="pre">k_d</span> <span class="pre">≠</span> <span class="pre">k_o</span></code>), pass <code class="docutils literal notranslate"><span class="pre">beta_d</span></code> and <code class="docutils literal notranslate"><span class="pre">beta_o</span></code> with different lengths to <code class="docutils literal notranslate"><span class="pre">generate_flow_data</span></code>. The design matrix layout becomes:</p>
+<p>When destination and origin attribute matrices have different numbers of columns (<code class="docutils literal notranslate"><span class="pre">k_d</span> <span class="pre">≠</span> <span class="pre">k_o</span></code>), pass <code class="docutils literal notranslate"><span class="pre">beta_d</span></code> and <code class="docutils literal notranslate"><span class="pre">beta_o</span></code> with different lengths to <code class="docutils literal notranslate"><span class="pre">simulate_sar_flow</span></code>. The design matrix layout becomes:</p>
 <p><code class="docutils literal notranslate"><span class="pre">intercept</span> <span class="pre">|</span> <span class="pre">intra_indicator</span> <span class="pre">|</span> <span class="pre">dest_*(k_d)</span> <span class="pre">|</span> <span class="pre">orig_*(k_o)</span> <span class="pre">|</span> <span class="pre">intra_*(k_d)</span> <span class="pre">|</span> <span class="pre">dist</span></code></p>
-<p>The model auto-detects <code class="docutils literal notranslate"><span class="pre">k_d</span></code> and <code class="docutils literal notranslate"><span class="pre">k_o</span></code> from column name prefixes (<code class="docutils literal notranslate"><span class="pre">dest_*</span></code> vs <code class="docutils literal notranslate"><span class="pre">orig_*</span></code>). <code class="docutils literal notranslate"><span class="pre">spatial_effects()</span></code> reports destination and origin effects separately when <code class="docutils literal notranslate"><span class="pre">k_d</span> <span class="pre">≠</span> <span class="pre">k_o</span></code>, since the predictors are different variables.</p>
+<p>The model auto-detects <code class="docutils literal notranslate"><span class="pre">k_d</span></code> and <code class="docutils literal notranslate"><span class="pre">k_o</span></code> from column name prefixes (<code class="docutils literal notranslate"><span class="pre">dest_*</span></code> vs <code class="docutils literal notranslate"><span class="pre">orig_*</span></code>). <code class="docutils literal notranslate"><span class="pre">impacts()</span></code> reports destination and origin effects separately when <code class="docutils literal notranslate"><span class="pre">k_d</span> <span class="pre">≠</span> <span class="pre">k_o</span></code>, since the predictors are different variables.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.dgp.flows</span><span class="w"> </span><span class="kn">import</span> <span class="n">generate_flow_data</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.dgp</span><span class="w"> </span><span class="kn">import</span> <span class="n">simulate_sar_flow</span>
 
 <span class="c1"># Asymmetric: 2 destination attributes, 1 origin attribute</span>
-<span class="n">data_asym</span> <span class="o">=</span> <span class="n">generate_flow_data</span><span class="p">(</span>
+<span class="n">data_asym</span> <span class="o">=</span> <span class="n">simulate_sar_flow</span><span class="p">(</span>
     <span class="n">n</span><span class="o">=</span><span class="mi">5</span><span class="p">,</span>
     <span class="n">rho_d</span><span class="o">=</span><span class="mf">0.2</span><span class="p">,</span>
     <span class="n">rho_o</span><span class="o">=</span><span class="mf">0.15</span><span class="p">,</span>
@@ -2541,16 +2535,16 @@ Three modes are supported:</p>
     <span class="n">G_asym</span><span class="p">,</span>
     <span class="n">col_names</span><span class="o">=</span><span class="n">data_asym</span><span class="p">[</span><span class="s2">"col_names"</span><span class="p">],</span>
 <span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">"symmetric_xo_xd ="</span><span class="p">,</span> <span class="n">model_asym</span><span class="o">.</span><span class="n">_symmetric_xo_xd</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"shared_od_covariates ="</span><span class="p">,</span> <span class="n">model_asym</span><span class="o">.</span><span class="n">_shared_od_covariates</span><span class="p">)</span>
 <span class="n">model_asym</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="o">**</span><span class="n">SAMPLE_KWARGS_DEMO</span><span class="p">)</span>
-<span class="n">model_asym</span><span class="o">.</span><span class="n">spatial_effects</span><span class="p">()</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>  <span class="c1"># auto -&gt; separate</span>
+<span class="n">model_asym</span><span class="o">.</span><span class="n">impacts</span><span class="p">()</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>  <span class="c1"># auto -&gt; separate</span>
 </code></pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>k_d=2, k_o=1
 Columns: ['intercept', 'intra_indicator', 'dest_x0', 'dest_x1', 'orig_y0', 'intra_x0', 'intra_x1', 'log_distance']
-symmetric_xo_xd = False
+shared_od_covariates = False
 </code></pre></div>
 </div>
 <div class="output text_html"><div>
@@ -2593,128 +2587,128 @@ symmetric_xo_xd = False
       <th>x0</th>
       <th>dest</th>
       <th>origin</th>
-      <td>0.4678</td>
-      <td>0.0295</td>
-      <td>1.8720</td>
-      <td>0.005</td>
+      <td>0.4906</td>
+      <td>0.0576</td>
+      <td>1.8208</td>
+      <td>0.015</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>dest</th>
       <th>origin</th>
-      <td>-0.2400</td>
-      <td>-0.8931</td>
-      <td>-0.0140</td>
-      <td>0.010</td>
+      <td>-0.2532</td>
+      <td>-1.0131</td>
+      <td>-0.0264</td>
+      <td>0.005</td>
     </tr>
     <tr>
       <th>x0</th>
       <th>dest</th>
       <th>destination</th>
-      <td>1.2049</td>
-      <td>0.3981</td>
-      <td>2.8459</td>
+      <td>1.2207</td>
+      <td>0.4027</td>
+      <td>2.5570</td>
       <td>0.005</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>dest</th>
       <th>destination</th>
-      <td>-0.7510</td>
-      <td>-1.4273</td>
-      <td>-0.3375</td>
+      <td>-0.7569</td>
+      <td>-1.7492</td>
+      <td>-0.3368</td>
       <td>0.000</td>
     </tr>
     <tr>
       <th>x0</th>
       <th>dest</th>
-      <th>intra</th>
-      <td>0.3239</td>
-      <td>0.0469</td>
-      <td>0.6980</td>
-      <td>0.025</td>
+      <th>intraunit</th>
+      <td>0.3337</td>
+      <td>0.0622</td>
+      <td>0.7839</td>
+      <td>0.030</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>dest</th>
-      <th>intra</th>
-      <td>-0.1287</td>
-      <td>-0.3010</td>
-      <td>0.0126</td>
-      <td>0.075</td>
+      <th>intraunit</th>
+      <td>-0.1338</td>
+      <td>-0.3590</td>
+      <td>0.0026</td>
+      <td>0.060</td>
     </tr>
     <tr>
       <th>x0</th>
       <th>dest</th>
       <th>network</th>
-      <td>1.8401</td>
-      <td>0.1361</td>
-      <td>7.3235</td>
-      <td>0.000</td>
+      <td>1.9163</td>
+      <td>0.2335</td>
+      <td>7.1425</td>
+      <td>0.005</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>dest</th>
       <th>network</th>
-      <td>-1.0564</td>
-      <td>-3.7698</td>
-      <td>-0.0930</td>
+      <td>-1.1154</td>
+      <td>-4.2690</td>
+      <td>-0.1627</td>
       <td>0.000</td>
     </tr>
     <tr>
       <th>x0</th>
       <th>dest</th>
       <th>total</th>
-      <td>3.8366</td>
-      <td>0.8094</td>
-      <td>12.7778</td>
-      <td>0.000</td>
+      <td>3.9613</td>
+      <td>0.9284</td>
+      <td>11.9867</td>
+      <td>0.005</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>dest</th>
       <th>total</th>
-      <td>-2.1760</td>
-      <td>-6.3817</td>
-      <td>-0.5892</td>
+      <td>-2.2594</td>
+      <td>-7.2128</td>
+      <td>-0.6491</td>
       <td>0.000</td>
     </tr>
     <tr>
       <th rowspan="5" valign="top">y0</th>
       <th rowspan="5" valign="top">orig</th>
       <th>origin</th>
-      <td>0.7081</td>
-      <td>0.1682</td>
-      <td>1.4964</td>
-      <td>0.020</td>
+      <td>0.7214</td>
+      <td>-0.0052</td>
+      <td>1.6944</td>
+      <td>0.055</td>
     </tr>
     <tr>
       <th>destination</th>
-      <td>0.1881</td>
-      <td>0.0093</td>
-      <td>0.8273</td>
-      <td>0.020</td>
+      <td>0.1967</td>
+      <td>-0.0019</td>
+      <td>0.9148</td>
+      <td>0.055</td>
     </tr>
     <tr>
-      <th>intra</th>
-      <td>0.1770</td>
-      <td>0.0420</td>
-      <td>0.3741</td>
-      <td>0.020</td>
+      <th>intraunit</th>
+      <td>0.1803</td>
+      <td>-0.0013</td>
+      <td>0.4236</td>
+      <td>0.055</td>
     </tr>
     <tr>
       <th>network</th>
-      <td>0.7524</td>
-      <td>0.0372</td>
-      <td>3.3090</td>
-      <td>0.020</td>
+      <td>0.7870</td>
+      <td>-0.0077</td>
+      <td>3.6593</td>
+      <td>0.055</td>
     </tr>
     <tr>
       <th>total</th>
-      <td>1.8256</td>
-      <td>0.2600</td>
-      <td>5.9838</td>
-      <td>0.020</td>
+      <td>1.8854</td>
+      <td>-0.0166</td>
+      <td>7.2861</td>
+      <td>0.055</td>
     </tr>
   </tbody>
 </table>
@@ -2749,7 +2743,7 @@ Feature names: ['intercept', 'intra_indicator', 'dest_x0', 'dest_x1', 'orig_y0',
 <p><code class="docutils literal notranslate"><span class="pre">OLSFlow</span></code> is the conventional log-linear gravity model
 (Thomas-Agnan &amp; LeSage 2014, eq. 83.2): no spatial-lag terms, just
 <span class="math notranslate nohighlight">\(y = X \beta + \varepsilon\)</span> with iid Gaussian errors.  It uses the
-same <code class="docutils literal notranslate"><span class="pre">spatial_effects()</span></code> API and reproduces the closed-form
+same <code class="docutils literal notranslate"><span class="pre">impacts()</span></code> API and reproduces the closed-form
 expressions in Table 83.1 (with <span class="math notranslate nohighlight">\(A = I_N\)</span>):</p>
 <div class="math notranslate nohighlight">
 \[
@@ -2765,7 +2759,7 @@ expressions in Table 83.1 (with <span class="math notranslate nohighlight">\(A =
 
 <span class="n">ols_flow</span> <span class="o">=</span> <span class="n">OLSFlow</span><span class="p">(</span><span class="n">y_vec</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">G</span><span class="p">,</span> <span class="n">col_names</span><span class="o">=</span><span class="n">col_names</span><span class="p">)</span>
 <span class="n">ols_flow</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="o">**</span><span class="n">SAMPLE_KWARGS_DEMO</span><span class="p">)</span>
-<span class="n">ols_flow</span><span class="o">.</span><span class="n">spatial_effects</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">"combined"</span><span class="p">)</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
+<span class="n">ols_flow</span><span class="o">.</span><span class="n">impacts</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">"combined"</span><span class="p">)</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
 </code></pre></div>
 </div>
 </div>
@@ -2853,7 +2847,7 @@ The rhat statistic is larger than 1.01 for some parameters. This indicates probl
     <tr>
       <th>x0</th>
       <th>combined</th>
-      <th>intra</th>
+      <th>intraunit</th>
       <td>0.0962</td>
       <td>0.0653</td>
       <td>0.1288</td>
@@ -2862,7 +2856,7 @@ The rhat statistic is larger than 1.01 for some parameters. This indicates probl
     <tr>
       <th>x1</th>
       <th>combined</th>
-      <th>intra</th>
+      <th>intraunit</th>
       <td>-0.0118</td>
       <td>-0.0432</td>
       <td>0.0199</td>
@@ -2912,7 +2906,7 @@ The rhat statistic is larger than 1.01 for some parameters. This indicates probl
 <p>Good practice after any Bayesian fit: check <span class="math notranslate nohighlight">\(\hat{R}\)</span> (should be <span class="math notranslate nohighlight">\(&lt; 1.01\)</span>) and effective sample size (ESS &gt; 400 per chain).</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">idata</span> <span class="ow">in</span> <span class="p">[(</span><span class="s2">"SARFlow"</span><span class="p">,</span> <span class="n">idata_sar</span><span class="p">),</span> <span class="p">(</span><span class="s2">"SARFlowSeparable"</span><span class="p">,</span> <span class="n">idata_sep</span><span class="p">)]:</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">idata</span> <span class="ow">in</span> <span class="p">[(</span><span class="s2">"SARFlow"</span><span class="p">,</span> <span class="n">idata_sar</span><span class="p">),</span> <span class="p">(</span><span class="s2">"SARFlow (separable)"</span><span class="p">,</span> <span class="n">idata_sep</span><span class="p">)]:</span>
     <span class="n">diag</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="n">idata</span><span class="p">,</span> <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s2">"rho_d"</span><span class="p">,</span> <span class="s2">"rho_o"</span><span class="p">],</span> <span class="n">ci_kind</span><span class="o">=</span><span class="s2">"hdi"</span><span class="p">,</span> <span class="n">ci_prob</span><span class="o">=</span><span class="mf">0.94</span><span class="p">)</span>
     <span class="n">rhat_ok</span> <span class="o">=</span> <span class="p">(</span><span class="n">diag</span><span class="p">[</span><span class="s2">"r_hat"</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mf">1.01</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
     <span class="n">ess_ok</span> <span class="o">=</span> <span class="p">(</span><span class="n">diag</span><span class="p">[</span><span class="s2">"ess_bulk"</span><span class="p">]</span> <span class="o">&gt;</span> <span class="mi">400</span><span class="p">)</span><span class="o">.</span><span class="n">all</span><span class="p">()</span>
@@ -2923,12 +2917,12 @@ The rhat statistic is larger than 1.01 for some parameters. This indicates probl
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>SARFlow                    r_hat&lt;1.01: False   ess_bulk&gt;400: False
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>SARFlow                    r_hat&lt;1.01: True   ess_bulk&gt;400: True
         mean     sd hdi94_lb hdi94_ub ess_bulk r_hat
-rho_d  0.303  0.063     0.19     0.42      295  1.02
-rho_o  0.152  0.064    0.042     0.28      289  1.01
+rho_d  0.309  0.063     0.18     0.42     3194  1.00
+rho_o  0.149  0.064    0.021     0.26     1761  1.00
 
-SARFlowSeparable           r_hat&lt;1.01: True   ess_bulk&gt;400: True
+SARFlow (separable)        r_hat&lt;1.01: True   ess_bulk&gt;400: True
         mean     sd hdi94_lb hdi94_ub ess_bulk r_hat
 rho_d  0.377  0.048     0.28     0.46     3320  1.00
 rho_o   0.24  0.066     0.12     0.36     2449  1.00
@@ -2991,40 +2985,40 @@ ESS, sampler yield, <span class="math notranslate nohighlight">\(\hat{R}\)</span
   <tbody>
     <tr>
       <th>rho_d</th>
-      <td>295.087532</td>
-      <td>541.962238</td>
-      <td>1.016256</td>
-      <td>0.003682</td>
-      <td>7.377188</td>
-      <td>1.760779</td>
+      <td>3194.397117</td>
+      <td>2860.104178</td>
+      <td>0.999772</td>
+      <td>0.001113</td>
+      <td>79.859928</td>
+      <td>7.134872</td>
       <td>False</td>
     </tr>
     <tr>
       <th>rho_o</th>
-      <td>289.147043</td>
-      <td>437.003549</td>
-      <td>1.005580</td>
-      <td>0.003731</td>
-      <td>7.228676</td>
-      <td>1.162923</td>
-      <td>False</td>
+      <td>1761.580949</td>
+      <td>1660.607827</td>
+      <td>1.001566</td>
+      <td>0.001494</td>
+      <td>44.039524</td>
+      <td>0.101318</td>
+      <td>True</td>
     </tr>
     <tr>
       <th>rho_w</th>
-      <td>195.678011</td>
-      <td>305.102837</td>
-      <td>1.016850</td>
-      <td>0.005779</td>
-      <td>4.891950</td>
-      <td>4.048526</td>
-      <td>False</td>
+      <td>1853.449434</td>
+      <td>1436.638945</td>
+      <td>1.001032</td>
+      <td>0.001847</td>
+      <td>46.336236</td>
+      <td>1.280769</td>
+      <td>True</td>
     </tr>
   </tbody>
 </table>
 </div></div></div>
 </div>
 <h2 id="compare-the-two-specifications">Compare the two specifications<a class="headerlink" href="#compare-the-two-specifications" title="Link to this heading">¶</a></h2>
-<p>The WAIC / LOO-CV scores can be used to compare <code class="docutils literal notranslate"><span class="pre">SARFlow</span></code> and <code class="docutils literal notranslate"><span class="pre">SARFlowSeparable</span></code> when both are estimated on the same data.  A lower ELPD (expected log pointwise predictive density) indicates a worse-fitting model.</p>
+<p>The WAIC / LOO-CV scores can be used to compare the unrestricted and the separable <code class="docutils literal notranslate"><span class="pre">SARFlow</span></code> when both are estimated on the same data.  A lower ELPD (expected log pointwise predictive density) indicates a worse-fitting model.</p>
 <blockquote>
 <div><p><strong>Note</strong>: here we fit <code class="docutils literal notranslate"><span class="pre">SARFlow</span></code> to the separable data to make the comparison meaningful — the separable model is nested in the unrestricted one.</p>
 </div></blockquote>
@@ -3053,7 +3047,7 @@ ESS, sampler yield, <span class="math notranslate nohighlight">\(\hat{R}\)</span
 <div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Gibbs sampling <span style="font-weight: bold">(</span>flow<span style="font-weight: bold">)</span>: <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span> chains for <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> tune and <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> draw iterations <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span> x <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> = <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">8</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> draws total<span style="font-weight: bold">)</span>
 </pre>
 </div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 74s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">109</span> draws/s<span style="font-weight: bold">)</span>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 13s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">601</span> draws/s<span style="font-weight: bold">)</span>
 </pre>
 </div></div>
 </div>
@@ -3064,7 +3058,7 @@ ESS, sampler yield, <span class="math notranslate nohighlight">\(\hat{R}\)</span
     <span class="n">loo_sar</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">loo</span><span class="p">(</span><span class="n">idata_sar_on_sep</span><span class="p">)</span>
     <span class="n">loo_sep</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">loo</span><span class="p">(</span><span class="n">idata_sep</span><span class="p">)</span>
     <span class="n">comparison</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span>
-        <span class="p">{</span><span class="s2">"SARFlow (3 ρ)"</span><span class="p">:</span> <span class="n">idata_sar_on_sep</span><span class="p">,</span> <span class="s2">"SARFlowSeparable"</span><span class="p">:</span> <span class="n">idata_sep</span><span class="p">}</span>
+        <span class="p">{</span><span class="s2">"SARFlow (3 ρ)"</span><span class="p">:</span> <span class="n">idata_sar_on_sep</span><span class="p">,</span> <span class="s2">"SARFlow (separable)"</span><span class="p">:</span> <span class="n">idata_sep</span><span class="p">}</span>
     <span class="p">)</span>
     <span class="nb">print</span><span class="p">(</span><span class="s2">"LOO-CV model comparison:"</span><span class="p">)</span>
     <span class="nb">print</span><span class="p">(</span><span class="n">comparison</span><span class="p">[[</span><span class="s2">"elpd"</span><span class="p">,</span> <span class="s2">"p"</span><span class="p">,</span> <span class="s2">"elpd_diff"</span><span class="p">,</span> <span class="s2">"weight"</span><span class="p">,</span> <span class="s2">"se"</span><span class="p">,</span> <span class="s2">"dse"</span><span class="p">]]</span><span class="o">.</span><span class="n">to_string</span><span class="p">())</span>
@@ -3076,25 +3070,25 @@ ESS, sampler yield, <span class="math notranslate nohighlight">\(\hat{R}\)</span
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>LOO-CV model comparison:
-                   elpd     p  elpd_diff  weight    se  dse
-SARFlowSeparable -560.0  10.3        0.0    0.91  14.0  0.0
-SARFlow (3 ρ)    -560.0  11.1       -1.0    0.09  14.0  1.5
+                      elpd     p  elpd_diff  weight    se  dse
+SARFlow (separable) -560.0  10.3        0.0    0.78  14.0  0.0
+SARFlow (3 ρ)       -560.0  10.9       -1.0    0.22  14.0  1.5
 </code></pre></div>
 </div>
 </div>
 </div>
 <h2 id="allow-negative-spillovers">Allow negative spillovers<a class="headerlink" href="#allow-negative-spillovers" title="Link to this heading">¶</a></h2>
-<p>By default <code class="docutils literal notranslate"><span class="pre">SARFlow</span></code> uses a Dirichlet prior that forces <span class="math notranslate nohighlight">\(\rho_d, \rho_o, \rho_w \geq 0\)</span> and <span class="math notranslate nohighlight">\(\rho_d + \rho_o + \rho_w \leq 1\)</span>.  Setting <code class="docutils literal notranslate"><span class="pre">restrict_positive=False</span></code> allows negative spillovers via independent <code class="docutils literal notranslate"><span class="pre">Uniform(-1,</span> <span class="pre">1)</span></code> priors plus a differentiable stability wall potential.</p>
-<p>Use <code class="docutils literal notranslate"><span class="pre">restrict_positive=False</span></code> when competitive effects (e.g. negative network parameter) are theoretically expected.</p>
+<p>By default <code class="docutils literal notranslate"><span class="pre">SARFlow</span></code> uses a Dirichlet prior that forces <span class="math notranslate nohighlight">\(\rho_d, \rho_o, \rho_w \geq 0\)</span> and <span class="math notranslate nohighlight">\(\rho_d + \rho_o + \rho_w \leq 1\)</span>.  Setting <code class="docutils literal notranslate"><span class="pre">nonnegative_dependence=False</span></code> allows negative spillovers via independent <code class="docutils literal notranslate"><span class="pre">Uniform(-1,</span> <span class="pre">1)</span></code> priors plus a differentiable stability wall potential.</p>
+<p>Use <code class="docutils literal notranslate"><span class="pre">nonnegative_dependence=False</span></code> when competitive effects (e.g. negative network parameter) are theoretically expected.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="c1"># Fit with restrict_positive=False to allow negative rho values</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="c1"># Fit with nonnegative_dependence=False to allow negative rho values</span>
 <span class="n">sar_flow_neg</span> <span class="o">=</span> <span class="n">SARFlow</span><span class="p">(</span>
     <span class="n">y_vec</span><span class="p">,</span>
     <span class="n">X</span><span class="p">,</span>
     <span class="n">G</span><span class="p">,</span>
     <span class="n">col_names</span><span class="o">=</span><span class="n">col_names</span><span class="p">,</span>
-    <span class="n">restrict_positive</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># Uniform(-1,1) priors + stability potential</span>
+    <span class="n">nonnegative_dependence</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>  <span class="c1"># Uniform(-1,1) priors + stability potential</span>
 <span class="p">)</span>
 <span class="n">idata_neg</span> <span class="o">=</span> <span class="n">sar_flow_neg</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
     <span class="n">draws</span><span class="o">=</span><span class="mi">800</span><span class="p">,</span>
@@ -3106,7 +3100,7 @@ SARFlow (3 ρ)    -560.0  11.1       -1.0    0.09  14.0  1.5
 <span class="p">)</span>
 
 <span class="n">summary_neg</span> <span class="o">=</span> <span class="n">sar_flow_neg</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="n">ci_kind</span><span class="o">=</span><span class="s2">"hdi"</span><span class="p">,</span> <span class="n">ci_prob</span><span class="o">=</span><span class="mf">0.94</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="s2">"=== SARFlow (restrict_positive=False) ==="</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"=== SARFlow (nonnegative_dependence=False) ==="</span><span class="p">)</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">summary_neg</span><span class="p">[[</span><span class="s2">"mean"</span><span class="p">,</span> <span class="s2">"sd"</span><span class="p">,</span> <span class="s2">"hdi94_lb"</span><span class="p">,</span> <span class="s2">"hdi94_ub"</span><span class="p">,</span> <span class="s2">"r_hat"</span><span class="p">]]</span><span class="o">.</span><span class="n">to_string</span><span class="p">())</span>
 </code></pre></div>
 </div>
@@ -3115,88 +3109,56 @@ SARFlow (3 ρ)    -560.0  11.1       -1.0    0.09  14.0  1.5
 <div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Gibbs sampling <span style="font-weight: bold">(</span>flow<span style="font-weight: bold">)</span>: <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span> chains for <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> tune and <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">800</span> draw iterations <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span> x <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">800</span> = <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">7</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">200</span> draws total<span style="font-weight: bold">)</span>
 </pre>
 </div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 71s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">102</span> draws/s<span style="font-weight: bold">)</span>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 26s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">280</span> draws/s<span style="font-weight: bold">)</span>
 </pre>
-</div><div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>=== SARFlow (restrict_positive=False) ===
+</div><div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>=== SARFlow (nonnegative_dependence=False) ===
                      mean        sd  hdi94_lb  hdi94_ub     r_hat
-rho_d               0.314     0.065       0.2      0.45      1.02
-rho_o               0.148     0.068     0.025      0.27      1.02
-rho_w                0.15     0.089   -0.0011      0.32      1.05
-sigma               1.003    0.0366      0.94       1.1      1.00
-intercept        0.317227  0.217917 -0.088207  0.724866  1.000112
-intra_indicator  0.236103  0.326432 -0.355808  0.859162  0.999678
-dest_x0          1.114731  0.110262  0.900919  1.309903  1.011853
-dest_x1          -0.62747  0.087305  -0.78202  -0.45472  1.002805
-orig_x0          0.498305  0.089438  0.326327  0.659779   1.01405
-orig_x1          0.331357  0.076535  0.190595  0.476149  1.000263
-intra_x0         0.049676  0.300487  -0.52245  0.612584  1.000897
-intra_x1        -0.144628  0.320673 -0.741599  0.459876  0.999811
-log_distance    -0.887132  0.195995 -1.239187 -0.516576  1.001103
+rho_d               0.313     0.065      0.19      0.43      1.00
+rho_o               0.151     0.069     0.024      0.28      1.00
+rho_w               0.153     0.092    -0.013      0.33      1.00
+sigma               1.002    0.0361      0.94       1.1      1.00
+intercept        0.323882  0.217598 -0.085505  0.731325  0.999572
+intra_indicator  0.229508  0.332525 -0.399134  0.850958  1.000708
+dest_x0          1.108096  0.114131  0.883777  1.308914  1.000285
+dest_x1         -0.624999    0.0904 -0.787936  -0.44866  1.000453
+orig_x0          0.497901    0.0862  0.334421   0.65772   1.00076
+orig_x1          0.332503  0.075318  0.195852  0.478992   0.99994
+intra_x0         0.061162   0.30397  -0.49742  0.635618   1.00051
+intra_x1         -0.15145  0.324395 -0.749419  0.462525  1.000489
+log_distance    -0.890899  0.198512 -1.259171 -0.515693  1.000037
 </code></pre></div>
 </div>
 </div>
 </div>
 <h2 id="test-whether-the-spatial-terms-are-needed">Test whether the spatial terms are needed<a class="headerlink" href="#test-whether-the-spatial-terms-are-needed" title="Link to this heading">¶</a></h2>
-<p>Once a baseline gravity model has been fit, the Bayesian Lagrange-multiplier
-(LM) tests in <code class="docutils literal notranslate"><span class="pre">neighbayes.diagnostics</span></code> indicate which spatial-lag directions
-(destination, origin, network) are worth adding — and which intra-block
-columns deserve their own coefficients. They are the OD-flow analogues of the
-classic Anselin/Koley–Bera LM family, ported to the posterior-predictive
-score formulation of Doğan, Taşpınar &amp; Bera (2021).</p>
-<p>For each posterior draw <span class="math notranslate nohighlight">\(g\)</span> from a fitted <strong>null</strong> model with residuals
-<span class="math notranslate nohighlight">\(e_g = y - X\beta_g\)</span>, the score for direction <span class="math notranslate nohighlight">\(i \in \{d, o, w\}\)</span> is</p>
+<p>The Bayesian Lagrange-multiplier tests ask whether an aspatial gravity model
+leaves spatial dependence in its residuals. Each is a score test of the
+lag-flow model</p>
 <div class="math notranslate nohighlight">
 \[
-s_g^{(i)} = (W_i\, y)^\top e_g, \qquad
-W_d = I_n \otimes W,\; W_o = W \otimes I_n,\; W_w = W \otimes W,
+y = \rho_d W_d y + \rho_o W_o y + \rho_w W_w y + X\beta + \varepsilon,
+\qquad W_d = I_n \otimes W,\; W_o = W \otimes I_n,\; W_w = W \otimes W,
 \]</div>
-<p>and the information matrix uses the cached Kronecker-trace block
-<span class="math notranslate nohighlight">\(T_{\text{flow}}\)</span> (computed in <span class="math notranslate nohighlight">\(\mathcal{O}(\mathrm{nnz})\)</span> from
-<code class="docutils literal notranslate"><span class="pre">flow_trace_blocks(W)</span></code>):</p>
-<div class="math notranslate nohighlight">
-\[
-J = T_{\text{flow}}\,\bar\sigma^{2} + Q, \qquad
-Q_{ij} = (W_i y)^\top (W_j y).
-\]</div>
-<p>The marginal statistic is <span class="math notranslate nohighlight">\(LM_g = (s_g^{(i)})^2 / J_{ii}\)</span> (<span class="math notranslate nohighlight">\(\chi^2_1\)</span>); the
-joint statistic is <span class="math notranslate nohighlight">\(g_g^\top J^{-1} g_g\)</span> (<span class="math notranslate nohighlight">\(\chi^2_3\)</span>). The Bayesian
-<span class="math notranslate nohighlight">\(p\)</span>-value reports <span class="math notranslate nohighlight">\(1 - F_{\chi^2_{\text{df}}}(\overline{LM})\)</span>.</p>
-<h3 id="robust-neyman-orthogonal-tests">10.1  Robust (Neyman-orthogonal) tests<a class="headerlink" href="#robust-neyman-orthogonal-tests" title="Link to this heading">¶</a></h3>
-<p>The marginal LM tests assume the other two ρ parameters are zero under the
-null. When that assumption is in doubt, evaluate the score and information
-at the <strong>alternative</strong> SARFlow posterior and apply the Neyman-orthogonal
-adjustment</p>
-<div class="math notranslate nohighlight">
-\[
-s^{*}_i = s_i - J_{i,\nu} J_{\nu,\nu}^{-1} s_\nu,
-\qquad
-V^{*} = J_{ii} - J_{i,\nu} J_{\nu,\nu}^{-1} J_{\nu,i},
-\]</div>
-<p>where <span class="math notranslate nohighlight">\(\nu\)</span> indexes the two nuisance directions. The result is robust to
-local misspecification of the nuisance ρ’s (Doğan et al. 2021,
-Proposition 3).</p>
+<p>at a fitted <code class="docutils literal notranslate"><span class="pre">OLSFlow</span></code>, where every <span class="math notranslate nohighlight">\(\rho\)</span> is zero. The score of direction
+<span class="math notranslate nohighlight">\(k\)</span> is <span class="math notranslate nohighlight">\((W_k y)^\top e/\sigma^2 - \operatorname{tr} W_k\)</span>, made orthogonal to
+the coefficients and the variance the null estimates. Its information needs
+only traces of the <span class="math notranslate nohighlight">\(n \times n\)</span> matrix <span class="math notranslate nohighlight">\(W\)</span>, so the <span class="math notranslate nohighlight">\(n^2\)</span> pairs never form a
+Kronecker product. The reported statistic is the test at the posterior-mean
+parameters (Doğan, Taşpınar &amp; Bera 2021). A robust test also removes the
+other two directions (Bera &amp; Yoon 1993): <code class="docutils literal notranslate"><span class="pre">Robust-LM-Flow-Destination</span></code> asks for
+a destination lag whether or not origin and network lags are present.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.diagnostics.lmtests</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-    <span class="n">bayesian_robust_lm_flow_dest_test</span><span class="p">,</span>
-    <span class="n">bayesian_robust_lm_flow_network_test</span><span class="p">,</span>
-    <span class="n">bayesian_robust_lm_flow_orig_test</span><span class="p">,</span>
-<span class="p">)</span>
-
-<span class="n">robust_tests</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">"rho_d | (rho_o, rho_w)"</span><span class="p">:</span> <span class="n">bayesian_robust_lm_flow_dest_test</span><span class="p">(</span><span class="n">sar_flow</span><span class="p">),</span>
-    <span class="s2">"rho_o | (rho_d, rho_w)"</span><span class="p">:</span> <span class="n">bayesian_robust_lm_flow_orig_test</span><span class="p">(</span><span class="n">sar_flow</span><span class="p">),</span>
-    <span class="s2">"rho_w | (rho_d, rho_o)"</span><span class="p">:</span> <span class="n">bayesian_robust_lm_flow_network_test</span><span class="p">(</span><span class="n">sar_flow</span><span class="p">),</span>
-<span class="p">}</span>
-
-<span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
-    <span class="p">[(</span><span class="n">k</span><span class="p">,</span> <span class="n">r</span><span class="o">.</span><span class="n">mean</span><span class="p">,</span> <span class="n">r</span><span class="o">.</span><span class="n">bayes_pvalue</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">robust_tests</span><span class="o">.</span><span class="n">items</span><span class="p">()],</span>
-    <span class="n">columns</span><span class="o">=</span><span class="p">[</span><span class="s2">"test"</span><span class="p">,</span> <span class="s2">"LM* mean"</span><span class="p">,</span> <span class="s2">"Bayes p"</span><span class="p">],</span>
-<span class="p">)</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">diagnostics</span> <span class="o">=</span> <span class="n">ols_flow</span><span class="o">.</span><span class="n">spatial_diagnostics</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">"Recommended:"</span><span class="p">,</span> <span class="n">ols_flow</span><span class="o">.</span><span class="n">spatial_diagnostics_decision</span><span class="p">(</span><span class="nb">format</span><span class="o">=</span><span class="s2">"model"</span><span class="p">))</span>
+<span class="n">diagnostics</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
 </code></pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Recommended: SARFlow
+</code></pre></div>
+</div>
 <div class="output text_html"><div>
 <style scoped>
     .dataframe tbody tr th:only-of-type {
@@ -3215,49 +3177,103 @@ Proposition 3).</p>
   <thead>
     <tr style="text-align: right;">
       <th></th>
+      <th>statistic</th>
+      <th>median</th>
+      <th>df</th>
+      <th>p_value</th>
+      <th>ci_lower</th>
+      <th>ci_upper</th>
+    </tr>
+    <tr>
       <th>test</th>
-      <th>LM* mean</th>
-      <th>Bayes p</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <th>0</th>
-      <td>rho_d | (rho_o, rho_w)</td>
-      <td>1.8193</td>
-      <td>0.1774</td>
+      <th>LM-Flow-Destination</th>
+      <td>53.777</td>
+      <td>53.124</td>
+      <td>1</td>
+      <td>0.000</td>
+      <td>41.175</td>
+      <td>74.458</td>
     </tr>
     <tr>
-      <th>1</th>
-      <td>rho_o | (rho_d, rho_w)</td>
-      <td>0.8021</td>
-      <td>0.3705</td>
+      <th>LM-Flow-Origin</th>
+      <td>32.209</td>
+      <td>31.725</td>
+      <td>1</td>
+      <td>0.000</td>
+      <td>25.007</td>
+      <td>45.143</td>
     </tr>
     <tr>
-      <th>2</th>
-      <td>rho_w | (rho_d, rho_o)</td>
-      <td>0.8317</td>
-      <td>0.3618</td>
+      <th>LM-Flow-OD</th>
+      <td>48.089</td>
+      <td>47.768</td>
+      <td>1</td>
+      <td>0.000</td>
+      <td>37.006</td>
+      <td>66.543</td>
+    </tr>
+    <tr>
+      <th>LM-Flow-Joint</th>
+      <td>99.299</td>
+      <td>98.672</td>
+      <td>3</td>
+      <td>0.000</td>
+      <td>77.707</td>
+      <td>136.749</td>
+    </tr>
+    <tr>
+      <th>Robust-LM-Flow-Destination</th>
+      <td>34.804</td>
+      <td>34.433</td>
+      <td>1</td>
+      <td>0.000</td>
+      <td>26.117</td>
+      <td>48.271</td>
+    </tr>
+    <tr>
+      <th>Robust-LM-Flow-Origin</th>
+      <td>22.095</td>
+      <td>21.808</td>
+      <td>1</td>
+      <td>0.000</td>
+      <td>17.047</td>
+      <td>31.076</td>
+    </tr>
+    <tr>
+      <th>Robust-LM-Flow-OD</th>
+      <td>11.269</td>
+      <td>11.227</td>
+      <td>1</td>
+      <td>0.001</td>
+      <td>8.358</td>
+      <td>16.142</td>
     </tr>
   </tbody>
 </table>
 </div></div></div>
 </div>
-<h3 id="panel-analogues">10.2  Panel analogues<a class="headerlink" href="#panel-analogues" title="Link to this heading">¶</a></h3>
-<p>For a fitted <code class="xref py py-class docutils literal notranslate"><span class="pre">OLSFlowPanel</span></code>,
-the same tests are available with the <code class="docutils literal notranslate"><span class="pre">bayesian_panel_lm_flow_*</span></code> prefix.
-Scores accumulate over the demeaned panel stack of length <span class="math notranslate nohighlight">\(n^2 \cdot T\)</span>
-and the information matrix scales the trace block by <span class="math notranslate nohighlight">\(T\)</span> to reflect i.i.d.
-within-period contributions under <span class="math notranslate nohighlight">\(H_0\)</span>:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.diagnostics</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
-    <span class="n">bayesian_panel_lm_flow_dest_test</span><span class="p">,</span>
-    <span class="n">bayesian_panel_lm_flow_orig_test</span><span class="p">,</span>
-    <span class="n">bayesian_panel_lm_flow_network_test</span><span class="p">,</span>
-    <span class="n">bayesian_panel_lm_flow_joint_test</span><span class="p">,</span>
-    <span class="n">bayesian_panel_lm_flow_intra_test</span><span class="p">,</span>
-<span class="p">)</span>
-</code></pre></div>
-</div>
+<p><code class="docutils literal notranslate"><span class="pre">spatial_diagnostics_decision()</span></code> reads the joint test: dependence in any
+direction recommends <code class="docutils literal notranslate"><span class="pre">SARFlow</span></code>, and its absence keeps <code class="docutils literal notranslate"><span class="pre">OLSFlow</span></code>.</p>
+<p>The tests are defined at the Gaussian aspatial null only. A fitted <code class="docutils literal notranslate"><span class="pre">SARFlow</span></code>
+already estimates the lags they test, and the count flows (<code class="docutils literal notranslate"><span class="pre">NegBinFlow</span></code> and
+its spatial forms) have no flow tests yet, so <code class="docutils literal notranslate"><span class="pre">spatial_diagnostics()</span></code> raises
+for them.</p>
+<h3 id="panel-analogues">Panel analogues<a class="headerlink" href="#panel-analogues" title="Link to this heading">¶</a></h3>
+<p>An <code class="docutils literal notranslate"><span class="pre">OLSFlow</span></code> panel (fitted with <code class="docutils literal notranslate"><span class="pre">T</span></code>) has the same suite under the
+<code class="docutils literal notranslate"><span class="pre">bayesian_panel_lm_flow_*</span></code> names (<code class="docutils literal notranslate"><span class="pre">Panel-LM-Flow-*</span></code> in its table). Its scores
+are those of the Lee and Yu (2010) transformed likelihood that the demeaned
+panel gives: pair effects cost one period of the Jacobian, and time effects
+remove each period’s common level from its lags.</p>
 <h2 id="choosing-between-the-flow-models">Choosing between the flow models<a class="headerlink" href="#choosing-between-the-flow-models" title="Link to this heading">¶</a></h2>
 <table class="docutils data align-default">
 <thead>
@@ -3266,20 +3282,20 @@ within-period contributions under <span class="math notranslate nohighlight">\(H
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p>No prior on sign of spatial effects</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">SARFlow(restrict_positive=False)</span></code></p></td>
+<tr class="row-even"><td><p>No prior on the sign of the dependence</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">SARFlow(nonnegative_dependence=False)</span></code></p></td>
 </tr>
-<tr class="row-odd"><td><p>Positive spillovers expected</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">SARFlow(restrict_positive=True)</span></code></p></td>
+<tr class="row-odd"><td><p>Nonnegative dependence expected</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">SARFlow(nonnegative_dependence=True)</span></code></p></td>
 </tr>
 <tr class="row-even"><td><p>Separability plausible, fast inference needed</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">SARFlowSeparable</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">SARFlow(separable=True)</span></code></p></td>
 </tr>
 <tr class="row-odd"><td><p>Count/non-negative flows</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">SARNegBinFlow</span></code> or <code class="docutils literal notranslate"><span class="pre">SARNegBinFlowSeparable</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">SARNegBinFlow</span></code>, unrestricted or <code class="docutils literal notranslate"><span class="pre">separable=True</span></code></p></td>
 </tr>
 <tr class="row-even"><td><p>Counts with no conditional overdispersion</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">SARPoissonFlowSeparable</span></code> — see <a class="reference internal" href="poisson_flow.html"><span class="std std-doc">How to estimate Poisson origin–destination flow models</span></a></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">SARPoissonFlow(separable=True)</span></code> — see <a class="reference internal" href="poisson_flow.html"><span class="std std-doc">How to estimate Poisson origin–destination flow models</span></a></p></td>
 </tr>
 <tr class="row-odd"><td><p>Aspatial count baseline</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">NegBinFlow</span></code></p></td>
@@ -3298,7 +3314,7 @@ the <code class="docutils literal notranslate"><span class="pre">resolvent</span
 — flow counts without a dispersion parameter</p></li>
 <li><p><a class="reference internal" href="panel_flow_models.html"><span class="std std-doc">How to estimate panel flow models</span></a> — the same
 models over repeated periods</p></li>
-<li><p><a class="reference internal" href="priors.html"><span class="std std-doc">How to set priors</span></a> — including <code class="docutils literal notranslate"><span class="pre">restrict_positive</span></code></p></li>
+<li><p><a class="reference internal" href="priors.html"><span class="std std-doc">How to set priors</span></a> — including <code class="docutils literal notranslate"><span class="pre">nonnegative_dependence</span></code></p></li>
 </ul>
 
 
@@ -3346,7 +3362,7 @@ models over repeated periods</p></li>
   
     Created using
     <a href="https://www.sphinx-doc.org/" target="_blank" rel="noopener">Sphinx</a>
-    8.2.3.
+    9.2.0.
      and
     <a href="https://github.com/jbms/sphinx-immaterial/" target="_blank" rel="noopener">Sphinx-Immaterial</a>
   

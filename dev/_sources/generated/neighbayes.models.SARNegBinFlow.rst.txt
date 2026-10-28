@@ -16,11 +16,11 @@
       ~SARNegBinFlow.__init__
       ~SARNegBinFlow.fit
       ~SARNegBinFlow.fitted_values
+      ~SARNegBinFlow.impacts
       ~SARNegBinFlow.posterior_predictive
       ~SARNegBinFlow.residuals
       ~SARNegBinFlow.spatial_diagnostics
       ~SARNegBinFlow.spatial_diagnostics_decision
-      ~SARNegBinFlow.spatial_effects
       ~SARNegBinFlow.summary
    
    

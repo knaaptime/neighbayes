@@ -16,10 +16,10 @@
       ~SDMTobit.__init__
       ~SDMTobit.fit
       ~SDMTobit.fitted_values
+      ~SDMTobit.impacts
       ~SDMTobit.residuals
       ~SDMTobit.spatial_diagnostics
       ~SDMTobit.spatial_diagnostics_decision
-      ~SDMTobit.spatial_effects
       ~SDMTobit.summary
    
    

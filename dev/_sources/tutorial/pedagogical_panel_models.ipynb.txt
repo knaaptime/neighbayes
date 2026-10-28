@@ -42,16 +42,7 @@
     "from libpysal.graph import Graph\n",
     "\n",
     "from neighbayes import dgp\n",
-    "from neighbayes.models import (\n",
-    "    OLSPanelFE,\n",
-    "    OLSPanelRE,\n",
-    "    SARPanelFE,\n",
-    "    SARPanelRE,\n",
-    "    SDEMPanelFE,\n",
-    "    SDMPanelFE,\n",
-    "    SEMPanelFE,\n",
-    "    SEMPanelRE,\n",
-    ")\n",
+    "from neighbayes.models import OLS, SAR, SDEM, SDM, SEM\n",
     "\n",
     "az.style.use(\"arviz-variat\")"
    ]
@@ -86,15 +77,16 @@
     "T = 4\n",
     "beta = np.array([1.5, -0.8, 0.6, 0.4, -0.5], dtype=float)\n",
     "\n",
-    "panel_sim = dgp.simulate_panel_sar_fe(\n",
+    "panel_sim = dgp.simulate_sar(\n",
     "    N=N,\n",
     "    T=T,\n",
     "    rho=0.35,\n",
     "    beta=beta,\n",
     "    sigma=1.0,\n",
-    "    sigma_alpha=0.5,\n",
     "    rng=rng,\n",
     "    W=W,\n",
+    "    unit_effects=\"fixed\",\n",
+    "    unit_effect_sd=0.5,\n",
     ")\n",
     "\n",
     "panel = pd.DataFrame(\n",
@@ -124,7 +116,7 @@
    "outputs": [],
    "source": [
     "def fit_panel_model(\n",
-    "    model_cls, formula, data, W, effects=3, draws=2000, tune=1000, chains=2, seed=42\n",
+    "    model_cls, formula, data, W, draws=2000, tune=1000, chains=2, seed=42, **design\n",
     "):\n",
     "    \"\"\"Fit a panel model and return (model, summary, effects_df).\n",
     "\n",
@@ -137,7 +129,7 @@
     "        W=W,\n",
     "        unit_col=\"unit\",\n",
     "        time_col=\"time\",\n",
-    "        effects=effects,\n",
+    "        **design,\n",
     "    )\n",
     "    m.fit(\n",
     "        draws=draws,\n",
@@ -149,7 +141,7 @@
     "        idata_kwargs={\"log_likelihood\": True},\n",
     "    )\n",
     "    summary = m.summary(round_to=3)\n",
-    "    effects_df = pd.DataFrame(m.spatial_effects())\n",
+    "    effects_df = pd.DataFrame(m.impacts())\n",
     "    return m, summary, effects_df\n",
     "\n",
     "\n",
@@ -184,12 +176,12 @@
    "source": [
     "formula = \"price_pp ~ poverty + rev_rating + num_spots + crowded\"\n",
     "ols_panel, summary_ols, effects_ols = fit_panel_model(\n",
-    "    OLSPanelFE, formula, panel, W, effects=3\n",
+    "    OLS, formula, panel, W, unit_effects=\"fixed\", time_effects=True\n",
     ")\n",
     "display(summary_ols)\n",
     "display(effects_ols)\n",
     "display(diagnostics_table(ols_panel.inference_data, [\"beta\", \"sigma\"]))\n",
-    "show_trace(ols_panel.inference_data, [\"sigma\"], \"OLSPanelFE trace\")"
+    "show_trace(ols_panel.inference_data, [\"sigma\"], \"OLS, two-way fixed effects: trace\")"
    ]
   },
   {
@@ -208,12 +200,14 @@
    "outputs": [],
    "source": [
     "sar_panel, summary_sar, effects_sar = fit_panel_model(\n",
-    "    SARPanelFE, formula, panel, W, effects=3\n",
+    "    SAR, formula, panel, W, unit_effects=\"fixed\", time_effects=True\n",
     ")\n",
     "display(summary_sar)\n",
     "display(effects_sar)\n",
     "display(diagnostics_table(sar_panel.inference_data, [\"rho\", \"beta\", \"sigma\"]))\n",
-    "show_trace(sar_panel.inference_data, [\"rho\", \"sigma\"], \"SARPanelFE trace\")"
+    "show_trace(\n",
+    "    sar_panel.inference_data, [\"rho\", \"sigma\"], \"SAR, two-way fixed effects: trace\"\n",
+    ")"
    ]
   },
   {
@@ -232,12 +226,14 @@
    "outputs": [],
    "source": [
     "sem_panel, summary_sem, effects_sem = fit_panel_model(\n",
-    "    SEMPanelFE, formula, panel, W, effects=3\n",
+    "    SEM, formula, panel, W, unit_effects=\"fixed\", time_effects=True\n",
     ")\n",
     "display(summary_sem)\n",
     "display(effects_sem)\n",
     "display(diagnostics_table(sem_panel.inference_data, [\"lam\", \"beta\", \"sigma\"]))\n",
-    "show_trace(sem_panel.inference_data, [\"lam\", \"sigma\"], \"SEMPanelFE trace\")"
+    "show_trace(\n",
+    "    sem_panel.inference_data, [\"lam\", \"sigma\"], \"SEM, two-way fixed effects: trace\"\n",
+    ")"
    ]
   },
   {
@@ -256,12 +252,14 @@
    "outputs": [],
    "source": [
     "sdm_panel, summary_sdm, effects_sdm = fit_panel_model(\n",
-    "    SDMPanelFE, formula, panel, W, effects=3\n",
+    "    SDM, formula, panel, W, unit_effects=\"fixed\", time_effects=True\n",
     ")\n",
     "display(summary_sdm)\n",
     "display(effects_sdm)\n",
     "display(diagnostics_table(sdm_panel.inference_data, [\"rho\", \"beta\", \"sigma\"]))\n",
-    "show_trace(sdm_panel.inference_data, [\"rho\", \"sigma\"], \"SDMPanelFE trace\")"
+    "show_trace(\n",
+    "    sdm_panel.inference_data, [\"rho\", \"sigma\"], \"SDM, two-way fixed effects: trace\"\n",
+    ")"
    ]
   },
   {
@@ -280,12 +278,14 @@
    "outputs": [],
    "source": [
     "sdem_panel, summary_sdem, effects_sdem = fit_panel_model(\n",
-    "    SDEMPanelFE, formula, panel, W, effects=3\n",
+    "    SDEM, formula, panel, W, unit_effects=\"fixed\", time_effects=True\n",
     ")\n",
     "display(summary_sdem)\n",
     "display(effects_sdem)\n",
     "display(diagnostics_table(sdem_panel.inference_data, [\"lam\", \"beta\", \"sigma\"]))\n",
-    "show_trace(sdem_panel.inference_data, [\"lam\", \"sigma\"], \"SDEMPanelFE trace\")"
+    "show_trace(\n",
+    "    sdem_panel.inference_data, [\"lam\", \"sigma\"], \"SDEM, two-way fixed effects: trace\"\n",
+    ")"
    ]
   },
   {
@@ -340,14 +340,18 @@
    "outputs": [],
    "source": [
     "ols_panel_re, summary_ols_re, effects_ols_re = fit_panel_model(\n",
-    "    OLSPanelRE, formula, panel, W, effects=0\n",
+    "    OLS, formula, panel, W, unit_effects=\"random\"\n",
     ")\n",
     "display(summary_ols_re)\n",
     "display(effects_ols_re)\n",
     "display(\n",
-    "    diagnostics_table(ols_panel_re.inference_data, [\"beta\", \"sigma\", \"sigma_alpha\"])\n",
+    "    diagnostics_table(ols_panel_re.inference_data, [\"beta\", \"sigma\", \"unit_effect_sd\"])\n",
     ")\n",
-    "show_trace(ols_panel_re.inference_data, [\"sigma\", \"sigma_alpha\"], \"OLSPanelRE trace\")"
+    "show_trace(\n",
+    "    ols_panel_re.inference_data,\n",
+    "    [\"sigma\", \"unit_effect_sd\"],\n",
+    "    \"OLS, random effects: trace\",\n",
+    ")"
    ]
   },
   {
@@ -366,17 +370,19 @@
    "outputs": [],
    "source": [
     "sar_panel_re, summary_sar_re, effects_sar_re = fit_panel_model(\n",
-    "    SARPanelRE, formula, panel, W, effects=0\n",
+    "    SAR, formula, panel, W, unit_effects=\"random\"\n",
     ")\n",
     "display(summary_sar_re)\n",
     "display(effects_sar_re)\n",
     "display(\n",
     "    diagnostics_table(\n",
-    "        sar_panel_re.inference_data, [\"rho\", \"beta\", \"sigma\", \"sigma_alpha\"]\n",
+    "        sar_panel_re.inference_data, [\"rho\", \"beta\", \"sigma\", \"unit_effect_sd\"]\n",
     "    )\n",
     ")\n",
     "show_trace(\n",
-    "    sar_panel_re.inference_data, [\"rho\", \"sigma\", \"sigma_alpha\"], \"SARPanelRE trace\"\n",
+    "    sar_panel_re.inference_data,\n",
+    "    [\"rho\", \"sigma\", \"unit_effect_sd\"],\n",
+    "    \"SAR, random effects: trace\",\n",
     ")"
    ]
   },
@@ -396,17 +402,19 @@
    "outputs": [],
    "source": [
     "sem_panel_re, summary_sem_re, effects_sem_re = fit_panel_model(\n",
-    "    SEMPanelRE, formula, panel, W, effects=0\n",
+    "    SEM, formula, panel, W, unit_effects=\"random\"\n",
     ")\n",
     "display(summary_sem_re)\n",
     "display(effects_sem_re)\n",
     "display(\n",
     "    diagnostics_table(\n",
-    "        sem_panel_re.inference_data, [\"lam\", \"beta\", \"sigma\", \"sigma_alpha\"]\n",
+    "        sem_panel_re.inference_data, [\"lam\", \"beta\", \"sigma\", \"unit_effect_sd\"]\n",
     "    )\n",
     ")\n",
     "show_trace(\n",
-    "    sem_panel_re.inference_data, [\"lam\", \"sigma\", \"sigma_alpha\"], \"SEMPanelRE trace\"\n",
+    "    sem_panel_re.inference_data,\n",
+    "    [\"lam\", \"sigma\", \"unit_effect_sd\"],\n",
+    "    \"SEM, random effects: trace\",\n",
     ")"
    ]
   },
@@ -427,14 +435,14 @@
    "source": [
     "# Collect all fitted panel models for comparison\n",
     "panel_models = {\n",
-    "    \"OLSPanelFE\": ols_panel,\n",
-    "    \"SARPanelFE\": sar_panel,\n",
-    "    \"SEMPanelFE\": sem_panel,\n",
-    "    \"SDMPanelFE\": sdm_panel,\n",
-    "    \"SDEMPanelFE\": sdem_panel,\n",
-    "    \"OLSPanelRE\": ols_panel_re,\n",
-    "    \"SARPanelRE\": sar_panel_re,\n",
-    "    \"SEMPanelRE\": sem_panel_re,\n",
+    "    \"OLS (FE)\": ols_panel,\n",
+    "    \"SAR (FE)\": sar_panel,\n",
+    "    \"SEM (FE)\": sem_panel,\n",
+    "    \"SDM (FE)\": sdm_panel,\n",
+    "    \"SDEM (FE)\": sdem_panel,\n",
+    "    \"OLS (RE)\": ols_panel_re,\n",
+    "    \"SAR (RE)\": sar_panel_re,\n",
+    "    \"SEM (RE)\": sem_panel_re,\n",
     "}\n",
     "idata_dict = {name: m.inference_data for name, m in panel_models.items()}\n",
     "\n",
@@ -472,7 +480,7 @@
     "\n",
     "The `neighbayes.diagnostics` module provides a full suite of Bayesian Lagrange Multiplier (LM) tests for panel models, following the framework of Dogan et al. (2021) with panel-specific formulas from Anselin (2008), Elhorst (2014), and Koley & Bera (2024).\n",
     "\n",
-    "These tests help answer the question: *which spatial panel specification is most appropriate?* They test for omitted spatial lag ($\\rho$), spatial error ($\\lambda$), and spatially lagged covariates ($\\gamma$), both individually and jointly, with robust variants that account for the presence of other spatial effects.\n",
+    "These tests help answer the question: *which spatial panel specification is most appropriate?* They test for omitted spatial lag ($\\rho$), spatial error ($\\lambda$), and spatially lagged covariates ($\\gamma$), both individually and jointly, with robust variants that account for the presence of the other terms.\n",
     "\n",
     "The decision tree mirrors the classical Anselin (1988) / Koley-Bera (2024) approach, but uses the full posterior distribution rather than point estimates — yielding Bayesian p-values and credible intervals for each LM statistic."
    ]
@@ -582,10 +590,10 @@
    "metadata": {},
    "outputs": [],
    "source": [
-    "from neighbayes.models import SLXPanelFE\n",
+    "from neighbayes.models import SLX\n",
     "\n",
     "slx_panel, summary_slx, effects_slx = fit_panel_model(\n",
-    "    SLXPanelFE, formula, panel, W, effects=3\n",
+    "    SLX, formula, panel, W, unit_effects=\"fixed\", time_effects=True\n",
     ")\n",
     "display(summary_slx)"
    ]

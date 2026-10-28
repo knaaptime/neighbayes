@@ -1,0 +1,41 @@
+﻿neighbayes.models.priors.SARZINBPriors
+======================================
+
+.. currentmodule:: neighbayes.models.priors
+
+.. autoclass:: SARZINBPriors
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SARZINBPriors.__init__
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SARZINBPriors.alpha_fixed
+      ~SARZINBPriors.alpha_nu
+      ~SARZINBPriors.alpha_sigma
+      ~SARZINBPriors.beta_mu
+      ~SARZINBPriors.beta_mu_zero
+      ~SARZINBPriors.beta_sigma
+      ~SARZINBPriors.beta_sigma_zero
+      ~SARZINBPriors.nu
+      ~SARZINBPriors.rho_lower
+      ~SARZINBPriors.rho_lower_zero
+      ~SARZINBPriors.rho_upper
+      ~SARZINBPriors.rho_upper_zero
+      ~SARZINBPriors.sigma2_alpha
+      ~SARZINBPriors.sigma2_beta
+   
+   

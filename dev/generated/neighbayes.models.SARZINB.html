@@ -11,10 +11,10 @@
       
       
       
-        <link rel="prev" href="neighbayes.models.SARNegBinStructural.html">
+        <link rel="prev" href="neighbayes.models.ZINB.html">
       
       
-        <link rel="next" href="neighbayes.models.Logit.html">
+        <link rel="next" href="neighbayes.models.HurdleNegBin.html">
       
       
       <link rel="icon" href="../_static/pysal_favicon.ico">
@@ -42,7 +42,7 @@
         <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
       
     
-        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.74c816e3f9967dd6e.min.css?v=6cfe2491" />
+        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.6efbe22605a23fcd6.min.css?v=b2ceb110" />
         <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
         <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
         <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=93c5fc88" />
@@ -530,7 +530,7 @@
   
   
   <span class="md-ellipsis">
-    <span>How to fit spatial logit models</span>
+    <span>How to fit a spatial logit model</span>
     
   </span>
   
@@ -1004,16 +1004,63 @@
                 
   
   
+    
+  
+  
+  
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_2_1" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../api.html#models" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    <span>Models</span>
+    
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_6_2_1" id="__nav_6_2_1_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_6_2_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6_2_1">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Models</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
   
   
   
     <li class="md-nav__item">
-      <a href="../api.html#cross-sectional-spatial-models" class="md-nav__link">
+      <a href="../api.html#gaussian" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    <span>Cross-<wbr>Sectional Spatial Models</span>
+    <span>Gaussian</span>
     
   </span>
   
@@ -1032,60 +1079,12 @@
   
   
     <li class="md-nav__item">
-      <a href="../api.html#panel-spatial-models-fixed-effects" class="md-nav__link">
+      <a href="../api.html#censored-and-binary" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    <span>Panel Spatial Models <wbr>(Fixed Effects)</span>
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../api.html#panel-spatial-models-random-effects" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    <span>Panel Spatial Models <wbr>(Random Effects)</span>
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../api.html#dynamic-panel-spatial-models" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    <span>Dynamic Panel Spatial Models</span>
+    <span>Censored and binary</span>
     
   </span>
   
@@ -1113,16 +1112,16 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_2_5" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_2_1_3" checked>
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../api.html#non-linear-spatial-models" class="md-nav__link ">
+            <a href="../api.html#counts" class="md-nav__link ">
               
   
   
   <span class="md-ellipsis">
-    <span>Non-<wbr>Linear Spatial Models</span>
+    <span>Counts</span>
     
   </span>
   
@@ -1130,16 +1129,16 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_6_2_5" id="__nav_6_2_5_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_6_2_1_3" id="__nav_6_2_1_3_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="3" aria-labelledby="__nav_6_2_5_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_6_2_5">
+        <nav class="md-nav" data-md-level="4" aria-labelledby="__nav_6_2_1_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6_2_1_3">
             <span class="md-nav__icon md-icon"></span>
-            <span>Non-<wbr>Linear Spatial Models</span>
+            <span>Counts</span>
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -1151,84 +1150,12 @@
   
   
     <li class="md-nav__item">
-      <a href="neighbayes.models.SARProbit.html" class="md-nav__link">
+      <a href="neighbayes.models.NegBin.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    <span>neighbayes.<wbr>models.<wbr>SARProbit</span>
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="neighbayes.models.SARTobit.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    <span>neighbayes.<wbr>models.<wbr>SARTobit</span>
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="neighbayes.models.SEMTobit.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    <span>neighbayes.<wbr>models.<wbr>SEMTobit</span>
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="neighbayes.models.SDMTobit.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    <span>neighbayes.<wbr>models.<wbr>SDMTobit</span>
+    <span>neighbayes.<wbr>models.<wbr>Neg<wbr>Bin</span>
     
   </span>
   
@@ -1271,12 +1198,60 @@
   
   
     <li class="md-nav__item">
-      <a href="neighbayes.models.SARNegBinStructural.html" class="md-nav__link">
+      <a href="neighbayes.models.SEMNegBin.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    <span>neighbayes.<wbr>models.<wbr>SARNeg<wbr>Bin<wbr>Structural</span>
+    <span>neighbayes.<wbr>models.<wbr>SEMNeg<wbr>Bin</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="neighbayes.models.SDEMNegBin.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>neighbayes.<wbr>models.<wbr>SDEMNeg<wbr>Bin</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="neighbayes.models.ZINB.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>neighbayes.<wbr>models.<wbr>ZINB</span>
     
   </span>
   
@@ -1414,12 +1389,24 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.__init__.Z" class="md-nav__link">
+  <a href="#neighbayes.models.SARZINB.__init__.X_zero" class="md-nav__link">
     
       <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SARZINB.__init__.Z (Python parameter) — Selection covariate matrix of shape (n, p)."><span>Z</span></span>
+      <span title="neighbayes.models.SARZINB.__init__.X_zero (Python parameter) — Zero-part covariate matrix of shape (n, p); a DataFrame&#39;s column names label beta_zero."><span>X_<wbr>zero</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.__init__.formula_zero" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.__init__.formula_zero (Python parameter) — Right-hand side for the zero part, e.g."><span>formula_<wbr>zero</span></span>
     </span>
   </a>
   
@@ -1431,19 +1418,19 @@
       <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SARZINB.__init__.W (Python parameter) — Spatial weights for the count equation, shape (n, n)."><span>W</span></span>
+      <span title="neighbayes.models.SARZINB.__init__.W (Python parameter) — Spatial weights for the count part, shape (n, n) (N × N in a panel)."><span>W</span></span>
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.__init__.W_sel" class="md-nav__link">
+  <a href="#neighbayes.models.SARZINB.__init__.W_zero" class="md-nav__link">
     
       <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SARZINB.__init__.W_sel (Python parameter) — Spatial weights for the selection equation."><span>W_<wbr>sel</span></span>
+      <span title="neighbayes.models.SARZINB.__init__.W_zero (Python parameter) — Spatial weights for the zero part."><span>W_<wbr>zero</span></span>
     </span>
   </a>
   
@@ -1467,19 +1454,115 @@
       <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SARZINB.__init__.logdet_method (Python parameter) — How to compute log|I − ρW|."><span>logdet_<wbr>method</span></span>
+      <span title="neighbayes.models.SARZINB.__init__.logdet_method (Python parameter) — How log|I - rho*W| is computed over rho: summed over the eigenvalues of W; interpolated (Chebyshev, AAA rational, or cubic spline) through values from a sparse factorization, exact to the interpolant&#39;s tolerance; or expanded stochastically with no factorization, the one method with sampling error."><span>logdet_<wbr>method</span></span>
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.__init__.robust" class="md-nav__link">
+  <a href="#neighbayes.models.SARZINB.__init__.logdet_decomp" class="md-nav__link">
     
       <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SARZINB.__init__.robust (Python parameter) — Not supported."><span>robust</span></span>
+      <span title="neighbayes.models.SARZINB.__init__.logdet_decomp (Python parameter) — The factorization an interpolating method uses: sparse Cholesky (undirected W; scikit-sparse CHOLMOD) or sparse LU (KLU or UMFPACK, chosen by the sparsity pattern)."><span>logdet_<wbr>decomp</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.__init__.time_col" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.__init__.time_col (Python parameter) — Formula-mode panel: the period and unit columns of data."><span>time_<wbr>col</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.__init__.unit_col" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.__init__.unit_col (Python parameter) — Formula-mode panel: the period and unit columns of data."><span>unit_<wbr>col</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.__init__.N" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.__init__.N (Python parameter) — Matrix-mode panel: the numbers of units and periods."><span>N</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.__init__.T" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.__init__.T (Python parameter) — Matrix-mode panel: the numbers of units and periods."><span>T</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.__init__.unit_effects" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.__init__.unit_effects (Python parameter) — A panel&#39;s random unit effects, inside the count filter."><span>unit_<wbr>effects</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.__init__.time_effects" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.__init__.time_effects (Python parameter) — A panel&#39;s fixed time effects in the count part (add period dummies to X_zero for period effects in the zero part)."><span>time_<wbr>effects</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.__init__.mundlak" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.__init__.mundlak (Python parameter) — Add the unit means of the time-varying columns to a panel&#39;s count design."><span>mundlak</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.__init__.latent" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.__init__.latent (Python parameter) — The latent model instead of the reduced form: each part a latent SAR propagating its own disturbance, a unit active when its logistic utility is positive and its count then Poisson given the log-mean (neighbayes.samplers.two_part_latent)."><span>latent</span></span>
     </span>
   </a>
   
@@ -1503,40 +1586,14 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.corridor_probabilities" class="md-nav__link">
+  <a href="#neighbayes.models.SARZINB.activation_probabilities" class="md-nav__link">
     
       <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SARZINB.corridor_probabilities (Python method) — Posterior-mean corridor activation probabilities."><span>corridor_<wbr>probabilities</span></span>
+      <span title="neighbayes.models.SARZINB.activation_probabilities (Python method) — Posterior mean of each P(u &gt; 0): an active unit (ZINB), a positive count (hurdle)."><span>activation_<wbr>probabilities</span></span>
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="corridor_probabilities">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.corridor_probabilities-returns" class="md-nav__link">
-    
-    <span class="md-ellipsis">
-      <span>Returns</span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.corridor_probabilities-return-type" class="md-nav__link">
-    
-    <span class="md-ellipsis">
-      <span>Return type</span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
         
@@ -1649,12 +1706,12 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.fit.gibbs_backend" class="md-nav__link">
+  <a href="#neighbayes.models.SARZINB.fit.backend" class="md-nav__link">
     
       <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SARZINB.fit.gibbs_backend (Python parameter) — Execution backend for the Gibbs sampler."><span>gibbs_<wbr>backend</span></span>
+      <span title="neighbayes.models.SARZINB.fit.backend (Python parameter) — What executes the sampler."><span>backend</span></span>
     </span>
   </a>
   
@@ -1702,7 +1759,7 @@
       <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SARZINB.fit.sample_kwargs (Python parameter) — For NUTS, forwarded to pm.sample (nuts_sampler=...); for Gibbs, the family&#39;s declared options (an unsupported key raises)."><span>sample_<wbr>kwargs</span></span>
+      <span title="neighbayes.models.SARZINB.fit.sample_kwargs (Python parameter) — For NUTS, forwarded to pm.sample; for Gibbs, the family&#39;s declared options (an unsupported key raises)."><span>sample_<wbr>kwargs</span></span>
     </span>
   </a>
   
@@ -1767,6 +1824,76 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.impacts" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.impacts (Python method) — Direct, indirect and total impacts for one equation."><span>impacts</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="impacts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.impacts-parameters" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Parameters</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.impacts.equation" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.impacts.equation (Python parameter) — &#34;count&#34;: impacts of X on the count part&#39;s log-mean, through (I − ρW)⁻¹Xβ."><span>equation</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.impacts.return_posterior_samples" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.impacts.return_posterior_samples (Python parameter) — Also return the per-draw impacts."><span>return_<wbr>posterior_<wbr>samples</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.impacts.scale" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.impacts.scale (Python parameter) — The equation&#39;s link scale (&#34;logmean&#34;, &#34;logodds&#34;, the default) or, for a latent model, its outcome scale: &#34;count&#34;, the expected count of an active unit (ZINB) or of a positive count (hurdle), and &#34;probability&#34;, of the zero part&#39;s u &gt; 0."><span>scale</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#neighbayes.models.SARZINB.inference_data" class="md-nav__link">
     
       <span aria-label="Python property" class="objinfo-icon objinfo-icon__alias" title="Python property">P</span>
@@ -1794,6 +1921,34 @@
     
     <span class="md-ellipsis">
       <span>Return type</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.posterior_predictive" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.posterior_predictive (Python method) — Posterior-predictive counts, shape (n_draws, n_obs)."><span>posterior_<wbr>predictive</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="posterior_predictive">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.posterior_predictive-parameters" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Parameters</span>
     </span>
   </a>
   
@@ -2007,84 +2162,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.spatial_effects" class="md-nav__link">
-    
-      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
-    
-    <span class="md-ellipsis">
-      <span title="neighbayes.models.SARZINB.spatial_effects (Python method) — Compute Bayesian inference for direct, indirect, and total impacts."><span>spatial_<wbr>effects</span></span>
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="spatial_effects">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.spatial_effects-parameters" class="md-nav__link">
-    
-    <span class="md-ellipsis">
-      <span>Parameters</span>
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Parameters">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.spatial_effects.equation" class="md-nav__link">
-    
-      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
-    
-    <span class="md-ellipsis">
-      <span title="neighbayes.models.SARZINB.spatial_effects.equation (Python parameter) — Which equation to compute impacts for."><span>equation</span></span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.spatial_effects.return_posterior_samples" class="md-nav__link">
-    
-      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
-    
-    <span class="md-ellipsis">
-      <span title="neighbayes.models.SARZINB.spatial_effects.return_posterior_samples (Python parameter) — If True, return a (DataFrame, dict) tuple where the dict contains the full posterior draws."><span>return_<wbr>posterior_<wbr>samples</span></span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.spatial_effects-returns" class="md-nav__link">
-    
-    <span class="md-ellipsis">
-      <span>Returns</span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.spatial_effects-return-type" class="md-nav__link">
-    
-    <span class="md-ellipsis">
-      <span>Return type</span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#neighbayes.models.SARZINB.summary" class="md-nav__link">
     
       <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
@@ -2168,35 +2245,9 @@
       <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SARZINB.zero_attribution (Python method) — Decompose observed zeros into structural vs sampling zeros."><span>zero_<wbr>attribution</span></span>
+      <span title="neighbayes.models.SARZINB.zero_attribution (Python method) — Posterior split of each observed zero into structural and sampling."><span>zero_<wbr>attribution</span></span>
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="zero_attribution">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.zero_attribution-returns" class="md-nav__link">
-    
-    <span class="md-ellipsis">
-      <span>Returns</span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.zero_attribution-return-type" class="md-nav__link">
-    
-    <span class="md-ellipsis">
-      <span>Return type</span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
         
@@ -2222,12 +2273,12 @@
   
   
     <li class="md-nav__item">
-      <a href="neighbayes.models.Logit.html" class="md-nav__link">
+      <a href="neighbayes.models.HurdleNegBin.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    <span>neighbayes.<wbr>models.<wbr>Logit</span>
+    <span>neighbayes.<wbr>models.<wbr>Hurdle<wbr>Neg<wbr>Bin</span>
     
   </span>
   
@@ -2246,60 +2297,12 @@
   
   
     <li class="md-nav__item">
-      <a href="neighbayes.models.NegBin.html" class="md-nav__link">
+      <a href="neighbayes.models.SARHurdleNegBin.html" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    <span>neighbayes.<wbr>models.<wbr>Neg<wbr>Bin</span>
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="neighbayes.models.SARLogit.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    <span>neighbayes.<wbr>models.<wbr>SARLogit</span>
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="neighbayes.models.SEMLogit.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    <span>neighbayes.<wbr>models.<wbr>SEMLogit</span>
+    <span>neighbayes.<wbr>models.<wbr>SARHurdle<wbr>Neg<wbr>Bin</span>
     
   </span>
   
@@ -2327,12 +2330,12 @@
   
   
     <li class="md-nav__item">
-      <a href="../api.html#panel-spatial-models-tobit" class="md-nav__link">
+      <a href="../api.html#flows" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    <span>Panel Spatial Models <wbr>(Tobit)</span>
+    <span>Flows</span>
     
   </span>
   
@@ -2351,18 +2354,27 @@
   
   
     <li class="md-nav__item">
-      <a href="../api.html#flow-models" class="md-nav__link">
+      <a href="../api.html#multilevel" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    <span>Flow Models</span>
+    <span>Multilevel</span>
     
   </span>
   
 
       </a>
     </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
   
 
               
@@ -2477,6 +2489,30 @@
   
   <span class="md-ellipsis">
     <span>Graph Utilities</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api.html#runtime-configuration" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Runtime Configuration</span>
     
   </span>
   
@@ -2867,12 +2903,24 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.__init__.Z" class="md-nav__link">
+  <a href="#neighbayes.models.SARZINB.__init__.X_zero" class="md-nav__link">
     
       <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SARZINB.__init__.Z (Python parameter) — Selection covariate matrix of shape (n, p)."><span>Z</span></span>
+      <span title="neighbayes.models.SARZINB.__init__.X_zero (Python parameter) — Zero-part covariate matrix of shape (n, p); a DataFrame&#39;s column names label beta_zero."><span>X_<wbr>zero</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.__init__.formula_zero" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.__init__.formula_zero (Python parameter) — Right-hand side for the zero part, e.g."><span>formula_<wbr>zero</span></span>
     </span>
   </a>
   
@@ -2884,19 +2932,19 @@
       <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SARZINB.__init__.W (Python parameter) — Spatial weights for the count equation, shape (n, n)."><span>W</span></span>
+      <span title="neighbayes.models.SARZINB.__init__.W (Python parameter) — Spatial weights for the count part, shape (n, n) (N × N in a panel)."><span>W</span></span>
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.__init__.W_sel" class="md-nav__link">
+  <a href="#neighbayes.models.SARZINB.__init__.W_zero" class="md-nav__link">
     
       <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SARZINB.__init__.W_sel (Python parameter) — Spatial weights for the selection equation."><span>W_<wbr>sel</span></span>
+      <span title="neighbayes.models.SARZINB.__init__.W_zero (Python parameter) — Spatial weights for the zero part."><span>W_<wbr>zero</span></span>
     </span>
   </a>
   
@@ -2920,19 +2968,115 @@
       <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SARZINB.__init__.logdet_method (Python parameter) — How to compute log|I − ρW|."><span>logdet_<wbr>method</span></span>
+      <span title="neighbayes.models.SARZINB.__init__.logdet_method (Python parameter) — How log|I - rho*W| is computed over rho: summed over the eigenvalues of W; interpolated (Chebyshev, AAA rational, or cubic spline) through values from a sparse factorization, exact to the interpolant&#39;s tolerance; or expanded stochastically with no factorization, the one method with sampling error."><span>logdet_<wbr>method</span></span>
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.__init__.robust" class="md-nav__link">
+  <a href="#neighbayes.models.SARZINB.__init__.logdet_decomp" class="md-nav__link">
     
       <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SARZINB.__init__.robust (Python parameter) — Not supported."><span>robust</span></span>
+      <span title="neighbayes.models.SARZINB.__init__.logdet_decomp (Python parameter) — The factorization an interpolating method uses: sparse Cholesky (undirected W; scikit-sparse CHOLMOD) or sparse LU (KLU or UMFPACK, chosen by the sparsity pattern)."><span>logdet_<wbr>decomp</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.__init__.time_col" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.__init__.time_col (Python parameter) — Formula-mode panel: the period and unit columns of data."><span>time_<wbr>col</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.__init__.unit_col" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.__init__.unit_col (Python parameter) — Formula-mode panel: the period and unit columns of data."><span>unit_<wbr>col</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.__init__.N" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.__init__.N (Python parameter) — Matrix-mode panel: the numbers of units and periods."><span>N</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.__init__.T" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.__init__.T (Python parameter) — Matrix-mode panel: the numbers of units and periods."><span>T</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.__init__.unit_effects" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.__init__.unit_effects (Python parameter) — A panel&#39;s random unit effects, inside the count filter."><span>unit_<wbr>effects</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.__init__.time_effects" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.__init__.time_effects (Python parameter) — A panel&#39;s fixed time effects in the count part (add period dummies to X_zero for period effects in the zero part)."><span>time_<wbr>effects</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.__init__.mundlak" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.__init__.mundlak (Python parameter) — Add the unit means of the time-varying columns to a panel&#39;s count design."><span>mundlak</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.__init__.latent" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.__init__.latent (Python parameter) — The latent model instead of the reduced form: each part a latent SAR propagating its own disturbance, a unit active when its logistic utility is positive and its count then Poisson given the log-mean (neighbayes.samplers.two_part_latent)."><span>latent</span></span>
     </span>
   </a>
   
@@ -2956,40 +3100,14 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.corridor_probabilities" class="md-nav__link">
+  <a href="#neighbayes.models.SARZINB.activation_probabilities" class="md-nav__link">
     
       <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SARZINB.corridor_probabilities (Python method) — Posterior-mean corridor activation probabilities."><span>corridor_<wbr>probabilities</span></span>
+      <span title="neighbayes.models.SARZINB.activation_probabilities (Python method) — Posterior mean of each P(u &gt; 0): an active unit (ZINB), a positive count (hurdle)."><span>activation_<wbr>probabilities</span></span>
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="corridor_probabilities">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.corridor_probabilities-returns" class="md-nav__link">
-    
-    <span class="md-ellipsis">
-      <span>Returns</span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.corridor_probabilities-return-type" class="md-nav__link">
-    
-    <span class="md-ellipsis">
-      <span>Return type</span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
         
@@ -3102,12 +3220,12 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.fit.gibbs_backend" class="md-nav__link">
+  <a href="#neighbayes.models.SARZINB.fit.backend" class="md-nav__link">
     
       <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SARZINB.fit.gibbs_backend (Python parameter) — Execution backend for the Gibbs sampler."><span>gibbs_<wbr>backend</span></span>
+      <span title="neighbayes.models.SARZINB.fit.backend (Python parameter) — What executes the sampler."><span>backend</span></span>
     </span>
   </a>
   
@@ -3155,7 +3273,7 @@
       <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SARZINB.fit.sample_kwargs (Python parameter) — For NUTS, forwarded to pm.sample (nuts_sampler=...); for Gibbs, the family&#39;s declared options (an unsupported key raises)."><span>sample_<wbr>kwargs</span></span>
+      <span title="neighbayes.models.SARZINB.fit.sample_kwargs (Python parameter) — For NUTS, forwarded to pm.sample; for Gibbs, the family&#39;s declared options (an unsupported key raises)."><span>sample_<wbr>kwargs</span></span>
     </span>
   </a>
   
@@ -3220,6 +3338,76 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.impacts" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.impacts (Python method) — Direct, indirect and total impacts for one equation."><span>impacts</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="impacts">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.impacts-parameters" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Parameters</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Parameters">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.impacts.equation" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.impacts.equation (Python parameter) — &#34;count&#34;: impacts of X on the count part&#39;s log-mean, through (I − ρW)⁻¹Xβ."><span>equation</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.impacts.return_posterior_samples" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.impacts.return_posterior_samples (Python parameter) — Also return the per-draw impacts."><span>return_<wbr>posterior_<wbr>samples</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.impacts.scale" class="md-nav__link">
+    
+      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.impacts.scale (Python parameter) — The equation&#39;s link scale (&#34;logmean&#34;, &#34;logodds&#34;, the default) or, for a latent model, its outcome scale: &#34;count&#34;, the expected count of an active unit (ZINB) or of a positive count (hurdle), and &#34;probability&#34;, of the zero part&#39;s u &gt; 0."><span>scale</span></span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#neighbayes.models.SARZINB.inference_data" class="md-nav__link">
     
       <span aria-label="Python property" class="objinfo-icon objinfo-icon__alias" title="Python property">P</span>
@@ -3247,6 +3435,34 @@
     
     <span class="md-ellipsis">
       <span>Return type</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.posterior_predictive" class="md-nav__link">
+    
+      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
+    
+    <span class="md-ellipsis">
+      <span title="neighbayes.models.SARZINB.posterior_predictive (Python method) — Posterior-predictive counts, shape (n_draws, n_obs)."><span>posterior_<wbr>predictive</span></span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="posterior_predictive">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#neighbayes.models.SARZINB.posterior_predictive-parameters" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Parameters</span>
     </span>
   </a>
   
@@ -3460,84 +3676,6 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.spatial_effects" class="md-nav__link">
-    
-      <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
-    
-    <span class="md-ellipsis">
-      <span title="neighbayes.models.SARZINB.spatial_effects (Python method) — Compute Bayesian inference for direct, indirect, and total impacts."><span>spatial_<wbr>effects</span></span>
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="spatial_effects">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.spatial_effects-parameters" class="md-nav__link">
-    
-    <span class="md-ellipsis">
-      <span>Parameters</span>
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Parameters">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.spatial_effects.equation" class="md-nav__link">
-    
-      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
-    
-    <span class="md-ellipsis">
-      <span title="neighbayes.models.SARZINB.spatial_effects.equation (Python parameter) — Which equation to compute impacts for."><span>equation</span></span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.spatial_effects.return_posterior_samples" class="md-nav__link">
-    
-      <span aria-label="Python parameter" class="objinfo-icon objinfo-icon__sub-data" title="Python parameter">p</span>
-    
-    <span class="md-ellipsis">
-      <span title="neighbayes.models.SARZINB.spatial_effects.return_posterior_samples (Python parameter) — If True, return a (DataFrame, dict) tuple where the dict contains the full posterior draws."><span>return_<wbr>posterior_<wbr>samples</span></span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.spatial_effects-returns" class="md-nav__link">
-    
-    <span class="md-ellipsis">
-      <span>Returns</span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.spatial_effects-return-type" class="md-nav__link">
-    
-    <span class="md-ellipsis">
-      <span>Return type</span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
   <a href="#neighbayes.models.SARZINB.summary" class="md-nav__link">
     
       <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
@@ -3621,35 +3759,9 @@
       <span aria-label="Python method" class="objinfo-icon objinfo-icon__procedure" title="Python method">M</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.models.SARZINB.zero_attribution (Python method) — Decompose observed zeros into structural vs sampling zeros."><span>zero_<wbr>attribution</span></span>
+      <span title="neighbayes.models.SARZINB.zero_attribution (Python method) — Posterior split of each observed zero into structural and sampling."><span>zero_<wbr>attribution</span></span>
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="zero_attribution">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.zero_attribution-returns" class="md-nav__link">
-    
-    <span class="md-ellipsis">
-      <span>Returns</span>
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#neighbayes.models.SARZINB.zero_attribution-return-type" class="md-nav__link">
-    
-    <span class="md-ellipsis">
-      <span>Return type</span>
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
         
@@ -3685,15 +3797,15 @@
 <h1 id="neighbayes-models-sarzinb">neighbayes.models.SARZINB<a class="headerlink" href="#neighbayes-models-sarzinb" title="Link to this heading">¶</a></h1>
 <dl class="py class objdesc">
 <dt class="sig sig-object highlight sig-wrap py" id="neighbayes.models.SARZINB">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">neighbayes.models.</span></span><span class="sig-name descname"><span class="pre">SARZINB</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.formula" title="neighbayes.models.SARZINB.__init__.formula (Python parameter) — Wilkinson-style formula for the count equation, e.g. &quot;y ~ x1 + x2&quot;."><span class="n"><span class="pre">formula</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.data" title="neighbayes.models.SARZINB.__init__.data (Python parameter) — Data source for formula mode."><span class="n"><span class="pre">data</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.y" title="neighbayes.models.SARZINB.__init__.y (Python parameter) — Non-negative integer counts of shape (n,)."><span class="n"><span class="pre">y</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.X" title="neighbayes.models.SARZINB.__init__.X (Python parameter) — Count covariate matrix of shape (n, k)."><span class="n"><span class="pre">X</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.Z" title="neighbayes.models.SARZINB.__init__.Z (Python parameter) — Selection covariate matrix of shape (n, p)."><span class="n"><span class="pre">Z</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.W" title="neighbayes.models.SARZINB.__init__.W (Python parameter) — Spatial weights for the count equation, shape (n, n)."><span class="n"><span class="pre">W</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.W_sel" title="neighbayes.models.SARZINB.__init__.W_sel (Python parameter) — Spatial weights for the selection equation."><span class="n"><span class="pre">W_sel</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.priors" title="neighbayes.models.SARZINB.__init__.priors (Python parameter) — Override default priors."><span class="n"><span class="pre">priors</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.logdet_method" title="neighbayes.models.SARZINB.__init__.logdet_method (Python parameter) — How to compute log|I − ρW|."><span class="n"><span class="pre">logdet_method</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.robust" title="neighbayes.models.SARZINB.__init__.robust (Python parameter) — Not supported."><span class="n"><span class="pre">robust</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">**</span></span><a class="n reference internal" href="#neighbayes.models.SARZINB" title="neighbayes.models.SARZINB.__init__.kwargs (Python parameter)"><span class="n"><span class="pre">kwargs</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/cross_section/sar_zinb.py#L67-L919"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></span><span class="sig-prename descclassname"><span class="pre">neighbayes.models.</span></span><span class="sig-name descname"><span class="pre">SARZINB</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.formula" title="neighbayes.models.SARZINB.__init__.formula (Python parameter) — Wilkinson-style formula for the count equation, e.g. &quot;y ~ x1 + x2&quot;."><span class="n"><span class="pre">formula</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.data" title="neighbayes.models.SARZINB.__init__.data (Python parameter) — Data source for formula mode."><span class="n"><span class="pre">data</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.y" title="neighbayes.models.SARZINB.__init__.y (Python parameter) — Non-negative integer counts of shape (n,)."><span class="n"><span class="pre">y</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.X" title="neighbayes.models.SARZINB.__init__.X (Python parameter) — Count covariate matrix of shape (n, k)."><span class="n"><span class="pre">X</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.W" title="neighbayes.models.SARZINB.__init__.W (Python parameter) — Spatial weights for the count part, shape (n, n) (N × N in a panel)."><span class="n"><span class="pre">W</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.unit_effects" title="neighbayes.models.SARZINB.__init__.unit_effects (Python parameter) — A panel's random unit effects, inside the count filter."><span class="n"><span class="pre">unit_effects</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.time_effects" title="neighbayes.models.SARZINB.__init__.time_effects (Python parameter) — A panel's fixed time effects in the count part (add period dummies to X_zero for period effects in the zero part)."><span class="n"><span class="pre">time_effects</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB" title="neighbayes.models.SARZINB.__init__.dynamic (Python parameter)"><span class="n"><span class="pre">dynamic</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.mundlak" title="neighbayes.models.SARZINB.__init__.mundlak (Python parameter) — Add the unit means of the time-varying columns to a panel's count design."><span class="n"><span class="pre">mundlak</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.latent" title="neighbayes.models.SARZINB.__init__.latent (Python parameter) — The latent model instead of the reduced form: each part a latent SAR propagating its own disturbance, a unit active when its logistic utility is positive and its count then Poisson given the log-mean (neighbayes.samplers.two_part_latent)."><span class="n"><span class="pre">latent</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.X_zero" title="neighbayes.models.SARZINB.__init__.X_zero (Python parameter) — Zero-part covariate matrix of shape (n, p); a DataFrame's column names label beta_zero."><span class="n"><span class="pre">X_zero</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.formula_zero" title="neighbayes.models.SARZINB.__init__.formula_zero (Python parameter) — Right-hand side for the zero part, e.g."><span class="n"><span class="pre">formula_zero</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.W_zero" title="neighbayes.models.SARZINB.__init__.W_zero (Python parameter) — Spatial weights for the zero part."><span class="n"><span class="pre">W_zero</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.unit_col" title="neighbayes.models.SARZINB.__init__.unit_col (Python parameter) — Formula-mode panel: the period and unit columns of data."><span class="n"><span class="pre">unit_col</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.time_col" title="neighbayes.models.SARZINB.__init__.time_col (Python parameter) — Formula-mode panel: the period and unit columns of data."><span class="n"><span class="pre">time_col</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.N" title="neighbayes.models.SARZINB.__init__.N (Python parameter) — Matrix-mode panel: the numbers of units and periods."><span class="n"><span class="pre">N</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.T" title="neighbayes.models.SARZINB.__init__.T (Python parameter) — Matrix-mode panel: the numbers of units and periods."><span class="n"><span class="pre">T</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.priors" title="neighbayes.models.SARZINB.__init__.priors (Python parameter) — Override default priors."><span class="n"><span class="pre">priors</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.logdet_method" title="neighbayes.models.SARZINB.__init__.logdet_method (Python parameter) — How log|I - rho*W| is computed over rho: summed over the eigenvalues of W; interpolated (Chebyshev, AAA rational, or cubic spline) through values from a sparse factorization, exact to the interpolant's tolerance; or expanded stochastically with no factorization, the one method with sampling error."><span class="n"><span class="pre">logdet_method</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB" title="neighbayes.models.SARZINB.__init__.robust (Python parameter)"><span class="n"><span class="pre">robust</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB" title="neighbayes.models.SARZINB.__init__.durbin_vars (Python parameter)"><span class="n"><span class="pre">durbin_vars</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.logdet_decomp" title="neighbayes.models.SARZINB.__init__.logdet_decomp (Python parameter) — The factorization an interpolating method uses: sparse Cholesky (undirected W; scikit-sparse CHOLMOD) or sparse LU (KLU or UMFPACK, chosen by the sparsity pattern)."><span class="n"><span class="pre">logdet_decomp</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="s1">'auto'</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB" title="neighbayes.models.SARZINB.__init__.logdet_adapt (Python parameter)"><span class="n"><span class="pre">logdet_adapt</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">True</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/cross_section/sar_zinb.py#L71-L675"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB" title="Link to this definition">¶</a></dt>
 <dd><p>Bayesian zero-inflated SAR Negative Binomial with PG-Gibbs sampler.</p>
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.models.SARZINB-parameters">Parameters<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARZINB-parameters" title="Permalink to this headline">¶</a></dt>
 <dd class="field-odd"><dl class="simple api-field highlight">
-<dt id="neighbayes.models.SARZINB.__init__.formula"><span class="sig-name descname">formula</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)">str</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.formula" title="Permalink to this definition">¶</a></dt><dd><p>Wilkinson-style formula for the <strong>count</strong> equation, e.g.
+<dt id="neighbayes.models.SARZINB.__init__.formula"><span class="sig-name descname">formula</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)">str</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.formula" title="Permalink to this definition">¶</a></dt><dd><p>Wilkinson-style formula for the <strong>count</strong> equation, e.g.
 <code class="docutils literal notranslate"><span class="pre">&quot;y</span> <span class="pre">~</span> <span class="pre">x1</span> <span class="pre">+</span> <span class="pre">x2&quot;</span></code>. Requires <code class="docutils literal notranslate"><span class="pre">data</span></code>.</p>
 </dd>
-<dt id="neighbayes.models.SARZINB.__init__.data"><span class="sig-name descname">data</span><span class="p"> : </span><span class="desctype"><span class="desctype">pandas.DataFrame or <a class="reference external" href="https://geopandas.org/en/latest/docs/reference/api/geopandas.GeoDataFrame.html#geopandas.GeoDataFrame" title="(in GeoPandas v1.2.1.dev0.dev+g199fc53c8)">geopandas.GeoDataFrame</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.data" title="Permalink to this definition">¶</a></dt><dd><p>Data source for formula mode.</p>
+<dt id="neighbayes.models.SARZINB.__init__.data"><span class="sig-name descname">data</span><span class="p"> : </span><span class="desctype"><span class="desctype">pandas.DataFrame or <a class="reference external" href="https://geopandas.org/en/latest/docs/reference/api/geopandas.GeoDataFrame.html#geopandas.GeoDataFrame" title="(in GeoPandas v1.2.1.dev5.dev+gf7883f7fc)">geopandas.GeoDataFrame</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.data" title="Permalink to this definition">¶</a></dt><dd><p>Data source for formula mode.</p>
 </dd>
 <dt id="neighbayes.models.SARZINB.__init__.y"><span class="sig-name descname">y</span><span class="p"> : </span><span class="desctype"><span class="desctype">array-like, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.y" title="Permalink to this definition">¶</a></dt><dd><p>Non-negative integer counts of shape <code class="docutils literal notranslate"><span class="pre">(n,)</span></code>. Required in
 matrix mode.</p>
@@ -3701,62 +3813,125 @@ matrix mode.</p>
 <dt id="neighbayes.models.SARZINB.__init__.X"><span class="sig-name descname">X</span><span class="p"> : </span><span class="desctype"><span class="desctype">array-like, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.X" title="Permalink to this definition">¶</a></dt><dd><p>Count covariate matrix of shape <code class="docutils literal notranslate"><span class="pre">(n,</span> <span class="pre">k)</span></code>. Required in matrix
 mode.</p>
 </dd>
-<dt id="neighbayes.models.SARZINB.__init__.Z"><span class="sig-name descname">Z</span><span class="p"> : </span><span class="desctype"><span class="desctype">array-like, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.Z" title="Permalink to this definition">¶</a></dt><dd><p>Selection covariate matrix of shape <code class="docutils literal notranslate"><span class="pre">(n,</span> <span class="pre">p)</span></code>. If <code class="docutils literal notranslate"><span class="pre">None</span></code>,
-defaults to <code class="docutils literal notranslate"><span class="pre">X</span></code> (same covariates for both equations).</p>
+<dt id="neighbayes.models.SARZINB.__init__.X_zero"><span class="sig-name descname">X_zero</span><span class="p"> : </span><span class="desctype"><span class="desctype">array-like or pandas.DataFrame, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.X_zero" title="Permalink to this definition">¶</a></dt><dd><p>Zero-part covariate matrix of shape <code class="docutils literal notranslate"><span class="pre">(n,</span> <span class="pre">p)</span></code>; a DataFrame’s column
+names label <code class="docutils literal notranslate"><span class="pre">beta_zero</span></code>. If <code class="docutils literal notranslate"><span class="pre">None</span></code> (and no <code class="docutils literal notranslate"><span class="pre">formula_zero</span></code>),
+defaults to <code class="docutils literal notranslate"><span class="pre">X</span></code> (the same covariates in both parts).</p>
 </dd>
-<dt id="neighbayes.models.SARZINB.__init__.W"><span class="sig-name descname">W</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://pysal.org/libpysal/stable/generated/libpysal.graph.Graph.html#libpysal.graph.Graph" title="(in libpysal v4.15.0)">libpysal.graph.Graph</a> or scipy.sparse matrix</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.W" title="Permalink to this definition">¶</a></dt><dd><p>Spatial weights for the <strong>count</strong> equation, shape <code class="docutils literal notranslate"><span class="pre">(n,</span> <span class="pre">n)</span></code>.</p>
+<dt id="neighbayes.models.SARZINB.__init__.formula_zero"><span class="sig-name descname">formula_zero</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)">str</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.formula_zero" title="Permalink to this definition">¶</a></dt><dd><p>Right-hand side for the <strong>zero</strong> part, e.g. <code class="docutils literal notranslate"><span class="pre">&quot;~</span> <span class="pre">z1</span> <span class="pre">+</span> <span class="pre">z2&quot;</span></code>,
+evaluated on <code class="docutils literal notranslate"><span class="pre">data</span></code> (formula mode). Alternative to <code class="docutils literal notranslate"><span class="pre">X_zero</span></code>.</p>
 </dd>
-<dt id="neighbayes.models.SARZINB.__init__.W_sel"><span class="sig-name descname">W_sel</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://pysal.org/libpysal/stable/generated/libpysal.graph.Graph.html#libpysal.graph.Graph" title="(in libpysal v4.15.0)">libpysal.graph.Graph</a> or scipy.sparse matrix, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.W_sel" title="Permalink to this definition">¶</a></dt><dd><p>Spatial weights for the <strong>selection</strong> equation. If <code class="docutils literal notranslate"><span class="pre">None</span></code>,
-uses <code class="docutils literal notranslate"><span class="pre">W</span></code> (same weights for both equations).</p>
+<dt id="neighbayes.models.SARZINB.__init__.W"><span class="sig-name descname">W</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://pysal.org/libpysal/stable/generated/libpysal.graph.Graph.html#libpysal.graph.Graph" title="(in libpysal v4.15.1)">libpysal.graph.Graph</a> or scipy.sparse matrix</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.W" title="Permalink to this definition">¶</a></dt><dd><p>Spatial weights for the <strong>count</strong> part, shape <code class="docutils literal notranslate"><span class="pre">(n,</span> <span class="pre">n)</span></code> (<code class="docutils literal notranslate"><span class="pre">N</span> <span class="pre">×</span> <span class="pre">N</span></code>
+in a panel).</p>
 </dd>
-<dt id="neighbayes.models.SARZINB.__init__.priors"><span class="sig-name descname">priors</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.14)">dict</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.priors" title="Permalink to this definition">¶</a></dt><dd><p><p>Override default priors. Supported keys:</p>
+<dt id="neighbayes.models.SARZINB.__init__.W_zero"><span class="sig-name descname">W_zero</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://pysal.org/libpysal/stable/generated/libpysal.graph.Graph.html#libpysal.graph.Graph" title="(in libpysal v4.15.1)">libpysal.graph.Graph</a> or scipy.sparse matrix, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.W_zero" title="Permalink to this definition">¶</a></dt><dd><p>Spatial weights for the <strong>zero</strong> part. If <code class="docutils literal notranslate"><span class="pre">None</span></code>, uses <code class="docutils literal notranslate"><span class="pre">W</span></code> (the
+same weights in both parts).</p>
+</dd>
+<dt id="neighbayes.models.SARZINB.__init__.priors"><span class="sig-name descname">priors</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.15)">dict</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.priors" title="Permalink to this definition">¶</a></dt><dd><p><p>Override default priors. Supported keys:</p>
 <ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">gamma_mu</span></code>, <code class="docutils literal notranslate"><span class="pre">gamma_sigma</span></code> (float or array, default Gelman et al.
-2008 on the logit scale, centred at even odds): Normal prior on γ.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">lam_lower</span></code> (float, default -0.999): Lower bound for λ.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">lam_upper</span></code> (float, default 0.999): Upper bound for λ.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">beta_mu_zero</span></code>, <code class="docutils literal notranslate"><span class="pre">beta_sigma_zero</span></code> (float or array, default
+Gelman et al. 2008 on the logit scale, centred at even odds): Normal
+prior on <code class="docutils literal notranslate"><span class="pre">beta_zero</span></code>.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">rho_lower_zero</span></code>, <code class="docutils literal notranslate"><span class="pre">rho_upper_zero</span></code> (float, default -0.999 and
+0.999): bounds for <code class="docutils literal notranslate"><span class="pre">rho_zero</span></code>.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">beta_mu</span></code>, <code class="docutils literal notranslate"><span class="pre">beta_sigma</span></code> (float or array, default Gelman et al.
 2008 on the log scale): Normal prior on β, intercept at
 <code class="docutils literal notranslate"><span class="pre">log(mean(y))</span></code> with scale 2.5 and slopes <code class="docutils literal notranslate"><span class="pre">2.5</span> <span class="pre">/</span> <span class="pre">sd(x_j)</span></code>.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">rho_lower</span></code> (float, default -0.999): Lower bound for ρ.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">rho_upper</span></code> (float, default 0.999): Upper bound for ρ.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">alpha_sigma</span></code> (float, default 2.5): Half-Normal scale for α.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">alpha_nu</span></code> (float, default 3.0): Half-Normal ν for α.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">alpha_sigma</span></code>, <code class="docutils literal notranslate"><span class="pre">alpha_nu</span></code> (float, default 2.5 and 3.0):
+Half-Student-t(ν, σ) prior on the NB dispersion α.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">alpha_fixed</span></code> (float, optional): hold α at this value instead;
+a large value (10-20 times the typical mean count) makes the count
+part essentially Poisson on the same exact sampler.</p></li>
 </ul>
+<p>See <a class="reference internal" href="neighbayes.models.priors.SARZINBPriors.html#neighbayes.models.priors.SARZINBPriors" title="neighbayes.models.priors.SARZINBPriors (Python class) — Priors for neighbayes.models.SARZINB and the ZINB panels."><code class="xref py py-class docutils literal notranslate"><span class="pre">SARZINBPriors</span></code></a>.</p>
 </p>
 </dd>
-<dt id="neighbayes.models.SARZINB.__init__.logdet_method"><span class="sig-name descname">logdet_method</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)">str</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.logdet_method" title="Permalink to this definition">¶</a></dt><dd><p>How to compute log|I − ρW|. <code class="docutils literal notranslate"><span class="pre">None</span></code> (default) auto-selects.</p>
+<dt id="neighbayes.models.SARZINB.__init__.logdet_method"><span class="sig-name descname">logdet_method</span><span class="p"> : </span><span class="desctype"><span class="desctype">{&quot;eigenvalue&quot;, &quot;cheb&quot;, &quot;aaa&quot;, &quot;spline&quot;, &quot;stochastic&quot;}, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.logdet_method" title="Permalink to this definition">¶</a></dt><dd><p>How <code class="docutils literal notranslate"><span class="pre">log|I</span> <span class="pre">-</span> <span class="pre">rho*W|</span></code> is computed over rho: summed over the
+eigenvalues of <code class="docutils literal notranslate"><span class="pre">W</span></code>; interpolated (Chebyshev, AAA rational, or cubic
+spline) through values from a sparse factorization, exact to the
+interpolant’s tolerance; or expanded stochastically with no
+factorization, the one method with sampling error.  <code class="docutils literal notranslate"><span class="pre">None</span></code> (default)
+selects from the size and symmetry of <code class="docutils literal notranslate"><span class="pre">W</span></code>: <code class="docutils literal notranslate"><span class="pre">&quot;eigenvalue&quot;</span></code> for
+<code class="docutils literal notranslate"><span class="pre">n</span> <span class="pre">&lt;=</span> <span class="pre">500</span></code>; <code class="docutils literal notranslate"><span class="pre">&quot;aaa&quot;</span></code> up to <code class="docutils literal notranslate"><span class="pre">n</span> <span class="pre">=</span> <span class="pre">60000</span></code>
+(<code class="docutils literal notranslate"><span class="pre">NEIGHBAYES_LOGDET_FACTOR_MAX_N</span></code>) unless the factorization’s fill-in
+would dominate; <code class="docutils literal notranslate"><span class="pre">&quot;stochastic&quot;</span></code> beyond.</p>
 </dd>
-<dt id="neighbayes.models.SARZINB.__init__.robust"><span class="sig-name descname">robust</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)">bool</a>, default False</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.robust" title="Permalink to this definition">¶</a></dt><dd><p>Not supported. Raises <code class="docutils literal notranslate"><span class="pre">NotImplementedError</span></code> if True.</p>
+<dt id="neighbayes.models.SARZINB.__init__.logdet_decomp"><span class="sig-name descname">logdet_decomp</span><span class="p"> : </span><span class="desctype"><span class="desctype">{&quot;auto&quot;, &quot;chol&quot;, &quot;lu&quot;}, default &quot;auto&quot;</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.logdet_decomp" title="Permalink to this definition">¶</a></dt><dd><p>The factorization an interpolating method uses: sparse Cholesky
+(undirected <code class="docutils literal notranslate"><span class="pre">W</span></code>; scikit-sparse CHOLMOD) or sparse LU (KLU or UMFPACK,
+chosen by the sparsity pattern).  <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code> takes <code class="docutils literal notranslate"><span class="pre">&quot;chol&quot;</span></code> where the
+method has it and <code class="docutils literal notranslate"><span class="pre">W</span></code> is undirected, else <code class="docutils literal notranslate"><span class="pre">&quot;lu&quot;</span></code>.  Ignored by
+<code class="docutils literal notranslate"><span class="pre">&quot;eigenvalue&quot;</span></code> and <code class="docutils literal notranslate"><span class="pre">&quot;stochastic&quot;</span></code>; <code class="docutils literal notranslate"><span class="pre">&quot;spline&quot;</span></code> on <code class="docutils literal notranslate"><span class="pre">&quot;chol&quot;</span></code>
+raises.</p>
+</dd>
+<dt id="neighbayes.models.SARZINB.__init__.time_col"><span class="sig-name descname">time_col</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)">str</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.time_col" title="Permalink to this definition">¶</a></dt><dd><p>Formula-mode panel: the period and unit columns of <code class="docutils literal notranslate"><span class="pre">data</span></code>.  Given
+time, the model is a panel (<code class="xref py py-mod docutils literal notranslate"><span class="pre">neighbayes.models.panel._zinb</span></code>),
+stacked by period, then unit, with structural zeros per period;
+<code class="docutils literal notranslate"><span class="pre">X_zero</span></code> may vary over time.  A panel’s priors are
+<a class="reference internal" href="neighbayes.models.priors.PanelZINBPriors.html#neighbayes.models.priors.PanelZINBPriors" title="neighbayes.models.priors.PanelZINBPriors (Python class) — Priors for the ZINB panels (neighbayes.models.SARZINB &amp; co)."><code class="xref py py-class docutils literal notranslate"><span class="pre">PanelZINBPriors</span></code></a>.</p>
+</dd>
+<dt id="neighbayes.models.SARZINB.__init__.unit_col"><span class="sig-name descname">unit_col</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)">str</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.unit_col" title="Permalink to this definition">¶</a></dt><dd><p>Formula-mode panel: the period and unit columns of <code class="docutils literal notranslate"><span class="pre">data</span></code>.  Given
+time, the model is a panel (<code class="xref py py-mod docutils literal notranslate"><span class="pre">neighbayes.models.panel._zinb</span></code>),
+stacked by period, then unit, with structural zeros per period;
+<code class="docutils literal notranslate"><span class="pre">X_zero</span></code> may vary over time.  A panel’s priors are
+<a class="reference internal" href="neighbayes.models.priors.PanelZINBPriors.html#neighbayes.models.priors.PanelZINBPriors" title="neighbayes.models.priors.PanelZINBPriors (Python class) — Priors for the ZINB panels (neighbayes.models.SARZINB &amp; co)."><code class="xref py py-class docutils literal notranslate"><span class="pre">PanelZINBPriors</span></code></a>.</p>
+</dd>
+<dt id="neighbayes.models.SARZINB.__init__.N"><span class="sig-name descname">N</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)">int</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.N" title="Permalink to this definition">¶</a></dt><dd><p>Matrix-mode panel: the numbers of units and periods.</p>
+</dd>
+<dt id="neighbayes.models.SARZINB.__init__.T"><span class="sig-name descname">T</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)">int</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.T" title="Permalink to this definition">¶</a></dt><dd><p>Matrix-mode panel: the numbers of units and periods.</p>
+</dd>
+<dt id="neighbayes.models.SARZINB.__init__.unit_effects"><span class="sig-name descname">unit_effects</span><span class="p"> : </span><span class="desctype"><span class="desctype">{None, &quot;random&quot;}, default None</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.unit_effects" title="Permalink to this definition">¶</a></dt><dd><p>A panel’s random unit effects, inside the count filter.  The zero
+part has none: a unit effect there would compete with the zero
+process for the same information.</p>
+</dd>
+<dt id="neighbayes.models.SARZINB.__init__.time_effects"><span class="sig-name descname">time_effects</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)">bool</a>, default False</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.time_effects" title="Permalink to this definition">¶</a></dt><dd><p>A panel’s fixed time effects in the count part (add period dummies to
+<code class="docutils literal notranslate"><span class="pre">X_zero</span></code> for period effects in the zero part).</p>
+</dd>
+<dt id="neighbayes.models.SARZINB.__init__.mundlak"><span class="sig-name descname">mundlak</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)">bool</a>, default False</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.mundlak" title="Permalink to this definition">¶</a></dt><dd><p>Add the unit means of the time-varying columns to a panel’s count
+design.  Needs unit effects.</p>
+</dd>
+<dt id="neighbayes.models.SARZINB.__init__.latent"><span class="sig-name descname">latent</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)">bool</a>, default False</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.__init__.latent" title="Permalink to this definition">¶</a></dt><dd><p>The latent model instead of the reduced form: each part a latent SAR
+propagating its own disturbance, a unit active when its logistic
+utility is positive and its count then Poisson given the log-mean
+(<code class="xref py py-mod docutils literal notranslate"><span class="pre">neighbayes.samplers.two_part_latent</span></code>).  As a panel its count
+part takes the effects above inside its filter, its zero part none.</p>
 </dd>
 </dl>
 </dd>
 </dl>
 <p class="rubric">Notes</p>
-<p>The model is fit with a custom 9-block Gibbs sampler that composes
-the SAR-logit blocks (ω^sel, η^sel, γ, λ), the zero-allocation
-block (z), and the reduced-form SAR-NB blocks (ω^cnt, β, ρ, α).
-No PyMC model is constructed; calling <code class="docutils literal notranslate"><span class="pre">_build_pymc_model</span></code>
-raises <code class="docutils literal notranslate"><span class="pre">NotImplementedError</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">fit()</span></code> defaults to a 9-block Gibbs sampler that composes the SAR-logit
+blocks of the zero part (ω_z, η_z, β_z, ρ_z), the zero-allocation block (z), and the
+reduced-form SAR-NB blocks (ω^cnt, β, ρ, α); <code class="docutils literal notranslate"><span class="pre">sampler=&quot;nuts&quot;</span></code> fits the
+same model and priors in PyMC (<code class="docutils literal notranslate"><span class="pre">ZeroInflatedNegativeBinomial</span></code>).</p>
+<p><code class="docutils literal notranslate"><span class="pre">activation_probabilities</span></code>, <code class="docutils literal notranslate"><span class="pre">zero_attribution</span></code> and the fitted means are
+posterior expectations averaged over draws; <code class="docutils literal notranslate"><span class="pre">posterior_predictive</span></code>
+simulates <code class="docutils literal notranslate"><span class="pre">d</span> <span class="pre">~</span> <span class="pre">Bern(π)</span></code>, <code class="docutils literal notranslate"><span class="pre">y</span> <span class="pre">=</span> <span class="pre">d</span> <span class="pre">·</span> <span class="pre">NB</span></code>.</p>
 <dl class="py method objdesc">
 <dt class="sig sig-object highlight sig-wrap py" id="neighbayes.models.SARZINB.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.formula" title="neighbayes.models.SARZINB.__init__.formula (Python parameter) — Wilkinson-style formula for the count equation, e.g. &quot;y ~ x1 + x2&quot;."><span class="n"><span class="pre">formula</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.data" title="neighbayes.models.SARZINB.__init__.data (Python parameter) — Data source for formula mode."><span class="n"><span class="pre">data</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.y" title="neighbayes.models.SARZINB.__init__.y (Python parameter) — Non-negative integer counts of shape (n,)."><span class="n"><span class="pre">y</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.X" title="neighbayes.models.SARZINB.__init__.X (Python parameter) — Count covariate matrix of shape (n, k)."><span class="n"><span class="pre">X</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.Z" title="neighbayes.models.SARZINB.__init__.Z (Python parameter) — Selection covariate matrix of shape (n, p)."><span class="n"><span class="pre">Z</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.W" title="neighbayes.models.SARZINB.__init__.W (Python parameter) — Spatial weights for the count equation, shape (n, n)."><span class="n"><span class="pre">W</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.W_sel" title="neighbayes.models.SARZINB.__init__.W_sel (Python parameter) — Spatial weights for the selection equation."><span class="n"><span class="pre">W_sel</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.priors" title="neighbayes.models.SARZINB.__init__.priors (Python parameter) — Override default priors."><span class="n"><span class="pre">priors</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.logdet_method" title="neighbayes.models.SARZINB.__init__.logdet_method (Python parameter) — How to compute log|I − ρW|."><span class="n"><span class="pre">logdet_method</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.robust" title="neighbayes.models.SARZINB.__init__.robust (Python parameter) — Not supported."><span class="n"><span class="pre">robust</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">**</span></span><a class="n reference internal" href="#neighbayes.models.SARZINB" title="neighbayes.models.SARZINB.__init__.kwargs (Python parameter)"><span class="n"><span class="pre">kwargs</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/cross_section/sar_zinb.py#L128-L195"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB.__init__" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.formula" title="neighbayes.models.SARZINB.__init__.formula (Python parameter) — Wilkinson-style formula for the count equation, e.g. &quot;y ~ x1 + x2&quot;."><span class="n"><span class="pre">formula</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.data" title="neighbayes.models.SARZINB.__init__.data (Python parameter) — Data source for formula mode."><span class="n"><span class="pre">data</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.y" title="neighbayes.models.SARZINB.__init__.y (Python parameter) — Non-negative integer counts of shape (n,)."><span class="n"><span class="pre">y</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.X" title="neighbayes.models.SARZINB.__init__.X (Python parameter) — Count covariate matrix of shape (n, k)."><span class="n"><span class="pre">X</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.W" title="neighbayes.models.SARZINB.__init__.W (Python parameter) — Spatial weights for the count part, shape (n, n) (N × N in a panel)."><span class="n"><span class="pre">W</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.unit_effects" title="neighbayes.models.SARZINB.__init__.unit_effects (Python parameter) — A panel's random unit effects, inside the count filter."><span class="n"><span class="pre">unit_effects</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.time_effects" title="neighbayes.models.SARZINB.__init__.time_effects (Python parameter) — A panel's fixed time effects in the count part (add period dummies to X_zero for period effects in the zero part)."><span class="n"><span class="pre">time_effects</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB" title="neighbayes.models.SARZINB.__init__.dynamic (Python parameter)"><span class="n"><span class="pre">dynamic</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.mundlak" title="neighbayes.models.SARZINB.__init__.mundlak (Python parameter) — Add the unit means of the time-varying columns to a panel's count design."><span class="n"><span class="pre">mundlak</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__.latent" title="neighbayes.models.SARZINB.__init__.latent (Python parameter) — The latent model instead of the reduced form: each part a latent SAR propagating its own disturbance, a unit active when its logistic utility is positive and its count then Poisson given the log-mean (neighbayes.samplers.two_part_latent)."><span class="n"><span class="pre">latent</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">**</span></span><a class="n reference internal" href="#neighbayes.models.SARZINB.__init__" title="neighbayes.models.SARZINB.__init__.kwargs (Python parameter)"><span class="n"><span class="pre">kwargs</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_mixins/_designs.py#L323-L371"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB.__init__" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
 
 <p class="rubric">Methods</p>
 <table class="autosummary longtable docutils data align-default">
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="#neighbayes.models.SARZINB.__init__" title="neighbayes.models.SARZINB.__init__ (Python method)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>([formula, data, y, X, Z, W, W_sel, ...])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#neighbayes.models.SARZINB.__init__" title="neighbayes.models.SARZINB.__init__ (Python method)"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>([formula, data, y, X, W, ...])</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#neighbayes.models.SARZINB.corridor_probabilities" title="neighbayes.models.SARZINB.corridor_probabilities (Python method) — Posterior-mean corridor activation probabilities."><code class="xref py py-obj docutils literal notranslate"><span class="pre">corridor_probabilities</span></code></a>()</p></td>
-<td><p>Posterior-mean corridor activation probabilities.</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#neighbayes.models.SARZINB.activation_probabilities" title="neighbayes.models.SARZINB.activation_probabilities (Python method) — Posterior mean of each P(u &gt; 0): an active unit (ZINB), a positive count (hurdle)."><code class="xref py py-obj docutils literal notranslate"><span class="pre">activation_probabilities</span></code></a>([draws])</p></td>
+<td><p>Posterior mean of each <code class="docutils literal notranslate"><span class="pre">P(u</span> <span class="pre">&gt;</span> <span class="pre">0)</span></code>: an active unit (ZINB), a positive count (hurdle).</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#neighbayes.models.SARZINB.fit" title="neighbayes.models.SARZINB.fit (Python method) — Draw samples from the posterior."><code class="xref py py-obj docutils literal notranslate"><span class="pre">fit</span></code></a>([draws, tune, chains, target_accept, ...])</p></td>
 <td><p>Draw samples from the posterior.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#neighbayes.models.SARZINB.fitted_values" title="neighbayes.models.SARZINB.fitted_values (Python method) — Return fitted values at posterior mean parameters."><code class="xref py py-obj docutils literal notranslate"><span class="pre">fitted_values</span></code></a>()</p></td>
 <td><p>Return fitted values at posterior mean parameters.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#neighbayes.models.SARZINB.impacts" title="neighbayes.models.SARZINB.impacts (Python method) — Direct, indirect and total impacts for one equation."><code class="xref py py-obj docutils literal notranslate"><span class="pre">impacts</span></code></a>([equation, ...])</p></td>
+<td><p>Direct, indirect and total impacts for one equation.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#neighbayes.models.SARZINB.posterior_predictive" title="neighbayes.models.SARZINB.posterior_predictive (Python method) — Posterior-predictive counts, shape (n_draws, n_obs)."><code class="xref py py-obj docutils literal notranslate"><span class="pre">posterior_predictive</span></code></a>(*args, **kwargs)</p></td>
+<td><p>Posterior-predictive counts, shape <code class="docutils literal notranslate"><span class="pre">(n_draws,</span> <span class="pre">n_obs)</span></code>.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#neighbayes.models.SARZINB.residuals" title="neighbayes.models.SARZINB.residuals (Python method) — Return residuals y - fitted_values."><code class="xref py py-obj docutils literal notranslate"><span class="pre">residuals</span></code></a>()</p></td>
 <td><p>Return residuals <code class="docutils literal notranslate"><span class="pre">y</span> <span class="pre">-</span> <span class="pre">fitted_values</span></code>.</p></td>
@@ -3767,14 +3942,11 @@ raises <code class="docutils literal notranslate"><span class="pre">NotImplement
 <tr class="row-odd"><td><p><a class="reference internal" href="#neighbayes.models.SARZINB.spatial_diagnostics_decision" title="neighbayes.models.SARZINB.spatial_diagnostics_decision (Python method) — Return a model-selection decision from Bayesian LM test results."><code class="xref py py-obj docutils literal notranslate"><span class="pre">spatial_diagnostics_decision</span></code></a>([alpha, format])</p></td>
 <td><p>Return a model-selection decision from Bayesian LM test results.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#neighbayes.models.SARZINB.spatial_effects" title="neighbayes.models.SARZINB.spatial_effects (Python method) — Compute Bayesian inference for direct, indirect, and total impacts."><code class="xref py py-obj docutils literal notranslate"><span class="pre">spatial_effects</span></code></a>([equation, ...])</p></td>
-<td><p>Compute Bayesian inference for direct, indirect, and total impacts.</p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#neighbayes.models.SARZINB.summary" title="neighbayes.models.SARZINB.summary (Python method) — Return posterior summary table."><code class="xref py py-obj docutils literal notranslate"><span class="pre">summary</span></code></a>([var_names])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#neighbayes.models.SARZINB.summary" title="neighbayes.models.SARZINB.summary (Python method) — Return posterior summary table."><code class="xref py py-obj docutils literal notranslate"><span class="pre">summary</span></code></a>([var_names])</p></td>
 <td><p>Return posterior summary table.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#neighbayes.models.SARZINB.zero_attribution" title="neighbayes.models.SARZINB.zero_attribution (Python method) — Decompose observed zeros into structural vs sampling zeros."><code class="xref py py-obj docutils literal notranslate"><span class="pre">zero_attribution</span></code></a>()</p></td>
-<td><p>Decompose observed zeros into structural vs sampling zeros.</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#neighbayes.models.SARZINB.zero_attribution" title="neighbayes.models.SARZINB.zero_attribution (Python method) — Posterior split of each observed zero into structural and sampling."><code class="xref py py-obj docutils literal notranslate"><span class="pre">zero_attribution</span></code></a>([draws])</p></td>
+<td><p>Posterior split of each observed zero into structural and sampling.</p></td>
 </tr>
 </tbody>
 </table>
@@ -3790,23 +3962,15 @@ raises <code class="docutils literal notranslate"><span class="pre">NotImplement
 </tbody>
 </table>
 <dl class="py method objdesc">
-<dt class="sig sig-object highlight py" id="neighbayes.models.SARZINB.corridor_probabilities">
-<span class="sig-name descname"><span class="pre">corridor_probabilities</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/cross_section/sar_zinb.py#L851-L867"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB.corridor_probabilities" title="Link to this definition">¶</a></dt>
-<dd><p>Posterior-mean corridor activation probabilities.</p>
-<p>Returns π_i = logit⁻¹(η_i^sel) at posterior means of λ and γ.</p>
-<dl class="field-list simple">
-<dt class="field-odd" id="neighbayes.models.SARZINB.corridor_probabilities-returns">Returns<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARZINB.corridor_probabilities-returns" title="Permalink to this headline">¶</a></dt>
-<dd class="field-odd"><p><strong>pi</strong> – Fitted activation probabilities.</p>
-</dd>
-<dt class="field-even" id="neighbayes.models.SARZINB.corridor_probabilities-return-type">Return type<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARZINB.corridor_probabilities-return-type" title="Permalink to this headline">¶</a></dt>
-<dd class="field-even"><p>ndarray of shape (n,)</p>
-</dd>
-</dl>
+<dt class="sig sig-object highlight py" id="neighbayes.models.SARZINB.activation_probabilities">
+<span class="sig-name descname"><span class="pre">activation_probabilities</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.activation_probabilities" title="neighbayes.models.SARZINB.activation_probabilities.draws (Python parameter)"><span class="n"><span class="pre">draws</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">200</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/cross_section/_latent_two_part.py#L640-L649"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB.activation_probabilities" title="Link to this definition">¶</a></dt>
+<dd><p>Posterior mean of each <code class="docutils literal notranslate"><span class="pre">P(u</span> <span class="pre">&gt;</span> <span class="pre">0)</span></code>: an active unit (ZINB), a positive count (hurdle).</p>
+<p>The latent model’s averages the propagated disturbances by simulation.</p>
 </dd></dl>
 
 <dl class="py method objdesc">
 <dt class="sig sig-object highlight sig-wrap py" id="neighbayes.models.SARZINB.fit">
-<span class="sig-name descname"><span class="pre">fit</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.fit.draws" title="neighbayes.models.SARZINB.fit.draws (Python parameter) — Post-warmup draws, warmup steps, and number of chains."><span class="n"><span class="pre">draws</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">2000</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.fit.tune" title="neighbayes.models.SARZINB.fit.tune (Python parameter) — Post-warmup draws, warmup steps, and number of chains."><span class="n"><span class="pre">tune</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">1000</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.fit.chains" title="neighbayes.models.SARZINB.fit.chains (Python parameter) — Post-warmup draws, warmup steps, and number of chains."><span class="n"><span class="pre">chains</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">4</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.fit.target_accept" title="neighbayes.models.SARZINB.fit.target_accept (Python parameter) — Target acceptance rate for NUTS."><span class="n"><span class="pre">target_accept</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.fit.random_seed" title="neighbayes.models.SARZINB.fit.random_seed (Python parameter) — Seed for reproducibility."><span class="n"><span class="pre">random_seed</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.fit.progressbar" title="neighbayes.models.SARZINB.fit.progressbar (Python parameter) — Show progress bar(s) during sampling."><span class="n"><span class="pre">progressbar</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">True</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.fit.sampler" title="neighbayes.models.SARZINB.fit.sampler (Python parameter) — Sampling method."><span class="n"><span class="pre">sampler</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.fit.gibbs_backend" title="neighbayes.models.SARZINB.fit.gibbs_backend (Python parameter) — Execution backend for the Gibbs sampler."><span class="n"><span class="pre">gibbs_backend</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="s1">'auto'</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.fit.thin" title="neighbayes.models.SARZINB.fit.thin (Python parameter) — Keep every thin-th post-warmup Gibbs draw (Gibbs only)."><span class="n"><span class="pre">thin</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">1</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.fit.n_jobs" title="neighbayes.models.SARZINB.fit.n_jobs (Python parameter) — Parallel workers for the NumPy Gibbs path (Gibbs only)."><span class="n"><span class="pre">n_jobs</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="o">-</span><span class="mi">1</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.fit.idata_kwargs" title="neighbayes.models.SARZINB.fit.idata_kwargs (Python parameter) — {&quot;log_likelihood&quot;: True} stores the complete Jacobian-corrected pointwise log-likelihood that az.loo / az.compare need, for Gibbs and NUTS alike."><span class="n"><span class="pre">idata_kwargs</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">**</span></span><a class="n reference internal" href="#neighbayes.models.SARZINB.fit.sample_kwargs" title="neighbayes.models.SARZINB.fit.sample_kwargs (Python parameter) — For NUTS, forwarded to pm.sample (nuts_sampler=...); for Gibbs, the family's declared options (an unsupported key raises)."><span class="n"><span class="pre">sample_kwargs</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/base.py#L263-L394"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB.fit" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">fit</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.fit.draws" title="neighbayes.models.SARZINB.fit.draws (Python parameter) — Post-warmup draws, warmup steps, and number of chains."><span class="n"><span class="pre">draws</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">2000</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.fit.tune" title="neighbayes.models.SARZINB.fit.tune (Python parameter) — Post-warmup draws, warmup steps, and number of chains."><span class="n"><span class="pre">tune</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">1000</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.fit.chains" title="neighbayes.models.SARZINB.fit.chains (Python parameter) — Post-warmup draws, warmup steps, and number of chains."><span class="n"><span class="pre">chains</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">4</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.fit.target_accept" title="neighbayes.models.SARZINB.fit.target_accept (Python parameter) — Target acceptance rate for NUTS."><span class="n"><span class="pre">target_accept</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.fit.random_seed" title="neighbayes.models.SARZINB.fit.random_seed (Python parameter) — Seed for reproducibility."><span class="n"><span class="pre">random_seed</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.fit.progressbar" title="neighbayes.models.SARZINB.fit.progressbar (Python parameter) — Show progress bar(s) during sampling."><span class="n"><span class="pre">progressbar</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">True</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.fit.sampler" title="neighbayes.models.SARZINB.fit.sampler (Python parameter) — Sampling method."><span class="n"><span class="pre">sampler</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.fit.backend" title="neighbayes.models.SARZINB.fit.backend (Python parameter) — What executes the sampler."><span class="n"><span class="pre">backend</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.fit.thin" title="neighbayes.models.SARZINB.fit.thin (Python parameter) — Keep every thin-th post-warmup Gibbs draw (Gibbs only)."><span class="n"><span class="pre">thin</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">1</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.fit.n_jobs" title="neighbayes.models.SARZINB.fit.n_jobs (Python parameter) — Parallel workers for the NumPy Gibbs path (Gibbs only)."><span class="n"><span class="pre">n_jobs</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="o">-</span><span class="mi">1</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.fit.idata_kwargs" title="neighbayes.models.SARZINB.fit.idata_kwargs (Python parameter) — {&quot;log_likelihood&quot;: True} stores the complete Jacobian-corrected pointwise log-likelihood that az.loo / az.compare need, for Gibbs and NUTS alike."><span class="n"><span class="pre">idata_kwargs</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">**</span></span><a class="n reference internal" href="#neighbayes.models.SARZINB.fit.sample_kwargs" title="neighbayes.models.SARZINB.fit.sample_kwargs (Python parameter) — For NUTS, forwarded to pm.sample; for Gibbs, the family's declared options (an unsupported key raises)."><span class="n"><span class="pre">sample_kwargs</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/base.py#L584-L724"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB.fit" title="Link to this definition">¶</a></dt>
 <dd><p>Draw samples from the posterior.</p>
 <p>Dispatches to this model’s Gibbs sampler (<code class="docutils literal notranslate"><span class="pre">sampler=&quot;gibbs&quot;</span></code>) or NUTS
 (<code class="docutils literal notranslate"><span class="pre">sampler=&quot;nuts&quot;</span></code>).  When <code class="docutils literal notranslate"><span class="pre">sampler</span></code> is <code class="docutils literal notranslate"><span class="pre">None</span></code> (default), Gibbs is
@@ -3814,38 +3978,40 @@ used if the model has a registered Gibbs sampler, otherwise NUTS.</p>
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.models.SARZINB.fit-parameters">Parameters<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARZINB.fit-parameters" title="Permalink to this headline">¶</a></dt>
 <dd class="field-odd"><dl class="simple api-field highlight">
-<dt id="neighbayes.models.SARZINB.fit.draws"><span class="sig-name descname">draws</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)">int</a></span></span><a class="headerlink" href="#neighbayes.models.SARZINB.fit.draws" title="Permalink to this definition">¶</a></dt><dd><p>Post-warmup draws, warmup steps, and number of chains.</p>
+<dt id="neighbayes.models.SARZINB.fit.draws"><span class="sig-name descname">draws</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)">int</a></span></span><a class="headerlink" href="#neighbayes.models.SARZINB.fit.draws" title="Permalink to this definition">¶</a></dt><dd><p>Post-warmup draws, warmup steps, and number of chains.</p>
 </dd>
-<dt id="neighbayes.models.SARZINB.fit.tune"><span class="sig-name descname">tune</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)">int</a></span></span><a class="headerlink" href="#neighbayes.models.SARZINB.fit.tune" title="Permalink to this definition">¶</a></dt><dd><p>Post-warmup draws, warmup steps, and number of chains.</p>
+<dt id="neighbayes.models.SARZINB.fit.tune"><span class="sig-name descname">tune</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)">int</a></span></span><a class="headerlink" href="#neighbayes.models.SARZINB.fit.tune" title="Permalink to this definition">¶</a></dt><dd><p>Post-warmup draws, warmup steps, and number of chains.</p>
 </dd>
-<dt id="neighbayes.models.SARZINB.fit.chains"><span class="sig-name descname">chains</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)">int</a></span></span><a class="headerlink" href="#neighbayes.models.SARZINB.fit.chains" title="Permalink to this definition">¶</a></dt><dd><p>Post-warmup draws, warmup steps, and number of chains.</p>
+<dt id="neighbayes.models.SARZINB.fit.chains"><span class="sig-name descname">chains</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)">int</a></span></span><a class="headerlink" href="#neighbayes.models.SARZINB.fit.chains" title="Permalink to this definition">¶</a></dt><dd><p>Post-warmup draws, warmup steps, and number of chains.</p>
 </dd>
-<dt id="neighbayes.models.SARZINB.fit.target_accept"><span class="sig-name descname">target_accept</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)">float</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.fit.target_accept" title="Permalink to this definition">¶</a></dt><dd><p>Target acceptance rate for NUTS.  NUTS-only: passing it with the
+<dt id="neighbayes.models.SARZINB.fit.target_accept"><span class="sig-name descname">target_accept</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)">float</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.fit.target_accept" title="Permalink to this definition">¶</a></dt><dd><p>Target acceptance rate for NUTS.  NUTS-only: passing it with the
 Gibbs sampler raises <code class="docutils literal notranslate"><span class="pre">TypeError</span></code>.  Defaults to <code class="docutils literal notranslate"><span class="pre">0.9</span></code> for NUTS.</p>
 </dd>
-<dt id="neighbayes.models.SARZINB.fit.random_seed"><span class="sig-name descname">random_seed</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)">int</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.fit.random_seed" title="Permalink to this definition">¶</a></dt><dd><p>Seed for reproducibility.</p>
+<dt id="neighbayes.models.SARZINB.fit.random_seed"><span class="sig-name descname">random_seed</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)">int</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.fit.random_seed" title="Permalink to this definition">¶</a></dt><dd><p>Seed for reproducibility.</p>
 </dd>
-<dt id="neighbayes.models.SARZINB.fit.progressbar"><span class="sig-name descname">progressbar</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)">bool</a>, default True</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.fit.progressbar" title="Permalink to this definition">¶</a></dt><dd><p>Show progress bar(s) during sampling.</p>
+<dt id="neighbayes.models.SARZINB.fit.progressbar"><span class="sig-name descname">progressbar</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)">bool</a>, default True</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.fit.progressbar" title="Permalink to this definition">¶</a></dt><dd><p>Show progress bar(s) during sampling.</p>
 </dd>
 <dt id="neighbayes.models.SARZINB.fit.sampler"><span class="sig-name descname">sampler</span><span class="p"> : </span><span class="desctype"><span class="desctype">{&quot;gibbs&quot;, &quot;nuts&quot;, None}, default None</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.fit.sampler" title="Permalink to this definition">¶</a></dt><dd><p>Sampling method.  <code class="docutils literal notranslate"><span class="pre">None</span></code> auto-selects Gibbs when this model has
 one, else NUTS.</p>
 </dd>
-<dt id="neighbayes.models.SARZINB.fit.gibbs_backend"><span class="sig-name descname">gibbs_backend</span><span class="p"> : </span><span class="desctype"><span class="desctype">{&quot;auto&quot;, &quot;jax&quot;, &quot;numpy&quot;}, default &quot;auto&quot;</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.fit.gibbs_backend" title="Permalink to this definition">¶</a></dt><dd><p>Execution backend for the Gibbs sampler.  <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code> uses JAX when
-installed and supported by the family, else NumPy.  Ignored for NUTS.</p>
+<dt id="neighbayes.models.SARZINB.fit.backend"><span class="sig-name descname">backend</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)">str</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.fit.backend" title="Permalink to this definition">¶</a></dt><dd><p>What executes the sampler.  For Gibbs, <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code> (the default),
+<code class="docutils literal notranslate"><span class="pre">&quot;jax&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;numpy&quot;</span></code>; <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code> takes JAX when it is installed
+and supported by the family, else NumPy.  For NUTS, <code class="docutils literal notranslate"><span class="pre">&quot;pymc&quot;</span></code> (the
+default), <code class="docutils literal notranslate"><span class="pre">&quot;nutpie&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;numpyro&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">&quot;blackjax&quot;</span></code>.</p>
 </dd>
-<dt id="neighbayes.models.SARZINB.fit.thin"><span class="sig-name descname">thin</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)">int</a>, default 1</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.fit.thin" title="Permalink to this definition">¶</a></dt><dd><p>Keep every <code class="docutils literal notranslate"><span class="pre">thin</span></code>-th post-warmup Gibbs draw (Gibbs only).</p>
+<dt id="neighbayes.models.SARZINB.fit.thin"><span class="sig-name descname">thin</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)">int</a>, default 1</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.fit.thin" title="Permalink to this definition">¶</a></dt><dd><p>Keep every <code class="docutils literal notranslate"><span class="pre">thin</span></code>-th post-warmup Gibbs draw (Gibbs only).</p>
 </dd>
-<dt id="neighbayes.models.SARZINB.fit.n_jobs"><span class="sig-name descname">n_jobs</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.14)">int</a>, default -1</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.fit.n_jobs" title="Permalink to this definition">¶</a></dt><dd><p>Parallel workers for the NumPy Gibbs path (Gibbs only).</p>
+<dt id="neighbayes.models.SARZINB.fit.n_jobs"><span class="sig-name descname">n_jobs</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)">int</a>, default -1</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.fit.n_jobs" title="Permalink to this definition">¶</a></dt><dd><p>Parallel workers for the NumPy Gibbs path (Gibbs only).</p>
 </dd>
-<dt id="neighbayes.models.SARZINB.fit.idata_kwargs"><span class="sig-name descname">idata_kwargs</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.14)">dict</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.fit.idata_kwargs" title="Permalink to this definition">¶</a></dt><dd><p><code class="docutils literal notranslate"><span class="pre">{&quot;log_likelihood&quot;:</span> <span class="pre">True}</span></code> stores the complete Jacobian-corrected
+<dt id="neighbayes.models.SARZINB.fit.idata_kwargs"><span class="sig-name descname">idata_kwargs</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.15)">dict</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.fit.idata_kwargs" title="Permalink to this definition">¶</a></dt><dd><p><code class="docutils literal notranslate"><span class="pre">{&quot;log_likelihood&quot;:</span> <span class="pre">True}</span></code> stores the complete Jacobian-corrected
 pointwise log-likelihood that <code class="docutils literal notranslate"><span class="pre">az.loo</span></code> /
 <code class="docutils literal notranslate"><span class="pre">az.compare</span></code> need, for Gibbs and NUTS alike.  Off by default, as
 in PyMC: it holds one value per draw, chain, and observation (16 GB
 at n = 250,000 with 4 × 2,000 draws).  For NUTS the dict is also
 passed to <code class="docutils literal notranslate"><span class="pre">pm.sample</span></code>.</p>
 </dd>
-<dt id="neighbayes.models.SARZINB.fit.sample_kwargs"><span class="o">**</span><span class="n sig-name">sample_kwargs</span><a class="headerlink" href="#neighbayes.models.SARZINB.fit.sample_kwargs" title="Permalink to this definition">¶</a></dt><dd><p>For NUTS, forwarded to <code class="docutils literal notranslate"><span class="pre">pm.sample</span></code> (<code class="docutils literal notranslate"><span class="pre">nuts_sampler=...</span></code>); for
-Gibbs, the family’s declared options (an unsupported key raises).</p>
+<dt id="neighbayes.models.SARZINB.fit.sample_kwargs"><span class="o">**</span><span class="n sig-name">sample_kwargs</span><a class="headerlink" href="#neighbayes.models.SARZINB.fit.sample_kwargs" title="Permalink to this definition">¶</a></dt><dd><p>For NUTS, forwarded to <code class="docutils literal notranslate"><span class="pre">pm.sample</span></code>; for Gibbs, the family’s
+declared options (an unsupported key raises).</p>
 </dd>
 </dl>
 </dd>
@@ -3857,7 +4023,7 @@ Gibbs, the family’s declared options (an unsupported key raises).</p>
 
 <dl class="py method objdesc">
 <dt class="sig sig-object highlight py" id="neighbayes.models.SARZINB.fitted_values">
-<span class="sig-name descname"><span class="pre">fitted_values</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L984-L994"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB.fitted_values" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">fitted_values</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L983-L993"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB.fitted_values" title="Link to this definition">¶</a></dt>
 <dd><p>Return fitted values at posterior mean parameters.</p>
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.models.SARZINB.fitted_values-returns">Returns<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARZINB.fitted_values-returns" title="Permalink to this headline">¶</a></dt>
@@ -3870,9 +4036,32 @@ fixed-effects-transformed for panel models).</p>
 </dl>
 </dd></dl>
 
+<dl class="py method objdesc">
+<dt class="sig sig-object highlight sig-wrap py" id="neighbayes.models.SARZINB.impacts">
+<span class="sig-name descname"><span class="pre">impacts</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.impacts.equation" title="neighbayes.models.SARZINB.impacts.equation (Python parameter) — &quot;count&quot;: impacts of X on the count part's log-mean, through (I − ρW)⁻¹Xβ."><span class="n"><span class="pre">equation</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="s1">'count'</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.impacts.return_posterior_samples" title="neighbayes.models.SARZINB.impacts.return_posterior_samples (Python parameter) — Also return the per-draw impacts."><span class="n"><span class="pre">return_posterior_samples</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.impacts.scale" title="neighbayes.models.SARZINB.impacts.scale (Python parameter) — The equation's link scale (&quot;logmean&quot;, &quot;logodds&quot;, the default) or, for a latent model, its outcome scale: &quot;count&quot;, the expected count of an active unit (ZINB) or of a positive count (hurdle), and &quot;probability&quot;, of the zero part's u &gt; 0."><span class="n"><span class="pre">scale</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_mixins/_two_part.py#L183-L231"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB.impacts" title="Link to this definition">¶</a></dt>
+<dd><p>Direct, indirect and total impacts for one equation.</p>
+<dl class="field-list simple">
+<dt class="field-odd" id="neighbayes.models.SARZINB.impacts-parameters">Parameters<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARZINB.impacts-parameters" title="Permalink to this headline">¶</a></dt>
+<dd class="field-odd"><dl class="simple api-field highlight">
+<dt id="neighbayes.models.SARZINB.impacts.equation"><span class="sig-name descname">equation</span><span class="p"> : </span><span class="desctype"><span class="desctype">{&quot;count&quot;, &quot;zero&quot;}, default &quot;count&quot;</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.impacts.equation" title="Permalink to this definition">¶</a></dt><dd><p><code class="docutils literal notranslate"><span class="pre">&quot;count&quot;</span></code>: impacts of X on the count part’s log-mean, through
+<code class="docutils literal notranslate"><span class="pre">(I</span> <span class="pre">−</span> <span class="pre">ρW)⁻¹Xβ</span></code>.  <code class="docutils literal notranslate"><span class="pre">&quot;zero&quot;</span></code>: impacts of <code class="docutils literal notranslate"><span class="pre">X_zero</span></code> on the zero
+part’s log-odds, through <code class="docutils literal notranslate"><span class="pre">(I</span> <span class="pre">−</span> <span class="pre">ρ_zero</span> <span class="pre">W_zero)⁻¹</span> <span class="pre">X_zero</span> <span class="pre">β_zero</span></code>.</p>
+</dd>
+<dt id="neighbayes.models.SARZINB.impacts.return_posterior_samples"><span class="sig-name descname">return_posterior_samples</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.15)">bool</a>, default False</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.impacts.return_posterior_samples" title="Permalink to this definition">¶</a></dt><dd><p>Also return the per-draw impacts.</p>
+</dd>
+<dt id="neighbayes.models.SARZINB.impacts.scale"><span class="sig-name descname">scale</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)">str</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.impacts.scale" title="Permalink to this definition">¶</a></dt><dd><p>The equation’s link scale (<code class="docutils literal notranslate"><span class="pre">&quot;logmean&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;logodds&quot;</span></code>, the
+default) or, for a latent model, its outcome scale: <code class="docutils literal notranslate"><span class="pre">&quot;count&quot;</span></code>,
+the expected count of an active unit (ZINB) or of a positive count
+(hurdle), and <code class="docutils literal notranslate"><span class="pre">&quot;probability&quot;</span></code>, of the zero part’s <code class="docutils literal notranslate"><span class="pre">u</span> <span class="pre">&gt;</span> <span class="pre">0</span></code>.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
 <dl class="py property objdesc">
 <dt class="sig sig-object highlight py" id="neighbayes.models.SARZINB.inference_data">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">inference_data</span></span><span class="p"> <span class="pre">:</span> </span><span class="desctype"><span class="pre">xarray.core.datatree.DataTree</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models.py"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB.inference_data" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">inference_data</span></span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models.py"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB.inference_data" title="Link to this definition">¶</a></dt>
 <dd><p>Return the ArviZ DataTree from the most recent fit.</p>
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.models.SARZINB.inference_data-returns">Returns<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARZINB.inference_data-returns" title="Permalink to this headline">¶</a></dt>
@@ -3885,15 +4074,31 @@ been fit yet.</p>
 </dl>
 </dd></dl>
 
+<dl class="py method objdesc">
+<dt class="sig sig-object highlight py" id="neighbayes.models.SARZINB.posterior_predictive">
+<span class="sig-name descname"><span class="pre">posterior_predictive</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">*</span></span><a class="n reference internal" href="#neighbayes.models.SARZINB.posterior_predictive" title="neighbayes.models.SARZINB.posterior_predictive.args (Python parameter)"><span class="n"><span class="pre">args</span></span></a></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">**</span></span><a class="n reference internal" href="#neighbayes.models.SARZINB.posterior_predictive" title="neighbayes.models.SARZINB.posterior_predictive.kwargs (Python parameter)"><span class="n"><span class="pre">kwargs</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_mixins/_designs.py#L95-L96"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB.posterior_predictive" title="Link to this definition">¶</a></dt>
+<dd><p>Posterior-predictive counts, shape <code class="docutils literal notranslate"><span class="pre">(n_draws,</span> <span class="pre">n_obs)</span></code>.</p>
+<dl class="field-list simple">
+<dt class="field-odd" id="neighbayes.models.SARZINB.posterior_predictive-parameters">Parameters<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARZINB.posterior_predictive-parameters" title="Permalink to this headline">¶</a></dt>
+<dd class="field-odd"><dl class="simple api-field highlight">
+<dt><span class="sig-name descname">n_draws</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)">int</a>, optional</span></span></dt><dd><p>Posterior draws to simulate from; all of them by default.</p>
+</dd>
+<dt><span class="sig-name descname">random_seed</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#int" title="(in Python v3.15)">int</a>, optional</span></span></dt><dd><p>Seed for the simulation.</p>
+</dd>
+</dl>
+</dd>
+</dl>
+</dd></dl>
+
 <dl class="py property objdesc">
 <dt class="sig sig-object highlight py" id="neighbayes.models.SARZINB.pymc_model">
-<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">pymc_model</span></span><span class="p"> <span class="pre">:</span> </span><span class="desctype"><a class="reference external" href="https://www.pymc.io/projects/docs/en/stable/api/model/generated/pymc.model.core.Model.html#pymc.model.core.Model" title="(in PyMC v6.3.2)"><span class="pre">pymc.model.core.Model</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><a class="reference external" href="https://docs.python.org/3/builtins/constants.html#None" title="(in Python v3.14)"><span class="pre">None</span></a></span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models.py"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB.pymc_model" title="Link to this definition">¶</a></dt>
+<span class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></span><span class="sig-name descname"><span class="pre">pymc_model</span></span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models.py"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB.pymc_model" title="Link to this definition">¶</a></dt>
 <dd><p>Return the PyMC model object built for the most recent fit.</p>
-<p>For Gibbs-fitted models the PyMC model is not constructed during
-sampling; it is built lazily on first access so that downstream
-consumers (e.g. bridge sampling for marginal likelihoods) can
-evaluate <code class="docutils literal notranslate"><span class="pre">logp</span></code> and the prior under the same model definition
-used by the NUTS path.</p>
+<p>For a Gibbs-fitted cross-section the PyMC model is not constructed
+during sampling; it is built lazily on first access so that downstream
+consumers (e.g. bridge sampling for marginal likelihoods) can evaluate
+<code class="docutils literal notranslate"><span class="pre">logp</span></code> and the prior under the same model definition used by the
+NUTS path.</p>
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.models.SARZINB.pymc_model-returns">Returns<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARZINB.pymc_model-returns" title="Permalink to this headline">¶</a></dt>
 <dd class="field-odd"><p>The model object used by <a class="reference internal" href="#neighbayes.models.SARZINB.fit" title="neighbayes.models.SARZINB.fit (Python method) — Draw samples from the posterior."><code class="xref py py-meth docutils literal notranslate"><span class="pre">fit()</span></code></a>, or <code class="docutils literal notranslate"><span class="pre">None</span></code> if the instance
@@ -3907,7 +4112,7 @@ has not been fit yet.</p>
 
 <dl class="py method objdesc">
 <dt class="sig sig-object highlight py" id="neighbayes.models.SARZINB.residuals">
-<span class="sig-name descname"><span class="pre">residuals</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L996-L1006"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB.residuals" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">residuals</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L995-L1005"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB.residuals" title="Link to this definition">¶</a></dt>
 <dd><p>Return residuals <code class="docutils literal notranslate"><span class="pre">y</span> <span class="pre">-</span> <span class="pre">fitted_values</span></code>.</p>
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.models.SARZINB.residuals-returns">Returns<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARZINB.residuals-returns" title="Permalink to this headline">¶</a></dt>
@@ -3922,7 +4127,7 @@ has not been fit yet.</p>
 
 <dl class="py method objdesc">
 <dt class="sig sig-object highlight py" id="neighbayes.models.SARZINB.spatial_diagnostics">
-<span class="sig-name descname"><span class="pre">spatial_diagnostics</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L1679-L1749"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB.spatial_diagnostics" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">spatial_diagnostics</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L1700-L1770"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB.spatial_diagnostics" title="Link to this definition">¶</a></dt>
 <dd><p>Run Bayesian LM specification tests and return a summary table.</p>
 <p>Looks up the diagnostic suite registered for this model class
 and calls each test function on this fitted model, collecting the
@@ -3973,8 +4178,8 @@ time.</p>
 </dd>
 <dt class="field-odd" id="neighbayes.models.SARZINB.spatial_diagnostics-raises">Raises<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARZINB.spatial_diagnostics-raises" title="Permalink to this headline">¶</a></dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#RuntimeError" title="(in Python v3.14)"><strong>RuntimeError</strong></a> – If the model has not been fit yet.</p></li>
-<li><p><a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#ValueError" title="(in Python v3.14)"><strong>ValueError</strong></a> – If no spatial weights matrix <code class="docutils literal notranslate"><span class="pre">W</span></code> was supplied.</p></li>
+<li><p><a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#RuntimeError" title="(in Python v3.15)"><strong>RuntimeError</strong></a> – If the model has not been fit yet.</p></li>
+<li><p><a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#ValueError" title="(in Python v3.15)"><strong>ValueError</strong></a> – If no spatial weights matrix <code class="docutils literal notranslate"><span class="pre">W</span></code> was supplied.</p></li>
 </ul>
 </dd>
 </dl>
@@ -3983,7 +4188,7 @@ time.</p>
 <dl class="simple">
 <dt><a class="reference internal" href="#neighbayes.models.SARZINB.spatial_diagnostics_decision" title="neighbayes.models.SARZINB.spatial_diagnostics_decision (Python method) — Return a model-selection decision from Bayesian LM test results."><code class="xref py py-obj docutils literal notranslate"><span class="pre">spatial_diagnostics_decision</span></code></a></dt><dd><p>Model-selection decision based on the test results.</p>
 </dd>
-<dt><a class="reference internal" href="#neighbayes.models.SARZINB.spatial_effects" title="neighbayes.models.SARZINB.spatial_effects (Python method) — Compute Bayesian inference for direct, indirect, and total impacts."><code class="xref py py-obj docutils literal notranslate"><span class="pre">spatial_effects</span></code></a></dt><dd><p>Posterior inference for direct/indirect/total impacts.</p>
+<dt><a class="reference internal" href="#neighbayes.models.SARZINB.impacts" title="neighbayes.models.SARZINB.impacts (Python method) — Direct, indirect and total impacts for one equation."><code class="xref py py-obj docutils literal notranslate"><span class="pre">impacts</span></code></a></dt><dd><p>Posterior inference for direct/indirect/total impacts.</p>
 </dd>
 </dl>
 </div>
@@ -4002,7 +4207,7 @@ time.</p>
 
 <dl class="py method objdesc">
 <dt class="sig sig-object highlight py" id="neighbayes.models.SARZINB.spatial_diagnostics_decision">
-<span class="sig-name descname"><span class="pre">spatial_diagnostics_decision</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.spatial_diagnostics_decision.alpha" title="neighbayes.models.SARZINB.spatial_diagnostics_decision.alpha (Python parameter) — Significance level for the Bayesian p-values."><span class="n"><span class="pre">alpha</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">0.05</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.spatial_diagnostics_decision.format" title="neighbayes.models.SARZINB.spatial_diagnostics_decision.format (Python parameter) — Output format."><span class="n"><span class="pre">format</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="s1">'graphviz'</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L1751-L1866"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB.spatial_diagnostics_decision" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">spatial_diagnostics_decision</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.spatial_diagnostics_decision.alpha" title="neighbayes.models.SARZINB.spatial_diagnostics_decision.alpha (Python parameter) — Significance level for the Bayesian p-values."><span class="n"><span class="pre">alpha</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mf">0.05</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.spatial_diagnostics_decision.format" title="neighbayes.models.SARZINB.spatial_diagnostics_decision.format (Python parameter) — Output format."><span class="n"><span class="pre">format</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="s1">'graphviz'</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L1772-L1887"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB.spatial_diagnostics_decision" title="Link to this definition">¶</a></dt>
 <dd><p>Return a model-selection decision from Bayesian LM test results.</p>
 <p>Implements the decision tree from <span class="bibtex-citation" id="id1">Koley and Bera [<a class="reference internal" href="../references.html#id28" title="Malabika Koley and Anil K. Bera. To use, or not to use the spatial Durbin model? – that is the question. Spatial Economic Analysis, 19(1):30–56, 2024. URL: https://doi.org/10.1080/17421772.2023.2256810 (visited on 2025-05-21), doi:10.1080/17421772.2023.2256810.">2024</a>]</span>
 (the Bayesian analogue of the classical <code class="docutils literal notranslate"><span class="pre">stge_kb</span></code> procedure
@@ -4034,21 +4239,21 @@ Robust-LM-WX significant → SDM.</p></li>
 <ul class="simple">
 <li><p>Robust-LM-Lag-SDM significant → SDM;
 Robust-LM-Error-SDEM significant → SDEM;
-both → MANSAR; neither → SLX.</p></li>
+both → GNS; neither → SLX.</p></li>
 </ul>
-<p><strong>From SDM</strong>: LM-Error-SDM significant → MANSAR; else SDM.</p>
-<p><strong>From SDEM</strong>: LM-Lag-SDEM significant → MANSAR; else SDEM.</p>
+<p><strong>From SDM</strong>: LM-Error-SDM significant → GNS; else SDM.</p>
+<p><strong>From SDEM</strong>: LM-Lag-SDEM significant → GNS; else SDEM.</p>
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.models.SARZINB.spatial_diagnostics_decision-parameters">Parameters<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARZINB.spatial_diagnostics_decision-parameters" title="Permalink to this headline">¶</a></dt>
 <dd class="field-odd"><dl class="simple api-field highlight">
-<dt id="neighbayes.models.SARZINB.spatial_diagnostics_decision.alpha"><span class="sig-name descname">alpha</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.14)">float</a>, default 0.05</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.spatial_diagnostics_decision.alpha" title="Permalink to this definition">¶</a></dt><dd><p>Significance level for the Bayesian p-values.</p>
+<dt id="neighbayes.models.SARZINB.spatial_diagnostics_decision.alpha"><span class="sig-name descname">alpha</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#float" title="(in Python v3.15)">float</a>, default 0.05</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.spatial_diagnostics_decision.alpha" title="Permalink to this definition">¶</a></dt><dd><p>Significance level for the Bayesian p-values.</p>
 </dd>
 <dt id="neighbayes.models.SARZINB.spatial_diagnostics_decision.format"><span class="sig-name descname">format</span><span class="p"> : </span><span class="desctype"><span class="desctype">{&quot;graphviz&quot;, &quot;ascii&quot;, &quot;model&quot;}, default &quot;graphviz&quot;</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.spatial_diagnostics_decision.format" title="Permalink to this definition">¶</a></dt><dd><p>Output format. <code class="docutils literal notranslate"><span class="pre">&quot;model&quot;</span></code> returns the recommended-model name
 string. <code class="docutils literal notranslate"><span class="pre">&quot;ascii&quot;</span></code> returns an indented box-drawing rendering
 of the full decision tree with the chosen path highlighted.
 <code class="docutils literal notranslate"><span class="pre">&quot;graphviz&quot;</span></code> returns a <code class="xref py py-class docutils literal notranslate"><span class="pre">graphviz.Digraph</span></code> object that
 renders inline in Jupyter; if the optional <code class="docutils literal notranslate"><span class="pre">graphviz</span></code> package
-is not installed a <a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#UserWarning" title="(in Python v3.14)"><code class="xref py py-class docutils literal notranslate"><span class="pre">UserWarning</span></code></a> is issued and the
+is not installed a <a class="reference external" href="https://docs.python.org/3/builtins/exceptions.html#UserWarning" title="(in Python v3.15)"><code class="xref py py-class docutils literal notranslate"><span class="pre">UserWarning</span></code></a> is issued and the
 ASCII rendering is returned instead.</p>
 </dd>
 </dl>
@@ -4059,7 +4264,7 @@ string when <code class="docutils literal notranslate"><span class="pre">format=
 <code class="docutils literal notranslate"><span class="pre">format=&quot;graphviz&quot;</span></code> (with ASCII fallback on missing dep).</p>
 </dd>
 <dt class="field-odd" id="neighbayes.models.SARZINB.spatial_diagnostics_decision-return-type">Return type<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARZINB.spatial_diagnostics_decision-return-type" title="Permalink to this headline">¶</a></dt>
-<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.14)">str</a> or graphviz.Digraph</p>
+<dd class="field-odd"><p><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#str" title="(in Python v3.15)">str</a> or graphviz.Digraph</p>
 </dd>
 </dl>
 <div class="seealso admonition">
@@ -4075,48 +4280,13 @@ string when <code class="docutils literal notranslate"><span class="pre">format=
 </dd></dl>
 
 <dl class="py method objdesc">
-<dt class="sig sig-object highlight py" id="neighbayes.models.SARZINB.spatial_effects">
-<span class="sig-name descname"><span class="pre">spatial_effects</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.spatial_effects.equation" title="neighbayes.models.SARZINB.spatial_effects.equation (Python parameter) — Which equation to compute impacts for."><span class="n"><span class="pre">equation</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="s1">'count'</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.spatial_effects.return_posterior_samples" title="neighbayes.models.SARZINB.spatial_effects.return_posterior_samples (Python parameter) — If True, return a (DataFrame, dict) tuple where the dict contains the full posterior draws."><span class="n"><span class="pre">return_posterior_samples</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">False</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/cross_section/sar_zinb.py#L751-L826"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB.spatial_effects" title="Link to this definition">¶</a></dt>
-<dd><p>Compute Bayesian inference for direct, indirect, and total impacts.</p>
-<p>The ZINB-SAR model has two spatial lag equations — a count
-equation with parameter ρ and a selection (logit) equation
-with parameter λ — each with its own LeSage–Pace impact
-decomposition.  Use the <code class="docutils literal notranslate"><span class="pre">equation</span></code> parameter to select which
-equation’s impacts to report.</p>
-<dl class="field-list simple">
-<dt class="field-odd" id="neighbayes.models.SARZINB.spatial_effects-parameters">Parameters<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARZINB.spatial_effects-parameters" title="Permalink to this headline">¶</a></dt>
-<dd class="field-odd"><dl class="simple api-field highlight">
-<dt id="neighbayes.models.SARZINB.spatial_effects.equation"><span class="sig-name descname">equation</span><span class="p"> : </span><span class="desctype"><span class="desctype">{&quot;count&quot;, &quot;selection&quot;}, default &quot;count&quot;</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.spatial_effects.equation" title="Permalink to this definition">¶</a></dt><dd><p><p>Which equation to compute impacts for.</p>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">&quot;count&quot;</span></code>: impacts of X on E[y | d=1] through
-(I − ρW)⁻¹ Xβ.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">&quot;selection&quot;</span></code>: impacts of Z on P(d=1) on the log-odds
-scale through (I − λW_sel)⁻¹ Zγ.</p></li>
-</ul>
-</p>
-</dd>
-<dt id="neighbayes.models.SARZINB.spatial_effects.return_posterior_samples"><span class="sig-name descname">return_posterior_samples</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/functions.html#bool" title="(in Python v3.14)">bool</a>, default False</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.spatial_effects.return_posterior_samples" title="Permalink to this definition">¶</a></dt><dd><p>If <code class="docutils literal notranslate"><span class="pre">True</span></code>, return a <code class="docutils literal notranslate"><span class="pre">(DataFrame,</span> <span class="pre">dict)</span></code> tuple where the
-dict contains the full posterior draws.</p>
-</dd>
-</dl>
-</dd>
-<dt class="field-even" id="neighbayes.models.SARZINB.spatial_effects-returns">Returns<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARZINB.spatial_effects-returns" title="Permalink to this headline">¶</a></dt>
-<dd class="field-even"><p>Impact summary table, optionally with posterior draws.</p>
-</dd>
-<dt class="field-odd" id="neighbayes.models.SARZINB.spatial_effects-return-type">Return type<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARZINB.spatial_effects-return-type" title="Permalink to this headline">¶</a></dt>
-<dd class="field-odd"><p>pd.DataFrame or <a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#tuple" title="(in Python v3.14)">tuple</a> of (pd.DataFrame, <a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#dict" title="(in Python v3.14)">dict</a>)</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py method objdesc">
 <dt class="sig sig-object highlight py" id="neighbayes.models.SARZINB.summary">
-<span class="sig-name descname"><span class="pre">summary</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.summary.var_names" title="neighbayes.models.SARZINB.summary.var_names (Python parameter) — Variable names to include in the summary."><span class="n"><span class="pre">var_names</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">**</span></span><a class="n reference internal" href="#neighbayes.models.SARZINB.summary.kwargs" title="neighbayes.models.SARZINB.summary.kwargs (Python parameter) — Additional arguments passed to arviz.summary()."><span class="n"><span class="pre">kwargs</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L965-L982"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB.summary" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">summary</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.summary.var_names" title="neighbayes.models.SARZINB.summary.var_names (Python parameter) — Variable names to include in the summary."><span class="n"><span class="pre">var_names</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="kc">None</span></code></em>, </span><span class="sig-param-decl"><em class="sig-param"><span class="o"><span class="pre">**</span></span><a class="n reference internal" href="#neighbayes.models.SARZINB.summary.kwargs" title="neighbayes.models.SARZINB.summary.kwargs (Python parameter) — Additional arguments passed to arviz.summary()."><span class="n"><span class="pre">kwargs</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py#L964-L981"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB.summary" title="Link to this definition">¶</a></dt>
 <dd><p>Return posterior summary table.</p>
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.models.SARZINB.summary-parameters">Parameters<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARZINB.summary-parameters" title="Permalink to this headline">¶</a></dt>
 <dd class="field-odd"><dl class="simple api-field highlight">
-<dt id="neighbayes.models.SARZINB.summary.var_names"><span class="sig-name descname">var_names</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.14)">list</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.summary.var_names" title="Permalink to this definition">¶</a></dt><dd><p>Variable names to include in the summary.</p>
+<dt id="neighbayes.models.SARZINB.summary.var_names"><span class="sig-name descname">var_names</span><span class="p"> : </span><span class="desctype"><span class="desctype"><a class="reference external" href="https://docs.python.org/3/builtins/stdtypes.html#list" title="(in Python v3.15)">list</a>, optional</span></span><a class="headerlink" href="#neighbayes.models.SARZINB.summary.var_names" title="Permalink to this definition">¶</a></dt><dd><p>Variable names to include in the summary.</p>
 </dd>
 <dt id="neighbayes.models.SARZINB.summary.kwargs"><span class="o">**</span><span class="n sig-name">kwargs</span><a class="headerlink" href="#neighbayes.models.SARZINB.summary.kwargs" title="Permalink to this definition">¶</a></dt><dd><p>Additional arguments passed to <code class="xref py py-func docutils literal notranslate"><span class="pre">arviz.summary()</span></code>.</p>
 </dd>
@@ -4133,27 +4303,11 @@ dict contains the full posterior draws.</p>
 
 <dl class="py method objdesc">
 <dt class="sig sig-object highlight py" id="neighbayes.models.SARZINB.zero_attribution">
-<span class="sig-name descname"><span class="pre">zero_attribution</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/cross_section/sar_zinb.py#L869-L919"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB.zero_attribution" title="Link to this definition">¶</a></dt>
-<dd><p>Decompose observed zeros into structural vs sampling zeros.</p>
-<p>For each observation with y_i = 0, computes the posterior
-probability that the zero is structural (d_i = 0) versus
-sampling (d_i = 1 but NB draw was zero).</p>
-<dl class="field-list simple">
-<dt class="field-odd" id="neighbayes.models.SARZINB.zero_attribution-returns">Returns<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARZINB.zero_attribution-returns" title="Permalink to this headline">¶</a></dt>
-<dd class="field-odd"><p><dl class="simple">
-<dt><code class="docutils literal notranslate"><span class="pre">structural_prob</span></code><span class="classifier">ndarray of shape (n_zero,)</span></dt><dd><p>P(d_i = 0 | y_i = 0) for each zero observation.</p>
-</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">sampling_prob</span></code><span class="classifier">ndarray of shape (n_zero,)</span></dt><dd><p>P(d_i = 1, NB zero | y_i = 0) for each zero observation.</p>
-</dd>
-<dt><code class="docutils literal notranslate"><span class="pre">zero_indices</span></code><span class="classifier">ndarray of shape (n_zero,)</span></dt><dd><p>Indices of zero observations.</p>
-</dd>
-</dl>
-</p>
-</dd>
-<dt class="field-even" id="neighbayes.models.SARZINB.zero_attribution-return-type">Return type<span class="colon">:</span><a class="headerlink" href="#neighbayes.models.SARZINB.zero_attribution-return-type" title="Permalink to this headline">¶</a></dt>
-<dd class="field-even"><p>dict with keys</p>
-</dd>
-</dl>
+<span class="sig-name descname"><span class="pre">zero_attribution</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.models.SARZINB.zero_attribution" title="neighbayes.models.SARZINB.zero_attribution.draws (Python parameter)"><span class="n"><span class="pre">draws</span></span></a><span class="o"><span class="pre">=</span></span><code class="code python default_value docutils literal highlight highlight-python"><span class="mi">200</span></code></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/cross_section/_latent_two_part.py#L768-L784"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.models.SARZINB.zero_attribution" title="Link to this definition">¶</a></dt>
+<dd><p>Posterior split of each observed zero into structural and sampling.</p>
+<p>The latent model’s is the sampler’s: the average, over the sweeps after
+warmup, of each zero’s conditional probability that its unit is
+inactive (<code class="docutils literal notranslate"><span class="pre">draws</span></code> does not apply).</p>
 </dd></dl>
 
 </dd></dl>
@@ -4203,7 +4357,7 @@ sampling (d_i = 1 but NB draw was zero).</p>
   
     Created using
     <a href="https://www.sphinx-doc.org/" target="_blank" rel="noopener">Sphinx</a>
-    8.2.3.
+    9.2.0.
      and
     <a href="https://github.com/jbms/sphinx-immaterial/" target="_blank" rel="noopener">Sphinx-Immaterial</a>
   

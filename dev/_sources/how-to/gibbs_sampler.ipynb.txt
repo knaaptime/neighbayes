@@ -160,8 +160,9 @@
     "[Performance & Profiling](../performance/index.md).\n",
     "\n",
     "Two arguments do not cross the sampler boundary: `target_accept` raises\n",
-    "`TypeError` under Gibbs, and `idata_kwargs={\"log_likelihood\": True}` is\n",
-    "NUTS-only — Gibbs builds that group unasked."
+    "`TypeError` under Gibbs, and a backend belongs to its sampler, so\n",
+    "`backend=\"numpyro\"` raises under Gibbs as `backend=\"jax\"` does under NUTS.\n",
+    "`idata_kwargs={\"log_likelihood\": True}` works with either sampler."
    ]
   },
   {
@@ -184,10 +185,10 @@
    "source": [
     "## Pin a backend\n",
     "\n",
-    "`gibbs_backend` defaults to `\"auto\"`, which takes JAX when it is installed and\n",
+    "`backend` defaults to `\"auto\"`, which takes JAX when it is installed and\n",
     "falls back to NumPy. Pin it explicitly when you are benchmarking, or when you\n",
     "want the NumPy path's process-level parallelism (`n_jobs`) instead of the JAX\n",
-    "path's vectorised chains (`chain_method`)."
+    "path's vectorized chains."
    ]
   },
   {
@@ -201,9 +202,7 @@
     "    [\n",
     "        efficiency(\n",
     "            backend,\n",
-    "            *fit_timed(\n",
-    "                SAR(y=y, X=X, W=W), sampler=\"gibbs\", gibbs_backend=backend, **COMMON\n",
-    "            ),\n",
+    "            *fit_timed(SAR(y=y, X=X, W=W), sampler=\"gibbs\", backend=backend, **COMMON),\n",
     "        )\n",
     "        for backend in (\"numpy\", \"jax\")\n",
     "    ]\n",
@@ -215,10 +214,11 @@
    "id": "11",
    "metadata": {},
    "source": [
-    "JAX pays a one-off compilation cost on the first sweep, so a single\n",
-    "small-$n$ timing is the wrong basis for choosing — at $n = 49$ that cost is a\n",
-    "visible fraction of the total, and at the sizes where you would reach for JAX\n",
-    "it is amortized to nothing."
+    "JAX compiles the sweep on the first fit of a model structure, so a single\n",
+    "small-$n$ timing is the wrong basis for choosing — at $n = 49$ compilation is a\n",
+    "visible fraction of the total. It is paid once per structure: a refit, a longer\n",
+    "run, or new data of the same dimensions on the same graph reuses the compiled\n",
+    "program, and at the sizes where you would reach for JAX it is negligible."
    ]
   },
   {
@@ -243,7 +243,7 @@
     "idata_tuned, secs_tuned = fit_timed(\n",
     "    SAR(y=y, X=X, W=W),\n",
     "    sampler=\"gibbs\",\n",
-    "    gibbs_backend=\"numpy\",\n",
+    "    backend=\"numpy\",\n",
     "    slice_width=0.25,\n",
     "    n_jobs=-1,\n",
     "    thin=2,\n",
@@ -309,12 +309,18 @@
     "        )\n",
     "        for method, (idata, secs) in (\n",
     "            (\n",
-    "                m,\n",
+    "                f\"{m} on {d}\" if d != \"auto\" else m,\n",
     "                fit_timed(\n",
-    "                    SAR(y=y, X=X, W=W, logdet_method=m), sampler=\"gibbs\", **COMMON\n",
+    "                    SAR(y=y, X=X, W=W, logdet_method=m, logdet_decomp=d),\n",
+    "                    sampler=\"gibbs\",\n",
+    "                    **COMMON,\n",
     "                ),\n",
     "            )\n",
-    "            for m in (\"eigenvalue\", \"chebyshev\", \"cheb_stochastic\")\n",
+    "            for m, d in (\n",
+    "                (\"eigenvalue\", \"auto\"),\n",
+    "                (\"cheb\", \"chol\"),\n",
+    "                (\"stochastic\", \"auto\"),\n",
+    "            )\n",
     "        )\n",
     "    ]\n",
     ").round(4)"
@@ -325,7 +331,7 @@
    "id": "18",
    "metadata": {},
    "source": [
-    "`eigenvalue` is exact at this size, so it is the reference. A method whose\n",
+    "`exact` on `eig` is exact at this size, so it is the reference. A method whose\n",
     "ρ posterior drifts from it is trading accuracy for speed — sometimes the right\n",
     "trade at scale, never one to make unknowingly."
    ]

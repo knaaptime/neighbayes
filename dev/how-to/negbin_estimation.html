@@ -42,7 +42,7 @@
         <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
       
     
-        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.74c816e3f9967dd6e.min.css?v=6cfe2491" />
+        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.6efbe22605a23fcd6.min.css?v=b2ceb110" />
         <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
         <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
         <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=93c5fc88" />
@@ -532,7 +532,7 @@
   
   
   <span class="md-ellipsis">
-    <span>How to fit spatial logit models</span>
+    <span>How to fit a spatial logit model</span>
     
   </span>
   
@@ -1439,11 +1439,10 @@
   
 
 <h1 id="how-to-estimate-spatial-negative-binomial-models">How to estimate spatial negative binomial models<a class="headerlink" href="#how-to-estimate-spatial-negative-binomial-models" title="Link to this heading">¶</a></h1>
-<p>Overdispersed counts with spatial dependence. <code class="docutils literal notranslate"><span class="pre">SARNegBin</span></code> is the reduced form
-and the default choice; <code class="docutils literal notranslate"><span class="pre">SARNegBinStructural</span></code> adds an explicit latent noise
-term and a <code class="docutils literal notranslate"><span class="pre">sigma</span></code> parameter, at a large cost in mixing.</p>
-<p>Both sample by Pólya–Gamma Gibbs, which <code class="docutils literal notranslate"><span class="pre">fit()</span></code> selects for you; <code class="docutils literal notranslate"><span class="pre">SARNegBin</span></code>
-also has a NUTS path. Equations and constructor arguments are in
+<p>Overdispersed counts with spatial dependence. <code class="docutils literal notranslate"><span class="pre">SARNegBin</span></code> is the reduced form:
+the spatial lag acts on the log-mean.</p>
+<p>It samples by Pólya–Gamma Gibbs, which <code class="docutils literal notranslate"><span class="pre">fit()</span></code> selects for you, and also has a
+NUTS path. Equations and constructor arguments are in
 <a class="reference internal" href="../models.html"><span class="std std-doc">Supported Models</span></a>.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
@@ -1600,62 +1599,33 @@ alpha : 2.027   (true 2.0)
 <p>The dispersion parameter recovers tightly. <span class="math notranslate nohighlight">\(\rho\)</span> recovers to within its
 posterior standard deviation — read the interval, not the point.</p>
 <h2 id="configure-the-sampler">Configure the sampler<a class="headerlink" href="#configure-the-sampler" title="Link to this heading">¶</a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">gibbs_backend</span></code> is <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code> (JAX when installed, else NumPy), <code class="docutils literal notranslate"><span class="pre">&quot;jax&quot;</span></code>, or
-<code class="docutils literal notranslate"><span class="pre">&quot;numpy&quot;</span></code>, as elsewhere in the package. The count families accept these
+<p><code class="docutils literal notranslate"><span class="pre">backend</span></code> is <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code> (JAX when installed, else NumPy), <code class="docutils literal notranslate"><span class="pre">&quot;jax&quot;</span></code>, or
+<code class="docutils literal notranslate"><span class="pre">&quot;numpy&quot;</span></code>, as elsewhere in the package. <code class="docutils literal notranslate"><span class="pre">SARNegBin</span></code> accepts these
 additional options; anything else raises <code class="docutils literal notranslate"><span class="pre">TypeError</span></code>.</p>
 <table class="docutils data align-default">
 <thead>
 <tr class="row-odd"><th class="head"><p>Option</p></th>
-<th class="head"><p><code class="docutils literal notranslate"><span class="pre">SARNegBin</span></code></p></th>
-<th class="head"><p><code class="docutils literal notranslate"><span class="pre">SARNegBinStructural</span></code></p></th>
 <th class="head"><p>Meaning</p></th>
 </tr>
 </thead>
 <tbody>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">slice_width</span></code></p></td>
-<td><p>✅</p></td>
-<td><p>—</p></td>
 <td><p>initial slice interval for ρ</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">init_jitter</span></code></p></td>
-<td><p>✅</p></td>
-<td><p>—</p></td>
 <td><p>dispersion of the chain starting points around the GLM warm start</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">n_rho_omega_cycles</span></code></p></td>
-<td><p>✅</p></td>
-<td><p>—</p></td>
 <td><p>how many ρ/ω sub-sweeps per iteration</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">krylov_degree</span></code>, <code class="docutils literal notranslate"><span class="pre">krylov_dmax</span></code></p></td>
-<td><p>✅</p></td>
-<td><p>✅</p></td>
 <td><p>shift-invert Krylov basis for the ρ conditional</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">krylov_reuse</span></code></p></td>
-<td><p>✅</p></td>
-<td><p>—</p></td>
 <td><p>reuse that basis across draws</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">timeout</span></code></p></td>
-<td><p>✅</p></td>
-<td><p>—</p></td>
 <td><p>abort a run exceeding this many seconds</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">lanczos_deg</span></code>, <code class="docutils literal notranslate"><span class="pre">n_probes</span></code></p></td>
-<td><p>—</p></td>
-<td><p>✅</p></td>
-<td><p>stochastic log-determinant depth and probe count</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">pg_n_terms</span></code></p></td>
-<td><p>—</p></td>
-<td><p>✅</p></td>
-<td><p>truncation of the Pólya–Gamma series</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">return_eta</span></code></p></td>
-<td><p>—</p></td>
-<td><p>✅</p></td>
-<td><p>keep the latent field in the returned <code class="docutils literal notranslate"><span class="pre">InferenceData</span></code></p></td>
 </tr>
 </tbody>
 </table>
@@ -1663,7 +1633,7 @@ additional options; anything else raises <code class="docutils literal notransla
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">idata_tuned</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">fit_timed</span><span class="p">(</span>
     <span class="n">SARNegBin</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">),</span>
-    <span class="n">gibbs_backend</span><span class="o">=</span><span class="s2">"numpy"</span><span class="p">,</span>
+    <span class="n">backend</span><span class="o">=</span><span class="s2">"numpy"</span><span class="p">,</span>
     <span class="n">slice_width</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span>
     <span class="n">init_jitter</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
     <span class="n">krylov_reuse</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
@@ -1776,7 +1746,7 @@ machinery for binary outcomes</p></li>
   
     Created using
     <a href="https://www.sphinx-doc.org/" target="_blank" rel="noopener">Sphinx</a>
-    8.2.3.
+    9.2.0.
      and
     <a href="https://github.com/jbms/sphinx-immaterial/" target="_blank" rel="noopener">Sphinx-Immaterial</a>
   

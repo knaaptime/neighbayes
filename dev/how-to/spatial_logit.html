@@ -21,7 +21,7 @@
     
     
       
-        <title>How to fit spatial logit models - neighbayes</title>
+        <title>How to fit a spatial logit model - neighbayes</title>
       
     
     
@@ -42,7 +42,7 @@
         <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
       
     
-        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.74c816e3f9967dd6e.min.css?v=6cfe2491" />
+        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.6efbe22605a23fcd6.min.css?v=b2ceb110" />
         <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
         <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
         <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=93c5fc88" />
@@ -109,7 +109,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              How to fit spatial logit models
+              How to fit a spatial logit model
             
           </span>
         </div>
@@ -539,7 +539,7 @@
   
   
   <span class="md-ellipsis">
-    <span>How to fit spatial logit models</span>
+    <span>How to fit a spatial logit model</span>
     
   </span>
   
@@ -552,7 +552,7 @@
   
   
   <span class="md-ellipsis">
-    <span>How to fit spatial logit models</span>
+    <span>How to fit a spatial logit model</span>
     
   </span>
   
@@ -604,26 +604,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#fit-the-error-model" class="md-nav__link">
-    
-    <span class="md-ellipsis">
-      <span>Fit the error model</span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#reduced-form-or-structural-form" class="md-nav__link">
-    
-    <span class="md-ellipsis">
-      <span>Reduced form or structural form</span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#configure-the-sampler" class="md-nav__link">
     
     <span class="md-ellipsis">
@@ -638,6 +618,26 @@
     
     <span class="md-ellipsis">
       <span>Fitted probabilities</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fit-the-latent-sar-and-sem" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Fit the latent SAR and SEM</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#let-the-tests-choose-the-form" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Let the tests choose the form</span>
     </span>
   </a>
   
@@ -1435,26 +1435,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#fit-the-error-model" class="md-nav__link">
-    
-    <span class="md-ellipsis">
-      <span>Fit the error model</span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#reduced-form-or-structural-form" class="md-nav__link">
-    
-    <span class="md-ellipsis">
-      <span>Reduced form or structural form</span>
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#configure-the-sampler" class="md-nav__link">
     
     <span class="md-ellipsis">
@@ -1469,6 +1449,26 @@
     
     <span class="md-ellipsis">
       <span>Fitted probabilities</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#fit-the-latent-sar-and-sem" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Fit the latent SAR and SEM</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#let-the-tests-choose-the-form" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Let the tests choose the form</span>
     </span>
   </a>
   
@@ -1518,24 +1518,23 @@
   
   
 
-<h1 id="how-to-fit-spatial-logit-models">How to fit spatial logit models<a class="headerlink" href="#how-to-fit-spatial-logit-models" title="Link to this heading">¶</a></h1>
-<p>Binary outcomes with spatial dependence. <code class="docutils literal notranslate"><span class="pre">SARLogit</span></code> is the reduced form and the
-one to reach for; <code class="docutils literal notranslate"><span class="pre">SARLogitStructural</span></code> is the same model parameterised without
-inverting <span class="math notranslate nohighlight">\((I - \rho W)\)</span>; <code class="docutils literal notranslate"><span class="pre">SEMLogit</span></code> puts the spatial structure in the errors
-instead, as a nuisance rather than a channel for spillovers.</p>
-<p>All three sample by Pólya–Gamma Gibbs and <strong>have no NUTS path</strong> —
-<code class="docutils literal notranslate"><span class="pre">fit(sampler=&quot;nuts&quot;)</span></code> raises. Equations and constructor arguments are in
-<a class="reference internal" href="../models.html"><span class="std std-doc">Supported Models</span></a>; if you have not yet decided between a lag and
-an error specification, start with the
-<a class="reference internal" href="bayesian_lmtests.html"><span class="std std-doc">Bayesian LM specification tests</span></a>.</p>
+<h1 id="how-to-fit-a-spatial-logit-model">How to fit a spatial logit model<a class="headerlink" href="#how-to-fit-a-spatial-logit-model" title="Link to this heading">¶</a></h1>
+<p>Binary outcomes with spatial dependence. <code class="docutils literal notranslate"><span class="pre">SARLogit</span></code> is the reduced-form SAR: the
+spatial multiplier acts on the mean of the log-odds. It samples by Pólya–Gamma
+Gibbs and <strong>has no NUTS path</strong> — <code class="docutils literal notranslate"><span class="pre">fit(sampler=&quot;nuts&quot;)</span></code> raises. The equation and
+constructor arguments are in <a class="reference internal" href="../models.html"><span class="std std-doc">Supported Models</span></a>.</p>
+<p>There is no spatial logit with random effects and no SEM logit. In a
+cross-section the effects’ sd trades off against <span class="math notranslate nohighlight">\(\beta\)</span> and against the spatial
+parameter, and binary outcomes barely constrain the trade, so their posteriors
+are mostly prior.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">arviz</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">az</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.dgp</span><span class="w"> </span><span class="kn">import</span> <span class="n">simulate_sar_logit</span><span class="p">,</span> <span class="n">simulate_sem_logit</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">SARLogit</span><span class="p">,</span> <span class="n">SARLogitStructural</span><span class="p">,</span> <span class="n">SEMLogit</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.dgp</span><span class="w"> </span><span class="kn">import</span> <span class="n">simulate_sar_logit</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">SARLogit</span>
 </code></pre></div>
 </div>
 </div>
@@ -1568,22 +1567,22 @@ is weakly identified below roughly a thousand units. Fitting one of these to
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>observations : 1225  (35 x 35 queen grid)
 covariates   : 2
-outcome      : 463 ones, 762 zeros
+outcome      : 451 ones, 774 zeros
 </code></pre></div>
 </div>
 </div>
 </div>
 <h2 id="fit-the-reduced-form-model">Fit the reduced-form model<a class="headerlink" href="#fit-the-reduced-form-model" title="Link to this heading">¶</a></h2>
-<p>The sweep has four blocks, only one of which is non-conjugate:</p>
+<p>The sweep has three blocks, only one of which is non-conjugate:</p>
 <ol class="arabic simple">
-<li><p><span class="math notranslate nohighlight">\(\omega \mid \eta\)</span> — Pólya–Gamma augmentation</p></li>
-<li><p><span class="math notranslate nohighlight">\(\eta \mid \omega, \rho, \beta\)</span> — spatial-normal draw</p></li>
-<li><p><span class="math notranslate nohighlight">\(\beta \mid \eta, \rho\)</span> — conjugate normal</p></li>
-<li><p><span class="math notranslate nohighlight">\(\rho \mid \beta, \omega, y\)</span> — <strong>collapsed</strong> one-dimensional slice, with
-<span class="math notranslate nohighlight">\(\eta\)</span> integrated out</p></li>
+<li><p><span class="math notranslate nohighlight">\(\omega \mid \rho, \beta\)</span> — Pólya–Gamma augmentation at
+<span class="math notranslate nohighlight">\(\eta = (I - \rho W)^{-1}X\beta\)</span></p></li>
+<li><p><span class="math notranslate nohighlight">\(\rho \mid \omega\)</span> — a <strong>collapsed</strong> one-dimensional slice, with <span class="math notranslate nohighlight">\(\beta\)</span>
+integrated out</p></li>
+<li><p><span class="math notranslate nohighlight">\(\beta \mid \omega, \rho\)</span> — conjugate normal</p></li>
 </ol>
-<p>Collapsing block 4 is what makes this mix. Conditioning <span class="math notranslate nohighlight">\(\rho\)</span> on the current
-<span class="math notranslate nohighlight">\(\eta\)</span> draw instead couples the two so tightly that the chain crawls.</p>
+<p>Collapsing block 2 is what makes this mix: <span class="math notranslate nohighlight">\(\rho\)</span> and <span class="math notranslate nohighlight">\(\beta\)</span> trade off in the
+mean, and a <span class="math notranslate nohighlight">\(\rho\)</span> update conditioned on the current <span class="math notranslate nohighlight">\(\beta\)</span> crawls.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">model_sar</span> <span class="o">=</span> <span class="n">SARLogit</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y_sar</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X_sar</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W_sar</span><span class="p">)</span>
@@ -1614,39 +1613,39 @@ outcome      : 463 ones, 762 zeros
   <tbody>
     <tr>
       <th>rho</th>
-      <td>0.434</td>
-      <td>0.176</td>
-      <td>0.13</td>
-      <td>0.68</td>
-      <td>4998</td>
-      <td>3815</td>
+      <td>0.671</td>
+      <td>0.099</td>
+      <td>0.5</td>
+      <td>0.81</td>
+      <td>4505</td>
+      <td>3863</td>
       <td>1.00</td>
-      <td>0.0026</td>
-      <td>0.0025</td>
+      <td>0.0016</td>
+      <td>0.0015</td>
     </tr>
     <tr>
       <th>beta[x0]</th>
-      <td>-0.287</td>
-      <td>0.098</td>
-      <td>-0.46</td>
-      <td>-0.15</td>
-      <td>5104</td>
-      <td>4267</td>
+      <td>-0.179</td>
+      <td>0.061</td>
+      <td>-0.29</td>
+      <td>-0.097</td>
+      <td>4816</td>
+      <td>3804</td>
       <td>1.00</td>
-      <td>0.0014</td>
-      <td>0.0013</td>
+      <td>0.00092</td>
+      <td>0.00096</td>
     </tr>
     <tr>
       <th>beta[x1]</th>
-      <td>0.437</td>
-      <td>0.067</td>
-      <td>0.33</td>
-      <td>0.54</td>
-      <td>4483</td>
-      <td>5345</td>
+      <td>0.441</td>
+      <td>0.066</td>
+      <td>0.34</td>
+      <td>0.55</td>
+      <td>4401</td>
+      <td>4984</td>
       <td>1.00</td>
       <td>0.001</td>
-      <td>0.00063</td>
+      <td>0.00061</td>
     </tr>
   </tbody>
 </table></div></div>
@@ -1662,8 +1661,8 @@ outcome      : 463 ones, 762 zeros
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>rho  : 0.434   (true 0.5)
-beta : [-0.287  0.437]   (true [-0.3  0.5])
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>rho  : 0.671   (true 0.5)
+beta : [-0.179  0.441]   (true [-0.3  0.5])
 </code></pre></div>
 </div>
 </div>
@@ -1675,11 +1674,11 @@ chain is healthy, then read the width as what the data support.</p>
 <p>In a linear SAR model <span class="math notranslate nohighlight">\(\beta\)</span> is a marginal effect. <strong>Here it is not.</strong> The
 link is nonlinear, so a change in <span class="math notranslate nohighlight">\(x_i\)</span> moves <span class="math notranslate nohighlight">\(y_j\)</span> through both the spatial
 multiplier <span class="math notranslate nohighlight">\((I - \rho W)^{-1}\)</span> and the logistic derivative, which varies with
-<span class="math notranslate nohighlight">\(\eta_i\)</span>. <code class="docutils literal notranslate"><span class="pre">spatial_effects()</span></code> does the averaging and returns the
+<span class="math notranslate nohighlight">\(\eta_i\)</span>. <code class="docutils literal notranslate"><span class="pre">impacts()</span></code> does the averaging and returns the
 LeSage–Pace decomposition — direct, indirect, total — on the probability scale.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">model_sar</span><span class="o">.</span><span class="n">spatial_effects</span><span class="p">()</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">model_sar</span><span class="o">.</span><span class="n">impacts</span><span class="p">()</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
 </code></pre></div>
 </div>
 </div>
@@ -1734,17 +1733,17 @@ LeSage–Pace decomposition — direct, indirect, total — on the probability s
   <tbody>
     <tr>
       <th>x1</th>
-      <td>0.466</td>
-      <td>0.3429</td>
-      <td>0.5906</td>
+      <td>0.5164</td>
+      <td>0.3944</td>
+      <td>0.6409</td>
       <td>0.0</td>
-      <td>0.3646</td>
-      <td>0.0179</td>
-      <td>0.8731</td>
-      <td>0.0347</td>
-      <td>0.8306</td>
-      <td>0.459</td>
-      <td>1.3434</td>
+      <td>0.9109</td>
+      <td>0.3636</td>
+      <td>1.6429</td>
+      <td>0.0</td>
+      <td>1.4273</td>
+      <td>0.8535</td>
+      <td>2.1608</td>
       <td>0.0</td>
     </tr>
   </tbody>
@@ -1755,22 +1754,165 @@ LeSage–Pace decomposition — direct, indirect, total — on the probability s
 “how much does <span class="math notranslate nohighlight">\(x\)</span> change the outcome”. The gap between <code class="docutils literal notranslate"><span class="pre">direct</span></code> and the
 coefficient is the part of the effect that the spatial multiplier feeds back
 onto the unit itself.</p>
-<h2 id="fit-the-error-model">Fit the error model<a class="headerlink" href="#fit-the-error-model" title="Link to this heading">¶</a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">SEMLogit</span></code> swaps the lag for spatially correlated disturbances. The collapsed
-density for <span class="math notranslate nohighlight">\(\lambda\)</span> carries an extra term the SAR version does not: the
-correction <span class="math notranslate nohighlight">\(-\tfrac{1}{2}(X\beta)^\top A_\lambda^\top A_\lambda (X\beta)\)</span>
-depends on <span class="math notranslate nohighlight">\(\lambda\)</span>, whereas the SAR analogue is constant in <span class="math notranslate nohighlight">\(\rho\)</span> and drops
-out.</p>
+<h2 id="configure-the-sampler">Configure the sampler<a class="headerlink" href="#configure-the-sampler" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">backend</span></code> behaves as it does everywhere in the package: <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code>
+(the default — JAX when installed, else NumPy), <code class="docutils literal notranslate"><span class="pre">&quot;jax&quot;</span></code>, or <code class="docutils literal notranslate"><span class="pre">&quot;numpy&quot;</span></code>.</p>
+<p>Beyond the shared <code class="docutils literal notranslate"><span class="pre">fit()</span></code> arguments, <code class="docutils literal notranslate"><span class="pre">SARLogit</span></code> accepts the options below.
+Anything else raises <code class="docutils literal notranslate"><span class="pre">TypeError</span></code> rather than being silently ignored.</p>
+<table class="docutils data align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Option</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">slice_width</span></code></p></td>
+<td><p>initial slice interval for ρ</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">init_jitter</span></code></p></td>
+<td><p>scale of the random perturbation applied to chain starts</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">krylov_degree</span></code>, <code class="docutils literal notranslate"><span class="pre">krylov_dmax</span></code>, <code class="docutils literal notranslate"><span class="pre">krylov_reuse</span></code></p></td>
+<td><p>shift-invert Krylov basis for the ρ conditional — degree, trust radius, and whether the basis is reused across draws</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">timeout</span></code></p></td>
+<td><p>abort a run that exceeds this many seconds</p></td>
+</tr>
+</tbody>
+</table>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">data_sem</span> <span class="o">=</span> <span class="n">simulate_sem_logit</span><span class="p">(</span><span class="n">n_side</span><span class="o">=</span><span class="mi">35</span><span class="p">,</span> <span class="n">lam</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="n">BETA_TRUE</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">)</span>
-<span class="n">y_sem</span><span class="p">,</span> <span class="n">X_sem</span><span class="p">,</span> <span class="n">W_sem</span> <span class="o">=</span> <span class="n">data_sem</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">data_sem</span><span class="p">[</span><span class="s2">"X"</span><span class="p">],</span> <span class="n">data_sem</span><span class="p">[</span><span class="s2">"W_graph"</span><span class="p">]</span>
-
-<span class="n">model_sem</span> <span class="o">=</span> <span class="n">SEMLogit</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y_sem</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X_sem</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W_sem</span><span class="p">)</span>
-<span class="n">idata_sem</span> <span class="o">=</span> <span class="n">model_sem</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
-    <span class="n">draws</span><span class="o">=</span><span class="mi">1500</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">800</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">random_seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">idata_tuned</span> <span class="o">=</span> <span class="n">SARLogit</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y_sar</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X_sar</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W_sar</span><span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
+    <span class="n">draws</span><span class="o">=</span><span class="mi">800</span><span class="p">,</span>
+    <span class="n">tune</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span>
+    <span class="n">chains</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+    <span class="n">random_seed</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span>
+    <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="n">backend</span><span class="o">=</span><span class="s2">"numpy"</span><span class="p">,</span>
+    <span class="n">slice_width</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span>
+    <span class="n">krylov_reuse</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
 <span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span>
+    <span class="sa">f</span><span class="s2">"rho = </span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">idata_tuned</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s1">'rho'</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">, "</span>
+    <span class="sa">f</span><span class="s2">"ess = </span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">az</span><span class="o">.</span><span class="n">ess</span><span class="p">(</span><span class="n">idata_tuned</span><span class="p">,</span><span class="w"> </span><span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s1">'rho'</span><span class="p">])[</span><span class="s1">'rho'</span><span class="p">])</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2">"</span>
+<span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>rho = 0.678, ess = 1212
+</code></pre></div>
+</div>
+</div>
+</div>
+<h2 id="fitted-probabilities">Fitted probabilities<a class="headerlink" href="#fitted-probabilities" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">fitted_probabilities()</span></code> returns <span class="math notranslate nohighlight">\(P(y_i = 1)\)</span> at the posterior mean,
+<span class="math notranslate nohighlight">\(\hat\eta = (I - \hat\rho W)^{-1} X\hat\beta\)</span>: the multiplier is in the mean.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">probs_sar</span> <span class="o">=</span> <span class="n">model_sar</span><span class="o">.</span><span class="n">fitted_probabilities</span><span class="p">()</span>
 
+<span class="n">pd</span><span class="o">.</span><span class="n">Series</span><span class="p">(</span>
+    <span class="p">{</span><span class="s2">"mean"</span><span class="p">:</span> <span class="n">probs_sar</span><span class="o">.</span><span class="n">mean</span><span class="p">(),</span> <span class="s2">"min"</span><span class="p">:</span> <span class="n">probs_sar</span><span class="o">.</span><span class="n">min</span><span class="p">(),</span> <span class="s2">"max"</span><span class="p">:</span> <span class="n">probs_sar</span><span class="o">.</span><span class="n">max</span><span class="p">()},</span>
+    <span class="n">name</span><span class="o">=</span><span class="s2">"SARLogit"</span><span class="p">,</span>
+<span class="p">)</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>mean    0.367
+min     0.075
+max     0.769
+Name: SARLogit, dtype: float64
+</code></pre></div>
+</div>
+</div>
+</div>
+<h2 id="fit-the-latent-sar-and-sem">Fit the latent SAR and SEM<a class="headerlink" href="#fit-the-latent-sar-and-sem" title="Link to this heading">¶</a></h2>
+<p>The reduced form lets the multiplier carry only the covariates. The <strong>latent
+SAR</strong> carries the logit’s own disturbance too, <span class="math notranslate nohighlight">\(y = \mathbf 1\{y^* &gt; 0\}\)</span> with
+<span class="math notranslate nohighlight">\((I - \rho W)y^* = X\beta + \varepsilon\)</span> and <span class="math notranslate nohighlight">\(\varepsilon\)</span> standard logistic, so
+neighbours share their unobservables as well as their covariates; <code class="docutils literal notranslate"><span class="pre">SARLogit</span></code>
+fits it with <code class="docutils literal notranslate"><span class="pre">latent=True</span></code>. Its error-only sibling, <span class="math notranslate nohighlight">\(y^* = X\beta +
+(I - \lambda W)^{-1}\varepsilon\)</span>, is <code class="docutils literal notranslate"><span class="pre">SEMLogit</span></code>. At <span class="math notranslate nohighlight">\(\rho = 0\)</span> or <span class="math notranslate nohighlight">\(\lambda = 0\)</span>
+both are the plain logit, and neither has a variance parameter to trade off
+against <span class="math notranslate nohighlight">\(\rho\)</span>.</p>
+<p>Both sample by an exact Gibbs sweep over the latent utilities and the
+Kolmogorov scales that make the logistic a normal scale mixture (this needs
+<code class="docutils literal notranslate"><span class="pre">augax</span></code>). They have no NUTS path and store no pointwise log-likelihood.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.dgp</span><span class="w"> </span><span class="kn">import</span> <span class="n">simulate_sem_logit</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">SEMLogit</span>
+
+<span class="n">data_lat</span> <span class="o">=</span> <span class="n">simulate_sar_logit</span><span class="p">(</span><span class="n">n_side</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="n">BETA_TRUE</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">latent</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">latent</span> <span class="o">=</span> <span class="n">SARLogit</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">data_lat</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">X</span><span class="o">=</span><span class="n">data_lat</span><span class="p">[</span><span class="s2">"X"</span><span class="p">],</span> <span class="n">W</span><span class="o">=</span><span class="n">data_lat</span><span class="p">[</span><span class="s2">"W_graph"</span><span class="p">],</span> <span class="n">latent</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">idata_lat</span> <span class="o">=</span> <span class="n">latent</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">random_seed</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">az</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="n">idata_lat</span><span class="p">,</span> <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s2">"rho"</span><span class="p">,</span> <span class="s2">"beta"</span><span class="p">])</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>mean</th>
+      <th>sd</th>
+      <th>eti89_lb</th>
+      <th>eti89_ub</th>
+      <th>ess_bulk</th>
+      <th>ess_tail</th>
+      <th>r_hat</th>
+      <th>mcse_mean</th>
+      <th>mcse_sd</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>rho</th>
+      <td>0.322</td>
+      <td>0.061</td>
+      <td>0.22</td>
+      <td>0.42</td>
+      <td>437</td>
+      <td>709</td>
+      <td>1.01</td>
+      <td>0.0029</td>
+      <td>0.0014</td>
+    </tr>
+    <tr>
+      <th>beta[x0]</th>
+      <td>-0.256</td>
+      <td>0.065</td>
+      <td>-0.36</td>
+      <td>-0.15</td>
+      <td>827</td>
+      <td>1109</td>
+      <td>1.00</td>
+      <td>0.0023</td>
+      <td>0.0013</td>
+    </tr>
+    <tr>
+      <th>beta[x1]</th>
+      <td>0.448</td>
+      <td>0.075</td>
+      <td>0.32</td>
+      <td>0.57</td>
+      <td>639</td>
+      <td>979</td>
+      <td>1.00</td>
+      <td>0.003</td>
+      <td>0.0016</td>
+    </tr>
+  </tbody>
+</table></div></div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">data_sem</span> <span class="o">=</span> <span class="n">simulate_sem_logit</span><span class="p">(</span><span class="n">n_side</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">lam</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="n">BETA_TRUE</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">4</span><span class="p">)</span>
+<span class="n">sem</span> <span class="o">=</span> <span class="n">SEMLogit</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">data_sem</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">X</span><span class="o">=</span><span class="n">data_sem</span><span class="p">[</span><span class="s2">"X"</span><span class="p">],</span> <span class="n">W</span><span class="o">=</span><span class="n">data_sem</span><span class="p">[</span><span class="s2">"W_graph"</span><span class="p">])</span>
+<span class="n">idata_sem</span> <span class="o">=</span> <span class="n">sem</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">random_seed</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 <span class="n">az</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="n">idata_sem</span><span class="p">,</span> <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s2">"lam"</span><span class="p">,</span> <span class="s2">"beta"</span><span class="p">])</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
 </code></pre></div>
 </div>
@@ -1794,73 +1936,85 @@ out.</p>
   <tbody>
     <tr>
       <th>lam</th>
-      <td>0.37</td>
-      <td>0.15</td>
-      <td>0.11</td>
-      <td>0.58</td>
-      <td>3466</td>
-      <td>3469</td>
+      <td>0.294</td>
+      <td>0.063</td>
+      <td>0.19</td>
+      <td>0.39</td>
+      <td>334</td>
+      <td>573</td>
       <td>1.00</td>
-      <td>0.0026</td>
-      <td>0.0021</td>
+      <td>0.0035</td>
+      <td>0.0017</td>
     </tr>
     <tr>
       <th>beta[x0]</th>
-      <td>-0.365</td>
-      <td>0.084</td>
-      <td>-0.5</td>
-      <td>-0.23</td>
-      <td>1238</td>
-      <td>2160</td>
+      <td>-0.393</td>
+      <td>0.096</td>
+      <td>-0.54</td>
+      <td>-0.24</td>
+      <td>748</td>
+      <td>1054</td>
       <td>1.00</td>
-      <td>0.0024</td>
-      <td>0.0012</td>
+      <td>0.0035</td>
+      <td>0.0018</td>
     </tr>
     <tr>
       <th>beta[x1]</th>
-      <td>0.51</td>
-      <td>0.08</td>
-      <td>0.38</td>
-      <td>0.64</td>
-      <td>350</td>
-      <td>606</td>
-      <td>1.01</td>
-      <td>0.0043</td>
-      <td>0.002</td>
+      <td>0.477</td>
+      <td>0.072</td>
+      <td>0.36</td>
+      <td>0.59</td>
+      <td>720</td>
+      <td>968</td>
+      <td>1.00</td>
+      <td>0.0027</td>
+      <td>0.0015</td>
     </tr>
   </tbody>
 </table></div></div>
 </div>
-<h2 id="reduced-form-or-structural-form">Reduced form or structural form<a class="headerlink" href="#reduced-form-or-structural-form" title="Link to this heading">¶</a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">SARLogitStructural</span></code> samples the same SAR-logit model without inverting
-<span class="math notranslate nohighlight">\((I - \rho W)\)</span> into the mean. Fit both on the same data and they should agree;
-what differs is the sampler’s internals.</p>
+<p>The latent models’ impacts are on the latent index (<code class="docutils literal notranslate"><span class="pre">scale=&quot;probability&quot;</span></code>
+raises for them), and <code class="docutils literal notranslate"><span class="pre">fitted_probabilities()</span></code> simulates the utilities: the
+multiplier mixes the disturbances, so their marginals are no longer logistic.
+The GLM suite’s LM tests on a <code class="docutils literal notranslate"><span class="pre">Logit</span></code> fit are the score tests of exactly these
+two models, LM-Lag of the latent SAR and LM-Error of the latent SEM; see
+<a class="reference internal" href="../models.html"><span class="std std-doc">Supported Models</span></a>.</p>
+<h2 id="let-the-tests-choose-the-form">Let the tests choose the form<a class="headerlink" href="#let-the-tests-choose-the-form" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">spatial_diagnostics_decision()</span></code> on a fitted <code class="docutils literal notranslate"><span class="pre">Logit</span></code> reads the spillover and
+error tests as a pair. A latent SAR moves both, in the proportion its one <span class="math notranslate nohighlight">\(\rho\)</span>
+implies; when they move out of that proportion, <code class="docutils literal notranslate"><span class="pre">Robust-LM-Error</span></code> is significant
+and the tree names <code class="docutils literal notranslate"><span class="pre">SDEMLogit</span></code>, <span class="math notranslate nohighlight">\(y^* = X\beta + WX\theta + (I - \lambda
+W)^{-1}\varepsilon\)</span>, which gives the spillover and the clustered disturbance a
+parameter each. Here the covariate’s spillover opposes its direct effect, which
+no single <span class="math notranslate nohighlight">\(\rho\)</span> can produce.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">model_struct</span> <span class="o">=</span> <span class="n">SARLogitStructural</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y_sar</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X_sar</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W_sar</span><span class="p">)</span>
-<span class="n">idata_struct</span> <span class="o">=</span> <span class="n">model_struct</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
-    <span class="n">draws</span><span class="o">=</span><span class="mi">1500</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">800</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">4</span><span class="p">,</span> <span class="n">random_seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span>
-<span class="p">)</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.dgp</span><span class="w"> </span><span class="kn">import</span> <span class="n">simulate_sdem_logit</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">Logit</span><span class="p">,</span> <span class="n">SDEMLogit</span>
 
-<span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
-    <span class="p">{</span>
-        <span class="s2">"reduced (SARLogit)"</span><span class="p">:</span> <span class="p">[</span>
-            <span class="nb">float</span><span class="p">(</span><span class="n">idata_sar</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s2">"rho"</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()),</span>
-            <span class="nb">float</span><span class="p">(</span><span class="n">idata_sar</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s2">"rho"</span><span class="p">]</span><span class="o">.</span><span class="n">std</span><span class="p">()),</span>
-            <span class="nb">float</span><span class="p">(</span><span class="n">az</span><span class="o">.</span><span class="n">ess</span><span class="p">(</span><span class="n">idata_sar</span><span class="p">,</span> <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s2">"rho"</span><span class="p">])[</span><span class="s2">"rho"</span><span class="p">]),</span>
-        <span class="p">],</span>
-        <span class="s2">"structural"</span><span class="p">:</span> <span class="p">[</span>
-            <span class="nb">float</span><span class="p">(</span><span class="n">idata_struct</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s2">"rho"</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">()),</span>
-            <span class="nb">float</span><span class="p">(</span><span class="n">idata_struct</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s2">"rho"</span><span class="p">]</span><span class="o">.</span><span class="n">std</span><span class="p">()),</span>
-            <span class="nb">float</span><span class="p">(</span><span class="n">az</span><span class="o">.</span><span class="n">ess</span><span class="p">(</span><span class="n">idata_struct</span><span class="p">,</span> <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s2">"rho"</span><span class="p">])[</span><span class="s2">"rho"</span><span class="p">]),</span>
-        <span class="p">],</span>
-    <span class="p">},</span>
-    <span class="n">index</span><span class="o">=</span><span class="p">[</span><span class="s2">"rho mean"</span><span class="p">,</span> <span class="s2">"rho sd"</span><span class="p">,</span> <span class="s2">"rho ess"</span><span class="p">],</span>
-<span class="p">)</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+<span class="n">data_sdem</span> <span class="o">=</span> <span class="n">simulate_sdem_logit</span><span class="p">(</span>
+    <span class="n">n_side</span><span class="o">=</span><span class="mi">30</span><span class="p">,</span> <span class="n">lam</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span> <span class="n">beta</span><span class="o">=</span><span class="n">BETA_TRUE</span><span class="p">,</span> <span class="n">theta</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="o">-</span><span class="mf">1.0</span><span class="p">]),</span> <span class="n">seed</span><span class="o">=</span><span class="mi">0</span>
+<span class="p">)</span>
+<span class="n">logit</span> <span class="o">=</span> <span class="n">Logit</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">data_sdem</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">X</span><span class="o">=</span><span class="n">data_sdem</span><span class="p">[</span><span class="s2">"X"</span><span class="p">],</span> <span class="n">W</span><span class="o">=</span><span class="n">data_sdem</span><span class="p">[</span><span class="s2">"W_graph"</span><span class="p">])</span>
+<span class="n">logit</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">random_seed</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">logit</span><span class="o">.</span><span class="n">spatial_diagnostics_decision</span><span class="p">(</span><span class="nb">format</span><span class="o">=</span><span class="s2">"model"</span><span class="p">))</span>
+<span class="n">logit</span><span class="o">.</span><span class="n">spatial_diagnostics</span><span class="p">()</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span>
+    <span class="p">[</span><span class="s2">"Robust-LM-Lag"</span><span class="p">,</span> <span class="s2">"LM-Error"</span><span class="p">,</span> <span class="s2">"Robust-LM-Error"</span><span class="p">],</span> <span class="p">[</span><span class="s2">"statistic"</span><span class="p">,</span> <span class="s2">"p_value"</span><span class="p">]</span>
+<span class="p">]</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
 </code></pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>SDEMLogit
+</code></pre></div>
+</div>
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (2 chains in 2 jobs)
+NUTS: [beta]
+Sampling 2 chains for 500 tune and 1_000 draw iterations (1_000 + 2_000 draws total) took 3 seconds.
+We recommend running at least 4 chains for robust computation of convergence diagnostics
+</code></pre></div>
+</div>
 <div class="output text_html"><div>
 <style scoped>
     .dataframe tbody tr th:only-of-type {
@@ -1879,183 +2033,110 @@ what differs is the sampler’s internals.</p>
   <thead>
     <tr style="text-align: right;">
       <th></th>
-      <th>reduced (SARLogit)</th>
-      <th>structural</th>
+      <th>statistic</th>
+      <th>p_value</th>
+    </tr>
+    <tr>
+      <th>test</th>
+      <th></th>
+      <th></th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <th>rho mean</th>
-      <td>0.434</td>
-      <td>0.346</td>
+      <th>Robust-LM-Lag</th>
+      <td>38.352</td>
+      <td>0.0</td>
     </tr>
     <tr>
-      <th>rho sd</th>
-      <td>0.176</td>
-      <td>0.129</td>
+      <th>LM-Error</th>
+      <td>106.267</td>
+      <td>0.0</td>
     </tr>
     <tr>
-      <th>rho ess</th>
-      <td>4998.640</td>
-      <td>4158.398</td>
+      <th>Robust-LM-Error</th>
+      <td>58.949</td>
+      <td>0.0</td>
     </tr>
   </tbody>
 </table>
 </div></div></div>
 </div>
-<p>The two parameterisations are algebraically the same model — multiply
-the structural form through by <span class="math notranslate nohighlight">\((I - \rho W)^{-1}\)</span> and you have the reduced one
-— so the check is whether the posteriors are <em>consistent</em>, not whether the means
-match to three decimals. Compare the gap between the means against the posterior
-standard deviations: a difference well inside one standard deviation is two
-independent implementations agreeing, and that is worth more than either fit
-alone.</p>
-<p>They are not interchangeable in practice. The structural sampler conditions on
-<span class="math notranslate nohighlight">\(\eta\)</span> rather than integrating through the inverse, which changes both the cost
-per sweep and the width of the <span class="math notranslate nohighlight">\(\rho\)</span> posterior it reports. Prefer <code class="docutils literal notranslate"><span class="pre">SARLogit</span></code>
-unless you have a reason to want the latent field itself.</p>
-<h2 id="configure-the-sampler">Configure the sampler<a class="headerlink" href="#configure-the-sampler" title="Link to this heading">¶</a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">gibbs_backend</span></code> behaves as it does everywhere in the package: <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code>
-(the default — JAX when installed, else NumPy), <code class="docutils literal notranslate"><span class="pre">&quot;jax&quot;</span></code>, or <code class="docutils literal notranslate"><span class="pre">&quot;numpy&quot;</span></code>.</p>
-<p>Beyond the shared <code class="docutils literal notranslate"><span class="pre">fit()</span></code> arguments, the two families accept different options.
-Anything else raises <code class="docutils literal notranslate"><span class="pre">TypeError</span></code> rather than being silently ignored.</p>
-<table class="docutils data align-default">
-<thead>
-<tr class="row-odd"><th class="head"><p>Option</p></th>
-<th class="head"><p><code class="docutils literal notranslate"><span class="pre">SARLogit</span></code></p></th>
-<th class="head"><p><code class="docutils literal notranslate"><span class="pre">SEMLogit</span></code>, <code class="docutils literal notranslate"><span class="pre">SARLogitStructural</span></code></p></th>
-<th class="head"><p>Meaning</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">slice_width</span></code></p></td>
-<td><p>✅</p></td>
-<td><p>—</p></td>
-<td><p>initial slice interval for ρ</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">init_jitter</span></code></p></td>
-<td><p>✅</p></td>
-<td><p>—</p></td>
-<td><p>scale of the random perturbation applied to chain starts</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">krylov_degree</span></code>, <code class="docutils literal notranslate"><span class="pre">krylov_dmax</span></code>, <code class="docutils literal notranslate"><span class="pre">krylov_reuse</span></code></p></td>
-<td><p>✅</p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">krylov_degree</span></code>, <code class="docutils literal notranslate"><span class="pre">krylov_dmax</span></code></p></td>
-<td><p>shift-invert Krylov basis for the ρ conditional — degree, trust radius, and whether the basis is reused across draws</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">timeout</span></code></p></td>
-<td><p>✅</p></td>
-<td><p>—</p></td>
-<td><p>abort a run that exceeds this many seconds</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">lanczos_deg</span></code>, <code class="docutils literal notranslate"><span class="pre">n_probes</span></code></p></td>
-<td><p>—</p></td>
-<td><p>✅</p></td>
-<td><p>stochastic log-determinant: Lanczos depth and number of probe vectors</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">pg_n_terms</span></code></p></td>
-<td><p>—</p></td>
-<td><p>✅</p></td>
-<td><p>truncation of the Pólya–Gamma series</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">return_eta</span></code></p></td>
-<td><p>—</p></td>
-<td><p>✅</p></td>
-<td><p>keep the latent field <span class="math notranslate nohighlight">\(\eta\)</span> in the returned <code class="docutils literal notranslate"><span class="pre">InferenceData</span></code></p></td>
-</tr>
-</tbody>
-</table>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">idata_tuned</span> <span class="o">=</span> <span class="n">SARLogit</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y_sar</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X_sar</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W_sar</span><span class="p">)</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
-    <span class="n">draws</span><span class="o">=</span><span class="mi">800</span><span class="p">,</span>
-    <span class="n">tune</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span>
-    <span class="n">chains</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
-    <span class="n">random_seed</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span>
-    <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
-    <span class="n">gibbs_backend</span><span class="o">=</span><span class="s2">"numpy"</span><span class="p">,</span>
-    <span class="n">slice_width</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span>
-    <span class="n">krylov_reuse</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-<span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span>
-    <span class="sa">f</span><span class="s2">"rho = </span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">idata_tuned</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s1">'rho'</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">, "</span>
-    <span class="sa">f</span><span class="s2">"ess = </span><span class="si">{</span><span class="nb">float</span><span class="p">(</span><span class="n">az</span><span class="o">.</span><span class="n">ess</span><span class="p">(</span><span class="n">idata_tuned</span><span class="p">,</span><span class="w"> </span><span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s1">'rho'</span><span class="p">])[</span><span class="s1">'rho'</span><span class="p">])</span><span class="si">:</span><span class="s2">.0f</span><span class="si">}</span><span class="s2">"</span>
-<span class="p">)</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">sdem</span> <span class="o">=</span> <span class="n">SDEMLogit</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">data_sdem</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">X</span><span class="o">=</span><span class="n">data_sdem</span><span class="p">[</span><span class="s2">"X"</span><span class="p">],</span> <span class="n">W</span><span class="o">=</span><span class="n">data_sdem</span><span class="p">[</span><span class="s2">"W_graph"</span><span class="p">])</span>
+<span class="n">idata_sdem</span> <span class="o">=</span> <span class="n">sdem</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">draws</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">500</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">random_seed</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+<span class="n">az</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="n">idata_sdem</span><span class="p">,</span> <span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s2">"lam"</span><span class="p">,</span> <span class="s2">"beta"</span><span class="p">])</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
 </code></pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>rho = 0.426, ess = 1287
-</code></pre></div>
-</div>
-</div>
-</div>
-<h2 id="fitted-probabilities">Fitted probabilities<a class="headerlink" href="#fitted-probabilities" title="Link to this heading">¶</a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">fitted_probabilities()</span></code> returns <span class="math notranslate nohighlight">\(P(y_i = 1)\)</span> at the posterior mean. The two
-model types differ in what the spatial parameter does to the <em>mean</em>:</p>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">SARLogit</span></code> — <span class="math notranslate nohighlight">\(\hat\eta = (I - \hat\rho W)^{-1} X\hat\beta\)</span>; the multiplier is
-in the mean</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">SEMLogit</span></code> — <span class="math notranslate nohighlight">\(\hat\eta = X\hat\beta\)</span>; the spatial parameter shapes the
-variance, leaving the mean alone</p></li>
-</ul>
-<div class="cell docutils container">
-<div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">probs_sar</span> <span class="o">=</span> <span class="n">model_sar</span><span class="o">.</span><span class="n">fitted_probabilities</span><span class="p">()</span>
-<span class="n">probs_sem</span> <span class="o">=</span> <span class="n">model_sem</span><span class="o">.</span><span class="n">fitted_probabilities</span><span class="p">()</span>
-
-<span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
-    <span class="p">{</span>
-        <span class="s2">"SARLogit"</span><span class="p">:</span> <span class="p">[</span><span class="n">probs_sar</span><span class="o">.</span><span class="n">mean</span><span class="p">(),</span> <span class="n">probs_sar</span><span class="o">.</span><span class="n">min</span><span class="p">(),</span> <span class="n">probs_sar</span><span class="o">.</span><span class="n">max</span><span class="p">()],</span>
-        <span class="s2">"SEMLogit"</span><span class="p">:</span> <span class="p">[</span><span class="n">probs_sem</span><span class="o">.</span><span class="n">mean</span><span class="p">(),</span> <span class="n">probs_sem</span><span class="o">.</span><span class="n">min</span><span class="p">(),</span> <span class="n">probs_sem</span><span class="o">.</span><span class="n">max</span><span class="p">()],</span>
-    <span class="p">},</span>
-    <span class="n">index</span><span class="o">=</span><span class="p">[</span><span class="s2">"mean"</span><span class="p">,</span> <span class="s2">"min"</span><span class="p">,</span> <span class="s2">"max"</span><span class="p">],</span>
-<span class="p">)</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
-</code></pre></div>
-</div>
-</div>
-<div class="cell_output docutils container">
-<div class="output text_html"><div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
+<div class="output text_html"><table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
       <th></th>
-      <th>SARLogit</th>
-      <th>SEMLogit</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
       <th>mean</th>
-      <td>0.377</td>
-      <td>0.411</td>
+      <th>sd</th>
+      <th>eti89_lb</th>
+      <th>eti89_ub</th>
+      <th>ess_bulk</th>
+      <th>ess_tail</th>
+      <th>r_hat</th>
+      <th>mcse_mean</th>
+      <th>mcse_sd</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>lam</th>
+      <td>0.621</td>
+      <td>0.048</td>
+      <td>0.54</td>
+      <td>0.69</td>
+      <td>366</td>
+      <td>699</td>
+      <td>1.00</td>
+      <td>0.0025</td>
+      <td>0.0013</td>
     </tr>
     <tr>
-      <th>min</th>
-      <td>0.103</td>
-      <td>0.097</td>
+      <th>beta[x0]</th>
+      <td>-0.36</td>
+      <td>0.162</td>
+      <td>-0.62</td>
+      <td>-0.099</td>
+      <td>1002</td>
+      <td>1282</td>
+      <td>1.00</td>
+      <td>0.0051</td>
+      <td>0.003</td>
     </tr>
     <tr>
-      <th>max</th>
-      <td>0.737</td>
-      <td>0.779</td>
+      <th>beta[x1]</th>
+      <td>0.4</td>
+      <td>0.088</td>
+      <td>0.26</td>
+      <td>0.54</td>
+      <td>665</td>
+      <td>950</td>
+      <td>1.01</td>
+      <td>0.0034</td>
+      <td>0.002</td>
+    </tr>
+    <tr>
+      <th>beta[W*x1]</th>
+      <td>-1.04</td>
+      <td>0.18</td>
+      <td>-1.3</td>
+      <td>-0.76</td>
+      <td>477</td>
+      <td>803</td>
+      <td>1.00</td>
+      <td>0.0083</td>
+      <td>0.0039</td>
     </tr>
   </tbody>
-</table>
-</div></div></div>
+</table></div></div>
 </div>
 <h2 id="what-to-check-before-trusting-the-output">What to check before trusting the output<a class="headerlink" href="#what-to-check-before-trusting-the-output" title="Link to this heading">¶</a></h2>
 <div class="cell docutils container">
@@ -2087,15 +2168,15 @@ variance, leaving the mean alone</p></li>
   <tbody>
     <tr>
       <th>rho</th>
-      <td>0.434</td>
-      <td>0.176</td>
-      <td>0.13</td>
-      <td>0.68</td>
-      <td>4998</td>
-      <td>3815</td>
+      <td>0.671</td>
+      <td>0.099</td>
+      <td>0.5</td>
+      <td>0.81</td>
+      <td>4505</td>
+      <td>3863</td>
       <td>1.00</td>
-      <td>0.0026</td>
-      <td>0.0025</td>
+      <td>0.0016</td>
+      <td>0.0015</td>
     </tr>
   </tbody>
 </table></div></div>
@@ -2114,7 +2195,7 @@ not, because removing <span class="math notranslate nohighlight">\(y_i\)</span> 
 <ul class="simple">
 <li><p><a class="reference internal" href="bayesian_lmtests.html"><span class="std std-doc">How to run Bayesian LM specification tests</span></a> —
 deciding between lag and error before you fit</p></li>
-<li><p><a class="reference internal" href="priors.html"><span class="std std-doc">How to set priors</span></a> — <code class="docutils literal notranslate"><span class="pre">SARLogitPriors</span></code> and <code class="docutils literal notranslate"><span class="pre">SEMLogitPriors</span></code></p></li>
+<li><p><a class="reference internal" href="priors.html"><span class="std std-doc">How to set priors</span></a> — <code class="docutils literal notranslate"><span class="pre">SARLogitPriors</span></code></p></li>
 <li><p><a class="reference internal" href="negbin_estimation.html"><span class="std std-doc">How to estimate spatial negative binomial models</span></a> —
 the same Pólya–Gamma machinery for counts</p></li>
 </ul>
@@ -2164,7 +2245,7 @@ the same Pólya–Gamma machinery for counts</p></li>
   
     Created using
     <a href="https://www.sphinx-doc.org/" target="_blank" rel="noopener">Sphinx</a>
-    8.2.3.
+    9.2.0.
      and
     <a href="https://github.com/jbms/sphinx-immaterial/" target="_blank" rel="noopener">Sphinx-Immaterial</a>
   

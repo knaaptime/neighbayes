@@ -23,6 +23,7 @@
 
    .. autosummary::
    
+      ~SARNegBinPriors.alpha_fixed
       ~SARNegBinPriors.alpha_nu
       ~SARNegBinPriors.alpha_sigma
       ~SARNegBinPriors.beta_mu

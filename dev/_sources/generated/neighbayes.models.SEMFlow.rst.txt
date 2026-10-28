@@ -16,11 +16,11 @@
       ~SEMFlow.__init__
       ~SEMFlow.fit
       ~SEMFlow.fitted_values
+      ~SEMFlow.impacts
       ~SEMFlow.posterior_predictive
       ~SEMFlow.residuals
       ~SEMFlow.spatial_diagnostics
       ~SEMFlow.spatial_diagnostics_decision
-      ~SEMFlow.spatial_effects
       ~SEMFlow.summary
    
    

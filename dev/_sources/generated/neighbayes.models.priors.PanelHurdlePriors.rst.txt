@@ -1,0 +1,49 @@
+﻿neighbayes.models.priors.PanelHurdlePriors
+==========================================
+
+.. currentmodule:: neighbayes.models.priors
+
+.. autoclass:: PanelHurdlePriors
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~PanelHurdlePriors.__init__
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~PanelHurdlePriors.alpha_fixed
+      ~PanelHurdlePriors.alpha_nu
+      ~PanelHurdlePriors.alpha_sigma
+      ~PanelHurdlePriors.beta_mu
+      ~PanelHurdlePriors.beta_mu_zero
+      ~PanelHurdlePriors.beta_sigma
+      ~PanelHurdlePriors.beta_sigma_zero
+      ~PanelHurdlePriors.nu
+      ~PanelHurdlePriors.rho_lower
+      ~PanelHurdlePriors.rho_lower_zero
+      ~PanelHurdlePriors.rho_upper
+      ~PanelHurdlePriors.rho_upper_zero
+      ~PanelHurdlePriors.sigma2_alpha
+      ~PanelHurdlePriors.sigma2_beta
+      ~PanelHurdlePriors.time_effect_mu
+      ~PanelHurdlePriors.time_effect_mu_zero
+      ~PanelHurdlePriors.time_effect_sigma
+      ~PanelHurdlePriors.time_effect_sigma_zero
+      ~PanelHurdlePriors.unit_effect_mu
+      ~PanelHurdlePriors.unit_effect_mu_zero
+      ~PanelHurdlePriors.unit_effect_sd_scale
+      ~PanelHurdlePriors.unit_effect_sd_scale_zero
+   
+   

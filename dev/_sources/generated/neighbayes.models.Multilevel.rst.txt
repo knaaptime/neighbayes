@@ -1,0 +1,39 @@
+﻿neighbayes.models.Multilevel
+============================
+
+.. currentmodule:: neighbayes.models
+
+.. autoclass:: Multilevel
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Multilevel.__init__
+      ~Multilevel.fit
+      ~Multilevel.fitted_values
+      ~Multilevel.impacts
+      ~Multilevel.posterior_predictive
+      ~Multilevel.residuals
+      ~Multilevel.spatial_diagnostics
+      ~Multilevel.spatial_diagnostics_decision
+      ~Multilevel.summary
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~Multilevel.L
+      ~Multilevel.inference_data
+      ~Multilevel.level_names
+      ~Multilevel.pymc_model
+   
+   

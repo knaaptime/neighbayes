@@ -16,12 +16,12 @@
       ~SEM.__init__
       ~SEM.fit
       ~SEM.fitted_values
+      ~SEM.impacts
       ~SEM.predict
       ~SEM.predict_in_sample
       ~SEM.residuals
       ~SEM.spatial_diagnostics
       ~SEM.spatial_diagnostics_decision
-      ~SEM.spatial_effects
       ~SEM.summary
    
    

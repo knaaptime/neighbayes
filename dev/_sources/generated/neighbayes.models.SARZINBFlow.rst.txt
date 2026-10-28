@@ -1,0 +1,39 @@
+﻿neighbayes.models.SARZINBFlow
+=============================
+
+.. currentmodule:: neighbayes.models
+
+.. autoclass:: SARZINBFlow
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SARZINBFlow.__init__
+      ~SARZINBFlow.activation_probabilities
+      ~SARZINBFlow.fit
+      ~SARZINBFlow.fitted_values
+      ~SARZINBFlow.impacts
+      ~SARZINBFlow.posterior_predictive
+      ~SARZINBFlow.residuals
+      ~SARZINBFlow.spatial_diagnostics
+      ~SARZINBFlow.spatial_diagnostics_decision
+      ~SARZINBFlow.summary
+      ~SARZINBFlow.zero_attribution
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SARZINBFlow.inference_data
+      ~SARZINBFlow.pymc_model
+   
+   

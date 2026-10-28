@@ -23,6 +23,7 @@
 
    .. autosummary::
    
+      ~ZINBGibbsPriors.alpha_fixed
       ~ZINBGibbsPriors.alpha_nu
       ~ZINBGibbsPriors.alpha_sigma
       ~ZINBGibbsPriors.beta_mu

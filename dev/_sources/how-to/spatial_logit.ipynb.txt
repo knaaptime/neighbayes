@@ -5,18 +5,17 @@
    "id": "0",
    "metadata": {},
    "source": [
-    "# How to fit spatial logit models\n",
+    "# How to fit a spatial logit model\n",
     "\n",
-    "Binary outcomes with spatial dependence. `SARLogit` is the reduced form and the\n",
-    "one to reach for; `SARLogitStructural` is the same model parameterised without\n",
-    "inverting $(I - \\rho W)$; `SEMLogit` puts the spatial structure in the errors\n",
-    "instead, as a nuisance rather than a channel for spillovers.\n",
+    "Binary outcomes with spatial dependence. `SARLogit` is the reduced-form SAR: the\n",
+    "spatial multiplier acts on the mean of the log-odds. It samples by Pólya–Gamma\n",
+    "Gibbs and **has no NUTS path** — `fit(sampler=\"nuts\")` raises. The equation and\n",
+    "constructor arguments are in [Supported Models](../models.md).\n",
     "\n",
-    "All three sample by Pólya–Gamma Gibbs and **have no NUTS path** —\n",
-    "`fit(sampler=\"nuts\")` raises. Equations and constructor arguments are in\n",
-    "[Supported Models](../models.md); if you have not yet decided between a lag and\n",
-    "an error specification, start with the\n",
-    "[Bayesian LM specification tests](bayesian_lmtests.ipynb)."
+    "There is no spatial logit with random effects and no SEM logit. In a\n",
+    "cross-section the effects' sd trades off against $\\beta$ and against the spatial\n",
+    "parameter, and binary outcomes barely constrain the trade, so their posteriors\n",
+    "are mostly prior."
    ]
   },
   {
@@ -30,8 +29,8 @@
     "import numpy as np\n",
     "import pandas as pd\n",
     "\n",
-    "from neighbayes.dgp import simulate_sar_logit, simulate_sem_logit\n",
-    "from neighbayes.models import SARLogit, SARLogitStructural, SEMLogit"
+    "from neighbayes.dgp import simulate_sar_logit\n",
+    "from neighbayes.models import SARLogit"
    ]
   },
   {
@@ -72,16 +71,16 @@
    "source": [
     "## Fit the reduced-form model\n",
     "\n",
-    "The sweep has four blocks, only one of which is non-conjugate:\n",
+    "The sweep has three blocks, only one of which is non-conjugate:\n",
     "\n",
-    "1. $\\omega \\mid \\eta$ — Pólya–Gamma augmentation\n",
-    "2. $\\eta \\mid \\omega, \\rho, \\beta$ — spatial-normal draw\n",
-    "3. $\\beta \\mid \\eta, \\rho$ — conjugate normal\n",
-    "4. $\\rho \\mid \\beta, \\omega, y$ — **collapsed** one-dimensional slice, with\n",
-    "   $\\eta$ integrated out\n",
+    "1. $\\omega \\mid \\rho, \\beta$ — Pólya–Gamma augmentation at\n",
+    "   $\\eta = (I - \\rho W)^{-1}X\\beta$\n",
+    "2. $\\rho \\mid \\omega$ — a **collapsed** one-dimensional slice, with $\\beta$\n",
+    "   integrated out\n",
+    "3. $\\beta \\mid \\omega, \\rho$ — conjugate normal\n",
     "\n",
-    "Collapsing block 4 is what makes this mix. Conditioning $\\rho$ on the current\n",
-    "$\\eta$ draw instead couples the two so tightly that the chain crawls."
+    "Collapsing block 2 is what makes this mix: $\\rho$ and $\\beta$ trade off in the\n",
+    "mean, and a $\\rho$ update conditioned on the current $\\beta$ crawls."
    ]
   },
   {
@@ -133,7 +132,7 @@
     "In a linear SAR model $\\beta$ is a marginal effect. **Here it is not.** The\n",
     "link is nonlinear, so a change in $x_i$ moves $y_j$ through both the spatial\n",
     "multiplier $(I - \\rho W)^{-1}$ and the logistic derivative, which varies with\n",
-    "$\\eta_i$. `spatial_effects()` does the averaging and returns the\n",
+    "$\\eta_i$. `impacts()` does the averaging and returns the\n",
     "LeSage–Pace decomposition — direct, indirect, total — on the probability scale."
    ]
   },
@@ -144,7 +143,7 @@
    "metadata": {},
    "outputs": [],
    "source": [
-    "model_sar.spatial_effects().round(4)"
+    "model_sar.impacts().round(4)"
    ]
   },
   {
@@ -160,118 +159,23 @@
   },
   {
    "cell_type": "markdown",
-   "id": "11",
-   "metadata": {},
-   "source": [
-    "## Fit the error model\n",
-    "\n",
-    "`SEMLogit` swaps the lag for spatially correlated disturbances. The collapsed\n",
-    "density for $\\lambda$ carries an extra term the SAR version does not: the\n",
-    "correction $-\\tfrac{1}{2}(X\\beta)^\\top A_\\lambda^\\top A_\\lambda (X\\beta)$\n",
-    "depends on $\\lambda$, whereas the SAR analogue is constant in $\\rho$ and drops\n",
-    "out."
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "12",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "data_sem = simulate_sem_logit(n_side=35, lam=0.5, beta=BETA_TRUE, seed=42)\n",
-    "y_sem, X_sem, W_sem = data_sem[\"y\"], data_sem[\"X\"], data_sem[\"W_graph\"]\n",
-    "\n",
-    "model_sem = SEMLogit(y=y_sem, X=X_sem, W=W_sem)\n",
-    "idata_sem = model_sem.fit(\n",
-    "    draws=1500, tune=800, chains=4, random_seed=42, progressbar=False\n",
-    ")\n",
-    "\n",
-    "az.summary(idata_sem, var_names=[\"lam\", \"beta\"]).round(3)"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "13",
-   "metadata": {},
-   "source": [
-    "## Reduced form or structural form\n",
-    "\n",
-    "`SARLogitStructural` samples the same SAR-logit model without inverting\n",
-    "$(I - \\rho W)$ into the mean. Fit both on the same data and they should agree;\n",
-    "what differs is the sampler's internals."
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "14",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "model_struct = SARLogitStructural(y=y_sar, X=X_sar, W=W_sar)\n",
-    "idata_struct = model_struct.fit(\n",
-    "    draws=1500, tune=800, chains=4, random_seed=42, progressbar=False\n",
-    ")\n",
-    "\n",
-    "pd.DataFrame(\n",
-    "    {\n",
-    "        \"reduced (SARLogit)\": [\n",
-    "            float(idata_sar.posterior[\"rho\"].mean()),\n",
-    "            float(idata_sar.posterior[\"rho\"].std()),\n",
-    "            float(az.ess(idata_sar, var_names=[\"rho\"])[\"rho\"]),\n",
-    "        ],\n",
-    "        \"structural\": [\n",
-    "            float(idata_struct.posterior[\"rho\"].mean()),\n",
-    "            float(idata_struct.posterior[\"rho\"].std()),\n",
-    "            float(az.ess(idata_struct, var_names=[\"rho\"])[\"rho\"]),\n",
-    "        ],\n",
-    "    },\n",
-    "    index=[\"rho mean\", \"rho sd\", \"rho ess\"],\n",
-    ").round(3)"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "15",
-   "metadata": {},
-   "source": [
-    "The two parameterisations are algebraically the same model — multiply\n",
-    "the structural form through by $(I - \\rho W)^{-1}$ and you have the reduced one\n",
-    "— so the check is whether the posteriors are *consistent*, not whether the means\n",
-    "match to three decimals. Compare the gap between the means against the posterior\n",
-    "standard deviations: a difference well inside one standard deviation is two\n",
-    "independent implementations agreeing, and that is worth more than either fit\n",
-    "alone.\n",
-    "\n",
-    "They are not interchangeable in practice. The structural sampler conditions on\n",
-    "$\\eta$ rather than integrating through the inverse, which changes both the cost\n",
-    "per sweep and the width of the $\\rho$ posterior it reports. Prefer `SARLogit`\n",
-    "unless you have a reason to want the latent field itself."
-   ]
-  },
-  {
-   "cell_type": "markdown",
    "id": "16",
    "metadata": {},
    "source": [
     "## Configure the sampler\n",
     "\n",
-    "`gibbs_backend` behaves as it does everywhere in the package: `\"auto\"`\n",
+    "`backend` behaves as it does everywhere in the package: `\"auto\"`\n",
     "(the default — JAX when installed, else NumPy), `\"jax\"`, or `\"numpy\"`.\n",
     "\n",
-    "Beyond the shared `fit()` arguments, the two families accept different options.\n",
+    "Beyond the shared `fit()` arguments, `SARLogit` accepts the options below.\n",
     "Anything else raises `TypeError` rather than being silently ignored.\n",
     "\n",
-    "| Option | `SARLogit` | `SEMLogit`, `SARLogitStructural` | Meaning |\n",
-    "|---|---|---|---|\n",
-    "| `slice_width` | ✅ | — | initial slice interval for ρ |\n",
-    "| `init_jitter` | ✅ | — | scale of the random perturbation applied to chain starts |\n",
-    "| `krylov_degree`, `krylov_dmax`, `krylov_reuse` | ✅ | `krylov_degree`, `krylov_dmax` | shift-invert Krylov basis for the ρ conditional — degree, trust radius, and whether the basis is reused across draws |\n",
-    "| `timeout` | ✅ | — | abort a run that exceeds this many seconds |\n",
-    "| `lanczos_deg`, `n_probes` | — | ✅ | stochastic log-determinant: Lanczos depth and number of probe vectors |\n",
-    "| `pg_n_terms` | — | ✅ | truncation of the Pólya–Gamma series |\n",
-    "| `return_eta` | — | ✅ | keep the latent field $\\eta$ in the returned `InferenceData` |"
+    "| Option | Meaning |\n",
+    "|---|---|\n",
+    "| `slice_width` | initial slice interval for ρ |\n",
+    "| `init_jitter` | scale of the random perturbation applied to chain starts |\n",
+    "| `krylov_degree`, `krylov_dmax`, `krylov_reuse` | shift-invert Krylov basis for the ρ conditional — degree, trust radius, and whether the basis is reused across draws |\n",
+    "| `timeout` | abort a run that exceeds this many seconds |"
    ]
   },
   {
@@ -287,7 +191,7 @@
     "    chains=2,\n",
     "    random_seed=7,\n",
     "    progressbar=False,\n",
-    "    gibbs_backend=\"numpy\",\n",
+    "    backend=\"numpy\",\n",
     "    slice_width=0.4,\n",
     "    krylov_reuse=True,\n",
     ")\n",
@@ -304,13 +208,8 @@
    "source": [
     "## Fitted probabilities\n",
     "\n",
-    "`fitted_probabilities()` returns $P(y_i = 1)$ at the posterior mean. The two\n",
-    "model types differ in what the spatial parameter does to the *mean*:\n",
-    "\n",
-    "- `SARLogit` — $\\hat\\eta = (I - \\hat\\rho W)^{-1} X\\hat\\beta$; the multiplier is\n",
-    "  in the mean\n",
-    "- `SEMLogit` — $\\hat\\eta = X\\hat\\beta$; the spatial parameter shapes the\n",
-    "  variance, leaving the mean alone"
+    "`fitted_probabilities()` returns $P(y_i = 1)$ at the posterior mean,\n",
+    "$\\hat\\eta = (I - \\hat\\rho W)^{-1} X\\hat\\beta$: the multiplier is in the mean."
    ]
   },
   {
@@ -321,15 +220,123 @@
    "outputs": [],
    "source": [
     "probs_sar = model_sar.fitted_probabilities()\n",
-    "probs_sem = model_sem.fitted_probabilities()\n",
     "\n",
-    "pd.DataFrame(\n",
-    "    {\n",
-    "        \"SARLogit\": [probs_sar.mean(), probs_sar.min(), probs_sar.max()],\n",
-    "        \"SEMLogit\": [probs_sem.mean(), probs_sem.min(), probs_sem.max()],\n",
-    "    },\n",
-    "    index=[\"mean\", \"min\", \"max\"],\n",
+    "pd.Series(\n",
+    "    {\"mean\": probs_sar.mean(), \"min\": probs_sar.min(), \"max\": probs_sar.max()},\n",
+    "    name=\"SARLogit\",\n",
     ").round(3)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "f82edb28",
+   "metadata": {},
+   "source": [
+    "## Fit the latent SAR and SEM\n",
+    "\n",
+    "The reduced form lets the multiplier carry only the covariates. The **latent\n",
+    "SAR** carries the logit's own disturbance too, $y = \\mathbf 1\\{y^* > 0\\}$ with\n",
+    "$(I - \\rho W)y^* = X\\beta + \\varepsilon$ and $\\varepsilon$ standard logistic, so\n",
+    "neighbours share their unobservables as well as their covariates; `SARLogit`\n",
+    "fits it with `latent=True`. Its error-only sibling, $y^* = X\\beta +\n",
+    "(I - \\lambda W)^{-1}\\varepsilon$, is `SEMLogit`. At $\\rho = 0$ or $\\lambda = 0$\n",
+    "both are the plain logit, and neither has a variance parameter to trade off\n",
+    "against $\\rho$.\n",
+    "\n",
+    "Both sample by an exact Gibbs sweep over the latent utilities and the\n",
+    "Kolmogorov scales that make the logistic a normal scale mixture (this needs\n",
+    "`augax`). They have no NUTS path and store no pointwise log-likelihood."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "f8dfa434",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from neighbayes.dgp import simulate_sem_logit\n",
+    "from neighbayes.models import SEMLogit\n",
+    "\n",
+    "data_lat = simulate_sar_logit(n_side=30, rho=0.4, beta=BETA_TRUE, seed=3, latent=True)\n",
+    "latent = SARLogit(y=data_lat[\"y\"], X=data_lat[\"X\"], W=data_lat[\"W_graph\"], latent=True)\n",
+    "idata_lat = latent.fit(draws=1000, tune=500, chains=2, random_seed=3, progressbar=False)\n",
+    "az.summary(idata_lat, var_names=[\"rho\", \"beta\"]).round(3)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "6821d6a2",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "data_sem = simulate_sem_logit(n_side=30, lam=0.4, beta=BETA_TRUE, seed=4)\n",
+    "sem = SEMLogit(y=data_sem[\"y\"], X=data_sem[\"X\"], W=data_sem[\"W_graph\"])\n",
+    "idata_sem = sem.fit(draws=1000, tune=500, chains=2, random_seed=4, progressbar=False)\n",
+    "az.summary(idata_sem, var_names=[\"lam\", \"beta\"]).round(3)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "3e2f7137",
+   "metadata": {},
+   "source": [
+    "The latent models' impacts are on the latent index (`scale=\"probability\"`\n",
+    "raises for them), and `fitted_probabilities()` simulates the utilities: the\n",
+    "multiplier mixes the disturbances, so their marginals are no longer logistic.\n",
+    "The GLM suite's LM tests on a `Logit` fit are the score tests of exactly these\n",
+    "two models, LM-Lag of the latent SAR and LM-Error of the latent SEM; see\n",
+    "[Supported Models](../models.md)."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "f2f44000",
+   "metadata": {},
+   "source": [
+    "## Let the tests choose the form\n",
+    "\n",
+    "`spatial_diagnostics_decision()` on a fitted `Logit` reads the spillover and\n",
+    "error tests as a pair. A latent SAR moves both, in the proportion its one $\\rho$\n",
+    "implies; when they move out of that proportion, `Robust-LM-Error` is significant\n",
+    "and the tree names `SDEMLogit`, $y^* = X\\beta + WX\\theta + (I - \\lambda\n",
+    "W)^{-1}\\varepsilon$, which gives the spillover and the clustered disturbance a\n",
+    "parameter each. Here the covariate's spillover opposes its direct effect, which\n",
+    "no single $\\rho$ can produce."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "0c20192c",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from neighbayes.dgp import simulate_sdem_logit\n",
+    "from neighbayes.models import Logit, SDEMLogit\n",
+    "\n",
+    "data_sdem = simulate_sdem_logit(\n",
+    "    n_side=30, lam=0.6, beta=BETA_TRUE, theta=np.array([-1.0]), seed=0\n",
+    ")\n",
+    "logit = Logit(y=data_sdem[\"y\"], X=data_sdem[\"X\"], W=data_sdem[\"W_graph\"])\n",
+    "logit.fit(draws=1000, tune=500, chains=2, random_seed=0, progressbar=False)\n",
+    "print(logit.spatial_diagnostics_decision(format=\"model\"))\n",
+    "logit.spatial_diagnostics().loc[\n",
+    "    [\"Robust-LM-Lag\", \"LM-Error\", \"Robust-LM-Error\"], [\"statistic\", \"p_value\"]\n",
+    "].round(3)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "a5b8c7e3",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "sdem = SDEMLogit(y=data_sdem[\"y\"], X=data_sdem[\"X\"], W=data_sdem[\"W_graph\"])\n",
+    "idata_sdem = sdem.fit(draws=1000, tune=500, chains=2, random_seed=0, progressbar=False)\n",
+    "az.summary(idata_sdem, var_names=[\"lam\", \"beta\"]).round(3)"
    ]
   },
   {
@@ -376,7 +383,7 @@
     "\n",
     "- [How to run Bayesian LM specification tests](bayesian_lmtests.ipynb) —\n",
     "  deciding between lag and error before you fit\n",
-    "- [How to set priors](priors.ipynb) — `SARLogitPriors` and `SEMLogitPriors`\n",
+    "- [How to set priors](priors.ipynb) — `SARLogitPriors`\n",
     "- [How to estimate spatial negative binomial models](negbin_estimation.ipynb) —\n",
     "  the same Pólya–Gamma machinery for counts"
    ]

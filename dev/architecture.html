@@ -42,7 +42,7 @@
         <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
       
     
-        <link rel="stylesheet" type="text/css" href="_static/sphinx_immaterial_theme.74c816e3f9967dd6e.min.css?v=6cfe2491" />
+        <link rel="stylesheet" type="text/css" href="_static/sphinx_immaterial_theme.6efbe22605a23fcd6.min.css?v=b2ceb110" />
         <link rel="stylesheet" type="text/css" href="_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
         <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
         <link rel="stylesheet" type="text/css" href="_static/custom.css?v=93c5fc88" />
@@ -530,7 +530,7 @@
   
   
   <span class="md-ellipsis">
-    <span>How to fit spatial logit models</span>
+    <span>How to fit a spatial logit model</span>
     
   </span>
   
@@ -1620,7 +1620,7 @@ them — noise in the log-density is a property of the posterior you sample, not
 implementation detail to be chosen silently on a user’s behalf.</p>
 <p><strong>Automatic choices are overridable.</strong> The library picks a log-determinant method, a
 sampler, a sparse backend, and a set of priors for you. Every one of them can be
-replaced by an explicit argument — <code class="docutils literal notranslate"><span class="pre">logdet_method=</span></code>, <code class="docutils literal notranslate"><span class="pre">sampler=</span></code>, <code class="docutils literal notranslate"><span class="pre">gibbs_backend=</span></code>,
+replaced by an explicit argument — <code class="docutils literal notranslate"><span class="pre">logdet_method=</span></code>, <code class="docutils literal notranslate"><span class="pre">sampler=</span></code>, <code class="docutils literal notranslate"><span class="pre">backend=</span></code>,
 <code class="docutils literal notranslate"><span class="pre">priors=</span></code> — and the resolved log-determinant method is recorded on the model as
 <code class="docutils literal notranslate"><span class="pre">_resolved_logdet_method</span></code>. Nothing is chosen in a way you cannot see or change.</p>
 <p><strong>No bespoke result objects.</strong> <code class="docutils literal notranslate"><span class="pre">fit()</span></code> returns an ArviZ <code class="docutils literal notranslate"><span class="pre">DataTree</span></code> (<code class="docutils literal notranslate"><span class="pre">xarray.DataTree</span></code>). The posterior
@@ -1668,41 +1668,43 @@ is that adding a genuinely novel structure means extending the shared machinery 
 than writing a self-contained class, which is the right trade for a package whose models
 are variations on a small number of themes.</p>
 <h3 id="cross-section-and-panel-share-one-implementation">Cross-section and panel share one implementation<a class="headerlink" href="#cross-section-and-panel-share-one-implementation" title="Link to this heading">¶</a></h3>
-<p>Cross-sectional and panel models differ in only a few operations: what the spatial lag
-means, what operand the log-determinant factory receives, and what the symbolic sparse
-operator looks like inside a PyMC model. Those three are isolated behind the
-<code class="docutils literal notranslate"><span class="pre">SpatialStructure</span></code> strategy in
+<p>A cross-section is the <code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">=</span> <span class="pre">1</span></code> panel. One base class,
+<a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/base.py"><code class="docutils literal notranslate"><span class="pre">SpatialModel</span></code></a>,
+parses either kind of data: given time (<code class="docutils literal notranslate"><span class="pre">time_col</span></code>, or <code class="docutils literal notranslate"><span class="pre">T</span></code>), it sorts and stacks the
+panel by period, then unit, and applies the within transformation its fixed effects
+need; without time it holds <code class="docutils literal notranslate"><span class="pre">N</span> <span class="pre">=</span> <span class="pre">n</span></code> units and <code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">=</span> <span class="pre">1</span></code> period. The operations that
+depend on that layout are isolated in the <code class="docutils literal notranslate"><span class="pre">SpatialStructure</span></code> of
 <a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_structure.py"><code class="docutils literal notranslate"><span class="pre">models/_base/_structure.py</span></code></a>:</p>
 <table class="docutils data align-default">
 <colgroup>
-<col style="width: 22.0%" />
-<col style="width: 39.0%" />
-<col style="width: 39.0%" />
+<col style="width: 30.0%" />
+<col style="width: 70.0%" />
 </colgroup>
 <thead>
 <tr class="row-odd"><th class="head"><p>operation</p></th>
-<th class="head"><p><code class="docutils literal notranslate"><span class="pre">CrossSectionStructure</span></code></p></th>
-<th class="head"><p><code class="docutils literal notranslate"><span class="pre">PanelStructure</span></code></p></th>
+<th class="head"><p>what it does</p></th>
 </tr>
 </thead>
 <tbody>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">spatial_lag(x)</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">W</span> <span class="pre">&#64;</span> <span class="pre">x</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">W</span></code> applied per period via the Kronecker structure</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">W</span></code> applied within each period of the stacked data (<code class="docutils literal notranslate"><span class="pre">W</span> <span class="pre">&#64;</span> <span class="pre">x</span></code> in a cross-section)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">batch_spatial_lag(resid)</span></code></p></td>
+<td><p>the same lag for a batch of residual draws, one sparse multiply</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">W_sparse_NT()</span></code></p></td>
+<td><p>the <code class="docutils literal notranslate"><span class="pre">(N·T)×(N·T)</span></code> block <code class="docutils literal notranslate"><span class="pre">I_T</span> <span class="pre">⊗</span> <span class="pre">W</span></code>, so one multiply lags a stacked panel; <code class="docutils literal notranslate"><span class="pre">W</span></code>
+itself in a cross-section</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">logdet_W_operand()</span></code></p></td>
-<td><p>dense <code class="docutils literal notranslate"><span class="pre">W</span></code></p></td>
-<td><p>sparse <code class="docutils literal notranslate"><span class="pre">W</span></code> (the panel logdet path stays sparse)</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">W_pt_sparse()</span></code></p></td>
-<td><p>the <code class="docutils literal notranslate"><span class="pre">N×N</span></code> <code class="docutils literal notranslate"><span class="pre">W</span></code></p></td>
-<td><p>the <code class="docutils literal notranslate"><span class="pre">(N·T)×(N·T)</span></code> block <code class="docutils literal notranslate"><span class="pre">I_T</span> <span class="pre">⊗</span> <span class="pre">W</span></code>, so one symbolic multiply lags a stacked panel</p></td>
+<td><p>the sparse <code class="docutils literal notranslate"><span class="pre">W</span></code> handed to the log-determinant factory</p></td>
 </tr>
 </tbody>
 </table>
-<p>Everything that is behaviour-identical across the two lives in the shared base. This is
-why panel models inherit the diagnostics, effects, and prior handling of their
-cross-sectional counterparts without re-implementation.</p>
+<p>Everything else is behaviour-identical across the two, so panel models inherit the
+diagnostics, effects, and prior handling of their cross-sectional counterparts without
+re-implementation. The fixed-effects likelihood dimensions (Lee and Yu 2010) reduce to
+the cross-section’s when there are no effects and <code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">=</span> <span class="pre">1</span></code>.</p>
 <h3 id="priors-mirror-model-inheritance">Priors mirror model inheritance<a class="headerlink" href="#priors-mirror-model-inheritance" title="Link to this heading">¶</a></h3>
 <p>Priors are frozen dataclasses in
 <a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/priors.py"><code class="docutils literal notranslate"><span class="pre">models/priors.py</span></code></a>,
@@ -1719,7 +1721,7 @@ rather than a function. Three design decisions shape it.</p>
 <p><strong>Precompute once, evaluate many times.</strong> Every method splits into a <code class="docutils literal notranslate"><span class="pre">*_precompute</span></code>
 step that does the expensive linear algebra and an <code class="docutils literal notranslate"><span class="pre">*_eval</span></code> step that answers a single
 <span class="math notranslate nohighlight">\(\rho\)</span>. The sampler pays the setup once per model and then evaluates in microseconds.
-This is what makes exact interpolation competitive: <code class="docutils literal notranslate"><span class="pre">cheb_cholesky</span></code> factorises at a
+This is what makes exact interpolation competitive: <code class="docutils literal notranslate"><span class="pre">cheb</span></code> on <code class="docutils literal notranslate"><span class="pre">chol</span></code> factorises at a
 handful of Chebyshev nodes and then costs ~1.3 μs per <span class="math notranslate nohighlight">\(\rho\)</span> via Clenshaw recurrence;
 <code class="docutils literal notranslate"><span class="pre">aaa</span></code> factorises on an adaptive coarse grid, selects ~7 support points, and costs ~5 μs.
 Both are accurate to near machine precision, and both need far fewer factorisations than
@@ -1762,14 +1764,16 @@ decomposition needs no <span class="math notranslate nohighlight">\(O(n^3)\)</sp
 <p>Built callables are cached by a signature of <span class="math notranslate nohighlight">\(W\)</span> and the resolved bounds
 (<code class="docutils literal notranslate"><span class="pre">get_cached_logdet_fn</span></code>), so refitting a model, or fitting several models on the same
 graph, reuses the setup.</p>
-<p><strong>Auto-selection from the shape of the problem.</strong> <code class="docutils literal notranslate"><span class="pre">resolve_logdet_method</span></code> picks from the
-size and symmetry of <span class="math notranslate nohighlight">\(W\)</span>: exact eigendecomposition below <span class="math notranslate nohighlight">\(n=500\)</span>; <code class="docutils literal notranslate"><span class="pre">cheb_cholesky</span></code> for
-symmetric <span class="math notranslate nohighlight">\(W\)</span> (undirected graphs) up to <span class="math notranslate nohighlight">\(n=20{,}000\)</span>; <code class="docutils literal notranslate"><span class="pre">aaa</span></code> for non-symmetric <span class="math notranslate nohighlight">\(W\)</span> (KNN,
-travel time, migration flows) in the same range; a stochastic method above it, where
-factorisation fill-in stops being affordable. The symmetry test uses
-<code class="docutils literal notranslate"><span class="pre">Graph.asymmetry(intrinsic=False)</span></code> for libpysal graphs and never densifies a sparse
-matrix to check. Both cutoffs are environment variables, and <code class="docutils literal notranslate"><span class="pre">logdet_method=</span></code> overrides
-the choice outright.</p>
+<p><strong>Auto-selection from the shape of the problem.</strong> A model names its log-determinant
+by <code class="docutils literal notranslate"><span class="pre">logdet_method</span></code> (the approximation over ρ) and <code class="docutils literal notranslate"><span class="pre">logdet_decomp</span></code> (what supplies exact
+values), and <code class="docutils literal notranslate"><span class="pre">logdet_key</span></code> resolves the pair to one internal key that the factories
+and samplers dispatch on. Left to auto, <code class="docutils literal notranslate"><span class="pre">resolve_logdet_method</span></code> picks from the size
+and symmetry of <span class="math notranslate nohighlight">\(W\)</span>: <code class="docutils literal notranslate"><span class="pre">exact</span></code> on <code class="docutils literal notranslate"><span class="pre">eig</span></code> below <span class="math notranslate nohighlight">\(n=500\)</span>; <code class="docutils literal notranslate"><span class="pre">aaa</span></code> on <code class="docutils literal notranslate"><span class="pre">chol</span></code> for undirected <span class="math notranslate nohighlight">\(W\)</span>
+and on <code class="docutils literal notranslate"><span class="pre">lu</span></code> for directed <span class="math notranslate nohighlight">\(W\)</span> (KNN, travel time, migration flows) up to <span class="math notranslate nohighlight">\(n=60{,}000\)</span>; and
+<code class="docutils literal notranslate"><span class="pre">stochastic</span></code> above it, where factorisation fill-in stops being affordable. The
+symmetry test uses <code class="docutils literal notranslate"><span class="pre">Graph.asymmetry(intrinsic=False)</span></code> for libpysal graphs and never
+densifies a sparse matrix to check. Both cutoffs are environment variables, and the two
+arguments override the choice outright.</p>
 <h2 id="sampler-dispatch">Sampler dispatch<a class="headerlink" href="#sampler-dispatch" title="Link to this heading">¶</a></h2>
 <p>Sampler selection is a module-level dict keyed by <code class="docutils literal notranslate"><span class="pre">(likelihood,</span> <span class="pre">structure)</span></code> in
 <a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/samplers/_registry.py"><code class="docutils literal notranslate"><span class="pre">samplers/_registry.py</span></code></a>
@@ -1786,10 +1790,12 @@ lets class-based families keep their own <code class="docutils literal notransla
 <code class="docutils literal notranslate"><span class="pre">run_chains</span></code> + <code class="docutils literal notranslate"><span class="pre">gibbs_to_inference_data</span></code>. The registry unifies dispatch, not sampler
 internals.</p>
 </dd>
-<dt><code class="docutils literal notranslate"><span class="pre">backends</span></code> / <code class="docutils literal notranslate"><span class="pre">auto_backend</span></code></dt><dd><p>Which of <code class="docutils literal notranslate"><span class="pre">{&quot;jax&quot;,</span> <span class="pre">&quot;numpy&quot;}</span></code> the family supports, and which one <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code> should prefer.
-The Gaussian families prefer JAX, where a vmapped Gibbs is the fast path. The
-Pólya–Gamma families pin <code class="docutils literal notranslate"><span class="pre">auto</span></code> to NumPy, because there the CHOLMOD <code class="docutils literal notranslate"><span class="pre">factorize</span></code> path
-is fastest and the dense JAX path is an opt-in for GPU work.</p>
+<dt><code class="docutils literal notranslate"><span class="pre">backends</span></code></dt><dd><p>Which of <code class="docutils literal notranslate"><span class="pre">{&quot;jax&quot;,</span> <span class="pre">&quot;numpy&quot;}</span></code> the family supports; <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code> takes JAX when the family
+supports it and JAX is installed. The JAX path solves with sparse
+factorizations (sparsax), compiles once per model structure, and draws Pólya–Gamma
+variables exactly (augax), where the NumPy path’s draws carry a known bias in the
+<code class="docutils literal notranslate"><span class="pre">polyagamma</span></code> package and warn. The random-effects, count-panel and hurdle families
+are NumPy-only.</p>
 </dd>
 <dt><code class="docutils literal notranslate"><span class="pre">options</span></code></dt><dd><p>The family-specific <code class="docutils literal notranslate"><span class="pre">fit</span></code> keywords this runner accepts, e.g. <code class="docutils literal notranslate"><span class="pre">slice_width</span></code>,
 <code class="docutils literal notranslate"><span class="pre">krylov_degree</span></code>. The base <code class="docutils literal notranslate"><span class="pre">fit()</span></code> pops exactly these and raises on anything left over,
@@ -1820,13 +1826,17 @@ identical data — the check the package’s own validation notebooks run.</p>
 <p>There is one model code path. Acceleration is selected at run time and degrades to a
 working default rather than an error:</p>
 <ul class="simple">
-<li><p><strong>JAX</strong> is optional. <code class="docutils literal notranslate"><span class="pre">gibbs_backend=&quot;auto&quot;</span></code> uses it when it is installed and the
+<li><p><strong>JAX</strong> is optional. <code class="docutils literal notranslate"><span class="pre">backend=&quot;auto&quot;</span></code> uses it when it is installed and the
 family prefers it, NumPy otherwise. Requesting <code class="docutils literal notranslate"><span class="pre">&quot;jax&quot;</span></code> explicitly without JAX
 installed raises, because a silent downgrade of an explicit request would be
 misleading.</p></li>
-<li><p><strong>Sparse solves</strong> prefer KLU, then UMFPACK (both from <code class="docutils literal notranslate"><span class="pre">scikit-sparse</span></code>), then SciPy’s
-SuperLU, with a one-time advisory warning when it falls back so the performance loss
-is visible.</p></li>
+<li><p><strong>Sparse solves</strong> use KLU or UMFPACK (both from <code class="docutils literal notranslate"><span class="pre">scikit-sparse</span></code> and <code class="docutils literal notranslate"><span class="pre">sparsax</span></code>), chosen
+for each sparsity pattern by the work per factor entry of its factorization: KLU on
+the sparse graphs of contiguity and few-neighbour KNN weights, UMFPACK once the
+factor’s fronts grow dense. The choice depends on the pattern alone, never on a
+timing, so a fixed seed reproduces the same draws. Without <code class="docutils literal notranslate"><span class="pre">scikit-sparse</span></code> they fall
+back to SciPy’s SuperLU, with a one-time advisory warning so the performance loss is
+visible.</p></li>
 <li><p><strong>A dense LAPACK fast path</strong> handles small problems: below <code class="docutils literal notranslate"><span class="pre">NEIGHBAYES_KRON_DENSE_MAX</span></code>
 (512), <code class="docutils literal notranslate"><span class="pre">lu_factor</span></code> on a dense <span class="math notranslate nohighlight">\(I - \rho W\)</span> beats <code class="docutils literal notranslate"><span class="pre">splu</span></code>, because SuperLU spends most of
 its time in symbolic-factorisation overhead at that size while <code class="docutils literal notranslate"><span class="pre">dgetrf</span></code> is a single
@@ -1852,7 +1862,7 @@ robust variants — defined separately for cross-sectional, GLM, panel, and flow
 resolved through a registry of test suites. <code class="docutils literal notranslate"><span class="pre">spatial_diagnostics_decision()</span></code> walks those
 results through a decision tree and reports both the favoured model and the path it took
 to reach it, so the recommendation can be audited rather than taken on faith.</p>
-<p><code class="docutils literal notranslate"><span class="pre">spatial_effects()</span></code> decomposes a change in <span class="math notranslate nohighlight">\(X\)</span> through the spatial multiplier
+<p><code class="docutils literal notranslate"><span class="pre">impacts()</span></code> decomposes a change in <span class="math notranslate nohighlight">\(X\)</span> through the spatial multiplier
 <span class="math notranslate nohighlight">\((I - \rho W)^{-1}\)</span> into direct, indirect, and total effects, computed from the posterior
 draws. These are distributions, not delta-method approximations — which is much of the
 argument for estimating these models in a Bayesian framework in the first place.</p>
@@ -1873,8 +1883,8 @@ without touching model code:</p>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NEIGHBAYES_LOGDET_EIGEN_MAX_N</span></code></p></td>
 <td><p>largest <code class="docutils literal notranslate"><span class="pre">n</span></code> auto-routed to exact eigendecomposition (default 500)</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NEIGHBAYES_LOGDET_CHEB_MAX_N</span></code></p></td>
-<td><p>largest <code class="docutils literal notranslate"><span class="pre">n</span></code> auto-routed to an exact interpolating method (default 60000)</p></td>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NEIGHBAYES_LOGDET_FACTOR_MAX_N</span></code></p></td>
+<td><p>largest <code class="docutils literal notranslate"><span class="pre">n</span></code> auto-routed to a factorization (default 60000)</p></td>
 </tr>
 <tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NEIGHBAYES_SPARSE_BACKEND</span></code></p></td>
 <td><p>force a sparse solver instead of auto-detecting</p></td>
@@ -1938,7 +1948,7 @@ snapshotted at import time in <code class="docutils literal notranslate"><span c
   
     Created using
     <a href="https://www.sphinx-doc.org/" target="_blank" rel="noopener">Sphinx</a>
-    8.2.3.
+    9.2.0.
      and
     <a href="https://github.com/jbms/sphinx-immaterial/" target="_blank" rel="noopener">Sphinx-Immaterial</a>
   

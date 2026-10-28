@@ -42,7 +42,7 @@
         <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
       
     
-        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.74c816e3f9967dd6e.min.css?v=6cfe2491" />
+        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.6efbe22605a23fcd6.min.css?v=b2ceb110" />
         <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
         <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
         <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=93c5fc88" />
@@ -532,7 +532,7 @@
   
   
   <span class="md-ellipsis">
-    <span>How to fit spatial logit models</span>
+    <span>How to fit a spatial logit model</span>
     
   </span>
   
@@ -1531,7 +1531,7 @@
   
 
 <h1 id="how-to-estimate-poisson-origindestination-flow-models">How to estimate Poisson origin–destination flow models<a class="headerlink" href="#how-to-estimate-poisson-origindestination-flow-models" title="Link to this heading">¶</a></h1>
-<p>This guide fits <code class="docutils literal notranslate"><span class="pre">SARPoissonFlowSeparable</span></code> to origin–destination counts and
+<p>This guide fits <code class="docutils literal notranslate"><span class="pre">SARPoissonFlow(separable=True)</span></code> to origin–destination counts and
 decides between Poisson and negative binomial observation noise for the same
 spatial structure.</p>
 <p>Use it when your flows are counts, you want a correctly specified count
@@ -1561,7 +1561,7 @@ Read the comparison below as a specification question, not as a robust
 alternative to one.</p>
 </div>
 <h2 id="simulate-flow-counts">Simulate flow counts<a class="headerlink" href="#simulate-flow-counts" title="Link to this heading">¶</a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">generate_poisson_flow_data_separable</span></code> draws counts from
+<p><code class="docutils literal notranslate"><span class="pre">simulate_sar_poisson_flow(separable=True)</span></code> draws counts from
 <span class="math notranslate nohighlight">\(y_{ij}\sim\text{Poisson}(\mu_{ij})\)</span> with
 <span class="math notranslate nohighlight">\(\log\boldsymbol\mu = A(\rho_d,\rho_o,\rho_w)^{-1}X\beta\)</span> and the separable
 restriction <span class="math notranslate nohighlight">\(\rho_w = -\rho_d\rho_o\)</span>. With <span class="math notranslate nohighlight">\(n = 25\)</span> regions there are
@@ -1574,12 +1574,12 @@ restriction <span class="math notranslate nohighlight">\(\rho_w = -\rho_d\rho_o\
 <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.dgp.flows</span><span class="w"> </span><span class="kn">import</span> <span class="n">generate_poisson_flow_data_separable</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models.flow</span><span class="w"> </span><span class="kn">import</span> <span class="n">SARNegBinFlowSeparable</span><span class="p">,</span> <span class="n">SARPoissonFlowSeparable</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.dgp</span><span class="w"> </span><span class="kn">import</span> <span class="n">simulate_sar_poisson_flow</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">SARNegBinFlow</span><span class="p">,</span> <span class="n">SARPoissonFlow</span>
 
 <span class="n">RHO_D</span><span class="p">,</span> <span class="n">RHO_O</span> <span class="o">=</span> <span class="mf">0.35</span><span class="p">,</span> <span class="mf">0.25</span>
 
-<span class="n">data</span> <span class="o">=</span> <span class="n">generate_poisson_flow_data_separable</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="mi">25</span><span class="p">,</span> <span class="n">rho_d</span><span class="o">=</span><span class="n">RHO_D</span><span class="p">,</span> <span class="n">rho_o</span><span class="o">=</span><span class="n">RHO_O</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">7</span><span class="p">)</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">simulate_sar_poisson_flow</span><span class="p">(</span><span class="n">n</span><span class="o">=</span><span class="mi">25</span><span class="p">,</span> <span class="n">rho_d</span><span class="o">=</span><span class="n">RHO_D</span><span class="p">,</span> <span class="n">rho_o</span><span class="o">=</span><span class="n">RHO_O</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">7</span><span class="p">,</span> <span class="n">separable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
 <span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">G</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">"y_vec"</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="s2">"X"</span><span class="p">],</span> <span class="n">data</span><span class="p">[</span><span class="s2">"G"</span><span class="p">]</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"flows      : </span><span class="si">{</span><span class="n">y</span><span class="o">.</span><span class="n">size</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
@@ -1614,7 +1614,7 @@ counts, the <span class="math notranslate nohighlight">\(N\times p\)</span> orig
 weights graph on <span class="math notranslate nohighlight">\(n\)</span> units. Poisson flow models are Gibbs-only — <code class="docutils literal notranslate"><span class="pre">fit(sampler=&quot;nuts&quot;)</span></code> raises.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">model_pois</span> <span class="o">=</span> <span class="n">SARPoissonFlowSeparable</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">G</span><span class="p">,</span> <span class="n">col_names</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s2">"col_names"</span><span class="p">])</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">model_pois</span> <span class="o">=</span> <span class="n">SARPoissonFlow</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">G</span><span class="p">,</span> <span class="n">separable</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">col_names</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s2">"col_names"</span><span class="p">])</span>
 
 <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
 <span class="n">idata_pois</span> <span class="o">=</span> <span class="n">model_pois</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
@@ -1645,46 +1645,46 @@ weights graph on <span class="math notranslate nohighlight">\(n\)</span> units. 
   <tbody>
     <tr>
       <th>rho_d</th>
-      <td>0.315</td>
-      <td>0.047</td>
+      <td>0.316</td>
+      <td>0.05</td>
       <td>0.24</td>
       <td>0.39</td>
-      <td>543</td>
-      <td>829</td>
+      <td>474</td>
+      <td>614</td>
       <td>1.00</td>
-      <td>0.002</td>
-      <td>0.0011</td>
+      <td>0.0023</td>
+      <td>0.0012</td>
     </tr>
     <tr>
       <th>rho_o</th>
-      <td>0.229</td>
-      <td>0.055</td>
+      <td>0.231</td>
+      <td>0.057</td>
       <td>0.14</td>
       <td>0.32</td>
-      <td>431</td>
-      <td>639</td>
+      <td>346</td>
+      <td>474</td>
       <td>1.00</td>
-      <td>0.0026</td>
+      <td>0.0031</td>
       <td>0.0015</td>
     </tr>
     <tr>
       <th>rho_w</th>
-      <td>-0.072</td>
-      <td>0.021</td>
+      <td>-0.073</td>
+      <td>0.022</td>
       <td>-0.11</td>
-      <td>-0.041</td>
-      <td>501</td>
-      <td>615</td>
+      <td>-0.04</td>
+      <td>384</td>
+      <td>634</td>
       <td>1.00</td>
-      <td>0.00096</td>
-      <td>0.00053</td>
+      <td>0.0011</td>
+      <td>0.00052</td>
     </tr>
   </tbody>
 </table></div></div>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">rho_w</span></code> is deterministic here — the separable model pins it to
 <span class="math notranslate nohighlight">\(-\rho_d\rho_o\)</span> rather than sampling it — so it carries no independent
-information. It is reported because the spatial-effects decomposition needs
+information. It is reported because the impacts decomposition needs
 all three.</p>
 <p>Check recovery against the truth:</p>
 <div class="cell docutils container">
@@ -1696,18 +1696,18 @@ all three.</p>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>rho_d: 0.315  (true 0.35)
-rho_o: 0.229  (true 0.25)
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>rho_d: 0.316  (true 0.35)
+rho_o: 0.231  (true 0.25)
 </code></pre></div>
 </div>
 </div>
 </div>
 <h2 id="read-the-spillovers">Read the spillovers<a class="headerlink" href="#read-the-spillovers" title="Link to this heading">¶</a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">spatial_effects()</span></code> gives the LeSage–Thomas-Agnan decomposition of each
+<p><code class="docutils literal notranslate"><span class="pre">impacts()</span></code> gives the LeSage–Thomas-Agnan decomposition of each
 covariate into origin, destination, intra-regional and network components.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">model_pois</span><span class="o">.</span><span class="n">spatial_effects</span><span class="p">()</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">model_pois</span><span class="o">.</span><span class="n">impacts</span><span class="p">()</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">4</span><span class="p">)</span>
 </code></pre></div>
 </div>
 </div>
@@ -1752,54 +1752,54 @@ covariate into origin, destination, intra-regional and network components.</p>
       <th>x0</th>
       <th>dest</th>
       <th>origin</th>
-      <td>0.0081</td>
+      <td>0.0079</td>
       <td>0.0045</td>
-      <td>0.0125</td>
+      <td>0.0128</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>dest</th>
       <th>origin</th>
-      <td>0.0070</td>
-      <td>0.0034</td>
-      <td>0.0115</td>
+      <td>0.0069</td>
+      <td>0.0033</td>
+      <td>0.0118</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x0</th>
       <th>dest</th>
       <th>destination</th>
-      <td>0.4031</td>
-      <td>0.3714</td>
-      <td>0.4368</td>
+      <td>0.4019</td>
+      <td>0.3668</td>
+      <td>0.4379</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>dest</th>
       <th>destination</th>
-      <td>0.3928</td>
-      <td>0.3623</td>
-      <td>0.4238</td>
+      <td>0.3898</td>
+      <td>0.3551</td>
+      <td>0.4223</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x0</th>
       <th>dest</th>
-      <th>intra</th>
-      <td>0.0187</td>
-      <td>0.0131</td>
-      <td>0.0247</td>
+      <th>intraunit</th>
+      <td>0.0183</td>
+      <td>0.0128</td>
+      <td>0.0241</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>dest</th>
-      <th>intra</th>
-      <td>0.0161</td>
-      <td>0.0100</td>
-      <td>0.0224</td>
+      <th>intraunit</th>
+      <td>0.0159</td>
+      <td>0.0101</td>
+      <td>0.0216</td>
       <td>0.0</td>
     </tr>
     <tr>
@@ -1807,62 +1807,62 @@ covariate into origin, destination, intra-regional and network components.</p>
       <th>dest</th>
       <th>network</th>
       <td>0.1735</td>
-      <td>0.1124</td>
-      <td>0.2423</td>
+      <td>0.1099</td>
+      <td>0.2475</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>dest</th>
       <th>network</th>
-      <td>0.1695</td>
-      <td>0.1047</td>
-      <td>0.2412</td>
+      <td>0.1687</td>
+      <td>0.1044</td>
+      <td>0.2448</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x0</th>
       <th>dest</th>
       <th>total</th>
-      <td>0.6034</td>
-      <td>0.5364</td>
-      <td>0.6759</td>
+      <td>0.6017</td>
+      <td>0.5341</td>
+      <td>0.6797</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>dest</th>
       <th>total</th>
-      <td>0.5854</td>
-      <td>0.5073</td>
-      <td>0.6732</td>
+      <td>0.5813</td>
+      <td>0.5020</td>
+      <td>0.6706</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x0</th>
       <th>orig</th>
       <th>origin</th>
-      <td>0.4529</td>
+      <td>0.4515</td>
       <td>0.4104</td>
-      <td>0.4978</td>
+      <td>0.4951</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>orig</th>
       <th>origin</th>
-      <td>0.4663</td>
-      <td>0.4323</td>
-      <td>0.5007</td>
+      <td>0.4624</td>
+      <td>0.4312</td>
+      <td>0.4972</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x0</th>
       <th>orig</th>
       <th>destination</th>
-      <td>0.0054</td>
-      <td>0.0024</td>
-      <td>0.0092</td>
+      <td>0.0055</td>
+      <td>0.0023</td>
+      <td>0.0091</td>
       <td>0.0</td>
     </tr>
     <tr>
@@ -1870,62 +1870,62 @@ covariate into origin, destination, intra-regional and network components.</p>
       <th>orig</th>
       <th>destination</th>
       <td>0.0056</td>
-      <td>0.0025</td>
+      <td>0.0023</td>
       <td>0.0092</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x0</th>
       <th>orig</th>
-      <th>intra</th>
-      <td>0.0189</td>
+      <th>intraunit</th>
+      <td>0.0188</td>
       <td>0.0171</td>
+      <td>0.0206</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>x1</th>
+      <th>orig</th>
+      <th>intraunit</th>
+      <td>0.0193</td>
+      <td>0.0180</td>
       <td>0.0207</td>
       <td>0.0</td>
     </tr>
     <tr>
-      <th>x1</th>
-      <th>orig</th>
-      <th>intra</th>
-      <td>0.0194</td>
-      <td>0.0180</td>
-      <td>0.0209</td>
-      <td>0.0</td>
-    </tr>
-    <tr>
       <th>x0</th>
       <th>orig</th>
       <th>network</th>
-      <td>0.1303</td>
-      <td>0.0572</td>
-      <td>0.2209</td>
+      <td>0.1320</td>
+      <td>0.0542</td>
+      <td>0.2177</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>orig</th>
       <th>network</th>
-      <td>0.1337</td>
-      <td>0.0594</td>
-      <td>0.2203</td>
+      <td>0.1347</td>
+      <td>0.0561</td>
+      <td>0.2206</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x0</th>
       <th>orig</th>
       <th>total</th>
-      <td>0.6075</td>
-      <td>0.4976</td>
-      <td>0.7266</td>
+      <td>0.6078</td>
+      <td>0.4977</td>
+      <td>0.7300</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>x1</th>
       <th>orig</th>
       <th>total</th>
-      <td>0.6249</td>
-      <td>0.5315</td>
-      <td>0.7324</td>
+      <td>0.6220</td>
+      <td>0.5266</td>
+      <td>0.7252</td>
       <td>0.0</td>
     </tr>
   </tbody>
@@ -1933,12 +1933,12 @@ covariate into origin, destination, intra-regional and network components.</p>
 </div></div></div>
 </div>
 <h2 id="decide-between-poisson-and-negative-binomial">Decide between Poisson and negative binomial<a class="headerlink" href="#decide-between-poisson-and-negative-binomial" title="Link to this heading">¶</a></h2>
-<p>Fit <code class="docutils literal notranslate"><span class="pre">SARNegBinFlowSeparable</span></code> to the same counts, the same design, the same
+<p>Fit <code class="docutils literal notranslate"><span class="pre">SARNegBinFlow(separable=True)</span></code> to the same counts, the same design, the same
 weights. Only the observation model differs — the negative binomial adds a
 free dispersion parameter <code class="docutils literal notranslate"><span class="pre">alpha</span></code>.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">model_nb</span> <span class="o">=</span> <span class="n">SARNegBinFlowSeparable</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">G</span><span class="p">,</span> <span class="n">col_names</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s2">"col_names"</span><span class="p">])</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">model_nb</span> <span class="o">=</span> <span class="n">SARNegBinFlow</span><span class="p">(</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">G</span><span class="p">,</span> <span class="n">separable</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">col_names</span><span class="o">=</span><span class="n">data</span><span class="p">[</span><span class="s2">"col_names"</span><span class="p">])</span>
 
 <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
 <span class="n">idata_nb</span> <span class="o">=</span> <span class="n">model_nb</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
@@ -1969,39 +1969,39 @@ free dispersion parameter <code class="docutils literal notranslate"><span class
   <tbody>
     <tr>
       <th>rho_d</th>
-      <td>0.31</td>
-      <td>0.05</td>
+      <td>0.309</td>
+      <td>0.052</td>
       <td>0.23</td>
       <td>0.39</td>
-      <td>270</td>
-      <td>333</td>
-      <td>1.00</td>
-      <td>0.0031</td>
-      <td>0.002</td>
+      <td>449</td>
+      <td>730</td>
+      <td>1.01</td>
+      <td>0.0024</td>
+      <td>0.0012</td>
     </tr>
     <tr>
       <th>rho_o</th>
-      <td>0.228</td>
-      <td>0.059</td>
-      <td>0.13</td>
-      <td>0.32</td>
-      <td>284</td>
-      <td>453</td>
-      <td>1.01</td>
-      <td>0.0035</td>
-      <td>0.0019</td>
+      <td>0.222</td>
+      <td>0.058</td>
+      <td>0.12</td>
+      <td>0.31</td>
+      <td>440</td>
+      <td>628</td>
+      <td>1.00</td>
+      <td>0.0028</td>
+      <td>0.0015</td>
     </tr>
     <tr>
       <th>alpha</th>
       <td>127</td>
-      <td>8.95e+01</td>
-      <td>52</td>
-      <td>290</td>
-      <td>1632</td>
-      <td>1310</td>
+      <td>1.48e+02</td>
+      <td>51</td>
+      <td>270</td>
+      <td>1859</td>
+      <td>1354</td>
       <td>1.00</td>
-      <td>2.5</td>
-      <td>5.2</td>
+      <td>3.7</td>
+      <td>47</td>
     </tr>
   </tbody>
 </table></div></div>
@@ -2079,18 +2079,18 @@ signal, not a rounding difference.</p>
     <tr>
       <th>rho_d</th>
       <td>0.35</td>
-      <td>0.3153</td>
-      <td>0.3104</td>
-      <td>0.0472</td>
-      <td>0.0501</td>
+      <td>0.3160</td>
+      <td>0.3090</td>
+      <td>0.0497</td>
+      <td>0.0519</td>
     </tr>
     <tr>
       <th>rho_o</th>
       <td>0.25</td>
-      <td>0.2286</td>
-      <td>0.2275</td>
-      <td>0.0554</td>
-      <td>0.0586</td>
+      <td>0.2315</td>
+      <td>0.2221</td>
+      <td>0.0567</td>
+      <td>0.0578</td>
     </tr>
   </tbody>
 </table>
@@ -2161,19 +2161,19 @@ scheme draws one mixing weight — so equal draws are not equal work.</p>
   <tbody>
     <tr>
       <th>Poisson</th>
-      <td>32.602</td>
-      <td>543.691</td>
-      <td>431.425</td>
-      <td>16.677</td>
-      <td>1.005</td>
+      <td>38.824</td>
+      <td>474.201</td>
+      <td>346.797</td>
+      <td>12.214</td>
+      <td>1.004</td>
     </tr>
     <tr>
       <th>NegBin</th>
-      <td>46.978</td>
-      <td>270.205</td>
-      <td>284.764</td>
-      <td>5.752</td>
-      <td>1.005</td>
+      <td>5.390</td>
+      <td>449.900</td>
+      <td>440.914</td>
+      <td>83.465</td>
+      <td>1.008</td>
     </tr>
   </tbody>
 </table>
@@ -2250,7 +2250,7 @@ variance-to-mean ratio and the share of zeros.</p>
     <tr>
       <th>var/mean</th>
       <td>6.383</td>
-      <td>6.601</td>
+      <td>6.497</td>
     </tr>
     <tr>
       <th>zeros</th>
@@ -2260,7 +2260,7 @@ variance-to-mean ratio and the share of zeros.</p>
     <tr>
       <th>max</th>
       <td>43.000</td>
-      <td>47.816</td>
+      <td>47.018</td>
     </tr>
   </tbody>
 </table>
@@ -2288,7 +2288,7 @@ flat ridge that one-at-a-time slice updates cannot traverse: at <span class="mat
 with <span class="math notranslate nohighlight">\(\hat R \approx 1.4\)</span>, for this sampler and for <code class="docutils literal notranslate"><span class="pre">SARNegBinFlow</span></code> alike.</p>
 <p>This is weak identification, not a sampler defect — the profile likelihood is
 genuinely flat along the ridge, and the samplers are exploring it correctly.
-Tuning will not fix it. Prefer <code class="docutils literal notranslate"><span class="pre">SARPoissonFlowSeparable</span></code> unless <span class="math notranslate nohighlight">\(\rho_w\)</span> is
+Tuning will not fix it. Prefer the separable <code class="docutils literal notranslate"><span class="pre">SARPoissonFlow</span></code> unless <span class="math notranslate nohighlight">\(\rho_w\)</span> is
 itself the object of interest.</p>
 </div>
 <h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Link to this heading">¶</a></h2>
@@ -2346,7 +2346,7 @@ models over repeated periods</p></li>
   
     Created using
     <a href="https://www.sphinx-doc.org/" target="_blank" rel="noopener">Sphinx</a>
-    8.2.3.
+    9.2.0.
      and
     <a href="https://github.com/jbms/sphinx-immaterial/" target="_blank" rel="noopener">Sphinx-Immaterial</a>
   

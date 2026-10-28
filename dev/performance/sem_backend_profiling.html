@@ -42,7 +42,7 @@
         <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
       
     
-        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.74c816e3f9967dd6e.min.css?v=6cfe2491" />
+        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.6efbe22605a23fcd6.min.css?v=b2ceb110" />
         <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
         <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
         <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=93c5fc88" />
@@ -530,7 +530,7 @@
   
   
   <span class="md-ellipsis">
-    <span>How to fit spatial logit models</span>
+    <span>How to fit a spatial logit model</span>
     
   </span>
   
@@ -1648,27 +1648,27 @@
 
 <span class="n">BACKENDS</span> <span class="o">=</span> <span class="p">{</span>
     <span class="s2">"c"</span><span class="p">:</span> <span class="p">{</span>
-        <span class="s2">"nuts_sampler"</span><span class="p">:</span> <span class="s2">"pymc"</span><span class="p">,</span>
+        <span class="s2">"backend"</span><span class="p">:</span> <span class="s2">"pymc"</span><span class="p">,</span>
         <span class="s2">"compile_kwargs"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"mode"</span><span class="p">:</span> <span class="s2">"FAST_RUN"</span><span class="p">},</span>
         <span class="s2">"requires"</span><span class="p">:</span> <span class="p">[],</span>
     <span class="p">},</span>
     <span class="s2">"numba"</span><span class="p">:</span> <span class="p">{</span>
-        <span class="s2">"nuts_sampler"</span><span class="p">:</span> <span class="s2">"pymc"</span><span class="p">,</span>
+        <span class="s2">"backend"</span><span class="p">:</span> <span class="s2">"pymc"</span><span class="p">,</span>
         <span class="s2">"compile_kwargs"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"mode"</span><span class="p">:</span> <span class="s2">"NUMBA"</span><span class="p">},</span>
         <span class="s2">"requires"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"numba"</span><span class="p">],</span>
     <span class="p">},</span>
     <span class="s2">"numpyro"</span><span class="p">:</span> <span class="p">{</span>
-        <span class="s2">"nuts_sampler"</span><span class="p">:</span> <span class="s2">"numpyro"</span><span class="p">,</span>
+        <span class="s2">"backend"</span><span class="p">:</span> <span class="s2">"numpyro"</span><span class="p">,</span>
         <span class="s2">"compile_kwargs"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
         <span class="s2">"requires"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"numpyro"</span><span class="p">,</span> <span class="s2">"jax"</span><span class="p">],</span>
     <span class="p">},</span>
     <span class="s2">"blackjax"</span><span class="p">:</span> <span class="p">{</span>
-        <span class="s2">"nuts_sampler"</span><span class="p">:</span> <span class="s2">"blackjax"</span><span class="p">,</span>
+        <span class="s2">"backend"</span><span class="p">:</span> <span class="s2">"blackjax"</span><span class="p">,</span>
         <span class="s2">"compile_kwargs"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
         <span class="s2">"requires"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"blackjax"</span><span class="p">,</span> <span class="s2">"jax"</span><span class="p">],</span>
     <span class="p">},</span>
     <span class="s2">"nutpie"</span><span class="p">:</span> <span class="p">{</span>
-        <span class="s2">"nuts_sampler"</span><span class="p">:</span> <span class="s2">"nutpie"</span><span class="p">,</span>
+        <span class="s2">"backend"</span><span class="p">:</span> <span class="s2">"nutpie"</span><span class="p">,</span>
         <span class="s2">"compile_kwargs"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
         <span class="s2">"requires"</span><span class="p">:</span> <span class="p">[</span><span class="s2">"nutpie"</span><span class="p">],</span>
     <span class="p">},</span>
@@ -1726,7 +1726,13 @@
 
     <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
     <span class="k">try</span><span class="p">:</span>
-        <span class="n">model</span> <span class="o">=</span> <span class="n">SEM</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span> <span class="n">logdet_method</span><span class="o">=</span><span class="n">PROFILE_CFG</span><span class="p">[</span><span class="s2">"logdet_method"</span><span class="p">])</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">SEM</span><span class="p">(</span>
+            <span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span>
+            <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">,</span>
+            <span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span>
+            <span class="n">logdet_method</span><span class="o">=</span><span class="n">PROFILE_CFG</span><span class="p">[</span><span class="s2">"logdet_method"</span><span class="p">],</span>
+            <span class="n">logdet_decomp</span><span class="o">=</span><span class="n">PROFILE_CFG</span><span class="p">[</span><span class="s2">"logdet_decomp"</span><span class="p">],</span>
+        <span class="p">)</span>
         <span class="n">kwargs</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
             <span class="n">draws</span><span class="o">=</span><span class="n">PROFILE_CFG</span><span class="p">[</span><span class="s2">"draws"</span><span class="p">],</span>
             <span class="n">tune</span><span class="o">=</span><span class="n">PROFILE_CFG</span><span class="p">[</span><span class="s2">"tune"</span><span class="p">],</span>
@@ -1735,10 +1741,10 @@
             <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
             <span class="n">compute_convergence_checks</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
             <span class="n">sampler</span><span class="o">=</span><span class="s2">"nuts"</span><span class="p">,</span>
-            <span class="n">nuts_sampler</span><span class="o">=</span><span class="n">cfg</span><span class="p">[</span><span class="s2">"nuts_sampler"</span><span class="p">],</span>
+            <span class="n">backend</span><span class="o">=</span><span class="n">cfg</span><span class="p">[</span><span class="s2">"backend"</span><span class="p">],</span>
             <span class="n">idata_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s2">"log_likelihood"</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
         <span class="p">)</span>
-        <span class="k">if</span> <span class="n">cfg</span><span class="p">[</span><span class="s2">"nuts_sampler"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"pymc"</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">cfg</span><span class="p">[</span><span class="s2">"backend"</span><span class="p">]</span> <span class="o">==</span> <span class="s2">"pymc"</span><span class="p">:</span>
             <span class="n">kwargs</span><span class="p">[</span><span class="s2">"cores"</span><span class="p">]</span> <span class="o">=</span> <span class="n">PROFILE_CFG</span><span class="p">[</span><span class="s2">"cores"</span><span class="p">]</span>
             <span class="n">kwargs</span><span class="p">[</span><span class="s2">"compile_kwargs"</span><span class="p">]</span> <span class="o">=</span> <span class="n">cfg</span><span class="p">[</span><span class="s2">"compile_kwargs"</span><span class="p">]</span>
         <span class="n">idata</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
@@ -1852,19 +1858,6 @@ Profiling backend=blackjax...
 Profiling backend=nutpie...
 </code></pre></div>
 </div>
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
-Multiprocess sampling (4 chains in 2 jobs)
-NUTS: [lam, beta, sigma2]
-Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws total) took 4 seconds.
-Initializing NUTS using jitter+adapt_diag...
-Multiprocess sampling (4 chains in 2 jobs)
-NUTS: [lam, beta, sigma2]
-Sampling 4 chains for 500 tune and 500 draw iterations (2_000 + 2_000 draws total) took 4 seconds.
-NUTS[numpyro]: [lam, beta, sigma2]
-NUTS[blackjax]: [lam, beta, sigma2]
-NUTS[nutpie]: [lam, beta, sigma2]
-</code></pre></div>
-</div>
 <div class="output text_html"><div>
 <style scoped>
     .dataframe tbody tr th:only-of-type {
@@ -1898,58 +1891,45 @@ NUTS[nutpie]: [lam, beta, sigma2]
   <tbody>
     <tr>
       <th>0</th>
-      <td>nutpie</td>
+      <td>c</td>
       <td>True</td>
-      <td>4.316</td>
-      <td>0.453</td>
-      <td>0.053</td>
-      <td>0.692</td>
-      <td>0.032</td>
-      <td>0.0</td>
-      <td>True</td>
-      <td></td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>False</td>
+      <td>KeyError: 'logdet_decomp'</td>
     </tr>
     <tr>
       <th>1</th>
       <td>numba</td>
       <td>True</td>
-      <td>5.493</td>
-      <td>0.451</td>
-      <td>0.051</td>
-      <td>0.693</td>
-      <td>0.032</td>
-      <td>0.0</td>
-      <td>True</td>
-      <td></td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>False</td>
+      <td>KeyError: 'logdet_decomp'</td>
     </tr>
     <tr>
       <th>2</th>
       <td>numpyro</td>
       <td>True</td>
-      <td>8.406</td>
-      <td>0.449</td>
-      <td>0.049</td>
-      <td>0.692</td>
-      <td>0.032</td>
-      <td>0.0</td>
-      <td>True</td>
-      <td></td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>False</td>
+      <td>KeyError: 'logdet_decomp'</td>
     </tr>
     <tr>
       <th>3</th>
-      <td>c</td>
-      <td>True</td>
-      <td>8.917</td>
-      <td>0.451</td>
-      <td>0.051</td>
-      <td>0.693</td>
-      <td>0.032</td>
-      <td>0.0</td>
-      <td>True</td>
-      <td></td>
-    </tr>
-    <tr>
-      <th>4</th>
       <td>blackjax</td>
       <td>True</td>
       <td>NaN</td>
@@ -1959,7 +1939,20 @@ NUTS[nutpie]: [lam, beta, sigma2]
       <td>NaN</td>
       <td>NaN</td>
       <td>False</td>
-      <td>TypeError: build_kernel.&lt;locals&gt;.kernel() got ...</td>
+      <td>KeyError: 'logdet_decomp'</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>nutpie</td>
+      <td>True</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>False</td>
+      <td>KeyError: 'logdet_decomp'</td>
     </tr>
   </tbody>
 </table>
@@ -1983,7 +1976,7 @@ NUTS[nutpie]: [lam, beta, sigma2]
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/4d8bf10518e7cab383c3ce35dd087396732d614faaeb7e6848a831f8ddfc8e09.png" src="../_images/4d8bf10518e7cab383c3ce35dd087396732d614faaeb7e6848a831f8ddfc8e09.png" />
+<img alt="../_images/7d00a7fe7f3b15dfc15aae81d4d0a4cb0a4cd3f1c4981ed77a12dcad0d32d89e.png" src="../_images/7d00a7fe7f3b15dfc15aae81d4d0a4cb0a4cd3f1c4981ed77a12dcad0d32d89e.png" />
 </div>
 </div>
 <h2 id="log-likelihood-equivalence-across-backends">Log-likelihood equivalence across backends<a class="headerlink" href="#log-likelihood-equivalence-across-backends" title="Link to this heading">¶</a></h2>
@@ -2018,7 +2011,7 @@ NUTS[nutpie]: [lam, beta, sigma2]
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Backends with native log_likelihood capture: ['nutpie', 'numba', 'numpyro', 'c']
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Backends with native log_likelihood capture: []
 </code></pre></div>
 </div>
 <div class="output text_html"><div>
@@ -2045,30 +2038,6 @@ NUTS[nutpie]: [lam, beta, sigma2]
     </tr>
   </thead>
   <tbody>
-    <tr>
-      <th>0</th>
-      <td>nutpie</td>
-      <td>-275.8027</td>
-      <td>-1.0774</td>
-    </tr>
-    <tr>
-      <th>1</th>
-      <td>numba</td>
-      <td>-275.8633</td>
-      <td>-1.0776</td>
-    </tr>
-    <tr>
-      <th>2</th>
-      <td>numpyro</td>
-      <td>-275.7517</td>
-      <td>-1.0772</td>
-    </tr>
-    <tr>
-      <th>3</th>
-      <td>c</td>
-      <td>-275.8633</td>
-      <td>-1.0776</td>
-    </tr>
   </tbody>
 </table>
 </div></div></div>
@@ -2102,7 +2071,9 @@ NUTS[nutpie]: [lam, beta, sigma2]
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/949263913b7a6ad04acf4cc7873bc0f9ee4e76c447efd3496f7eb9bc0e63c610.png" src="../_images/949263913b7a6ad04acf4cc7873bc0f9ee4e76c447efd3496f7eb9bc0e63c610.png" />
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Need &gt;=2 backends with log_likelihood for pairwise comparison.
+</code></pre></div>
+</div>
 </div>
 </div>
 <div class="cell docutils container">
@@ -2142,41 +2113,9 @@ NUTS[nutpie]: [lam, beta, sigma2]
   <thead>
     <tr style="text-align: right;">
       <th></th>
-      <th>backend</th>
-      <th>elpd_loo</th>
-      <th>se</th>
-      <th>p_loo</th>
     </tr>
   </thead>
   <tbody>
-    <tr>
-      <th>0</th>
-      <td>nutpie</td>
-      <td>-278.041</td>
-      <td>12.006</td>
-      <td>4.366</td>
-    </tr>
-    <tr>
-      <th>1</th>
-      <td>numba</td>
-      <td>-278.150</td>
-      <td>11.992</td>
-      <td>4.460</td>
-    </tr>
-    <tr>
-      <th>2</th>
-      <td>numpyro</td>
-      <td>-277.940</td>
-      <td>12.040</td>
-      <td>4.265</td>
-    </tr>
-    <tr>
-      <th>3</th>
-      <td>c</td>
-      <td>-278.150</td>
-      <td>11.992</td>
-      <td>4.460</td>
-    </tr>
   </tbody>
 </table>
 </div></div></div>
@@ -2189,93 +2128,6 @@ NUTS[nutpie]: [lam, beta, sigma2]
 </code></pre></div>
 </div>
 </div>
-<div class="cell_output docutils container">
-<div class="output text_html"><div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>rank</th>
-      <th>elpd_diff</th>
-      <th>dse</th>
-      <th>p_worse</th>
-      <th>diag_diff</th>
-      <th>diag_elpd</th>
-      <th>p</th>
-      <th>elpd</th>
-      <th>se</th>
-      <th>weight</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>numpyro</th>
-      <td>0</td>
-      <td>0.0</td>
-      <td>0.000</td>
-      <td>NaN</td>
-      <td></td>
-      <td></td>
-      <td>4.3</td>
-      <td>-280.0</td>
-      <td>12.0</td>
-      <td>1.0</td>
-    </tr>
-    <tr>
-      <th>nutpie</th>
-      <td>1</td>
-      <td>-0.1</td>
-      <td>0.080</td>
-      <td>0.9</td>
-      <td>|elpd_diff| &lt; 4</td>
-      <td></td>
-      <td>4.4</td>
-      <td>-280.0</td>
-      <td>12.0</td>
-      <td>0.0</td>
-    </tr>
-    <tr>
-      <th>numba</th>
-      <td>2</td>
-      <td>-0.2</td>
-      <td>0.061</td>
-      <td>1.0</td>
-      <td>|elpd_diff| &lt; 4</td>
-      <td></td>
-      <td>4.5</td>
-      <td>-280.0</td>
-      <td>12.0</td>
-      <td>0.0</td>
-    </tr>
-    <tr>
-      <th>c</th>
-      <td>3</td>
-      <td>-0.2</td>
-      <td>0.061</td>
-      <td>1.0</td>
-      <td>|elpd_diff| &lt; 4</td>
-      <td></td>
-      <td>4.5</td>
-      <td>-280.0</td>
-      <td>12.0</td>
-      <td>0.0</td>
-    </tr>
-  </tbody>
-</table>
-</div></div></div>
 </div>
 <h2 id="reading-the-results">Reading the results<a class="headerlink" href="#reading-the-results" title="Link to this heading">¶</a></h2>
 <p>Three things to verify:</p>
@@ -2331,7 +2183,7 @@ NUTS[nutpie]: [lam, beta, sigma2]
   
     Created using
     <a href="https://www.sphinx-doc.org/" target="_blank" rel="noopener">Sphinx</a>
-    8.2.3.
+    9.2.0.
      and
     <a href="https://github.com/jbms/sphinx-immaterial/" target="_blank" rel="noopener">Sphinx-Immaterial</a>
   

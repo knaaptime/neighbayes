@@ -17,10 +17,10 @@
       ~SARLogit.fit
       ~SARLogit.fitted_probabilities
       ~SARLogit.fitted_values
+      ~SARLogit.impacts
       ~SARLogit.residuals
       ~SARLogit.spatial_diagnostics
       ~SARLogit.spatial_diagnostics_decision
-      ~SARLogit.spatial_effects
       ~SARLogit.summary
    
    
