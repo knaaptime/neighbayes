@@ -119,7 +119,9 @@ def test_sar_logit_backend_recovery(sar_logit_data, backend):
     from neighbayes.models import SARLogit
 
     y, X, W = sar_logit_data
-    idata = SARLogit(y=y, X=X, W=W).fit(backend=backend, **_fit_kwargs(backend))
+    idata = SARLogit(y=y, X=X, W=W, latent=False).fit(
+        backend=backend, **_fit_kwargs(backend)
+    )
 
     rho_hat = float(idata.posterior["rho"].mean())
     beta_hat = idata.posterior["beta"].mean(("chain", "draw")).values
@@ -144,7 +146,7 @@ def sar_negbin_data():
     rng = np.random.default_rng(42)
     W = W_to_graph(make_rook_W(SIDE_NB))
     return dgp.simulate_sar_negbin(
-        W=_as_sparse(W), rho=RHO_NB, beta=BETA_NB, alpha=ALPHA_NB, rng=rng
+        W=_as_sparse(W), rho=RHO_NB, beta=BETA_NB, alpha=ALPHA_NB, rng=rng, latent=False
     )
 
 
@@ -155,7 +157,7 @@ def test_sar_negbin_backend_recovery(sar_negbin_data, backend):
 
     d = sar_negbin_data
     W = W_to_graph(make_rook_W(SIDE_NB))
-    idata = SARNegBin(y=d["y"], X=d["X"], W=W).fit(
+    idata = SARNegBin(y=d["y"], X=d["X"], W=W, latent=False).fit(
         backend=backend, **_fit_kwargs(backend)
     )
 
@@ -193,6 +195,7 @@ def sar_zinb_data():
         beta_zero=GAMMA_ZINB,
         alpha=ALPHA_ZINB,
         rng=rng,
+        latent=False,
     )
 
 
@@ -203,7 +206,7 @@ def test_sar_zinb_backend_recovery(sar_zinb_data, backend):
 
     d = sar_zinb_data
     W = W_to_graph(make_rook_W(SIDE_NB))
-    idata = SARZINB(y=d["y"], X=d["X"], X_zero=d["X_zero"], W=W).fit(
+    idata = SARZINB(y=d["y"], X=d["X"], X_zero=d["X_zero"], W=W, latent=False).fit(
         backend=backend, **_fit_kwargs(backend)
     )
 
@@ -245,7 +248,9 @@ def test_sar_logit_backend_mixing(sar_logit_data, backend):
     from neighbayes.models import SARLogit
 
     y, X, W = sar_logit_data
-    idata = SARLogit(y=y, X=X, W=W).fit(backend=backend, **_fit_kwargs(backend))
+    idata = SARLogit(y=y, X=X, W=W, latent=False).fit(
+        backend=backend, **_fit_kwargs(backend)
+    )
 
     summ = az.summary(idata, var_names=["rho"])
     ess = float(summ.loc["rho", "ess_bulk"])
@@ -311,6 +316,7 @@ def sar_zinb_small_data():
         beta_zero=GAMMA_ZINB,
         alpha=ALPHA_ZINB,
         seed=3,
+        latent=False,
     )
 
 
@@ -329,7 +335,7 @@ def test_sar_zinb_backends_agree(sar_zinb_small_data):
 
     fits = {}
     for backend in BACKENDS:
-        idata = SARZINB(y=d["y"], X=d["X"], X_zero=d["X_zero"], W=W).fit(
+        idata = SARZINB(y=d["y"], X=d["X"], X_zero=d["X_zero"], W=W, latent=False).fit(
             backend=backend, **_fit_kwargs(backend)
         )
         fits[backend] = idata.posterior

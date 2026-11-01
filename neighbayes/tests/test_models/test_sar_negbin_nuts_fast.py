@@ -37,7 +37,7 @@ def _count_data(seed: int = 101):
 def test_sar_negbin_build_pymc_model():
     """Reduced-form NUTS model has rho, beta, alpha — no jacobian, sigma or z."""
     y, X, W = _count_data()
-    model = SARNegBin(y=y, X=X, W=W)
+    model = SARNegBin(y=y, X=X, W=W, latent=False)
     pymc_model = model._build_pymc_model()
 
     assert isinstance(pymc_model, pm.Model)
@@ -60,17 +60,17 @@ def test_sar_negbin_rejects_noninteger_or_negative_y():
     y_bad = np.array([0.0, 1.2, 2.0, 1.0])
     X_bad = np.column_stack([np.ones(4), np.arange(4)])
     with pytest.raises(ValueError, match="integer-valued"):
-        SARNegBin(y=y_bad, X=X_bad, W=W_to_graph(make_line_W(4)))
+        SARNegBin(y=y_bad, X=X_bad, W=W_to_graph(make_line_W(4)), latent=False)
 
     y_neg = np.array([0.0, 1.0, -1.0, 2.0])
     with pytest.raises(ValueError, match="non-negative"):
-        SARNegBin(y=y_neg, X=X_bad, W=W_to_graph(make_line_W(4)))
+        SARNegBin(y=y_neg, X=X_bad, W=W_to_graph(make_line_W(4)), latent=False)
 
 
 def test_sar_negbin_fitted_values_and_effects_with_mock_posterior():
     y, X, W = _count_data(seed=103)
     n = X.shape[0]
-    model = SARNegBin(y=y, X=X, W=W)
+    model = SARNegBin(y=y, X=X, W=W, latent=False)
 
     # Reduced form: only β, ρ, α — no σ, no z.
     model._idata = _idata(
@@ -107,7 +107,7 @@ def test_sar_negbin_count_effects_sparse_matches_eigen():
     """
     y, X, W = _count_data(seed=103)
     n = X.shape[0]
-    model = SARNegBin(y=y, X=X, W=W)
+    model = SARNegBin(y=y, X=X, W=W, latent=False)
     model._idata = _idata(
         {
             "beta": np.stack([np.array([0.2, 0.7]), np.array([0.21, 0.71])]),
@@ -151,7 +151,7 @@ def test_sar_negbin_count_effects_sparse_batched_matches_columnwise():
 
     y, X, W = _count_data(seed=131)
     n = X.shape[0]
-    model = SARNegBin(y=y, X=X, W=W)
+    model = SARNegBin(y=y, X=X, W=W, latent=False)
     model._idata = _idata(
         {
             "beta": np.stack([np.array([0.25, 0.55]), np.array([0.24, 0.57])]),
@@ -202,7 +202,7 @@ def test_sar_negbin_count_effects_sparse_batched_matches_columnwise():
 def test_sar_negbin_impacts_rejects_unknown_method():
     y, X, W = _count_data(seed=103)
     n = X.shape[0]
-    model = SARNegBin(y=y, X=X, W=W)
+    model = SARNegBin(y=y, X=X, W=W, latent=False)
     model._idata = _idata(
         {
             "beta": np.stack([np.array([0.2, 0.7]), np.array([0.21, 0.71])]),
@@ -217,7 +217,7 @@ def test_sar_negbin_impacts_rejects_unknown_method():
 def test_sar_negbin_impacts_rejects_unknown_scale():
     y, X, W = _count_data(seed=104)
     n = X.shape[0]
-    model = SARNegBin(y=y, X=X, W=W)
+    model = SARNegBin(y=y, X=X, W=W, latent=False)
     model._idata = _idata(
         {
             "beta": np.stack([np.array([0.2, 0.7]), np.array([0.21, 0.71])]),
@@ -232,7 +232,9 @@ def test_sar_negbin_impacts_rejects_unknown_scale():
 
 def test_simulate_sar_negbin_output_contract():
     W = W_to_graph(make_line_W(8))
-    out = dgp.simulate_sar_negbin(W=_as_sparse(W), rho=0.25, alpha=1.5, seed=42)
+    out = dgp.simulate_sar_negbin(
+        W=_as_sparse(W), rho=0.25, alpha=1.5, seed=42, latent=False
+    )
 
     assert {"y", "X", "mu", "W_sparse", "W_graph", "params_true"}.issubset(out)
     y = out["y"]
@@ -264,7 +266,7 @@ def test_sar_negbin_jax_logp_grad(monkeypatch):
 
     try:
         y, X, W = _count_data(seed=104)
-        model = SARNegBin(y=y, X=X, W=W)
+        model = SARNegBin(y=y, X=X, W=W, latent=False)
         pm_model = model._build_pymc_model()
 
         with pm_model:
@@ -288,7 +290,7 @@ def test_sar_negbin_jax_logp_grad(monkeypatch):
 def test_sar_negbin_fit_rejects_invalid_sampler():
     """fit() raises ValueError for invalid sampler string."""
     y, X, W = _count_data(seed=105)
-    model = SARNegBin(y=y, X=X, W=W)
+    model = SARNegBin(y=y, X=X, W=W, latent=False)
     with pytest.raises(ValueError, match="sampler must be"):
         model.fit(draws=10, tune=10, sampler="hmc")
 
@@ -298,7 +300,7 @@ def test_sar_negbin_fit_nuts_routes_to_nuts_path(monkeypatch):
     from neighbayes.models.base import SpatialModel
 
     y, X, W = _count_data(seed=106)
-    model = SARNegBin(y=y, X=X, W=W)
+    model = SARNegBin(y=y, X=X, W=W, latent=False)
 
     called_with = {}
 

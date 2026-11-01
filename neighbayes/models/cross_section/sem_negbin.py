@@ -82,6 +82,7 @@ class SEMNegBin(CountDesigns, LatentNegBinMixin, SpatialModel):
     _fitted_mean_from_posterior_static = (
         LatentNegBinMixin._fitted_mean_from_posterior_latent
     )
+    _posterior_predictive_static = LatentNegBinMixin._posterior_predictive_latent
 
     def _compute_impacts_posterior_static(
         self,

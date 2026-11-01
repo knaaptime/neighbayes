@@ -50,6 +50,25 @@ instead (Yu and Meng 2011), each exact:
 6. the spatial parameter with :math:`\varepsilon` held: one random-walk
    Metropolis proposal, the log-means following by one solve.
 
+At small :math:`\alpha` with mostly zero counts, the spatial parameter,
+:math:`\alpha` and the depth of the zeros' log-means move together, and each
+of steps 2–6 pins two of them while it moves the third.  A last move holds what
+the counts pin best, the log-means :math:`\eta_P` at the positive counts and
+the standardized disturbances :math:`z_Z` at the zeros:
+
+8. the spatial parameter, :math:`\log\alpha` and the level of :math:`X\beta`
+   (the coefficients move along :math:`v`, :math:`Xv = \mathbf 1`) jointly.
+   Write the filter as :math:`Au = o + \varepsilon`, with :math:`u = \eta`
+   and :math:`o = X\beta + c` (SAR) or :math:`u = \eta - X\beta` and
+   :math:`o = 0` (SEM).  Its rows at the zeros give
+   :math:`u_Z = A_{ZZ}^{-1}(o_Z + \varepsilon_Z + \rho W_{ZP}u_P)`, one solve,
+   and the map from :math:`(\eta_P, z_Z)` to :math:`\eta` has Jacobian
+   :math:`s_\alpha^{|Z|}/|A_{ZZ}|` (:func:`zero_set_logdet`).  The move
+   slices along the eigenvectors of its conditional's Hessian (Tibbits et al.
+   2014), estimated by finite differences at doubling intervals in warmup and
+   fixed after it; stepping out shares one budget between the sides at random
+   (Neal 2003), so the slice stays reversible when the budget binds.
+
 The solves are BiCGSTAB from the nearby solution at hand.  There is no
 Pólya–Gamma step and no added scale: the only disturbance is the negative
 binomial's own.
@@ -65,6 +84,14 @@ unit's equations, so
 7. :math:`c_g \mid \cdot` is one-dimensional and log-concave: independence
    Metropolis–Hastings from a *t* at its mode, all units at once, and
    :math:`\sigma_c` a slice on :math:`\log\sigma_c` under a half-*t*(3) prior.
+
+``level_shift`` :math:`m` adds :math:`-m\log(1 - \rho)` to the spatial
+parameter's target (steps 2 and 6): Lee and Yu's (2010) time-effects term.
+With a row-standardized :math:`W`, a period effect inside the filter moves its
+period's log-mean level by :math:`\tau_t/(1 - \rho)`, so flat priors on the
+:math:`\tau_t` themselves leave a factor :math:`1 - \rho` per period in the
+marginal of :math:`\rho` and pull it down by :math:`O(1/n)`; the term makes
+the priors flat on the levels instead.
 """
 
 from __future__ import annotations
@@ -94,6 +121,14 @@ _SOLVE_RTOL = 1e-12
 _SOLVE_MAXITER = 500
 #: Target acceptance of the spatial parameter's interweaving proposal.
 _PAR_ACCEPT = 0.44
+#: Stepping-out budget of a slice of the joint move, shared between the sides.
+_JOINT_MAX_STEPS = 16
+#: Shrinkage budget of a slice of the joint move, after which the state stays.
+_JOINT_MAX_SHRINKS = 200
+#: The joint move's finite-difference steps and its widths before the first
+#: estimate, in the spatial parameter, log alpha and the level.
+_JOINT_FD_STEP = np.array([0.002, 0.005, 0.02])
+_JOINT_WIDTH = np.array([0.02, 0.1, 0.2])
 
 
 def filter_columns(
@@ -480,6 +515,55 @@ def initial_state(y: np.ndarray, X: np.ndarray) -> tuple[np.ndarray, np.ndarray,
     return eta, beta, float(np.clip(1.0 / max(var, 1e-2), 0.2, 50.0))
 
 
+def zero_set_logdet(
+    W: sp.spmatrix,
+    zero: np.ndarray,
+    method: Optional[str] = None,
+    rho_min: float = -1.0,
+    rho_max: float = 1.0,
+) -> Callable[[float], float]:
+    """``rho -> log|I - rho W_ZZ|``: the filter on the zero counts' sites (step 8).
+
+    ``W`` is one period's weights and ``zero`` the ``(T, n)`` mask of zero
+    counts of a time-first stack, so ``W_ZZ`` is block-diagonal, a block per
+    period.  ``method`` is the model's log-determinant method (``None`` to
+    choose one for ``W_ZZ``).  The eigenvalue method takes each block's
+    eigenvalues; a stochastic one gives way to the exact rational route, since
+    the joint move's target must carry the same ``log|A|`` as the rest of the
+    sweep, which an independent estimate of ``log|A_ZZ|`` would perturb.
+    """
+    from ..._logdet import make_logdet_numpy_fn
+    from ..._logdet._config import _is_symmetric_W, resolve_logdet_method
+
+    W = sp.csr_matrix(W, dtype=np.float64)
+    blocks = [W[z][:, z] for z in np.asarray(zero, dtype=bool) if z.any()]
+    if not blocks:
+        return lambda r: 0.0
+    W_zz = sp.block_diag(blocks, format="csr")
+    method = resolve_logdet_method(method, n=W_zz.shape[0], W=W_zz)
+    eigs = None
+    if method == "eigenvalue":
+        eigs = np.concatenate([np.linalg.eigvals(b.toarray()) for b in blocks])
+    elif method == "stoch_cheb":
+        method = "chol_aaa" if _is_symmetric_W(W_zz) else "lu_aaa"
+    return make_logdet_numpy_fn(
+        W_zz, eigs, method=method, rho_min=rho_min, rho_max=rho_max
+    )
+
+
+def joint_axes(X: np.ndarray, alpha_fixed: bool) -> tuple[tuple[int, ...], np.ndarray]:
+    """The joint move's coordinates and the level direction ``v``, ``X v = 1``.
+
+    The coordinates index (spatial parameter, log alpha, level): log alpha
+    drops out when alpha is fixed, the level when no ``v`` exists (``v`` is
+    then zero).
+    """
+    v = np.linalg.lstsq(X, np.ones(X.shape[0]), rcond=None)[0]
+    level = bool(np.allclose(X @ v, 1.0, rtol=0.0, atol=1e-8))
+    axes = (0,) + ((1,) if not alpha_fixed else ()) + ((2,) if level else ())
+    return axes, v if level else np.zeros(X.shape[1])
+
+
 class LatentNegBinChain:
     """One chain's state and sweep (see the module).
 
@@ -487,6 +571,8 @@ class LatentNegBinChain:
     the ``n x n`` weights.  ``kind`` says what each count observes
     (:data:`POISSON` everywhere by default); a two-part model sets it between
     sweeps.  ``unit_effects`` (SAR only) adds random unit effects.
+    ``zero_logdet`` is step 8's :func:`zero_set_logdet` of the zero counts,
+    built here with the method chosen for it when not given.
     :func:`~neighbayes.samplers._utils._sweeps.run_sweeps` runs one.
     """
 
@@ -504,6 +590,8 @@ class LatentNegBinChain:
         T: int = 1,
         unit_effects: Optional[UnitEffects] = None,
         kind: Optional[np.ndarray] = None,
+        level_shift: float = 0.0,
+        zero_logdet: Optional[Callable[[float], float]] = None,
     ):
         nT, k = X.shape
         n = nT // T
@@ -516,6 +604,7 @@ class LatentNegBinChain:
         self.rng = rng
         self.priors = priors
         self.logdet_fn = logdet_fn
+        self.level_shift = float(level_shift)
         self.y = np.asarray(y, dtype=np.float64).reshape(T, n)
         self.kind = (
             np.full((T, n), POISSON, dtype=np.int8)
@@ -555,10 +644,162 @@ class LatentNegBinChain:
         self.step = 0.1
         self.it = 0
 
+        # Step 8: the zero counts' rows of the stack's filter.
+        zero = self.y == 0
+        self.Z, self.P = np.flatnonzero(zero), np.flatnonzero(~zero)
+        stack = sp.kron(sp.identity(T, format="csr"), W, format="csr")
+        rows = stack[self.Z]
+        self.W_ZZ, self.W_ZP = rows[:, self.Z].tocsr(), rows[:, self.P].tocsr()
+        self.W_P = stack[self.P]
+        self.zero_logdet = (
+            zero_set_logdet(W, zero, None, self.lo, self.hi)
+            if zero_logdet is None
+            else zero_logdet
+        )
+        self.joint_axes, self.level_dir = joint_axes(X, self.fixed is not None)
+        self.joint_dirs = np.eye(len(self.joint_axes))
+        self.joint_widths = _JOINT_WIDTH[list(self.joint_axes)]
+        self.joint_start = np.zeros(self.Z.size)
+
     def _effects(self):
         """The unit effects on the stack, ``(T, n)``."""
         fx = self.fx
         return 0.0 if fx is None else self.c[fx.group].reshape(self.T, self.n)
+
+    # --- step 8: the joint move ---------------------------------------------
+    def _joint_offset(self, xb: np.ndarray) -> np.ndarray:
+        """``o`` in ``A u = o + eps``: ``X beta`` and the unit effects (SAR), zero (SEM)."""
+        if not self.sar:
+            return np.zeros_like(xb)
+        fx = self.fx
+        return xb if fx is None else xb + self.c[fx.group]
+
+    def _joint_point(self) -> np.ndarray:
+        """The current spatial parameter, log alpha and level (zero) on the move's axes."""
+        return np.array([self.par, np.log(self.alpha), 0.0])[list(self.joint_axes)]
+
+    def _joint_held(self) -> tuple[np.ndarray, np.ndarray]:
+        """``(eta_P, z_Z)``: the log-means at the positive counts, the standardized
+        disturbances at the zeros."""
+        eta = self.eta.reshape(-1)
+        xb = self.X @ self.beta
+        u = eta if self.sar else eta - xb
+        Z, P = self.Z, self.P
+        e_z = (
+            u[Z]
+            - self.par * (self.W_ZZ @ u[Z] + self.W_ZP @ u[P])
+            - self._joint_offset(xb)[Z]
+        )
+        m, s = _gamma_moments(self.alpha)
+        return eta[P], (e_z - m) / s
+
+    def _joint_eval(self, x: np.ndarray, held) -> tuple[float, Optional[np.ndarray]]:
+        """``(log density, eta)`` at the move's point ``x``; ``-inf`` outside the bounds."""
+        full = [self.par, None, 0.0]
+        for i, ax in enumerate(self.joint_axes):
+            full[ax] = x[i]
+        par, log_a, shift = full
+        free = log_a is not None
+        if not (self.lo < par < self.hi) or (free and not -10.0 < log_a < 10.0):
+            return -np.inf, None
+        alpha = np.exp(log_a) if free else self.alpha
+        eta_p, z = held
+        Z, P = self.Z, self.P
+        beta = self.beta + shift * self.level_dir
+        xb = self.X @ beta
+        o = self._joint_offset(xb)
+        m, s = _gamma_moments(alpha)
+        u = np.empty(xb.size)
+        u[P] = eta_p if self.sar else eta_p - xb[P]
+        e_z = m + s * z
+        if Z.size:
+            rhs = o[Z] + e_z + par * (self.W_ZP @ u[P])
+            self.joint_start = _filter_solve(self.W_ZZ, par, rhs, self.joint_start)
+            u[Z] = self.joint_start
+        e_p = u[P] - par * (self.W_P @ u) - o[P]
+        eta = u if self.sar else u + xb
+        with np.errstate(over="ignore"):  # a far trial point: -inf, rejected
+            stat = float(np.sum(e_z - np.exp(e_z)) + np.sum(e_p - np.exp(e_p)))
+        if free:
+            disturbances = _alpha_log_density(xb.size, stat, log_a, self.priors)
+        else:
+            disturbances = alpha * stat
+        r = beta - self.b0
+        value = (
+            _obs_loglik(self.y.reshape(-1)[Z], eta[Z], self.kind.reshape(-1)[Z])
+            + self.T * self.logdet_fn(par)
+            - self.level_shift * np.log1p(-par)
+            - self.zero_logdet(par)
+            + Z.size * np.log(s)
+            + disturbances
+            - 0.5 * r @ self.B0inv @ r
+        )
+        return value, eta
+
+    def _joint_directions(self) -> None:
+        """Re-estimate the move's directions and widths at the current state.
+
+        The eigenvectors of the conditional's Hessian, by central differences,
+        and twice the sd along each; kept as they were unless it is positive
+        definite.
+        """
+        held = self._joint_held()
+        x = self._joint_point()
+        h = _JOINT_FD_STEP[list(self.joint_axes)]
+        dim = x.size
+        E = np.diag(h)
+        H = np.empty((dim, dim))
+        for i in range(dim):
+            for j in range(i, dim):
+                f = [
+                    self._joint_eval(x + a * E[i] + b * E[j], held)[0]
+                    for a, b in ((1, 1), (1, -1), (-1, 1), (-1, -1))
+                ]
+                H[i, j] = H[j, i] = -(f[0] - f[1] - f[2] + f[3]) / (4 * h[i] * h[j])
+        if not np.all(np.isfinite(H)):
+            return
+        lam, V = np.linalg.eigh(H)
+        if lam.min() > 0:
+            self.joint_dirs, self.joint_widths = V, 2.0 / np.sqrt(lam)
+
+    def _joint_move(self) -> None:
+        """Step 8: a slice along each of the move's directions, in random order."""
+        rng = self.rng
+        held = self._joint_held()
+        x = self._joint_point()
+        fx, eta = self._joint_eval(x, held)
+        if eta is None:  # a state on a bound of the spatial parameter
+            return
+        for j in rng.permutation(x.size):
+            step, w = self.joint_dirs[:, j], self.joint_widths[j]
+            level = fx - rng.standard_exponential()
+            lo = -w * rng.random()
+            hi = lo + w
+            left = int(_JOINT_MAX_STEPS * rng.random())
+            right = _JOINT_MAX_STEPS - 1 - left
+            while left > 0 and self._joint_eval(x + lo * step, held)[0] > level:
+                lo -= w
+                left -= 1
+            while right > 0 and self._joint_eval(x + hi * step, held)[0] > level:
+                hi += w
+                right -= 1
+            for _ in range(_JOINT_MAX_SHRINKS):
+                t = lo + rng.random() * (hi - lo)
+                ft, et = self._joint_eval(x + t * step, held)
+                if ft > level:
+                    x, fx, eta = x + t * step, ft, et
+                    break
+                if t < 0:
+                    lo = t
+                else:
+                    hi = t
+        full = dict(zip(self.joint_axes, x))
+        self.par = float(full[0])
+        if 1 in full:
+            self.alpha = float(np.exp(full[1]))
+        if 2 in full:
+            self.beta = self.beta + full[2] * self.level_dir
+        self.eta = eta.reshape(self.T, self.n)
 
     def sweep(self, tuning: bool) -> None:
         """One Gibbs sweep."""
@@ -585,8 +826,14 @@ class LatentNegBinChain:
 
         # 2. The spatial parameter, given eta.
         Weta = lag(eta)
-        logdet_fn = self.logdet_fn
+        logdet_fn, shift = self.logdet_fn, self.level_shift
         logdet = (lambda r: T * logdet_fn(r)) if T > 1 else logdet_fn
+        if shift:
+            jacobian = logdet
+
+            def logdet(r):
+                return jacobian(r) - shift * np.log1p(-r)
+
         if sar:
             # beta = u - rho g keeps eps = e0 - rho d.
             g = self.XtX_inv_Xt @ Weta.reshape(-1)
@@ -690,6 +937,8 @@ class LatentNegBinChain:
             log_ratio = _obs_loglik(yv, (base_eta + new).reshape(-1), kv) - (
                 _obs_loglik(yv, (base_eta + cur).reshape(-1), kv)
             )
+            if self.level_shift:
+                log_ratio += self.level_shift * (np.log1p(-par) - np.log1p(-prop))
             if np.log(rng.random()) < log_ratio:
                 par, eta, accepted = prop, base_eta + new, True
         if tuning:
@@ -697,6 +946,12 @@ class LatentNegBinChain:
                 (float(accepted) - _PAR_ACCEPT) / np.sqrt(self.it + 1.0)
             )
         self.par, self.eta = par, eta
+
+        # 8. The spatial parameter, alpha and the level jointly, eta_P and
+        # z_Z held; the directions re-estimated at doubling intervals in warmup.
+        if tuning and (self.it & (self.it + 1)) == 0:
+            self._joint_directions()
+        self._joint_move()
         self.it += 1
 
     def draw(self, store_latent: bool) -> dict:

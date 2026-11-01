@@ -1,6 +1,6 @@
 r"""The latent SAR, SEM and SDEM negative binomial.
 
-Shared by ``SARNegBin(latent=True)`` (:math:`(I - \rho W)\eta = X\beta +
+Shared by the unmarked :class:`SARNegBin` (:math:`(I - \rho W)\eta = X\beta +
 \varepsilon`), :class:`SEMNegBin` (:math:`(I - \lambda W)(\eta - X\beta) =
 \varepsilon`) and :class:`SDEMNegBin`, with :math:`y_i \sim
 \mathrm{Poisson}(e^{\eta_i})` and :math:`\varepsilon_i = \log\gamma_i`,
@@ -14,9 +14,11 @@ from __future__ import annotations
 from typing import Optional
 
 import numpy as np
+import scipy.sparse as sp
 
 # Importing the sampler registers its Gibbs entry.
-from ...samplers.negbin_latent._core import LatentNegBinChain
+from ...samplers._utils._latent_loglik import log_gamma_noise
+from ...samplers.negbin_latent._core import LatentNegBinChain, zero_set_logdet
 from .._base._nb import nb_alpha_fixed
 from ..priors import ReducedGibbsPriors
 from ._latent import LatentMixin
@@ -31,6 +33,17 @@ class LatentNegBinMixin(LatentMixin):
         "n locations at once, which no NUTS model evaluates."
     )
     _latent_chain_class = LatentNegBinChain
+
+    @property
+    def _latent_chain_kw(self) -> dict:
+        """The joint move's log-determinant on the zero counts' sites."""
+        b = self._logdet_bounds
+        zero = np.asarray(self._y).reshape(self._T if self._is_panel else 1, -1) == 0
+        return {
+            "zero_logdet": zero_set_logdet(
+                self._W_sparse, zero, b.method, b.rho_min, b.rho_max
+            )
+        }
 
     @staticmethod
     def _latent_chains_jax(**kwargs):
@@ -73,8 +86,7 @@ class LatentNegBinMixin(LatentMixin):
 
     def _latent_noise(self, rng, size, params) -> np.ndarray:
         """Log-gamma disturbances at one posterior draw's ``alpha``."""
-        alpha = float(params["alpha"])
-        return np.log(rng.gamma(alpha, 1.0 / alpha, size=size))
+        return log_gamma_noise(rng, float(params["alpha"]), size)
 
     @staticmethod
     def _latent_outcome_weight(m, U, E, d, params, exact) -> np.ndarray:
@@ -99,8 +111,7 @@ class LatentNegBinMixin(LatentMixin):
         return np.exp(np.clip(m + own + log_mean, -50.0, 50.0))
 
     def _latent_disturbances(self, rng, size):
-        alpha = float(self._posterior_mean("alpha"))
-        return np.log(rng.gamma(alpha, 1.0 / alpha, size=size))
+        return log_gamma_noise(rng, float(self._posterior_mean("alpha")), size)
 
     def _fitted_mean_from_posterior_latent(
         self, n_sims: int = 1000, random_seed: Optional[int] = 0
@@ -112,3 +123,34 @@ class LatentNegBinMixin(LatentMixin):
         the mean of :math:`e^{\eta}` returned.
         """
         return np.exp(self._latent_index_draws(n_sims, random_seed)).mean(axis=1)
+
+    def _posterior_predictive_latent(
+        self,
+        n_draws: Optional[int] = None,
+        random_seed: Optional[int] = None,
+    ) -> np.ndarray:
+        """Posterior-predictive counts, ``(n_draws, n_obs)``: one fresh simulation per draw.
+
+        Each posterior draw's disturbances are drawn afresh and propagated
+        through its own filter, and the counts are Poisson given the log-means.
+        """
+        self._require_fit()
+        post = self._idata.posterior
+        par = post[self._latent_param].values.reshape(-1)
+        alpha = post["alpha"].values.reshape(-1)
+        systematic = self._latent_systematic(post)
+        total = par.size if n_draws is None else min(int(n_draws), par.size)
+        rng = np.random.default_rng(random_seed)
+        n = systematic.shape[1]
+        eye = sp.identity(n, format="csc")
+        W = self._latent_W
+        out = np.empty((total, n))
+        for g in range(total):
+            eps = self._latent_noise(rng, n, {"alpha": alpha[g]})
+            lu = sp.linalg.splu((eye - par[g] * W).tocsc())
+            if self._latent_process == "sar":
+                eta = lu.solve(systematic[g] + eps)
+            else:
+                eta = systematic[g] + lu.solve(eps)
+            out[g] = rng.poisson(np.exp(np.clip(eta, -30.0, 30.0)))
+        return out

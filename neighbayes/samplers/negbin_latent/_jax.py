@@ -7,10 +7,17 @@ are conditionally independent, so the latent logit's colouring
 (:func:`..binary_latent._jax.colour_classes`) splits them into classes, each
 drawn at once and the classes in turn.  A slice per lane would run as long as
 the slowest lane of its class, so a class is drawn instead by independence
-Metropolis–Hastings from a *t* at each conditional's mode (:func:`_eta_mh`),
-in a fixed number of passes.  The filter solves are BiCGSTAB from the nearby
-solution at hand, falling back on the sparse LU should one stall; products with
-:math:`W` are gathers from its padded rows, which on CPU beat scatter-adds.
+Metropolis–Hastings from a two-component *t* mixture at each conditional's
+mode (:func:`_eta_mh`), in a fixed number of passes.  The filter solves are
+BiCGSTAB from the nearby solution at hand, falling back on the sparse LU should
+one stall; products with :math:`W` are gathers from its padded rows, which on
+CPU beat scatter-adds.
+
+Step 8's solves on the zero counts' sites run on the whole stack, the filter
+masked to those sites and the identity elsewhere, and its
+:math:`\log|A_{ZZ}|` is a Chebyshev series of fixed order
+(:func:`_zero_logdet_series`), so that the compiled sweep does not depend on
+which counts are zero.
 """
 
 from __future__ import annotations
@@ -23,11 +30,31 @@ from .._utils._latent_loglik import POISSON, TRUNCATED, UNOBSERVED
 from ..binary_latent._jax import class_table, colour_classes, column_table
 from ._core import (
     _BETA_DF,
+    _JOINT_FD_STEP,
+    _JOINT_MAX_SHRINKS,
+    _JOINT_MAX_STEPS,
+    _JOINT_WIDTH,
     _PAR_ACCEPT,
     _SOLVE_MAXITER,
     _SOLVE_RTOL,
     initial_state,
+    joint_axes,
+    zero_set_logdet,
 )
+
+#: Order of the Chebyshev series of step 8's ``log|I - rho W_ZZ|``.
+_ZERO_LOGDET_ORDER = 128
+
+
+def _zero_logdet_series(fn, lo, hi):
+    """``fn``, step 8's ``log|I - rho W_ZZ|``, as Chebyshev coefficients on ``[lo, hi]``."""
+    import jax.numpy as jnp
+
+    from ..._logdet._chebyshev import chebyshev_coeffs_dct1, chebyshev_gauss_nodes
+
+    nodes, _ = chebyshev_gauss_nodes(_ZERO_LOGDET_ORDER, lo, hi)
+    coeffs = chebyshev_coeffs_dct1(np.array([fn(r) for r in nodes]))
+    return jnp.asarray(coeffs), jnp.float64(lo), jnp.float64(hi)
 
 
 def _row_table(W):
@@ -44,11 +71,22 @@ def _row_table(W):
 
 
 def _latent_data(
-    y, X, W, priors, ld_params, sparse_arrays, T=1, unit_effects=None, kind=None
+    y,
+    X,
+    W,
+    priors,
+    ld_params,
+    sparse_arrays,
+    T=1,
+    unit_effects=None,
+    kind=None,
+    level_shift=0.0,
+    zero_logdet=None,
 ):
     """The read-only arrays every chain's sweep takes (``consts``).
 
-    ``kind`` is what each count observes, :data:`POISSON` by default.
+    ``kind`` is what each count observes, :data:`POISSON` by default;
+    ``level_shift`` and ``zero_logdet`` as :class:`._core.LatentNegBinChain`.
     """
     import jax.numpy as jnp
 
@@ -80,9 +118,17 @@ def _latent_data(
         sym = {"sqd": jnp.asarray(sq), "Wsym": jnp.asarray(sq[:, None] * Wv / sq[Wc])}
     else:
         sym = {}
+    zero = np.asarray(y).reshape(T, n) == 0
+    lo, hi = float(priors.rho_lower), float(priors.rho_upper)
+    if zero_logdet is None:
+        zero_logdet = zero_set_logdet(W, zero, None, lo, hi)
+    _, level = joint_axes(X, priors.alpha_fixed is not None)
     return {
         **effects,
         **sym,
+        "zmask": jnp.asarray(zero, dtype=jnp.float64),
+        "level": jnp.asarray(level),
+        "zero_logdet": _zero_logdet_series(zero_logdet, lo, hi),
         "y": jnp.asarray(y, dtype=jnp.float64).reshape(T, n),
         "kind": jnp.asarray(
             np.full(nT, POISSON) if kind is None else kind, dtype=jnp.int32
@@ -106,6 +152,7 @@ def _latent_data(
         "alpha_nu": jnp.float64(priors.alpha_nu),
         "alpha_sigma": jnp.float64(priors.alpha_sigma),
         "logdet": ld_params,
+        "level_shift": jnp.float64(level_shift),
         "sparse": sparse_arrays,
     }
 
@@ -113,6 +160,8 @@ def _latent_data(
 #: Newton steps to the mode of a log-mean's conditional, and the largest step.
 _ETA_NEWTON = 3
 _ETA_NEWTON_MAX_STEP = 5.0
+#: Floor of the slope whose inverse scales the wide proposal component.
+_ETA_MIN_SLOPE = 1e-3
 
 
 def _obs_terms(t, y, kind):
@@ -148,13 +197,17 @@ def _eta_mh(x0, yi, ki, e, Av, alpha, key, active):
     """Independence MH for the log-means of one colour class.
 
     ``e`` are the disturbances in the rows of each lane's column of ``A`` and
-    ``Av`` that column's values.  The proposal is a *t* with 2 degrees of
-    freedom, drawn by inversion, at the conditional mode with the curvature
-    there as its scale; its tails are heavier than the conditional's on both
-    sides.  Newton starts from the precision-weighted mean of the terms' own
-    modes (the Poisson's at ``log(y + 1/2)``, each disturbance's at zero),
-    which, like the steps, involves the other log-means only, so the proposal
-    does not depend on the current value.  Lanes outside ``active`` keep it.
+    ``Av`` that column's values.  The proposal is an equal mixture of two *t*'s
+    with 2 degrees of freedom at the conditional mode, drawn by inversion: one
+    scaled by the curvature there, one by ``1 / s``, ``s = y + alpha sum(Av)``
+    the conditional's slope where every disturbance sits in its left tail.  At
+    small ``alpha`` a zero count's conditional is nearly flat for tens of units
+    below its mode, beyond the curvature's reach, and the second component
+    covers that range.  Newton starts from the precision-weighted mean of the
+    terms' own modes (the Poisson's at ``log(y + 1/2)``, each disturbance's at
+    zero), which, like the steps, involves the other log-means only, so the
+    proposal does not depend on the current value.  Lanes outside ``active``
+    keep it.
     """
     import jax
     import jax.numpy as jnp
@@ -183,14 +236,20 @@ def _eta_mh(x0, yi, ki, e, Av, alpha, key, active):
         g, h = grad_hess(t)
         t = t + jnp.clip(g / h, -_ETA_NEWTON_MAX_STEP, _ETA_NEWTON_MAX_STEP)
     sd = 1.0 / jnp.sqrt(grad_hess(t)[1])
+    slope = jnp.where(ki != UNOBSERVED, yi, 0.0) + alpha * jnp.sum(Av, axis=1)
+    wide = jnp.maximum(sd, 1.0 / jnp.maximum(slope, _ETA_MIN_SLOPE))
 
     def logq(x):
-        z = (x - t) / sd
-        return -1.5 * jnp.log1p(0.5 * z * z)
+        def log_t(s):
+            z = (x - t) / s
+            return -1.5 * jnp.log1p(0.5 * z * z) - jnp.log(s)
 
-    k_prop, k_acc = jax.random.split(key)
+        return jnp.logaddexp(log_t(sd), log_t(wide))
+
+    k_pick, k_prop, k_acc = jax.random.split(key, 3)
+    scale = jnp.where(jax.random.uniform(k_pick, x0.shape) < 0.5, sd, wide)
     u = jax.random.uniform(k_prop, x0.shape, minval=1e-12, maxval=1.0 - 1e-12)
-    prop = t + sd * (2.0 * u - 1.0) / jnp.sqrt(2.0 * u * (1.0 - u))
+    prop = t + scale * (2.0 * u - 1.0) / jnp.sqrt(2.0 * u * (1.0 - u))
     log_ratio = f(prop) - f(x0) + logq(x0) - logq(prop)
     accept = active & (jnp.log(jax.random.uniform(k_acc, x0.shape)) < log_ratio)
     return jnp.where(accept, prop, x0)
@@ -208,17 +267,37 @@ def _make_sweep(
     store_latent,
     T=1,
     n_groups=0,
+    axes=(0, 1, 2),
 ):
     import jax
     import jax.numpy as jnp
     from jax.scipy.sparse.linalg import bicgstab, cg
     from jax.scipy.special import digamma, gammaln, polygamma
 
+    from ..._logdet._jax import jax_logdet_chebyshev_traced
     from .._utils._jax_slice import adapt_slice_width, jax_slice_sample_1d
 
     sar = process == "sar"
     n_obs = n * T
     effects = n_groups > 0
+
+    # Step 8's Hessian stencil on its axes: entry (i, j) from four points.
+    dim = len(axes)
+    free_alpha = 1 in axes
+    h = _JOINT_FD_STEP[list(axes)]
+    eye = np.eye(dim)
+    stencil = [
+        (i, j, a, b)
+        for i in range(dim)
+        for j in range(i, dim)
+        for a, b in ((1, 1), (1, -1), (-1, 1), (-1, -1))
+    ]
+    fd_points = np.array(
+        [a * h[i] * eye[i] + b * h[j] * eye[j] for i, j, a, b in stencil]
+    )
+    fd_weight = np.array([-a * b / (4 * h[i] * h[j]) for i, j, a, b in stencil])
+    fd_i = np.array([s[0] for s in stencil])
+    fd_j = np.array([s[1] for s in stencil])
 
     def gamma_moments(a):
         return digamma(a) - jnp.log(a), jnp.sqrt(polygamma(1, a))
@@ -232,7 +311,7 @@ def _make_sweep(
             """``W`` applied to each period's row of ``v`` (``(T, n)``)."""
             return jnp.sum(d["Wvals"] * v[..., d["Wcols"]], axis=-1)
 
-        def solve(r, b, x0):
+        def solve(r, b, x0, mask=None):
             """``A(r)^{-1}`` applied to each period of ``b`` (``(T, n)``).
 
             A ``W`` with a symmetric ``D^{1/2} W D^{-1/2}`` is solved by CG on
@@ -240,13 +319,20 @@ def _make_sweep(
             interval: a quarter cheaper than BiCGSTAB per solve, which tells
             as ``|rho|`` and the iteration count grow.  Any other ``W`` by
             BiCGSTAB.  A solve that misses its tolerance falls back
-            on the sparse LU.
+            on the sparse LU.  ``mask``, 0/1 like ``b``, keeps ``W``'s rows
+            and columns at its ones, the identity elsewhere (step 8).
             """
+
+            def lag(v, vals):
+                if mask is None:
+                    return jnp.sum(vals * v[..., d["Wcols"]], axis=-1)
+                return mask * jnp.sum(vals * (mask * v)[..., d["Wcols"]], axis=-1)
+
             if "sqd" in d:
                 sq = d["sqd"]
 
                 def A(v):
-                    return v - r * jnp.sum(d["Wsym"] * v[..., d["Wcols"]], axis=-1)
+                    return v - r * lag(v, d["Wsym"])
 
                 rhs = sq * b
                 v, _ = cg(A, rhs, x0=sq * x0, tol=_SOLVE_RTOL, maxiter=_SOLVE_MAXITER)
@@ -254,7 +340,7 @@ def _make_sweep(
             else:
 
                 def A(v):
-                    return v - r * W(v)
+                    return v - r * lag(v, d["Wvals"])
 
                 rhs = b
                 v, _ = bicgstab(A, b, x0=x0, tol=_SOLVE_RTOL, maxiter=_SOLVE_MAXITER)
@@ -262,13 +348,19 @@ def _make_sweep(
             ok = jnp.linalg.norm(rhs - A(v)) <= 100.0 * _SOLVE_RTOL * jnp.linalg.norm(
                 rhs
             )
-            vals = sparse["eye"] - r * sparse["w"]
+            Ai, Aj = sparse["Ai"], sparse["Aj"]
+            if mask is None:
+                vals = sparse["eye"] - r * sparse["w"]
+                return jax.lax.cond(
+                    ok,
+                    lambda: x,
+                    lambda: jax.vmap(lambda bb: lu_solve(Ai, Aj, vals, bb))(b),
+                )
+            vals = sparse["eye"] - r * sparse["w"] * mask[:, Ai] * mask[:, Aj]
             return jax.lax.cond(
                 ok,
                 lambda: x,
-                lambda: jax.vmap(
-                    lambda bb: lu_solve(sparse["Ai"], sparse["Aj"], vals, bb)
-                )(b),
+                lambda: jax.vmap(lambda vv, bb: lu_solve(Ai, Aj, vv, bb))(vals, b),
             )
 
         def poisson(eta):
@@ -353,6 +445,7 @@ def _make_sweep(
                 e = e0 - r * dv
                 return (
                     T * logdet_eval(r, d["logdet"])
+                    - d["level_shift"] * jnp.log1p(-r)
                     + alpha * gamma_stat(e)
                     - 0.5 * b @ B0inv @ b
                 )
@@ -555,8 +648,13 @@ def _make_sweep(
         step = st["step"]
         prop = par + step * jax.random.normal(keys[5])
         inside = (prop > d["lo"]) & (prop < d["hi"])
-        new = solve(jnp.where(inside, prop, par), xi, cur)
-        log_ratio = poisson(base + new) - poisson(base + cur)
+        at = jnp.where(inside, prop, par)
+        new = solve(at, xi, cur)
+        log_ratio = (
+            poisson(base + new)
+            - poisson(base + cur)
+            + d["level_shift"] * (jnp.log1p(-par) - jnp.log1p(-at))
+        )
         accepted = inside & (jnp.log(jax.random.uniform(keys[6])) < log_ratio)
         par = jnp.where(accepted, prop, par)
         eta = jnp.where(accepted, base + new, eta)
@@ -566,6 +664,151 @@ def _make_sweep(
             step * jnp.exp((accepted - _PAR_ACCEPT) / jnp.sqrt(it + 1.0)),
             step,
         )
+
+        # 8. The spatial parameter, alpha and the level jointly, the log-means
+        # held at the positive counts and the standardized disturbances at the
+        # zeros (see ._core); the zeros' solve is masked to their sites.
+        zm, lv = d["zmask"], d["level"]
+        n_zero = jnp.sum(zm)
+
+        def offset(xb):
+            return xb + unit() if sar else jnp.zeros_like(xb)
+
+        xb_now = stack(X @ beta)
+        u_now = eta if sar else eta - xb_now
+        m_now, s_now = gamma_moments(alpha)
+        z_held = zm * (u_now - par * W(u_now) - offset(xb_now) - m_now) / s_now
+        eta_held, par_now, alpha_now, beta_now = eta, par, alpha, beta
+
+        def coords(x):
+            full = [par_now, jnp.log(alpha_now), 0.0]
+            for i, ax in enumerate(axes):
+                full[ax] = x[i]
+            return full
+
+        def joint_eval(x, start):
+            """``(log density, eta, zero-site solution)`` at ``x``; ``-inf`` outside."""
+            r, la, shift = coords(x)
+            inside = (r > d["lo"]) & (r < d["hi"])
+            if free_alpha:
+                inside = inside & (la > -10.0) & (la < 10.0)
+            r = jnp.where(inside, r, par_now)
+            la = jnp.where(inside, la, jnp.log(alpha_now))
+            b = beta_now + shift * lv
+            xb = stack(X @ b)
+            o = offset(xb)
+            mm, ss = gamma_moments(jnp.exp(la))
+            up = (1.0 - zm) * (eta_held if sar else eta_held - xb)
+            ez = mm + ss * z_held
+            uz = solve(r, zm * (o + ez + r * W(up)), start, mask=zm)
+            u = up + zm * uz
+            et = u if sar else u + xb
+            stat = gamma_stat(jnp.where(zm > 0, ez, u - r * W(u) - o))
+            rb = b - b0
+            val = (
+                jnp.sum(zm * _obs_terms(et, y, d["kind"])[0])
+                + T * logdet_eval(r, d["logdet"])
+                - d["level_shift"] * jnp.log1p(-r)
+                - jax_logdet_chebyshev_traced(r, *d["zero_logdet"])
+                + n_zero * jnp.log(ss)
+                + (alpha_density(stat, la) if free_alpha else alpha_now * stat)
+                - 0.5 * rb @ B0inv @ rb
+            )
+            return jnp.where(inside, val, -jnp.inf), et, uz
+
+        point = jnp.stack([[par, jnp.log(alpha), 0.0][ax] for ax in axes])
+        dirs, widths = st["joint_dirs"], st["joint_widths"]
+
+        def estimate(start):
+            """The Hessian's eigenvectors and twice the sd along each, if it is
+            positive definite (see ``._core``)."""
+
+            pts, wts = jnp.asarray(fd_points), jnp.asarray(fd_weight)
+            rows, cols = jnp.asarray(fd_i), jnp.asarray(fd_j)
+
+            def body(m, carry):
+                acc, start = carry
+                f, _, start = joint_eval(point + pts[m], start)
+                return acc.at[rows[m], cols[m]].add(wts[m] * f), start
+
+            acc, start = jax.lax.fori_loop(
+                0, len(stencil), body, (jnp.zeros((dim, dim)), start)
+            )
+            H = acc + jnp.triu(acc, 1).T
+            finite = jnp.all(jnp.isfinite(H))
+            lam, V = jnp.linalg.eigh(jnp.where(finite, H, jnp.eye(dim)))
+            ok = finite & (jnp.min(lam) > 0)
+            new_widths = 2.0 / jnp.sqrt(jnp.where(ok, lam, 1.0))
+            return jnp.where(ok, V, dirs), jnp.where(ok, new_widths, widths), start
+
+        i_it = it.astype(jnp.int32)
+        refresh = jnp.logical_and(tuning, (i_it & (i_it + 1)) == 0)
+        dirs, widths, start = jax.lax.cond(
+            refresh, estimate, lambda s: (dirs, widths, s), st["joint_start"]
+        )
+        f_now, eta_now, start = joint_eval(point, start)
+        k_perm, k_dirs = jax.random.split(keys[9])
+        order = jax.random.permutation(k_perm, dim)
+
+        def direction(j, carry):
+            """One slice along a direction: stepping out, then shrinkage."""
+            x, f, et, start, key = carry
+            key, k_lvl, k_pos, k_split, k_shr = jax.random.split(key, 5)
+            dv, w = dirs[:, order[j]], widths[order[j]]
+            level = f - jax.random.exponential(k_lvl)
+            lo = -w * jax.random.uniform(k_pos)
+            left = jnp.floor(_JOINT_MAX_STEPS * jax.random.uniform(k_split))
+            left = left.astype(jnp.int32)
+            right = _JOINT_MAX_STEPS - 1 - left
+
+            # Stages: 0 steps out left, 1 right, 2 shrinks, 3 is done.
+            def body(s):
+                stage, lo, hi, left, right, x, f, et, start, i, shrinks = s
+                u = jax.random.uniform(jax.random.fold_in(k_shr, i))
+                t = jnp.where(
+                    stage == 0, lo, jnp.where(stage == 1, hi, lo + u * (hi - lo))
+                )
+                ft, e_t, start = joint_eval(x + t * dv, start)
+                above = ft > level
+                out_l, out_r = (stage == 0) & above, (stage == 1) & above
+                lo = jnp.where(out_l, lo - w, lo)
+                hi = jnp.where(out_r, hi + w, hi)
+                left = left - out_l.astype(jnp.int32)
+                right = right - out_r.astype(jnp.int32)
+                shrink = stage == 2
+                accept = shrink & above
+                lo = jnp.where(shrink & ~above & (t < 0), t, lo)
+                hi = jnp.where(shrink & ~above & (t >= 0), t, hi)
+                x = jnp.where(accept, x + t * dv, x)
+                f = jnp.where(accept, ft, f)
+                et = jnp.where(accept, e_t, et)
+                shrinks = shrinks + shrink.astype(jnp.int32)
+                stage = jnp.select(
+                    [stage == 0, stage == 1],
+                    [
+                        jnp.where(out_l & (left > 0), 0, jnp.where(right > 0, 1, 2)),
+                        jnp.where(out_r & (right > 0), 1, 2),
+                    ],
+                    jnp.where(accept | (shrinks >= _JOINT_MAX_SHRINKS), 3, 2),
+                ).astype(jnp.int32)
+                return stage, lo, hi, left, right, x, f, et, start, i + 1, shrinks
+
+            stage = jnp.where(left > 0, 0, jnp.where(right > 0, 1, 2)).astype(jnp.int32)
+            zero = jnp.int32(0)
+            s = jax.lax.while_loop(
+                lambda s: s[0] < 3,
+                body,
+                (stage, lo, lo + w, left, right, x, f, et, start, zero, zero),
+            )
+            return s[5], s[6], s[7], s[8], key
+
+        x, _, eta, start, _ = jax.lax.fori_loop(
+            0, dim, direction, (point, f_now, eta_now, start, k_dirs)
+        )
+        par, la, shift = coords(x)
+        if free_alpha:
+            alpha = jnp.exp(la)
+        beta = beta + shift * lv
 
         out = {
             "par": par,
@@ -577,6 +820,9 @@ def _make_sweep(
             "step": step,
             "slice_width": width,
             "it": it + 1.0,
+            "joint_dirs": dirs,
+            "joint_widths": widths,
+            "joint_start": start,
         }
         draws = (par, beta, alpha)
         if effects:
@@ -587,6 +833,35 @@ def _make_sweep(
         return out, draws
 
     return sweep
+
+
+def start_state(y, X, T, priors, slice_width, unit_effects, axes):
+    """A chain's starting state, as :class:`._core.LatentNegBinChain` starts."""
+    import jax.numpy as jnp
+
+    nT = X.shape[0]
+    n = nT // T
+    eta0, beta0, alpha0 = initial_state(np.asarray(y, dtype=np.float64), X)
+    if priors.alpha_fixed is not None:
+        alpha0 = float(priors.alpha_fixed)
+    start = {
+        "par": jnp.float64(0.0),
+        "beta": jnp.asarray(beta0),
+        "alpha": jnp.float64(alpha0),
+        "eta": jnp.asarray(eta0).reshape(T, n),
+        "sxb": jnp.asarray(X @ beta0).reshape(T, n),
+        "s1": jnp.ones((T, n)),
+        "step": jnp.float64(0.1),
+        "slice_width": jnp.float64(slice_width),
+        "it": jnp.float64(0.0),
+        "joint_dirs": jnp.eye(len(axes)),
+        "joint_widths": jnp.asarray(_JOINT_WIDTH[list(axes)]),
+        "joint_start": jnp.zeros((T, n)),
+    }
+    if unit_effects is not None:
+        start["c"] = jnp.zeros(unit_effects.n_groups)
+        start["sigma_c"] = jnp.float64(unit_effects.sd_scale)
+    return start
 
 
 def run_chains_jax_latent_negbin(
@@ -606,12 +881,15 @@ def run_chains_jax_latent_negbin(
     store_latent=False,
     T=1,
     unit_effects=None,
+    level_shift=0.0,
+    zero_logdet=None,
     progressbar=False,
     probes=None,
 ):
     """Run the latent-NB chains in parallel threads; one dict per chain.
 
-    ``T`` and ``unit_effects`` as :class:`._core.LatentNegBinChain`; ``store_latent``
+    ``T``, ``unit_effects``, ``level_shift`` and ``zero_logdet`` as
+    :class:`._core.LatentNegBinChain`; ``store_latent``
     adds the log-means at every kept draw, ``"latent"``.  ``probes``, a
     :class:`~neighbayes._logdet._probe_check.WarmupProbes` whose initial
     parameters are ``logdet_params``, sizes the probe pool halfway through
@@ -643,35 +921,31 @@ def run_chains_jax_latent_negbin(
         ld_params, ld_key = logdet_params, (logdet_kind,)
     lu_solve, sparse_arrays = _sparse_solve_parts(_build_sparse_ctx(W, n))
     sparse_arrays = {key: sparse_arrays[key] for key in ("Ai", "Aj", "eye", "w")}
-    data = _latent_data(y, X, W, priors, ld_params, sparse_arrays, T, unit_effects)
+    data = _latent_data(
+        y,
+        X,
+        W,
+        priors,
+        ld_params,
+        sparse_arrays,
+        T,
+        unit_effects,
+        level_shift=level_shift,
+        zero_logdet=zero_logdet,
+    )
     n_colours = int(data["classes"].shape[0])
     alpha_fixed = priors.alpha_fixed is not None
     row_std = bool(np.allclose(np.asarray(W.sum(axis=1)).ravel(), 1.0))
+    axes, _ = joint_axes(X, alpha_fixed)
 
     static = (n, k, process, n_colours, alpha_fixed, row_std, lu_solve, store_latent)
     sweep = cached_sweep(
-        ("negbin_latent", *static, T, n_groups, *ld_key),
+        ("negbin_latent", *static, T, n_groups, axes, *ld_key),
         lambda: _make_sweep(
-            *static[:6], logdet_eval, lu_solve, store_latent, T, n_groups
+            *static[:6], logdet_eval, lu_solve, store_latent, T, n_groups, axes
         ),
     )
-    eta0, beta0, alpha0 = initial_state(np.asarray(y, dtype=np.float64), X)
-    if alpha_fixed:
-        alpha0 = float(priors.alpha_fixed)
-    start = {
-        "par": jnp.float64(0.0),
-        "beta": jnp.asarray(beta0),
-        "alpha": jnp.float64(alpha0),
-        "eta": jnp.asarray(eta0).reshape(T, n),
-        "sxb": jnp.asarray(X @ beta0).reshape(T, n),
-        "s1": jnp.ones((T, n)),
-        "step": jnp.float64(0.1),
-        "slice_width": jnp.float64(slice_width),
-        "it": jnp.float64(0.0),
-    }
-    if n_groups:
-        start["c"] = jnp.zeros(n_groups)
-        start["sigma_c"] = jnp.float64(unit_effects.sd_scale)
+    start = start_state(y, X, T, priors, slice_width, unit_effects, axes)
     states = [dict(start) for _ in seeds]
     warm = [jax.random.PRNGKey(int(s)) for s in seeds]
     draw = [jax.random.fold_in(jax.random.PRNGKey(int(s)), 1) for s in seeds]

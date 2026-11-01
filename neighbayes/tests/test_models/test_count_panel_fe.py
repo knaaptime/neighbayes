@@ -43,6 +43,7 @@ def _place(cls, data, N, T, effects=0, **kw):
 
     X = pd.DataFrame(data["X"], columns=["Intercept", "x"])
     design = effects_kwargs(effects, treatment="random")
+    kw.setdefault("latent", False)  # the reduced-form panel
     return cls(y=data["y"], X=X, W=data["W_sparse"], N=N, T=T, **design, **kw)
 
 
@@ -66,7 +67,7 @@ class TestConstruction:
         assert fp["effect_mu"] == 0.0 and fp["effect_sd_scale"] == 1.0
 
     def test_period_effects_absorb_time_only_columns(self):
-        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0)
+        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0, latent=False)
         trend = np.repeat(np.arange(3.0), 16)
         X = np.column_stack([d["X"], trend])
         with pytest.warns(UserWarning, match="absorbed by the period effects"):
@@ -78,13 +79,20 @@ class TestConstruction:
                 W=d["W_sparse"],
                 N=16,
                 T=3,
+                latent=False,
             )
         # Beside unit effects the intercept stays as the baseline level.
         assert two_way._X.shape[1] == 2
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             time_only = SARNegBin(
-                time_effects=True, y=d["y"], X=X, W=d["W_sparse"], N=16, T=3
+                time_effects=True,
+                y=d["y"],
+                X=X,
+                W=d["W_sparse"],
+                N=16,
+                T=3,
+                latent=False,
             )
         assert time_only._X.shape[1] == 1  # the intercept goes too
 
@@ -103,19 +111,27 @@ class TestConstruction:
         assert time_only._period_labels == ["t0", "t1", "t2"]
 
     def test_effects_record_their_names(self):
-        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0)
+        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0, latent=False)
         a = _place(SARNegBin, d, 16, 3, effects=3)
         assert a.model == 3
         assert a.effects == "two_way"
 
     def test_time_invariant_design_identifies_rho_under_unit_effects(self):
-        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0)
+        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0, latent=False)
         X = np.column_stack([np.ones(48), np.tile(np.arange(16.0), 3)])
-        m = SARNegBin(unit_effects="random", y=d["y"], X=X, W=d["W_sparse"], N=16, T=3)
+        m = SARNegBin(
+            unit_effects="random",
+            y=d["y"],
+            X=X,
+            W=d["W_sparse"],
+            N=16,
+            T=3,
+            latent=False,
+        )
         assert m._X.shape[1] == 2
 
     def test_spatial_model_with_nothing_left_raises(self):
-        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0)
+        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0, latent=False)
         with pytest.raises(ValueError, match="not identified"):
             SARNegBin(
                 time_effects=True,
@@ -124,17 +140,18 @@ class TestConstruction:
                 W=d["W_sparse"],
                 N=16,
                 T=3,
+                latent=False,
             )
 
     def test_aspatial_model_without_slopes_is_allowed(self):
-        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0)
+        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0, latent=False)
         m = NegBin(
             time_effects=True, y=d["y"], X=np.ones((48, 1)), W=d["W_sparse"], N=16, T=3
         )
         assert m._X.shape[1] == 0
 
     def test_mundlak_adds_unit_means(self):
-        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0)
+        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0, latent=False)
         m = _place(SARNegBin, d, 16, 3, effects=1, mundlak=True)
         assert m._feature_names == ["Intercept", "x", "x_mean"]
         np.testing.assert_allclose(
@@ -145,7 +162,7 @@ class TestConstruction:
             _place(SARNegBin, d, 16, 3, effects=2, mundlak=True)
 
     def test_all_zero_units_warn(self):
-        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0)
+        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0, latent=False)
         y = d["y"].copy()
         y[np.tile(np.arange(16), 3) == 0] = 0
         y[np.tile(np.arange(16), 3) == 5] = 0
@@ -155,7 +172,7 @@ class TestConstruction:
 
     def test_unit_effects_need_two_periods(self):
         """``T=1`` is the cross-section, which takes no unit effects."""
-        d = simulate_sar_negbin(N=16, T=1, n_side=4, seed=0)
+        d = simulate_sar_negbin(N=16, T=1, n_side=4, seed=0, latent=False)
         with pytest.raises(NotImplementedError, match="only in a panel"):
             _place(NegBin, d, 16, 1, effects=1)
 
@@ -206,7 +223,7 @@ def test_flow_fit_api(cls, effects):
 @pytest.mark.parametrize("cls", PANEL_CLASSES)
 @pytest.mark.parametrize("effects", [0, 1, 2, 3])
 def test_panel_fit_api(cls, effects):
-    d = simulate_sar_negbin(N=25, T=3, n_side=5, seed=1)
+    d = simulate_sar_negbin(N=25, T=3, n_side=5, seed=1, latent=False)
     m = _place(cls, d, 25, 3, effects=effects)
     idata = m.fit(**QUICK)  # Gibbs, the default, as for the Gaussian panels
     assert m._pymc_model is None
@@ -223,7 +240,7 @@ def test_panel_fit_api(cls, effects):
 
 @pytest.mark.parametrize("cls", PANEL_CLASSES)
 def test_panel_nuts_builds_fixed_effects(cls):
-    d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=2)
+    d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=2, latent=False)
     m = _place(cls, d, 16, 3, effects=3)
     model = m._build_pymc_model()
     assert "unit_effect" in model.named_vars
@@ -232,7 +249,7 @@ def test_panel_nuts_builds_fixed_effects(cls):
 
 
 def test_nuts_on_request():
-    d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=3)
+    d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=3, latent=False)
     m = _place(NegBin, d, 16, 3, effects=1)
     idata = m.fit(
         sampler="nuts", draws=20, tune=20, chains=1, progressbar=False, random_seed=0
@@ -242,7 +259,7 @@ def test_nuts_on_request():
 
 
 def test_pooled_aspatial_gibbs_runs_on_request():
-    d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=5)
+    d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=5, latent=False)
     m = _place(NegBin, d, 16, 3, effects=0)
     idata = m.fit(sampler="gibbs", **QUICK)
     assert m._pymc_model is None
@@ -254,7 +271,7 @@ def test_gibbs_runs_through_the_registry():
 
     entry = resolve("count", "panel")
     assert entry is not None and entry.backends == {"numpy"}
-    d = simulate_sar_negbin(N=16, T=4, n_side=4, seed=6)
+    d = simulate_sar_negbin(N=16, T=4, n_side=4, seed=6, latent=False)
     m = _place(SARNegBin, d, 16, 4, effects=1)
     idata = m.fit(thin=2, **QUICK)
     assert idata.posterior["beta"].shape[1] == QUICK["draws"] // 2
@@ -263,7 +280,7 @@ def test_gibbs_runs_through_the_registry():
 
 
 def test_group_effect_summary_storage():
-    d = simulate_sar_negbin(N=25, T=3, n_side=5, seed=4)
+    d = simulate_sar_negbin(N=25, T=3, n_side=5, seed=4, latent=False)
     m = _place(SARNegBin, d, 25, 3, effects=1)
     idata = m.fit(store_effects=False, **QUICK)
     assert "unit_effect" not in idata.posterior
@@ -384,7 +401,7 @@ def _covers(draws, truth, k=3.0):
 @pytest.mark.recovery
 def test_panel_two_way_recovery_beats_pooled():
     N, T, rho, beta = 225, 6, 0.4, np.array([0.5, 0.6])
-    d = simulate_sar_negbin(N=N, T=T, n_side=15, rho=rho, beta=beta, alpha=3.0, seed=11, fe_x_corr=0.7, unit_effects="random", unit_effect_sd=0.8, time_effects=True, time_effect_sd=0.3)  # fmt: skip
+    d = simulate_sar_negbin(N=N, T=T, n_side=15, rho=rho, beta=beta, alpha=3.0, seed=11, fe_x_corr=0.7, unit_effects="random", unit_effect_sd=0.8, time_effects=True, time_effect_sd=0.3, latent=False)  # fmt: skip
     fit = dict(draws=600, tune=400, chains=2, progressbar=False, random_seed=3)
     # The unit effects correlate with x, so the pooled-effects model needs the
     # Mundlak means to keep the slope unbiased.
@@ -499,7 +516,7 @@ def _filter_solve(W, rho, b, T):
 
 def test_place_dgp_draws_unit_effects_inside_the_filter():
     N, T = 25, 3
-    d = simulate_sar_negbin(N=N, T=T, n_side=5, rho=0.5, unit_effects="random", unit_effect_sd=0.7, time_effects=True, seed=1)  # fmt: skip
+    d = simulate_sar_negbin(N=N, T=T, n_side=5, rho=0.5, unit_effects="random", unit_effect_sd=0.7, time_effects=True, seed=1, latent=False)  # fmt: skip
     pt_ = d["params_true"]
     inner = d["X"] @ pt_["beta"] + np.tile(pt_["unit_effect"], T)
     eta = _filter_solve(d["W_sparse"], pt_["rho"], inner, T)
@@ -531,7 +548,7 @@ def test_flow_dgp_draws_pair_effects_inside_the_filter(separable):
 
 def test_fitted_mean_puts_unit_effects_inside_the_filter():
     N, T = 25, 3
-    d = simulate_sar_negbin(N=N, T=T, n_side=5, rho=0.4, unit_effects="random", unit_effect_sd=0.7, time_effects=True, seed=2)  # fmt: skip
+    d = simulate_sar_negbin(N=N, T=T, n_side=5, rho=0.4, unit_effects="random", unit_effect_sd=0.7, time_effects=True, seed=2, latent=False)  # fmt: skip
     m = _place(SARNegBin, d, N, T, effects=3)
     m.fit(**QUICK)
     mean = lambda v: m._idata.posterior[v].mean(("chain", "draw")).values  # noqa: E731
@@ -544,7 +561,7 @@ def test_fitted_mean_puts_unit_effects_inside_the_filter():
 @pytest.mark.slow
 def test_spatial_unit_effects_gibbs_matches_nuts():
     """Effects inside the filter: Gibbs (collapsed SAR effect block) vs PyMC."""
-    d = simulate_sar_negbin(N=64, T=4, n_side=8, rho=0.5, alpha=3.0, seed=43, unit_effects="random", unit_effect_sd=0.6, time_effects=True, time_effect_sd=0.3)  # fmt: skip
+    d = simulate_sar_negbin(N=64, T=4, n_side=8, rho=0.5, alpha=3.0, seed=43, unit_effects="random", unit_effect_sd=0.6, time_effects=True, time_effect_sd=0.3, latent=False)  # fmt: skip
     gibbs = _place(SARNegBin, d, 64, 4, effects=3).fit(
         sampler="gibbs", draws=2000, tune=500, chains=2, progressbar=False,
         random_seed=1, n_jobs=1,
@@ -580,7 +597,7 @@ def test_unrestricted_flow_pair_effects_gibbs_matches_nuts():
 @pytest.mark.slow
 @pytest.mark.parametrize("alpha_fixed", [None, 30.0])
 def test_unit_effects_gibbs_matches_nuts(alpha_fixed):
-    d = simulate_sar_negbin(N=64, T=4, n_side=8, rho=0.0, alpha=3.0, seed=41, fe_x_corr=0.5, unit_effects="random", unit_effect_sd=0.7, time_effects=True, time_effect_sd=0.3)  # fmt: skip
+    d = simulate_sar_negbin(N=64, T=4, n_side=8, rho=0.0, alpha=3.0, seed=41, fe_x_corr=0.5, unit_effects="random", unit_effect_sd=0.7, time_effects=True, time_effect_sd=0.3, latent=False)  # fmt: skip
     priors = None if alpha_fixed is None else {"alpha_fixed": alpha_fixed}
     gibbs = _place(NegBin, d, 64, 4, effects=3, priors=priors).fit(
         sampler="gibbs", draws=2000, tune=500, chains=2, progressbar=False,

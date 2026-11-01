@@ -92,11 +92,14 @@ def column_table(W):
     return R, O, V
 
 
-def _latent_data(y, X, W, priors, ld_params, sign=None, unit_effects=None):
+def _latent_data(
+    y, X, W, priors, ld_params, sign=None, unit_effects=None, level_shift=0.0
+):
     """The read-only arrays every chain's sweep takes (``consts``).
 
     ``sign`` is each utility's side of zero, that of ``y`` by default;
-    ``unit_effects`` adds a SAR's random unit effects.
+    ``unit_effects`` adds a SAR's random unit effects; ``level_shift`` as
+    :class:`._core.LatentBinaryChain`.
     """
     import jax.numpy as jnp
 
@@ -137,6 +140,7 @@ def _latent_data(y, X, W, priors, ld_params, sign=None, unit_effects=None):
         "lo": jnp.float64(priors.rho_lower),
         "hi": jnp.float64(priors.rho_upper),
         "logdet": ld_params,
+        "level_shift": jnp.float64(level_shift),
         # The scale move's draw is a gamma when the prior means are zero.
         "scale_gamma": jnp.asarray(
             not np.any(b0) and (fx is None or float(fx.mu) == 0.0)
@@ -337,6 +341,7 @@ def _make_sweep(
             def dens(r):
                 return (
                     logdet_eval(r, params)
+                    - d["level_shift"] * jnp.log1p(-r)
                     - 0.5 * (yPy - 2.0 * r * yPz + r * r * zPz)
                     + 0.5 * (q00 - 2.0 * r * q01 + r * r * q11)
                 )

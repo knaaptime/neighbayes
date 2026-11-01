@@ -57,6 +57,9 @@ def run_chains_jax_latent_two_part(
     T=1,
     unit_effects=None,
     unit_effects_zero=None,
+    level_shift=0.0,
+    level_shift_zero=0.0,
+    zero_logdet=None,
     progressbar=False,
     probes=None,
     probes_zero=None,
@@ -67,7 +70,9 @@ def run_chains_jax_latent_two_part(
     one period.  ``probes`` and ``probes_zero``, the parts'
     :class:`~neighbayes._logdet._probe_check.WarmupProbes` (one object when
     the parts share W), size their probe pools halfway through warmup; both
-    or neither.  The keys are those of :func:`._core.make_chain`.
+    or neither.  ``zero_logdet`` is the count part's, as
+    :class:`~neighbayes.samplers.negbin_latent._core.LatentNegBinChain`.  The
+    keys are those of :func:`._core.make_chain`.
     """
     import jax
     import jax.numpy as jnp
@@ -75,7 +80,7 @@ def run_chains_jax_latent_two_part(
     from ..._jax_dispatch import ensure_x64
     from ..binary_latent import _jax as logit_jax
     from ..negbin_latent import _jax as nb_jax
-    from ..negbin_latent._core import initial_state
+    from ..negbin_latent._core import joint_axes
     from ..negbin_reduced._jax import _build_sparse_ctx, _sparse_solve_parts
 
     ensure_x64()
@@ -109,6 +114,7 @@ def run_chains_jax_latent_two_part(
         params_z,
         sign=sign,
         unit_effects=unit_effects_zero,
+        level_shift=level_shift_zero,
     )
     n_colours_z = int(data_z["classes"].shape[0])
     if zinb:
@@ -129,16 +135,27 @@ def run_chains_jax_latent_two_part(
     sparse_arrays = {key: sparse_arrays[key] for key in ("Ai", "Aj", "eye", "w")}
     kind = np.where(pos, TRUNCATED, UNOBSERVED) if not zinb else None
     data_c = nb_jax._latent_data(
-        y, X, W, priors, params_c, sparse_arrays, T, unit_effects, kind=kind
+        y,
+        X,
+        W,
+        priors,
+        params_c,
+        sparse_arrays,
+        T,
+        unit_effects,
+        kind=kind,
+        level_shift=level_shift,
+        zero_logdet=zero_logdet,
     )
     n_colours_c = int(data_c["classes"].shape[0])
     alpha_fixed = priors.alpha_fixed is not None
     row_std = bool(np.allclose(np.asarray(W.sum(axis=1)).ravel(), 1.0))
+    axes, _ = joint_axes(X, alpha_fixed)
     static_c = (n, k, "sar", n_colours_c, alpha_fixed, row_std, lu_solve, store_latent)
     sweep_c = cached_sweep(
-        ("negbin_latent", *static_c, T, n_groups, *key_c),
+        ("negbin_latent", *static_c, T, n_groups, axes, *key_c),
         lambda: nb_jax._make_sweep(
-            *static_c[:6], eval_c, lu_solve, store_latent, T, n_groups
+            *static_c[:6], eval_c, lu_solve, store_latent, T, n_groups, axes
         ),
     )
 
@@ -173,13 +190,20 @@ def run_chains_jax_latent_two_part(
         return sweep
 
     sweep = cached_sweep(
-        ("two_part_latent", model, *static_z, *key_z, *static_c, T, n_groups, *key_c),
+        (
+            "two_part_latent",
+            model,
+            *static_z,
+            *key_z,
+            *static_c,
+            T,
+            n_groups,
+            axes,
+            *key_c,
+        ),
         build,
     )
 
-    eta0, beta0, alpha0 = initial_state(y, X)
-    if alpha_fixed:
-        alpha0 = float(priors.alpha_fixed)
     m0 = np.sqrt(2.0 * np.pi) * np.log(2.0)
     start_z = {
         "par": jnp.float64(0.0),
@@ -193,20 +217,7 @@ def run_chains_jax_latent_two_part(
     if n_groups_z:
         start_z["c"] = jnp.full(n_groups_z, float(unit_effects_zero.mu))
         start_z["sigma_c"] = jnp.float64(unit_effects_zero.sd_scale)
-    start_c = {
-        "par": jnp.float64(0.0),
-        "beta": jnp.asarray(beta0),
-        "alpha": jnp.float64(alpha0),
-        "eta": jnp.asarray(eta0).reshape(T, n),
-        "sxb": jnp.asarray(X @ beta0).reshape(T, n),
-        "s1": jnp.ones((T, n)),
-        "step": jnp.float64(0.1),
-        "slice_width": jnp.float64(slice_width),
-        "it": jnp.float64(0.0),
-    }
-    if n_groups:
-        start_c["c"] = jnp.zeros(n_groups)
-        start_c["sigma_c"] = jnp.float64(unit_effects.sd_scale)
+    start_c = nb_jax.start_state(y, X, T, priors, slice_width, unit_effects, axes)
     start = {"zero": start_z, "count": start_c}
     if zinb:
         start.update(

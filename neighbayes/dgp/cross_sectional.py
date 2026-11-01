@@ -251,7 +251,7 @@ def simulate_sar_negbin(
     contiguity: str = "queen",
     create_gdf: bool = False,
     geometry_type: str = "polygon",
-    latent: bool = False,
+    latent: bool = True,
 ) -> dict:
     r"""Simulate data from the reduced-form SAR-NB2 that :class:`SARNegBin` fits.
 
@@ -261,8 +261,9 @@ def simulate_sar_negbin(
 
     With ``T`` (and ``N``) it draws the :class:`SARNegBin` panel, whose random
     unit effects (``unit_effects="random"``) enter inside the filter.  With
-    ``latent=True`` it draws the latent SAR that ``SARNegBin(latent=True)``
-    fits, whose filter propagates the negative binomial's gamma disturbance:
+    ``latent=True``, the default, it draws the latent SAR that the unmarked
+    ``SARNegBin`` fits, whose filter propagates the negative binomial's gamma
+    disturbance:
 
     .. math::
 
@@ -309,9 +310,9 @@ def simulate_sar_negbin(
         Whether to attach a GeoDataFrame to the output.
     geometry_type : str, default "polygon"
         Type of geometry for the GeoDataFrame.
-    latent : bool, default False
-        Draw the latent SAR instead of the reduced form; ``eta_true`` is then
-        the log-mean.
+    latent : bool, default True
+        The latent SAR, whose ``eta_true`` is the log-mean; ``False`` draws the
+        reduced form.
 
     Returns
     -------
@@ -376,6 +377,8 @@ def _simulate_latent_negbin(
     contiguity, create_gdf, geometry_type,
 ) -> dict:  # fmt: skip
     """The latent SAR, SEM or SDEM negative binomial: one gamma disturbance each."""
+    from ..samplers._utils._latent_loglik import log_gamma_noise
+
     if alpha <= 0:
         raise ValueError("alpha must be strictly positive.")
     rng = ensure_rng(rng, seed)
@@ -385,7 +388,7 @@ def _simulate_latent_negbin(
     X = make_design_matrix(rng, nobs, k=max(len(beta) - 1, 0), add_intercept=True)
     name = "rho" if process == "sar" else "lam"
     _check_rho_stability(par, name=name)
-    eps = np.log(rng.gamma(alpha, 1.0 / alpha, size=nobs))
+    eps = log_gamma_noise(rng, alpha, nobs)
     if err_hetero:
         eps = eps * _hetero_scale(X, 1.0)
     solve = spatial_filter_factor(Ws, par)

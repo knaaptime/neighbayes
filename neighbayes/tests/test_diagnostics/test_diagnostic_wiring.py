@@ -166,7 +166,7 @@ def test_panel_diagnostics_registries_match_expected():
 
 
 def test_count_suites_follow_the_design():
-    """A count cross-section has its reduced-form SAR suite; the panels have none."""
+    """A reduced-form count cross-section has its SAR suite; the latent SAR and panels have none."""
     from neighbayes.diagnostics.lmtests.registry import get_diagnostic_suite
     from neighbayes.models import NegBin, SARNegBin
     from neighbayes.tests.helpers import W_to_graph, make_line_W
@@ -181,7 +181,8 @@ def test_count_suites_follow_the_design():
     def labels(model):
         return [label for _, label in get_diagnostic_suite(model).tests]
 
-    assert labels(SARNegBin(**xs)) == ["LM-Error", "LM-WX"]
+    assert labels(SARNegBin(**xs, latent=False)) == ["LM-Error", "LM-WX"]
+    assert get_diagnostic_suite(SARNegBin(**xs)) is None
     assert labels(NegBin(**xs)) == [
         "LM-Lag",
         "LM-Error",

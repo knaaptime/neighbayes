@@ -262,11 +262,10 @@ A binary outcome is the sign of a latent utility, $y_i = \mathbf{1}[y_i^* > 0]$.
 The latent SAR propagates the link's own disturbance through the multiplier,
 standard logistic for the logit and standard normal for the probit, so its
 $\rho = 0$ member is the aspatial model and no scale parameter is pinned: the
-link fixes it. The reduced form propagates only the covariates. An unmarked SAR
-class is the form its field means by the name (ADR 0003): the latent SAR for the
-probit, `SARProbit`, and the reduced form for the logit, `SARLogit`; `latent=`
-names the other. The SEM and SDEM classes are latent in both links and take no
-`latent` argument.
+link fixes it. The reduced form propagates only the covariates. The unmarked SAR
+class is the latent SAR in both links, as in every family (ADR 0004):
+`SARProbit` and `SARLogit`, with `latent=False` fitting the reduced form. The
+SEM and SDEM classes are latent too and take no `latent` argument.
 
 The latent models share one exact Gibbs sweep: the utilities from their
 truncated normal conditionals (Albert and Chib 1993), one at a time on NumPy or a
@@ -337,7 +336,7 @@ takes no unit or time effects, because a within transformation would mix censore
 and uncensored values in the likelihood. Impacts are on the latent scale, through
 the spatial multiplier within each period.
 
-### Panel count models (`SARNegBin`, `NegBin`)
+### Panel count models, reduced form (`SARNegBin(latent=False)`, `NegBin`)
 
 $$y_{it} \sim \operatorname{NegBin}(\mu_{it}, \alpha), \quad \log \boldsymbol{\mu}_t = (I - \rho W)^{-1} (X_t\beta + c) + \tau_t$$
 
@@ -382,13 +381,13 @@ Both classes default to Gibbs; `sampler="nuts"` runs the PyMC model. `priors={"a
 (10-20 times the typical mean count) gives an essentially Poisson model that
 keeps the exact Pólya–Gamma sampler.
 
-### SARNegBin (Reduced Form)
+### SARNegBin, reduced form (`latent=False`)
 
 $$y_i \sim \operatorname{NegBin}(\mu_i, \alpha), \quad \mu = \exp(\eta), \quad \eta = (I - \rho W)^{-1} X\beta$$
 
 No disturbance propagates — spatial dependence enters only through the mean propagator. Supports both NUTS and Pólya–Gamma Gibbs sampling. Unit effects need a panel (above): in a cross-section one draw per observation is a disturbance, not a unit effect.
 
-### SARNegBin, latent (`latent=True`)
+### SARNegBin (latent SAR)
 
 $$y_i \sim \operatorname{Poisson}(e^{\eta_i}), \quad (I - \rho W)\eta = X\beta + \varepsilon, \quad \varepsilon_i = \log\gamma_i,\ \gamma_i \sim \operatorname{Gamma}(\alpha, \alpha)$$
 
@@ -402,7 +401,14 @@ $\beta$ shifted along the least-squares fit of $W\eta$ on $X$, $\beta$ from a
 *t* at its Laplace approximation, and $\alpha$. Small counts pin $\eta$ only
 loosely, so two moves interweave the parametrization that holds the
 disturbances instead (Yu & Meng 2011): $\alpha$ with the standardized
-disturbances held, and $\rho$ with the disturbances held. There is no NUTS path.
+disturbances held, and $\rho$ with the disturbances held. When $\alpha$ is
+small and most counts are zero, $\rho$, $\alpha$ and the depth of the zeros'
+log-means move together, and every one-parameter move pins them; a last move
+draws $\rho$, $\log\alpha$ and the level of $X\beta$ jointly, holding the log-means
+at the positive counts and the standardized disturbances at the zeros, by a
+slice along the eigenvectors of its Hessian. On a 100 × 100 lattice with 95%
+zeros and $\alpha = 0.05$ it raised the effective sample size of $\rho$ from
+0.1% to 4.5% of the sweeps. There is no NUTS path.
 The pointwise log-likelihood
 (`idata_kwargs={"log_likelihood": True}`) integrates each observation's latent
 value out given the others, $p(y_i \mid \theta, \eta_{-i}) = \int p(y_i \mid
@@ -419,7 +425,14 @@ $(I - \rho W)\eta_t = X_t\beta + \tau_t + c + \varepsilon_t$, $c_i \sim
 N(\mu, \sigma_c^2)$ with $\sigma_c$ learned; each period's gamma disturbance
 propagates through the same filter, so the Jacobian is $T\log|I - \rho W|$.
 The sweep runs over the stacked periods, and a unit effect, entering only its
-own unit's equations, is drawn from a *t* at its conditional mode.
+own unit's equations, is drawn from a *t* at its conditional mode. With period
+effects and a row-standardized $W$, the target also carries Lee and Yu's (2010)
+time-effects term, $-T\log(1 - \rho)$, as the Gaussian panels do: a period
+effect inside the filter moves its period's log-mean level by
+$\tau_t/(1 - \rho)$, so priors flat on the $\tau_t$ themselves would leave a
+factor $1 - \rho$ per period in the marginal of $\rho$ and bias it down
+(by about one posterior sd at $N = 100$); the term makes them flat on the
+levels.
 
 Impacts are on the log-mean by default; `impacts(scale="count")` gives them on
 the expected count, which averages over the propagated heterogeneity. With $u =
@@ -451,7 +464,7 @@ $$y_i \sim \operatorname{Poisson}(e^{\eta_i}), \quad \eta = X\beta + WX\theta + 
 $\beta$ and indirect $\theta$ (times the mean row sum of $W$), or with
 `scale="count"` on the expected count.
 
-### SARZINB
+### SARZINB, reduced form (`latent=False`)
 
 $$y_i \sim \operatorname{ZINB}(\mu_i, \alpha, \pi_i), \quad \log \boldsymbol{\mu} = (I - \rho W)^{-1} X\beta, \quad \operatorname{logit} \boldsymbol{\pi} = (I - \rho_z W_z)^{-1} X_z\beta_z$$
 
@@ -475,7 +488,7 @@ versus none" questions on sparse counts, use a hurdle model
 ({ref}`below <hurdle-models>`), whose zero part is fit to the observed
 zeros.
 
-### SARZINB, latent (`latent=True`)
+### SARZINB (latent)
 
 $$y_i = 0 \text{ if } u_i \le 0, \quad y_i \mid u_i > 0 \sim \operatorname{Poisson}(e^{\eta_i}), \quad (I - \rho_z W_z)u = X_z\beta_z + \varepsilon_z, \quad (I - \rho W)\eta = X\beta + \varepsilon$$
 
@@ -523,8 +536,10 @@ with pair effects, or the flow hurdle.
 $$P(y > 0) = \operatorname{logit}^{-1}(\eta_z), \quad y \mid y > 0 \sim \operatorname{NB}(\mu, \alpha) \text{ truncated at } 0, \quad \eta_z = (I - \rho_z W_z)^{-1} X_z\beta_z, \quad \log \boldsymbol{\mu} = (I - \rho W)^{-1} X\beta$$
 
 A hurdle separates *whether* a count is positive from *how large* it is when
-it is. Both parts are reduced-form SARs: the spatial lag acts on the linear
-predictor and no latent disturbance enters, so neither part has a Jacobian.
+it is. In the reduced form (`latent=False`) both parts are reduced-form SARs:
+the spatial lag acts on the linear predictor and no latent disturbance enters,
+so neither part has a Jacobian. The unmarked `SARHurdleNegBin` is the latent
+model (below).
 The zero part is named as in SARZINB (`rho_zero`, `beta_zero`, `X_zero`,
 `W_zero`).
 
@@ -568,14 +583,14 @@ a ridge, so they are drawn jointly by a slice sampler that moves along it.
 The halves share no parameters, so the posterior factorizes. Linking them
 through correlated unit (pair) effects is a planned extension.
 
-**Latent (`SARHurdleNegBin(latent=True)`).** Each part is a latent SAR with its
+**Latent (the unmarked `SARHurdleNegBin`).** Each part is a latent SAR with its
 own disturbance: a count is positive when the utility
 $u = (I - \rho_z W_z)^{-1}(X_z\beta_z + \varepsilon_z)$, $\varepsilon_z$
 logistic, is positive, and is then $\operatorname{Poisson}(e^{\eta_i})$
 truncated at zero, $\eta = (I - \rho W)^{-1}(X\beta + \varepsilon)$,
 $\varepsilon_i = \log\gamma_i$. The truncation conditions on $\eta_i$, as in
 hurdle models with random effects. The parts still share nothing: the zero
-part is `SARLogit(latent=True)` fitted to $\mathbf 1(y > 0)$, the count part
+part is the latent `SARLogit` fitted to $\mathbf 1(y > 0)$, the count part
 the latent SAR NB observing the positive counts only, and a sweep is one sweep
 of each. LOO and impacts work as for the latent SARZINB, the count part's
 outcome being the expected positive count. As a panel both parts take random
@@ -595,7 +610,7 @@ $$y_i \sim \operatorname{NegBin}(\mu_i, \alpha), \quad \log \boldsymbol{\mu} = X
 
 Non-spatial negative binomial baseline.
 
-### SARLogit (Reduced Form)
+### SARLogit, reduced form (`latent=False`)
 
 $$y_i \sim \operatorname{Bernoulli}(p_i), \quad \eta = (I - \rho W)^{-1}X\beta$$
 
@@ -609,7 +624,7 @@ $\lambda$, and binary outcomes barely constrain the trade: on 1,225 units with
 effects of sd 2, an SEM logit with such effects had its $\lambda$ near 0.3
 against 0.5 and the effects' sd at 6 ± 6, held only by its prior.
 
-### SARLogit, latent (`latent=True`)
+### SARLogit (latent SAR)
 
 $$y_i = \mathbf 1\{y^*_i > 0\}, \quad (I - \rho W) y^* = X\beta + \varepsilon, \quad \varepsilon_i \sim \operatorname{Logistic}(0, 1)$$
 
@@ -846,10 +861,12 @@ information, using the Fisher weights.
 
 The suites also carry LM-WX and Moran-Working, a Moran diagnostic on the
 Pólya–Gamma working residuals that is not the score test of a fitted model. At
-a reduced-form SAR null (`SARLogit`, `SARNegBin`) the suites are LM-Error, the
+a reduced-form SAR null (`SARLogit(latent=False)`, `SARNegBin(latent=False)`)
+the suites are LM-Error, the
 score of a latent error process added to the fitted model, and LM-WX; both are
 uncorrelated with the other scores there, so their robust forms are the same
-statistics.
+statistics. A fitted latent SAR, the default, has no such suite yet: the tests
+with the latent SAR as their null are not derived.
 
 `Logit.spatial_diagnostics_decision()` and `NegBin.spatial_diagnostics_decision()`
 read the tests as a pair (the table names the logit's classes; the negative
@@ -859,11 +876,11 @@ measures the departure from that proportion.
 
 | Robust LM-Lag | LM-Error | Robust LM-Error | Recommendation |
 |---|---|---|---|
-| significant | not | — | `SARLogit` (reduced form) |
-| significant | significant | not | `SARLogit(latent=True)` |
+| significant | not | — | `SARLogit(latent=False)` |
+| significant | significant | not | `SARLogit` |
 | significant | significant | significant | `SDEMLogit` |
 | not | significant | significant | `SEMLogit` |
-| not | significant | not | `SEMLogit` or `SARLogit(latent=True)` |
+| not | significant | not | `SEMLogit` or `SARLogit` |
 | not | not | — | `Logit` |
 
 The last but one row is ambiguous by construction: without a spillover term to

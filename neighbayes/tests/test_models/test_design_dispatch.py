@@ -41,22 +41,38 @@ ROUTES = [
     (m.SDM, {**PANEL, "dynamic": True}, "dynamic", 0),
     (m.SDM, {**PANEL, "dynamic": "restricted"}, "restricted", 0),
     (m.SAR, {"time_col": "year", "unit_col": "id"}, "static", 0),
-    # Count families: the design
-    (m.SARNegBin, {}, "static", None),
-    (m.SARNegBin, PANEL, "panel", 0),
+    # Count families: the design (the unmarked SAR is latent, ADR 0004)
+    (m.SARNegBin, {}, "latent", None),
+    (m.SARNegBin, {"latent": False}, "static", None),
+    (m.SARNegBin, PANEL, "latent", 0),
+    (m.SARNegBin, {**PANEL, "latent": False}, "panel", 0),
     (
         m.SARNegBin,
         {**PANEL, "unit_effects": "random", "time_effects": True},
+        "latent",
+        3,
+    ),
+    (
+        m.SARNegBin,
+        {**PANEL, "unit_effects": "random", "time_effects": True, "latent": False},
         "panel",
         3,
     ),
     (m.NegBin, {**PANEL, "unit_effects": "random"}, "panel", 1),
     (m.ZINB, {**PANEL, "time_effects": True}, "panel", 2),
-    (m.SARZINB, {**PANEL, "unit_effects": "random"}, "panel", 1),
+    (m.SARZINB, {**PANEL, "unit_effects": "random"}, "latent", 1),
+    (m.SARZINB, {**PANEL, "unit_effects": "random", "latent": False}, "panel", 1),
     (m.HurdleNegBin, PANEL, "panel", 0),
-    (m.SARHurdleNegBin, {**PANEL, "unit_effects": "random"}, "panel", 1),
+    (m.SARHurdleNegBin, {**PANEL, "unit_effects": "random"}, "latent", 1),
+    (
+        m.SARHurdleNegBin,
+        {**PANEL, "unit_effects": "random", "latent": False},
+        "panel",
+        1,
+    ),
     # Logit, Tobit and probit families
-    (m.SARLogit, {}, "static", None),
+    (m.SARLogit, {}, "latent", None),
+    (m.SARLogit, {"latent": False}, "static", None),
     (m.SARLogit, {"latent": True}, "latent", None),
     (m.SEMLogit, {}, "static", None),
     (m.SDEMLogit, {}, "static", None),
@@ -210,15 +226,18 @@ def test_a_count_cross_section_is_the_public_class(panel_data):
     y = np.random.default_rng(1).poisson(2.0, size=n)
     model = m.SARNegBin(y=y, X=panel_data["X"][:n], W=panel_data["W"])
     assert type(model) is m.SARNegBin
-    assert model._design == "static"
+    assert model._design == "latent"
 
 
-@pytest.mark.parametrize("cls", [m.SARNegBin, m.ZINB, m.SARHurdleNegBin])
-def test_a_count_panel_is_the_public_class(panel_data, cls):
+@pytest.mark.parametrize(
+    "cls, design",
+    [(m.SARNegBin, "latent"), (m.ZINB, "panel"), (m.SARHurdleNegBin, "latent")],
+)
+def test_a_count_panel_is_the_public_class(panel_data, cls, design):
     y = np.random.default_rng(1).poisson(2.0, size=panel_data["N"] * panel_data["T"])
     model = cls(**{**panel_data, "y": y}, unit_effects="random", time_effects=True)
     assert type(model) is cls
-    assert model._design == "panel"
+    assert model._design == design
     assert model.effects == "two_way"
 
 

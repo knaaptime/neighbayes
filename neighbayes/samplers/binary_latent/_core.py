@@ -155,6 +155,8 @@ class LatentBinaryChain:
     ``link`` is ``"logit"`` or ``"probit"``.  ``sign`` is each utility's side of zero (``+1``, ``-1``, or ``0`` for
     unknown, which needs ``logq`` set before each sweep); by default it is
     that of ``y``.  ``unit_effects`` adds a SAR's random unit effects.
+    ``level_shift`` ``m`` adds ``-m log(1 - rho)`` to the SAR's ``rho``
+    target, the panel's time-effects term (see :mod:`..negbin_latent._core`).
     :func:`~neighbayes.samplers._utils._sweeps.run_sweeps` runs one.
     """
 
@@ -172,6 +174,7 @@ class LatentBinaryChain:
         slice_width: float = 0.4,
         sign: Optional[np.ndarray] = None,
         unit_effects: Optional[UnitEffects] = None,
+        level_shift: float = 0.0,
     ):
         n, k = X.shape
         self.sar = process == "sar"
@@ -192,6 +195,7 @@ class LatentBinaryChain:
         self.W = sp.csr_matrix(W)
         self.eye = sp.identity(n, format="csr")
         self.logdet_fn = logdet_fn
+        self.level_shift = float(level_shift)
         self.b0 = np.broadcast_to(np.asarray(priors.beta_mu, dtype=np.float64), (k,))
         self.B0inv = np.diag(
             1.0 / np.broadcast_to(np.asarray(priors.beta_sigma, float), (k,)) ** 2
@@ -257,11 +261,14 @@ class LatentBinaryChain:
             q00, q01, q11 = c0 @ Bc0, c0 @ Bc1, c1 @ Bc1
             yPy, yPz, zPz = yt @ py, yt @ pz, z @ pz
 
+            shift = self.level_shift
+
             def logp(r):
                 return (
                     logdet_fn(r)
                     - 0.5 * (yPy - 2.0 * r * yPz + r * r * zPz)
                     + 0.5 * (q00 - 2.0 * r * q01 + r * r * q11)
+                    - (shift * np.log1p(-r) if shift else 0.0)
                 )
 
             par, _, _, _ = slice_sample_1d_adaptive(

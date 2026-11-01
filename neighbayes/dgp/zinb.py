@@ -37,7 +37,7 @@ def simulate_sar_zinb(
     err_hetero: bool = False,
     create_gdf: bool = False,
     geometry_type: str = "polygon",
-    latent: bool = False,
+    latent: bool = True,
 ) -> dict:
     r"""Simulate data from a zero-inflated SAR-NB DGP.
 
@@ -68,8 +68,8 @@ def simulate_sar_zinb(
         y_i = 0 \text{ if } d_i = 0, \quad
         y_i \sim \text{NegBin}(\cdot) \text{ if } d_i = 1
 
-    With ``latent=True`` it draws the latent model ``SARZINB(latent=True)``
-    fits, each part's own disturbance propagated: :math:`d_i = \mathbf 1(u_i >
+    With ``latent=True``, the default, it draws the latent model the unmarked
+    ``SARZINB`` fits, each part's own disturbance propagated: :math:`d_i = \mathbf 1(u_i >
     0)`, :math:`u = (I - \rho_z W_z)^{-1}(X_z\beta_z + \varepsilon_z)` with
     :math:`\varepsilon_z` logistic, and :math:`y_i \mid d_i = 1 \sim
     \mathrm{Poisson}(e^{\eta_i})`, :math:`\eta = (I - \rho W)^{-1}(X\beta +
@@ -303,9 +303,9 @@ def _latent_parts(
                 hi = mid
         beta_zero[0] += 0.5 * (lo + hi)
     u = solve_z(X_zero @ beta_zero + rng.logistic(size=n))
-    # log g by log Gamma(alpha + 1) + log(U) / alpha, which does not underflow.
-    eps = np.log(rng.gamma(alpha + 1.0, 1.0 / alpha, size=n))
-    eps += np.log(rng.random(n)) / alpha
+    from ..samplers._utils._latent_loglik import log_gamma_noise
+
+    eps = log_gamma_noise(rng, alpha, n)
     eta = spatial_filter_factor(Ws, rho)(X @ beta + eps)
     return u, eta, beta_zero
 

@@ -237,17 +237,17 @@ def simulate_sar_logit(
     contiguity: str = "queen",
     create_gdf: bool = False,
     geometry_type: str = "polygon",
-    latent: bool = False,
+    latent: bool = True,
 ) -> dict:
     """Simulate SAR-logit binary outcome data.
 
     DGP
     ---
-    ``eta = (I - rho W)^{-1} X beta``, ``y ~ Bernoulli(logit^{-1}(eta))``: the
-    reduced form :class:`~neighbayes.models.SARLogit` fits.  With
-    ``latent=True``, the latent SAR ``SARLogit(latent=True)`` fits:
+    The latent SAR the unmarked :class:`~neighbayes.models.SARLogit` fits,
     ``y* = (I - rho W)^{-1} (X beta + eps)``, ``eps`` iid standard logistic,
-    ``y = 1(y* > 0)``.
+    ``y = 1(y* > 0)``.  With ``latent=False``, the reduced form
+    ``SARLogit(latent=False)`` fits: ``eta = (I - rho W)^{-1} X beta``,
+    ``y ~ Bernoulli(logit^{-1}(eta))``.
 
     Parameters
     ----------
@@ -275,9 +275,10 @@ def simulate_sar_logit(
     geometry_type : {"point", "polygon"}, default="polygon"
         Geometry to generate when ``create_gdf=True`` and no source
         ``gdf`` is provided.
-    latent : bool, default=False
-        Draw the latent SAR instead of the reduced form; ``eta_true`` is then
-        the latent utility ``y*``.
+    latent : bool, default=True
+        The latent SAR, whose ``eta_true`` is the latent utility ``y*``;
+        ``False`` draws the reduced form, whose ``eta_true`` is the linear
+        predictor.
 
     Returns
     -------

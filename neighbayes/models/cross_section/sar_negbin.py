@@ -1,8 +1,12 @@
-r"""Reduced-form spatial autoregressive Negative Binomial (SAR-NB) model.
+r"""Spatial autoregressive negative binomial: the latent SAR, or the reduced form.
 
-Spatial dependence enters purely through the mean propagator
-:math:`(I - \rho W)^{-1}` and overdispersion is captured by the Negative
-Binomial dispersion parameter :math:`\alpha`; no disturbance propagates.
+The unmarked ``SARNegBin`` is the latent SAR (ADR 0004), which propagates the
+negative binomial's own gamma disturbance through the multiplier
+(:mod:`._latent_negbin`).  ``latent=False`` is the reduced form, the field's
+spatial lag model of counts (Lambert, Brown and Florax 2010): spatial
+dependence enters only through the mean propagator :math:`(I - \rho W)^{-1}`
+and overdispersion through the dispersion :math:`\alpha`, no disturbance
+propagating,
 
 .. math::
 
@@ -10,13 +14,8 @@ Binomial dispersion parameter :math:`\alpha`; no disturbance propagates.
     \mu = \exp(\eta), \qquad
     \eta = (I - \rho W)^{-1} X \beta.
 
-This is the field's spatial lag model of counts (Lambert, Brown and Florax
-2010).  ``latent=True`` is the latent SAR instead, which propagates the
-negative binomial's own gamma disturbance
-(:mod:`._latent_negbin`).
-
-Sampling
---------
+Sampling the reduced form
+-------------------------
 Two samplers are available:
 
 * **Pólya-Gamma Gibbs** (default): call
@@ -67,21 +66,10 @@ from ._latent_negbin import LatentNegBinMixin
 
 
 class SARNegBin(CountDesigns, LatentNegBinMixin, _CountPanel, SpatialModel):
-    r"""Bayesian reduced-form spatial autoregressive negative binomial (SAR-NB).
+    r"""Bayesian SAR negative binomial: the latent SAR, or the reduced form with ``latent=False``.
 
-    .. math::
-
-        y_i \sim \mathrm{NegBin}(\mu_i, \alpha), \qquad
-        \mu = \exp(\eta), \qquad
-        \eta = (I - \rho W)^{-1} X \beta .
-
-    The spatial lag acts on the log-mean; ``y`` is not transformed, so the
-    likelihood carries no :math:`\log|I - \rho W|` Jacobian.  ``fit()``
-    defaults to Pólya–Gamma Gibbs; ``sampler="nuts"`` fits the same model in
-    PyMC.
-
-    With ``latent=True`` it is the latent SAR, whose multiplier propagates the
-    negative binomial's own disturbance as well as the covariates:
+    The latent SAR's multiplier propagates the negative binomial's own
+    disturbance as well as the covariates:
 
     .. math::
 
@@ -96,6 +84,19 @@ class SARNegBin(CountDesigns, LatentNegBinMixin, _CountPanel, SpatialModel):
     log-likelihood integrates each log-mean out given the rest, and its
     impacts are on the log-mean or, ``impacts(scale="count")``, the expected
     count.
+
+    ``latent=False`` is the reduced form,
+
+    .. math::
+
+        y_i \sim \mathrm{NegBin}(\mu_i, \alpha), \qquad
+        \mu = \exp(\eta), \qquad
+        \eta = (I - \rho W)^{-1} X \beta ,
+
+    whose spatial lag acts on the log-mean only; ``y`` is not transformed, so
+    the likelihood carries no :math:`\log|I - \rho W|` Jacobian.  Its
+    ``fit()`` defaults to Pólya–Gamma Gibbs, and ``sampler="nuts"`` fits it in
+    PyMC.
 
     Parameters
     ----------
@@ -152,10 +153,13 @@ class SARNegBin(CountDesigns, LatentNegBinMixin, _CountPanel, SpatialModel):
         Add the unit means of the time-varying columns to a panel's design
         (inside the filter), absorbing a correlation between the unit effects
         and ``X``.  Needs unit effects.
-    latent : bool, default False
-        The latent SAR instead of the reduced form.  As a panel it takes random
-        unit effects and period effects, both inside the filter with the
-        covariates and each period's gamma disturbance.
+    latent : bool, default True
+        The latent SAR; ``False`` fits the reduced form.  As a panel the latent
+        SAR takes random unit effects and period effects, both inside the
+        filter with the covariates and each period's gamma disturbance; with
+        period effects and a row-standardized ``W`` its target carries Lee and
+        Yu's (2010) time-effects term, :math:`-T\log(1 - \rho)`, so that the
+        period effects are flat on each period's log-mean level.
     """
 
     _DESIGNS = {
@@ -166,6 +170,7 @@ class SARNegBin(CountDesigns, LatentNegBinMixin, _CountPanel, SpatialModel):
     # The latent SAR's log-mean impacts and coordinates are the reduced form's.
     _FALLBACK = {"latent": "static"}
     _latent_panel = True
+    _latent_default = True
 
     _priors_cls = SARNegBinPriors
     _gibbs_key: tuple[str, str] | None = ("count", "cross_section")

@@ -66,7 +66,7 @@ class TestSARLogitRecovery:
     def test_recovers_rho_and_beta(self, sar_logit_reduced_data):
         y, X, W_dense = sar_logit_reduced_data
         W_graph = W_to_graph(W_dense)
-        model = SARLogit(y=y, X=X, W=W_graph)
+        model = SARLogit(y=y, X=X, W=W_graph, latent=False)
         idata = model.fit(**SAMPLE_KWARGS)
 
         rho_hat = float(idata.posterior["rho"].mean())
@@ -83,7 +83,7 @@ class TestSARLogitRecovery:
     def test_fitted_probabilities_in_range(self, sar_logit_reduced_data):
         y, X, W_dense = sar_logit_reduced_data
         W_graph = W_to_graph(W_dense)
-        model = SARLogit(y=y, X=X, W=W_graph)
+        model = SARLogit(y=y, X=X, W=W_graph, latent=False)
         model.fit(**SAMPLE_KWARGS)
 
         p_hat = model.fitted_probabilities()

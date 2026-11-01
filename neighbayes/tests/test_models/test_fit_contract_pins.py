@@ -363,7 +363,7 @@ def _count_cases():
 @pytest.mark.filterwarnings("ignore:Zero-inflated NB:UserWarning")
 def test_count_xs_fit_contract(name, ctor, zi, expected, sampler):
     y, X = _count_xy(zero_inflate=zi)
-    model = ctor(y=y, X=X, W=_count_graph())
+    model = ctor(y=y, X=X, W=_count_graph(), latent=False)  # the reduced forms
     kwargs = dict(
         sampler=sampler, draws=6, tune=6, chains=1, progressbar=False, random_seed=1
     )

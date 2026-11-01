@@ -772,7 +772,7 @@ def warn_pg_information(ratios, alpha: float, mean_count: float) -> None:
         "sampler will mix slowly.  The augmentation is tightest when alpha is "
         "near the counts' scale: with alpha far above the mean (counts close "
         "to Poisson) hold it with priors={'alpha_fixed': ...} at 10 to 20 times "
-        "the mean; far below, the latent model (latent=True) has no Pólya–Gamma "
+        "the mean; far below, the latent model (the default) has no Pólya–Gamma "
         "step.",
         UserWarning,
         stacklevel=3,

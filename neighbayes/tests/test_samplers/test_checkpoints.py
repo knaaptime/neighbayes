@@ -163,7 +163,7 @@ def test_a_fit_resumes_with_its_probe_check(tmp_path, monkeypatch):
     from neighbayes.models import SARNegBin
 
     # A bar no 50-probe pool meets, so the midpoint substitutes a grown pool.
-    monkeypatch.setattr("neighbayes._logdet._probe_check.run_bar", lambda *a, **k: 2e-4)
+    monkeypatch.setattr("neighbayes._logdet._probe_check.run_bar", lambda *a, **k: 2e-5)
     d = dgp.simulate_sar_negbin(n_side=8, seed=9, latent=True)
 
     def fit():

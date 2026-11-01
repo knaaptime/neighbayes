@@ -88,6 +88,20 @@ class LatentMixin:
         return self._is_panel and getattr(self, "_fe_groups", False)
 
     @property
+    def _latent_level_shift(self) -> float:
+        """Lee and Yu's (2010) time-effects term: ``T``, or 0 without period effects.
+
+        With period effects inside the filter and a row-standardized ``W``, the
+        samplers add ``-T log(1 - ρ)`` to ρ's target, which makes each period's
+        effect flat on its log-mean level rather than on itself (see
+        :mod:`neighbayes.samplers.negbin_latent._core`), as the Gaussian panels
+        do (``SpatialModel._jacobian_shift``).
+        """
+        if not self._latent_periods or self._latent_process != "sar":
+            return 0.0
+        return float(self._T) if self._W_row_standardized() else 0.0
+
+    @property
     def _latent_W(self) -> sp.csr_matrix:
         """The filter's weights on the stack: ``I_T ⊗ W`` for a panel."""
         W = self._W_sparse.tocsr()
@@ -167,7 +181,11 @@ class LatentMixin:
                 mu=fp["effect_mu"],
                 sd_scale=fp["effect_sd_scale"],
             )
-        return {"T": int(self._T), "unit_effects": fx}
+        return {
+            "T": int(self._T),
+            "unit_effects": fx,
+            "level_shift": self._latent_level_shift,
+        }
 
     def _latent_systematic(self, post) -> np.ndarray:
         """``(G, n T)``: each draw's systematic part, ``Xβ`` plus the panel's effects."""
@@ -372,7 +390,15 @@ class LatentMixin:
         raise NotImplementedError(
             f"{type(self).__name__}'s latent model is fitted by Gibbs sampling: "
             + self._latent_no_nuts
+            + self._reduced_form_hint
         )
+
+    @property
+    def _reduced_form_hint(self) -> str:
+        """Where the class also has a reduced form, how to fit it by NUTS."""
+        if self._design != "latent":
+            return ""
+        return " Pass latent=False for the reduced form, which NUTS fits."
 
     def _latent_impacts(self, scale: str, return_posterior_samples: bool):
         """Impacts on the latent index (``_index_scale``) or the outcome scale."""

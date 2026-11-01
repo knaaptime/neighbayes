@@ -343,16 +343,16 @@ class TestGetSpec:
         )
         assert result == "SEM"
 
-    @pytest.mark.parametrize("family", ["Logit", "NegBin"])
+    @pytest.mark.parametrize("family", ["Logit", "Probit", "NegBin"])
     @pytest.mark.parametrize(
         "significant, leaf",
         [
             ((), "{f}"),
-            (("Robust-LM-Lag",), "SAR{f}"),
-            (("Robust-LM-Lag", "LM-Error"), "SAR{f}(latent=True)"),
+            (("Robust-LM-Lag",), "SAR{f}(latent=False)"),
+            (("Robust-LM-Lag", "LM-Error"), "SAR{f}"),
             (("Robust-LM-Lag", "LM-Error", "Robust-LM-Error"), "SDEM{f}"),
             (("LM-Error", "Robust-LM-Error"), "SEM{f}"),
-            (("LM-Error",), "SEM{f} or SAR{f}(latent=True)"),
+            (("LM-Error",), "SEM{f} or SAR{f}"),
         ],
     )
     def test_glm_tree_reads_the_tests_as_a_pair(self, family, significant, leaf):

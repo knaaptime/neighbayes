@@ -38,7 +38,8 @@ def test_designs(which):
     d, m = _model(which)
     assert m._design == "latent"
     assert m._gibbs_key == (f"{which}_latent", "cross_section")
-    assert cls(y=d["y"], X=d["X"], W=d["W_sparse"])._design == "static"
+    assert cls(y=d["y"], X=d["X"], W=d["W_sparse"])._design == "latent"
+    assert cls(y=d["y"], X=d["X"], W=d["W_sparse"], latent=False)._design == "static"
     panel = dict(y=np.r_[d["y"], d["y"]], X=np.r_[d["X"], d["X"]], W=d["W_sparse"])
     assert cls(**panel, N=25, T=2, latent=True)._design == "latent"
     with pytest.raises(NotImplementedError, match="Gibbs sampling"):
@@ -166,8 +167,8 @@ def test_fit_and_summaries(which, backend):
 
 def test_reduced_form_reports_the_link_scale_only():
     cls, sim = MODELS["hurdle"]
-    d = sim(n_side=5, seed=1)
-    m = cls(y=d["y"], X=d["X"], W=d["W_sparse"])
+    d = sim(n_side=5, seed=1, latent=False)
+    m = cls(y=d["y"], X=d["X"], W=d["W_sparse"], latent=False)
     m.fit(**QUICK)
     assert m.impacts(equation="zero", scale="logodds").attrs["scale"] == "logodds"
     with pytest.raises(NotImplementedError, match="link scale"):
@@ -211,3 +212,14 @@ def test_recovery(which, backend):
         v = post[name].values.reshape(-1, *post[name].shape[2:])
         z = (v.mean(0) - np.atleast_1d(truth[name])) / v.std(0)
         assert np.all(np.abs(z) < 3.5), (name, z)
+
+
+@pytest.mark.parametrize("which, zero_shift", [("hurdle", 3.0), ("zinb", 0.0)])
+def test_panel_parts_carry_the_time_effects_term(which, zero_shift):
+    """Each part with period effects in its filter carries -T log(1 - rho)."""
+    cls, sim = MODELS[which]
+    kw = dict(latent=True, unit_effects="random", time_effects=True)
+    d = sim(n_side=4, T=3, seed=1, **kw)
+    m = cls(y=d["y"], X=d["X"], W=d["W_sparse"], N=16, T=3, **kw)
+    assert m._part_level_shift(zero=False) == 3.0
+    assert m._part_level_shift(zero=True) == zero_shift

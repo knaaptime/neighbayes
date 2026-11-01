@@ -1,6 +1,10 @@
-r"""Zero-inflated SAR Negative Binomial (ZINB-SAR) model.
+r"""Zero-inflated SAR negative binomial: the latent model, or the reduced form.
 
-Composes a reduced-form SAR logit zero part with a reduced-form SAR NB count
+The unmarked ``SARZINB`` is the latent model (ADR 0004): each part a latent
+SAR propagating its own disturbance, a unit active when its logistic utility
+is positive and its count then Poisson given the log-mean
+(:mod:`._latent_two_part`).  ``latent=False`` is the reduced form, which
+composes a reduced-form SAR logit zero part with a reduced-form SAR NB count
 part via a zero-allocation block:
 
 .. math::
@@ -13,8 +17,8 @@ part via a zero-allocation block:
     \end{cases} \\
     \eta^{\mathrm{cnt}} &= (I - \rho W_{\mathrm{cnt}})^{-1} X\beta
 
-Both parts are reduced-form SARs: the spatial lag enters each linear predictor
-as a deterministic mean propagator (no random effects), so the
+In the reduced form both parts' spatial lags enter the linear predictors as
+deterministic mean propagators (no random effects), so the
 ``|I − ρ_z W_z|`` / ``|I − ρW|`` Jacobians cancel under marginalization.  The
 Pólya–Gamma augmentation yields fully conjugate Gibbs updates for all blocks
 except ρ, ρ_z and α, which use 1-D adaptive slice sampling.  The NumPy and JAX
@@ -71,7 +75,7 @@ from ._latent_two_part import LatentZINBMixin
 class SARZINB(
     CountDesigns, _ZINBPanel, ZeroPartMixin, LatentZINBMixin, ZINBMixin, SpatialModel
 ):
-    """Bayesian zero-inflated SAR Negative Binomial with PG-Gibbs sampler.
+    """Bayesian zero-inflated SAR negative binomial: latent, or reduced with ``latent=False``.
 
     Parameters
     ----------
@@ -155,10 +159,11 @@ class SARZINB(
     mundlak : bool, default False
         Add the unit means of the time-varying columns to a panel's count
         design.  Needs unit effects.
-    latent : bool, default False
-        The latent model instead of the reduced form: each part a latent SAR
-        propagating its own disturbance, a unit active when its logistic
-        utility is positive and its count then Poisson given the log-mean
+    latent : bool, default True
+        The latent model; ``False`` fits the reduced form.  In the latent
+        model each part is a latent SAR propagating its own disturbance, a
+        unit active when its logistic utility is positive and its count then
+        Poisson given the log-mean
         (:mod:`neighbayes.samplers.two_part_latent`).  As a panel its count
         part takes the effects above inside its filter, its zero part none.
 
@@ -181,6 +186,7 @@ class SARZINB(
     }
     _zero_part = True
     _latent_panel = True
+    _latent_default = True
 
     _spatial_params: tuple[str, ...] = ("rho", "rho_zero")
     _model_type: str = "zinb_sar"

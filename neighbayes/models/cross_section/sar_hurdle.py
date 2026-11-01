@@ -1,4 +1,9 @@
-r"""Reduced-form SAR hurdle negative binomial (cross-section).
+r"""SAR hurdle negative binomial: the latent model, or the reduced form.
+
+The unmarked ``SARHurdleNegBin`` is the latent model (ADR 0004): each part a
+latent SAR propagating its own disturbance, a count positive when its
+logistic utility is and then Poisson given the log-mean, truncated at zero
+(:mod:`._latent_two_part`).  ``latent=False`` is the reduced form,
 
 .. math::
 
@@ -45,7 +50,7 @@ class SARHurdleNegBin(
     HurdleMixin,
     SpatialModel,
 ):
-    """Bayesian reduced-form SAR hurdle NB2 with a Pólya–Gamma Gibbs sampler.
+    """Bayesian SAR hurdle NB2: the latent model, or the reduced form with ``latent=False``.
 
     Parameters
     ----------
@@ -108,10 +113,11 @@ class SARHurdleNegBin(
     mundlak : bool, default False
         Add the unit means of the time-varying columns to both of a panel's
         designs.  Needs unit effects.
-    latent : bool, default False
-        The latent model instead of the reduced form: each part a latent SAR
-        propagating its own disturbance, a count positive when its logistic
-        utility is, and then Poisson given the log-mean, truncated at zero
+    latent : bool, default True
+        The latent model; ``False`` fits the reduced form.  In the latent
+        model each part is a latent SAR propagating its own disturbance, a
+        count positive when its logistic utility is, and then Poisson given
+        the log-mean, truncated at zero
         (:mod:`neighbayes.samplers.two_part_latent`).  As a panel both parts
         take the effects above, each inside its own filter.
 
@@ -140,6 +146,7 @@ class SARHurdleNegBin(
     }
     _zero_part = True
     _latent_panel = True
+    _latent_default = True
     _needs_positive = True
 
     _spatial_params: tuple[str, ...] = ("rho", "rho_zero")

@@ -201,7 +201,8 @@ def _negbin_latent(seed=9):
     from neighbayes import dgp
     from neighbayes.models import SARNegBin
 
-    d = dgp.simulate_sar_negbin(n_side=8, seed=seed, latent=True)
+    # rho high enough that the warmup's draws need more than the first 50 probes
+    d = dgp.simulate_sar_negbin(n_side=8, rho=0.7, seed=seed, latent=True)
     return SARNegBin(
         y=d["y"], X=d["X"], W=d["W_sparse"], latent=True, logdet_method="stochastic"
     )

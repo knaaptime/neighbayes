@@ -55,11 +55,17 @@ def _cases():
         ),
     )
     y, X = make_sar_logit_data(np.random.default_rng(3), Wd, rho=0.4, beta=beta)
-    out["SARLogit"] = (y, lambda y, X=X: M.SARLogit(y=y, X=X, W=W))
-    dn = dgp.simulate_sar_negbin(W=_as_sparse(W), rho=0.4, beta=np.array([0.5, 0.8]), alpha=2.0, rng=np.random.default_rng(4))  # fmt: skip
-    out["SARNegBin"] = (dn["y"], lambda y: M.SARNegBin(y=y, X=dn["X"], W=W))
-    dz = dgp.simulate_sar_zinb(n_side=6, seed=6)
-    out["SARZINB"] = (dz["y"], lambda y: M.SARZINB(y=y, X=dz["X"], W=dz["W_sparse"]))
+    out["SARLogit"] = (y, lambda y, X=X: M.SARLogit(y=y, X=X, W=W, latent=False))
+    dn = dgp.simulate_sar_negbin(W=_as_sparse(W), rho=0.4, beta=np.array([0.5, 0.8]), alpha=2.0, rng=np.random.default_rng(4), latent=False)  # fmt: skip
+    out["SARNegBin"] = (
+        dn["y"],
+        lambda y: M.SARNegBin(y=y, X=dn["X"], W=W, latent=False),
+    )
+    dz = dgp.simulate_sar_zinb(n_side=6, seed=6, latent=False)
+    out["SARZINB"] = (
+        dz["y"],
+        lambda y: M.SARZINB(y=y, X=dz["X"], W=dz["W_sparse"], latent=False),
+    )
     dl = dgp.simulate_sar_logit(n_side=6, seed=7, latent=True)
     out["SARLogitLatent"] = (
         dl["y"],

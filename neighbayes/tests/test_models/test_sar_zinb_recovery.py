@@ -66,6 +66,7 @@ def zinb_data():
         beta_zero=GAMMA_TRUE,
         alpha=ALPHA_TRUE,
         rng=rng,
+        latent=False,
     )
 
 
@@ -78,7 +79,7 @@ class TestSARZINBRecovery:
         Z = zinb_data["X_zero"]
         W = zinb_data["W_graph"]
 
-        model = SARZINB(y=y, X=X, X_zero=Z, W=W)
+        model = SARZINB(y=y, X=X, X_zero=Z, W=W, latent=False)
         idata = model.fit(
             draws=DRAWS,
             tune=TUNE,
@@ -98,7 +99,7 @@ class TestSARZINBRecovery:
         Z = zinb_data["X_zero"]
         W = zinb_data["W_graph"]
 
-        model = SARZINB(y=y, X=X, X_zero=Z, W=W)
+        model = SARZINB(y=y, X=X, X_zero=Z, W=W, latent=False)
         idata = model.fit(
             draws=DRAWS,
             tune=TUNE,
@@ -118,7 +119,7 @@ class TestSARZINBRecovery:
         Z = zinb_data["X_zero"]
         W = zinb_data["W_graph"]
 
-        model = SARZINB(y=y, X=X, X_zero=Z, W=W)
+        model = SARZINB(y=y, X=X, X_zero=Z, W=W, latent=False)
         idata = model.fit(
             draws=DRAWS,
             tune=TUNE,
@@ -137,7 +138,7 @@ class TestSARZINBRecovery:
         Z = zinb_data["X_zero"]
         W = zinb_data["W_graph"]
 
-        model = SARZINB(y=y, X=X, X_zero=Z, W=W)
+        model = SARZINB(y=y, X=X, X_zero=Z, W=W, latent=False)
         idata = model.fit(
             draws=DRAWS,
             tune=TUNE,
@@ -158,7 +159,7 @@ class TestSARZINBRecovery:
         Z = zinb_data["X_zero"]
         W = zinb_data["W_graph"]
 
-        model = SARZINB(y=y, X=X, X_zero=Z, W=W)
+        model = SARZINB(y=y, X=X, X_zero=Z, W=W, latent=False)
         idata = model.fit(
             draws=DRAWS,
             tune=TUNE,

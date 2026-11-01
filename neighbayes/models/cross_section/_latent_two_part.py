@@ -1,6 +1,6 @@
 r"""The latent SAR hurdle and zero-inflated negative binomial.
 
-``SARHurdleNegBin(latent=True)`` and ``SARZINB(latent=True)`` pair a latent SAR
+The unmarked ``SARHurdleNegBin`` and ``SARZINB`` pair a latent SAR
 logit zero part with a latent SAR negative binomial count part,
 
 .. math::
@@ -36,18 +36,11 @@ import scipy.sparse as sp
 from ..._lazy_deps import xr
 from ...samplers import two_part_latent as _two_part_latent  # noqa: F401
 from ...samplers._utils._idata import gibbs_to_inference_data
+from ...samplers._utils._latent_loglik import log_gamma_noise
 from .._mixins._two_part import _SUMMARY_DRAWS, PART_SCALES
 
 #: Fresh disturbance vectors per posterior draw in the simulated summaries.
 _SUMMARY_SIMS = 64
-
-
-def _log_gamma_noise(rng, alpha: float, size) -> np.ndarray:
-    """``log g``, ``g ~ Gamma(alpha, alpha)``, without underflow at small ``alpha``."""
-    return (
-        np.log(rng.gamma(alpha + 1.0, 1.0 / alpha, size=size))
-        + np.log(rng.random(size)) / alpha
-    )
 
 
 def _truncated_mean(lam: np.ndarray) -> np.ndarray:
@@ -136,7 +129,8 @@ class LatentTwoPartMixin:
         raise NotImplementedError(
             f"{type(self).__name__}'s latent model is fitted by Gibbs sampling: its "
             "likelihood integrates both parts' propagated disturbances over all n "
-            "locations at once, which no NUTS model evaluates."
+            "locations at once, which no NUTS model evaluates.  Pass latent=False "
+            "for the reduced form, which NUTS fits."
         )
 
     # ------------------------------------------------------------------
@@ -167,6 +161,17 @@ class LatentTwoPartMixin:
                 Z, priors_zero, self._D_tau, self._sel_fe_priors()
             )
         return X, priors, Z, priors_zero
+
+    def _part_level_shift(self, zero: bool) -> float:
+        """One part's time-effects term, ``T`` or 0 (see ``LatentMixin._latent_level_shift``)."""
+        if not self._part_effects(zero)[0]:
+            return 0.0
+        if zero and self._W_zero_sparse is not self._W_sparse:
+            rows = np.asarray(self._W_zero_sparse.sum(axis=1)).ravel()
+            row_std = bool(np.allclose(rows[rows != 0], 1.0))
+        else:
+            row_std = self._W_row_standardized()
+        return float(self._latent_T) if row_std else 0.0
 
     def _latent_unit_effects(self, zero: bool):
         """One part's random unit effects for the sampler, or ``None``."""
@@ -278,9 +283,14 @@ class LatentTwoPartMixin:
         ``log_likelihood`` stores each observation's likelihood with both
         parts' latent values integrated out, for ``az.loo``.
         """
+        from ...samplers.negbin_latent._core import zero_set_logdet
+
         X, priors, Z, priors_zero = self._latent_blocks()
         y = np.asarray(self._y, dtype=np.float64)
         W = self._W_sparse.tocsr()
+        b = self._logdet_bounds
+        zero = y.reshape(self._latent_T, -1) == 0
+        zero_logdet = zero_set_logdet(W, zero, b.method, b.rho_min, b.rho_max)
         W_zero = self._W_zero_sparse.tocsr()
         rng = np.random.default_rng(random_seed)
         seeds = [int(s) for s in rng.integers(0, 2**31, size=chains)]
@@ -312,6 +322,9 @@ class LatentTwoPartMixin:
             T=self._latent_T,
             unit_effects=self._latent_unit_effects(zero=False),
             unit_effects_zero=self._latent_unit_effects(zero=True),
+            level_shift=self._part_level_shift(zero=False),
+            level_shift_zero=self._part_level_shift(zero=True),
+            zero_logdet=zero_logdet,
         )
         if backend == "jax":
             from ...samplers.two_part_latent._jax import run_chains_jax_latent_two_part
@@ -554,7 +567,7 @@ class LatentTwoPartMixin:
             extra = {"alpha": post["alpha"].values.reshape(-1)}
 
             def noise(rng, size, params):
-                return _log_gamma_noise(rng, float(params["alpha"]), size)
+                return log_gamma_noise(rng, float(params["alpha"]), size)
 
             if self._two_part == "zinb":
                 weight = LatentNegBinMixin._latent_outcome_weight
@@ -623,7 +636,7 @@ class LatentTwoPartMixin:
             self._W_sparse,
             float(draw["rho"]),
             self._part_systematic(False, g)[:, None]
-            + _log_gamma_noise(rng, float(draw["alpha"]), (n, n_sims)),
+            + log_gamma_noise(rng, float(draw["alpha"]), (n, n_sims)),
         )
         return U, H
 
@@ -690,7 +703,7 @@ class LatentTwoPartMixin:
 
 
 class LatentHurdleMixin(LatentTwoPartMixin):
-    """``SARHurdleNegBin(latent=True)``: priors and the positive count's mean."""
+    """The latent ``SARHurdleNegBin``: priors and the positive count's mean."""
 
     _two_part = "hurdle"
     _zero_effects = True
@@ -738,7 +751,7 @@ class LatentHurdleMixin(LatentTwoPartMixin):
 
 
 class LatentZINBMixin(LatentTwoPartMixin):
-    """``SARZINB(latent=True)``: priors and the zeros' attribution."""
+    """The latent ``SARZINB``: priors and the zeros' attribution."""
 
     _two_part = "zinb"
     _zero_effects = False

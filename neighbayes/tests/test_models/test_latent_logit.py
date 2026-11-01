@@ -52,7 +52,9 @@ def test_designs():
     latent = SARLogit(y=d["y"], X=d["X"], W=d["W_sparse"], latent=True)
     assert latent._design == "latent"
     assert latent._gibbs_key == ("binary_latent", "cross_section")
-    assert SARLogit(y=d["y"], X=d["X"], W=d["W_sparse"])._design == "static"
+    assert SARLogit(y=d["y"], X=d["X"], W=d["W_sparse"])._design == "latent"
+    reduced = SARLogit(y=d["y"], X=d["X"], W=d["W_sparse"], latent=False)
+    assert reduced._design == "static"
     sem = SEMLogit(y=d["y"], X=d["X"], W=d["W_sparse"])
     assert sem._gibbs_key == ("binary_latent", "cross_section")
     with pytest.raises(NotImplementedError, match="latent SEM already"):
@@ -309,8 +311,10 @@ def test_recovery(process, truth):
             "Logit",
         ),
         (
-            lambda: dgp.simulate_sar_logit(n_side=30, rho=0.6, beta=BETA, seed=10),
-            "SARLogit",
+            lambda: dgp.simulate_sar_logit(
+                n_side=30, rho=0.6, beta=BETA, seed=10, latent=False
+            ),
+            "SARLogit(latent=False)",
         ),
         (
             lambda: dgp.simulate_sem_logit(n_side=30, lam=0.6, beta=BETA, seed=10),

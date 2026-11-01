@@ -1,6 +1,6 @@
 r"""The latent SAR, SEM and SDEM logit and probit.
 
-Shared by ``SARLogit(latent=True)`` and :class:`SARProbit` (:math:`(I - \rho
+Shared by the unmarked :class:`SARLogit` and :class:`SARProbit` (:math:`(I - \rho
 W) y^* = X\beta + \varepsilon`), :class:`SEMLogit` and :class:`SEMProbit`
 (:math:`(I - \lambda W)(y^* - X\beta) = \varepsilon`) and the SDEMs, with
 :math:`y = \mathbf 1\{y^* > 0\}` and the disturbance the link's own: standard
