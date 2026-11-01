@@ -275,7 +275,11 @@ def _make_sweep(
     from jax.scipy.special import digamma, gammaln, polygamma
 
     from ..._logdet._jax import jax_logdet_chebyshev_traced
-    from .._utils._jax_slice import adapt_slice_width, jax_slice_sample_1d
+    from .._utils._jax_slice import (
+        adapt_slice_width,
+        jax_slice_along,
+        jax_slice_sample_1d,
+    )
 
     sar = process == "sar"
     n_obs = n * T
@@ -751,59 +755,23 @@ def _make_sweep(
         order = jax.random.permutation(k_perm, dim)
 
         def direction(j, carry):
-            """One slice along a direction: stepping out, then shrinkage."""
-            x, f, et, start, key = carry
-            key, k_lvl, k_pos, k_split, k_shr = jax.random.split(key, 5)
-            dv, w = dirs[:, order[j]], widths[order[j]]
-            level = f - jax.random.exponential(k_lvl)
-            lo = -w * jax.random.uniform(k_pos)
-            left = jnp.floor(_JOINT_MAX_STEPS * jax.random.uniform(k_split))
-            left = left.astype(jnp.int32)
-            right = _JOINT_MAX_STEPS - 1 - left
-
-            # Stages: 0 steps out left, 1 right, 2 shrinks, 3 is done.
-            def body(s):
-                stage, lo, hi, left, right, x, f, et, start, i, shrinks = s
-                u = jax.random.uniform(jax.random.fold_in(k_shr, i))
-                t = jnp.where(
-                    stage == 0, lo, jnp.where(stage == 1, hi, lo + u * (hi - lo))
-                )
-                ft, e_t, start = joint_eval(x + t * dv, start)
-                above = ft > level
-                out_l, out_r = (stage == 0) & above, (stage == 1) & above
-                lo = jnp.where(out_l, lo - w, lo)
-                hi = jnp.where(out_r, hi + w, hi)
-                left = left - out_l.astype(jnp.int32)
-                right = right - out_r.astype(jnp.int32)
-                shrink = stage == 2
-                accept = shrink & above
-                lo = jnp.where(shrink & ~above & (t < 0), t, lo)
-                hi = jnp.where(shrink & ~above & (t >= 0), t, hi)
-                x = jnp.where(accept, x + t * dv, x)
-                f = jnp.where(accept, ft, f)
-                et = jnp.where(accept, e_t, et)
-                shrinks = shrinks + shrink.astype(jnp.int32)
-                stage = jnp.select(
-                    [stage == 0, stage == 1],
-                    [
-                        jnp.where(out_l & (left > 0), 0, jnp.where(right > 0, 1, 2)),
-                        jnp.where(out_r & (right > 0), 1, 2),
-                    ],
-                    jnp.where(accept | (shrinks >= _JOINT_MAX_SHRINKS), 3, 2),
-                ).astype(jnp.int32)
-                return stage, lo, hi, left, right, x, f, et, start, i + 1, shrinks
-
-            stage = jnp.where(left > 0, 0, jnp.where(right > 0, 1, 2)).astype(jnp.int32)
-            zero = jnp.int32(0)
-            s = jax.lax.while_loop(
-                lambda s: s[0] < 3,
-                body,
-                (stage, lo, lo + w, left, right, x, f, et, start, zero, zero),
+            """One slice along a direction, from the point at hand."""
+            x, f, et, start = carry
+            dv = dirs[:, order[j]]
+            t, f, et, start = jax_slice_along(
+                lambda t, s: joint_eval(x + t * dv, s),
+                f,
+                et,
+                start,
+                widths[order[j]],
+                jax.random.fold_in(k_dirs, j),
+                _JOINT_MAX_STEPS,
+                _JOINT_MAX_SHRINKS,
             )
-            return s[5], s[6], s[7], s[8], key
+            return x + t * dv, f, et, start
 
-        x, _, eta, start, _ = jax.lax.fori_loop(
-            0, dim, direction, (point, f_now, eta_now, start, k_dirs)
+        x, _, eta, start = jax.lax.fori_loop(
+            0, dim, direction, (point, f_now, eta_now, start)
         )
         par, la, shift = coords(x)
         if free_alpha:

@@ -1011,14 +1011,15 @@ The reduced form has no latent σ² — spatial dependence enters only through t
 
 ### Gibbs Sampler (NB flow models)
 
-NB flow models (`SARNegBinFlow`, unrestricted or separable, and `NegBinFlow`) support a Pólya–Gamma Gibbs sampler via `sampler="gibbs"`:
+NB flow models (`SARNegBinFlow`, unrestricted or separable, and `NegBinFlow`) support Gibbs sampling via `sampler="gibbs"`:
 
 ```python
 model = SARNegBinFlow(y_int, X, G)   # positional: (y, X, W)
 idata = model.fit(sampler="gibbs", draws=2000, tune=1000, chains=4)
 ```
 
-The sampler uses a reduced-form Pólya–Gamma augmentation strategy with no σ² parameter — spatial dependence enters only through the mean propagator $A^{-1}$:
+Spatial dependence enters only through the mean propagator $A^{-1}$; there is
+no σ² parameter. The unrestricted model uses Pólya–Gamma augmentation:
 
 | Block | Full conditional | Update |
 |---|---|---|
@@ -1027,7 +1028,26 @@ The sampler uses a reduced-form Pólya–Gamma augmentation strategy with no σ�
 | ρ \| ω, y | 1-D non-conjugate | Adaptive slice sampling (β marginalised) |
 | α \| y, η | 1-D non-conjugate | Slice sampling on log(α) |
 
-For the unrestricted model (`SARNegBinFlow`), each ρ parameter (ρ_d, ρ_o, ρ_w) is updated via independent 1-D slice sampling with β marginalised out. For the separable model (`separable=True`), ρ_w = −ρ_d·ρ_o is deterministic and only ρ_d and ρ_o are sampled. The aspatial `NegBinFlow` omits the ρ block entirely.
+Each ρ parameter (ρ_d, ρ_o, ρ_w) is updated by its own 1-D slice with β
+marginalised out. The aspatial `NegBinFlow` omits the ρ block entirely.
+
+The separable model (`separable=True`, cross-section or panel without pair
+effects) slices its exact NB2 likelihood instead, with no augmentation. At
+small α the Pólya–Gamma likelihood given ω is far more precise than the NB2
+one, and chains that condition on ω crawl: on a Los Angeles tract panel at
+α ≈ 0.015 their information ratio reached 71. The model has no latent field,
+only $k + 3$ parameters, so slicing the exact likelihood is cheap. With
+$a = -\log(1-\rho_d)$, $b = -\log(1-\rho_o)$ and $\theta = \beta /
+((1-\rho_d)(1-\rho_o))$, which holds the mean level fixed while ρ moves,
+
+| Block | Update |
+|---|---|
+| θ \| a, b, α | Slice along each eigenvector of the Fisher information ($\eta$ is linear in θ) |
+| (a, b) \| θ, α | Slice along each eigenvector of their warmup covariance |
+| α \| y, η | Slice sampling on log(α) |
+
+and ρ_w = −ρ_d·ρ_o is deterministic. Panels with pair effects keep the
+Pólya–Gamma sampler that integrates the effects out.
 
 ## Log-Determinant Methods
 

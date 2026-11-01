@@ -591,7 +591,7 @@ class SARNegBinFlow(FlowCountDesigns, _FlowCount, FlowModel):
         gibbs_backend: str = "numpy",
         log_likelihood: bool = False,
     ) -> xr.DataTree:
-        """The posterior without effects, by reduced-form Pólya–Gamma Gibbs."""
+        """The posterior without effects, by reduced-form Gibbs (:mod:`._nb_gibbs`)."""
         from ._nb_gibbs import run_negbin_flow_gibbs
 
         separable = self._flow_filter == "separable"

@@ -1,9 +1,10 @@
-"""Shared reduced-form PG-Gibbs driver for the NB flow models.
+"""Shared reduced-form Gibbs driver for the NB flow models.
 
 The four NB SAR flow classes (cross-section/panel x unrestricted/separable)
 build identical caches, priors, and chain plumbing around the two
-``negbin_reduced`` flow chain kernels; this module holds the single driver
-they all delegate to from ``_fit_gibbs``.
+``negbin_reduced`` flow chain kernels: the exact-likelihood sampler for the
+separable filter and Pólya–Gamma Gibbs for the unrestricted one.  This module
+holds the single driver they all delegate to from ``_fit_gibbs``.
 """
 
 from __future__ import annotations
@@ -29,13 +30,13 @@ def run_negbin_flow_gibbs(
     gibbs_backend: str = "numpy",
     log_likelihood: bool = False,
 ) -> xr.DataTree:
-    """Run the reduced-form PG-Gibbs sampler for an NB SAR flow model.
+    """Run the reduced-form Gibbs sampler for an NB SAR flow model.
 
     Builds the cache, priors, and per-chain initial states from ``model``
-    attributes, dispatches to :func:`run_chain_unrestricted` (3-rho) or
-    :func:`run_chain_separable` (2-rho Kronecker), assembles the
-    posterior into an :class:`xarray.DataTree`, and stores it on
-    ``model._idata``.
+    attributes, dispatches to :func:`run_chain_unrestricted` (3-rho,
+    Pólya–Gamma) or :func:`run_chain_separable_exact` (2-rho Kronecker, the
+    exact NB2 likelihood), assembles the posterior into an
+    :class:`xarray.DataTree`, and stores it on ``model._idata``.
 
     Parameters
     ----------
@@ -62,10 +63,8 @@ def run_negbin_flow_gibbs(
         FlowReducedGibbsState,
         run_chain_unrestricted,
     )
-    from ...samplers.negbin_reduced._flow_structured import (
-        classify_flow_design,
-        run_chain_separable_structured,
-    )
+    from ...samplers.negbin_reduced._flow_exact import run_chain_separable_exact
+    from ...samplers.negbin_reduced._flow_structured import classify_flow_design
 
     X = model._X
     y = model._y_int_vec.astype(np.float64)
@@ -145,11 +144,11 @@ def run_negbin_flow_gibbs(
             store_log_lik=log_likelihood,
         )
         if separable:
-            # Structured sweep (cross-section and panel): n × n solves only,
-            # rank-one design columns integrated out of the ρ updates
-            # (samplers/negbin_reduced/_flow_structured.py).  It replaces the
-            # Krylov-basis kernel, whose cross-sweep basis reuse biased ρ.
-            return run_chain_separable_structured(
+            # The exact NB2 likelihood, sliced (cross-section and panel; n × n
+            # solves only): samplers/negbin_reduced/_flow_exact.py.  Pólya–Gamma
+            # Gibbs crawls here at small α, where its likelihood given ω is far
+            # more precise than the NB2 one.
+            return run_chain_separable_exact(
                 y,
                 X,
                 W_csc,
@@ -186,12 +185,11 @@ def run_negbin_flow_gibbs(
         inits = [_make_init(np.random.default_rng(s)) for s in seeds]
 
         if separable:
-            # JAX port of the structured sweep (cross-section and panel).
-            from ...samplers.negbin_reduced._flow_structured_jax import (
-                run_chains_jax_flow_structured,
+            from ...samplers.negbin_reduced._flow_exact_jax import (
+                run_chains_jax_flow_exact,
             )
 
-            chain_results = run_chains_jax_flow_structured(
+            chain_results = run_chains_jax_flow_exact(
                 y,
                 W_csc,
                 model._n,

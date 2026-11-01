@@ -415,3 +415,44 @@ def update_slice_width(
 
     # Clamp
     width_state.w = max(width_state.w_min, min(width_state.w_max, width_state.w))
+
+
+def slice_along(
+    f: Callable[[float], tuple[float, object]],
+    f0: float,
+    aux0: object,
+    w: float,
+    rng: np.random.Generator,
+    max_steps: int = 16,
+    max_shrinks: int = 200,
+) -> tuple[float, float, object]:
+    """One slice on ``t ↦ f(t)`` from ``t = 0``, for a move along a fixed line.
+
+    ``f(t)`` returns ``(log density, aux)``, ``aux`` anything the caller wants
+    back from the accepted point; ``f0`` and ``aux0`` are its values at 0.  The
+    stepping-out budget ``max_steps`` is shared between the sides at random
+    (Neal 2003, Fig. 3), so the slice stays reversible when the budget binds.
+    Returns ``(t, log density, aux)`` at the new point, or at 0 when the
+    shrinkage budget runs out.
+    """
+    level = f0 - rng.standard_exponential()
+    lo = -w * rng.random()
+    hi = lo + w
+    left = int(max_steps * rng.random())
+    right = max_steps - 1 - left
+    while left > 0 and f(lo)[0] > level:
+        lo -= w
+        left -= 1
+    while right > 0 and f(hi)[0] > level:
+        hi += w
+        right -= 1
+    for _ in range(max_shrinks):
+        t = lo + rng.random() * (hi - lo)
+        ft, aux = f(t)
+        if ft > level:
+            return t, ft, aux
+        if t < 0:
+            lo = t
+        else:
+            hi = t
+    return 0.0, f0, aux0

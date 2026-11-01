@@ -106,7 +106,12 @@ from scipy.special import digamma, gammaln, polygamma
 
 from ...models.priors import ReducedGibbsPriors
 from .._utils._latent_loglik import POISSON, TRUNCATED, UNOBSERVED, log_positive
-from .._utils._slice import SliceWidthState, slice_sample_1d, slice_sample_1d_adaptive
+from .._utils._slice import (
+    SliceWidthState,
+    slice_along,
+    slice_sample_1d,
+    slice_sample_1d_adaptive,
+)
 
 #: Degrees of freedom of the β proposal.
 _BETA_DF = 8.0
@@ -771,28 +776,17 @@ class LatentNegBinChain:
         if eta is None:  # a state on a bound of the spatial parameter
             return
         for j in rng.permutation(x.size):
-            step, w = self.joint_dirs[:, j], self.joint_widths[j]
-            level = fx - rng.standard_exponential()
-            lo = -w * rng.random()
-            hi = lo + w
-            left = int(_JOINT_MAX_STEPS * rng.random())
-            right = _JOINT_MAX_STEPS - 1 - left
-            while left > 0 and self._joint_eval(x + lo * step, held)[0] > level:
-                lo -= w
-                left -= 1
-            while right > 0 and self._joint_eval(x + hi * step, held)[0] > level:
-                hi += w
-                right -= 1
-            for _ in range(_JOINT_MAX_SHRINKS):
-                t = lo + rng.random() * (hi - lo)
-                ft, et = self._joint_eval(x + t * step, held)
-                if ft > level:
-                    x, fx, eta = x + t * step, ft, et
-                    break
-                if t < 0:
-                    lo = t
-                else:
-                    hi = t
+            step = self.joint_dirs[:, j]
+            t, fx, eta = slice_along(
+                lambda t, x=x, step=step: self._joint_eval(x + t * step, held),
+                fx,
+                eta,
+                self.joint_widths[j],
+                rng,
+                _JOINT_MAX_STEPS,
+                _JOINT_MAX_SHRINKS,
+            )
+            x = x + t * step
         full = dict(zip(self.joint_axes, x))
         self.par = float(full[0])
         if 1 in full:

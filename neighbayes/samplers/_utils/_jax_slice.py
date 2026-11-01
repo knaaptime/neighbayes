@@ -402,3 +402,62 @@ def adapt_slice_width(width, steps_left, steps_right, tuning=True):
         jnp.where(shrink, width * rule.shrink_factor, width),
     )
     return jnp.where(tuning, jnp.clip(tuned, rule.w_min, rule.w_max), width)
+
+
+def jax_slice_along(f, f0, aux0, carry0, w, key, max_steps=16, max_shrinks=200):
+    """One slice on ``t ↦ f(t)`` from ``t = 0``, for a move along a fixed line.
+
+    The traceable :func:`._slice.slice_along`.  ``f(t, carry)`` returns ``(log
+    density, aux, carry)``: ``aux`` comes back from the accepted point, and
+    ``carry`` threads through every evaluation (a solver's warm start, say);
+    ``f0`` and ``aux0`` are the values at 0.  The stepping-out budget is
+    shared between the sides at random (Neal 2003, Fig. 3), so the slice stays
+    reversible when the budget binds.  One loop runs the stepping out and the
+    shrinkage, so ``f`` is traced once.  Returns ``(t, log density, aux,
+    carry)``, ``t = 0`` when the shrinkage budget runs out.
+    """
+    k_lvl, k_pos, k_split, k_shr = jax.random.split(key, 4)
+    level = f0 - jax.random.exponential(k_lvl)
+    lo = -w * jax.random.uniform(k_pos)
+    left = jnp.floor(max_steps * jax.random.uniform(k_split)).astype(jnp.int32)
+    right = max_steps - 1 - left
+
+    # Stages: 0 steps out left, 1 right, 2 shrinks, 3 is done.
+    def body(s):
+        stage, lo, hi, left, right, t_new, f_new, aux, carry, i, shrinks = s
+        u = jax.random.uniform(jax.random.fold_in(k_shr, i))
+        t = jnp.where(stage == 0, lo, jnp.where(stage == 1, hi, lo + u * (hi - lo)))
+        ft, aux_t, carry = f(t, carry)
+        above = ft > level
+        out_l, out_r = (stage == 0) & above, (stage == 1) & above
+        lo = jnp.where(out_l, lo - w, lo)
+        hi = jnp.where(out_r, hi + w, hi)
+        left = left - out_l.astype(jnp.int32)
+        right = right - out_r.astype(jnp.int32)
+        shrink = stage == 2
+        accept = shrink & above
+        lo = jnp.where(shrink & ~above & (t < 0), t, lo)
+        hi = jnp.where(shrink & ~above & (t >= 0), t, hi)
+        t_new = jnp.where(accept, t, t_new)
+        f_new = jnp.where(accept, ft, f_new)
+        aux = jax.tree.map(lambda a, b: jnp.where(accept, a, b), aux_t, aux)
+        shrinks = shrinks + shrink.astype(jnp.int32)
+        stage = jnp.select(
+            [stage == 0, stage == 1],
+            [
+                jnp.where(out_l & (left > 0), 0, jnp.where(right > 0, 1, 2)),
+                jnp.where(out_r & (right > 0), 1, 2),
+            ],
+            jnp.where(accept | (shrinks >= max_shrinks), 3, 2),
+        ).astype(jnp.int32)
+        return stage, lo, hi, left, right, t_new, f_new, aux, carry, i + 1, shrinks
+
+    stage = jnp.where(left > 0, 0, jnp.where(right > 0, 1, 2)).astype(jnp.int32)
+    zero = jnp.int32(0)
+    s = jax.lax.while_loop(
+        lambda s: s[0] < 3,
+        body,
+        (stage, lo, lo + w, left, right, jnp.zeros_like(lo), f0, aux0, carry0,
+         zero, zero),
+    )  # fmt: skip
+    return s[5], s[6], s[7], s[8]
