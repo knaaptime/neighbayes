@@ -7,17 +7,19 @@ period.  The filter acts on the log-mean,
 
 .. math::
 
-    \eta_t = A(\rho)^{-1}(X_t\beta + C) + \tau_t,
+    \eta_t = A(\rho)^{-1}X_t\beta + c + \tau_t,
 
-so the count likelihood carries no ``|A|`` Jacobian.  A negative binomial
-panel's pair effects ``C`` are random and partially pooled, and its period
-effects ``τ`` fixed.
+so the count likelihood carries no ``|A|`` Jacobian.  The SAR negative
+binomial's effects are levels after the filter on its separable form: fixed
+pair effects ``c`` (``pair_effects="fixed"``), origin and destination levels
+``γ_i + κ_j`` (``origin_effects``, ``destination_effects``) and period effects
+``τ``.  The aspatial negative binomial's pair effects are random and partially
+pooled.
 """
 
 from __future__ import annotations
 
 import warnings
-from types import SimpleNamespace
 from typing import Optional
 
 import numpy as np
@@ -37,28 +39,20 @@ _POISSON_DISPERSION_WARN = 2.0
 _COUNT_FE_DOC = """
     Effects
     -------
-    A panel (``T``) takes ``pair_effects="random"`` and ``time_effects=True``.  The within transform of the Gaussian panels does not carry to
-    a log link, so the effects are parameters: pair effects (one per
-    origin–destination pair), integrated out of every ρ update and drawn
-    jointly with β, held as a pair index rather than ``n²`` dummy columns.  They
-    enter inside the spatial filter, with the covariates,
-    ``η_t = A⁻¹(X_tβ + C) + τ_t``: random effects propagate as ``X`` does.
-    Under pooling that is a different prior from effects added after the
-    filter, not a reparameterization (inside, ``A⁻¹C`` has covariance
-    ``σ²(AᵀA)⁻¹``).  The separable panel's structured sweep cannot integrate
-    them out at scale, so it holds them while ρ moves and draws them by
-    conjugate gradients.
+    A panel (``T``) takes ``pair_effects="random"`` and ``time_effects=True``.
+    The within transform of the Gaussian panels does not carry to a log link,
+    so the effects are parameters, ``η_t = X_tβ + C + τ_t``: pair effects (one
+    per origin–destination pair), drawn jointly with β and held as a pair
+    index rather than ``n²`` dummy columns.
 
     Pair effects are **partially pooled**: ``C_ij ~ N(μ, σ²)`` with σ learned
     (half-t(3, ``pair_effect_sd_scale``) prior, default scale 1).  A pair seen
     in few periods is shrunk toward the common mean in proportion to how little
-    its data say; with weekly sparse flows a fixed, wide prior instead leaves
-    the dispersion α and ρ with an incidental-parameter bias and lets ρ drift
-    to a degenerate mode near 1.  Pair effects absorb nothing: the intercept
-    and time-invariant columns (intra indicator, log distance) stay in the
-    design and anchor the level.  ``mundlak=True`` adds the pair means of the
-    time-varying columns inside the filter, absorbing a correlation between the
-    pair effects and ``X``.
+    its data say.  Pair effects absorb nothing: the intercept and
+    time-invariant columns (intra indicator, log distance) stay in the design
+    and anchor the level.  ``mundlak=True`` adds the pair means of the
+    time-varying columns, absorbing a correlation between the pair effects and
+    ``X``.
 
     Period effects join the coefficient block under a fixed prior
     (``time_effect_mu``, default 0 beside pair effects and ``log mean y``
@@ -72,9 +66,91 @@ _COUNT_FE_DOC = """
     ``fit(store_effects=None)`` keeps every draw of the pair effects when
     they fit in about 500 MB and otherwise only their posterior mean and sd
     (``idata["pair_effect_summary"]``); ``posterior_predictive`` needs the
-    draws.  Effects run on the NumPy Gibbs backend, and on JAX for the
-    separable panels (the structured sweep that scales).
+    draws.  Effects run on the NumPy Gibbs backend.
 """
+
+_SAR_NB_EFFECTS_DOC = r"""
+    Effects
+    -------
+    The within transform of the Gaussian panels does not carry to a log link,
+    so the effects are parameters, added to the log-mean after the filter and
+    sampled with the exact likelihood (``separable=True``):
+
+    .. math::
+
+        \eta_{t,ij} = (A^{-1}X_t\beta)_{ij} + c_{ij} + \tau_t
+        \quad\text{or}\quad
+        (A^{-1}X_t\beta)_{ij} + \gamma_i + \kappa_j + \tau_t.
+
+    ``pair_effects="fixed"`` (a panel) gives each origin–destination pair a
+    level under a flat prior: the fixed-effects static panel, identified by
+    the within-pair variation alone.  Under a flat prior a level inside the
+    filter is a reparameterization of one after it, ``A^{-1}c`` ranging over
+    every array as ``c`` does.  The pair levels absorb every time-invariant
+    column (the intercept, log distance, the intra indicator, time-invariant
+    attributes), so ``ρ`` is identified by the time-varying columns.  A pair
+    with no count in any (live) period has no proper posterior and leaves
+    the likelihood; its level is NaN and it predicts zero counts.  The
+    posterior integrates each level out rather than profiling it, and the
+    NB2 log-mean is information-orthogonal to α, so the posterior of α
+    escapes the leading, order-``1/T`` incidental-parameter bias of the
+    dummy-variable estimator (Lancaster 2002).  Pair effects are fixed only:
+    random ones inside the filter tie ρ to the spatial pattern of the pair
+    levels, which moved ρ by ten posterior sd in simulation.
+
+    ``origin_effects`` and ``destination_effects`` (``"fixed"``, or
+    ``"random"``; cross-section or panel) add a level per origin and per
+    destination: the production-, attraction- or doubly constrained gravity
+    model with balancing factors (Griffith & Fischer 2016).  Fixed levels take
+    a flat prior, the first set carrying the overall level and a later one
+    holding its first level at 0.  Random levels are ``N(μ, τ²)`` with ``τ``
+    learned under a half-t(3, ``*_effect_sd_scale``) prior (default 1) and
+    ``*_effect_mu`` defaulting to ``log mean(y)`` shared between the random
+    levels present.  For a row-standardized ``W`` the filter maps a column
+    constant along a row (an origin attribute, the intercept) to one again,
+    so the origin levels absorb the intercept and the time-invariant origin
+    attributes, and the destination levels the destination attributes.  One
+    set of levels leaves the other side's ρ well identified; with both, ρ is
+    identified weakly.
+
+    ``time_effects=True`` adds period levels ``N(time_effect_mu,
+    time_effect_sigma²)`` (``time_effect_sigma`` 2.5): beside other effects
+    the first period is the baseline and ``time_effect_mu`` defaults to 0;
+    alone, every period has a level, centred on ``log mean(y)``, and the
+    intercept is absorbed.  Absorbed columns are dropped from the design and
+    their impacts come back as NaN.  The posterior holds ``pair_effect``
+    (dims origin, destination), ``origin_effect``, ``destination_effect``,
+    ``time_effect`` and the random sets' ``*_sd``.  ``fit(store_effects=None)``
+    keeps every draw of the pair effects when they fit in about 500 MB and
+    otherwise only their posterior mean and sd
+    (``idata["pair_effect_summary"]``); ``posterior_predictive`` needs the
+    draws.  NUTS takes the random origin and destination effects and the
+    period effects, not the fixed ones.
+
+    The unrestricted panel takes ``time_effects=True`` only, its period
+    effects joining the coefficient block of its Pólya–Gamma sampler (NumPy).
+    ``alpha_fixed`` holds α at a value; a large one (10-20 times the typical
+    mean count) makes the model an essentially Poisson one (see
+    :mod:`neighbayes.models._base._nb`).
+"""
+
+
+def _absorbed_by_levels(X, n: int, T: int, kinds) -> np.ndarray:
+    """The columns of a time-first flow design in the span of the level sets.
+
+    Each kind of level (``"origin"``, ``"destination"``, ``"pair"``,
+    ``"period"``) is constant over some axes of the ``T × n × n`` flow arrays;
+    a column is absorbed when sweeping out each set's means in turn leaves no
+    residual (exact on the balanced flow array).
+    """
+    from ...samplers.negbin_reduced._flow_exact import _LEVEL_AXES
+
+    B = np.asarray(X, dtype=np.float64).T.reshape(-1, T, n, n)
+    rest = B
+    for kind in kinds:
+        rest = rest - rest.mean(axis=_LEVEL_AXES[kind], keepdims=True)
+    tol = 1e-10 * np.maximum(np.abs(B).max(axis=(1, 2, 3)), 1.0)
+    return np.abs(rest).max(axis=(1, 2, 3)) <= tol
 
 
 class _FlowCount(CountPanelFEMixin):
@@ -104,10 +180,232 @@ class _FlowCount(CountPanelFEMixin):
                 stacklevel=3,
             )
 
-    def _finish_count_init(self, y_arr: np.ndarray, effects, mundlak=False) -> None:
+    def _finish_count_init(
+        self,
+        y_arr: np.ndarray,
+        effects,
+        mundlak=False,
+        origin_effects=None,
+        destination_effects=None,
+    ) -> None:
         self._y_int_vec = np.asarray(y_arr).reshape(-1).astype(np.int64)
-        self._init_count_fe(effects, self._N, self._T, mundlak)
-        self.effects = self._count_effects
+        self._level_kinds: tuple[tuple[str, str], ...] = ()
+        if mundlak and self._pair_effects == "fixed":
+            raise ValueError(
+                f"{type(self).__name__} takes no mundlak=True: its pair effects are "
+                "fixed and absorb the pair means."
+            )
+        levels = (
+            (effects in (1, 3) and self._pair_effects == "fixed")
+            or origin_effects is not None
+            or destination_effects is not None
+            or (
+                effects in (2, 3)
+                and self._takes_levels
+                and self._flow_filter == "separable"
+            )
+        )
+        if levels:
+            # Levels after the filter replace the count effects.
+            self._init_count_fe(0, self._N, self._T, False)
+            self._init_levels(effects, origin_effects, destination_effects)
+            self.effects = effects
+        else:
+            self._init_count_fe(effects, self._N, self._T, mundlak)
+            self.effects = self._count_effects
+
+    def _init_levels(self, effects, origin_effects, destination_effects) -> None:
+        """Levels after the filter: validate, and drop the columns they absorb."""
+        for arg, value in (
+            ("origin_effects", origin_effects),
+            ("destination_effects", destination_effects),
+        ):
+            if value not in (None, "random", "fixed"):
+                raise ValueError(
+                    f"{arg} must be None, 'fixed' or 'random'; got {value!r}."
+                )
+        name = type(self).__name__
+        pairs = effects in (1, 3)
+        od = tuple(
+            (side, how)
+            for side, how in (
+                ("origin", origin_effects),
+                ("destination", destination_effects),
+            )
+            if how is not None
+        )
+        if self._flow_filter != "separable":
+            raise NotImplementedError(
+                f"{name} takes fixed pair effects and origin and destination effects "
+                "with separable=True."
+            )
+        if pairs and od:
+            raise ValueError(
+                f"{name}: fixed pair effects absorb origin and destination effects; "
+                "pass one or the other."
+            )
+        kinds = ((("pair", "fixed"),) if pairs else od) + (
+            (("period", "fixed"),) if effects in (2, 3) else ()
+        )
+        what = (
+            "fixed pair effects"
+            if pairs
+            else "origin and destination effects"
+            if od
+            else "period effects"
+        )
+        absorbed = _absorbed_by_levels(
+            self._X, self._n, self._T, [kind for kind, _ in kinds]
+        )
+        keep = np.flatnonzero(~absorbed)
+        if not keep.size:
+            raise ValueError(
+                f"No covariate is left after the {what}, so the spatial parameters "
+                "are not identified."
+            )
+        slopes = [
+            n_
+            for n_, a, col in zip(self._feature_names, absorbed, self._X.T)
+            if a and not np.allclose(col, col[0])
+        ]
+        if slopes:
+            warnings.warn(
+                f"{slopes} are absorbed by the {what}; their effects are not "
+                "identified (NaN).",
+                UserWarning,
+                stacklevel=5,
+            )
+        prior = self._beta_keep
+        self._beta_keep = keep if prior is None else prior[keep]
+        self._X = self._X[:, keep]
+        self._feature_names = [self._feature_names[j] for j in keep]
+        self._level_kinds = kinds
+
+    def _flow_levels(self, cell_mask=None):
+        """The model's levels after the filter as :class:`FlowLevels`, or ``None``.
+
+        The first set carries the overall level ``log mean(y)``: a fixed one
+        starts there, random ones share it as their prior mean, period levels
+        are centred on it.  Fixed sets after the first hold their first level at
+        0 (period levels at ``time_effect_mu``); pair, origin and destination
+        levels take a flat prior, period levels ``N(time_effect_mu,
+        time_effect_sigma²)``.  ``log mean(y)`` reads the live cells of
+        ``cell_mask`` (flat bool) only.
+        """
+        if not self._level_kinds:
+            return None
+        from ...samplers.negbin_reduced._flow_exact import FlowLevels, LevelSet
+
+        p = self.priors
+        y = self._y_int_vec if cell_mask is None else self._y_int_vec[cell_mask]
+        level = float(np.log(max(float(np.mean(y)), 1e-3)))
+        n_random = sum(how == "random" for _, how in self._level_kinds)
+        lead_random = self._level_kinds[0][1] == "random"
+        sets = []
+        for i, (kind, how) in enumerate(self._level_kinds):
+            if kind == "period":
+                mu = float(p.get("time_effect_mu", level if i == 0 else 0.0))
+                sets.append(
+                    LevelSet(kind, False, mu, float(p.get("time_effect_sigma", 2.5)))
+                )
+            elif how == "random":
+                mu = level / n_random if lead_random else 0.0
+                sets.append(
+                    LevelSet(
+                        kind,
+                        True,
+                        float(p.get(f"{kind}_effect_mu", mu)),
+                        float(p.get(f"{kind}_effect_sd_scale", 1.0)),
+                    )
+                )
+            else:
+                sets.append(LevelSet(kind, False, level if i == 0 else 0.0))
+        return FlowLevels(tuple(sets))
+
+    @property
+    def _level_index(self) -> dict:
+        """Each stacked flow's unit of every kind of level (rows are origins)."""
+        r = np.arange(self._N * self._T)
+        o, d = (r // self._n) % self._n, r % self._n
+        return {"origin": o, "destination": d, "pair": (o, d), "period": r // self._N}
+
+    @staticmethod
+    def _level_name(kind: str) -> str:
+        """A level set's posterior name (period levels are the time effects)."""
+        return "time_effect" if kind == "period" else f"{kind}_effect"
+
+    @property
+    def _level_periods(self) -> list[str]:
+        """The stored period levels: every period alone, all but the baseline beside others."""
+        first = 0 if self._level_kinds[0][0] == "period" else 1
+        return [f"t{t}" for t in range(first, self._T)]
+
+    def _fe_coords(self) -> dict:
+        coords = super()._fe_coords()
+        for kind, _ in self._level_kinds:
+            if kind == "period":
+                coords["time"] = self._level_periods
+            else:
+                coords.update(
+                    origin=list(range(self._n)), destination=list(range(self._n))
+                )
+        return coords
+
+    def _pymc_fe_terms(self, zero: bool = False, fe_priors: Optional[dict] = None):
+        """The effects' ``(inner, outer)`` parts, the levels joining ``outer``."""
+        inner, outer = super()._pymc_fe_terms(zero, fe_priors)
+        lv = self._flow_levels()
+        if lv is None or zero:
+            return inner, outer
+        flat = [st.kind for st in lv.sets if st.flat]
+        if flat:
+            raise NotImplementedError(
+                f"{type(self).__name__}'s fixed {' and '.join(flat)} effects run on "
+                "the Gibbs sampler (sampler='gibbs')."
+            )
+        index = self._level_index
+        for i, st in enumerate(lv.sets):
+            name = self._level_name(st.kind)
+            if st.random:
+                # Non-centred, as the pair effects: c = μ + σ·z.
+                sd = pm.HalfStudentT(f"{name}_sd", nu=3.0, sigma=st.scale)
+                raw = pm.Normal(f"{name}_raw", 0.0, 1.0, dims=st.kind)
+                level = pm.Deterministic(name, st.mu + sd * raw, dims=st.kind)
+            else:
+                level = pm.Normal(name, st.mu, st.scale, dims="time")
+                if lv.baseline(i):
+                    # Beside another set the first period is held at its mean.
+                    level = pt.concatenate([pt.as_tensor_variable([st.mu]), level])
+            outer = outer + level[index[st.kind]]
+        return inner, outer
+
+    def _fe_draws(self, n_draws: int):
+        """Per-draw ``(inner, outer)`` effect parts, the levels joining ``outer``.
+
+        A unit dropped for want of counts (NaN level) predicts zero counts.
+        """
+        inner, outer = super()._fe_draws(n_draws)
+        lv = self._flow_levels()
+        if lv is None:
+            return inner, outer
+        post = self._idata.posterior
+        index = self._level_index
+        for i, st in enumerate(lv.sets):
+            name = self._level_name(st.kind)
+            if name not in post.data_vars:
+                raise RuntimeError(
+                    f"posterior_predictive needs per-draw {name} draws, which this "
+                    "fit stored only as a summary; refit with store_effects=True."
+                )
+            lev = post[name].values
+            lev = lev.reshape((-1,) + lev.shape[2:])[:n_draws]
+            if st.kind == "period" and lv.baseline(i):
+                lev = np.concatenate([np.full((len(lev), 1), st.mu), lev], axis=1)
+            idx = index[st.kind]
+            part = lev[(slice(None),) + (idx if isinstance(idx, tuple) else (idx,))]
+            part = np.where(np.isnan(part), -np.inf, part)
+            outer = part if outer is None else outer + part
+        return inner, outer
 
     def _model_coords(self, extra: Optional[dict] = None) -> dict:
         coords = super()._model_coords(extra)
@@ -145,23 +443,14 @@ class _FlowCount(CountPanelFEMixin):
         return self._solve_A(rho["rho_d"], rho["rho_o"], rho["rho_w"], Xb).T.reshape(-1)
 
     def _count_filter(self):
-        """The filter the count Gibbs sampler moves ρ through."""
-        from ...samplers.count_panel._filters import (
-            FlowSeparableFilter,
-            FlowUnrestrictedFilter,
-            NoFilter,
-        )
+        """The filter the unrestricted panel's count Gibbs sampler moves ρ through."""
+        from ...samplers.count_panel._filters import FlowUnrestrictedFilter
 
-        lower = self.priors.get("rho_lower", -0.999)
-        upper = self.priors.get("rho_upper", 0.999)
-        if self._flow_filter == "unrestricted":
-            return FlowUnrestrictedFilter(
-                self._Wd, self._Wo, self._Ww, self._W_sparse, self._T, lower, upper,
-                self.nonnegative_dependence,
-            )  # fmt: skip
-        if self._flow_filter == "separable":
-            return FlowSeparableFilter(self._W_sparse, self._T, lower, upper)
-        return NoFilter()
+        return FlowUnrestrictedFilter(
+            self._Wd, self._Wo, self._Ww, self._W_sparse, self._T,
+            self.priors.get("rho_lower", -0.999), self.priors.get("rho_upper", 0.999),
+            self.nonnegative_dependence,
+        )  # fmt: skip
 
     def _build_pymc_model(self) -> pm.Model:
         """The NB2 count model; no ``|A|`` Jacobian, the filter acting on the mean."""
@@ -372,19 +661,23 @@ class SARNegBinFlow(FlowCountDesigns, _FlowCount, FlowModel):
     .. math::
 
         y_{ij,t} \sim \operatorname{NegBin}(\mu_{ij,t}, \alpha), \qquad
-        \log \mu_t = A(\rho)^{-1}(X_t\beta + C) + \tau_t.
+        \log \mu_t = A(\rho)^{-1}X_t\beta + c + \tau_t.
 
     ``separable=True`` pins ``ρ_w = -ρ_d ρ_o``, whose ``n × n`` structured
-    sweep scales (and runs on JAX); the unrestricted flow's JAX kernel covers
-    the cross-section without effects.
+    sweep scales (and runs on JAX): it slices the exact likelihood, and takes
+    the fixed pair effects ``c``, origin and destination effects and period
+    effects ``τ`` (below).  The unrestricted flow's Pólya–Gamma JAX kernel
+    covers the cross-section without effects.
     """
 
-    __doc__ = __doc__ + _COUNT_FE_DOC
+    __doc__ = __doc__ + _SAR_NB_EFFECTS_DOC
 
     _DESIGNS = {
         "static": {"_flow_filter": "unrestricted"},
         "separable": {"_flow_filter": "separable"},
     }
+    _pair_effects = "fixed"
+    _takes_levels = True
 
     def _fit_static(
         self,
@@ -399,7 +692,6 @@ class SARNegBinFlow(FlowCountDesigns, _FlowCount, FlowModel):
         progressbar: bool = True,
         n_jobs: int = -1,
         idata_kwargs: Optional[dict] = None,
-        store_effects: Optional[bool] = None,
         **sample_kwargs,
     ) -> xr.DataTree:
         """Sample the posterior of the unrestricted NB2 SAR flow.
@@ -417,9 +709,8 @@ class SARNegBinFlow(FlowCountDesigns, _FlowCount, FlowModel):
         ``backend="auto"`` (default) takes JAX when it is installed and the
         configuration has a JAX kernel, else NumPy; NUTS takes ``"pymc"`` (its
         default), ``"nutpie"``, ``"numpyro"`` or ``"blackjax"``.  The unrestricted JAX kernel
-        covers the cross-section (``T = 1``) without effects; panels and pair or
-        period effects run on NumPy.  With pair or period effects the sweep
-        also integrates out the pair effects; see the class docstring.
+        covers the cross-section (``T = 1``) without effects; panels and period
+        effects (the unrestricted panel's only effects) run on NumPy.
 
         ``idata_kwargs={"log_likelihood": True}`` stores the pointwise
         log-likelihood (one value per draw, chain, and flow-period) for
@@ -447,11 +738,11 @@ class SARNegBinFlow(FlowCountDesigns, _FlowCount, FlowModel):
                     progressbar=progressbar,
                     n_jobs=n_jobs,
                     log_likelihood=log_lik,
-                    store_effects=store_effects,
+                    store_effects=None,
                     model_type="nb_sar_flow_panel_fe",
                 )
             else:
-                idata = self._fit_pooled_gibbs(
+                idata = self._fit_flow_gibbs(
                     draws=draws,
                     tune=tune,
                     chains=chains,
@@ -496,9 +787,10 @@ class SARNegBinFlow(FlowCountDesigns, _FlowCount, FlowModel):
     ) -> xr.DataTree:
         """Sample the posterior of the separable NB2 SAR flow.
 
-        ``sampler="gibbs"`` (default) runs the reduced-form Pólya–Gamma Gibbs
-        sampler with per-period Kronecker solves; ``sampler="nuts"`` uses the
-        PyMC count path (exact likelihood, much slower).  With
+        ``sampler="gibbs"`` (default) slices the exact NB2 likelihood with
+        per-period Kronecker solves, the effects added after the filter (see
+        the class docstring); ``sampler="nuts"`` uses the PyMC count path
+        (much slower, and without fixed effects).  With
         ``attach_log_abs_det`` (default) the per-draw Jacobian ``T·log|A(ρ)|``
         (using the separability relation ``ρ_w = −ρ_d ρ_o``) is recorded in
         ``sample_stats["log_abs_det"]`` for diagnostics — not folded into the
@@ -506,65 +798,44 @@ class SARNegBinFlow(FlowCountDesigns, _FlowCount, FlowModel):
 
         ``backend="jax"`` runs the same structured sweep compiled with JAX,
         chains on threads; ``"numpy"`` runs it on the host; ``"auto"`` (default)
-        takes JAX when it is installed, else NumPy.  With pair or period
-        effects the structured sweep also integrates out the effects, on either backend (see the class
-        docstring).
+        takes JAX when it is installed, else NumPy.
 
-        ``cell_mask`` (Gibbs effects path only) masks cells out of the count
-        likelihood: a bool array of live cells shaped ``(T, n, n)``,
-        ``(T·n·n,)`` or ``(n, n)`` (broadcast over periods).  Masked cells are
-        drawn-then-discarded — their Pólya–Gamma variates keep the random
-        stream mask-invariant — and pairs whose every period is masked stay
-        prior-only and drop out of the learned pair-sd deviance, so masking
-        the intraunit diagonal leaves the posterior of every other cell
-        bit-identical.  The default priors are data-derived, so under a mask
-        they re-derive from the live cells alone (the Gelman intercept
-        centring and the effect levels use ``log mean(y_live)``); explicit
-        ``beta_mu``/``pair_effect_mu``/``time_effect_mu`` overrides pass
-        through untouched.  Raises on the pooled or NUTS paths.
+        ``cell_mask`` (Gibbs only) removes cells from the count likelihood: a
+        bool array of live cells shaped ``(T, n, n)``, ``(T·n·n,)`` or
+        ``(n, n)`` (broadcast over periods), such as all but the intraregional
+        diagonal.  A fixed level with no live count is dropped (NaN).  The
+        data-derived default priors read the live cells only (explicit
+        ``beta_mu``, ``*_effect_mu`` overrides pass through), so the masked
+        counts do not reach the posterior.
+
+        ``store_effects`` (default: when they fit in about 500 MB) keeps every
+        draw of the pair effects; otherwise only their posterior mean and sd
+        (``idata["pair_effect_summary"]``), and ``posterior_predictive``
+        needs the draws.
 
         ``idata_kwargs={"log_likelihood": True}`` stores the pointwise
-        log-likelihood (one value per draw, chain, and flow-period) for
-        ``az.loo`` on either sampler; off by default, as in PyMC.
+        log-likelihood (one value per draw, chain, and flow-period; 0 off the
+        live cells) for ``az.loo`` on either sampler; off by default, as in
+        PyMC.
         """
         log_lik = bool((idata_kwargs or {}).get("log_likelihood", False))
         backend = select_backend(sampler, backend, sample_kwargs)
         if sampler == "gibbs":
-            gibbs_backend = self._resolve_gibbs_backend(backend, jax=True)
-            if self._count_effects:
-                idata = self._fit_gibbs_fe(
-                    gibbs_backend=gibbs_backend,
-                    draws=draws,
-                    tune=tune,
-                    chains=chains,
-                    random_seed=random_seed,
-                    progressbar=progressbar,
-                    n_jobs=n_jobs,
-                    log_likelihood=log_lik,
-                    store_effects=store_effects,
-                    cell_mask=cell_mask,
-                )
-            else:
-                if cell_mask is not None:
-                    raise ValueError(
-                        "cell_mask is supported by the effects Gibbs path; "
-                        "fit a panel with pair or period effects."
-                    )
-                idata = self._fit_pooled_gibbs(
-                    draws=draws,
-                    tune=tune,
-                    chains=chains,
-                    random_seed=random_seed,
-                    progressbar=progressbar,
-                    n_jobs=n_jobs,
-                    gibbs_backend=gibbs_backend,
-                    log_likelihood=log_lik,
-                )
+            idata = self._fit_flow_gibbs(
+                draws=draws,
+                tune=tune,
+                chains=chains,
+                random_seed=random_seed,
+                progressbar=progressbar,
+                n_jobs=n_jobs,
+                gibbs_backend=self._resolve_gibbs_backend(backend, jax=True),
+                log_likelihood=log_lik,
+                store_effects=store_effects,
+                cell_mask=cell_mask,
+            )
         else:
             if cell_mask is not None:
-                raise ValueError(
-                    "cell_mask is supported only by the Gibbs effects path"
-                )
+                raise ValueError("cell_mask is supported only by the Gibbs sampler.")
             idata = FlowModel.fit(
                 self,
                 draws=draws,
@@ -580,7 +851,7 @@ class SARNegBinFlow(FlowCountDesigns, _FlowCount, FlowModel):
             self._attach_log_abs_det_or_warn(idata)
         return idata
 
-    def _fit_pooled_gibbs(
+    def _fit_flow_gibbs(
         self,
         draws: int = 2000,
         tune: int = 1000,
@@ -590,11 +861,25 @@ class SARNegBinFlow(FlowCountDesigns, _FlowCount, FlowModel):
         n_jobs: int = -1,
         gibbs_backend: str = "numpy",
         log_likelihood: bool = False,
+        store_effects: Optional[bool] = None,
+        cell_mask: Optional[np.ndarray] = None,
     ) -> xr.DataTree:
-        """The posterior without effects, by reduced-form Gibbs (:mod:`._nb_gibbs`)."""
+        """The posterior without count effects, by reduced-form Gibbs (:mod:`._nb_gibbs`).
+
+        Levels after the filter (:meth:`_flow_levels`) ride along on the
+        separable flow's exact sampler.
+        """
+        from ...samplers.negbin_reduced._flow_exact import normalize_cell_mask
         from ._nb_gibbs import run_negbin_flow_gibbs
 
         separable = self._flow_filter == "separable"
+        cell_mask = normalize_cell_mask(cell_mask, self._T, self._n)
+        levels = self._flow_levels(cell_mask)
+        keep_pairs = True
+        if levels is not None and any(st.kind == "pair" for st in levels.sets):
+            keep_pairs = self._store_group_draws(
+                store_effects, chains, draws, n_groups=self._N
+            )
         return run_negbin_flow_gibbs(
             self,
             separable=separable,
@@ -609,163 +894,9 @@ class SARNegBinFlow(FlowCountDesigns, _FlowCount, FlowModel):
             n_jobs=n_jobs,
             gibbs_backend=gibbs_backend,
             log_likelihood=log_likelihood,
-        )
-
-    def _fit_gibbs_fe(
-        self,
-        *,
-        gibbs_backend: str = "numpy",
-        draws: int,
-        tune: int,
-        chains: int,
-        random_seed: Optional[int],
-        progressbar: bool,
-        n_jobs: int,
-        log_likelihood: bool,
-        store_effects: Optional[bool],
-        cell_mask: Optional[np.ndarray] = None,
-    ) -> xr.DataTree:
-        """Structured sweep with pair and period effects integrated out."""
-
-        from ...samplers._utils._seeds import spawn_chain_seeds
-        from ...samplers.gaussian._chain_runner import run_chains
-        from ...samplers.negbin_reduced._flow_structured import classify_flow_design
-        from ...samplers.negbin_reduced._flow_structured_fe import (
-            _normalize_cell_mask,
-            run_chain_separable_structured_fe,
-        )
-
-        pv = self._flow_count_priors()
-        fp = self._count_fe_priors()
-        rho_lower = self.priors.get("rho_lower", -0.999)
-        rho_upper = self.priors.get("rho_upper", 0.999)
-        cell_mask = _normalize_cell_mask(cell_mask, self._T, self._n)
-        if cell_mask is not None:
-            # Both default priors are data-derived — the Gelman intercept
-            # centring and the effect levels use log mean y — and masked
-            # cells are discarded from the likelihood, so re-derive them
-            # from the live cells.  Rebuilding through the same helpers
-            # keeps every explicit prior override in force.
-            from .._base._shared import gelman_default_beta_prior
-
-            y_live = self._y_int_vec.astype(np.float64)[cell_mask]
-            X_arr = np.asarray(self._X, dtype=np.float64)
-            k = X_arr.shape[1]
-            names = list(self._feature_names) or [f"x{j}" for j in range(k)]
-            g_mu, g_sd = gelman_default_beta_prior(y_live, X_arr, names, link="log")
-            pv = dict(pv)
-            pv["beta_mu"] = np.broadcast_to(
-                np.asarray(self.priors.get("beta_mu", g_mu), dtype=np.float64), (k,)
-            ).copy()
-            pv["beta_sigma"] = np.broadcast_to(
-                np.asarray(self.priors.get("beta_sigma", g_sd), dtype=np.float64), (k,)
-            ).copy()
-            fp = self._effect_priors(
-                float(np.log(max(float(np.mean(y_live)), 1e-3))), self._X, ""
-            )
-        priors = SimpleNamespace(
-            beta_mu=pv["beta_mu"],
-            beta_sigma=pv["beta_sigma"],
-            alpha_sigma=pv["alpha_sigma"],
-            alpha_nu=pv["alpha_nu"],
-            alpha_fixed=pv["alpha_fixed"],
-            rho_lower=rho_lower,
-            rho_upper=rho_upper,
-        )
-        keep_groups = self._store_group_draws(store_effects, chains, draws)
-        y = self._y_int_vec.astype(np.float64)
-        X = np.asarray(self._X, dtype=np.float64)
-        struct = classify_flow_design(X, self._n, self._T)
-        W_csc = self._W_sparse.tocsc()
-        k = X.shape[1]
-        pair = self._pair_args(fp) if self._fe_groups else None
-        periods = (
-            (fp["time_effect_mu"], fp["time_effect_sigma"], self._n_tau)
-            if self._fe_periods
-            else None
-        )
-
-        def _init(rng):
-            return SimpleNamespace(
-                beta=rng.normal(0.0, 0.1, size=k),
-                rho_d=rng.uniform(-0.1, 0.1),
-                rho_o=rng.uniform(-0.1, 0.1),
-                alpha=1.0 if pv["alpha_fixed"] is None else pv["alpha_fixed"],
-            )
-
-        if gibbs_backend == "jax":
-            from ...samplers._utils._seeds import seed_sequence_to_int
-            from ...samplers.negbin_reduced._flow_structured_fe_jax import (
-                run_chains_jax_flow_structured_fe,
-            )
-
-            int_seeds = [
-                seed_sequence_to_int(s) for s in spawn_chain_seeds(random_seed, chains)
-            ]
-            results = run_chains_jax_flow_structured_fe(
-                y,
-                W_csc,
-                self._n,
-                priors,
-                [_init(np.random.default_rng(s)) for s in int_seeds],
-                draws,
-                tune,
-                struct=struct,
-                pair_effects=pair,
-                period_effects=periods,
-                keep_group_draws=keep_groups,
-                jax_seeds=int_seeds,
-                store_log_lik=log_likelihood,
-                cell_mask=cell_mask,
-                progressbar=progressbar,
-            )
-            return self._assemble_count_idata(
-                results, ["rho_d", "rho_o", "rho_w"], keep_groups, log_likelihood
-            )
-
-        def _chain_fn(chain_id, seed, progress_manager=None, chain_id_kw=0):
-            rng = np.random.default_rng(seed)
-            init = _init(rng)
-            return run_chain_separable_structured_fe(
-                y,
-                X,
-                W_csc,
-                self._n,
-                priors,
-                init,
-                draws,
-                tune,
-                T=self._T,
-                pair_effects=pair,
-                period_effects=periods,
-                rho_lower=rho_lower,
-                rho_upper=rho_upper,
-                rng=rng,
-                chain_id=chain_id,
-                progress_manager=progress_manager,
-                store_log_lik=log_likelihood,
-                store_group_draws=keep_groups,
-                struct=struct,
-                cell_mask=cell_mask,
-            )
-
-        seeds = (
-            spawn_chain_seeds(random_seed, chains) if random_seed is not None else None
-        )
-        results = run_chains(
-            chain_fn=_chain_fn,
-            n_chains=chains,
-            seeds=seeds,
-            n_jobs=n_jobs,
-            progressbar=progressbar,
-            parallel=n_jobs != 1,
-            draws=draws,
-            tune=tune,
-            model_type="nb_sar_flow_sep_panel_fe",
-            timeout=None,
-        )
-        return self._assemble_count_idata(
-            results, ["rho_d", "rho_o", "rho_w"], keep_groups, log_likelihood
+            levels=levels,
+            keep_pair_draws=keep_pairs,
+            cell_mask=cell_mask,
         )
 
 

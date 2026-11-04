@@ -568,14 +568,20 @@ class FlowDesigns(DesignDispatch):
 class FlowCountDesigns(FlowDesigns):
     """Design dispatch for the count flow families (see the module).
 
-    The response is validated as counts.  A panel's pair effects are random
-    and, with its period effects, are parameters of the count model rather than
-    a within transform (``mundlak=True`` adds the pair means of the
-    time-varying columns).  A two-part family (``_zero_part``) also takes the
-    zero part's design ``X_zero`` and weights ``W_zero``.
+    The response is validated as counts.  A panel's pair and period effects are
+    parameters of the count model rather than a within transform: random pair
+    effects (``_pair_effects = "random"``) inside the filter, with
+    ``mundlak=True`` adding the pair means of the time-varying columns, or, in
+    a family that takes levels after the filter (``_takes_levels``), fixed pair
+    effects there.  A two-part family (``_zero_part``) also takes the zero
+    part's design ``X_zero`` and weights ``W_zero``.
     """
 
     _pair_effects = "random"
+    #: Whether the family takes levels after the filter: its pair effects
+    #: (``_pair_effects = "fixed"``), and origin and destination effects
+    #: (``origin_effects``, ``destination_effects``).
+    _takes_levels: bool = False
     #: Whether the family has a zero part (ZINB, hurdle).
     _zero_part: bool = False
     #: Whether the family needs a positive count (the hurdle's count part).
@@ -589,6 +595,11 @@ class FlowCountDesigns(FlowDesigns):
             if self._zero_part
             else None
         )
+        levels = (
+            {k: kwargs.pop(k, None) for k in ("origin_effects", "destination_effects")}
+            if self._takes_levels
+            else {}
+        )
         name = type(self).__name__
         y_arr = require_counts(y, name)
         if self._needs_positive and not np.any(y_arr > 0):
@@ -598,7 +609,7 @@ class FlowCountDesigns(FlowDesigns):
         if zero is not None:
             # Before the count effects drop the columns they absorb from X.
             self._init_flow_zero_part(**zero)
-        self._finish_count_init(y_arr, effects, mundlak)
+        self._finish_count_init(y_arr, effects, mundlak, **levels)
 
     def _init_flow_zero_part(self, X_zero=None, W_zero=None) -> None:
         """The zero part's design ``_Z`` (default ``X``) and weights (default ``W``)."""
@@ -634,8 +645,10 @@ class FlowCountDesigns(FlowDesigns):
 
     @classmethod
     def _signature_extra(cls) -> tuple[str, ...]:
-        return (("mundlak",) if cls._has_panel else ()) + (
-            ("X_zero", "W_zero") if cls._zero_part else ()
+        return (
+            (("mundlak",) if cls._has_panel and cls._pair_effects == "random" else ())
+            + (("X_zero", "W_zero") if cls._zero_part else ())
+            + (("origin_effects", "destination_effects") if cls._takes_levels else ())
         )
 
 

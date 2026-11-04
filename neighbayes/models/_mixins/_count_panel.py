@@ -317,13 +317,24 @@ class CountPanelFEMixin:
         return CountPanelFE(groups=groups, D_tau=self._D_tau)
 
     def _store_group_draws(
-        self, store: Optional[bool], chains: int, draws: int
+        self,
+        store: Optional[bool],
+        chains: int,
+        draws: int,
+        n_groups: Optional[int] = None,
     ) -> bool:
-        if not self._fe_groups:
-            return False
+        """Whether to keep every draw of the unit (pair) effects.
+
+        ``n_groups`` sizes effects held outside the count effects (the flows'
+        fixed pair levels); by default the count effects' groups.
+        """
+        if n_groups is None:
+            if not self._fe_groups:
+                return False
+            n_groups = self._n_groups
         if store is not None:
             return bool(store)
-        nbytes = 8 * self._n_groups * chains * draws
+        nbytes = 8 * n_groups * chains * draws
         if nbytes > _GROUP_DRAWS_MAX_BYTES:
             warnings.warn(
                 f"Per-draw {self._effect_index} effects would take "

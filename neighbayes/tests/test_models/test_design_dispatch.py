@@ -98,7 +98,12 @@ ROUTES = [
     (m.OLSFlow, {"T": 2}, "static", 0),
     (m.NegBinFlow, {"T": 2, "pair_effects": "random"}, "static", 1),
     (m.SARNegBinFlow, {"separable": True}, "separable", None),
-    (m.SARNegBinFlow, {"T": 2, "pair_effects": "random"}, "static", 1),
+    (
+        m.SARNegBinFlow,
+        {"T": 2, "separable": True, "pair_effects": "fixed"},
+        "separable",
+        1,
+    ),
     (m.SARPoissonFlow, {"separable": True}, "separable", None),
     (m.SARZINBFlow, {"separable": True}, "separable", None),
     (
@@ -171,8 +176,8 @@ REFUSALS = [
     (m.SARFlow, {"separable": "yes"}, ValueError, "separable must be"),
     (m.OLSFlow, {"separable": True}, ValueError, "no spatial dependence"),
     (
-        m.SARNegBinFlow,
-        {"T": 2, "pair_effects": "fixed"},
+        m.SARZINBFlow,
+        {"T": 2, "separable": True, "pair_effects": "fixed"},
         NotImplementedError,
         "fixed pair effects",
     ),

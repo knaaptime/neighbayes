@@ -706,6 +706,46 @@ $$y_{ij} \sim \operatorname{NegBin}(\mu_{ij}, \alpha), \quad \log \boldsymbol{\m
 
 $$y_{ij} \sim \operatorname{NegBin}(\mu_{ij}, \alpha), \quad \log \boldsymbol{\mu} = A(\boldsymbol{\rho})^{-1} X\beta, \quad \rho_w = -\rho_d \rho_o$$
 
+`pair_effects="fixed"` (a panel) is the fixed-effects static panel: a level
+per origin–destination pair after the filter, under a flat prior,
+$\eta_{t,ij} = (A^{-1}X_t\beta)_{ij} + c_{ij} + \tau_t$. Under a flat prior a
+level inside the filter is a reparameterization of one after it. The pair
+levels absorb every time-invariant column (intercept, log distance, the intra
+indicator, time-invariant attributes), so $\rho$ and $\beta$ are identified by
+the within-pair variation of the time-varying columns, which is what makes the
+estimates robust to time-invariant confounding. A pair with no count in any
+period has no proper posterior and leaves the likelihood. The posterior
+integrates each level out rather than profiling it, and the NB2 log-mean is
+information-orthogonal to $\alpha$, so $\alpha$ escapes the leading
+$O(1/T)$ incidental-parameter bias of the dummy-variable estimator (Lancaster
+2002); in simulation at $T = 2$–16 its posterior mean showed no bias, where
+random pair levels pulled $\alpha$ low at small $T$.
+
+`origin_effects` and `destination_effects` (`"random"` or `"fixed"`) add a
+level per origin and per destination after the filter,
+$\eta_{ij} = (A^{-1}X\beta)_{ij} + \gamma_i + \kappa_j$; random levels are
+$\gamma_i \sim N(\mu_o, \tau_o^2)$, $\kappa_j \sim N(\mu_d, \tau_d^2)$ with
+both scales learned, fixed ones flat: the production-, attraction- or doubly
+constrained gravity model with balancing factors (Griffith & Fischer 2016).
+For a row-standardized $W$ the filter maps a column constant along each row to
+one again, so the levels absorb the intercept and the time-invariant origin
+(destination) attributes, which are dropped with a warning. The spatial
+parameters are then identified only by the remaining columns, such as
+distance; with distance alone they can sit near a bound, on any sampler. With
+origin levels alone $\rho_d$ is well identified, with destination levels alone
+$\rho_o$; with both, $\rho$ is weakly identified.
+
+`time_effects=True` adds period levels $\tau_t$: beside other effects the
+first period is the baseline; alone, every period has one and the intercept is
+absorbed. All of these run on the exact-likelihood Gibbs sampler, which moves
+the levels with the coefficients and with $\rho$ (otherwise they crawl
+against each other); `cell_mask` removes cells (the intraregional diagonal)
+from the likelihood. NUTS takes the random levels and the period effects only.
+The SAR NB flow takes no random pair effects: random pair effects inside the
+filter tie $\rho$ to the spatial pattern of the pair levels, and in
+simulation moved it by about ten posterior sd. The unrestricted SAR NB panel
+takes period effects only.
+
 ### SARPoissonFlow
 
 $$y_{ij} \sim \operatorname{Poisson}(\mu_{ij}), \quad \log \boldsymbol{\mu} = A(\boldsymbol{\rho})^{-1} X\beta$$
@@ -740,13 +780,14 @@ $$y = X\beta + u, \quad u = \lambda_d W_d u + \lambda_o W_o u - \lambda_d \lambd
 
 ## Panel Flow Models
 
-Stack the flow models above across $T$ periods in time-first order; any flow class is a panel when `T` is given, with `pair_effects` and `time_effects`. The NB
-panels take pair and period effects as parameters, the pair effects partially
-pooled,
+Stack the flow models above across $T$ periods in time-first order; any flow class is a panel when `T` is given, with `pair_effects` and `time_effects`. The
+SAR NB panel takes fixed pair effects after the filter (see `SARNegBinFlow`
+above). The ZINB and hurdle panels take pair and period effects as parameters,
+the pair effects partially pooled,
 $\log \boldsymbol{\mu}_t = A(\boldsymbol{\rho})^{-1} (X_t\beta + c) + \tau_t$,
 with one effect per origin-destination pair held as an index, never as $n^2$
-dummy columns; see the panel count models above. The separable panels (NB,
-ZINB, hurdle) keep their structured $n \times n$ sweep. Their $n^2 \times n^2$
+dummy columns; see the panel count models above. Their separable panels keep a
+structured $n \times n$ sweep. Their $n^2 \times n^2$
 effect block cannot be integrated out at scale, so the sweep holds the effects
 while $\rho$ moves (interweaving steps with the effects and with their
 propagated values held), draws them by conjugate gradients, and moves the
@@ -1046,8 +1087,9 @@ $a = -\log(1-\rho_d)$, $b = -\log(1-\rho_o)$ and $\theta = \beta /
 | (a, b) \| θ, α | Slice along each eigenvector of their warmup covariance |
 | α \| y, η | Slice sampling on log(α) |
 
-and ρ_w = −ρ_d·ρ_o is deterministic. Panels with pair effects keep the
-Pólya–Gamma sampler that integrates the effects out.
+and ρ_w = −ρ_d·ρ_o is deterministic. Fixed pair effects, origin and
+destination effects and period effects are levels after the filter, drawn in
+blocks of their own and carried along by the θ and (a, b) moves.
 
 ## Log-Determinant Methods
 

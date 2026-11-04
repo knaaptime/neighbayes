@@ -931,3 +931,65 @@ def separable_flow_pg_reference(y, X, W_csc, n, priors, init, draws, tune, rng, 
             out["rho_d"].append(state.rho_d)
             out["rho_o"].append(state.rho_o)
     return {name: np.asarray(v) for name, v in out.items()}
+
+
+class FlowSeparableFilter:
+    """Separable flow filter ``A = L_o ⊗ L_d`` (``ρ_w = −ρ_d ρ_o``) for the count
+    panel kernel, its ``n² × n²`` operator explicit (a test oracle: the package
+    samples the separable flows with the structured kernels)."""
+
+    names = ("rho_d", "rho_o")
+
+    def __init__(self, W: sp.spmatrix, T: int, lower: float, upper: float):
+        self.W_csc = sp.csc_matrix(W, dtype=np.float64)
+        self.n = self.W_csc.shape[0]
+        self.T = int(T)
+        self._bounds = (float(lower), float(upper))
+        self._unit_solvers = None
+
+    def admissible(self, rho: dict) -> bool:
+        lo, hi = self._bounds
+        return all(lo < rho[k] < hi for k in self.names)
+
+    def bounds(self, name: str) -> tuple[float, float]:
+        return self._bounds
+
+    def solve(self, rho: dict, X: np.ndarray) -> np.ndarray:
+        from neighbayes.samplers.negbin_reduced._flow import _solve_A_separable
+
+        return _solve_A_separable(
+            rho["rho_d"], rho["rho_o"], X, self.W_csc, self.n, T=self.T
+        )
+
+    def effect_operator(self, rho: dict) -> sp.csc_matrix:
+        """``A = L_o ⊗ L_d`` as an explicit ``n² × n²`` matrix (moderate ``n``)."""
+        eye = sp.eye(self.n, format="csc")
+        Lo = (eye - float(rho["rho_o"]) * self.W_csc).tocsc()
+        Ld = (eye - float(rho["rho_d"]) * self.W_csc).tocsc()
+        return sp.kron(Lo, Ld, format="csc")
+
+    def effect_gram(self, rho: dict):
+        """``(AᵀA, log|AᵀA|)``, ``log|A| = n(log|L_o| + log|L_d|)`` from two
+        ``n × n`` factorizations."""
+        from neighbayes.samplers.negbin_reduced._flow_structured import (
+            _FilterSolver,
+        )
+
+        if self._unit_solvers is None:
+            self._unit_solvers = (_FilterSolver(self.W_csc), _FilterSolver(self.W_csc))
+        so, sd = self._unit_solvers
+        A = self.effect_operator(rho)
+        logdet = (
+            so.at(float(rho["rho_o"])).logdet() + sd.at(float(rho["rho_d"])).logdet()
+        )
+        return (A.T @ A).tocsc(), 2.0 * self.n * logdet
+
+    def effect_pattern(self) -> sp.csc_matrix:
+        eye = sp.eye(self.n, format="csc")
+        W = self.W_csc
+        from neighbayes.samplers.count_panel._filters import _gram_pattern
+
+        return _gram_pattern(sp.kron(eye, W), sp.kron(W, eye), sp.kron(W, W))
+
+    def init(self, rng: np.random.Generator) -> dict:
+        return {k: float(rng.uniform(-0.1, 0.1)) for k in self.names}

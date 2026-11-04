@@ -588,8 +588,8 @@ def test_flow_hurdle_guards():
 def test_flow_hurdle_structured_matches_generic():
     """The structured n × n sweep against the materialized-U kernel (pair effects)."""
     from neighbayes.models import SARHurdleNegBinFlow
-    from neighbayes.samplers.count_panel._filters import FlowSeparableFilter
     from neighbayes.samplers.hurdle._generic import HurdlePriors, run_chain
+    from neighbayes.tests.helpers import FlowSeparableFilter
 
     # Enough positive weeks per pair that the count half is identified; on a
     # tiny panel (~2 positive weeks per pair) both samplers mix too slowly

@@ -75,7 +75,7 @@ def test_flow_cross_section(cls, backend):
     "cls,effects,backend",
     [
         (sar_negbin_flow, 0, "numpy"),
-        (sar_negbin_flow, 3, "numpy"),
+        (sar_negbin_flow, 2, "numpy"),  # the unrestricted panel's only effects
         (sar_negbin_separable, 0, "numpy"),
         (sar_negbin_separable, 3, "numpy"),
         pytest.param(sar_negbin_separable, 3, "jax", marks=pytest.mark.requires_jax),
