@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from neighbayes.models import OLS, SAR, SDEM, SDM, SEM, SLX
 
@@ -52,16 +53,18 @@ EXPECTED_REGISTRIES = {
     OLS: [
         "LM-Lag",
         "LM-Error",
+        "LM-WX",
         "LM-SDM-Joint",
         "LM-SLX-Error-Joint",
         "Robust-LM-Lag",
         "Robust-LM-Error",
+        "Robust-LM-WX",
     ],
     SAR: ["LM-Error", "LM-WX", "Robust-LM-WX", "Robust-LM-Error"],
     SEM: ["LM-Lag", "LM-WX", "Robust-LM-Lag", "Robust-LM-WX"],
     SLX: ["LM-Lag", "LM-Error", "Robust-LM-Lag-SDM", "Robust-LM-Error-SDEM"],
-    SDM: ["LM-Error-SDM", "Robust-LM-Error-SDM"],
-    SDEM: ["LM-Lag-SDEM", "Robust-LM-Lag-SDEM"],
+    SDM: ["LM-Error-SDM"],
+    SDEM: ["LM-Lag-SDEM"],
     OLSFlow: [
         "LM-Flow-Destination",
         "LM-Flow-Origin",
@@ -122,33 +125,48 @@ def _panel(cls, **design):
 _OLS_PANEL = [
     "Panel-LM-Lag",
     "Panel-LM-Error",
+    "Panel-LM-WX",
     "Panel-LM-SDM-Joint",
     "Panel-LM-SLX-Error-Joint",
     "Panel-Robust-LM-Lag",
     "Panel-Robust-LM-Error",
+    "Panel-Robust-LM-WX",
+]
+_SAR_PANEL = [
+    "Panel-LM-Error",
+    "Panel-LM-WX",
+    "Panel-Robust-LM-WX",
+    "Panel-Robust-LM-Error",
+]
+_SEM_PANEL = [
+    "Panel-LM-Lag",
+    "Panel-LM-WX",
+    "Panel-Robust-LM-Lag",
+    "Panel-Robust-LM-WX",
+]
+_SLX_PANEL = [
+    "Panel-LM-Lag",
+    "Panel-LM-Error",
+    "Panel-Robust-LM-Lag-SDM",
+    "Panel-Robust-LM-Error-SDEM",
 ]
 _FE = {"unit_effects": "fixed"}
 _RE = {"unit_effects": "random"}
+_DYNAMIC = {"dynamic": True}
 EXPECTED_PANEL_REGISTRIES = [
     (OLS, _FE, _OLS_PANEL),
-    (SAR, _FE, ["Panel-LM-Error", "Panel-LM-WX", "Panel-Robust-LM-WX"]),
-    (SEM, _FE, ["Panel-LM-Lag", "Panel-LM-WX"]),
-    (
-        SLX,
-        _FE,
-        [
-            "Panel-LM-Lag",
-            "Panel-LM-Error",
-            "Panel-Robust-LM-Lag-SDM",
-            "Panel-Robust-LM-Error-SDEM",
-        ],
-    ),
+    (SAR, _FE, _SAR_PANEL),
+    (SEM, _FE, _SEM_PANEL),
+    (SLX, _FE, _SLX_PANEL),
     (SDM, _FE, ["Panel-LM-Error-SDM"]),
     (SDEM, _FE, ["Panel-LM-Lag-SDEM"]),
     (OLS, _RE, _OLS_PANEL),
-    (SAR, _RE, ["Panel-LM-Error", "Panel-LM-WX", "Panel-Robust-LM-WX"]),
-    (SEM, _RE, ["Panel-LM-Lag", "Panel-LM-WX"]),
+    (SAR, _RE, _SAR_PANEL),
+    (SEM, _RE, _SEM_PANEL),
     (SDEM, _RE, ["Panel-LM-Lag-SDEM"]),
+    # A dynamic panel runs the static suite: each test reads its null from the fit.
+    (SEM, _DYNAMIC, _SEM_PANEL),
+    (SLX, _DYNAMIC, _SLX_PANEL),
 ]
 
 
@@ -163,6 +181,50 @@ def test_panel_diagnostics_registries_match_expected():
         assert actual_labels == expected_labels, (
             f"{cls.__name__} {design}: expected {expected_labels}, got {actual_labels}"
         )
+
+
+def _tree_tests(node):
+    """Every test a decision tree can consult."""
+    if isinstance(node, str):
+        return set()
+    own = {node.name} if node.kind == "test" else set()
+    return own | _tree_tests(node.if_true) | _tree_tests(node.if_false)
+
+
+def _cross_sections():
+    from neighbayes.models import SARTobit, SDMTobit, SEMTobit
+    from neighbayes.tests.helpers import W_to_graph, make_line_W
+
+    rng = np.random.default_rng(0)
+    xs = dict(y=rng.standard_normal(6), X=rng.standard_normal((6, 2)))
+    W = W_to_graph(make_line_W(6))
+    yield from (cls(**xs, W=W) for cls in (OLS, SAR, SEM, SLX, SDM, SDEM))
+    yield from (cls(**xs, W=W, censoring=0.0) for cls in (SARTobit, SEMTobit, SDMTobit))
+
+
+def _panels():
+    from neighbayes.models import SARTobit, SEMTobit
+
+    for cls, design, _ in EXPECTED_PANEL_REGISTRIES:
+        yield _panel(cls, **design)
+    for cls in (SARTobit, SEMTobit):
+        yield _panel(cls, censoring=0.0)
+
+
+@pytest.mark.parametrize(
+    "model",
+    [*_cross_sections(), *_panels()],
+    ids=lambda m: f"{type(m).__name__}-{getattr(m, '_design', '')}",
+)
+def test_every_test_a_tree_reads_is_in_the_models_suite(model):
+    """A test the suite lacks reads as not significant, which silently prunes the tree."""
+    from neighbayes.diagnostics import _decision_trees as dt
+    from neighbayes.diagnostics.lmtests.registry import get_diagnostic_suite
+
+    name = type(model).__name__
+    spec = dt.get_panel_spec(name) if model._panel_diagnostics else dt.get_spec(name)
+    labels = {label for _, label in get_diagnostic_suite(model).tests}
+    assert _tree_tests(spec) <= labels, sorted(_tree_tests(spec) - labels)
 
 
 def test_count_suites_follow_the_design():

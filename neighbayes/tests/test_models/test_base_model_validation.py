@@ -101,7 +101,7 @@ class TestParseW:
 
 
 class TestIsolates:
-    """Isolates — units with no neighbour inside the bandwidth — are valid.
+    """Isolates — units with no neighbor inside the bandwidth — are valid.
 
     Row-standardizing leaves an isolate's row summing to 0 rather than 1
     because there is nothing to divide by.  That is correct output, not a
@@ -252,465 +252,95 @@ class TestCrossSectionalDiagnosticsDecision:
     def W_graph(self):
         return _W_to_graph(_rook_W(4))
 
-    @pytest.fixture
-    def ols_model(self, W_graph):
-        from neighbayes.models.cross_section.ols import OLS
+    @pytest.mark.parametrize(
+        "cls_name, pvalues, expected",
+        [
+            # WX alone at a SAR fit adds WX though its robust test is silent:
+            # the robust test guards against an error term LM-Error rules out.
+            (
+                "sar.SAR",
+                {"LM-WX": 0.031, "Robust-LM-WX": 0.082, "LM-Error": 0.12},
+                "SDM",
+            ),
+            ("sar.SAR", {"LM-WX": 0.5, "LM-Error": 0.01}, "SARAR"),
+            ("sar.SAR", {"LM-WX": 0.5, "LM-Error": 0.5}, "SAR"),
+            # Both plain and both robust tests reject: the stronger robust test.
+            (
+                "sar.SAR",
+                {
+                    "LM-WX": 0.01,
+                    "LM-Error": 0.01,
+                    "Robust-LM-WX": 0.02,
+                    "Robust-LM-Error": 0.001,
+                },
+                "SARAR",
+            ),
+            # Both plain tests reject and neither robust one does: the stronger.
+            (
+                "ols.OLS",
+                {
+                    "LM-Lag": 0.01,
+                    "LM-Error": 0.01,
+                    "Robust-LM-Lag": 0.3,
+                    "Robust-LM-Error": 0.2,
+                },
+                "SEM",
+            ),
+            ("sem.SEM", {"LM-Lag": 0.5, "LM-WX": 0.01}, "SDEM"),
+            ("ols.OLS", {"LM-Lag": 0.5, "LM-Error": 0.5, "LM-WX": 0.01}, "SLX"),
+            (
+                "slx.SLX",
+                {
+                    "LM-Lag": 0.01,
+                    "LM-Error": 0.01,
+                    "Robust-LM-Lag-SDM": 0.01,
+                    "Robust-LM-Error-SDEM": 0.5,
+                },
+                "SDM",
+            ),
+            ("sdm.SDM", {"LM-Error-SDM": 0.01}, "GNS"),
+            ("sdem.SDEM", {"LM-Lag-SDEM": 0.5}, "SDEM"),
+            ("tobit.SARTobit", {"LM-WX": 0.01, "LM-Error": 0.5}, "SDMTobit"),
+            ("tobit.SEMTobit", {"LM-Lag": 0.01, "LM-WX": 0.5}, "SARARTobit"),
+            ("tobit.SDMTobit", {"LM-Error-SDM": 0.01}, "GNSTobit"),
+        ],
+    )
+    def test_decision(self, W_graph, monkeypatch, cls_name, pvalues, expected):
+        import importlib
 
+        module, name = cls_name.rsplit(".", 1)
+        cls = getattr(
+            importlib.import_module(f"neighbayes.models.cross_section.{module}"), name
+        )
         rng = np.random.default_rng(0)
-        return OLS(y=rng.standard_normal(4), X=rng.standard_normal((4, 2)), W=W_graph)
-
-    def test_ols_only_lag(self, ols_model, monkeypatch):
-        df = pd.DataFrame({"p_value": [0.001, 0.9]}, index=["LM-Lag", "LM-Error"])
-        monkeypatch.setattr(ols_model, "spatial_diagnostics", lambda: df)
+        extra = {"censoring": 0.0} if name.endswith("Tobit") else {}
+        model = cls(
+            y=rng.standard_normal(4), X=rng.standard_normal((4, 2)), W=W_graph, **extra
+        )
+        df = pd.DataFrame({"p_value": list(pvalues.values())}, index=list(pvalues))
+        monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
         assert (
-            ols_model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SAR"
+            model.spatial_diagnostics_decision(alpha=0.05, format="model") == expected
         )
 
-    def test_ols_only_error(self, ols_model, monkeypatch):
-        df = pd.DataFrame({"p_value": [0.9, 0.001]}, index=["LM-Lag", "LM-Error"])
-        monkeypatch.setattr(ols_model, "spatial_diagnostics", lambda: df)
-        assert (
-            ols_model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SEM"
-        )
-
-    def test_ols_neither(self, ols_model, monkeypatch):
-        df = pd.DataFrame({"p_value": [0.9, 0.9]}, index=["LM-Lag", "LM-Error"])
-        monkeypatch.setattr(ols_model, "spatial_diagnostics", lambda: df)
-        assert (
-            ols_model.spatial_diagnostics_decision(alpha=0.05, format="model") == "OLS"
-        )
-
-    def test_ols_both_robust_lag(self, ols_model, monkeypatch):
-        df = pd.DataFrame(
-            {"p_value": [0.001, 0.001, 0.001, 0.9]},
-            index=["LM-Lag", "LM-Error", "Robust-LM-Lag", "Robust-LM-Error"],
-        )
-        monkeypatch.setattr(ols_model, "spatial_diagnostics", lambda: df)
-        assert (
-            ols_model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SAR"
-        )
-
-    def test_ols_both_robust_error(self, ols_model, monkeypatch):
-        df = pd.DataFrame(
-            {"p_value": [0.001, 0.001, 0.9, 0.001]},
-            index=["LM-Lag", "LM-Error", "Robust-LM-Lag", "Robust-LM-Error"],
-        )
-        monkeypatch.setattr(ols_model, "spatial_diagnostics", lambda: df)
-        assert (
-            ols_model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SEM"
-        )
-
-    def test_ols_both_robust_both(self, ols_model, monkeypatch):
-        # Both naive AND both robust significant: route to the dominant
-        # single-channel model via the robust p-value tie-break.  Equal
-        # robust p-values resolve in favour of SAR (lag <= error).
-        # SARAR is intentionally unreachable from OLS because its proper
-        # null is a fitted SAR (or SEM) — the user must escalate.
-        df = pd.DataFrame(
-            {"p_value": [0.001, 0.001, 0.001, 0.001]},
-            index=["LM-Lag", "LM-Error", "Robust-LM-Lag", "Robust-LM-Error"],
-        )
-        monkeypatch.setattr(ols_model, "spatial_diagnostics", lambda: df)
-        assert (
-            ols_model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SAR"
-        )
-
-    def test_ols_both_no_robust_fallback(self, ols_model, monkeypatch):
-        """When both naive tests fire but no robust tests available, fall back to p-value comparison."""
-        df = pd.DataFrame(
-            {"p_value": [0.001, 0.001]},
-            index=["LM-Lag", "LM-Error"],
-        )
-        monkeypatch.setattr(ols_model, "spatial_diagnostics", lambda: df)
-        result = ols_model.spatial_diagnostics_decision(alpha=0.05, format="model")
-        # Should fall back to comparing p-values; both equal so LM-Lag wins (<=)
-        assert result == "SAR"
-
-    def test_sar_error_significant(self, W_graph, monkeypatch):
-        from neighbayes.models.cross_section.sar import SAR
+    def test_panel_decision_breaks_ties_on_the_panel_tests(self, W_graph, monkeypatch):
+        from neighbayes.models import SEM
 
         rng = np.random.default_rng(0)
-        model = SAR(y=rng.standard_normal(4), X=rng.standard_normal((4, 2)), W=W_graph)
-        # SARAR is reachable only when naive ``LM-Error`` AND its robust
-        # refinement ``Robust-LM-Error`` (Schur-purged for ρ) both fire.
-        df = pd.DataFrame(
-            {"p_value": [0.001, 0.001]},
-            index=["LM-Error", "Robust-LM-Error"],
+        model = SEM(
+            y=rng.standard_normal(8), X=rng.standard_normal((8, 2)), W=W_graph, N=4, T=2
         )
-        monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SARAR"
-
-    def test_sar_error_naive_only_falls_through(self, W_graph, monkeypatch):
-        # If only naive ``LM-Error`` fires but the robust refinement
-        # clears it, the SAR fit already absorbs the dependence; keep SAR.
-        from neighbayes.models.cross_section.sar import SAR
-
-        rng = np.random.default_rng(0)
-        model = SAR(y=rng.standard_normal(4), X=rng.standard_normal((4, 2)), W=W_graph)
         df = pd.DataFrame(
-            {"p_value": [0.001, 0.9]},
-            index=["LM-Error", "Robust-LM-Error"],
-        )
-        monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SAR"
-
-    def test_sar_wx_significant(self, W_graph, monkeypatch):
-        from neighbayes.models.cross_section.sar import SAR
-
-        rng = np.random.default_rng(0)
-        model = SAR(y=rng.standard_normal(4), X=rng.standard_normal((4, 2)), W=W_graph)
-        # SDM is reachable only when naive ``LM-WX`` AND its robust
-        # refinement both fire (precondition principle).
-        df = pd.DataFrame(
-            {"p_value": [0.9, 0.001, 0.001]},
-            index=["LM-Error", "LM-WX", "Robust-LM-WX"],
-        )
-        monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SDM"
-
-    def test_sar_wx_naive_only_falls_through(self, W_graph, monkeypatch):
-        # If naive ``LM-WX`` fires but the robust refinement clears it, the
-        # tree must fall through to the LM-Error branch — not commit to SDM.
-        from neighbayes.models.cross_section.sar import SAR
-
-        rng = np.random.default_rng(0)
-        model = SAR(y=rng.standard_normal(4), X=rng.standard_normal((4, 2)), W=W_graph)
-        df = pd.DataFrame(
-            {"p_value": [0.9, 0.001, 0.9]},
-            index=["LM-Error", "LM-WX", "Robust-LM-WX"],
-        )
-        monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SAR"
-
-    def test_sar_robust_only_does_not_route_sdm(self, W_graph, monkeypatch):
-        # Robust-LM-WX firing without the naive precursor must NOT commit
-        # the tree to SDM.
-        from neighbayes.models.cross_section.sar import SAR
-
-        rng = np.random.default_rng(0)
-        model = SAR(y=rng.standard_normal(4), X=rng.standard_normal((4, 2)), W=W_graph)
-        df = pd.DataFrame(
-            {"p_value": [0.9, 0.9, 0.001]},
-            index=["LM-Error", "LM-WX", "Robust-LM-WX"],
-        )
-        monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SAR"
-
-    def test_sar_neither_significant(self, W_graph, monkeypatch):
-        from neighbayes.models.cross_section.sar import SAR
-
-        rng = np.random.default_rng(0)
-        model = SAR(y=rng.standard_normal(4), X=rng.standard_normal((4, 2)), W=W_graph)
-        df = pd.DataFrame(
-            {"p_value": [0.9, 0.9, 0.9]},
-            index=["LM-Error", "LM-WX", "Robust-LM-WX"],
-        )
-        monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SAR"
-
-    def test_sem_lag_significant(self, W_graph, monkeypatch):
-        from neighbayes.models.cross_section.sem import SEM
-
-        rng = np.random.default_rng(0)
-        model = SEM(y=rng.standard_normal(4), X=rng.standard_normal((4, 2)), W=W_graph)
-        # SARAR requires both naive ``LM-Lag`` AND its robust refinement
-        # ``Robust-LM-Lag`` (Schur-purged for the WX block) to fire.
-        df = pd.DataFrame(
-            {"p_value": [0.001, 0.9, 0.001, 0.9]},
-            index=["LM-Lag", "LM-WX", "Robust-LM-Lag", "Robust-LM-WX"],
-        )
-        monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SARAR"
-
-    def test_sem_lag_naive_only_keeps_sem(self, W_graph, monkeypatch):
-        from neighbayes.models.cross_section.sem import SEM
-
-        rng = np.random.default_rng(0)
-        model = SEM(y=rng.standard_normal(4), X=rng.standard_normal((4, 2)), W=W_graph)
-        df = pd.DataFrame(
-            {"p_value": [0.001, 0.9, 0.9, 0.9]},
-            index=["LM-Lag", "LM-WX", "Robust-LM-Lag", "Robust-LM-WX"],
-        )
-        monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SEM"
-
-    def test_sem_wx_significant(self, W_graph, monkeypatch):
-        from neighbayes.models.cross_section.sem import SEM
-
-        rng = np.random.default_rng(0)
-        model = SEM(y=rng.standard_normal(4), X=rng.standard_normal((4, 2)), W=W_graph)
-        # SDEM requires both naive ``LM-WX`` AND ``Robust-LM-WX`` to fire.
-        df = pd.DataFrame(
-            {"p_value": [0.9, 0.001, 0.9, 0.001]},
-            index=["LM-Lag", "LM-WX", "Robust-LM-Lag", "Robust-LM-WX"],
-        )
-        monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SDEM"
-
-    def test_sem_all_robust_lag_wins(self, W_graph, monkeypatch):
-        from neighbayes.models.cross_section.sem import SEM
-
-        rng = np.random.default_rng(0)
-        model = SEM(y=rng.standard_normal(4), X=rng.standard_normal((4, 2)), W=W_graph)
-        # Both naive precursors fire; both robust survive; smaller-p
-        # (= larger statistic) side wins.  Lag side has smaller p → SARAR.
-        df = pd.DataFrame(
-            {"p_value": [0.001, 0.001, 0.0001, 0.01]},
-            index=["LM-Lag", "LM-WX", "Robust-LM-Lag", "Robust-LM-WX"],
-        )
-        monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SARAR"
-
-    def test_sem_all_robust_wx_wins(self, W_graph, monkeypatch):
-        from neighbayes.models.cross_section.sem import SEM
-
-        rng = np.random.default_rng(0)
-        model = SEM(y=rng.standard_normal(4), X=rng.standard_normal((4, 2)), W=W_graph)
-        df = pd.DataFrame(
-            {"p_value": [0.001, 0.001, 0.01, 0.0001]},
-            index=["LM-Lag", "LM-WX", "Robust-LM-Lag", "Robust-LM-WX"],
-        )
-        monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SDEM"
-
-    def test_sdm_robust_significant(self, W_graph, monkeypatch):
-        from neighbayes.models.cross_section.sdm import SDM
-
-        rng = np.random.default_rng(0)
-        model = SDM(y=rng.standard_normal(4), X=rng.standard_normal((4, 2)), W=W_graph)
-        df = pd.DataFrame(
-            {"p_value": [0.001, 0.001]},
-            index=["LM-Error-SDM", "Robust-LM-Error-SDM"],
-        )
-        monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "GNS"
-
-    def test_sdm_naive_only_keeps_sdm(self, W_graph, monkeypatch):
-        from neighbayes.models.cross_section.sdm import SDM
-
-        rng = np.random.default_rng(0)
-        model = SDM(y=rng.standard_normal(4), X=rng.standard_normal((4, 2)), W=W_graph)
-        df = pd.DataFrame(
-            {"p_value": [0.001, 0.9]},
-            index=["LM-Error-SDM", "Robust-LM-Error-SDM"],
-        )
-        monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SDM"
-
-    def test_sdem_robust_significant(self, W_graph, monkeypatch):
-        from neighbayes.models.cross_section.sdem import SDEM
-
-        rng = np.random.default_rng(0)
-        model = SDEM(y=rng.standard_normal(4), X=rng.standard_normal((4, 2)), W=W_graph)
-        df = pd.DataFrame(
-            {"p_value": [0.001, 0.001]},
-            index=["LM-Lag-SDEM", "Robust-LM-Lag-SDEM"],
-        )
-        monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "GNS"
-
-    def test_sdem_naive_only_keeps_sdem(self, W_graph, monkeypatch):
-        from neighbayes.models.cross_section.sdem import SDEM
-
-        rng = np.random.default_rng(0)
-        model = SDEM(y=rng.standard_normal(4), X=rng.standard_normal((4, 2)), W=W_graph)
-        df = pd.DataFrame(
-            {"p_value": [0.001, 0.9]},
-            index=["LM-Lag-SDEM", "Robust-LM-Lag-SDEM"],
-        )
-        monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SDEM"
-
-    def test_slx_robust_lag_sdm(self, W_graph, monkeypatch):
-        from neighbayes.models.cross_section.slx import SLX
-
-        rng = np.random.default_rng(0)
-        model = SLX(y=rng.standard_normal(4), X=rng.standard_normal((4, 2)), W=W_graph)
-        # Naive ``LM-Lag`` must fire to reach the robust refinement.
-        df = pd.DataFrame(
-            {"p_value": [0.001, 0.9, 0.001, 0.9]},
+            {"p_value": [0.01, 0.01, 0.4, 0.2]},
             index=[
-                "LM-Lag",
-                "LM-Error",
-                "Robust-LM-Lag-SDM",
-                "Robust-LM-Error-SDEM",
-            ],
-        )
-        monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SDM"
-
-    def test_slx_robust_error_sdem(self, W_graph, monkeypatch):
-        from neighbayes.models.cross_section.slx import SLX
-
-        rng = np.random.default_rng(0)
-        model = SLX(y=rng.standard_normal(4), X=rng.standard_normal((4, 2)), W=W_graph)
-        # Naive ``LM-Error`` must fire to reach the robust refinement.
-        df = pd.DataFrame(
-            {"p_value": [0.9, 0.001, 0.9, 0.001]},
-            index=[
-                "LM-Lag",
-                "LM-Error",
-                "Robust-LM-Lag-SDM",
-                "Robust-LM-Error-SDEM",
+                "Panel-LM-Lag",
+                "Panel-LM-WX",
+                "Panel-Robust-LM-Lag",
+                "Panel-Robust-LM-WX",
             ],
         )
         monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
         assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SDEM"
-
-    def test_slx_robust_both_lag_wins(self, W_graph, monkeypatch):
-        # When both robust tests fire (with both naive precursors firing),
-        # the smaller-p (= larger statistic) side wins.  Lag-SDM has the
-        # smaller p-value here, so SDM is preferred.
-        from neighbayes.models.cross_section.slx import SLX
-
-        rng = np.random.default_rng(0)
-        model = SLX(y=rng.standard_normal(4), X=rng.standard_normal((4, 2)), W=W_graph)
-        df = pd.DataFrame(
-            {"p_value": [0.001, 0.001, 0.0001, 0.01]},
-            index=[
-                "LM-Lag",
-                "LM-Error",
-                "Robust-LM-Lag-SDM",
-                "Robust-LM-Error-SDEM",
-            ],
-        )
-        monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SDM"
-
-    def test_slx_robust_both_error_wins(self, W_graph, monkeypatch):
-        from neighbayes.models.cross_section.slx import SLX
-
-        rng = np.random.default_rng(0)
-        model = SLX(y=rng.standard_normal(4), X=rng.standard_normal((4, 2)), W=W_graph)
-        df = pd.DataFrame(
-            {"p_value": [0.001, 0.001, 0.01, 0.0001]},
-            index=[
-                "LM-Lag",
-                "LM-Error",
-                "Robust-LM-Lag-SDM",
-                "Robust-LM-Error-SDEM",
-            ],
-        )
-        monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SDEM"
-
-    def test_slx_neither_robust(self, W_graph, monkeypatch):
-        from neighbayes.models.cross_section.slx import SLX
-
-        rng = np.random.default_rng(0)
-        model = SLX(y=rng.standard_normal(4), X=rng.standard_normal((4, 2)), W=W_graph)
-        df = pd.DataFrame(
-            {"p_value": [0.9, 0.9, 0.9, 0.9]},
-            index=[
-                "LM-Lag",
-                "LM-Error",
-                "Robust-LM-Lag-SDM",
-                "Robust-LM-Error-SDEM",
-            ],
-        )
-        monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SLX"
-
-    def test_slx_robust_only_no_naive_routes_slx(self, W_graph, monkeypatch):
-        # Robust tests firing without naive precursors must NOT escalate.
-        from neighbayes.models.cross_section.slx import SLX
-
-        rng = np.random.default_rng(0)
-        model = SLX(y=rng.standard_normal(4), X=rng.standard_normal((4, 2)), W=W_graph)
-        df = pd.DataFrame(
-            {"p_value": [0.9, 0.9, 0.001, 0.001]},
-            index=[
-                "LM-Lag",
-                "LM-Error",
-                "Robust-LM-Lag-SDM",
-                "Robust-LM-Error-SDEM",
-            ],
-        )
-        monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SLX"
-
-    def test_sdm_error_sdm_significant(self, W_graph, monkeypatch):
-        from neighbayes.models.cross_section.sdm import SDM
-
-        rng = np.random.default_rng(0)
-        model = SDM(y=rng.standard_normal(4), X=rng.standard_normal((4, 2)), W=W_graph)
-        df = pd.DataFrame(
-            {"p_value": [0.001, 0.001]},
-            index=["LM-Error-SDM", "Robust-LM-Error-SDM"],
-        )
-        monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "GNS"
-
-    def test_sdem_lag_sdem_significant(self, W_graph, monkeypatch):
-        from neighbayes.models.cross_section.sdem import SDEM
-
-        rng = np.random.default_rng(0)
-        model = SDEM(y=rng.standard_normal(4), X=rng.standard_normal((4, 2)), W=W_graph)
-        df = pd.DataFrame(
-            {"p_value": [0.001, 0.001]},
-            index=["LM-Lag-SDEM", "Robust-LM-Lag-SDEM"],
-        )
-        monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "GNS"
-
-    def test_sartobit_error_significant(self, W_graph, monkeypatch):
-        from neighbayes.models.cross_section.tobit import SARTobit
-
-        rng = np.random.default_rng(0)
-        model = SARTobit(
-            y=rng.standard_normal(4),
-            X=rng.standard_normal((4, 2)),
-            W=W_graph,
-            censoring=0.0,
-        )
-        df = pd.DataFrame(
-            {"p_value": [0.001, 0.001]},
-            index=["LM-Error", "Robust-LM-Error"],
-        )
-        monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert (
-            model.spatial_diagnostics_decision(alpha=0.05, format="model")
-            == "SARARTobit"
-        )
-
-    def test_semtobit_lag_significant(self, W_graph, monkeypatch):
-        from neighbayes.models.cross_section.tobit import SEMTobit
-
-        rng = np.random.default_rng(0)
-        model = SEMTobit(
-            y=rng.standard_normal(4),
-            X=rng.standard_normal((4, 2)),
-            W=W_graph,
-            censoring=0.0,
-        )
-        df = pd.DataFrame(
-            {"p_value": [0.001, 0.9, 0.001, 0.9]},
-            index=["LM-Lag", "LM-WX", "Robust-LM-Lag", "Robust-LM-WX"],
-        )
-        monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert (
-            model.spatial_diagnostics_decision(alpha=0.05, format="model")
-            == "SARARTobit"
-        )
-
-    def test_sdmtobit_error_significant(self, W_graph, monkeypatch):
-        from neighbayes.models.cross_section.tobit import SDMTobit
-
-        rng = np.random.default_rng(0)
-        model = SDMTobit(
-            y=rng.standard_normal(4),
-            X=rng.standard_normal((4, 2)),
-            W=W_graph,
-            censoring=0.0,
-        )
-        df = pd.DataFrame(
-            {"p_value": [0.001, 0.001]},
-            index=["LM-Error", "Robust-LM-Error"],
-        )
-        monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
-        assert (
-            model.spatial_diagnostics_decision(alpha=0.05, format="model") == "GNSTobit"
-        )
 
 
 # ---------------------------------------------------------------------------
@@ -798,13 +428,8 @@ class TestDecisionOutputFormats:
             fitted_ols.spatial_diagnostics_decision(format="bogus")
 
     def test_sar_ascii_error_branch_drawn_per_channel(self):
-        """The SAR error_branch is intentionally built twice (not shared)
-        so that the graphviz/ASCII renderer draws naive→robust strictly
-        within each channel — i.e. the reader sees a separate ``LM-Error``
-        subtree under both the ``LM-WX`` "not sig" edge and the
-        ``Robust-LM-WX`` "not sig" edge, never a shared back-reference
-        that visually places ``LM-Error`` ahead of ``Robust-LM-WX``.
-        """
+        """The SAR tree tests LM-Error under both LM-WX edges, and the
+        renderer draws each subtree in full rather than as a back-reference."""
         from neighbayes.diagnostics import _decision_trees as _dt
 
         spec = _dt.get_spec("SAR")

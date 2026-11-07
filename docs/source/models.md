@@ -90,9 +90,9 @@ $$y_{it} = x_{it}' \beta + Wx_{it}' \theta + a_i + \tau_t + \epsilon_{it}$$
 $$y_{it} = x_{it}' \beta + \alpha_i + \tau_t + \epsilon_{it}, \quad \alpha_i \sim N(0, \sigma_\alpha^2)$$
 
 The random-effects Gibbs sampler (this and the spatial variants below) updates
-$\sigma_\alpha$ by interweaving a centred step ($\sigma_\alpha \mid \alpha$) with
-a non-centred one ($\sigma_\alpha \mid \alpha/\sigma_\alpha$, exact under the
-Gaussian likelihood). The centred step alone mixes at about 1% of draws when the
+$\sigma_\alpha$ by interweaving a centered step ($\sigma_\alpha \mid \alpha$) with
+a non-centered one ($\sigma_\alpha \mid \alpha/\sigma_\alpha$, exact under the
+Gaussian likelihood). The centered step alone mixes at about 1% of draws when the
 unit effects are small against $\sigma/\sqrt{T}$, the common many-units,
 few-periods spatial panel.
 
@@ -128,7 +128,7 @@ $v_\ell = \lambda_\ell W_\ell v_\ell + \varepsilon_\ell$, or none (`None`), and
 any level may add the Durbin terms $W_\ell X_\ell$ (`"SDM"`, `"SDEM"`, `"SLX"`).
 
 Every graph spans all groups at its level, whatever their parent: a West Texas
-county neighbours New Mexico counties. Because each level's effect passes
+county neighbors New Mexico counties. Because each level's effect passes
 through the filter of the level below, a shift at the top reaches the units
 through every filter beneath it. In the reduced form with a lag at every level,
 
@@ -201,7 +201,7 @@ ran:
 - 2–10× faster than NumPy with about 600 units;
 - 1.5–4× faster with 14,400 units, where the collapsed scheme's cost is
   CHOLMOD's own factorization. `sampler="nuts"` fits the same model
-non-centred. Gibbs and NUTS agree across lag, error and no-process
+non-centered. Gibbs and NUTS agree across lag, error and no-process
 configurations. The units' intercept is heavy-tailed: its spread grows as the top
 level's $\rho$ nears 1, where NUTS diverges.
 
@@ -269,7 +269,7 @@ SEM and SDEM classes are latent too and take no `latent` argument.
 
 The latent models share one exact Gibbs sweep: the utilities from their
 truncated normal conditionals (Albert and Chib 1993), one at a time on NumPy or a
-colour class at a time on JAX (the default), then $\rho$ or $\lambda$ with
+color class at a time on JAX (the default), then $\rho$ or $\lambda$ with
 $\beta$ integrated out, then $\beta$, and a scale move on $(y^*, \beta)$. The
 logit adds the Kolmogorov scales that make its disturbance a normal scale
 mixture (Holmes and Held 2006). The likelihood is an orthant probability, so
@@ -370,8 +370,8 @@ a fixed prior and absorb the columns that vary only over time. Pooling assumes
 the effects are unrelated to $X$; when they are not, `mundlak=True` adds the
 unit means of the time-varying columns to the design inside the filter (Mundlak
 1978), which absorbs the correlation (in a nonlinear model only approximately).
-The Gibbs sampler updates $\sigma$ by interweaving a centred step
-($\sigma \mid c$) with a non-centred one ($\sigma \mid \tilde c$,
+The Gibbs sampler updates $\sigma$ by interweaving a centered step
+($\sigma \mid c$) with a non-centered one ($\sigma \mid \tilde c$,
 $\tilde c = (c - \mu)/\sigma$; Yu & Meng 2011), the latter on the exact
 likelihood rather than the Pólya–Gamma working one, so no augmentation layer
 stands between $\sigma$ and the data (Papaspiliopoulos, Roberts & Sermaidis
@@ -395,7 +395,7 @@ The latent SAR: the multiplier propagates the negative binomial's own gamma
 disturbance, so $\rho = 0$ is `NegBin` and the GLM suite's LM-Lag is its score
 test. The Gibbs sampler carries the log-means $\eta$, given which the
 disturbances are a sparse linear map and every conditional is log-concave: the
-log-means are drawn one at a time by slice on NumPy and a colour class at a time
+log-means are drawn one at a time by slice on NumPy and a color class at a time
 by independence Metropolis–Hastings on JAX (the default), then $\rho$ with
 $\beta$ shifted along the least-squares fit of $W\eta$ on $X$, $\beta$ from a
 *t* at its Laplace approximation, and $\alpha$. Small counts pin $\eta$ only
@@ -644,7 +644,7 @@ integrated out, then $\beta$, and ends with a scale move that rescales the
 utilities and $\beta$ together (Liu and Wu 1999), which keeps $\rho$ mixing as
 it nears one (at $\rho = 0.97$ it quadruples its effective draws). It runs on
 JAX by default, drawing the
-utilities a colour class at a time (classes of utilities that share no row of
+utilities a color class at a time (classes of utilities that share no row of
 $I - \rho W$ are conditionally independent), and on NumPy one at a time. There
 is no NUTS path (the likelihood is an orthant probability). Its pointwise
 log-likelihood integrates each utility out as the negative binomial's does, the
@@ -868,7 +868,8 @@ estimates is the plain test.
 | Robust LM-Error | $\lambda = 0$ | OLS | $\rho$ | 1 |
 | Robust LM-Lag-SDM | $\rho = 0$ | SLX | $\lambda$ | 1 |
 | Robust LM-Error-SDEM | $\lambda = 0$ | SLX | $\rho$ | 1 |
-| LM-WX | $\theta = 0$ | SAR, SEM | | $k_{wx}$ |
+| LM-WX | $\theta = 0$ | OLS, SAR, SEM | | $k_{wx}$ |
+| Robust LM-WX | $\theta = 0$ | OLS | $\rho$ | $k_{wx}$ |
 | Robust LM-WX | $\theta = 0$ | SAR | $\lambda$ | $k_{wx}$ |
 | Robust LM-Error | $\lambda = 0$ | SAR | $\theta$ | 1 |
 | Robust LM-Lag | $\rho = 0$ | SEM | $\theta$ | 1 |
@@ -887,6 +888,31 @@ $\mathbf 1$ removed under time effects), random unit effects enter as
 coefficients carrying their prior, and a dynamic panel conditions on its first
 period with the lagged outcome as a regressor; the functions carry the
 `bayesian_panel_lm_*` prefix.
+
+At the OLS null the lag score is the error score plus $\hat\beta^\top$ times
+the WX score, and the error and WX scores are uncorrelated. So the two joint tests
+are one statistic, which splits two ways: LM-SDM-Joint = LM-Lag + Robust LM-WX
+(Koley & Bera 2024) = LM-Error + LM-WX. The lag robust to WX, their Robust
+LM-Lag-SDM, is therefore LM-Error there, and the error and WX tests robust to
+each other are the plain ones; the OLS suite runs none of these duplicates.
+
+`spatial_diagnostics_decision()` reads a fitted model's tests by the rule of
+Anselin et al. (1996), the one `spreg`'s `stge_classic` implements. A model that
+leaves two directions untested (OLS: lag and error; SAR: WX and error; SEM: lag
+and WX; SLX: lag and error) is kept when neither plain test rejects, and gains
+the direction whose plain test rejects when one does. When both do, it gains the
+direction whose robust test rejects, or, when both or neither do, the one with
+the smaller robust p-value. A plain test is valid when the other direction is
+absent and a robust one either way, at a cost in power, so the robust pair only
+settles a double rejection. The OLS fit also leaves WX untested, and a lone WX
+rejection there adds it (the SLX). The lag and the error together go to their
+robust pair whether or not WX also rejects, and the SAR or SEM fit then tests WX.
+The lag and WX go to Koley & Bera's robust pair, whose lag test is LM-Error
+there: it has not rejected, so WX goes ahead if Robust LM-WX rejects, and the
+smaller p-value of the two decides otherwise. The error and WX go to the smaller
+p-value. The SDM and SDEM read their one test. The trees name
+SARAR and GNS where the tests point, though neighbayes does not fit them; panel
+and Tobit models follow the same trees.
 
 ### Logit and negative binomial
 
@@ -996,7 +1022,7 @@ random-effects and Tobit models still require NUTS.
 
 For any Gibbs sampler, `backend` selects the execution path:
 
-| Value | Behaviour |
+| Value | Behavior |
 |---|---|
 | `"auto"` | **default** — JAX when installed and supported by the family, else NumPy |
 | `"jax"` | the sweep compiled into one XLA program; chains run in parallel, vectorized under `jax.vmap` for the Gaussian families and one thread per chain for the others |
@@ -1102,7 +1128,7 @@ blocks of their own and carried along by the θ and (a, b) moves.
 The log-determinant $\log|I - \rho W|$ is evaluated at every MCMC draw, and is
 the term that makes large problems expensive. Two arguments of the **model**
 constructor (not of `fit()`) choose how it is computed, and both samplers
-honour them:
+honor them:
 
 - `logdet_method` is the method: `"eigenvalue"` sums over the eigenvalues of
   $W$ from one dense eigendecomposition; `"cheb"`, `"aaa"` and `"spline"`
@@ -1130,7 +1156,7 @@ incur:
 |---|---|---|---|
 | ≤ 500 | any | `eigenvalue` | one $O(n^3)$ eigendecomposition, then $O(n)$ per ρ — exact and cheap at this size |
 | ≤ 60000 | undirected | `aaa` on `chol` | sparse Cholesky at adaptively chosen AAA support points; root-exponential convergence |
-| ≤ 60000 | directed | `aaa` on `lu` | the same rational scheme over sparse LU (KLU or UMFPACK) — k-nearest-neighbour, travel time, migration |
+| ≤ 60000 | directed | `aaa` on `lu` | the same rational scheme over sparse LU (KLU or UMFPACK) — k-nearest-neighbor, travel time, migration |
 | > 60000 | any | `stochastic` | no factorization, at the cost of stochastic error |
 
 **Fill-in guard.** Size alone does not predict factorization cost — a dense or

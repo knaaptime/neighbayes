@@ -88,9 +88,10 @@ def bayesian_panel_robust_lm_error_test(model) -> BayesianLMTestResult:
 
 
 def bayesian_panel_lm_wx_test(model) -> BayesianLMTestResult:
-    r"""Panel LM test for omitted :math:`WX` at a SAR panel (H₀: θ = 0 | SAR).
+    r"""Panel LM test for omitted :math:`WX` at an OLS or SAR panel (H₀: θ = 0).
 
-    Whether the SAR panel should be the SDM panel.
+    Whether the OLS panel should be the SLX panel, or the SAR panel the SDM
+    panel.
 
     Returns
     -------
@@ -173,6 +174,69 @@ def bayesian_panel_robust_lm_wx_test(model) -> BayesianLMTestResult:
     )
 
 
+def bayesian_panel_robust_lm_error_sar_test(model) -> BayesianLMTestResult:
+    r"""Robust panel LM-error at a SAR panel (H₀: λ = 0, robust to a local θ).
+
+    The panel analogue of
+    :func:`~neighbayes.diagnostics.lmtests.bayesian_robust_lm_error_sar_test`:
+    the error score net of the :math:`WX` direction.
+
+    Returns
+    -------
+    BayesianLMTestResult
+        Per-draw LM samples, summary statistics and ``df = 1``.
+    """
+    return _panel_test(
+        model,
+        ("lam",),
+        ("theta",),
+        test_type="bayesian_panel_robust_lm_error_sar",
+        wx=True,
+    )
+
+
+def bayesian_panel_robust_lm_lag_sem_test(model) -> BayesianLMTestResult:
+    r"""Robust panel LM-lag at an OLS or SEM panel (H₀: ρ = 0, robust to a local θ).
+
+    The panel analogue of
+    :func:`~neighbayes.diagnostics.lmtests.bayesian_robust_lm_lag_sem_test`:
+    the lag score net of the :math:`WX` direction.
+
+    Returns
+    -------
+    BayesianLMTestResult
+        Per-draw LM samples, summary statistics and ``df = 1``.
+    """
+    return _panel_test(
+        model,
+        ("rho",),
+        ("theta",),
+        test_type="bayesian_panel_robust_lm_lag_sem",
+        wx=True,
+    )
+
+
+def bayesian_panel_robust_lm_wx_sem_test(model) -> BayesianLMTestResult:
+    r"""Robust panel LM-WX at an OLS or SEM panel (H₀: θ = 0, robust to a local ρ).
+
+    The panel analogue of
+    :func:`~neighbayes.diagnostics.lmtests.bayesian_robust_lm_wx_sem_test`:
+    the :math:`WX` score net of the lag direction.
+
+    Returns
+    -------
+    BayesianLMTestResult
+        Per-draw LM samples, summary statistics and ``df = k_wx``.
+    """
+    return _panel_test(
+        model,
+        ("theta",),
+        ("rho",),
+        test_type="bayesian_panel_robust_lm_wx_sem",
+        wx=True,
+    )
+
+
 def bayesian_panel_robust_lm_error_sdem_test(model) -> BayesianLMTestResult:
     r"""Robust panel LM-error at an SLX panel (H₀: λ = 0, robust to a local ρ).
 
@@ -208,7 +272,7 @@ def bayesian_panel_lm_error_sdm_test(model) -> BayesianLMTestResult:
 def bayesian_panel_lm_lag_sdem_test(model) -> BayesianLMTestResult:
     r"""Panel LM test for a spatial lag at an SEM or SDEM panel (H₀: ρ = 0).
 
-    Whether the panel should add the lag; the dynamic SEM panel's suite uses it.
+    Whether the SDEM panel should be the general nesting panel.
 
     Returns
     -------
@@ -216,19 +280,6 @@ def bayesian_panel_lm_lag_sdem_test(model) -> BayesianLMTestResult:
         Per-draw LM samples, summary statistics and ``df = 1``.
     """
     return _panel_test(model, ("rho",), test_type="bayesian_panel_lm_lag_sdem")
-
-
-def bayesian_panel_robust_lm_lag_sdem_test(model) -> BayesianLMTestResult:
-    r"""Robust panel LM-lag at an SEM or SDEM panel (H₀: ρ = 0).
-
-    Robust to the error process, which the null estimates, so this is :func:`bayesian_panel_lm_lag_sdem_test`.
-
-    Returns
-    -------
-    BayesianLMTestResult
-        Per-draw LM samples, summary statistics and ``df = 1``.
-    """
-    return _panel_test(model, ("rho",), test_type="bayesian_panel_robust_lm_lag_sdem")
 
 
 def _flow_panel_test(model, tested, robust=(), *, test_type: str):

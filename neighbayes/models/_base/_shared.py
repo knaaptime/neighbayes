@@ -134,7 +134,7 @@ def _row_sums_csr(W_csr: sp.csr_matrix) -> np.ndarray:
 def _isolate_mask_csr(W_csr: sp.csr_matrix) -> np.ndarray:
     """Boolean mask of *isolates* — units whose row sums to zero.
 
-    Isolates are units with no neighbour inside the bandwidth, a normal outcome
+    Isolates are units with no neighbor inside the bandwidth, a normal outcome
     of distance-band contiguity: row-standardizing leaves their row at 0 because
     there is nothing to divide by.  They are valid weights, but they do break
     ``W1 = 1``, so the spatial-multiplier closed forms carry an explicit isolate
@@ -414,27 +414,6 @@ def _tobit_pointwise_loglik(
         ll[:, uncens] = -0.5 * (resid**2 + np.log(2.0 * np.pi) + 2.0 * np.log(sig))
         ll[:, censored] = norm.logcdf((censoring - mu[:, censored]) / sig)
     return ll
-
-
-# Tie-break predicates used by the LM decision trees.  Each key maps to a
-# ``(test_a, test_b)`` pair evaluated as ``p_a <= p_b``; panel trees use the
-# same pairs with a ``panel_`` key prefix and ``Panel-`` test-name prefix.
-#  - lag_pval_le_error_pval: OLS tree, both naive tests fire.
-#  - robust_lag_pval_le_error_pval: OLS tree, both naive AND both robust
-#    tests fire — route to the dominant single-channel model based on the
-#    smaller robust p-value.  We never escalate directly to SARAR from OLS;
-#    the user must fit SAR (or SEM) and re-run diagnostics from there.
-#  - lag_sdm_pval_le_error_sdem_pval: SLX tree, both omitted-channel tests
-#    fire — the channel with the smaller p-value (larger statistic) wins.
-#  - lag_sem_pval_le_wx_sem_pval: SEM tree, both Schur-purged score tests
-#    survive — lag direction → SARAR, WX direction → SDEM.  (Cross-section
-#    only; the panel specs never reference this predicate.)
-_DECISION_PREDICATE_PAIRS: dict[str, tuple[str, str]] = {
-    "lag_pval_le_error_pval": ("LM-Lag", "LM-Error"),
-    "robust_lag_pval_le_error_pval": ("Robust-LM-Lag", "Robust-LM-Error"),
-    "lag_sdm_pval_le_error_sdem_pval": ("Robust-LM-Lag-SDM", "Robust-LM-Error-SDEM"),
-    "lag_sem_pval_le_wx_sem_pval": ("Robust-LM-Lag", "Robust-LM-WX"),
-}
 
 
 class SharedSpatialMethods(metaclass=ABCMeta):
@@ -1514,7 +1493,7 @@ class SharedSpatialMethods(metaclass=ABCMeta):
 
     @cached_property
     def _isolate_mask(self) -> np.ndarray:
-        """Boolean mask of units with no neighbours — see :func:`_isolate_mask_csr`.
+        """Boolean mask of units with no neighbors — see :func:`_isolate_mask_csr`.
 
         Isolates are valid weights but break ``W1 = 1``, so the closed forms
         below carry an explicit isolate term.  Detecting them is one
@@ -1528,7 +1507,7 @@ class SharedSpatialMethods(metaclass=ABCMeta):
 
     @cached_property
     def _n_isolates(self) -> int:
-        """Number of units with no neighbours."""
+        """Number of units with no neighbors."""
         return int(self._isolate_mask.sum())
 
     def _multiplier_row_sums(self, rho: float) -> np.ndarray:
@@ -1781,42 +1760,40 @@ class SharedSpatialMethods(metaclass=ABCMeta):
     ) -> Any:
         """Return a model-selection decision from Bayesian LM test results.
 
-        Implements the decision tree from :cite:t:`koley2024UseNot`
-        (the Bayesian analogue of the classical ``stge_kb`` procedure
-        in :cite:t:`anselin1996SimpleDiagnostic`).  Panel models use the
-        ``Panel-``-prefixed test analogues and the panel decision specs,
-        following :cite:t:`elhorst2014SpatialEconometrics`.  The decision
-        logic depends on the current model type and the pattern of
-        significant tests:
+        One rule reads every fitted model's tests: the specific-to-general
+        rule of :cite:t:`anselin1996SimpleDiagnostic`, which ``spreg``'s
+        ``stge_classic`` implements.  A model that leaves two directions
+        untested runs a plain and a robust LM test for each:
 
-        **From OLS** (6-test decision tree):
+        1. Neither plain test is significant → keep the model.
+        2. One is → add that direction.
+        3. Both are → add the direction whose robust test is significant; if
+           both or neither are, the one with the smaller robust p-value.
 
-        1. If only LM-Lag is significant → SAR.
-        2. If only LM-Error is significant → SEM.
-        3. If both are significant → use the Anselin–Florax / Koley–Bera
-           robust pair: Robust-LM-Lag → SAR, Robust-LM-Error → SEM,
-           both → SARAR. If neither robust test is significant, fall
-           back to the lower raw p-value.
-        4. If neither naive test is significant → OLS.
+        A plain test is valid when the other direction is absent and a robust
+        one is valid either way, at a cost in power, so the robust pair only
+        chooses between two plain rejections.  The SDM and SDEM leave one
+        direction, and its test decides.  The directions, and the models they
+        lead to:
 
-        **From SAR** (3-test decision tree):
+        - OLS: lag → SAR, error → SEM, ``WX`` → SLX.  With three directions
+          untested, the lag and the error together go to their robust pair
+          whether or not ``WX`` also rejects (the SAR or SEM then tests it);
+          the lag and ``WX`` go to the robust pair of
+          :cite:t:`koley2024UseNot`, whose lag test is LM-Error at the OLS fit;
+          the error and ``WX``, whose scores are uncorrelated there, to the
+          smaller p-value.
+        - SAR: ``WX`` → SDM, error → SARAR.
+        - SEM: lag → SARAR, ``WX`` → SDEM.
+        - SLX: lag → SDM, error → SDEM.
+        - SDM: error → GNS.  SDEM: lag → GNS.
 
-        - LM-Error significant → SARAR; LM-WX significant → SDM;
-          Robust-LM-WX significant → SDM.
-
-        **From SEM** (2-test decision tree):
-
-        - LM-Lag significant → SARAR; LM-WX significant → SDEM.
-
-        **From SLX** (4-test decision tree):
-
-        - Robust-LM-Lag-SDM significant → SDM;
-          Robust-LM-Error-SDEM significant → SDEM;
-          both → GNS; neither → SLX.
-
-        **From SDM**: LM-Error-SDM significant → GNS; else SDM.
-
-        **From SDEM**: LM-Lag-SDEM significant → GNS; else SDEM.
+        SARAR and GNS are where the tests point; neighbayes does not fit them.
+        The ``WX`` tests are those of :cite:t:`koley2024UseNot`.  Panel models
+        run the ``Panel-`` tests through the same trees
+        (:cite:p:`elhorst2014SpatialEconometrics`), and the Tobit classes the
+        same trees with Tobit leaves.  The logit, probit and NB at their
+        aspatial null read their tests as a pair of their own.
 
         Parameters
         ----------
@@ -1862,11 +1839,8 @@ class SharedSpatialMethods(metaclass=ABCMeta):
             return diag.loc[test_a, "p_value"] <= diag.loc[test_b, "p_value"]
 
         panel = self._panel_diagnostics
-        key_prefix = "panel_" if panel else ""
-        test_prefix = "Panel-" if panel else ""
         predicate_lookup = {
-            key_prefix + key: partial(_p_le, test_prefix + a, test_prefix + b)
-            for key, (a, b) in _DECISION_PREDICATE_PAIRS.items()
+            key: partial(_p_le, a, b) for key, (a, b) in _dt.PREDICATE_PAIRS.items()
         }
 
         spec = _dt.get_panel_spec(model_type) if panel else _dt.get_spec(model_type)

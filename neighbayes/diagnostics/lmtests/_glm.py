@@ -353,7 +353,7 @@ def _weighted_mx_quadratic(X: np.ndarray, v: np.ndarray, w: np.ndarray) -> float
 def _weighted_mx_cross(
     X: np.ndarray, U: np.ndarray, V: np.ndarray, w: np.ndarray
 ) -> np.ndarray:
-    r"""Generalises :func:`_weighted_mx_quadratic` to arbitrary left/right factors.
+    r"""Generalizes :func:`_weighted_mx_quadratic` to arbitrary left/right factors.
 
     Returns :math:`U^\top \Omega V - U^\top \Omega X (X^\top \Omega X)^{-1}
     X^\top \Omega V`.

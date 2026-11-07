@@ -9,6 +9,7 @@ from __future__ import annotations
 import pytest
 
 from neighbayes.diagnostics._decision_trees import (
+    PREDICATE_PAIRS,
     TreeNode,
     evaluate,
     get_panel_spec,
@@ -220,129 +221,6 @@ class TestGetSpec:
         result = get_spec("UnknownModel")
         assert result == "UnknownModel"
 
-    def test_ols_tree_evaluate_all_sig(self):
-        """All naive + robust significant → SAR via robust p-value tie-break.
-
-        ``SARAR`` is intentionally unreachable from the OLS tree because
-        its proper null is a fitted SAR (or SEM) model.
-        """
-        tree = get_spec("OLS")
-        result, path = evaluate(
-            tree,
-            sig_lookup=lambda _: True,
-            predicate_lookup={
-                "robust_lag_pval_le_error_pval": lambda: True,
-                "lag_pval_le_error_pval": lambda: True,
-            },
-        )
-        assert result == "SAR"
-
-    def test_ols_tree_evaluate_none_sig(self):
-        """Walk the OLS tree with no tests significant → OLS."""
-        tree = get_spec("OLS")
-        result, path = evaluate(tree, sig_lookup=lambda _: False)
-        assert result == "OLS"
-
-    def test_ols_tree_only_lag_sig(self):
-        """Only LM-Lag significant → SAR."""
-        tree = get_spec("OLS")
-
-        def lookup(name):
-            return name == "LM-Lag"
-
-        result, path = evaluate(tree, sig_lookup=lookup)
-        assert result == "SAR"
-
-    def test_ols_tree_only_error_sig(self):
-        """Only LM-Error significant → SEM."""
-        tree = get_spec("OLS")
-
-        def lookup(name):
-            return name == "LM-Error"
-
-        result, path = evaluate(tree, sig_lookup=lookup)
-        assert result == "SEM"
-
-    def test_ols_tree_robust_lag_only(self):
-        """Both naive sig, robust lag only → SAR."""
-        tree = get_spec("OLS")
-
-        def lookup(name):
-            return name in ("LM-Lag", "LM-Error", "Robust-LM-Lag")
-
-        result, path = evaluate(tree, sig_lookup=lookup)
-        assert result == "SAR"
-
-    def test_ols_tree_robust_error_only(self):
-        """Both naive sig, robust error only → SEM."""
-        tree = get_spec("OLS")
-
-        def lookup(name):
-            return name in ("LM-Lag", "LM-Error", "Robust-LM-Error")
-
-        result, path = evaluate(tree, sig_lookup=lookup)
-        assert result == "SEM"
-
-    def test_ols_tree_robust_both(self):
-        """Both naive and both robust sig → robust p-value tie-break (SAR/SEM).
-
-        The OLS tree never reaches SARAR because SARAR's correct null is
-        a fitted SAR (or SEM); the user must escalate by fitting that
-        intermediate model and re-running diagnostics.
-        """
-        tree = get_spec("OLS")
-
-        def lookup(name):
-            return name in (
-                "LM-Lag",
-                "LM-Error",
-                "Robust-LM-Lag",
-                "Robust-LM-Error",
-            )
-
-        # Robust-LM-Lag wins the tie-break -> SAR.
-        result, path = evaluate(
-            tree,
-            sig_lookup=lookup,
-            predicate_lookup={"robust_lag_pval_le_error_pval": lambda: True},
-        )
-        assert result == "SAR"
-
-        # Robust-LM-Error wins the tie-break -> SEM.
-        result, path = evaluate(
-            tree,
-            sig_lookup=lookup,
-            predicate_lookup={"robust_lag_pval_le_error_pval": lambda: False},
-        )
-        assert result == "SEM"
-
-    def test_ols_tree_robust_neither_predicate(self):
-        """Both naive sig, neither robust → predicate fallback."""
-        tree = get_spec("OLS")
-
-        def lookup(name):
-            return name in ("LM-Lag", "LM-Error")
-
-        result, path = evaluate(
-            tree,
-            sig_lookup=lookup,
-            predicate_lookup={"lag_pval_le_error_pval": lambda: True},
-        )
-        assert result == "SAR"
-
-    def test_ols_tree_robust_neither_predicate_false(self):
-        tree = get_spec("OLS")
-
-        def lookup(name):
-            return name in ("LM-Lag", "LM-Error")
-
-        result, path = evaluate(
-            tree,
-            sig_lookup=lookup,
-            predicate_lookup={"lag_pval_le_error_pval": lambda: False},
-        )
-        assert result == "SEM"
-
     @pytest.mark.parametrize("family", ["Logit", "Probit", "NegBin"])
     @pytest.mark.parametrize(
         "significant, leaf",
@@ -394,70 +272,10 @@ class TestGetPanelSpec:
         result = get_panel_spec("UnknownPanel")
         assert result == "UnknownPanel"
 
-    def test_panel_ols_all_sig(self):
-        # All naive + robust significant: route via the robust p-value
-        # tie-break to the dominant single-channel panel model.  SARAR is
-        # intentionally unreachable from a panel-OLS fit.
-        tree = get_panel_spec("OLS")
-        result, path = evaluate(
-            tree,
-            sig_lookup=lambda _: True,
-            predicate_lookup={
-                "panel_robust_lag_pval_le_error_pval": lambda: True,
-                "panel_lag_pval_le_error_pval": lambda: True,
-            },
-        )
-        assert result == "SAR"
-
     def test_panel_ols_none_sig(self):
         tree = get_panel_spec("OLS")
         result, path = evaluate(tree, sig_lookup=lambda _: False)
         assert "OLS" in result
-
-
-class TestGetPanelDynamicSpec:
-    """Dynamic panel decision trees reuse static panel structure with 'Dynamic' suffix."""
-
-    def test_ols_dynamic_spec(self):
-        tree = get_panel_spec("OLS")
-        assert isinstance(tree, TreeNode)
-
-    def test_sar_dynamic_spec(self):
-        tree = get_panel_spec("SAR")
-        assert isinstance(tree, TreeNode)
-
-    def test_sem_dynamic_spec(self):
-        tree = get_panel_spec("SEM")
-        assert isinstance(tree, TreeNode)
-
-    def test_slx_dynamic_spec(self):
-        tree = get_panel_spec("SLX")
-        assert isinstance(tree, TreeNode)
-
-    def test_sdm_dynamic_spec(self):
-        tree = get_panel_spec("SDM")
-        assert isinstance(tree, TreeNode)
-
-    def test_sdem_dynamic_spec(self):
-        tree = get_panel_spec("SDEM")
-        assert isinstance(tree, TreeNode)
-
-    def test_dynamic_ols_all_sig(self):
-        tree = get_panel_spec("OLS")
-        result, path = evaluate(
-            tree,
-            sig_lookup=lambda _: True,
-            predicate_lookup={
-                "panel_robust_lag_pval_le_error_pval": lambda: True,
-                "panel_lag_pval_le_error_pval": lambda: True,
-            },
-        )
-        assert result == "SAR"
-
-    def test_dynamic_ols_none_sig(self):
-        tree = get_panel_spec("OLS")
-        result, path = evaluate(tree, sig_lookup=lambda _: False)
-        assert result == "OLS"
 
 
 class TestGetPanelTobitSpec:
@@ -471,22 +289,139 @@ class TestGetPanelTobitSpec:
         tree = get_panel_spec("SEMTobit")
         assert isinstance(tree, TreeNode)
 
-    def test_sar_tobit_all_sig(self):
-        tree = get_panel_spec("SARTobit")
-        result, path = evaluate(tree, sig_lookup=lambda _: True)
-        assert result == "SDMTobit"
-
     def test_sar_tobit_none_sig(self):
         tree = get_panel_spec("SARTobit")
         result, path = evaluate(tree, sig_lookup=lambda _: False)
         assert result == "SARTobit"
 
-    def test_sem_tobit_all_sig(self):
-        tree = get_panel_spec("SEMTobit")
-        result, path = evaluate(tree, sig_lookup=lambda _: True)
-        assert result == "SDEMTobit"
-
     def test_sem_tobit_none_sig(self):
         tree = get_panel_spec("SEMTobit")
         result, path = evaluate(tree, sig_lookup=lambda _: False)
         assert result == "SEMTobit"
+
+
+# ---------------------------------------------------------------------------
+# The classical rule, at every tree that tests two directions
+# ---------------------------------------------------------------------------
+
+# (spec getter, model type, plain a, plain b, robust a, robust b, leaf a, leaf b)
+_PAIR_TREES = [
+    ("OLS", "LM-Lag", "LM-Error", "Robust-LM-Lag", "Robust-LM-Error", "SAR", "SEM"),
+    ("SAR", "LM-WX", "LM-Error", "Robust-LM-WX", "Robust-LM-Error", "SDM", "SARAR"),
+    ("SEM", "LM-Lag", "LM-WX", "Robust-LM-Lag", "Robust-LM-WX", "SARAR", "SDEM"),
+    (
+        "SLX",
+        "LM-Lag",
+        "LM-Error",
+        "Robust-LM-Lag-SDM",
+        "Robust-LM-Error-SDEM",
+        "SDM",
+        "SDEM",
+    ),
+]
+_TREES = [
+    pytest.param(getter, null + family, labels, (a + family, b + family), id=label)
+    for null, *names, a, b in _PAIR_TREES
+    for getter, prefix, family, label in (
+        (get_spec, "", "", null),
+        (get_panel_spec, "Panel-", "", f"Panel-{null}"),
+        (get_spec, "", "Tobit", f"{null}Tobit"),
+        (get_panel_spec, "Panel-", "Tobit", f"Panel-{null}Tobit"),
+    )
+    if not (family and null in ("OLS", "SLX"))
+    for labels in [[prefix + name for name in names]]
+]
+
+# p-values of (plain a, plain b, robust a, robust b), and the leaf they reach.
+_CASES = [
+    pytest.param((0.5, 0.5, 0.5, 0.5), "stay", id="neither"),
+    pytest.param((0.01, 0.5, 0.5, 0.5), "a", id="a-alone-robust-silent"),
+    pytest.param((0.01, 0.5, 0.01, 0.5), "a", id="a-alone"),
+    pytest.param((0.5, 0.01, 0.5, 0.5), "b", id="b-alone-robust-silent"),
+    pytest.param((0.5, 0.5, 0.01, 0.01), "stay", id="robust-only"),
+    pytest.param((0.01, 0.01, 0.01, 0.5), "a", id="both-robust-a"),
+    pytest.param((0.01, 0.01, 0.5, 0.01), "b", id="both-robust-b"),
+    pytest.param((0.01, 0.01, 0.001, 0.01), "a", id="both-both-a-stronger"),
+    pytest.param((0.01, 0.01, 0.01, 0.001), "b", id="both-both-b-stronger"),
+    pytest.param((0.01, 0.01, 0.2, 0.4), "a", id="both-neither-a-stronger"),
+    pytest.param((0.01, 0.01, 0.4, 0.2), "b", id="both-neither-b-stronger"),
+]
+
+
+def _walk(spec, p):
+    predicates = {
+        key: (lambda a=a, b=b: p[a] <= p[b]) for key, (a, b) in PREDICATE_PAIRS.items()
+    }
+    return evaluate(spec, lambda name: p.get(name, 1.0) < 0.05, predicates)[0]
+
+
+@pytest.mark.parametrize("getter, null, tests, leaves", _TREES)
+@pytest.mark.parametrize("pvalues, expected", _CASES)
+def test_two_direction_trees_follow_the_classical_rule(
+    getter, null, tests, leaves, pvalues, expected
+):
+    """A lone plain rejection adds its direction; the robust pair breaks ties."""
+    leaf = {"stay": null, "a": leaves[0], "b": leaves[1]}[expected]
+    assert _walk(getter(null), dict(zip(tests, pvalues))) == leaf
+
+
+@pytest.mark.parametrize(
+    "getter, null, test, leaf",
+    [
+        (get_spec, "SDM", "LM-Error-SDM", "GNS"),
+        (get_spec, "SDEM", "LM-Lag-SDEM", "GNS"),
+        (get_spec, "SDMTobit", "LM-Error-SDM", "GNSTobit"),
+        (get_panel_spec, "SDM", "Panel-LM-Error-SDM", "GNS"),
+        (get_panel_spec, "SDEM", "Panel-LM-Lag-SDEM", "GNS"),
+    ],
+)
+def test_one_direction_trees_read_their_one_test(getter, null, test, leaf):
+    assert _walk(getter(null), {test: 0.01}) == leaf
+    assert _walk(getter(null), {test: 0.5}) == null
+
+
+_OLS_CASES = [
+    pytest.param({"LM-WX": 0.01}, "SLX", id="wx-alone"),
+    # The lag and WX: Koley and Bera's pair, whose lag test is LM-Error here.
+    pytest.param(
+        {"LM-Lag": 0.01, "LM-Error": 0.5, "LM-WX": 0.01, "Robust-LM-WX": 0.01},
+        "SLX",
+        id="lag-wx-wx-robust",
+    ),
+    pytest.param(
+        {"LM-Lag": 0.01, "LM-Error": 0.2, "LM-WX": 0.01, "Robust-LM-WX": 0.5},
+        "SAR",
+        id="lag-wx-lag-stronger",
+    ),
+    pytest.param(
+        {"LM-Lag": 0.01, "LM-Error": 0.6, "LM-WX": 0.01, "Robust-LM-WX": 0.2},
+        "SLX",
+        id="lag-wx-wx-stronger",
+    ),
+    pytest.param({"LM-Error": 0.02, "LM-WX": 0.01}, "SLX", id="error-wx-wx-stronger"),
+    pytest.param(
+        {"LM-Error": 0.001, "LM-WX": 0.01}, "SEM", id="error-wx-error-stronger"
+    ),
+    # All three: the lag and the error settle it, as in the paper's Figure 2;
+    # the SAR or SEM fit then tests WX.
+    pytest.param(
+        {
+            "LM-Lag": 0.01,
+            "LM-Error": 0.01,
+            "LM-WX": 0.001,
+            "Robust-LM-Lag": 0.5,
+            "Robust-LM-Error": 0.01,
+        },
+        "SEM",
+        id="all-three",
+    ),
+]
+
+
+@pytest.mark.parametrize("prefix", ["", "Panel-"])
+@pytest.mark.parametrize("pvalues, leaf", _OLS_CASES)
+def test_the_ols_tree_reads_wx_too(prefix, pvalues, leaf):
+    """The OLS fit leaves WX untested as well (Koley & Bera 2024)."""
+    spec = get_panel_spec("OLS") if prefix else get_spec("OLS")
+    p = {prefix + name: value for name, value in pvalues.items()}
+    assert _walk(spec, p) == leaf

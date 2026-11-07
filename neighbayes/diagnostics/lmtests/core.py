@@ -264,7 +264,7 @@ def _mx_quadratic(X: np.ndarray, v: np.ndarray) -> float:
 def _mx_cross(X: np.ndarray, U: np.ndarray, V: np.ndarray) -> np.ndarray:
     r"""Compute :math:`U^\top M_X V = U^\top V - U^\top X (X^\top X)^{-1} X^\top V`.
 
-    Generalises :func:`_mx_quadratic` to arbitrary left/right factors.
+    Generalizes :func:`_mx_quadratic` to arbitrary left/right factors.
     Returns shape inferred from ``U`` and ``V`` (matches ``U.T @ V``):
     scalar / vector / matrix as appropriate.
     """

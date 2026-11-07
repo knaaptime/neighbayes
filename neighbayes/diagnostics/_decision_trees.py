@@ -2,8 +2,8 @@
 
 This module provides:
 
-- A small ``TreeNode`` dataclass that represents the Koley & Bera / stge_kb
-  decision trees as data, parameterized per starting model type.
+- A small ``TreeNode`` dataclass that represents the LM-test decision trees
+  as data, one per fitted model type.
 - ``evaluate(node, sig_lookup, predicate_lookup)`` which walks the tree and
   returns the recommended model name plus the traversed path.
 - ``render_ascii`` and ``render_graphviz`` which render the tree (with the
@@ -20,6 +20,7 @@ import importlib
 import importlib.util
 import warnings
 from dataclasses import dataclass, field
+from functools import partial
 from typing import Any, Callable, Union
 
 __all__ = [
@@ -180,7 +181,8 @@ def render_ascii(
         marker = " *" if on_path else ""
         if isinstance(node, str):
             tag = " ← SELECTED" if on_path and node == decision else ""
-            lines.append(f"{prefix}{connector}[{node}]{marker}{tag}")
+            edge = f"<{edge_label}> " if edge_label else ""
+            lines.append(f"{prefix}{connector}{edge}[{node}]{marker}{tag}")
             return
 
         # Internal node
@@ -386,376 +388,177 @@ def render(
 
 
 # ---------------------------------------------------------------------------
-# Cross-sectional decision tree specs
+# Gaussian and Tobit decision tree specs
 # ---------------------------------------------------------------------------
+#
+# Every fitted model whose tree can extend it in two directions reads its four
+# tests as Anselin, Bera, Florax and Yoon (1996) read theirs at the OLS fit,
+# the rule ``spreg.stge_classic`` implements.  A plain LM test is valid when
+# the other direction is absent; a robust one is valid either way and pays for
+# it in power.  So the robust pair is consulted only when both plain tests
+# reject:
+#
+# - neither plain test rejects: keep the fitted model;
+# - one rejects: add that direction;
+# - both reject: add the direction whose robust test rejects; if both or
+#   neither do, the one with the smaller robust p-value.
+#
+# The OLS fit leaves a third direction, WX, and its tree is the one in the
+# paper's Figure 2 (see ``_ols_spec``).  The SDM and SDEM leave one direction,
+# and their one test decides.  SARAR and GNS are where the tests point, though
+# neighbayes does not fit them.
 
 
-def _ols_spec() -> TreeNode:
-    """OLS decision tree (Koley & Bera 2024, stge_kb).
+@dataclass(frozen=True)
+class _Direction:
+    """A direction a fitted model leaves at zero, as its tree tests it."""
 
-    Reachable terminals: ``OLS``, ``SAR``, ``SEM``.
+    test: str  # plain LM test
+    robust: str  # the same test, robust to the other direction
+    model: str  # the model that adds the direction
 
-    ``SARAR`` is intentionally **not** a terminal here.  SARAR's correct
-    null model is SAR (or SEM), not OLS, so a Bayesian specification test
-    for the SARAR alternative cannot be conducted from an OLS fit alone.
-    When the OLS tests indicate joint lag+error dependence, the tree
-    recommends the dominant single-channel model (SAR or SEM) and the
-    user is expected to fit that intermediate model and re-run
-    diagnostics from there to potentially escalate to SARAR.
+
+# The two directions each model's tree tests, as its diagnostic suite labels
+# them.  Panel suites carry the same labels behind a ``Panel-`` prefix.
+_DIRECTION_PAIRS: dict[str, tuple[_Direction, _Direction]] = {
+    "OLS": (
+        _Direction("LM-Lag", "Robust-LM-Lag", "SAR"),
+        _Direction("LM-Error", "Robust-LM-Error", "SEM"),
+    ),
+    "SAR": (
+        _Direction("LM-WX", "Robust-LM-WX", "SDM"),
+        _Direction("LM-Error", "Robust-LM-Error", "SARAR"),
+    ),
+    "SEM": (
+        _Direction("LM-Lag", "Robust-LM-Lag", "SARAR"),
+        _Direction("LM-WX", "Robust-LM-WX", "SDEM"),
+    ),
+    "SLX": (
+        _Direction("LM-Lag", "Robust-LM-Lag-SDM", "SDM"),
+        _Direction("LM-Error", "Robust-LM-Error-SDEM", "SDEM"),
+    ),
+}
+
+# At the OLS fit the lag score is the error score plus β̂ᵀ times the WX score,
+# and the error and WX scores are uncorrelated.  So Koley and Bera's lag robust
+# to WX is the error test, and the error and WX tests robust to each other are
+# the plain ones; the suite runs none of them twice, and the tree reads LM-Error
+# where it needs the lag robust to WX.
+_OLS_LAG_WX = ("LM-Error", "Robust-LM-WX")
+_OLS_ERROR_WX = ("LM-Error", "LM-WX")
+
+# The one direction the SDM and SDEM leave: (test, model).
+_SINGLE_DIRECTION: dict[str, tuple[str, str]] = {
+    "SDM": ("LM-Error-SDM", "GNS"),
+    "SDEM": ("LM-Lag-SDEM", "GNS"),
+}
+
+# ``p(a) <= p(b)`` for the robust pair of every two-direction tree, keyed by
+# the predicate id its tie-break nodes carry.
+_PREDICATES = {
+    **{null: (a.robust, b.robust) for null, (a, b) in _DIRECTION_PAIRS.items()},
+    "OLS-lag-WX": _OLS_LAG_WX,
+    "OLS-error-WX": _OLS_ERROR_WX,
+}
+PREDICATE_PAIRS: dict[str, tuple[str, str]] = {
+    prefix + key: (prefix + a, prefix + b)
+    for key, (a, b) in _PREDICATES.items()
+    for prefix in ("", "Panel-")
+}
+
+
+def _test(name: str, if_true, if_false) -> TreeNode:
+    return TreeNode(kind="test", name=name, if_true=if_true, if_false=if_false)
+
+
+def _stronger(a: str, b: str, to_a: str, to_b: str, key: str) -> TreeNode:
+    """``to_a`` when test ``a`` has the smaller p-value, else ``to_b``."""
+    return TreeNode(
+        kind="predicate",
+        name=f"{a} p <= {b} p",
+        if_true=to_a,
+        if_false=to_b,
+        predicate_id=key,
+    )
+
+
+def _settle(a: _Direction, b: _Direction, key: str, prefix: str, family: str):
+    """Both plain tests reject: the robust pair picks, the stronger on a tie."""
+    ra, rb = prefix + a.robust, prefix + b.robust
+    to_a, to_b = a.model + family, b.model + family
+    # Each tie-break is built anew, so the renderers draw both.
+    return _test(
+        ra,
+        _test(rb, _stronger(ra, rb, to_a, to_b, prefix + key), to_a),
+        _test(rb, to_b, _stronger(ra, rb, to_a, to_b, prefix + key)),
+    )
+
+
+def _pair_spec(null: str, *, prefix: str = "", family: str = "") -> TreeNode:
+    """The tree of a model that leaves two directions untested.
+
+    ``prefix`` is the suite's test-label prefix (``"Panel-"`` for panels) and
+    ``family`` the leaves' suffix (``"Tobit"`` for the Tobit classes).
     """
-    # Robust-vs-robust tie-break used when both naive AND both robust
-    # tests fire: the smaller-p (= larger-stat) channel wins.
-    robust_tie_break = TreeNode(
-        kind="predicate",
-        name="Robust-LM-Lag p <= Robust-LM-Error p",
-        if_true="SAR",
-        if_false="SEM",
-        predicate_id="robust_lag_pval_le_error_pval",
-    )
-    # Both naive sig: robust pair branch.  We never escalate to SARAR
-    # because that would require a fitted SAR/SEM null.
-    both_sig = TreeNode(
-        kind="test",
-        name="Robust-LM-Lag",
-        if_true=TreeNode(
-            kind="test",
-            name="Robust-LM-Error",
-            if_true=robust_tie_break,
-            if_false="SAR",
-        ),
-        if_false=TreeNode(
-            kind="test",
-            name="Robust-LM-Error",
-            if_true="SEM",
-            if_false=TreeNode(
-                kind="predicate",
-                name="LM-Lag p <= LM-Error p",
-                if_true="SAR",
-                if_false="SEM",
-                predicate_id="lag_pval_le_error_pval",
-            ),
-        ),
-    )
-    return TreeNode(
-        kind="test",
-        name="LM-Lag",
-        if_true=TreeNode(
-            kind="test",
-            name="LM-Error",
-            if_true=both_sig,
-            if_false="SAR",
-        ),
-        if_false=TreeNode(
-            kind="test",
-            name="LM-Error",
-            if_true="SEM",
-            if_false="OLS",
-        ),
+    a, b = _DIRECTION_PAIRS[null]
+    to_a, to_b = a.model + family, b.model + family
+    return _test(
+        prefix + a.test,
+        _test(prefix + b.test, _settle(a, b, null, prefix, family), to_a),
+        _test(prefix + b.test, to_b, null + family),
     )
 
 
-def _sar_spec() -> TreeNode:
-    # Precondition principle: a robust LM test only refines its naive
-    # precursor — never consult ``Robust-LM-WX`` unless ``LM-WX`` has
-    # already fired, and never commit to a model whose only support comes
-    # from a robust test.
-    #
-    # WX channel: if naive ``LM-WX`` from the SAR fit fires AND the robust
-    # version survives the ρ-orthogonalization, the omitted block is WX
-    # (→ SDM).  If naive LM-WX is silent, or fires but the robust check
-    # clears it, fall through to the error channel.
-    #
-    # Error channel (fall-through): naive ``LM-Error`` only escalates to
-    # SARAR if the SAR-null-conditional ``Robust-LM-Error`` (Schur-purged
-    # for ρ) also fires; otherwise the naive signal is attributable to
-    # nuisance dependence already absorbed by the SAR fit and we keep SAR.
-    #
-    # The error branch is constructed twice (instead of being shared) so
-    # the graphviz renderer draws two distinct subtrees and the visual
-    # ordering matches the strict naive→robust descent within each
-    # channel.
-    def _error_branch() -> TreeNode:
-        return TreeNode(
-            kind="test",
-            name="LM-Error",
-            if_true=TreeNode(
-                kind="test",
-                name="Robust-LM-Error",
-                if_true="SARAR",
-                if_false="SAR",
-            ),
-            if_false="SAR",
-        )
+def _ols_spec(*, prefix: str = "") -> TreeNode:
+    """The OLS tree: the lag, the error process and ``WX``.
 
-    return TreeNode(
-        kind="test",
-        name="LM-WX",
-        if_true=TreeNode(
-            kind="test",
-            name="Robust-LM-WX",
-            if_true="SDM",
-            if_false=_error_branch(),
-        ),
-        if_false=_error_branch(),
-    )
-
-
-def _sem_spec() -> TreeNode:
-    # If LM-Lag fires from a SEM fit it can mean either (i) a true lag on top
-    # of the error process (→ SARAR) or (ii) omitted WX masquerading as ρ
-    # (→ SDEM).  ``LM-WX`` (here the SEM-null variant exposed under that
-    # label, see SEM diagnostic suite) settles the ambiguity.
-    #
-    # Robust-after-naive precondition: a naive precursor (``LM-Lag`` or
-    # ``LM-WX``) must fire before consulting its Schur-orthogonalized
-    # robust counterpart.  When both naive precursors fire AND both robust
-    # tests survive, ``Robust-LM-Lag`` p vs ``Robust-LM-WX`` p settles
-    # which direction the SEM fit is missing the most evidence in:
-    # smaller-p (larger-stat) wins.
-    both_robust = TreeNode(
-        kind="predicate",
-        name="Robust-LM-Lag p <= Robust-LM-WX p",
-        if_true="SARAR",
-        if_false="SDEM",
-        predicate_id="lag_sem_pval_le_wx_sem_pval",
-    )
-    both_naive_sig = TreeNode(
-        kind="test",
-        name="Robust-LM-Lag",
-        if_true=TreeNode(
-            kind="test",
-            name="Robust-LM-WX",
-            if_true=both_robust,
-            if_false="SARAR",
-        ),
-        if_false=TreeNode(
-            kind="test",
-            name="Robust-LM-WX",
-            if_true="SDEM",
-            if_false="SEM",
-        ),
-    )
-    return TreeNode(
-        kind="test",
-        name="LM-Lag",
-        if_true=TreeNode(
-            kind="test",
-            name="LM-WX",
-            if_true=both_naive_sig,
-            if_false=TreeNode(
-                kind="test",
-                name="Robust-LM-Lag",
-                if_true="SARAR",
-                if_false="SEM",
-            ),
-        ),
-        if_false=TreeNode(
-            kind="test",
-            name="LM-WX",
-            if_true=TreeNode(
-                kind="test",
-                name="Robust-LM-WX",
-                if_true="SDEM",
-                if_false="SEM",
-            ),
-            if_false="SEM",
-        ),
-    )
-
-
-def _slx_spec() -> TreeNode:
-    # Precondition principle: ``Robust-LM-Lag-SDM`` only refines naive
-    # ``LM-Lag``, and ``Robust-LM-Error-SDEM`` only refines naive
-    # ``LM-Error``.  Never escalate the SLX fit to SDM/SDEM unless the
-    # corresponding naive precursor from the SLX fit has fired.
-    #
-    # When both naive precursors fire, both robust refinements are
-    # consulted; if both robust tests survive, the smaller-p (larger-stat)
-    # side wins via ``lag_sdm_pval_le_error_sdem_pval``.  ``GNS`` is
-    # intentionally not a terminal here; users wanting GNS should fit
-    # it explicitly and compare via :func:`bayes_factor_compare_models`.
-    both_naive_sig = TreeNode(
-        kind="test",
-        name="Robust-LM-Lag-SDM",
-        if_true=TreeNode(
-            kind="test",
-            name="Robust-LM-Error-SDEM",
-            if_true=TreeNode(
-                kind="predicate",
-                name="Robust-LM-Lag-SDM p <= Robust-LM-Error-SDEM p",
-                if_true="SDM",
-                if_false="SDEM",
-                predicate_id="lag_sdm_pval_le_error_sdem_pval",
-            ),
-            if_false="SDM",
-        ),
-        if_false=TreeNode(
-            kind="test",
-            name="Robust-LM-Error-SDEM",
-            if_true="SDEM",
+    One rejection adds its direction (SAR, SEM, SLX).  The lag and the error
+    together go to their robust pair, whether or not ``WX`` also rejects; the
+    SAR or SEM fit then tests ``WX``.  The lag and ``WX`` (without the error) go
+    to Koley and Bera's robust pair, whose lag test is LM-Error here: it has not
+    rejected, so ``WX`` goes ahead if Robust LM-WX rejects, and otherwise the
+    smaller p-value of the two decides.  The error and ``WX`` go to the smaller
+    p-value.
+    """
+    lag, error = _DIRECTION_PAIRS["OLS"]
+    wx = prefix + "LM-WX"
+    lag_robust, wx_robust = (prefix + name for name in _OLS_LAG_WX)
+    lag_wx = _test(
+        wx_robust,
+        "SLX",
+        TreeNode(
+            kind="predicate",
+            name=f"{lag_robust} (the lag robust to WX) p <= {wx_robust} p",
+            if_true="SAR",
             if_false="SLX",
+            predicate_id=prefix + "OLS-lag-WX",
         ),
     )
+    error_wx = _stronger(
+        *(prefix + name for name in _OLS_ERROR_WX),
+        "SEM",
+        "SLX",
+        prefix + "OLS-error-WX",
+    )
+    return _test(
+        prefix + lag.test,
+        _test(
+            prefix + error.test,
+            _settle(lag, error, "OLS", prefix, ""),
+            _test(wx, lag_wx, "SAR"),
+        ),
+        _test(prefix + error.test, _test(wx, error_wx, "SEM"), _test(wx, "SLX", "OLS")),
+    )
+
+
+def _single_spec(null: str, *, prefix: str = "", family: str = "") -> TreeNode:
+    """The tree of a model that leaves one direction untested."""
+    name, model = _SINGLE_DIRECTION[null]
     return TreeNode(
         kind="test",
-        name="LM-Lag",
-        if_true=TreeNode(
-            kind="test",
-            name="LM-Error",
-            if_true=both_naive_sig,
-            if_false=TreeNode(
-                kind="test",
-                name="Robust-LM-Lag-SDM",
-                if_true="SDM",
-                if_false="SLX",
-            ),
-        ),
-        if_false=TreeNode(
-            kind="test",
-            name="LM-Error",
-            if_true=TreeNode(
-                kind="test",
-                name="Robust-LM-Error-SDEM",
-                if_true="SDEM",
-                if_false="SLX",
-            ),
-            if_false="SLX",
-        ),
-    )
-
-
-def _sdm_spec() -> TreeNode:
-    # Robust-after-naive: only escalate to GNS when both the naive SDM
-    # error score (``LM-Error-SDM``) and its Neyman-orthogonal
-    # counterpart (``Robust-LM-Error-SDM``, Schur-purged for ρ at the
-    # SDM posterior mean) survive.  Without the robust gate the naive
-    # error signal can be a relabelling of mis-specified ρ.
-    return TreeNode(
-        kind="test",
-        name="LM-Error-SDM",
-        if_true=TreeNode(
-            kind="test",
-            name="Robust-LM-Error-SDM",
-            if_true="GNS",
-            if_false="SDM",
-        ),
-        if_false="SDM",
-    )
-
-
-def _sdem_spec() -> TreeNode:
-    # Robust-after-naive: only escalate to GNS when both ``LM-Lag-SDEM``
-    # and ``Robust-LM-Lag-SDEM`` (Schur-purged for the WX block, with
-    # λ filtered at its posterior mean) fire.
-    return TreeNode(
-        kind="test",
-        name="LM-Lag-SDEM",
-        if_true=TreeNode(
-            kind="test",
-            name="Robust-LM-Lag-SDEM",
-            if_true="GNS",
-            if_false="SDEM",
-        ),
-        if_false="SDEM",
-    )
-
-
-# Tobit variants: the same logic, with Tobit leaves.
-def _sar_tobit_spec() -> TreeNode:
-    # Tobit mirror of ``_sar_spec`` — see that docstring.  The error
-    # branch is built twice (not shared) so the graphviz layout draws
-    # naive→robust strictly within each channel.
-    def _error_branch() -> TreeNode:
-        return TreeNode(
-            kind="test",
-            name="LM-Error",
-            if_true=TreeNode(
-                kind="test",
-                name="Robust-LM-Error",
-                if_true="SARARTobit",
-                if_false="SARTobit",
-            ),
-            if_false="SARTobit",
-        )
-
-    return TreeNode(
-        kind="test",
-        name="LM-WX",
-        if_true=TreeNode(
-            kind="test",
-            name="Robust-LM-WX",
-            if_true="SDMTobit",
-            if_false=_error_branch(),
-        ),
-        if_false=_error_branch(),
-    )
-
-
-def _sem_tobit_spec() -> TreeNode:
-    # Tobit mirror of ``_sem_spec`` — see that docstring.
-    both_robust = TreeNode(
-        kind="predicate",
-        name="Robust-LM-Lag p <= Robust-LM-WX p",
-        if_true="SARARTobit",
-        if_false="SDEMTobit",
-        predicate_id="lag_sem_pval_le_wx_sem_pval",
-    )
-    both_naive_sig = TreeNode(
-        kind="test",
-        name="Robust-LM-Lag",
-        if_true=TreeNode(
-            kind="test",
-            name="Robust-LM-WX",
-            if_true=both_robust,
-            if_false="SARARTobit",
-        ),
-        if_false=TreeNode(
-            kind="test",
-            name="Robust-LM-WX",
-            if_true="SDEMTobit",
-            if_false="SEMTobit",
-        ),
-    )
-    return TreeNode(
-        kind="test",
-        name="LM-Lag",
-        if_true=TreeNode(
-            kind="test",
-            name="LM-WX",
-            if_true=both_naive_sig,
-            if_false=TreeNode(
-                kind="test",
-                name="Robust-LM-Lag",
-                if_true="SARARTobit",
-                if_false="SEMTobit",
-            ),
-        ),
-        if_false=TreeNode(
-            kind="test",
-            name="LM-WX",
-            if_true=TreeNode(
-                kind="test",
-                name="Robust-LM-WX",
-                if_true="SDEMTobit",
-                if_false="SEMTobit",
-            ),
-            if_false="SEMTobit",
-        ),
-    )
-
-
-def _sdm_tobit_spec() -> TreeNode:
-    # Tobit mirror of ``_sdm_spec`` — see that docstring.
-    return TreeNode(
-        kind="test",
-        name="LM-Error",
-        if_true=TreeNode(
-            kind="test",
-            name="Robust-LM-Error",
-            if_true="GNSTobit",
-            if_false="SDMTobit",
-        ),
-        if_false="SDMTobit",
+        name=prefix + name,
+        if_true=model + family,
+        if_false=null + family,
     )
 
 
@@ -812,26 +615,22 @@ def _glm_spec(family: str) -> TreeNode:
 
 
 _CROSS_SECTIONAL_SPECS: dict[str, Callable[[], TreeNode]] = {
-    "Logit": lambda: _glm_spec("Logit"),
-    "Probit": lambda: _glm_spec("Probit"),
-    "NegBin": lambda: _glm_spec("NegBin"),
+    "Logit": partial(_glm_spec, "Logit"),
+    "Probit": partial(_glm_spec, "Probit"),
+    "NegBin": partial(_glm_spec, "NegBin"),
     "OLS": _ols_spec,
-    "SAR": _sar_spec,
-    "SEM": _sem_spec,
-    "SLX": _slx_spec,
-    "SDM": _sdm_spec,
-    "SDEM": _sdem_spec,
-    "SARTobit": _sar_tobit_spec,
-    "SEMTobit": _sem_tobit_spec,
-    "SDMTobit": _sdm_tobit_spec,
+    **{null: partial(_pair_spec, null) for null in ("SAR", "SEM", "SLX")},
+    **{null: partial(_single_spec, null) for null in _SINGLE_DIRECTION},
+    "SARTobit": partial(_pair_spec, "SAR", family="Tobit"),
+    "SEMTobit": partial(_pair_spec, "SEM", family="Tobit"),
+    "SDMTobit": partial(_single_spec, "SDM", family="Tobit"),
 }
 
 
 def get_spec(model_type: str) -> TreeNode | str:
     """Return the cross-sectional decision tree for ``model_type``.
 
-    Falls back to a single leaf with the model name if no spec exists
-    (matches the current ``return model_type`` fallback behavior).
+    Falls back to a single leaf with the model name if no spec exists.
     """
     factory = _CROSS_SECTIONAL_SPECS.get(model_type)
     if factory is None:
@@ -839,242 +638,19 @@ def get_spec(model_type: str) -> TreeNode | str:
     return factory()
 
 
-# ---------------------------------------------------------------------------
-# Panel decision tree specs
-# ---------------------------------------------------------------------------
-
-
-def _panel_ols_spec() -> TreeNode:
-    # Panel mirror of :func:`_ols_spec`.  ``SARAR`` is
-    # intentionally not a reachable terminal: its proper null is
-    # ``SAR`` (or ``SEM``), and a valid
-    # specification test for SARAR cannot be conducted from a panel-OLS
-    # fit alone.  The tree recommends the dominant single-channel model
-    # and the user re-runs diagnostics from there.
-    robust_tie_break = TreeNode(
-        kind="predicate",
-        name="Panel-Robust-LM-Lag p <= Panel-Robust-LM-Error p",
-        if_true="SAR",
-        if_false="SEM",
-        predicate_id="panel_robust_lag_pval_le_error_pval",
-    )
-    both_sig = TreeNode(
-        kind="test",
-        name="Panel-Robust-LM-Lag",
-        if_true=TreeNode(
-            kind="test",
-            name="Panel-Robust-LM-Error",
-            if_true=robust_tie_break,
-            if_false="SAR",
-        ),
-        if_false=TreeNode(
-            kind="test",
-            name="Panel-Robust-LM-Error",
-            if_true="SEM",
-            if_false=TreeNode(
-                kind="predicate",
-                name="Panel-LM-Lag p <= Panel-LM-Error p",
-                if_true="SAR",
-                if_false="SEM",
-                predicate_id="panel_lag_pval_le_error_pval",
-            ),
-        ),
-    )
-    # OLSPanel{RE} doesn't expose robust tests; the evaluator will simply
-    # follow `if_false` when the test isn't present (sig_lookup returns
-    # False for missing tests).
-    return TreeNode(
-        kind="test",
-        name="Panel-LM-Lag",
-        if_true=TreeNode(
-            kind="test",
-            name="Panel-LM-Error",
-            if_true=both_sig,
-            if_false="SAR",
-        ),
-        if_false=TreeNode(
-            kind="test",
-            name="Panel-LM-Error",
-            if_true="SEM",
-            if_false="OLS",
-        ),
-    )
-
-
-def _panel_sar_spec() -> TreeNode:
-    # Panel mirror of ``_sar_spec`` — see that docstring.  Build the
-    # error branch twice (not shared) so graphviz draws naive→robust
-    # strictly within each channel.
-    def _error_branch() -> TreeNode:
-        return TreeNode(
-            kind="test",
-            name="Panel-LM-Error",
-            if_true="SARAR",
-            if_false="SAR",
-        )
-
-    return TreeNode(
-        kind="test",
-        name="Panel-LM-WX",
-        if_true=TreeNode(
-            kind="test",
-            name="Panel-Robust-LM-WX",
-            if_true="SDM",
-            if_false=_error_branch(),
-        ),
-        if_false=_error_branch(),
-    )
-
-
-def _panel_sem_spec() -> TreeNode:
-    # Panel mirror of ``_sem_spec`` — see that docstring.
-    return TreeNode(
-        kind="test",
-        name="Panel-LM-Lag",
-        if_true=TreeNode(
-            kind="test",
-            name="Panel-LM-WX",
-            if_true="SDEM",
-            if_false="SARAR",
-        ),
-        if_false=TreeNode(
-            kind="test",
-            name="Panel-LM-WX",
-            if_true="SDEM",
-            if_false="SEM",
-        ),
-    )
-
-
-def _panel_slx_spec() -> TreeNode:
-    # Panel mirror of ``_slx_spec`` — see that docstring.
-    both_naive_sig = TreeNode(
-        kind="test",
-        name="Panel-Robust-LM-Lag-SDM",
-        if_true=TreeNode(
-            kind="test",
-            name="Panel-Robust-LM-Error-SDEM",
-            if_true=TreeNode(
-                kind="predicate",
-                name="Panel-Robust-LM-Lag-SDM p <= Panel-Robust-LM-Error-SDEM p",
-                if_true="SDM",
-                if_false="SDEM",
-                predicate_id="panel_lag_sdm_pval_le_error_sdem_pval",
-            ),
-            if_false="SDM",
-        ),
-        if_false=TreeNode(
-            kind="test",
-            name="Panel-Robust-LM-Error-SDEM",
-            if_true="SDEM",
-            if_false="SLX",
-        ),
-    )
-    return TreeNode(
-        kind="test",
-        name="Panel-LM-Lag",
-        if_true=TreeNode(
-            kind="test",
-            name="Panel-LM-Error",
-            if_true=both_naive_sig,
-            if_false=TreeNode(
-                kind="test",
-                name="Panel-Robust-LM-Lag-SDM",
-                if_true="SDM",
-                if_false="SLX",
-            ),
-        ),
-        if_false=TreeNode(
-            kind="test",
-            name="Panel-LM-Error",
-            if_true=TreeNode(
-                kind="test",
-                name="Panel-Robust-LM-Error-SDEM",
-                if_true="SDEM",
-                if_false="SLX",
-            ),
-            if_false="SLX",
-        ),
-    )
-
-
-def _panel_sdm_spec() -> TreeNode:
-    return TreeNode(
-        kind="test",
-        name="Panel-LM-Error-SDM",
-        if_true="GNS",
-        if_false="SDM",
-    )
-
-
-def _panel_sdem_spec() -> TreeNode:
-    return TreeNode(
-        kind="test",
-        name="Panel-LM-Lag-SDEM",
-        if_true="GNS",
-        if_false="SDEM",
-    )
-
-
-# Static and dynamic panels share these trees: a leaf names the process, and
-# the panel design comes from the model the diagnostics were run on.
+# Static, random-effects and dynamic panels share these trees: a leaf names the
+# process, and the panel design comes from the model the diagnostics ran on.
 _PANEL_SPECS: dict[str, Callable[[], TreeNode]] = {
-    "OLS": _panel_ols_spec,
-    "SAR": _panel_sar_spec,
-    "SEM": _panel_sem_spec,
-    "SLX": _panel_slx_spec,
-    "SDM": _panel_sdm_spec,
-    "SDEM": _panel_sdem_spec,
-}
-
-
-# Panel Tobit specs mirror the cross-sectional Tobit specs.
-def _panel_tobit_sar_spec() -> TreeNode:
-    return TreeNode(
-        kind="test",
-        name="Panel-LM-Error",
-        if_true=TreeNode(
-            kind="test",
-            name="Panel-Robust-LM-WX",
-            if_true="SDMTobit",
-            if_false="SARARTobit",
-        ),
-        if_false=TreeNode(
-            kind="test",
-            name="Panel-Robust-LM-WX",
-            if_true="SDMTobit",
-            if_false=TreeNode(
-                kind="test",
-                name="Panel-LM-WX",
-                if_true="SDMTobit",
-                if_false="SARTobit",
-            ),
-        ),
-    )
-
-
-def _panel_tobit_sem_spec() -> TreeNode:
-    return TreeNode(
-        kind="test",
-        name="Panel-LM-Lag",
-        if_true=TreeNode(
-            kind="test",
-            name="Panel-LM-WX",
-            if_true="SDEMTobit",
-            if_false="SARARTobit",
-        ),
-        if_false=TreeNode(
-            kind="test",
-            name="Panel-LM-WX",
-            if_true="SDEMTobit",
-            if_false="SEMTobit",
-        ),
-    )
-
-
-_PANEL_TOBIT_SPECS: dict[str, Callable[[], TreeNode]] = {
-    "SARTobit": _panel_tobit_sar_spec,
-    "SEMTobit": _panel_tobit_sem_spec,
+    "OLS": partial(_ols_spec, prefix="Panel-"),
+    **{
+        null: partial(_pair_spec, null, prefix="Panel-")
+        for null in ("SAR", "SEM", "SLX")
+    },
+    **{
+        null: partial(_single_spec, null, prefix="Panel-") for null in _SINGLE_DIRECTION
+    },
+    "SARTobit": partial(_pair_spec, "SAR", prefix="Panel-", family="Tobit"),
+    "SEMTobit": partial(_pair_spec, "SEM", prefix="Panel-", family="Tobit"),
 }
 
 
@@ -1085,13 +661,6 @@ def get_panel_spec(model_type: str) -> TreeNode | str:
     fixed-effects, random-effects and dynamic panels alike) or a Tobit
     (``"SARTobit"``, for its pooled panel).  Falls back to a leaf if not found.
     """
-    # Pooled Tobit panels (SARTobit, SEMTobit)
-    if "Tobit" in model_type:
-        factory = _PANEL_TOBIT_SPECS.get(model_type)
-        if factory is not None:
-            return factory()
-        return model_type
-
     factory = _PANEL_SPECS.get(model_type)
     return model_type if factory is None else factory()
 
