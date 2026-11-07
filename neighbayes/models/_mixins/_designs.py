@@ -21,26 +21,28 @@ The count families (NegBin, SARNegBin, SEMNegBin, SDEMNegBin, ZINB, SARZINB,
 HurdleNegBin, SARHurdleNegBin), :class:`CountDesigns`:
 
 ``"static"``
-    The cross-section: SARNegBin's reduced form, and the latent SEM of
-    SEMNegBin and SDEMNegBin.
+    The cross-section: the reduced form of the SAR classes
+    (``SARNegBin(latent=False)``), and the latent SEM of SEMNegBin and
+    SDEMNegBin.
 ``"latent"``
-    ``SARNegBin(latent=True)``, the latent SAR, which propagates the negative
-    binomial's gamma disturbance (:mod:`..cross_section._latent_negbin`).
+    The latent SAR, which propagates the negative binomial's gamma disturbance
+    (:mod:`..cross_section._latent_negbin`), cross-section or panel: the
+    unmarked ``SARNegBin``, ``SARZINB`` and ``SARHurdleNegBin`` (ADR 0004).
 ``"panel"``
-    The panel, pooled or with random unit effects and fixed time effects
-    (:mod:`..panel._count`, :mod:`..panel._zinb`, :mod:`..panel._hurdle`).
+    The reduced-form panel, pooled or with random unit effects and fixed time
+    effects (:mod:`..panel._count`, :mod:`..panel._zinb`, :mod:`..panel._hurdle`).
 
 The binary families (Logit, SARLogit, SEMLogit, SDEMLogit, Probit, SARProbit,
 SEMProbit, SDEMProbit), :class:`BinaryDesigns`:
 
 ``"static"``
-    The cross-section: the reduced form of SARLogit and ``SARProbit(latent=False)``,
-    and the latent SEM of the SEM and SDEM classes (a SEM has no reduced form
-    to distinguish, ADR 0003).
+    The cross-section: the reduced form, ``SARLogit(latent=False)`` and
+    ``SARProbit(latent=False)``, and the latent SEM of the SEM and SDEM classes
+    (a SEM has no reduced form to distinguish, ADR 0003).
 ``"latent"``
     The latent SAR, which propagates the link's own disturbance
-    (:mod:`..cross_section._latent_binary`): ``SARLogit(latent=True)``, and
-    ``SARProbit``, whose unmarked form it is.
+    (:mod:`..cross_section._latent_binary`): the unmarked ``SARLogit`` and
+    ``SARProbit`` (ADR 0004).
 
 The flow families, :class:`FlowDesigns` (OLSFlow, SARFlow, SEMFlow) and
 :class:`FlowCountDesigns` (NegBinFlow, SARNegBinFlow, SARPoissonFlow,
@@ -228,7 +230,7 @@ class BinaryDesigns(DesignDispatch):
     The response is validated as binary; there is no panel, and a
     cross-section takes no unit effects.  ``latent=True`` selects the latent
     SAR where the class implements it; ``latent=None`` takes the class's
-    ``_latent_default``, the form its unmarked name means (ADR 0003).
+    ``_latent_default``, the form its unmarked name means (ADR 0004).
     """
 
     _likelihood: str = "binary"
@@ -308,11 +310,13 @@ class CountDesigns(DesignDispatch):
     The response is validated as counts for every design; a two-part family
     (``_zero_part``) also takes the zero part's design and weights, which it
     builds before the panel's effects drop the columns they absorb.
-    ``latent=True`` selects the latent SAR of a cross-section where the class
-    implements it.
+    ``latent=True`` selects the latent SAR where the class implements it;
+    ``latent=None`` takes the class's ``_latent_default``, the form its
+    unmarked name means (ADR 0004).
     """
 
     _likelihood: str = "count"
+    _latent_default: bool = False
     #: Whether the class's latent design is implemented as a panel too.
     _latent_panel: bool = False
     #: Whether the family has a zero part (ZINB, hurdle).
@@ -332,7 +336,7 @@ class CountDesigns(DesignDispatch):
         time_effects=False,
         dynamic=False,
         mundlak=False,
-        latent=False,
+        latent=None,
         **kwargs,
     ):
         zero = (
@@ -358,6 +362,11 @@ class CountDesigns(DesignDispatch):
                 f"robust=True is not supported for {type(self).__name__}."
             )
         self._set_design(design)
+        if panel and design == "latent" and "panel" in self._DESIGNS:
+            # A latent panel takes the reduced panel's effect priors.
+            self._priors_cls = self._DESIGNS["panel"].get(
+                "_priors_cls", self._priors_cls
+            )
         super().__init__(formula, data, y, X, W, **kwargs)
         self._init_counts()
         if zero is not None:
@@ -387,7 +396,10 @@ class CountDesigns(DesignDispatch):
         """The design the arguments describe, and the base class's arguments."""
         name = cls.__name__
         unit, time, dynamic = _pop_design(kw)
-        latent = _latent_flag(cls, kw.pop("latent", False), "NegBin")
+        latent = kw.pop("latent", None)
+        if latent is None:
+            latent = cls._latent_default
+        latent = _latent_flag(cls, latent, "NegBin")
         if latent and _is_panel(kw) and not cls._latent_panel:
             raise NotImplementedError(
                 f"{name}(latent=True) is implemented for the cross-section only."
@@ -556,14 +568,20 @@ class FlowDesigns(DesignDispatch):
 class FlowCountDesigns(FlowDesigns):
     """Design dispatch for the count flow families (see the module).
 
-    The response is validated as counts.  A panel's pair effects are random
-    and, with its period effects, are parameters of the count model rather than
-    a within transform (``mundlak=True`` adds the pair means of the
-    time-varying columns).  A two-part family (``_zero_part``) also takes the
-    zero part's design ``X_zero`` and weights ``W_zero``.
+    The response is validated as counts.  A panel's pair and period effects are
+    parameters of the count model rather than a within transform: random pair
+    effects (``_pair_effects = "random"``) inside the filter, with
+    ``mundlak=True`` adding the pair means of the time-varying columns, or, in
+    a family that takes levels after the filter (``_takes_levels``), fixed pair
+    effects there.  A two-part family (``_zero_part``) also takes the zero
+    part's design ``X_zero`` and weights ``W_zero``.
     """
 
     _pair_effects = "random"
+    #: Whether the family takes levels after the filter: its pair effects
+    #: (``_pair_effects = "fixed"``), and origin and destination effects
+    #: (``origin_effects``, ``destination_effects``).
+    _takes_levels: bool = False
     #: Whether the family has a zero part (ZINB, hurdle).
     _zero_part: bool = False
     #: Whether the family needs a positive count (the hurdle's count part).
@@ -577,6 +595,11 @@ class FlowCountDesigns(FlowDesigns):
             if self._zero_part
             else None
         )
+        levels = (
+            {k: kwargs.pop(k, None) for k in ("origin_effects", "destination_effects")}
+            if self._takes_levels
+            else {}
+        )
         name = type(self).__name__
         y_arr = require_counts(y, name)
         if self._needs_positive and not np.any(y_arr > 0):
@@ -586,7 +609,7 @@ class FlowCountDesigns(FlowDesigns):
         if zero is not None:
             # Before the count effects drop the columns they absorb from X.
             self._init_flow_zero_part(**zero)
-        self._finish_count_init(y_arr, effects, mundlak)
+        self._finish_count_init(y_arr, effects, mundlak, **levels)
 
     def _init_flow_zero_part(self, X_zero=None, W_zero=None) -> None:
         """The zero part's design ``_Z`` (default ``X``) and weights (default ``W``)."""
@@ -622,8 +645,10 @@ class FlowCountDesigns(FlowDesigns):
 
     @classmethod
     def _signature_extra(cls) -> tuple[str, ...]:
-        return (("mundlak",) if cls._has_panel else ()) + (
-            ("X_zero", "W_zero") if cls._zero_part else ()
+        return (
+            (("mundlak",) if cls._has_panel and cls._pair_effects == "random" else ())
+            + (("X_zero", "W_zero") if cls._zero_part else ())
+            + (("origin_effects", "destination_effects") if cls._takes_levels else ())
         )
 
 

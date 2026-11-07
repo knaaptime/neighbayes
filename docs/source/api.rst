@@ -193,7 +193,7 @@ Bayesian Diagnostics
 GLM Bayesian LM Tests
 ^^^^^^^^^^^^^^^^^^^^^
 
-LM tests for the logit, probit and NB families: the latent SAR and SEM score tests at the GLM null (Logit, Probit, NegBin), the error and WX tests at a reduced-form SAR null (SARLogit, ``SARProbit(latent=False)``, SARNegBin), and a Moran diagnostic on working residuals.
+LM tests for the logit, probit and NB families: the latent SAR and SEM score tests at the GLM null (Logit, Probit, NegBin), the error and WX tests at a reduced-form SAR null (``SARLogit(latent=False)``, ``SARProbit(latent=False)``, ``SARNegBin(latent=False)``), and a Moran diagnostic on working residuals.
 
 .. autosummary::
    :toctree: generated/

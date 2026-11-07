@@ -1,12 +1,13 @@
-"""Separable NB flow samplers must match an exact-solve reference posterior.
+"""The separable NB flow sampler must match an independent reference posterior.
 
-Both separable backends once reused a ρ Krylov basis across sweeps.  A basis for
-ρ_d is built at (ρ_d, ρ_o) and ρ_o is re-sliced every sweep, so the reused basis
-evaluated the density at a stale ρ_o: ρ posterior SDs came out 10–20% too wide
-with ESS near 50 from 40,000 draws, while every marginal mean still looked
-right.  This pins the posterior SDs of the NumPy and JAX (structured) backends, for the
-cross-section and a panel, to the reference sampler run with exact solves at
-every candidate.
+The production sampler slices the exact NB2 likelihood
+(:mod:`neighbayes.samplers.negbin_reduced._flow_exact`); the reference is
+Pólya–Gamma Gibbs with exact Kronecker solves at every slice candidate
+(:func:`neighbayes.tests.helpers.separable_flow_pg_reference`).  The two share
+no block, so their agreement on the posterior means and SDs of ρ, on both
+backends, for the cross-section and a panel, checks each.  (A sampler that once
+reused a ρ Krylov basis across sweeps got the means right and the SDs 10–20%
+too wide.)
 """
 
 from __future__ import annotations
@@ -19,11 +20,8 @@ from neighbayes.dgp import simulate_sar_negbin_flow
 from neighbayes.models import SARNegBinFlow
 from neighbayes.models._base._shared import gelman_default_beta_prior
 from neighbayes.models.priors import FlowReducedGibbsPriors
-from neighbayes.samplers.negbin_reduced._flow import (
-    FlowReducedGibbsCache,
-    FlowReducedGibbsState,
-    run_chain_separable,
-)
+from neighbayes.samplers.negbin_reduced._flow import FlowReducedGibbsState
+from neighbayes.tests.helpers import separable_flow_pg_reference
 
 N_REGIONS = 25
 DRAWS, TUNE, CHAINS = 4000, 800, 4
@@ -43,8 +41,8 @@ def _model(data):
     )
 
 
-def _exact_reference(m, n, T=1):
-    """Exact Kronecker solves at every slice candidate (no Krylov basis)."""
+def _pg_reference(m, n, T=1):
+    """The Pólya–Gamma reference: exact Kronecker solves at every slice candidate."""
     mu, sd = gelman_default_beta_prior(m._y, m._X, list(m._feature_names))
     priors = FlowReducedGibbsPriors(
         beta_mu=mu,
@@ -67,21 +65,8 @@ def _exact_reference(m, n, T=1):
             alpha=1.0,
             omega=np.full(n * n * T, 0.5),
         )
-        cache = FlowReducedGibbsCache(
-            None, None, None, W, n, separable=True, T=T, krylov_degree=0
-        )
-        out = run_chain_separable(
-            m._y_int_vec.astype(float),
-            m._X,
-            W,
-            n,
-            priors,
-            cache,
-            init,
-            DRAWS,
-            TUNE,
-            rng=rng,
-            store_log_lik=False,
+        out = separable_flow_pg_reference(
+            m._y_int_vec.astype(float), m._X, W, n, priors, init, DRAWS, TUNE, rng, T
         )
         for name in draws:
             draws[name].append(out[name])
@@ -101,7 +86,7 @@ def _assert_matches(idata, reference):
 
 @pytest.fixture(scope="module")
 def reference(data):
-    return _exact_reference(_model(data), N_REGIONS)
+    return _pg_reference(_model(data), N_REGIONS)
 
 
 PANEL_N, PANEL_T = 20, 4
@@ -119,7 +104,7 @@ def panel_model():
 
 @pytest.fixture(scope="module")
 def panel_reference(panel_model):
-    return _exact_reference(panel_model, PANEL_N, PANEL_T)
+    return _pg_reference(panel_model, PANEL_N, PANEL_T)
 
 
 BACKENDS = ["numpy", pytest.param("jax", marks=pytest.mark.requires_jax)]
@@ -127,7 +112,7 @@ BACKENDS = ["numpy", pytest.param("jax", marks=pytest.mark.requires_jax)]
 
 @pytest.mark.slow
 @pytest.mark.parametrize("backend", BACKENDS)
-def test_separable_posterior_matches_exact_reference(data, reference, backend):
+def test_separable_posterior_matches_pg_reference(data, reference, backend):
     idata = _model(data).fit(
         draws=DRAWS,
         tune=TUNE,
@@ -141,7 +126,7 @@ def test_separable_posterior_matches_exact_reference(data, reference, backend):
 
 @pytest.mark.slow
 @pytest.mark.parametrize("backend", BACKENDS)
-def test_separable_panel_posterior_matches_exact_reference(
+def test_separable_panel_posterior_matches_pg_reference(
     panel_model, panel_reference, backend
 ):
     idata = panel_model.fit(

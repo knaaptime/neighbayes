@@ -1,9 +1,10 @@
-"""Shared reduced-form PG-Gibbs driver for the NB flow models.
+"""Shared reduced-form Gibbs driver for the NB flow models.
 
 The four NB SAR flow classes (cross-section/panel x unrestricted/separable)
 build identical caches, priors, and chain plumbing around the two
-``negbin_reduced`` flow chain kernels; this module holds the single driver
-they all delegate to from ``_fit_gibbs``.
+``negbin_reduced`` flow chain kernels: the exact-likelihood sampler for the
+separable filter and Pólya–Gamma Gibbs for the unrestricted one.  This module
+holds the single driver they all delegate to from ``_fit_gibbs``.
 """
 
 from __future__ import annotations
@@ -28,14 +29,17 @@ def run_negbin_flow_gibbs(
     n_jobs: int = -1,
     gibbs_backend: str = "numpy",
     log_likelihood: bool = False,
+    levels=None,
+    keep_pair_draws: bool = True,
+    cell_mask=None,
 ) -> xr.DataTree:
-    """Run the reduced-form PG-Gibbs sampler for an NB SAR flow model.
+    """Run the reduced-form Gibbs sampler for an NB SAR flow model.
 
     Builds the cache, priors, and per-chain initial states from ``model``
-    attributes, dispatches to :func:`run_chain_unrestricted` (3-rho) or
-    :func:`run_chain_separable` (2-rho Kronecker), assembles the
-    posterior into an :class:`xarray.DataTree`, and stores it on
-    ``model._idata``.
+    attributes, dispatches to :func:`run_chain_unrestricted` (3-rho,
+    Pólya–Gamma) or :func:`run_chain_separable_exact` (2-rho Kronecker, the
+    exact NB2 likelihood), assembles the posterior into an
+    :class:`xarray.DataTree`, and stores it on ``model._idata``.
 
     Parameters
     ----------
@@ -53,7 +57,17 @@ def run_negbin_flow_gibbs(
         observations; ``N_f * T`` for panels).
     T : int, default 1
         Number of panel periods sharing the per-period system matrix.
+    levels : FlowLevels, optional
+        Levels after the filter (separable only).
+    keep_pair_draws : bool, default True
+        Keep every draw of the pair levels; otherwise only their posterior
+        mean and sd (``pair_effect_summary``).
+    cell_mask : array, optional
+        ``(T·n·n,)`` bool, ``True`` for the cells in the likelihood
+        (separable only).
     """
+    if not separable and (levels is not None or cell_mask is not None):
+        raise ValueError("Levels and cell masks need the separable flow.")
     from ...samplers._utils._idata import gibbs_to_inference_data
     from ...samplers.gaussian._chain_runner import run_chains
     from ...samplers.negbin_reduced._flow import (
@@ -62,10 +76,8 @@ def run_negbin_flow_gibbs(
         FlowReducedGibbsState,
         run_chain_unrestricted,
     )
-    from ...samplers.negbin_reduced._flow_structured import (
-        classify_flow_design,
-        run_chain_separable_structured,
-    )
+    from ...samplers.negbin_reduced._flow_exact import run_chain_separable_exact
+    from ...samplers.negbin_reduced._flow_structured import classify_flow_design
 
     X = model._X
     y = model._y_int_vec.astype(np.float64)
@@ -92,6 +104,19 @@ def run_negbin_flow_gibbs(
 
     # --- Build priors ---
     pv = model._flow_count_priors()
+    if cell_mask is not None:
+        # The data-derived defaults read the live cells only; explicit
+        # overrides pass through.
+        from .._base._shared import gelman_default_beta_prior
+
+        names = list(model._feature_names) or [f"x{j}" for j in range(k)]
+        g_mu, g_sd = gelman_default_beta_prior(
+            y[cell_mask], X[cell_mask], names, link="log"
+        )
+        for key, default in (("beta_mu", g_mu), ("beta_sigma", g_sd)):
+            pv[key] = np.broadcast_to(
+                np.asarray(model.priors.get(key, default), dtype=np.float64), (k,)
+            ).copy()
     priors = FlowReducedGibbsPriors(
         beta_mu=pv["beta_mu"],
         beta_sigma=pv["beta_sigma"],
@@ -145,11 +170,11 @@ def run_negbin_flow_gibbs(
             store_log_lik=log_likelihood,
         )
         if separable:
-            # Structured sweep (cross-section and panel): n × n solves only,
-            # rank-one design columns integrated out of the ρ updates
-            # (samplers/negbin_reduced/_flow_structured.py).  It replaces the
-            # Krylov-basis kernel, whose cross-sweep basis reuse biased ρ.
-            return run_chain_separable_structured(
+            # The exact NB2 likelihood, sliced (cross-section and panel; n × n
+            # solves only): samplers/negbin_reduced/_flow_exact.py.  Pólya–Gamma
+            # Gibbs crawls here at small α, where its likelihood given ω is far
+            # more precise than the NB2 one.
+            return run_chain_separable_exact(
                 y,
                 X,
                 W_csc,
@@ -166,6 +191,9 @@ def run_negbin_flow_gibbs(
                 progress_manager=progress_manager,
                 store_log_lik=log_likelihood,
                 struct=struct,
+                levels=levels,
+                keep_pair_draws=keep_pair_draws,
+                cell_mask=cell_mask,
             )
         return run_chain_unrestricted(
             Wd=model._Wd, Wo=model._Wo, Ww=model._Ww, **common
@@ -186,12 +214,11 @@ def run_negbin_flow_gibbs(
         inits = [_make_init(np.random.default_rng(s)) for s in seeds]
 
         if separable:
-            # JAX port of the structured sweep (cross-section and panel).
-            from ...samplers.negbin_reduced._flow_structured_jax import (
-                run_chains_jax_flow_structured,
+            from ...samplers.negbin_reduced._flow_exact_jax import (
+                run_chains_jax_flow_exact,
             )
 
-            chain_results = run_chains_jax_flow_structured(
+            chain_results = run_chains_jax_flow_exact(
                 y,
                 W_csc,
                 model._n,
@@ -203,6 +230,9 @@ def run_negbin_flow_gibbs(
                 jax_seeds=seeds,
                 store_log_lik=log_likelihood,
                 progressbar=progressbar,
+                levels=levels,
+                keep_pair_draws=keep_pair_draws,
+                cell_mask=cell_mask,
             )
         else:
             from ...samplers.negbin_reduced._flow_jax import run_chains_jax_flow
@@ -254,6 +284,25 @@ def run_negbin_flow_gibbs(
         ll = {"obs": np.stack([c["log_lik"] for c in chain_results], axis=0)}
     coords = {"coefficient": list(model._feature_names)}
     dims = {"beta": ["coefficient"]}
+    stack = lambda key: np.stack([c[key] for c in chain_results])  # noqa: E731
+    units = list(range(model._n))
+    summary = None
+    for i, st in enumerate(levels.sets if levels is not None else ()):
+        key, name = f"{st.kind}_effect", model._level_name(st.kind)
+        if st.random:
+            posterior_samples[f"{name}_sd"] = stack(f"{key}_sd")
+        if st.kind == "period":
+            # Beside other sets the first period is the baseline, held at its mean.
+            posterior_samples[name] = stack(key)[..., int(levels.baseline(i)) :]
+            dims[name] = ["time"]
+            coords["time"] = model._level_periods
+            continue
+        coords.update(origin=units, destination=units)
+        if st.kind == "pair" and not keep_pair_draws:
+            summary = [c["pair_effect_summary"] for c in chain_results]
+            continue
+        posterior_samples[name] = stack(key)
+        dims[name] = ["origin", "destination"] if st.kind == "pair" else [st.kind]
 
     model._idata = gibbs_to_inference_data(
         posterior_samples=posterior_samples,
@@ -262,4 +311,18 @@ def run_negbin_flow_gibbs(
         coords=coords,
         dims=dims,
     )
+    if summary is not None:
+        # Pool the chains' moments (equal draw counts per chain).
+        means = np.stack([s["mean"] for s in summary])
+        var = np.stack([s["sd"] for s in summary]) ** 2
+        model._idata["pair_effect_summary"] = xr.Dataset(
+            {
+                "mean": (("origin", "destination"), means.mean(axis=0)),
+                "sd": (
+                    ("origin", "destination"),
+                    np.sqrt(var.mean(axis=0) + means.var(axis=0)),
+                ),
+            },
+            coords={"origin": units, "destination": units},
+        )
     return model._idata

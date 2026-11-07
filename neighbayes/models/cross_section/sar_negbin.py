@@ -1,8 +1,12 @@
-r"""Reduced-form spatial autoregressive Negative Binomial (SAR-NB) model.
+r"""Spatial autoregressive negative binomial: the latent SAR, or the reduced form.
 
-Spatial dependence enters purely through the mean propagator
-:math:`(I - \rho W)^{-1}` and overdispersion is captured by the Negative
-Binomial dispersion parameter :math:`\alpha`; no disturbance propagates.
+The unmarked ``SARNegBin`` is the latent SAR (ADR 0004), which propagates the
+negative binomial's own gamma disturbance through the multiplier
+(:mod:`._latent_negbin`).  ``latent=False`` is the reduced form, the field's
+spatial lag model of counts (Lambert, Brown and Florax 2010): spatial
+dependence enters only through the mean propagator :math:`(I - \rho W)^{-1}`
+and overdispersion through the dispersion :math:`\alpha`, no disturbance
+propagating,
 
 .. math::
 
@@ -10,13 +14,8 @@ Binomial dispersion parameter :math:`\alpha`; no disturbance propagates.
     \mu = \exp(\eta), \qquad
     \eta = (I - \rho W)^{-1} X \beta.
 
-This is the field's spatial lag model of counts (Lambert, Brown and Florax
-2010).  ``latent=True`` is the latent SAR instead, which propagates the
-negative binomial's own gamma disturbance
-(:mod:`._latent_negbin`).
-
-Sampling
---------
+Sampling the reduced form
+-------------------------
 Two samplers are available:
 
 * **Pólya-Gamma Gibbs** (default): call
@@ -67,21 +66,10 @@ from ._latent_negbin import LatentNegBinMixin
 
 
 class SARNegBin(CountDesigns, LatentNegBinMixin, _CountPanel, SpatialModel):
-    r"""Bayesian reduced-form spatial autoregressive negative binomial (SAR-NB).
+    r"""Bayesian SAR negative binomial: the latent SAR, or the reduced form with ``latent=False``.
 
-    .. math::
-
-        y_i \sim \mathrm{NegBin}(\mu_i, \alpha), \qquad
-        \mu = \exp(\eta), \qquad
-        \eta = (I - \rho W)^{-1} X \beta .
-
-    The spatial lag acts on the log-mean; ``y`` is not transformed, so the
-    likelihood carries no :math:`\log|I - \rho W|` Jacobian.  ``fit()``
-    defaults to Pólya–Gamma Gibbs; ``sampler="nuts"`` fits the same model in
-    PyMC.
-
-    With ``latent=True`` it is the latent SAR, whose multiplier propagates the
-    negative binomial's own disturbance as well as the covariates:
+    The latent SAR's multiplier propagates the negative binomial's own
+    disturbance as well as the covariates:
 
     .. math::
 
@@ -96,6 +84,19 @@ class SARNegBin(CountDesigns, LatentNegBinMixin, _CountPanel, SpatialModel):
     log-likelihood integrates each log-mean out given the rest, and its
     impacts are on the log-mean or, ``impacts(scale="count")``, the expected
     count.
+
+    ``latent=False`` is the reduced form,
+
+    .. math::
+
+        y_i \sim \mathrm{NegBin}(\mu_i, \alpha), \qquad
+        \mu = \exp(\eta), \qquad
+        \eta = (I - \rho W)^{-1} X \beta ,
+
+    whose spatial lag acts on the log-mean only; ``y`` is not transformed, so
+    the likelihood carries no :math:`\log|I - \rho W|` Jacobian.  Its
+    ``fit()`` defaults to Pólya–Gamma Gibbs, and ``sampler="nuts"`` fits it in
+    PyMC.
 
     Parameters
     ----------
@@ -152,10 +153,13 @@ class SARNegBin(CountDesigns, LatentNegBinMixin, _CountPanel, SpatialModel):
         Add the unit means of the time-varying columns to a panel's design
         (inside the filter), absorbing a correlation between the unit effects
         and ``X``.  Needs unit effects.
-    latent : bool, default False
-        The latent SAR instead of the reduced form.  As a panel it takes random
-        unit effects and period effects, both inside the filter with the
-        covariates and each period's gamma disturbance.
+    latent : bool, default True
+        The latent SAR; ``False`` fits the reduced form.  As a panel the latent
+        SAR takes random unit effects and period effects, both inside the
+        filter with the covariates and each period's gamma disturbance; with
+        period effects and a row-standardized ``W`` its target carries Lee and
+        Yu's (2010) time-effects term, :math:`-T\log(1 - \rho)`, so that the
+        period effects are flat on each period's log-mean level.
     """
 
     _DESIGNS = {
@@ -166,13 +170,10 @@ class SARNegBin(CountDesigns, LatentNegBinMixin, _CountPanel, SpatialModel):
     # The latent SAR's log-mean impacts and coordinates are the reduced form's.
     _FALLBACK = {"latent": "static"}
     _latent_panel = True
+    _latent_default = True
 
     _priors_cls = SARNegBinPriors
     _gibbs_key: tuple[str, str] | None = ("count", "cross_section")
-
-    #: Threshold above which count-scale impacts use the sparse
-    #: Hutchinson path instead of the eigendecomposition path.
-    _COUNT_EFFECTS_EIGEN_MAX_N: int = 2000
 
     # ------------------------------------------------------------------
     # PyMC graph (reduced-form NUTS)
@@ -673,7 +674,6 @@ class SARNegBin(CountDesigns, LatentNegBinMixin, _CountPanel, SpatialModel):
 
     def _compute_count_scale_impacts_posterior(
         self,
-        method: str = "auto",
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         r"""Compute posterior impacts on the expected-count scale for each draw.
 
@@ -694,263 +694,40 @@ class SARNegBin(CountDesigns, LatentNegBinMixin, _CountPanel, SpatialModel):
             \operatorname{diag}(\mu) (I - \rho W)^{-1} \beta_r.
 
         Direct, indirect, and total effects are the average diagonal, the
-        average off-diagonal sum, and their sum respectively. This is more
-        expensive than the log-mean-scale formula because it requires the
-        diagonal of the spatial multiplier for each posterior draw.
+        average off-diagonal sum, and their sum respectively.
 
-        For n ≤ ``_COUNT_EFFECTS_EIGEN_MAX_N`` (default 2000), this uses
-        the shared eigendecomposition cache (:attr:`_W_eigendecomposition`)
-        to avoid per-draw sparse LU factorization, reducing complexity from
-        :math:`O(\text{nnz}^{1.5})` per draw to :math:`O(n^2)` per draw.
-
-        For n > ``_COUNT_EFFECTS_EIGEN_MAX_N``, this uses sparse solves
-        with Hutchinson diagonal estimation, reducing memory from
-        :math:`O(n^2)` to :math:`O(\text{nnz})` and avoiding the
-        :math:`O(n^3)` eigendecomposition entirely.
+        :math:`(I - \rho W)^{-1}X`, the multiplier's diagonal and its row sums
+        are all functions of the scalar :math:`\rho`, computed exactly at a few
+        values and interpolated across the draws
+        (:class:`~neighbayes.samplers._utils._sparsax_utils.ResolventInterpolant`),
+        so no draw factors anything.
         """
         from ...diagnostics.lmtests import _get_posterior_draws
+        from ...samplers._utils._sparsax_utils import ResolventInterpolant
 
         idata = self.inference_data
-        rho_draws = _get_posterior_draws(idata, "rho")
-        beta_draws = _get_posterior_draws(idata, "beta")
-
-        n = self._X.shape[0]
+        rho = _get_posterior_draws(idata, "rho")
+        beta = _get_posterior_draws(idata, "beta")
         ni = self._nonintercept_indices
-        n_draws = rho_draws.shape[0]
-        n_effects = len(ni)
-
-        if method not in {"auto", "eigen", "sparse"}:
-            raise ValueError(
-                f"method must be one of {{'auto', 'eigen', 'sparse'}}, got {method!r}."
-            )
-
-        use_sparse = method == "sparse" or (
-            method == "auto" and n > self._COUNT_EFFECTS_EIGEN_MAX_N
+        F = ResolventInterpolant(
+            self._W_sparse, rho, rhs=self._X, diag=True, row_sums=True
         )
-        if use_sparse:
-            # Sparse solves + Hutchinson diagonal estimation; avoids the
-            # O(n³) eigendecomposition and O(n²) per-draw matmuls.
-            return self._compute_count_scale_impacts_posterior_sparse(
-                rho_draws=rho_draws,
-                beta_draws=beta_draws,
-                n=n,
-                ni=ni,
-                n_draws=n_draws,
-                n_effects=n_effects,
-            )
+        L = F.weights(rho)
+        SX, diag, rows = F.values["rhs"], F.values["diag"], F.values["row_sums"]
 
-        direct_samples = np.empty((n_draws, n_effects), dtype=np.float64)
-        total_samples = np.empty((n_draws, n_effects), dtype=np.float64)
-
-        # Use shared eigendecomposition cache (complex128 throughout).
-        # Row-standardized W is generally non-symmetric, so V and Vinv
-        # are complex.  Taking .real prematurely drops imaginary parts and
-        # produces wrong results for eta, diag, and row sums.
-        decomp = self._W_eigendecomposition
-        if decomp is None:
-            raise ValueError("No spatial weights matrix available.")
-        eigs_c = decomp[0]  # complex128, (n,)
-        V_c = decomp[1]  # complex128, (n, n)
-        Vinv_c = decomp[2]  # complex128, (n, n)
-
-        # Precompute Vinv @ X (complex128, (n, k)) — reused for every draw
-        VinvX = Vinv_c @ self._X.astype(np.complex128)  # (n, k)
-
-        # Precompute Vinv @ 1 (complex128, (n,)) for row sums
-        ones_c = np.ones(n, dtype=np.complex128)
-        Vinv_ones = Vinv_c @ ones_c  # (n,)
-
-        for draw_idx, (rho, beta) in enumerate(
-            zip(rho_draws, beta_draws, strict=False)
-        ):
-            inv_eigs_c = 1.0 / (1.0 - float(rho) * eigs_c)  # complex128
-
-            # eta = V @ diag(inv_eigs) @ Vinv @ X @ beta
-            coeff = inv_eigs_c * (VinvX @ beta.astype(np.complex128))  # (n,)
-            eta = (V_c @ coeff).real.astype(np.float64)  # (n,)
+        direct = np.empty((rho.size, len(ni)), dtype=np.float64)
+        total = np.empty((rho.size, len(ni)), dtype=np.float64)
+        for g in range(rho.size):
+            eta = L[g] @ (SX @ beta[g])
             mu = np.exp(np.clip(eta, -50.0, 50.0))
-
-            # diag((I - rho W)^{-1}) = diag(V @ diag(inv_eigs) @ Vinv)
-            # = sum_j V_{ij} * Vinv_{ji} / (1 - rho lambda_j)
-            # (element-wise product of V and Vinv^T, weighted by inv_eigs)
-            multiplier_diag = ((V_c * Vinv_c.T) @ inv_eigs_c).real.astype(
-                np.float64
-            )  # (n,)
-
-            if self._is_row_std:
-                multiplier_row_sums = self._multiplier_row_sums(rho)
-            else:
-                # row_sum_i = (V @ diag(inv_eigs) @ Vinv @ 1)_i
-                multiplier_row_sums = (V_c @ (inv_eigs_c * Vinv_ones)).real.astype(
-                    np.float64
-                )  # (n,)
-
-            direct_base = float(np.mean(mu * multiplier_diag))
-            total_base = float(np.mean(mu * multiplier_row_sums))
-
-            direct_samples[draw_idx] = direct_base * beta[ni]
-            total_samples[draw_idx] = total_base * beta[ni]
-
-        indirect_samples = total_samples - direct_samples
-        return direct_samples, indirect_samples, total_samples
-
-    @staticmethod
-    def _hutchinson_diag(
-        A_solve: callable,
-        n: int,
-        n_probes: int = 20,
-        rng: np.random.Generator | None = None,
-    ) -> np.ndarray:
-        r"""Estimate the diagonal of :math:`A^{-1}` via Hutchinson's method.
-
-        Given a callable ``A_solve(b)`` that returns :math:`A^{-1} b``, this
-        estimates :math:`\operatorname{diag}(A^{-1})` using Rademacher
-        (±1) probe vectors:
-
-        .. math::
-
-            \widehat{d_i} = \frac{1}{K} \sum_{k=1}^{K}
-                z_{ki} \, [A^{-1} z_k]_i,
-
-        where :math:`z_k \sim \operatorname{Rademacher}(\pm 1)`.
-        With 20 probes the relative error is typically < 5%.
-
-        Parameters
-        ----------
-        A_solve : callable
-            Function that takes a vector or matrix ``b`` and returns
-            :math:`A^{-1} b`.
-        n : int
-            Dimension of ``A``.
-        n_probes : int, default 20
-            Number of Rademacher probe vectors.
-        rng : numpy.random.Generator, optional
-            Random number generator.  If ``None``, a default generator
-            with seed 42 is used for reproducibility.
-
-        Returns
-        -------
-        numpy.ndarray, shape (n,)
-            Estimated diagonal of :math:`A^{-1}`.
-        """
-        if rng is None:
-            rng = np.random.default_rng(42)
-        Z = rng.choice(np.array([-1.0, 1.0]), size=(n, n_probes))
-        AinvZ = np.asarray(A_solve(Z), dtype=np.float64)
-        return np.mean(Z * AinvZ, axis=1)
-
-    def _compute_count_scale_impacts_posterior_sparse(
-        self,
-        rho_draws: np.ndarray,
-        beta_draws: np.ndarray,
-        n: int,
-        ni: list[int],
-        n_draws: int,
-        n_effects: int,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        r"""Count-scale impacts via sparse solves + Hutchinson.
-
-        For large W where eigendecomposition is infeasible, this method uses:
-
-        - A single sparse LU factorization of :math:`A = I - \rho W` per draw
-          (KLU when available, SuperLU otherwise), reused for the
-          :math:`\eta` solve, the Hutchinson probes, and the row-sum solve.
-        - **Batched** matrix solve: the right-hand sides for :math:`\eta`,
-          the optional row-sum vector :math:`\mathbf{1}`, and the
-          Hutchinson probe matrix :math:`Z \in \{-1, +1\}^{n \times K}` are
-          stacked into a single ``(n, 22)`` RHS and resolved with one
-          ``solver.solve`` call per draw.
-        - Hutchinson diagonal estimator for :math:`\operatorname{diag}(A^{-1})`.
-        - Closed-form :math:`1/(1-\rho)` row sums for row-standardized :math:`W`,
-          one extra sparse solve otherwise.
-
-        Complexity is one LU factor plus a single batched triangular solve
-        per draw.
-
-        Parameters
-        ----------
-        rho_draws : np.ndarray, shape (G,)
-        beta_draws : np.ndarray, shape (G, k)
-        n : int
-        ni : list[int]
-        n_draws : int
-        n_effects : int
-
-        Returns
-        -------
-        direct_samples : np.ndarray, shape (G, n_effects)
-        indirect_samples : np.ndarray, shape (G, n_effects)
-        total_samples : np.ndarray, shape (G, n_effects)
-        """
-        from ..._ops import _make_cached_sparse_solver
-
-        W = self._W_sparse
-        I_n = sp.eye(n, format="csr", dtype=np.float64)
-        ones = np.ones(n, dtype=np.float64)
-        rng = np.random.default_rng(42)  # fixed seed for reproducibility
-        n_probes = 20
-
-        # Pre-sample all Hutchinson probes up front so the per-draw RHS
-        # assembly is purely vectorized.
-        Z = rng.choice(
-            np.array([-1.0, 1.0], dtype=np.float64),
-            size=(n, n_probes),
-        )
-
-        direct_samples = np.empty((n_draws, n_effects), dtype=np.float64)
-        total_samples = np.empty((n_draws, n_effects), dtype=np.float64)
-
-        for draw_idx, (rho, beta) in enumerate(
-            zip(rho_draws, beta_draws, strict=False)
-        ):
-            rho_f = float(rho)
-            A = (I_n - rho_f * W).tocsc()
-
-            # Factorize A once and reuse for all per-draw RHSes.
-            solver = _make_cached_sparse_solver(A)
-            if solver is None:
-                solver = sp.linalg.splu(A)
-
-            # Stack RHSes: [Xβ, ones (if needed), Z_1, ..., Z_K] → (n, 22 or 21).
-            Xbeta = self._X @ beta
-            if self._is_row_std:
-                # Closed-form 1/(1-ρ) row sums; no need to solve A x = 1.
-                rhs = np.empty((n, 1 + n_probes), dtype=np.float64)
-                rhs[:, 0] = Xbeta
-                rhs[:, 1:] = Z
-                sol = np.asarray(solver.solve(rhs), dtype=np.float64)
-                eta = sol[:, 0]
-                AinvZ = sol[:, 1:]
-                multiplier_row_sums = self._multiplier_row_sums(rho_f)
-            else:
-                rhs = np.empty((n, 2 + n_probes), dtype=np.float64)
-                rhs[:, 0] = Xbeta
-                rhs[:, 1] = ones
-                rhs[:, 2:] = Z
-                sol = np.asarray(solver.solve(rhs), dtype=np.float64)
-                eta = sol[:, 0]
-                multiplier_row_sums = sol[:, 1]
-                AinvZ = sol[:, 2:]
-
-            mu = np.exp(np.clip(eta, -50.0, 50.0))
-
-            # Hutchinson: diag(A⁻¹) ≈ mean over probes of z ⊙ A⁻¹z.
-            multiplier_diag = np.mean(Z * AinvZ, axis=1)
-
-            direct_base = float(np.mean(mu * multiplier_diag))
-            total_base = float(np.mean(mu * multiplier_row_sums))
-
-            direct_samples[draw_idx] = direct_base * beta[ni]
-            total_samples[draw_idx] = total_base * beta[ni]
-
-        indirect_samples = total_samples - direct_samples
-        return direct_samples, indirect_samples, total_samples
+            direct[g] = np.mean(mu * (L[g] @ diag)) * beta[g, ni]
+            total[g] = np.mean(mu * (L[g] @ rows)) * beta[g, ni]
+        return direct, total - direct, total
 
     def impacts(
         self,
         return_posterior_samples: bool = False,
         scale: str = "logmean",
-        method: str = "auto",
     ):
         r"""Compute Bayesian inference for direct, indirect, and total impacts.
 
@@ -965,16 +742,8 @@ class SARNegBin(CountDesigns, LatentNegBinMixin, _CountPanel, SpatialModel):
             predictor scale :math:`\log \mu`.
 
             ``"count"`` returns impacts on the expected-count scale
-            :math:`\mu = \exp(\eta)`. This is exact but more expensive because
-            it requires the diagonal of the spatial multiplier for each
-            posterior draw.
-        method : {"auto", "eigen", "sparse"}, default "auto"
-            Only used when ``scale="count"``. ``"eigen"`` materializes the
-            eigendecomposition of :math:`W` (fast for small :math:`n` but
-            O(n³) memory/time); ``"sparse"`` uses one sparse LU per draw
-            plus a Hutchinson diagonal estimator; ``"auto"`` picks sparse
-            when :math:`n` exceeds
-            :attr:`_COUNT_EFFECTS_EIGEN_MAX_N` (default 2000).
+            :math:`\mu = \exp(\eta)`, which also needs the diagonal of the
+            spatial multiplier at each posterior draw.
         """
         if scale == "logmean":
             return super().impacts(return_posterior_samples=return_posterior_samples)
@@ -989,7 +758,7 @@ class SARNegBin(CountDesigns, LatentNegBinMixin, _CountPanel, SpatialModel):
 
         self._require_fit()
         return self._effects_frame(
-            *self._compute_count_scale_impacts_posterior(method=method),
+            *self._compute_count_scale_impacts_posterior(),
             return_posterior_samples=return_posterior_samples,
             scale=scale,
         )

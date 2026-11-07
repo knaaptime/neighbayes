@@ -227,7 +227,7 @@ class TestProgressForwarding:
     def test_sar_fit_forwards_progress_manager(self, monkeypatch):
         """SARLogit.fit should pass progress_manager through to run_chain."""
         y, X, W = _binary_data()
-        model = SARLogit(y=y, X=X, W=W)
+        model = SARLogit(y=y, X=X, W=W, latent=False)
         seen: dict[str, object] = {}
 
         def _fake_run_chain(

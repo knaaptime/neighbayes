@@ -365,8 +365,6 @@ class ReducedBinaryMixin:
 
     #: Threshold above which probability-scale impacts use the
     #: sparse Hutchinson path instead of the eigendecomposition path.
-    #: See :attr:`SARNegBin._COUNT_EFFECTS_EIGEN_MAX_N` for the
-    #: cost model — the binary case is identical structurally.
     _PROBABILITY_EFFECTS_EIGEN_MAX_N: int = 2000
 
     def _compute_probability_scale_impacts_posterior(
@@ -482,10 +480,8 @@ class ReducedBinaryMixin:
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         r"""Probability-scale impacts via sparse solves + Hutchinson.
 
-        Direct port of
-        :meth:`SARNegBin._compute_count_scale_impacts_posterior_sparse`
-        with the count-mean weight :math:`\mu` replaced by the link's density
-        :math:`F'(\eta)`.
+        One LU per draw, with the link's density :math:`F'(\eta)` weighting the
+        multiplier's Hutchinson diagonal and its row sums.
         """
         from ..._ops import _make_cached_sparse_solver
 

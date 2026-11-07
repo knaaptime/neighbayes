@@ -55,11 +55,17 @@ def _cases():
         ),
     )
     y, X = make_sar_logit_data(np.random.default_rng(3), Wd, rho=0.4, beta=beta)
-    out["SARLogit"] = (y, lambda y, X=X: M.SARLogit(y=y, X=X, W=W))
-    dn = dgp.simulate_sar_negbin(W=_as_sparse(W), rho=0.4, beta=np.array([0.5, 0.8]), alpha=2.0, rng=np.random.default_rng(4))  # fmt: skip
-    out["SARNegBin"] = (dn["y"], lambda y: M.SARNegBin(y=y, X=dn["X"], W=W))
-    dz = dgp.simulate_sar_zinb(n_side=6, seed=6)
-    out["SARZINB"] = (dz["y"], lambda y: M.SARZINB(y=y, X=dz["X"], W=dz["W_sparse"]))
+    out["SARLogit"] = (y, lambda y, X=X: M.SARLogit(y=y, X=X, W=W, latent=False))
+    dn = dgp.simulate_sar_negbin(W=_as_sparse(W), rho=0.4, beta=np.array([0.5, 0.8]), alpha=2.0, rng=np.random.default_rng(4), latent=False)  # fmt: skip
+    out["SARNegBin"] = (
+        dn["y"],
+        lambda y: M.SARNegBin(y=y, X=dn["X"], W=W, latent=False),
+    )
+    dz = dgp.simulate_sar_zinb(n_side=6, seed=6, latent=False)
+    out["SARZINB"] = (
+        dz["y"],
+        lambda y: M.SARZINB(y=y, X=dz["X"], W=dz["W_sparse"], latent=False),
+    )
     dl = dgp.simulate_sar_logit(n_side=6, seed=7, latent=True)
     out["SARLogitLatent"] = (
         dl["y"],
@@ -118,19 +124,33 @@ def _cases():
         fd["y_vec"],
         lambda y: M.SARNegBinFlow(y, fd["X"], fd["G"], separable=True),
     )
+    od = dgp.simulate_sar_negbin_flow(n=5, separable=True, seed=43, origin_effect_sd=0.5, destination_effect_sd=0.5)  # fmt: skip
+    out["SARNegBinFlow(separable) od levels"] = (
+        od["y_vec"],
+        lambda y: M.SARNegBinFlow(
+            y,
+            od["X"],
+            od["G"],
+            separable=True,
+            col_names=od["col_names"],
+            origin_effects="random",
+            destination_effects="random",
+        ),  # fmt: skip
+    )
     pf = dgp.simulate_sar_negbin_flow(n=5, T=3, rho_d=0.3, rho_o=0.2, seed=21, alpha=3.0, beta_d=[0.4, 0.4], beta_o=[0.4, 0.4], gamma_dist=-0.4, separable=True, pair_effects="random", pair_effect_sd=0.5, time_effects=True, time_effect_sd=0.3)  # fmt: skip
-    out["SARNegBinFlow(separable) panel"] = (
+    # Which pairs a flat level drops depends on the counts: data, not structure.
+    out["SARNegBinFlow(separable) fixed pairs"] = (
         pf["y"],
         lambda y: M.SARNegBinFlow(
+            y,
+            pf["X"],
+            pf["G"],
             separable=True,
-            pair_effects="random",
-            time_effects=True,
-            y=y,
-            X=pf["X"],
-            W=pf["G"],
             T=3,
+            pair_effects="fixed",
+            time_effects=True,
             col_names=pf["col_names"],
-        ),
+        ),  # fmt: skip
     )
     hd = dgp.simulate_sar_hurdle_negbin_flow(n=6, T=1, seed=2, beta_d=[0.4, 0.4], beta_o=[0.4, 0.4], gamma_dist=-0.4, alpha=3.0, separable=True)  # fmt: skip
     out["SARHurdleNegBinFlow"] = (
@@ -183,7 +203,8 @@ _CASES = (
     "SEMNegBin",
     "SARNegBinFlow",
     "SARNegBinFlow(separable)",
-    "SARNegBinFlow(separable) panel",
+    "SARNegBinFlow(separable) od levels",
+    "SARNegBinFlow(separable) fixed pairs",
     "SARHurdleNegBinFlow",
     "SARZINBFlow panel",
 )

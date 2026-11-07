@@ -206,8 +206,8 @@ def _nb_model():
     from neighbayes import dgp
     from neighbayes.models import SARNegBin
 
-    d = dgp.simulate_sar_negbin(n_side=6, seed=3)
-    return SARNegBin(y=d["y"], X=d["X"], W=d["W_sparse"])
+    d = dgp.simulate_sar_negbin(n_side=6, seed=3, latent=False)
+    return SARNegBin(y=d["y"], X=d["X"], W=d["W_sparse"], latent=False)
 
 
 @pytest.mark.parametrize("parallel_jobs", [1, 2])
@@ -232,10 +232,10 @@ def test_jax_fits_do_not_warn():
     from neighbayes import dgp
     from neighbayes.models import SARZINB
 
-    dz = dgp.simulate_sar_zinb(n_side=6, seed=3)
+    dz = dgp.simulate_sar_zinb(n_side=6, seed=3, latent=False)
     models = [
         _nb_model(),
-        SARZINB(y=dz["y"], X=dz["X"], W=dz["W_sparse"]),
+        SARZINB(y=dz["y"], X=dz["X"], W=dz["W_sparse"], latent=False),
     ]
     for model in models:
         with warnings.catch_warnings(record=True) as caught:

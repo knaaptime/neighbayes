@@ -823,6 +823,10 @@ def _bic_logml(idata, return_diagnostics=False, model=None):
     # Sum log-likelihood over observations for each draw
     per_draw_ll = [v.values.sum(axis=-1) for v in log_like_group.data_vars.values()]
     log_like_total = np.sum(per_draw_ll, axis=0)
+    # A Gaussian spatial model's pointwise terms are conditionals, which do not
+    # sum to the joint; it keeps the joint separately.
+    if "log_joint" in idata.children:
+        log_like_total = idata["log_joint"]["obs"].values
     if log_like_total.ndim > 1:
         log_like_total = log_like_total.reshape(-1)
     # ML log-likelihood: maximum of posterior log-likelihoods.
@@ -1083,6 +1087,14 @@ def bayes_factor_compare_models(
     is generally more trustworthy because it accounts for the actual
     prior specification.
 
+    **Panels.**  A fixed-effects fit describes the demeaned outcomes, so its
+    marginal likelihood compares only with other fits of the same demeaned
+    data, never with a random-effects or pooled fit of ``y``.  To weigh fixed
+    against random effects, compare random effects with a Mundlak model on
+    ``y``.  Bridge sampling integrates Gaussian random effects out analytically,
+    so its dimension does not grow with the number of units; it does not support
+    random effects with ``robust=True``.
+
     **Posterior model probabilities.**  After computing Bayes factors,
     posterior model probabilities can be obtained via :func:`post_prob`::
 
@@ -1198,6 +1210,9 @@ def bayes_factor_compare_models(
                     logp_fn, _, _, to_unconstrained = native
                 else:
                     pymc_model = obj.pymc_model
+                    if pymc_model is None and hasattr(obj, "_build_pymc_model"):
+                        # A Gibbs fit keeps no graph; build one as the density.
+                        pymc_model = obj._build_pymc_model()
                     if pymc_model is None:
                         raise ValueError(
                             f"Model at index {i} ('{model_labels[i]}') has no "

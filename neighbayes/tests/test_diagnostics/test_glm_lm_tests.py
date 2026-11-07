@@ -364,7 +364,7 @@ def test_score_decomposition_identities():
 @pytest.fixture(scope="module")
 def sar_logit_fit():
     y, X, W = _logit_dgp(seed=4, n_side=12, rho=0.4)
-    m = SARLogit(y=y, X=X, W=W_to_graph(W))
+    m = SARLogit(y=y, X=X, W=W_to_graph(W), latent=False)
     m.fit(draws=200, tune=200, chains=1, progressbar=False, random_seed=5, n_jobs=1)
     return m
 
@@ -380,7 +380,7 @@ def sar_probit_fit():
 @pytest.fixture(scope="module")
 def sar_negbin_fit():
     y, X, W = _negbin_dgp(seed=5, n_side=12, rho=0.4)
-    m = SARNegBin(y=y, X=X, W=W_to_graph(W))
+    m = SARNegBin(y=y, X=X, W=W_to_graph(W), latent=False)
     m.fit(draws=200, tune=200, chains=1, progressbar=False, random_seed=6, n_jobs=1)
     return m
 

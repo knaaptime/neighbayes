@@ -1,10 +1,12 @@
-"""NB count panels with pooled unit/pair effects and period effects.
+"""NB count panels: random unit/pair effects, fixed flow pair effects, period effects.
 
-Fast tests cover construction, the absorbed-column and identification rules,
-storage and the API on short chains.  The ``slow`` tests check recovery against
-DGPs whose effects correlate with ``X`` (so a pooled fit is visibly biased),
-agreement of the structured and materialized separable flow kernels, and of
-Gibbs with NUTS.
+The place panels and the aspatial flow take random effects; the SAR flow takes
+fixed pair effects after the filter, on its separable form (the model's own
+tests are ``test_flow_negbin_models.py``).  Fast tests cover construction, the
+absorbed-column and identification rules, storage and the API on short chains.
+The ``slow`` tests check recovery against DGPs whose effects correlate with
+``X`` (so a pooled fit is visibly biased), the separable flow's two backends
+against each other, and Gibbs against NUTS.
 """
 
 from __future__ import annotations
@@ -23,7 +25,16 @@ sar_negbin_flow = flow_form(SARNegBinFlow)
 sar_negbin_separable = flow_form(SARNegBinFlow, separable=True)
 
 
-FLOW_CLASSES = [sar_negbin_flow, sar_negbin_separable, negbin_flow]
+#: The flow families with random pair effects.
+RANDOM_PAIR_FLOW = [negbin_flow]
+#: Every flow family with each effects code it takes (the unrestricted SAR
+#: flow takes period effects only; the separable one's pair effects are fixed).
+FLOW_DESIGNS = [
+    *((negbin_flow, e) for e in (0, 1, 2, 3)),
+    (sar_negbin_flow, 0),
+    (sar_negbin_flow, 2),
+    *((sar_negbin_separable, e) for e in (0, 1, 2, 3)),
+]
 PANEL_CLASSES = [SARNegBin, NegBin]
 QUICK = dict(draws=20, tune=20, chains=1, progressbar=False, random_seed=0, n_jobs=1)
 
@@ -43,6 +54,7 @@ def _place(cls, data, N, T, effects=0, **kw):
 
     X = pd.DataFrame(data["X"], columns=["Intercept", "x"])
     design = effects_kwargs(effects, treatment="random")
+    kw.setdefault("latent", False)  # the reduced-form panel
     return cls(y=data["y"], X=X, W=data["W_sparse"], N=N, T=T, **design, **kw)
 
 
@@ -52,9 +64,9 @@ def _place(cls, data, N, T, effects=0, **kw):
 
 
 class TestConstruction:
-    @pytest.mark.parametrize("cls", FLOW_CLASSES)
+    @pytest.mark.parametrize("cls", RANDOM_PAIR_FLOW)
     def test_pair_effects_keep_time_invariant_columns(self, cls):
-        """Pooled pair effects absorb nothing; the intercept anchors the level."""
+        """Random pair effects absorb nothing; the intercept anchors the level."""
         data = _flow()
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
@@ -66,7 +78,7 @@ class TestConstruction:
         assert fp["effect_mu"] == 0.0 and fp["effect_sd_scale"] == 1.0
 
     def test_period_effects_absorb_time_only_columns(self):
-        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0)
+        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0, latent=False)
         trend = np.repeat(np.arange(3.0), 16)
         X = np.column_stack([d["X"], trend])
         with pytest.warns(UserWarning, match="absorbed by the period effects"):
@@ -78,17 +90,24 @@ class TestConstruction:
                 W=d["W_sparse"],
                 N=16,
                 T=3,
+                latent=False,
             )
         # Beside unit effects the intercept stays as the baseline level.
         assert two_way._X.shape[1] == 2
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
             time_only = SARNegBin(
-                time_effects=True, y=d["y"], X=X, W=d["W_sparse"], N=16, T=3
+                time_effects=True,
+                y=d["y"],
+                X=X,
+                W=d["W_sparse"],
+                N=16,
+                T=3,
+                latent=False,
             )
         assert time_only._X.shape[1] == 1  # the intercept goes too
 
-    @pytest.mark.parametrize("cls", FLOW_CLASSES)
+    @pytest.mark.parametrize("cls", RANDOM_PAIR_FLOW)
     def test_period_effects_layout(self, cls):
         data = _flow()
         with warnings.catch_warnings():
@@ -103,19 +122,27 @@ class TestConstruction:
         assert time_only._period_labels == ["t0", "t1", "t2"]
 
     def test_effects_record_their_names(self):
-        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0)
+        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0, latent=False)
         a = _place(SARNegBin, d, 16, 3, effects=3)
         assert a.model == 3
         assert a.effects == "two_way"
 
     def test_time_invariant_design_identifies_rho_under_unit_effects(self):
-        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0)
+        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0, latent=False)
         X = np.column_stack([np.ones(48), np.tile(np.arange(16.0), 3)])
-        m = SARNegBin(unit_effects="random", y=d["y"], X=X, W=d["W_sparse"], N=16, T=3)
+        m = SARNegBin(
+            unit_effects="random",
+            y=d["y"],
+            X=X,
+            W=d["W_sparse"],
+            N=16,
+            T=3,
+            latent=False,
+        )
         assert m._X.shape[1] == 2
 
     def test_spatial_model_with_nothing_left_raises(self):
-        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0)
+        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0, latent=False)
         with pytest.raises(ValueError, match="not identified"):
             SARNegBin(
                 time_effects=True,
@@ -124,17 +151,18 @@ class TestConstruction:
                 W=d["W_sparse"],
                 N=16,
                 T=3,
+                latent=False,
             )
 
     def test_aspatial_model_without_slopes_is_allowed(self):
-        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0)
+        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0, latent=False)
         m = NegBin(
             time_effects=True, y=d["y"], X=np.ones((48, 1)), W=d["W_sparse"], N=16, T=3
         )
         assert m._X.shape[1] == 0
 
     def test_mundlak_adds_unit_means(self):
-        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0)
+        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0, latent=False)
         m = _place(SARNegBin, d, 16, 3, effects=1, mundlak=True)
         assert m._feature_names == ["Intercept", "x", "x_mean"]
         np.testing.assert_allclose(
@@ -145,7 +173,7 @@ class TestConstruction:
             _place(SARNegBin, d, 16, 3, effects=2, mundlak=True)
 
     def test_all_zero_units_warn(self):
-        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0)
+        d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=0, latent=False)
         y = d["y"].copy()
         y[np.tile(np.arange(16), 3) == 0] = 0
         y[np.tile(np.arange(16), 3) == 5] = 0
@@ -155,15 +183,15 @@ class TestConstruction:
 
     def test_unit_effects_need_two_periods(self):
         """``T=1`` is the cross-section, which takes no unit effects."""
-        d = simulate_sar_negbin(N=16, T=1, n_side=4, seed=0)
+        d = simulate_sar_negbin(N=16, T=1, n_side=4, seed=0, latent=False)
         with pytest.raises(NotImplementedError, match="only in a panel"):
             _place(NegBin, d, 16, 1, effects=1)
 
-    def test_unrestricted_fixed_effects_require_numpy_backend(self):
+    def test_unrestricted_period_effects_require_numpy_backend(self):
         data = _flow()
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")
-            m = _flow_model(sar_negbin_flow, data, 3, effects=1)
+            m = _flow_model(sar_negbin_flow, data, 3, effects=2)
         with pytest.raises(ValueError, match="not supported"):
             m.fit(backend="jax", **QUICK)
 
@@ -173,8 +201,7 @@ class TestConstruction:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("cls", FLOW_CLASSES)
-@pytest.mark.parametrize("effects", [0, 1, 2, 3])
+@pytest.mark.parametrize("cls, effects", FLOW_DESIGNS)
 def test_flow_fit_api(cls, effects):
     data = _flow()
     X = np.column_stack(
@@ -192,11 +219,12 @@ def test_flow_fit_api(cls, effects):
         )
         idata = m.fit(sampler="gibbs", **QUICK)
     post = idata.posterior
+    random_pairs = cls in RANDOM_PAIR_FLOW
     assert ("pair_effect" in post) == (effects in (1, 3))
-    assert ("pair_effect_sd" in post) == (effects in (1, 3))
+    assert ("pair_effect_sd" in post) == (random_pairs and effects in (1, 3))
     assert ("time_effect" in post) == (effects in (2, 3))
     if effects in (1, 3):
-        assert post["pair_effect"].shape[-1] == 16
+        assert post["pair_effect"].shape[2:] == ((16,) if random_pairs else (4, 4))
     assert np.all(np.isfinite(post["beta"].values))
     pp = m.posterior_predictive(n_draws=2, random_seed=0)
     assert pp.shape == (2, data["y"].size)
@@ -206,7 +234,7 @@ def test_flow_fit_api(cls, effects):
 @pytest.mark.parametrize("cls", PANEL_CLASSES)
 @pytest.mark.parametrize("effects", [0, 1, 2, 3])
 def test_panel_fit_api(cls, effects):
-    d = simulate_sar_negbin(N=25, T=3, n_side=5, seed=1)
+    d = simulate_sar_negbin(N=25, T=3, n_side=5, seed=1, latent=False)
     m = _place(cls, d, 25, 3, effects=effects)
     idata = m.fit(**QUICK)  # Gibbs, the default, as for the Gaussian panels
     assert m._pymc_model is None
@@ -223,7 +251,7 @@ def test_panel_fit_api(cls, effects):
 
 @pytest.mark.parametrize("cls", PANEL_CLASSES)
 def test_panel_nuts_builds_fixed_effects(cls):
-    d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=2)
+    d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=2, latent=False)
     m = _place(cls, d, 16, 3, effects=3)
     model = m._build_pymc_model()
     assert "unit_effect" in model.named_vars
@@ -232,7 +260,7 @@ def test_panel_nuts_builds_fixed_effects(cls):
 
 
 def test_nuts_on_request():
-    d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=3)
+    d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=3, latent=False)
     m = _place(NegBin, d, 16, 3, effects=1)
     idata = m.fit(
         sampler="nuts", draws=20, tune=20, chains=1, progressbar=False, random_seed=0
@@ -242,7 +270,7 @@ def test_nuts_on_request():
 
 
 def test_pooled_aspatial_gibbs_runs_on_request():
-    d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=5)
+    d = simulate_sar_negbin(N=16, T=3, n_side=4, seed=5, latent=False)
     m = _place(NegBin, d, 16, 3, effects=0)
     idata = m.fit(sampler="gibbs", **QUICK)
     assert m._pymc_model is None
@@ -254,7 +282,7 @@ def test_gibbs_runs_through_the_registry():
 
     entry = resolve("count", "panel")
     assert entry is not None and entry.backends == {"numpy"}
-    d = simulate_sar_negbin(N=16, T=4, n_side=4, seed=6)
+    d = simulate_sar_negbin(N=16, T=4, n_side=4, seed=6, latent=False)
     m = _place(SARNegBin, d, 16, 4, effects=1)
     idata = m.fit(thin=2, **QUICK)
     assert idata.posterior["beta"].shape[1] == QUICK["draws"] // 2
@@ -263,7 +291,7 @@ def test_gibbs_runs_through_the_registry():
 
 
 def test_group_effect_summary_storage():
-    d = simulate_sar_negbin(N=25, T=3, n_side=5, seed=4)
+    d = simulate_sar_negbin(N=25, T=3, n_side=5, seed=4, latent=False)
     m = _place(SARNegBin, d, 25, 3, effects=1)
     idata = m.fit(store_effects=False, **QUICK)
     assert "unit_effect" not in idata.posterior
@@ -279,6 +307,7 @@ def test_group_effect_summary_storage():
 @pytest.mark.parametrize("effects", [1, 2, 3])
 @pytest.mark.parametrize("store", [True, False])
 def test_separable_fixed_effects_jax_backend(effects, store):
+    """Fixed pair and period effects on the JAX exact sampler, stored or summarized."""
     data = _flow()
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -295,12 +324,13 @@ def test_separable_fixed_effects_jax_backend(effects, store):
         )
     post = idata.posterior
     assert ("time_effect" in post) == (effects in (2, 3))
-    assert ("pair_effect_sd" in post) == (effects in (1, 3))
+    assert "pair_effect_sd" not in post
     if effects in (1, 3):
         if store:
-            assert post["pair_effect"].shape == (2, 20, 16)
+            assert post["pair_effect"].shape == (2, 20, 4, 4)
         else:
-            assert idata["pair_effect_summary"]["sd"].shape == (16,)
+            assert "pair_effect" not in post
+            assert idata["pair_effect_summary"]["sd"].shape == (4, 4)
     assert np.all(np.isfinite(idata.log_likelihood["obs"].values))
 
 
@@ -315,7 +345,8 @@ def test_log_likelihood_storage():
 
 
 def _masked_diag_fit(y, backend):
-    """Two-way-FE fit of ``y`` with the intraregional diagonal masked out."""
+    """Fixed pair and period effects fitted to ``y`` with the intraregional
+    diagonal masked out."""
     data = _flow(n=5, T=3, seed=7)
     n = 5
     eye = np.eye(n, dtype=bool)
@@ -323,7 +354,7 @@ def _masked_diag_fit(y, backend):
         warnings.simplefilter("ignore")
         m = SARNegBinFlow(
             separable=True,
-            pair_effects="random",
+            pair_effects="fixed",
             time_effects=True,
             y=y,
             X=data["X"],
@@ -345,17 +376,17 @@ def _masked_diag_fit(y, backend):
 
 
 def _assert_mask_invariance(backend):
-    """Masked cells are drawn-then-discarded: y ×100 on the diagonal must
-    leave every live-cell posterior trace bit-identical (the diagonal pairs
-    are prior-only under the mask, and no masked count may reach a live η,
-    the α block, the learned-sd deviance, or the Pólya–Gamma stream)."""
+    """Masked cells leave the likelihood: y ×100 on the diagonal must leave
+    every posterior trace bit-identical (the diagonal pairs drop out, and no
+    masked count may reach a live η, the α block, a level's draw, or a
+    data-derived default prior)."""
     data = _flow(n=5, T=3, seed=7)
     n, T = 5, 3
     y = np.asarray(data["y"], dtype=np.int64).copy()
     y2 = y.reshape(T, n, n).copy()
     y2[:, np.eye(n, dtype=bool)] *= 100
     idatas = [_masked_diag_fit(yy, backend) for yy in (y, y2.reshape(-1))]
-    for var in ("rho_d", "rho_o", "beta", "alpha", "pair_effect_sd", "time_effect"):
+    for var in ("rho_d", "rho_o", "beta", "alpha", "time_effect"):
         a = idatas[0].posterior[var].values
         b = idatas[1].posterior[var].values
         assert np.array_equal(a, b), f"{var} traces differ under masked y x100"
@@ -384,7 +415,7 @@ def _covers(draws, truth, k=3.0):
 @pytest.mark.recovery
 def test_panel_two_way_recovery_beats_pooled():
     N, T, rho, beta = 225, 6, 0.4, np.array([0.5, 0.6])
-    d = simulate_sar_negbin(N=N, T=T, n_side=15, rho=rho, beta=beta, alpha=3.0, seed=11, fe_x_corr=0.7, unit_effects="random", unit_effect_sd=0.8, time_effects=True, time_effect_sd=0.3)  # fmt: skip
+    d = simulate_sar_negbin(N=N, T=T, n_side=15, rho=rho, beta=beta, alpha=3.0, seed=11, fe_x_corr=0.7, unit_effects="random", unit_effect_sd=0.8, time_effects=True, time_effect_sd=0.3, latent=False)  # fmt: skip
     fit = dict(draws=600, tune=400, chains=2, progressbar=False, random_seed=3)
     # The unit effects correlate with x, so the pooled-effects model needs the
     # Mundlak means to keep the slope unbiased.
@@ -412,49 +443,6 @@ def test_flow_separable_pair_effects_recovery():
     names = list(m._feature_names)
     for side, truth in (("dest_x0", 0.4), ("orig_x0", 0.4)):
         assert _covers(post["beta"].values[..., names.index(side)], truth)
-
-
-@pytest.mark.slow
-def test_structured_and_materialized_separable_kernels_agree():
-    """The NB separable panel's structured FE sweep vs the generic kernel."""
-    from neighbayes.samplers.count_panel._filters import FlowSeparableFilter
-
-    data = simulate_sar_negbin_flow(
-        n=6,
-        T=4,
-        seed=31,
-        fe_x_corr=0.5,
-        separable=True,
-        pair_effects="random",
-        pair_effect_sd=0.5,
-        time_effects=True,
-        time_effect_sd=0.3,
-    )
-    m = _flow_model(sar_negbin_separable, data, 4, effects=3)
-    fit = dict(draws=1500, tune=500, chains=2, progressbar=False, n_jobs=1)
-    structured = m.fit(random_seed=1, attach_log_abs_det=False, **fit)
-    pv = m._flow_count_priors()
-    generic = m._run_count_panel_gibbs(
-        FlowSeparableFilter(m._W_sparse, 4, -0.999, 0.999),
-        beta_mu=pv["beta_mu"],
-        beta_sigma=pv["beta_sigma"],
-        draws=1500,
-        tune=500,
-        chains=2,
-        random_seed=2,
-        progressbar=False,
-        n_jobs=1,
-        log_likelihood=False,
-        store_effects=True,
-        model_type="check",
-        separable_flow=True,
-    )
-    for var in ("rho_d", "rho_o", "beta", "time_effect", "alpha"):
-        a = structured.posterior[var].values
-        b = generic.posterior[var].values
-        sd = a.reshape(-1, *a.shape[2:]).std(0)
-        diff = np.abs(a.mean((0, 1)) - b.mean((0, 1)))
-        assert np.all(diff < 0.25 * sd), (var, diff, sd)
 
 
 @pytest.mark.slow
@@ -499,7 +487,7 @@ def _filter_solve(W, rho, b, T):
 
 def test_place_dgp_draws_unit_effects_inside_the_filter():
     N, T = 25, 3
-    d = simulate_sar_negbin(N=N, T=T, n_side=5, rho=0.5, unit_effects="random", unit_effect_sd=0.7, time_effects=True, seed=1)  # fmt: skip
+    d = simulate_sar_negbin(N=N, T=T, n_side=5, rho=0.5, unit_effects="random", unit_effect_sd=0.7, time_effects=True, seed=1, latent=False)  # fmt: skip
     pt_ = d["params_true"]
     inner = d["X"] @ pt_["beta"] + np.tile(pt_["unit_effect"], T)
     eta = _filter_solve(d["W_sparse"], pt_["rho"], inner, T)
@@ -531,7 +519,7 @@ def test_flow_dgp_draws_pair_effects_inside_the_filter(separable):
 
 def test_fitted_mean_puts_unit_effects_inside_the_filter():
     N, T = 25, 3
-    d = simulate_sar_negbin(N=N, T=T, n_side=5, rho=0.4, unit_effects="random", unit_effect_sd=0.7, time_effects=True, seed=2)  # fmt: skip
+    d = simulate_sar_negbin(N=N, T=T, n_side=5, rho=0.4, unit_effects="random", unit_effect_sd=0.7, time_effects=True, seed=2, latent=False)  # fmt: skip
     m = _place(SARNegBin, d, N, T, effects=3)
     m.fit(**QUICK)
     mean = lambda v: m._idata.posterior[v].mean(("chain", "draw")).values  # noqa: E731
@@ -544,7 +532,7 @@ def test_fitted_mean_puts_unit_effects_inside_the_filter():
 @pytest.mark.slow
 def test_spatial_unit_effects_gibbs_matches_nuts():
     """Effects inside the filter: Gibbs (collapsed SAR effect block) vs PyMC."""
-    d = simulate_sar_negbin(N=64, T=4, n_side=8, rho=0.5, alpha=3.0, seed=43, unit_effects="random", unit_effect_sd=0.6, time_effects=True, time_effect_sd=0.3)  # fmt: skip
+    d = simulate_sar_negbin(N=64, T=4, n_side=8, rho=0.5, alpha=3.0, seed=43, unit_effects="random", unit_effect_sd=0.6, time_effects=True, time_effect_sd=0.3, latent=False)  # fmt: skip
     gibbs = _place(SARNegBin, d, 64, 4, effects=3).fit(
         sampler="gibbs", draws=2000, tune=500, chains=2, progressbar=False,
         random_seed=1, n_jobs=1,
@@ -561,26 +549,9 @@ def test_spatial_unit_effects_gibbs_matches_nuts():
 
 
 @pytest.mark.slow
-def test_unrestricted_flow_pair_effects_gibbs_matches_nuts():
-    data = _flow(n=5, T=4, seed=3, rho_d=0.3, rho_o=0.2, rho_w=0.05, alpha=3.0, pair_effects="random", pair_effect_sd=0.5, time_effects=True, time_effect_sd=0.3)  # fmt: skip
-    gibbs = _flow_model(sar_negbin_flow, data, 4, effects=3).fit(
-        sampler="gibbs", draws=2000, tune=500, chains=2, progressbar=False,
-        random_seed=1, n_jobs=1,
-    )  # fmt: skip
-    nuts = _flow_model(sar_negbin_flow, data, 4, effects=3).fit(
-        sampler="nuts", draws=1000, tune=1000, chains=2, progressbar=False,
-        random_seed=1, target_accept=0.9,
-    )  # fmt: skip
-    for var in ("rho_d", "rho_o", "rho_w", "alpha", "pair_effect_sd", "beta"):
-        a, b = gibbs.posterior[var].values, nuts.posterior[var].values
-        a, b = a.reshape(-1, *a.shape[2:]), b.reshape(-1, *b.shape[2:])
-        assert np.all(np.abs(a.mean(0) - b.mean(0)) < 0.25 * b.std(0)), var
-
-
-@pytest.mark.slow
 @pytest.mark.parametrize("alpha_fixed", [None, 30.0])
 def test_unit_effects_gibbs_matches_nuts(alpha_fixed):
-    d = simulate_sar_negbin(N=64, T=4, n_side=8, rho=0.0, alpha=3.0, seed=41, fe_x_corr=0.5, unit_effects="random", unit_effect_sd=0.7, time_effects=True, time_effect_sd=0.3)  # fmt: skip
+    d = simulate_sar_negbin(N=64, T=4, n_side=8, rho=0.0, alpha=3.0, seed=41, fe_x_corr=0.5, unit_effects="random", unit_effect_sd=0.7, time_effects=True, time_effect_sd=0.3, latent=False)  # fmt: skip
     priors = None if alpha_fixed is None else {"alpha_fixed": alpha_fixed}
     gibbs = _place(NegBin, d, 64, 4, effects=3, priors=priors).fit(
         sampler="gibbs", draws=2000, tune=500, chains=2, progressbar=False,
@@ -608,15 +579,3 @@ def test_cg_diagnostic_warns_only_above_its_threshold():
         warn_unconverged_cg([0.0, _CG_WARN / 10])
     with pytest.warns(RuntimeWarning, match="conjugate-gradient"):
         warn_unconverged_cg([0.0, _CG_WARN * 10])
-
-
-@pytest.mark.requires_jax
-def test_separable_jax_pair_effects_cg_converges():
-    data = _flow(
-        pair_effects="random", pair_effect_sd=0.5, separable=True, time_effects=True
-    )
-    m = _flow_model(sar_negbin_separable, data, 3, effects=3)
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        m.fit(backend="jax", **QUICK)
-    assert not [w for w in caught if "conjugate-gradient" in str(w.message)]

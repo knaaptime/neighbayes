@@ -1,6 +1,6 @@
 r"""The latent SAR, SEM and SDEM logit and probit.
 
-Shared by ``SARLogit(latent=True)`` and :class:`SARProbit` (:math:`(I - \rho
+Shared by the unmarked :class:`SARLogit` and :class:`SARProbit` (:math:`(I - \rho
 W) y^* = X\beta + \varepsilon`), :class:`SEMLogit` and :class:`SEMProbit`
 (:math:`(I - \lambda W)(y^* - X\beta) = \varepsilon`) and the SDEMs, with
 :math:`y = \mathbf 1\{y^* > 0\}` and the disturbance the link's own: standard
@@ -105,7 +105,7 @@ class LatentLogitMixin(LatentBinaryMixin):
         return rng.logistic(size=size)
 
     @staticmethod
-    def _latent_outcome_weight(m, U, E, d, params, exact) -> np.ndarray:
+    def _latent_outcome_weight(m, U, E, d, params) -> np.ndarray:
         """The density of ``u_i`` at ``-m_i``, Rao-Blackwellized over ``ε_i``.
 
         ``u_i = d_i ε_i + v_i``; given ``v_i`` the density is the logistic's,
@@ -141,7 +141,7 @@ class LatentProbitMixin(LatentBinaryMixin):
         return rng.standard_normal(size=size)
 
     @staticmethod
-    def _latent_outcome_weight(m, U, E, d, params, exact) -> np.ndarray:
+    def _latent_outcome_weight(m, U, E, d, params) -> np.ndarray:
         """The density of ``u_i`` at ``-m_i``, Rao-Blackwellized over ``ε_i``.
 
         ``u_i = d_i ε_i + v_i``; given ``v_i`` the density is the normal's,

@@ -58,6 +58,7 @@ def test_krylov_vs_exact_same_posterior(small_nb_problem):
         y=p["y"],
         X=p["X"],
         W=p["W_sparse"],
+        latent=False,
     )
     idata_exact = model_exact.fit(
         draws=200,
@@ -74,6 +75,7 @@ def test_krylov_vs_exact_same_posterior(small_nb_problem):
         y=p["y"],
         X=p["X"],
         W=p["W_sparse"],
+        latent=False,
     )
     idata_krylov = model_krylov.fit(
         draws=200,

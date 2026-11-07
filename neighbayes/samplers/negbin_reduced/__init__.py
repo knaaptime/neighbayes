@@ -31,7 +31,6 @@ from ._flow import (
     FlowReducedGibbsCache,
     FlowReducedGibbsPriors,
     FlowReducedGibbsState,
-    run_chain_separable,
     run_chain_unrestricted,
 )
 from ._jax import run_chains_jax_reduced
@@ -44,7 +43,6 @@ __all__ = [
     "FlowReducedGibbsCache",
     "FlowReducedGibbsPriors",
     "FlowReducedGibbsState",
-    "run_chain_separable",
     "run_chain_unrestricted",
 ]
 

@@ -1,8 +1,8 @@
 """Gibbs samplers for the latent SAR hurdle and zero-inflated NB (:mod:`._core`).
 
 Registers ``("hurdle_latent", "cross_section")`` and ``("zinb_latent",
-"cross_section")``, which ``SARHurdleNegBin(latent=True)`` and
-``SARZINB(latent=True)`` use, on the NumPy and JAX (:mod:`._jax`) backends.
+"cross_section")``, which the latent ``SARHurdleNegBin`` and ``SARZINB``
+use, on the NumPy and JAX (:mod:`._jax`) backends.
 """
 
 from .._registry import register

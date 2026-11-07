@@ -295,7 +295,8 @@ class _DynamicPanelMixin:
             if "theta" in idata.posterior:
                 theta_draws = idata.posterior["theta"].values.reshape(-1)
                 mu = mu + theta_draws[:, None] * self._Wy_lag[None, :]
-            elif design.shape[1] == z_cols:
+            elif isinstance(self, _SDMRestrictedDynamic):
+                # Only the restricted Durbin form carries -rho*phi*W*y_{t-1}.
                 mu = mu - (
                     spatial_draws[:, None] * phi_draws[:, None] * self._Wy_lag[None, :]
                 )
@@ -375,6 +376,7 @@ class _DynamicPanelMixin:
                 nuts_sampler=nuts_sampler,
             )
 
+        self._idata = self._store_conditional_log_likelihood(self._idata)
         return self._idata
 
 

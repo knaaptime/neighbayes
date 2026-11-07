@@ -86,7 +86,7 @@ def simulate_sar_hurdle_negbin(
     err_hetero: bool = False,
     create_gdf: bool = False,
     geometry_type: str = "polygon",
-    latent: bool = False,
+    latent: bool = True,
 ) -> dict:
     r"""Simulate a reduced-form SAR hurdle NB cross-section.
 
@@ -97,8 +97,8 @@ def simulate_sar_hurdle_negbin(
 
     ``d ~ Bernoulli(logit⁻¹(η_z))`` and ``y = d · tNB(e^{η^c}, α)``.
 
-    With ``latent=True`` it draws the latent hurdle ``SARHurdleNegBin(latent=True)``
-    fits, each part's own disturbance propagated: ``d = 1(u > 0)``,
+    With ``latent=True``, the default, it draws the latent hurdle the unmarked
+    ``SARHurdleNegBin`` fits, each part's own disturbance propagated: ``d = 1(u > 0)``,
     ``u = (I − ρ_z W_z)⁻¹(X_z β_z + ε_z)`` with ``ε_z`` logistic, and
     ``y | d = 1`` Poisson(``e^η``) truncated at zero, ``η = (I − ρW)⁻¹(Xβ + ε)``
     with ``ε = log γ``, ``γ ~ Gamma(α, α)``; ``eta_zero`` and ``eta_cnt`` are
@@ -245,7 +245,7 @@ def _simulate_sar_hurdle_negbin_panel_re(
     gdf=None,
     n_side: int | None = None,
     contiguity: str = "queen",
-    latent: bool = False,
+    latent: bool = True,
 ) -> dict:
     r"""Simulate a SAR hurdle NB panel with unit and period effects in both parts.
 
@@ -261,8 +261,8 @@ def _simulate_sar_hurdle_negbin_panel_re(
     period, ``d_{it} ~ Bernoulli(logit⁻¹(η_{z,it}))`` and ``y = d · tNB``.
     Matches :class:`~neighbayes.models.SARHurdleNegBin` panels
     (``rho = rho_zero = 0`` gives the aspatial :class:`~neighbayes.models.HurdleNegBin`).
-    With ``latent=True`` it draws the latent panel,
-    ``SARHurdleNegBin(latent=True)``'s: each part's disturbance and period
+    With ``latent=True``, the default, it draws the latent panel,
+    ``SARHurdleNegBin``'s: each part's disturbance and period
     effect propagate with its unit effects, a count is positive where the
     utility :math:`(I - \rho_z W_z)^{-1}(X_{z,t}\beta_z + c_z + \tau_{z,t} +
     \varepsilon_{z,t})` is, logistic :math:`\varepsilon_z`, and then

@@ -41,6 +41,19 @@ _U_FULL = np.arange(-35, 36) * _H  # sinh-sinh nodes on the line
 _U_HALF = np.arange(-45, 36) * _H  # exp-sinh nodes on the half-line
 
 
+def log_gamma_noise(rng: np.random.Generator, alpha: float, size) -> np.ndarray:
+    """``log g``, ``g ~ Gamma(alpha, alpha)``: the latent negative binomial's disturbance.
+
+    Drawn as ``log G + log(U) / alpha``, ``G ~ Gamma(alpha + 1, alpha)`` and ``U``
+    uniform.  ``log(rng.gamma(alpha, 1 / alpha))`` underflows to ``-inf``
+    instead, for 0.06% of draws at ``alpha = 0.01`` and 2.4% at ``0.005``.
+    """
+    return (
+        np.log(rng.gamma(alpha + 1.0, 1.0 / alpha, size=size))
+        + np.log(rng.random(size)) / alpha
+    )
+
+
 @njit(cache=True)
 def _logf(e, fam, alpha):
     """Log density of a disturbance, up to a constant, and two derivatives."""

@@ -859,3 +859,137 @@ def flow_logdet_grad_exact(W, rho_d: float, rho_o: float, rho_w: float) -> np.nd
     g_o = -np.sum(li * inv).real
     g_w = -np.sum(li * lj * inv).real
     return np.array([g_d, g_o, g_w], dtype=np.float64)
+
+
+def separable_flow_pg_reference(y, X, W_csc, n, priors, init, draws, tune, rng, T=1):
+    """Draws of ``rho_d`` and ``rho_o`` from a separable NB flow reference sampler.
+
+    Pólya–Gamma Gibbs with exact Kronecker solves at every slice candidate: ω,
+    then ρ_d and ρ_o each with β integrated out, then β and α.  It shares no
+    block with the production sampler, which slices the exact NB2 likelihood,
+    so agreement between them checks both.
+    """
+    from neighbayes.samplers.negbin._core import GibbsState, _sample_alpha
+    from neighbayes.samplers.negbin_reduced._core import (
+        ReducedGibbsPriors,
+        _sample_beta,
+        _sample_omega,
+    )
+    from neighbayes.samplers.negbin_reduced._flow import (
+        FlowReducedGibbsCache,
+        FlowReducedGibbsState,
+        _sample_rho_k,
+        _solve_A_separable,
+    )
+
+    y = np.asarray(y, dtype=np.float64)
+    X = np.ascontiguousarray(X, dtype=np.float64)
+    cache = FlowReducedGibbsCache(
+        None, None, None, W_csc, n, separable=True, T=T, krylov_degree=0
+    )
+    core = ReducedGibbsPriors(
+        beta_mu=priors.beta_mu,
+        beta_sigma=priors.beta_sigma,
+        alpha_sigma=priors.alpha_sigma,
+        alpha_nu=priors.alpha_nu,
+        alpha_fixed=getattr(priors, "alpha_fixed", None),
+        rho_lower=priors.rho_lower,
+        rho_upper=priors.rho_upper,
+    )
+    state = FlowReducedGibbsState(
+        beta=np.asarray(init.beta, dtype=np.float64).copy(),
+        rho_d=float(init.rho_d),
+        rho_o=float(init.rho_o),
+        rho_w=None,
+        alpha=float(init.alpha),
+        omega=np.asarray(init.omega, dtype=np.float64).copy(),
+    )
+    ones = np.flatnonzero(np.all(X == 1.0, axis=0))
+    intercept_col = int(ones[0]) if ones.size else -1
+    eta = _solve_A_separable(state.rho_d, state.rho_o, X, W_csc, n, T=T) @ state.beta
+    out = {"rho_d": [], "rho_o": []}
+    for i in range(tune + draws):
+        state.omega = _sample_omega(y, state.alpha, eta - np.log(state.alpha), rng=rng)
+        for name in ("rho_d", "rho_o"):
+            value = _sample_rho_k(
+                name, state, cache, y, X, priors, rng=rng, sweep_idx=i, tune=tune,
+                basis=None, intercept_col=intercept_col,
+            )  # fmt: skip
+            setattr(state, name, value)
+        Xt = _solve_A_separable(state.rho_d, state.rho_o, X, W_csc, n, T=T)
+        state.beta = _sample_beta(
+            beta_current=state.beta, Xtilde=Xt, omega=state.omega, y=y,
+            alpha=state.alpha, priors=core, rng=rng, rho=0.0, intercept_col=-1,
+        )  # fmt: skip
+        eta = Xt @ state.beta
+        state.alpha = _sample_alpha(
+            GibbsState(eta=eta, beta=state.beta, rho=state.rho_d, alpha=state.alpha,
+                       omega=state.omega),
+            y, core, rng=rng,
+        )  # fmt: skip
+        if i >= tune:
+            out["rho_d"].append(state.rho_d)
+            out["rho_o"].append(state.rho_o)
+    return {name: np.asarray(v) for name, v in out.items()}
+
+
+class FlowSeparableFilter:
+    """Separable flow filter ``A = L_o ⊗ L_d`` (``ρ_w = −ρ_d ρ_o``) for the count
+    panel kernel, its ``n² × n²`` operator explicit (a test oracle: the package
+    samples the separable flows with the structured kernels)."""
+
+    names = ("rho_d", "rho_o")
+
+    def __init__(self, W: sp.spmatrix, T: int, lower: float, upper: float):
+        self.W_csc = sp.csc_matrix(W, dtype=np.float64)
+        self.n = self.W_csc.shape[0]
+        self.T = int(T)
+        self._bounds = (float(lower), float(upper))
+        self._unit_solvers = None
+
+    def admissible(self, rho: dict) -> bool:
+        lo, hi = self._bounds
+        return all(lo < rho[k] < hi for k in self.names)
+
+    def bounds(self, name: str) -> tuple[float, float]:
+        return self._bounds
+
+    def solve(self, rho: dict, X: np.ndarray) -> np.ndarray:
+        from neighbayes.samplers.negbin_reduced._flow import _solve_A_separable
+
+        return _solve_A_separable(
+            rho["rho_d"], rho["rho_o"], X, self.W_csc, self.n, T=self.T
+        )
+
+    def effect_operator(self, rho: dict) -> sp.csc_matrix:
+        """``A = L_o ⊗ L_d`` as an explicit ``n² × n²`` matrix (moderate ``n``)."""
+        eye = sp.eye(self.n, format="csc")
+        Lo = (eye - float(rho["rho_o"]) * self.W_csc).tocsc()
+        Ld = (eye - float(rho["rho_d"]) * self.W_csc).tocsc()
+        return sp.kron(Lo, Ld, format="csc")
+
+    def effect_gram(self, rho: dict):
+        """``(AᵀA, log|AᵀA|)``, ``log|A| = n(log|L_o| + log|L_d|)`` from two
+        ``n × n`` factorizations."""
+        from neighbayes.samplers.negbin_reduced._flow_structured import (
+            _FilterSolver,
+        )
+
+        if self._unit_solvers is None:
+            self._unit_solvers = (_FilterSolver(self.W_csc), _FilterSolver(self.W_csc))
+        so, sd = self._unit_solvers
+        A = self.effect_operator(rho)
+        logdet = (
+            so.at(float(rho["rho_o"])).logdet() + sd.at(float(rho["rho_d"])).logdet()
+        )
+        return (A.T @ A).tocsc(), 2.0 * self.n * logdet
+
+    def effect_pattern(self) -> sp.csc_matrix:
+        eye = sp.eye(self.n, format="csc")
+        W = self.W_csc
+        from neighbayes.samplers.count_panel._filters import _gram_pattern
+
+        return _gram_pattern(sp.kron(eye, W), sp.kron(W, eye), sp.kron(W, W))
+
+    def init(self, rng: np.random.Generator) -> dict:
+        return {k: float(rng.uniform(-0.1, 0.1)) for k in self.names}

@@ -771,17 +771,37 @@ def _noncentred_level(
 # ---------------------------------------------------------------------------
 
 
+def unit_log_joint(
+    st: MultilevelStructure, z: np.ndarray, rho0: float, sig2_0: float
+) -> float:
+    """``log p(y | effects)``, the joint density of the units given the effects."""
+    e = st.unit_resid(z, rho0)
+    total = float(-0.5 * (e @ e) / sig2_0 - 0.5 * len(e) * np.log(2.0 * np.pi * sig2_0))
+    lv0 = st.levels[0]
+    if lv0.spatial:
+        total += float(lv0.logdet(rho0))
+    return total
+
+
 def unit_loglik_pointwise(
     st: MultilevelStructure, z: np.ndarray, rho0: float, sig2_0: float
 ) -> np.ndarray:
-    """Pointwise log-likelihood of ``y`` given the effects, Jacobian spread over n."""
+    """``log p(y_i | y_-i, effects)``: each unit given the others and the effects.
+
+    A spatial process at the unit level couples the units, so the term
+    leave-one-out needs is the conditional (Bürkner, Gabry and Vehtari 2021,
+    Prop. 1), with ``e = (I - rho W) y - h`` under either process; without one it
+    is each unit's own density.
+    """
     e = st.unit_resid(z, rho0)
-    n = len(e)
-    ll = -0.5 * e * e / sig2_0 - 0.5 * np.log(2.0 * np.pi * sig2_0)
     lv0 = st.levels[0]
-    if lv0.spatial:
-        ll = ll + lv0.logdet(rho0) / n
-    return ll
+    if not lv0.spatial:
+        return -0.5 * e * e / sig2_0 - 0.5 * np.log(2.0 * np.pi * sig2_0)
+    W = lv0.W
+    g = (e - rho0 * (W.T @ e)) / sig2_0
+    squares = np.asarray(W.multiply(W).sum(axis=0)).ravel()
+    q = (1.0 - 2.0 * rho0 * W.diagonal() + rho0 * rho0 * squares) / sig2_0
+    return -0.5 * np.log(2.0 * np.pi) + 0.5 * np.log(q) - 0.5 * g * g / q
 
 
 def run_multilevel_chain(
@@ -855,6 +875,7 @@ def run_multilevel_chain(
             out[f"theta_{ell}"] = np.empty((n_keep, st.J[ell]))
     if store_log_lik:
         out["log_lik"] = np.empty((n_keep, st.J[0]))
+        out["log_joint"] = np.empty(n_keep)
 
     for it in range(tune + draws):
         _sample_sigma2_units(st, state, priors, rng)
@@ -885,6 +906,9 @@ def run_multilevel_chain(
                         out[f"theta_{ell}"][j] = st.theta(state.z, ell)
                 if store_log_lik:
                     out["log_lik"][j] = unit_loglik_pointwise(
+                        st, state.z, state.rho[0], state.sig2[0]
+                    )
+                    out["log_joint"][j] = unit_log_joint(
                         st, state.z, state.rho[0], state.sig2[0]
                     )
         if progress_manager is not None:

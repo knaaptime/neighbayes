@@ -122,6 +122,7 @@ class _ResolventFit:
                 (idata_kwargs or {}).get("log_likelihood", False)
             ),
         )
+        self._idata = self._store_conditional_log_likelihood(self._idata)
         return self._idata
 
     def _resolvent_kwargs(self) -> dict:
@@ -182,7 +183,98 @@ _COMMON_PARAMS = """
         LeSage's ``rval``), sampled by NUTS."""
 
 
-class OLSFlow(FlowDesigns, _Aspatial, FlowModel):
+class _GaussianFlowConditional:
+    """The stored pointwise term of a Gaussian flow: each flow given the others."""
+
+    def _store_conditional_log_likelihood(self, idata):
+        """Store ``log p(y_i | y_-i, theta)``; keep the joint in ``log_joint``.
+
+        The filter is ``I - par_d W_d - par_o W_o - par_w W_w`` with
+        ``W_d = I (x) W``, ``W_o = W (x) I`` and ``W_w = W (x) W`` on each period's
+        flows (Bürkner, Gabry and Vehtari 2021, Prop. 1; ``_base/_conditional.py``).
+        A robust flow with fixed effects has no such form and keeps the stored
+        term, with a warning.
+        """
+        import warnings
+
+        from .._base._conditional import (
+            gaussian_conditional_loglik,
+            student_t_conditional_loglik,
+        )
+        from .._base._shared import _write_log_likelihood_to_idata
+
+        if "log_likelihood" not in idata.children:
+            return idata
+        if self.robust and (self._fe_unit or self._fe_time):
+            warnings.warn(
+                "A robust flow with fixed effects has no conditional density "
+                "p(y_i | y_-i) in closed or one-dimensional form; its stored "
+                "log-likelihood is not a leave-one-out term.",
+                UserWarning,
+                stacklevel=3,
+            )
+            return idata
+        post = idata.posterior
+        chains, draws = post.sizes["chain"], post.sizes["draw"]
+        S = chains * draws
+        sigma = post["sigma"].values.reshape(-1)
+        prefix = next((p for p in ("rho", "lam") if f"{p}_d" in post), None)
+        if prefix is None:
+            par = np.zeros((S, 3))
+        else:
+            d = post[f"{prefix}_d"].values.reshape(-1)
+            o = post[f"{prefix}_o"].values.reshape(-1)
+            w = (
+                post[f"{prefix}_w"].values.reshape(-1)
+                if f"{prefix}_w" in post
+                else -d * o
+            )
+            par = np.column_stack([d, o, w])
+        W = sp.csr_matrix(self._W_sparse)
+        I_n = sp.identity(self._n, format="csr")
+        Ws = [
+            sp.kron(I_n, W, format="csr"),
+            sp.kron(W, I_n, format="csr"),
+            sp.kron(W, W, format="csr"),
+        ]
+        T, N = self._T, self._N
+        X = np.asarray(self._X, dtype=np.float64)
+        beta = post["beta"].values.reshape(S, -1)
+        if beta.shape[1] != X.shape[1]:
+            raise ValueError(
+                f"beta has {beta.shape[1]} columns; the design has {X.shape[1]}."
+            )
+
+        def filtered(M):
+            """``M - sum_k par_k W_k M`` per period, for ``M`` of shape (draws, N*T)."""
+            out = M.copy()
+            flat = M.reshape(-1, N).T
+            for k, Wk in enumerate(Ws):
+                lagged = np.asarray(Wk @ flat).T.reshape(M.shape)
+                out -= par[:, [k]] * lagged
+            return out
+
+        y = np.broadcast_to(np.asarray(self._y, dtype=np.float64), (S, N * T))
+        if prefix == "lam":
+            e = filtered(y - beta @ X.T)
+        else:
+            e = filtered(np.array(y)) - beta @ X.T
+        stored = idata.log_likelihood["obs"].values
+        idata["log_joint"] = xr.Dataset(
+            {"obs": (("chain", "draw"), stored.reshape(chains, draws, -1).sum(axis=-1))}
+        )
+        if self.robust:
+            ll = student_t_conditional_loglik(e, par, sigma, self._nu, Ws, T=T)
+        else:
+            c = 1.0 / T if self._fe_unit else 0.0
+            ll = gaussian_conditional_loglik(
+                e, par, sigma**2, Ws, T=T, c=c, time_effects=self._fe_time
+            )
+        _write_log_likelihood_to_idata(idata, ll.reshape(chains, draws, -1))
+        return idata
+
+
+class OLSFlow(_GaussianFlowConditional, FlowDesigns, _Aspatial, FlowModel):
     r"""Non-spatial Bayesian origin-destination gravity model.
 
     The conventional log-linear gravity specification of
@@ -219,7 +311,7 @@ class OLSFlow(FlowDesigns, _Aspatial, FlowModel):
         return model
 
 
-class SARFlow(FlowDesigns, _ResolventFit, FlowModel):
+class SARFlow(_GaussianFlowConditional, FlowDesigns, _ResolventFit, FlowModel):
     r"""Bayesian SAR origin-destination flow model.
 
     .. math::
@@ -362,7 +454,7 @@ class SARFlow(FlowDesigns, _ResolventFit, FlowModel):
         return self._effects_separable(draws)
 
 
-class SEMFlow(FlowDesigns, _ResolventFit, FlowModel):
+class SEMFlow(_GaussianFlowConditional, FlowDesigns, _ResolventFit, FlowModel):
     r"""Bayesian spatial-error origin-destination flow model.
 
     .. math::

@@ -1,26 +1,27 @@
-r"""Reduced-form SAR-logit with Pólya–Gamma Gibbs sampler.
+r"""SAR logit: the latent SAR, or the reduced form with ``latent=False``.
+
+The unmarked ``SARLogit`` is the latent SAR (ADR 0004), which propagates the
+logit's own disturbance, ``y = 1{(I - ρW)⁻¹(Xβ + ε) > 0}`` with ε standard
+logistic (:mod:`._latent_binary`).
+
+``latent=False`` is the reduced form, Krisztin et al.'s (2022) SAR logit,
 
 .. math::
 
     y_i \sim \mathrm{Bernoulli}(\mathrm{logit}^{-1}(\eta_i)), \quad
-    \eta = (I - \rho W)^{-1} X\beta
+    \eta = (I - \rho W)^{-1} X\beta,
 
-This is the canonical spatial binary model: the spatial lag enters the
-*linear predictor* as a deterministic mean-propagator (there is **no**
-latent noise field, so σ does not appear).  The ``|I − ρW|`` Jacobian
-cancels when β is marginalized out, making the ρ conditional linear and
-Krylov-accelerable.  The Pólya–Gamma augmentation yields fully conjugate
-Gibbs updates for β and ρ (via a collapsed slice sampler).
+whose spatial lag enters the *linear predictor* as a deterministic
+mean-propagator (there is **no** latent noise field, so σ does not appear).
+The ``|I − ρW|`` Jacobian cancels when β is marginalized out, making the ρ
+conditional linear and Krylov-accelerable.  The Pólya–Gamma augmentation
+yields fully conjugate Gibbs updates for β and ρ (via a collapsed slice
+sampler).  Both backends fit it: ``backend="jax"`` (the default) runs the
+chains in parallel threads, one ``jax.jit`` program each; ``"numpy"`` uses
+the CHOLMOD factorization path.
 
-Both backends fit the same model: ``backend="jax"`` (the default via
-``"auto"``) runs the chains in parallel threads, one ``jax.jit`` program each;
-``"numpy"`` uses the CHOLMOD factorization path.  There is no SAR logit with
-random effects: in a cross-section their sd and ρ are barely identified from
-binary outcomes.
-
-``latent=True`` selects the latent SAR, which propagates the logit's own
-disturbance, ``y = 1{(I - ρW)⁻¹(Xβ + ε) > 0}`` with ε standard logistic
-(:mod:`._latent_binary`).
+There is no SAR logit with random effects: in a cross-section their sd and ρ
+are barely identified from binary outcomes.
 
 Use this model when:
 - The response is binary (0/1).
@@ -44,7 +45,7 @@ from ._reduced_binary import ReducedBinaryMixin
 
 
 class SARLogit(BinaryDesigns, ReducedBinaryMixin, LatentLogitMixin, SpatialModel):
-    """Bayesian SAR logit: the reduced form, or the latent SAR with ``latent=True``.
+    """Bayesian SAR logit: the latent SAR, or the reduced form with ``latent=False``.
 
     Parameters
     ----------
@@ -90,8 +91,8 @@ class SARLogit(BinaryDesigns, ReducedBinaryMixin, LatentLogitMixin, SpatialModel
         raises.
     robust : bool, default False
         Not supported. Raises ``NotImplementedError`` if True.
-    latent : bool, default False
-        Fit the latent SAR instead of the reduced form:
+    latent : bool, default True
+        The latent SAR; ``False`` fits the reduced form.  The latent SAR is
 
         .. math::
             y_i = \\mathbb 1\\{y^*_i > 0\\}, \\qquad
@@ -138,6 +139,7 @@ class SARLogit(BinaryDesigns, ReducedBinaryMixin, LatentLogitMixin, SpatialModel
         "latent": {"_gibbs_key": ("binary_latent", "cross_section")},
     }
     _latent_process = "sar"
+    _latent_default = True
 
     def impacts(
         self,

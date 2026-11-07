@@ -46,6 +46,8 @@ def _simulate_panel_count(
         warnings.warn(
             "err_hetero does not apply to count DGPs and is ignored.", stacklevel=3
         )
+    from ..samplers._utils._latent_loglik import log_gamma_noise
+
     rng = ensure_rng(rng, seed)
     Ws, Wg = resolve_weights(W=W, gdf=gdf, n_side=n_side, contiguity=contiguity)
     if Ws.shape[0] != N:
@@ -73,7 +75,7 @@ def _simulate_panel_count(
         X_t = np.column_stack([np.ones(N), Z])
         if latent:
             # Each period's gamma disturbance, and the period effect, propagate.
-            eps = np.log(rng.gamma(alpha, 1.0 / alpha, size=N))
+            eps = log_gamma_noise(rng, alpha, N)
             eta = solve(X_t @ beta + unit_effect + time_effect[t] + eps)
             mu = np.exp(np.clip(eta, -30.0, 30.0))
             y_t = rng.poisson(mu)
@@ -120,13 +122,13 @@ def _simulate_sar_negbin_panel_re(
     gdf=None,
     n_side: int | None = None,
     contiguity: str = "queen",
-    latent: bool = False,
+    latent: bool = True,
 ) -> dict:
     r"""Simulate a spatial-lag NB2 count panel, stacked time-first.
 
     The reduced form, :math:`\eta_t = A^{-1}(X_t\beta + c) + \tau_t` with NB2
-    counts, or with ``latent=True`` the latent SAR that
-    ``SARNegBin(latent=True)`` fits, :math:`A\eta_t = X_t\beta + \tau_t + c +
+    counts, or with ``latent=True`` (the default) the latent SAR that
+    ``SARNegBin`` fits, :math:`A\eta_t = X_t\beta + \tau_t + c +
     \varepsilon_t`, :math:`\varepsilon_{it} = \log\gamma_{it}`, and Poisson
     counts given :math:`\eta`.
 
@@ -186,7 +188,7 @@ def _simulate_sar_zinb_panel_re(
     gdf=None,
     n_side: int | None = None,
     contiguity: str = "queen",
-    latent: bool = False,
+    latent: bool = True,
 ) -> dict:
     r"""Simulate a zero-inflated SAR-NB panel with per-period structural zeros.
 
@@ -201,8 +203,8 @@ def _simulate_sar_zinb_panel_re(
     with a fresh zero-part design ``X_{z,t}`` (intercept plus standard-normal
     columns) each period, and ``y = d · y_NB``.  Matches
     :class:`~neighbayes.models.SARZINB` panels (``rho = rho_zero = 0`` gives
-    the aspatial :class:`~neighbayes.models.ZINB`).  With ``latent=True`` it
-    draws the latent panel, ``SARZINB(latent=True)``'s: the count part
+    the aspatial :class:`~neighbayes.models.ZINB`).  With ``latent=True`` (the
+    default) it draws the latent panel, ``SARZINB``'s: the count part
     :func:`_simulate_sar_negbin_panel_re`'s latent one, a unit active where its
     utility :math:`(I - \rho_z W_z)^{-1}(X_{z,t}\beta_z + \varepsilon_{z,t})`
     is positive, logistic :math:`\varepsilon_z` (``eta_zero`` holds the

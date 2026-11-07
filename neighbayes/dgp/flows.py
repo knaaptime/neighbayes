@@ -509,6 +509,8 @@ def simulate_sar_negbin_flow(
     err_hetero: bool = False,
     gdf: object = None,
     knn_k: int = 4,
+    origin_effect_sd: float | None = None,
+    destination_effect_sd: float | None = None,
 ) -> dict:
     r"""Generate synthetic O-D flow counts from an NB2 SAR flow DGP.
 
@@ -576,6 +578,12 @@ def simulate_sar_negbin_flow(
         NB model (the variance is determined by the mean and alpha).
     gdf : GeoDataFrame or None, default None
         Accepted for API parity; ignored (use *G* instead).
+    origin_effect_sd, destination_effect_sd : float or None, default None
+        Origin levels :math:`\gamma_i \sim N(0, \cdot^2)` and destination
+        levels :math:`\kappa_j \sim N(0, \cdot^2)` added to the log-mean after
+        the filter, :math:`\eta_{ij} + \gamma_i + \kappa_j`: the random
+        balancing factors of ``origin_effects="random"`` and
+        ``destination_effects="random"``.  ``None`` leaves them out.
 
     Returns
     -------
@@ -583,7 +591,9 @@ def simulate_sar_negbin_flow(
         ``y_vec`` : np.ndarray, shape (N,), dtype int64
             Flattened count observations.
         ``y_mat`` : np.ndarray, shape (n, n), dtype int64
-            Count observations reshaped as an O×D matrix.
+            Count observations reshaped as an O×D matrix (rows are origins).
+        ``origin_effect``, ``destination_effect`` : np.ndarray, shape (n,)
+            The levels, when their sd is given.
         ``eta_vec`` : np.ndarray, shape (N,)
             Log-mean (spatially filtered linear predictor).
         ``lambda_vec`` : np.ndarray, shape (N,)
@@ -654,6 +664,13 @@ def simulate_sar_negbin_flow(
 
     # --- Solve A eta = Xbeta  (reduced form: no sigma, no noise) ---
     eta_vec = _spsolve_flow(A, Xbeta)
+    levels = {}
+    if origin_effect_sd is not None:
+        levels["origin_effect"] = origin_effect_sd * rng.standard_normal(n)
+        eta_vec = eta_vec + np.repeat(levels["origin_effect"], n)
+    if destination_effect_sd is not None:
+        levels["destination_effect"] = destination_effect_sd * rng.standard_normal(n)
+        eta_vec = eta_vec + np.tile(levels["destination_effect"], n)
 
     lambda_vec = np.exp(eta_vec)
     p_nb = alpha / (alpha + lambda_vec)
@@ -681,6 +698,7 @@ def simulate_sar_negbin_flow(
         "beta_o": beta_o_arr,
         "gamma_dist": gamma_dist,
         "alpha": float(alpha),
+        **levels,
     }
 
 

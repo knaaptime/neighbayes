@@ -75,7 +75,7 @@ def test_flow_cross_section(cls, backend):
     "cls,effects,backend",
     [
         (sar_negbin_flow, 0, "numpy"),
-        (sar_negbin_flow, 3, "numpy"),
+        (sar_negbin_flow, 2, "numpy"),  # the unrestricted panel's only effects
         (sar_negbin_separable, 0, "numpy"),
         (sar_negbin_separable, 3, "numpy"),
         pytest.param(sar_negbin_separable, 3, "jax", marks=pytest.mark.requires_jax),
@@ -125,6 +125,7 @@ def test_panels(cls, effects):
             priors={"alpha_fixed": A},
         ),
         lambda: SARNegBin(
+            latent=False,
             y=_cross_section()[0]["y"],
             X=_cross_section()[0]["X"],
             W=_cross_section()[1],
@@ -138,6 +139,7 @@ def test_panels(cls, effects):
             priors={"alpha_fixed": A},
         ),
         lambda: SARNegBin(
+            latent=False,
             y=dgp.simulate_sar_negbin(N=16, T=3, n_side=4, seed=4)["y"],
             X=dgp.simulate_sar_negbin(N=16, T=3, n_side=4, seed=4)["X"],
             W=dgp.simulate_sar_negbin(N=16, T=3, n_side=4, seed=4)["W_sparse"],

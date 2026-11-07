@@ -26,7 +26,7 @@ A = 23.0
 
 
 def _xs(n_side=7, seed=0):
-    return dgp.simulate_sar_zinb(n_side=n_side, seed=seed)
+    return dgp.simulate_sar_zinb(n_side=n_side, seed=seed, latent=False)
 
 
 def _panel(seed=1):
@@ -39,6 +39,7 @@ def _panel(seed=1):
         unit_effect_sd=0.5,
         time_effects=True,
         time_effect_sd=0.3,
+        latent=False,
     )
 
 
@@ -99,7 +100,12 @@ class TestFixes:
             "alpha_fixed": A,
         }
         m = SARZINB(
-            y=d["y"], X=d["X"], X_zero=d["X_zero"], W=d["W_graph"], priors=priors
+            y=d["y"],
+            X=d["X"],
+            X_zero=d["X_zero"],
+            W=d["W_graph"],
+            priors=priors,
+            latent=False,
         )
         pv = m._zinb_priors()
         assert pv.lam_lower == -0.5 and pv.alpha_fixed == A
@@ -108,7 +114,7 @@ class TestFixes:
     def test_zinb_dgp_selection_is_reduced_form(self):
         from neighbayes.dgp.utils import spatial_filter_factor
 
-        d = dgp.simulate_sar_zinb(n_side=6, seed=3, rho_zero=0.3)
+        d = dgp.simulate_sar_zinb(n_side=6, seed=3, rho_zero=0.3, latent=False)
         expected = spatial_filter_factor(d["W_sparse"], 0.3)(
             d["X_zero"] @ d["params_true"]["beta_zero"]
         )
@@ -117,7 +123,7 @@ class TestFixes:
     def test_logit_dgp_reduced_form_option(self):
         from neighbayes.dgp.utils import spatial_filter_factor
 
-        d = dgp.simulate_sar_logit(n_side=6, seed=4, rho=0.3)
+        d = dgp.simulate_sar_logit(n_side=6, seed=4, rho=0.3, latent=False)
         expected = spatial_filter_factor(d["W_sparse"], 0.3)(
             d["X"] @ d["params_true"]["beta"]
         )
@@ -128,7 +134,9 @@ class TestFixes:
         from neighbayes.dgp.flows import _graph_to_csr
         from neighbayes.dgp.utils import spatial_filter_factor
 
-        d = dgp.simulate_sar_zinb(n_side=6, seed=3, rho_zero=0.5, target_pi=0.4)
+        d = dgp.simulate_sar_zinb(
+            n_side=6, seed=3, rho_zero=0.5, target_pi=0.4, latent=False
+        )
         expected = spatial_filter_factor(d["W_zero_sparse"], 0.5)(
             d["X_zero"] @ d["params_true"]["beta_zero"]
         )
@@ -155,8 +163,10 @@ class TestFixes:
     def test_jax_alpha_support_matches_numpy(self):
         """The JAX α slice once stopped at e⁴ ≈ 55; near-Poisson data needs more."""
         rng = np.random.default_rng(5)
-        d = dgp.simulate_sar_zinb(n_side=15, seed=5, alpha=400.0, rng=rng)
-        m = SARZINB(y=d["y"], X=d["X"], X_zero=d["X_zero"], W=d["W_graph"])
+        d = dgp.simulate_sar_zinb(n_side=15, seed=5, alpha=400.0, rng=rng, latent=False)
+        m = SARZINB(
+            y=d["y"], X=d["X"], X_zero=d["X_zero"], W=d["W_graph"], latent=False
+        )
         idata = m.fit(draws=600, tune=600, chains=2, progressbar=False, backend="jax")
         assert float(idata.posterior["alpha"].max()) > 60.0
 
@@ -183,12 +193,15 @@ class TestSARZINB:
             X_zero=d["X_zero"],
             W=d["W_graph"],
             priors={"alpha_fixed": A},
+            latent=False,
         )
         assert np.allclose(m.fit(**QUICK, **kw).posterior["alpha"].values, A)
 
     def test_nuts_model(self):
         d = _xs()
-        m = SARZINB(y=d["y"], X=d["X"], X_zero=d["X_zero"], W=d["W_graph"])
+        m = SARZINB(
+            y=d["y"], X=d["X"], X_zero=d["X_zero"], W=d["W_graph"], latent=False
+        )
         model = m._build_pymc_model()
         assert {"rho_zero", "beta_zero", "rho", "beta", "alpha", "obs"} <= set(
             model.named_vars
@@ -197,10 +210,12 @@ class TestSARZINB:
     def test_selection_names_and_formula(self):
         d = _xs()
         Zdf = pd.DataFrame(d["X_zero"], columns=["Intercept", "zq"])
-        m = SARZINB(y=d["y"], X=d["X"], X_zero=Zdf, W=d["W_graph"])
+        m = SARZINB(y=d["y"], X=d["X"], X_zero=Zdf, W=d["W_graph"], latent=False)
         assert m._sel_feature_names == ["Intercept", "zq"]
         frame = pd.DataFrame({"y": d["y"], "x": d["X"][:, 1], "zq": d["X_zero"][:, 1]})
-        m2 = SARZINB("y ~ x", data=frame, W=d["W_graph"], formula_zero="~ zq")
+        m2 = SARZINB(
+            "y ~ x", data=frame, W=d["W_graph"], formula_zero="~ zq", latent=False
+        )
         assert m2._sel_feature_names == ["Intercept", "zq"]
         np.testing.assert_allclose(m2._Z, d["X_zero"])
         with pytest.raises(ValueError, match="not both"):
@@ -210,11 +225,14 @@ class TestSARZINB:
                 W=d["W_graph"],
                 X_zero=d["X_zero"],
                 formula_zero="~ zq",
+                latent=False,
             )
 
     def test_posterior_summaries(self):
         d = _xs()
-        m = SARZINB(y=d["y"], X=d["X"], X_zero=d["X_zero"], W=d["W_graph"])
+        m = SARZINB(
+            y=d["y"], X=d["X"], X_zero=d["X_zero"], W=d["W_graph"], latent=False
+        )
         m.fit(backend="numpy", n_jobs=1, **QUICK)
         n = d["y"].size
         pp = m.posterior_predictive(n_draws=4, random_seed=0)
@@ -239,6 +257,7 @@ class TestSARZINB:
 def test_zinb_panel_api(cls, effects, sampler):
     d = _panel()
     m = cls(
+        latent=False,
         y=d["y"],
         X=d["X"],
         X_zero=d["X_zero"],
@@ -274,6 +293,7 @@ def test_zinb_panel_registry_and_storage():
         N=25,
         T=3,
         priors={"alpha_fixed": A},
+        latent=False,
     )
     idata = m.fit(store_effects=False, thin=2, n_jobs=1, **QUICK)
     assert idata.posterior["beta"].shape[1] == QUICK["draws"] // 2
@@ -375,9 +395,16 @@ def test_flow_zinb_guards():
 )
 @pytest.mark.parametrize("alpha_fixed", [None, 15.0])
 def test_sarzinb_gibbs_matches_nuts(backend, alpha_fixed):
-    d = dgp.simulate_sar_zinb(n_side=14, seed=3, rho=0.4, rho_zero=0.3)
+    d = dgp.simulate_sar_zinb(n_side=14, seed=3, rho=0.4, rho_zero=0.3, latent=False)
     priors = None if alpha_fixed is None else {"alpha_fixed": alpha_fixed}
-    m = SARZINB(y=d["y"], X=d["X"], X_zero=d["X_zero"], W=d["W_graph"], priors=priors)
+    m = SARZINB(
+        y=d["y"],
+        X=d["X"],
+        X_zero=d["X_zero"],
+        W=d["W_graph"],
+        priors=priors,
+        latent=False,
+    )
     g = m.fit(
         draws=3000, tune=1000, chains=4, progressbar=False, random_seed=1,
         backend=backend, n_jobs=4,
@@ -398,8 +425,8 @@ def test_generic_kernel_matches_sarzinb():
     from neighbayes.samplers.count_panel._filters import SARFilter
     from neighbayes.samplers.zinb._generic import ZINBPriors, run_chain
 
-    d = dgp.simulate_sar_zinb(n_side=14, seed=3, rho=0.4, rho_zero=0.3)
-    m = SARZINB(y=d["y"], X=d["X"], X_zero=d["X_zero"], W=d["W_graph"])
+    d = dgp.simulate_sar_zinb(n_side=14, seed=3, rho=0.4, rho_zero=0.3, latent=False)
+    m = SARZINB(y=d["y"], X=d["X"], X_zero=d["X_zero"], W=d["W_graph"], latent=False)
     ref = m.fit(
         draws=3000, tune=1000, chains=4, progressbar=False, random_seed=1, n_jobs=4
     ).posterior
@@ -434,7 +461,7 @@ def test_generic_kernel_matches_sarzinb():
 
 @pytest.mark.slow
 def test_zinb_panel_gibbs_matches_nuts():
-    d = dgp.simulate_sar_zinb(N=49, T=4, n_side=7, seed=2, fe_x_corr=0.5, unit_effects="random", unit_effect_sd=0.6, time_effects=True, time_effect_sd=0.3)  # fmt: skip
+    d = dgp.simulate_sar_zinb(N=49, T=4, n_side=7, seed=2, fe_x_corr=0.5, unit_effects="random", unit_effect_sd=0.6, time_effects=True, time_effect_sd=0.3, latent=False)  # fmt: skip
     m = SARZINB(
         unit_effects="random",
         time_effects=True,
@@ -444,6 +471,7 @@ def test_zinb_panel_gibbs_matches_nuts():
         W=d["W_sparse"],
         N=49,
         T=4,
+        latent=False,
     )
     g = m.fit(
         draws=4000, tune=1000, chains=4, progressbar=False, random_seed=1, n_jobs=4

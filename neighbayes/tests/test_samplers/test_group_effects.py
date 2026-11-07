@@ -158,11 +158,9 @@ def test_structured_gram_block_matches_materialized(n_tau_full):
 @pytest.mark.parametrize("pairs", [True, False])
 @pytest.mark.parametrize("n_tau_full", [True, False])
 def test_structured_jax_moments_match_numpy(pairs, n_tau_full):
-    # With pair effects the sweep holds them (they are no longer integrated
-    # out), so the moment block is the same either way; both sweeps build it.
-    """The JAX moment block against the NumPy ``_gram_block``."""
-    from types import SimpleNamespace
-
+    # With pair effects the equation holds them (they are not integrated
+    # out), so the moment block is the same either way; both equations build it.
+    """The JAX equation's moment block against the NumPy ``_gram_block``."""
     import jax.numpy as jnp
     import scipy.sparse as sp
 
@@ -172,7 +170,7 @@ def test_structured_jax_moments_match_numpy(pairs, n_tau_full):
     )
     from neighbayes.samplers.negbin_reduced._flow_structured_fe import _gram_block
     from neighbayes.samplers.negbin_reduced._flow_structured_fe_jax import (
-        make_structured_fe_sweep,
+        make_structured_equation,
     )
 
     ensure_x64()
@@ -182,21 +180,13 @@ def test_structured_jax_moments_match_numpy(pairs, n_tau_full):
     struct = classify_flow_design(X, n, T)
     W = sp.random(n, n, density=0.5, random_state=0, format="csc")
     n_tau = T if n_tau_full else T - 1
-    priors = SimpleNamespace(
-        beta_mu=np.zeros(k),
-        beta_sigma=np.ones(k),
-        alpha_sigma=2.5,
-        alpha_nu=3.0,
-        rho_lower=-0.9,
-        rho_upper=0.9,
-    )
-    s = 1.3
-    sweep, _, _ = make_structured_fe_sweep(
-        np.ones(T * n * n),
+    eq = make_structured_equation(
         W,
         struct,
-        priors,
-        pair_effects=(0.0, s) if pairs else None,
+        np.zeros(k),
+        np.ones(k),
+        rho_bounds=(-0.9, 0.9),
+        pair_effects=(0.0, 1.3) if pairs else None,
         period_effects=(0.0, 2.0, n_tau),
     )
     Oms = rng.gamma(2.0, 0.5, size=(T, n, n))
@@ -206,7 +196,7 @@ def test_structured_jax_moments_match_numpy(pairs, n_tau_full):
     ref = _gram_block(
         list(Oms), list(Rs), lambda t: cols[t], prec, np.full(n_tau, 0.25)
     )
-    got = sweep.kernels["moments"](
+    got = eq.moments(
         lambda t: jnp.asarray(cols)[t],
         lambda t: jnp.asarray(Rs)[t],
         k,

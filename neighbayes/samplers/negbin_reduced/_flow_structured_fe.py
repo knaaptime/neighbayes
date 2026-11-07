@@ -1,4 +1,4 @@
-r"""Structured separable NB flow sweep with pair and period effects.
+r"""One separable flow equation with pair and period effects, given working data.
 
 Extends :mod:`._flow_structured` (read it first) to
 
@@ -10,33 +10,35 @@ Extends :mod:`._flow_structured` (read it first) to
 with ``C`` the ``n × n`` array of random pair effects, inside the filter with
 the covariates, and ``τ_t`` period effects outside it — for the last
 ``n_tau`` periods (``T − 1`` beside pair effects, ``τ_0 = 0``; all ``T``
-without them).  The sweep carries the working effects ``C̃ = A⁻¹C``
-(``A = L_o ⊗ L_d``, so ``A⁻¹C = L_o⁻¹ C L_d⁻ᵀ``), whose prior
-``N(μA⁻¹1, σ²(AᵀA)⁻¹)`` depends on ρ.  Its ``n² × n²`` precision cannot be
-factored at scale, so — unlike the generic kernel of
-:mod:`neighbayes.samplers.count_panel`, which integrates the effects out — the
-effects are held while ρ moves and drawn by conjugate gradients.
+without them).  :class:`StructuredEquation` is the equation block of the
+two-part flow samplers (:mod:`neighbayes.samplers.zinb`,
+:mod:`neighbayes.samplers.hurdle`), which supply its Gaussian working data
+(Pólya–Gamma precisions and responses) and draw the rest of their sweep.
 
-**Sweep** (partially collapsed Gibbs):
+The equation carries the working effects ``C̃ = A⁻¹C`` (``A = L_o ⊗ L_d``, so
+``A⁻¹C = L_o⁻¹ C L_d⁻ᵀ``), whose prior ``N(μA⁻¹1, σ²(AᵀA)⁻¹)`` depends on ρ.
+Its ``n² × n²`` precision cannot be factored at scale, so — unlike the generic
+kernel of :mod:`neighbayes.samplers.count_panel`, which integrates the effects
+out — the effects are held while ρ moves and drawn by conjugate gradients.
 
-1. ``ω ~ PG(y + α, η − log α)``.
-2. ``ρ_d`` then ``ρ_o`` by slice sampling with every coefficient ``β`` and
+**Update** (partially collapsed):
+
+1. ``ρ_d`` then ``ρ_o`` by slice sampling with every coefficient ``β`` and
    the period effects ``τ`` integrated out (as in :mod:`._flow_structured`),
    twice: centred,
    with ``C̃`` held and its prior ``n log|L_o||L_d| − ‖AC̃ − μ‖²/2σ²`` in the
    density; then non-centred, with ``C`` held and ``C̃ = A(ρ)⁻¹C`` moving.
    Interweaving the two keeps ρ mixing whether the data pin the effects or
    the prior does.
-3. ``(β, τ) | ρ, C̃`` from the Schur Gram, then ``C̃ | β, τ`` from
+2. ``(β, τ) | ρ, C̃`` from the Schur Gram, then ``C̃ | β, τ`` from
    ``N(P⁻¹b, P⁻¹)``, ``P = Σ_t Ω_t + AᵀA/σ²``, by Jacobi-preconditioned
    conjugate gradients on a perturbed right-hand side (exact to the solver's
    tolerance), warm-started at the last draw.
-4. The time-invariant columns ``J`` (intercept, distance, intraunit
+3. The time-invariant columns ``J`` (intercept, distance, intraunit
    indicators) trade off exactly with ``C``: ``β_J + t``, ``C − Z_J t`` leaves
    η unchanged, so ``t`` is drawn from the two priors alone.  Without this
    move the effects pin those coefficients and they barely mix.
-5. The pair-effect sd: centred ``σ | C``, then non-centred ``σ | C/σ``.
-6. ``α`` by slice sampling on ``log α``.
+4. The pair-effect sd: centred ``σ | C``, then non-centred ``σ | C/σ``.
 
 Nothing ``N × N`` is formed; the extra memory is a few ``n × n`` arrays per
 column and per CG iterate.
@@ -50,16 +52,12 @@ import numpy as np
 import scipy.sparse as sp
 from scipy.linalg import cho_factor, cho_solve, solve_triangular
 
-from .._utils._count_loglik import nb_eta_loglik
 from .._utils._slice import (
     SliceWidthState,
     slice_sample_1d_adaptive,
     update_slice_width,
 )
 from .._utils._spatial_normal import FACTORIZATION_ERRORS
-from ..negbin._core import GibbsState as _StructuralState
-from ..negbin._core import _nb_loglik_pointwise, _sample_alpha
-from ._core import ReducedGibbsPriors, _sample_omega
 from ._flow_structured import (
     FlowDesignStructure,
     _FilterSolver,
@@ -114,31 +112,6 @@ def _gram_block(Oms, Rs, cols_of, prec, prec_tau):
                 M[j, :k] += cross
     M[np.diag_indices(K)] += np.concatenate([prec, prec_tau])
     return M, v, quad
-
-
-def _normalize_cell_mask(cell_mask, T: int, n: int):
-    """Validate a cell mask and flatten it to ``(T·n·n,)`` bool, or ``None``.
-
-    Accepts a bool array shaped ``(T, n, n)``, ``(T·n·n,)`` or ``(n, n)``
-    (broadcast over periods); ``True`` marks a live cell.  The flat order is
-    C-contiguous time-first, matching the stacked response.
-    """
-    if cell_mask is None:
-        return None
-    m = np.asarray(cell_mask)
-    if m.dtype != bool:
-        m = m.astype(bool)
-    N = T * n * n
-    if m.shape == (T, n, n):
-        return m.reshape(N)
-    if m.shape == (N,):
-        return m
-    if m.shape == (n, n):
-        return np.broadcast_to(m, (T, n, n)).reshape(N).copy()
-    raise ValueError(
-        f"cell_mask must be bool of shape {(T, n, n)}, {(N,)} or {(n, n)}; "
-        f"got {m.shape}"
-    )
 
 
 class StructuredEquation:
@@ -647,166 +620,3 @@ class StructuredEquation:
                 self.C = mean_c + self.s_pair * ct
             eta = eta + self.C
         self.eta = eta
-
-
-def run_chain_separable_structured_fe(
-    y: np.ndarray,
-    X: np.ndarray,
-    W_csc: sp.csc_matrix,
-    n: int,
-    priors,
-    init,
-    draws: int,
-    tune: int,
-    *,
-    T: int,
-    pair_effects: Optional[tuple[float, float]] = None,
-    period_effects: Optional[tuple[float, float, int]] = None,
-    rho_lower: float = -0.999,
-    rho_upper: float = 0.999,
-    thin: int = 1,
-    rng: Optional[np.random.Generator] = None,
-    chain_id: int = 0,
-    progress_manager: object | None = None,
-    store_log_lik: bool = False,
-    store_group_draws: bool = True,
-    struct: Optional[FlowDesignStructure] = None,
-    cell_mask: np.ndarray | None = None,
-) -> dict[str, np.ndarray]:
-    """One chain of the structured separable NB flow sampler with fixed effects.
-
-    Parameters
-    ----------
-    pair_effects : (mu, sigma) or None
-        Normal prior of the pair effects; ``None`` omits them.
-    period_effects : (mu, sigma, n_tau) or None
-        Normal prior of the period effects, which cover the last ``n_tau``
-        periods (``T − 1`` or ``T``); ``None`` omits them.
-    cell_mask : bool array, optional
-        Live cells (``True`` = live) shaped ``(T, n, n)``, ``(T·n·n,)`` or
-        ``(n, n)``; ``None`` keeps every cell.  Masked cells are drawn-then-
-        discarded: their Pólya–Gamma variates are drawn (so the random stream
-        is mask-invariant), then zeroed.  A pair whose every period is masked
-        carries no likelihood; its effect is informed by the prior and, through
-        the filter, by its neighbours'.  The α block tabulates live counts
-        only; with ``store_log_lik`` the stored pointwise values still cover
-        every cell.
-
-    Returns
-    -------
-    dict
-        ``rho_d, rho_o, rho_w, beta, alpha, time_effect`` and the pair effects
-        (``group_effect`` draws, or ``group_effect_mean``/``_sd``), ``log_lik``.
-    """
-    from ..count_panel._core import _GroupStore
-
-    rng = np.random.default_rng() if rng is None else rng
-    y = np.asarray(y, dtype=np.float64)
-    cell_mask = _normalize_cell_mask(cell_mask, T, n)
-    y_tab = (
-        np.unique(y[cell_mask], return_counts=True) if cell_mask is not None else None
-    )
-    core_priors = ReducedGibbsPriors(
-        alpha_sigma=priors.alpha_sigma,
-        alpha_nu=priors.alpha_nu,
-        alpha_fixed=getattr(priors, "alpha_fixed", None),
-    )
-    C_init = None
-    if pair_effects is not None:
-        Y = y.reshape(T, n, n)
-        if cell_mask is not None:
-            # Mask-aware start: no masked count may reach a live cell's η.
-            m3 = cell_mask.reshape(T, n, n)
-            Yl = np.where(m3, Y, 0.0)
-            pair_mean = Yl.sum(axis=0) / np.maximum(m3.sum(axis=0), 1)
-            grand = Yl.sum() / m3.sum()
-            C_init = np.log(pair_mean + 0.5) - np.log(grand + 0.5) + pair_effects[0]
-        else:
-            C_init = (
-                np.log(Y.mean(axis=0) + 0.5) - np.log(Y.mean() + 0.5) + pair_effects[0]
-            )
-    eq = StructuredEquation(
-        X,
-        W_csc,
-        n,
-        T,
-        priors.beta_mu,
-        priors.beta_sigma,
-        init_beta=init.beta,
-        init_rho={"rho_d": init.rho_d, "rho_o": init.rho_o},
-        pair_effects=pair_effects,
-        period_effects=period_effects,
-        rho_lower=rho_lower,
-        rho_upper=rho_upper,
-        C_init=C_init,
-        struct=struct,
-    )
-    alpha = float(init.alpha)
-
-    n_keep = draws // thin if thin > 0 else draws
-    out = {
-        "rho_d": np.empty(n_keep),
-        "rho_o": np.empty(n_keep),
-        "rho_w": np.empty(n_keep),
-        "beta": np.empty((n_keep, eq.k)),
-        "alpha": np.empty(n_keep),
-        "time_effect": np.empty((n_keep, eq.n_tau)),
-        "log_lik": np.empty((n_keep, y.size)) if store_log_lik else None,
-    }
-    if eq.pair_sd_scale is not None:
-        out["group_sd"] = np.empty(n_keep)
-    gstore = _GroupStore(n_keep, n * n, store_group_draws) if eq.has_pairs else None
-
-    y3 = y.reshape(T, n, n)
-    mask3 = cell_mask.reshape(T, n, n) if cell_mask is not None else None
-    for it in range(tune + draws):
-        # Masked cells draw with neutral inputs (h = α): the C PG sampler's
-        # random consumption is input-dependent, so this keeps the stream —
-        # and therefore every live draw — identical whatever masked y holds.
-        y_pg = np.where(cell_mask, y, 0.0) if cell_mask is not None else y
-        omega = _sample_omega(y_pg, alpha, eq.eta.ravel() - np.log(alpha), rng=rng)
-        if cell_mask is not None:
-            omega = np.where(cell_mask, omega, 0.0)
-            z = 0.5 * (y - alpha) / np.where(cell_mask, omega, 1.0) + np.log(alpha)
-            z = np.where(cell_mask, z, 0.0)
-        else:
-            z = 0.5 * (y - alpha) / omega + np.log(alpha)
-        eq.update(
-            omega.reshape(T, n, n),
-            z.reshape(T, n, n),
-            rng,
-            tuning=it < tune,
-        )
-        eq.exact_sd_move(lambda e: nb_eta_loglik(y3, e, alpha, mask3), rng)
-        st = _StructuralState(
-            eta=eq.eta.ravel(),
-            beta=eq.beta,
-            rho=eq.rho["rho_d"],
-            alpha=alpha,
-            omega=omega,
-        )
-        alpha = _sample_alpha(
-            st, y, core_priors, rng=rng, cell_mask=cell_mask, y_tab=y_tab
-        )
-
-        if it >= tune and (it - tune) % thin == 0:
-            j = (it - tune) // thin
-            if j < n_keep:
-                out["rho_d"][j] = eq.rho["rho_d"]
-                out["rho_o"][j] = eq.rho["rho_o"]
-                out["rho_w"][j] = -eq.rho["rho_d"] * eq.rho["rho_o"]
-                out["beta"][j] = eq.beta
-                out["alpha"][j] = alpha
-                out["time_effect"][j] = eq.tau
-                if eq.pair_sd_scale is not None:
-                    out["group_sd"][j] = eq.s_pair
-                if gstore is not None:
-                    gstore.add(j, eq.effects().ravel())
-                if store_log_lik:
-                    out["log_lik"][j] = _nb_loglik_pointwise(y, eq.eta.ravel(), alpha)
-        if progress_manager is not None:
-            progress_manager.update(chain_id, it, tuning=it < tune)
-
-    if gstore is not None:
-        out.update(gstore.result())
-    return out

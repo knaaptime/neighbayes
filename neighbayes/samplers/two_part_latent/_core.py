@@ -57,7 +57,17 @@ from ..negbin_latent._core import (
 
 
 def _zero_part(
-    y, Z, W_zero, priors_zero, logdet_zero_fn, rng, slice_width, T, sign, effects
+    y,
+    Z,
+    W_zero,
+    priors_zero,
+    logdet_zero_fn,
+    rng,
+    slice_width,
+    T,
+    sign,
+    effects,
+    level_shift=0.0,
 ) -> LatentBinaryChain:
     """The zero part's latent logit, on ``I_T ⊗ W_z`` with ``T log|A_z|``."""
     if T > 1:
@@ -78,6 +88,7 @@ def _zero_part(
         slice_width=slice_width,
         sign=sign,
         unit_effects=effects,
+        level_shift=level_shift,
     )
 
 
@@ -125,6 +136,9 @@ class LatentHurdleChain(_TwoPartChain):
         T: int = 1,
         unit_effects: Optional[UnitEffects] = None,
         unit_effects_zero: Optional[UnitEffects] = None,
+        level_shift: float = 0.0,
+        level_shift_zero: float = 0.0,
+        zero_logdet: Optional[Callable[[float], float]] = None,
     ):
         positive = np.asarray(y) > 0
         self.zero = _zero_part(
@@ -138,6 +152,7 @@ class LatentHurdleChain(_TwoPartChain):
             T,
             None,
             unit_effects_zero,
+            level_shift_zero,
         )
         self.count = LatentNegBinChain(
             y=y,
@@ -151,6 +166,8 @@ class LatentHurdleChain(_TwoPartChain):
             T=T,
             unit_effects=unit_effects,
             kind=np.where(positive, TRUNCATED, UNOBSERVED),
+            level_shift=level_shift,
+            zero_logdet=zero_logdet,
         )
 
     def sweep(self, tuning: bool) -> None:
@@ -177,6 +194,9 @@ class LatentZINBChain(_TwoPartChain):
         slice_width: float = 0.4,
         T: int = 1,
         unit_effects: Optional[UnitEffects] = None,
+        level_shift: float = 0.0,
+        level_shift_zero: float = 0.0,
+        zero_logdet: Optional[Callable[[float], float]] = None,
     ):
         y = np.asarray(y, dtype=np.float64)
         self.zeros = y == 0
@@ -191,6 +211,7 @@ class LatentZINBChain(_TwoPartChain):
             T,
             np.where(self.zeros, 0, 1),
             None,
+            level_shift_zero,
         )
         self.count = LatentNegBinChain(
             y=y,
@@ -203,6 +224,8 @@ class LatentZINBChain(_TwoPartChain):
             slice_width=slice_width,
             T=T,
             unit_effects=unit_effects,
+            level_shift=level_shift,
+            zero_logdet=zero_logdet,
         )
         self.structural = np.zeros(y.size)
         self.structural_sq = np.zeros(y.size)
@@ -251,6 +274,9 @@ def make_chain(
     T: int = 1,
     unit_effects: Optional[UnitEffects] = None,
     unit_effects_zero: Optional[UnitEffects] = None,
+    level_shift: float = 0.0,
+    level_shift_zero: float = 0.0,
+    zero_logdet: Optional[Callable[[float], float]] = None,
 ) -> _TwoPartChain:
     """The chain object of the latent ``model`` (``"hurdle"`` or ``"zinb"``).
 
@@ -259,11 +285,20 @@ def make_chain(
     ``rho_zero``, ``beta_zero``, ``rho``, ``beta`` and ``alpha``;
     ``store_latent`` adds the utilities (``latent_zero``) and log-means
     (``latent``).  A panel's unit effects add ``unit_effect`` and
-    ``unit_effect_sd`` (the hurdle's zero part's ``*_zero``).  Its
+    ``unit_effect_sd`` (the hurdle's zero part's ``*_zero``); ``level_shift``
+    and ``level_shift_zero`` are each part's time-effects term and
+    ``zero_logdet`` the count part's joint-move log-determinant (see
+    :mod:`..negbin_latent._core`).  Its
     ``summary()`` holds the ZINB's ``structural_prob`` and
     ``structural_prob_sd`` over the zero counts.
     """
-    panel = dict(T=T, unit_effects=unit_effects)
+    panel = dict(
+        T=T,
+        unit_effects=unit_effects,
+        level_shift=level_shift,
+        level_shift_zero=level_shift_zero,
+        zero_logdet=zero_logdet,
+    )
     if model == "hurdle":
         panel["unit_effects_zero"] = unit_effects_zero
     elif unit_effects_zero is not None:

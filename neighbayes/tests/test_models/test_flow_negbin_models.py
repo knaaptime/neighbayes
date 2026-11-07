@@ -106,22 +106,20 @@ class TestNegativeBinomialPanelFlowConstruction:
         assert "alpha" in pm_model.named_vars
 
     def test_negbin_panel_pair_effects_build(self):
-        """Pair effects are pooled parameters (see test_count_panel_fe.py), not demeaning."""
+        """The aspatial flow's pair effects are random effects (see
+        test_count_panel_fe.py), not demeaning; the SAR flow's are fixed only."""
         data = _small_panel_negbin_flow(seed=7)
-        model = SARNegBinFlow(
-            pair_effects="random",
-            time_effects=True,
-            y=data["y"],
-            W=data["G"],
-            X=data["X"],
-            T=3,
-            col_names=data["col_names"],
+        kw = dict(
+            y=data["y"], W=data["G"], X=data["X"], T=3, col_names=data["col_names"]
         )
+        model = NegBinFlow(pair_effects="random", time_effects=True, **kw)
         assert list(model._feature_names) == list(data["col_names"])
         pm_model = model._build_pymc_model()
         assert {"alpha", "pair_effect", "pair_effect_sd", "time_effect"} <= set(
             pm_model.named_vars
         )
+        with pytest.raises(NotImplementedError, match="no random pair effects"):
+            SARNegBinFlow(pair_effects="random", **kw)
 
 
 def _check_beta_recovery(
@@ -543,3 +541,295 @@ def test_failing_log_abs_det_diagnostic_keeps_the_posterior(monkeypatch, separab
     assert "sample_stats" not in idata.children or (
         "log_abs_det" not in idata.sample_stats
     )
+
+
+# ---------------------------------------------------------------------------
+# Origin and destination levels outside the filter
+# ---------------------------------------------------------------------------
+
+
+def _od_data(n=12, seed=5):
+    """A doubly constrained flow whose absorbed columns carry no effect.
+
+    The fitted levels absorb the filtered origin and destination attribute
+    effects; with those zero they estimate the simulated levels themselves.
+    """
+    from neighbayes.dgp import simulate_sar_negbin_flow
+
+    return simulate_sar_negbin_flow(
+        n=n, separable=True, rho_d=0.3, rho_o=0.2, alpha=3.0, seed=seed,
+        beta_d=[0.0, 0.0], beta_o=[0.0, 0.0], origin_effect_sd=0.8,
+        destination_effect_sd=0.6,
+    )  # fmt: skip
+
+
+def _od_model(d, **kw):
+    kw = {"origin_effects": "random", "destination_effects": "random", **kw}
+    return SARNegBinFlow(
+        d["y_vec"], d["X"], d["G"], separable=True, col_names=d["col_names"], **kw
+    )
+
+
+def test_od_levels_drop_the_columns_they_absorb():
+    """The intercept and the attributes go; the impacts read them as NaN."""
+    d = _od_data()
+    with pytest.warns(UserWarning, match="absorbed by the origin and destination"):
+        m = _od_model(d)
+    assert m._feature_names == [
+        "intra_indicator", "intra_x0", "intra_x1", "log_distance"
+    ]  # fmt: skip
+    with pytest.warns(UserWarning, match="absorbed"):
+        origin_only = _od_model(d, destination_effects=None)
+    assert "dest_x0" in origin_only._feature_names
+    assert "orig_x0" not in origin_only._feature_names
+    assert "intercept" not in origin_only._feature_names
+
+
+@pytest.mark.parametrize(
+    "backend", ["numpy", pytest.param("jax", marks=pytest.mark.requires_jax)]
+)
+def test_od_levels_fit_and_predict(backend):
+    import warnings
+
+    import numpy as np
+
+    d = _od_data()
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        m = _od_model(d)
+    post = m.fit(
+        draws=30, tune=30, chains=2, random_seed=0, progressbar=False, backend=backend
+    ).posterior
+    assert post["origin_effect"].dims[-1] == "origin"
+    assert post["destination_effect"].shape[-1] == 12
+    assert np.all(post["origin_effect_sd"].values > 0)
+    pp = m.posterior_predictive(n_draws=5, random_seed=0)
+    assert pp.shape == (5, 144) and np.all(pp >= 0)
+
+
+def test_od_levels_refusals():
+    d = _od_data(n=6)
+    with pytest.raises(NotImplementedError, match="separable=True"):
+        SARNegBinFlow(d["y_vec"], d["X"], d["G"], origin_effects="random")
+    with pytest.raises(ValueError, match="'fixed' or 'random'"):
+        _od_model(d, origin_effects="pooled")
+    from neighbayes.models import SARPoissonFlow
+
+    with pytest.raises(TypeError):
+        SARPoissonFlow(d["y_vec"], d["X"], d["G"], origin_effects="random")
+    with pytest.raises(NotImplementedError, match="random pair effects"):
+        _fe_model(_panel(), pair_effects="random", origin_effects="random")
+
+
+def test_od_levels_take_fixed_sides_and_period_effects():
+    """Fixed origins carry the level; destinations and periods hold a baseline."""
+    lv = _fe_model(
+        _panel(), pair_effects=None, origin_effects="fixed",
+        destination_effects="fixed",
+    )._flow_levels()  # fmt: skip
+    assert [(st.kind, st.flat) for st in lv.sets] == [
+        ("origin", True), ("destination", True), ("period", False)
+    ]  # fmt: skip
+    assert [lv.baseline(i) for i in range(3)] == [False, True, True]
+
+
+# ---------------------------------------------------------------------------
+# Fixed pair effects: the fixed-effects static panel
+# ---------------------------------------------------------------------------
+
+
+def _panel(n=6, T=4, seed=1):
+    """A separable NB flow panel with pair effects inside the filter.
+
+    The fixed-effects panel nests it: ``A⁻¹C`` is one more time-invariant
+    array, which the pair levels absorb.
+    """
+    from neighbayes.dgp import simulate_sar_negbin_flow
+
+    p = simulate_sar_negbin_flow(
+        n=n, T=T, seed=seed, separable=True, pair_effects="random", time_effects=True
+    )
+    return dict(p, T=T, n=n)
+
+
+def _fe_model(p, **kw):
+    import warnings
+
+    kw = {"pair_effects": "fixed", "time_effects": True, **kw}
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return SARNegBinFlow(
+            p["y"], p["X"], p["G"], separable=True, T=p["T"],
+            col_names=p["col_names"], **kw,
+        )  # fmt: skip
+
+
+def test_fixed_pairs_absorb_every_time_invariant_column():
+    p = _panel()
+    with pytest.warns(UserWarning, match="absorbed by the fixed pair effects"):
+        m = SARNegBinFlow(
+            p["y"], p["X"], p["G"], separable=True, T=4, pair_effects="fixed",
+            time_effects=True, col_names=p["col_names"],
+        )  # fmt: skip
+    assert m._feature_names == [
+        "dest_x0", "dest_x1", "orig_x0", "orig_x1", "intra_x0", "intra_x1"
+    ]  # fmt: skip
+    lv = m._flow_levels()
+    assert [(st.kind, st.flat) for st in lv.sets] == [("pair", True), ("period", False)]
+
+
+@pytest.mark.parametrize(
+    "backend", ["numpy", pytest.param("jax", marks=pytest.mark.requires_jax)]
+)
+def test_fixed_pairs_fit_and_predict(backend):
+    import numpy as np
+
+    m = _fe_model(_panel())
+    post = m.fit(
+        draws=30, tune=30, chains=2, random_seed=0, progressbar=False, backend=backend
+    ).posterior
+    assert post["pair_effect"].dims[-2:] == ("origin", "destination")
+    assert post["time_effect"].dims[-1] == "time"
+    assert post["time_effect"].shape[-1] == 3
+    pp = m.posterior_predictive(n_draws=5, random_seed=0)
+    assert pp.shape == (5, 144) and np.all(pp >= 0)
+
+
+@pytest.mark.parametrize(
+    "backend", ["numpy", pytest.param("jax", marks=pytest.mark.requires_jax)]
+)
+def test_fixed_pairs_drop_masked_and_empty_pairs(backend):
+    """A pair without a live count leaves the likelihood and predicts zeros."""
+    import numpy as np
+
+    p = _panel()
+    m = _fe_model(p)
+    diag = np.eye(6, dtype=bool)
+    idata = m.fit(
+        draws=30, tune=30, chains=2, random_seed=0, progressbar=False,
+        backend=backend, cell_mask=~diag, idata_kwargs={"log_likelihood": True},
+    )  # fmt: skip
+    dead = diag | (p["y"].reshape(4, 6, 6).sum(axis=0) == 0)
+    pe = idata.posterior["pair_effect"].values
+    assert np.array_equal(np.isnan(pe).all(axis=(0, 1)), dead)
+    assert np.all(np.isfinite(pe[..., ~dead]))
+    ll = idata.log_likelihood["obs"].values.reshape(2, 30, 4, 6, 6)
+    assert np.all(ll[..., dead] == 0.0)
+    pp = m.posterior_predictive(n_draws=5, random_seed=0).reshape(5, 4, 6, 6)
+    assert np.all(pp[..., dead] == 0.0)
+
+
+def test_fixed_pairs_summarize_the_pair_effects():
+    m = _fe_model(_panel())
+    idata = m.fit(
+        draws=30, tune=30, chains=2, random_seed=0, progressbar=False,
+        backend="numpy", store_effects=False,
+    )  # fmt: skip
+    assert "pair_effect" not in idata.posterior
+    assert idata["pair_effect_summary"]["mean"].shape == (6, 6)
+    with pytest.raises(RuntimeError, match="store_effects=True"):
+        m.posterior_predictive(n_draws=5)
+
+
+def test_fixed_pairs_refusals():
+    p = _panel()
+    with pytest.raises(ValueError, match="one or the other"):
+        _fe_model(p, origin_effects="random")
+    with pytest.raises(NotImplementedError, match="separable=True"):
+        SARNegBinFlow(
+            p["y"], p["X"], p["G"], T=4, pair_effects="fixed",
+            col_names=p["col_names"],
+        )  # fmt: skip
+    with pytest.raises(ValueError, match="mundlak"):
+        _fe_model(p, mundlak=True)
+    with pytest.raises(NotImplementedError, match="Gibbs sampler"):
+        _fe_model(p).fit(sampler="nuts", draws=5, tune=5, chains=1, progressbar=False)
+    from neighbayes.models import SARZINBFlow
+
+    with pytest.raises(NotImplementedError, match="no fixed pair effects"):
+        SARZINBFlow(
+            p["y"], p["X"], p["G"], separable=True, T=4, pair_effects="fixed",
+            col_names=p["col_names"],
+        )  # fmt: skip
+
+
+@pytest.mark.slow
+@pytest.mark.requires_jax
+def test_fixed_pairs_recover_the_panel():
+    """ρ, the attribute effects and α, from the within-pair variation alone."""
+    import arviz as az
+    import numpy as np
+
+    p = _panel(n=15, T=8, seed=3)
+    post = (
+        _fe_model(p)
+        .fit(
+            draws=1000,
+            tune=1000,
+            chains=4,
+            random_seed=1,
+            progressbar=False,
+            backend="jax",
+        )  # fmt: skip
+        .posterior
+    )
+    truth = {"rho_d": 0.3, "rho_o": 0.2, "alpha": 2.0}
+    for name, value in truth.items():
+        v = post[name].values.ravel()
+        assert abs(v.mean() - value) < 3.5 * v.std(), (name, v.mean(), v.std())
+    beta = post["beta"].sel(coefficient=["dest_x0", "dest_x1", "orig_x0", "orig_x1"])
+    z = (beta.mean(("chain", "draw")) - 1.0) / beta.std(("chain", "draw"))
+    assert np.all(np.abs(z.values) < 3.5), z.values
+    rhat = az.rhat(post.to_dataset()[["rho_d", "rho_o", "alpha", "beta"]])
+    assert max(float(rhat[k].max()) for k in rhat.data_vars) < 1.05
+
+
+@pytest.mark.slow
+@pytest.mark.requires_jax
+def test_od_levels_reproduce_the_margins():
+    """The balancing factors reproduce the observed origin and destination totals.
+
+    That is what makes them balancing factors: in the doubly constrained
+    gravity model the fitted row and column totals match the observed ones,
+    here nearly rather than exactly, the factors being pooled toward their
+    prior.  (The levels themselves absorb the filtered design's row and
+    column means as well, so they do not estimate the simulated factors alone.)
+    """
+    import warnings
+
+    import arviz as az
+    import numpy as np
+
+    n = 30
+    d = _od_data(n=n, seed=8)
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        m = _od_model(d)
+    post = m.fit(
+        draws=1000, tune=1000, chains=4, random_seed=1, progressbar=False, backend="jax"
+    ).posterior
+    G = post["rho_d"].size
+    rd, ro = post["rho_d"].values.ravel(), post["rho_o"].values.ravel()
+    beta = post["beta"].values.reshape(G, -1)
+    gam = post["origin_effect"].values.reshape(G, n)
+    kap = post["destination_effect"].values.reshape(G, n)
+    mu = np.mean(
+        [
+            np.exp(
+                m._eta_reduced(
+                    {"rho_d": rd[i], "rho_o": ro[i], "rho_w": -rd[i] * ro[i]}, beta[i]
+                ).reshape(n, n)
+                + gam[i][:, None]
+                + kap[i][None, :]
+            )
+            for i in np.linspace(0, G - 1, 200).astype(int)
+        ],
+        axis=0,
+    )
+    y = d["y_vec"].reshape(n, n)
+    for axis in (1, 0):
+        r = np.corrcoef(np.log(mu.sum(axis)), np.log(y.sum(axis) + 0.5))[0, 1]
+        assert r > 0.95, (axis, r)
+    rhat = az.rhat(post)
+    for name in ("rho_d", "rho_o", "origin_effect_sd", "destination_effect_sd"):
+        assert float(rhat[name]) < 1.05, name

@@ -311,6 +311,43 @@ class TestPanelInit:
         with pytest.raises(ValueError, match="balanced panel"):
             OLS(formula="y ~ x1", data=df, W=W_graph, unit_col="u", time_col="t")
 
+    def test_formula_mode_keeps_each_period_in_row_order(self, W_graph):
+        # Rows follow W, whose order need not be that of the sorted labels.
+        df = pd.DataFrame(
+            {
+                "u": [30, 10, 40, 20] * 2,
+                "t": [2, 2, 2, 2, 1, 1, 1, 1],
+                "y": np.arange(8.0),
+                "x1": np.arange(8.0) ** 2,
+            }
+        )
+        model = OLS(formula="y ~ x1", data=df, W=W_graph, unit_col="u", time_col="t")
+        assert model._y.tolist() == [4.0, 5.0, 6.0, 7.0, 0.0, 1.0, 2.0, 3.0]
+
+    def test_formula_mode_accepts_frame_stacked_by_unit(self, W_graph):
+        df = pd.DataFrame(
+            {
+                "u": [30, 30, 10, 10, 40, 40, 20, 20],
+                "t": [1, 2] * 4,
+                "y": np.arange(8.0),
+                "x1": np.arange(8.0) ** 2,
+            }
+        )
+        model = OLS(formula="y ~ x1", data=df, W=W_graph, unit_col="u", time_col="t")
+        assert model._y.tolist() == [0.0, 2.0, 4.0, 6.0, 1.0, 3.0, 5.0, 7.0]
+
+    def test_formula_mode_rejects_periods_in_different_orders(self, W_graph):
+        df = pd.DataFrame(
+            {
+                "u": [1, 2, 3, 4, 2, 1, 3, 4],
+                "t": [1, 1, 1, 1, 2, 2, 2, 2],
+                "y": np.arange(8.0),
+                "x1": np.arange(8.0) ** 2,
+            }
+        )
+        with pytest.raises(ValueError, match="same order"):
+            OLS(formula="y ~ x1", data=df, W=W_graph, unit_col="u", time_col="t")
+
     def test_matrix_mode_creates_model(self, W_graph):
         model = OLS(
             y=np.random.default_rng(0).standard_normal(12),

@@ -49,17 +49,21 @@ def test_reduced_rejects_noninteger_or_negative_y():
     y_bad = np.array([0.0, 1.2, 2.0, 1.0])
     X_bad = np.column_stack([np.ones(4), np.arange(4)])
     with pytest.raises(ValueError, match="integer-valued"):
-        bp.models.SARNegBin(y=y_bad, X=X_bad, W=W_to_graph(make_line_W(4)))
+        bp.models.SARNegBin(
+            y=y_bad, X=X_bad, W=W_to_graph(make_line_W(4)), latent=False
+        )
 
     y_neg = np.array([0.0, 1.0, -1.0, 2.0])
     with pytest.raises(ValueError, match="non-negative"):
-        bp.models.SARNegBin(y=y_neg, X=X_bad, W=W_to_graph(make_line_W(4)))
+        bp.models.SARNegBin(
+            y=y_neg, X=X_bad, W=W_to_graph(make_line_W(4)), latent=False
+        )
 
 
 def test_reduced_robust_is_unsupported():
     y, X, W = _count_data()
     with pytest.raises(NotImplementedError):
-        bp.models.SARNegBin(y=y, X=X, W=W, robust=True)
+        bp.models.SARNegBin(y=y, X=X, W=W, robust=True, latent=False)
 
 
 def test_reduced_build_pymc_model_returns_valid_model():
@@ -67,7 +71,7 @@ def test_reduced_build_pymc_model_returns_valid_model():
     import pymc as pm
 
     y, X, W = _count_data()
-    model = bp.models.SARNegBin(y=y, X=X, W=W)
+    model = bp.models.SARNegBin(y=y, X=X, W=W, latent=False)
     pymc_model = model._build_pymc_model()
     assert isinstance(pymc_model, pm.Model)
     assert "rho" in pymc_model.named_vars
@@ -90,7 +94,7 @@ def test_reduced_build_pymc_model_returns_valid_model():
 
 def test_reduced_fitted_values_and_effects_with_mock_posterior():
     y, X, W = _count_data(seed=103)
-    model = bp.models.SARNegBin(y=y, X=X, W=W)
+    model = bp.models.SARNegBin(y=y, X=X, W=W, latent=False)
 
     # Reduced form: only β, ρ, α — no σ, no z.
     model._idata = _idata(
@@ -127,7 +131,7 @@ def test_reduced_fit_returns_inference_data():
     mu = np.exp(eta)
     y = rng.poisson(mu)
 
-    model = bp.models.SARNegBin(y=y, X=X, W=W)
+    model = bp.models.SARNegBin(y=y, X=X, W=W, latent=False)
     idata = model.fit(
         draws=30,
         tune=30,
@@ -161,7 +165,7 @@ def test_reduced_fit_default_is_gibbs():
     mu = np.exp(eta)
     y = rng.poisson(mu)
 
-    model = bp.models.SARNegBin(y=y, X=X, W=W)
+    model = bp.models.SARNegBin(y=y, X=X, W=W, latent=False)
     # Default call (no sampler kwarg) should use Gibbs
     idata = model.fit(draws=10, tune=10, chains=1, random_seed=0)
     assert isinstance(idata, xr.DataTree)
@@ -211,7 +215,7 @@ def test_reduced_rho_mixing_with_beta_marginalization():
     p = alpha_true / (alpha_true + mu)
     y = rng.negative_binomial(alpha_true, p).astype(float)
 
-    model = bp.models.SARNegBin(y=y, X=X, W=W_to_graph(W_sparse))
+    model = bp.models.SARNegBin(y=y, X=X, W=W_to_graph(W_sparse), latent=False)
     model.fit(draws=400, tune=400, chains=2, random_seed=0)
 
     rho_ess = float(az.ess(model.inference_data, var_names=["rho"]).rho.values)
@@ -236,12 +240,12 @@ def test_reduced_nuts_and_gibbs_agree_and_recover_rho():
     from neighbayes.dgp import simulate_sar_negbin
     from neighbayes.models import SARNegBin
 
-    data = simulate_sar_negbin(n_side=25, rho=0.4, seed=1)
+    data = simulate_sar_negbin(n_side=25, rho=0.4, seed=1, latent=False)
     y, X, W = data["y"], data["X"], data["W_graph"]
     kwargs = dict(draws=1000, tune=800, chains=2, random_seed=1, progressbar=False)
 
-    gibbs = SARNegBin(y=y, X=X, W=W).fit(**kwargs)
-    nuts = SARNegBin(y=y, X=X, W=W).fit(sampler="nuts", **kwargs)
+    gibbs = SARNegBin(y=y, X=X, W=W, latent=False).fit(**kwargs)
+    nuts = SARNegBin(y=y, X=X, W=W, latent=False).fit(sampler="nuts", **kwargs)
 
     rho_gibbs = float(gibbs.posterior["rho"].mean())
     rho_nuts = float(nuts.posterior["rho"].mean())
@@ -268,8 +272,8 @@ def test_reduced_nuts_uses_the_resolved_beta_prior():
     from neighbayes.dgp import simulate_sar_negbin
     from neighbayes.models import SARNegBin
 
-    data = simulate_sar_negbin(n_side=15, rho=0.4, seed=1)
-    model = SARNegBin(y=data["y"], X=data["X"], W=data["W_graph"])
+    data = simulate_sar_negbin(n_side=15, rho=0.4, seed=1, latent=False)
+    model = SARNegBin(y=data["y"], X=data["X"], W=data["W_graph"], latent=False)
     # The default lives on the log scale of the linear predictor, and the
     # Gibbs path resolves the same one.
     expected_mu, expected_sigma = model._resolved_beta_prior(link="log")
@@ -310,8 +314,8 @@ def test_pg_information_ratio_grows_as_alpha_leaves_the_counts_scale():
 def test_sar_negbin_warns_when_the_pg_augmentation_is_tight(alpha, warns, backend):
     import warnings
 
-    d = bp.dgp.simulate_sar_negbin(n_side=8, seed=4, alpha=alpha, rho=0.3)
-    m = bp.models.SARNegBin(y=d["y"], X=d["X"], W=d["W_sparse"])
+    d = bp.dgp.simulate_sar_negbin(n_side=8, seed=4, alpha=alpha, rho=0.3, latent=False)
+    m = bp.models.SARNegBin(y=d["y"], X=d["X"], W=d["W_sparse"], latent=False)
     with warnings.catch_warnings(record=True) as caught:
         warnings.simplefilter("always")
         m.fit(

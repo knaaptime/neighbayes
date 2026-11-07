@@ -231,6 +231,7 @@ class FlowSharedMethods:
             )
         if compute_log_likelihood:
             self._attach_complete_log_likelihood(self._idata)
+        self._idata = self._store_conditional_log_likelihood(self._idata)
         return self._idata
 
     def spatial_diagnostics_decision(

@@ -1762,6 +1762,13 @@ class SharedSpatialMethods(metaclass=ABCMeta):
         from ...diagnostics.lmtests.registry import get_diagnostic_suite
 
         suite = get_diagnostic_suite(self)
+        if suite is None and getattr(self, "_design", None) == "latent":
+            raise ValueError(
+                f"{type(self).__name__} fits the latent SAR, and the LM tests with "
+                "the latent SAR as their null are not derived.  The aspatial "
+                "model's suite tests for the latent SAR; latent=False fits the "
+                "reduced form, which has its own suite."
+            )
         if suite is None:
             raise ValueError(
                 f"No diagnostic suite registered for {type(self).__name__}. "
