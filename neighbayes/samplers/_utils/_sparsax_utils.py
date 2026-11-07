@@ -2,7 +2,9 @@
 
 :class:`CachedSparseSolver` solves :math:`(I - \\sum_k \theta_k W_k)x = b`
 with one symbolic analysis reused across values, :class:`KluSarSolver` holds
-one KLU factor of :math:`I - \rho W` for many right-hand sides, and
+one KLU factor of :math:`I - \rho W` for many right-hand sides,
+:class:`ResolventInterpolant` carries functions of :math:`(I - \rho W)^{-1}`
+across posterior draws from a few factorizations, and
 :func:`profile_loglik_rho_grid` gives the reduced-form samplers their starting
 :math:`(\rho, \beta)`.
 """
@@ -10,6 +12,7 @@ one KLU factor of :math:`I - \rho W` for many right-hand sides, and
 from __future__ import annotations
 
 import warnings
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import scipy.sparse as sp
@@ -264,6 +267,37 @@ class CachedSparseSolver:
             out = np.asarray(sp.linalg.splu(A_csc).solve(rhs_np), dtype=np.float64)
         return out[:, 0] if single else out
 
+    def solve_batch(self, coeffs, rhs, pad_to: int | None = None):
+        r"""Solve :math:`A(\theta_b) X_b = B_b` across a batch of coefficients.
+
+        ``coeffs`` is ``(B, n_weights)`` and ``rhs`` ``(B, n, m)``; returns
+        ``(B, n, m)``.  sparsax factors and solves the whole batch in one
+        threaded native call, about ten times the throughput of ``B`` separate
+        calls at every ``n`` measured (:meth:`solve`'s per-call dispatch alone
+        costs more than a small system's factorization).  The program compiles
+        once per shape; ``pad_to`` fills a short batch with zero right-hand sides
+        up to a fixed size, so a final partial chunk does not compile another.
+        """
+        coeffs = np.atleast_2d(np.asarray(coeffs, dtype=np.float64))
+        rhs = np.asarray(rhs, dtype=np.float64)
+        B = coeffs.shape[0]
+        if rhs.ndim != 3 or rhs.shape[0] != B or rhs.shape[1] != self.n:
+            raise ValueError(
+                f"rhs must be ({B}, {self.n}, m) for {B} coefficients, got {rhs.shape}"
+            )
+        Ax = self.const_vals + coeffs @ np.stack(self.w_vals_list)
+        if not self._use_sparsax:
+            out = np.empty_like(rhs)
+            for b in range(B):
+                A = sp.csc_matrix((Ax[b], (self.Ai, self.Aj)), shape=(self.n, self.n))
+                out[b] = sp.linalg.splu(A).solve(rhs[b])
+            return out
+        if pad_to is not None and pad_to > B:
+            Ax = np.concatenate([Ax, np.repeat(Ax[-1:], pad_to - B, axis=0)])
+            rhs = np.concatenate([rhs, np.zeros((pad_to - B,) + rhs.shape[1:])])
+        x = _batched_lu_solve(self._lu)(self._Ai_jax, self._Aj_jax, Ax, rhs)
+        return np.asarray(x, dtype=np.float64)[:B]
+
     def _numpy_Ax(self, coeffs):
         ax = self.const_vals.copy()
         for c, wv in zip(coeffs, self.w_vals_list):
@@ -328,6 +362,280 @@ class CachedSparseSolver:
         if getattr(self, "_splu", None) is None:
             raise RuntimeError("factorize() must be called before logdet()")
         return float(np.sum(np.log(np.abs(self._splu.U.diagonal()))))
+
+
+def _batched_lu_solve(lu):
+    """``f(Ai, Aj, Ax, b)`` over a leading batch axis of ``Ax`` and ``b``, compiled once."""
+
+    def build():
+        import jax
+
+        return jax.jit(jax.vmap(lu.solve, in_axes=(None, None, 0, 0)))
+
+    from ._jax_utils import cached_sweep
+
+    return cached_sweep(("lu_solve_batch", lu.backend), build)
+
+
+def _batched_selinv(n: int):
+    """``f(Ai, Aj, Ax)``, the selected inverse over a leading batch axis of ``Ax``."""
+
+    def build():
+        import jax
+        import sparsax
+
+        return jax.jit(
+            jax.vmap(lambda Ai, Aj, Ax: sparsax.selinv(Ai, Aj, Ax, n), (None, None, 0))
+        )
+
+    from ._jax_utils import cached_sweep
+
+    return cached_sweep(("selinv_batch", n), build)
+
+
+#: Bytes allowed for one batch of right-hand sides in the multiplier's solves.
+_BATCH_BYTES = 256 * 1024 * 1024
+#: Nodes factored in one batched call.
+_NODE_BATCH = 8
+#: Node counts double from this one until the interpolant converges, up to the cap.
+_START_NODES = 5
+_MAX_NODES = 513
+
+
+def _column_blocks(solver: CachedSparseSolver, rho: np.ndarray):
+    """Yield ``(a, b, x)``, columns ``a:b`` of ``(I − ρW)⁻¹``, ``x`` ``(rho.size, n, b − a)``."""
+    n = solver.n
+    block = int(np.clip(_BATCH_BYTES // (8 * n * _NODE_BATCH), 1, n))
+    for a in range(0, n, block):
+        b = min(n, a + block)
+        E = np.zeros((rho.size, n, block))
+        E[:, np.arange(a, b), np.arange(b - a)] = 1.0
+        x = solver.solve_batch(-rho[:, None], E, pad_to=_NODE_BATCH)
+        yield a, b, x[..., : b - a]
+
+
+def fold_resolvent_columns(solver: CachedSparseSolver, rho, fold) -> np.ndarray:
+    r"""``Σ_j fold(S(ρ) e_j)`` at each ``rho``: entrywise functions of the whole inverse.
+
+    ``fold(C, i)`` takes a block of columns of :math:`S(\rho) = (I - \rho W)^{-1}`,
+    ``(n, m)``, at ``rho[i]``, and returns its contribution; the blocks are
+    summed, so the inverse is never held whole.  The nodes run on threads.
+    """
+    rho = np.atleast_1d(np.asarray(rho, dtype=np.float64))
+    total = None
+    with ThreadPoolExecutor() as pool:
+        for _, _, x in _column_blocks(solver, rho):
+            part = np.stack(list(pool.map(fold, x, range(rho.size))))
+            total = part if total is None else total + part
+    return total
+
+
+def _multiplier_diagonal(W_csc: sp.csc_matrix, solver: CachedSparseSolver):
+    r"""``rho -> (len(rho), n)``, the diagonal of :math:`(I - \rho W)^{-1}`.
+
+    When a positive diagonal ``D`` makes :math:`S = D^{1/2} W D^{-1/2}` symmetric
+    (a symmetric adjacency, row-standardized or not), the similarity keeps the
+    diagonal, and Takahashi's selected inversion reads it off one Cholesky
+    factor of :math:`I - \rho S`: 0.05 s at ``n = 40000``, where the ``n``
+    right-hand sides of a directed ``W`` take 13 s.
+    """
+    from ..negbin_reduced._core import _symmetrizing_diagonal
+
+    n = W_csc.shape[0]
+    d = _symmetrizing_diagonal(W_csc) if solver._use_sparsax else None
+    if d is None:
+
+        def by_columns(rho):
+            out = np.empty((rho.size, n))
+            for a, b, x in _column_blocks(solver, rho):
+                out[:, a:b] = x[:, np.arange(a, b), np.arange(b - a)]
+            return out
+
+        return by_columns
+
+    import jax.numpy as jnp
+
+    sq = np.sqrt(d)
+    S = sp.diags(sq) @ W_csc @ sp.diags(1.0 / sq)
+    P = sp.triu(S + sp.identity(n), format="coo")
+    P.sum_duplicates()
+    on_diag = P.row == P.col
+    s = P.data - on_diag
+    Ai = jnp.asarray(P.row, dtype=jnp.int32)
+    Aj = jnp.asarray(P.col, dtype=jnp.int32)
+    where, order = np.flatnonzero(on_diag), P.row[on_diag]
+
+    def selected(rho):
+        Ax = on_diag.astype(np.float64) - rho[:, None] * s
+        if rho.size < _NODE_BATCH:
+            Ax = np.concatenate(
+                [Ax, np.repeat(Ax[-1:], _NODE_BATCH - rho.size, axis=0)]
+            )
+        z = np.asarray(_batched_selinv(n)(Ai, Aj, Ax), dtype=np.float64)
+        out = np.empty((rho.size, n))
+        out[:, order] = z[: rho.size, where]
+        return out
+
+    return selected
+
+
+def _lobatto(K: int) -> np.ndarray:
+    return np.cos(np.pi * np.arange(K) / (K - 1))
+
+
+def _lagrange_weights(nodes: np.ndarray, x: np.ndarray) -> np.ndarray:
+    """``(x.size, K)``: each Chebyshev–Lobatto Lagrange polynomial at ``x``, barycentric."""
+    w = (-1.0) ** np.arange(nodes.size)
+    w[[0, -1]] *= 0.5
+    diff = x[:, None] - nodes
+    hit = diff == 0.0
+    diff[hit] = 1.0
+    t = w / diff
+    L = t / t.sum(axis=1, keepdims=True)
+    on_node = hit.any(axis=1)
+    L[on_node] = hit[on_node]
+    return L
+
+
+class ResolventInterpolant:
+    r"""Functions of :math:`S(\rho) = (I - \rho W)^{-1}` at many draws, from a few factors.
+
+    Effects need some of :math:`S(\rho)B` (``rhs``), the row sums
+    :math:`S(\rho)\mathbf 1`, the column sums :math:`S(\rho)^\top \mathbf 1` and
+    :math:`\operatorname{diag} S(\rho)` at every posterior draw of the scalar
+    :math:`\rho`.  Each is analytic in :math:`\rho`, so they are computed exactly
+    at Chebyshev–Lobatto nodes over the draws' range and interpolated: node
+    counts double, with no node recomputed, until the new nodes agree with the
+    last interpolant to ``tol``.
+
+    The nodes are in :math:`u = \operatorname{atanh}\rho`.  That sends the poles
+    at :math:`\rho = \pm 1` to infinity, leaving :math:`1/(1 \mp \rho)` entire in
+    :math:`u`, and every other pole :math:`1/\lambda` of a row-standardized
+    :math:`W` at least :math:`\pi/4` off the real axis.  So the node count stays
+    in the tens however near a draw comes to a bound, where a power series
+    needs about :math:`30/(1 - |\rho|)` terms.
+
+    Parameters
+    ----------
+    W : scipy.sparse matrix, shape (n, n)
+    rho : ndarray, shape (G,)
+        The draws to cover.
+    rhs : ndarray, shape (n, k), optional
+    row_sums, col_sums, diag : bool
+        Which functions to carry.
+    column_fold : callable, optional
+        A function of every entry of :math:`S(\\rho)`, summed over its columns
+        (:func:`fold_resolvent_columns`), carried as ``"fold"``.
+    tol : float
+        Relative agreement, per function, that stops the doubling.
+
+    Attributes
+    ----------
+    values : dict
+        ``"rhs"`` ``(K, n, k)``, ``"row_sums"``, ``"col_sums"`` and ``"diag"``
+        ``(K, n)``, and ``"fold"`` ``(K, ...)``, at the ``K`` nodes; :meth:`weights`
+        combines them at a draw.
+    """
+
+    def __init__(
+        self,
+        W,
+        rho,
+        *,
+        rhs=None,
+        row_sums: bool = False,
+        col_sums: bool = False,
+        diag: bool = False,
+        column_fold=None,
+        tol: float = 1e-10,
+    ):
+        W_csc = sp.csc_matrix(W, dtype=np.float64)
+        n = W_csc.shape[0]
+        rho = np.atleast_1d(np.asarray(rho, dtype=np.float64))
+        self._scale = max(1.0, 1.001 * float(np.abs(rho).max()))
+        u = np.arctanh(rho / self._scale)
+        lo, hi = float(u.min()), float(u.max())
+        if hi - lo < 1e-6:  # one value of rho: any small interval around it will do
+            lo, hi = lo - 1e-3, hi + 1e-3
+        self._mid, self._half = 0.5 * (lo + hi), 0.5 * (hi - lo)
+
+        solver = CachedSparseSolver([W_csc], n)
+        transposed = CachedSparseSolver([W_csc.T], n) if col_sums else None
+        diagonal = _multiplier_diagonal(W_csc, solver) if diag else None
+        columns = (
+            [] if rhs is None else [np.asarray(rhs, dtype=np.float64).reshape(n, -1)]
+        )
+        k = columns[0].shape[1] if columns else 0
+        if row_sums:
+            columns.append(np.ones((n, 1)))
+        B = np.hstack(columns) if columns else None
+
+        def at_nodes(x):
+            r = np.tanh(self._mid + self._half * x) * self._scale
+            out: dict[str, list] = {}
+            for a in range(0, r.size, _NODE_BATCH):
+                part = r[a : a + _NODE_BATCH]
+                if B is not None:
+                    sol = solver.solve_batch(
+                        -part[:, None],
+                        np.broadcast_to(B, (part.size,) + B.shape),
+                        pad_to=_NODE_BATCH,
+                    )
+                    if k:
+                        out.setdefault("rhs", []).append(sol[..., :k])
+                    if row_sums:
+                        out.setdefault("row_sums", []).append(sol[..., -1])
+                if col_sums:
+                    sol = transposed.solve_batch(
+                        -part[:, None],
+                        np.ones((part.size, n, 1)),
+                        pad_to=_NODE_BATCH,
+                    )
+                    out.setdefault("col_sums", []).append(sol[..., 0])
+                if diag:
+                    out.setdefault("diag", []).append(diagonal(part))
+                if column_fold is not None:
+                    out.setdefault("fold", []).append(
+                        fold_resolvent_columns(solver, part, column_fold)
+                    )
+            return {name: np.concatenate(v) for name, v in out.items()}
+
+        K = _START_NODES
+        values = at_nodes(_lobatto(K))
+        while True:
+            K_next = 2 * K - 1
+            fresh = _lobatto(K_next)[1::2]
+            new = at_nodes(fresh)
+            L = _lagrange_weights(_lobatto(K), fresh)
+            error = 0.0
+            for name, v in values.items():
+                gap = np.abs(np.tensordot(L, v, axes=1) - new[name]).max()
+                error = max(error, gap / max(np.abs(v).max(), 1e-300))
+            merged = {}
+            for name, v in values.items():
+                m = np.empty((K_next,) + v.shape[1:])
+                m[::2], m[1::2] = v, new[name]
+                merged[name] = m
+            values, K = merged, K_next
+            if error < tol:
+                break
+            if K >= _MAX_NODES:
+                warnings.warn(
+                    f"The resolvent of W did not interpolate to {tol:.0e} in {K} "
+                    f"nodes (last relative change {error:.1e}): rho {rho.min():.6f} "
+                    f"to {rho.max():.6f} nearly reaches a pole of it.",
+                    RuntimeWarning,
+                    stacklevel=2,
+                )
+                break
+        self.values = values
+        self._nodes = _lobatto(K)
+
+    def weights(self, rho) -> np.ndarray:
+        """``(len(rho), K)``: the weights that combine the node values at each ``rho``."""
+        rho = np.atleast_1d(np.asarray(rho, dtype=np.float64))
+        x = (np.arctanh(rho / self._scale) - self._mid) / self._half
+        return _lagrange_weights(self._nodes, x)
 
 
 class KluSarSolver:

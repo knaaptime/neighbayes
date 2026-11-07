@@ -441,12 +441,18 @@ S(\rho)\varepsilon$ and $m = S(\rho)X\beta$,
 $$\mathbb{E}\,y_i = e^{m_i}\prod_j \frac{\Gamma(\alpha + S_{ij})}{\Gamma(\alpha)\,\alpha^{S_{ij}}}, \qquad \frac{\partial\,\mathbb{E}\,y_i}{\partial x_{jk}} = \mathbb{E}\,y_i\,S_{ij}\beta_k,$$
 
 the reduced form's count-scale impact with each row scaled by the mean of the
-propagated heterogeneity. The product needs every entry of $S$, so each
-posterior draw estimates it by Monte Carlo over fresh disturbances (one batched
-sparse solve), taking the unit's own factor in closed form where the
-multiplier's diagonal is exact. The same holds, with $S$ replaced by $(I -
-\lambda W)^{-1}$ and no spillover through the mean, for `SEMNegBin` and
-`SDEMNegBin`.
+propagated heterogeneity. The product needs every entry of $S$, but depends on
+the parameters only through $(\rho, \alpha)$, so it is computed at a few values
+of those and interpolated across the draws, in $\operatorname{atanh}\rho$ and
+$\log\alpha$, with no factorization per draw beyond $m$. It is not simulated:
+at small $\alpha$ rare draws carry the mean of $e^{u_i}$, and at $\alpha = 0.05$
+128 simulations read 16–29% low at $\rho = 0.7$ and lose the effect entirely at
+$\rho = 0.9$. A draw with an entry $S_{ij} \le -\alpha$ (a negative $\rho$ at
+small $\alpha$) has no expected count; it is left out of the effects with a
+warning. The same holds, with $S$ replaced by $(I - \lambda W)^{-1}$ and no
+spillover through the mean, for `SEMNegBin` and `SDEMNegBin`, and for the count
+part of a latent `SARZINB`. The count part of a latent `SARHurdleNegBin` takes
+the same mean less a simulated bounded remainder, which is at most half of it.
 
 ### SEMNegBin
 

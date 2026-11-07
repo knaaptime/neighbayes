@@ -899,6 +899,55 @@ class TestFlowEffectsLeSageDecomposition:
         got = _flow_effect_sums(_FlowEffectMoments(W), *rhos)[0]
         np.testing.assert_allclose(got, _reference_unit_sums(W, *rhos), atol=1e-12)
 
+    @pytest.mark.parametrize("row_standardize", [True, False])
+    @pytest.mark.parametrize(
+        "rd, ro", [(0.9876, 0.9988), (-0.9, 0.95), (0.0, 0.5), (0.3, 0.2)]
+    )
+    def test_separable_sums_match_dense_solve(self, rd, ro, row_standardize):
+        """On ρ_w = −ρ_d ρ_o, by the resolvent: exact at any ρ, near a bound too."""
+        from neighbayes.models.flow import _flow_effect_sums, _FlowEffectMoments
+
+        W = _ring_W(7, row_standardize)
+        rho = (rd, ro, -rd * ro)
+        got = _flow_effect_sums(_FlowEffectMoments(W), *rho)[0]
+        np.testing.assert_allclose(
+            got, _reference_unit_sums(W, *rho), rtol=1e-7, atol=1e-10
+        )
+
+    def test_separable_route_matches_the_series(self):
+        from neighbayes.models.flow._flow import (
+            _flow_effect_sums,
+            _FlowEffectMoments,
+            _series_effect_sums,
+        )
+
+        moments = _FlowEffectMoments(_ring_W(9))
+        rng = np.random.default_rng(0)
+        rd, ro = rng.uniform(0.1, 0.4, 50), rng.uniform(-0.2, 0.3, 50)
+        np.testing.assert_allclose(
+            _flow_effect_sums(moments, rd, ro, -rd * ro),
+            _series_effect_sums(moments, rd, ro, -rd * ro),
+            rtol=1e-8,
+            atol=1e-11,
+        )
+
+    def test_separable_draws_near_the_bound_do_not_cost_the_series(self):
+        """2000 draws up to ρ = 0.9995: the series would need 38 GB of moments."""
+        from neighbayes.models.flow import _flow_effect_sums, _FlowEffectMoments
+
+        W = _ring_W(36)
+        rng = np.random.default_rng(1)
+        rd, ro = rng.uniform(0.99, 0.9995, 2000), rng.uniform(0.3, 0.5, 2000)
+        moments = _FlowEffectMoments(W)
+        sums = _flow_effect_sums(moments, rd, ro, -rd * ro)
+        assert sums.shape == (2000, 3, 4) and moments.P == -1
+        np.testing.assert_allclose(
+            sums[0],
+            _reference_unit_sums(W, rd[0], ro[0], -rd[0] * ro[0]),
+            rtol=1e-7,
+            atol=1e-10,
+        )
+
     def test_zero_rho_closed_form(self):
         """With A = I, effects collapse to closed-form expressions."""
         from neighbayes.models.flow import (

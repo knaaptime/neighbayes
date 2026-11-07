@@ -35,14 +35,15 @@ Pólya–Gamma sampler (:mod:`~neighbayes.models._base._nb`).
 
 from __future__ import annotations
 
+from functools import cached_property
 from typing import Optional
 
 import numpy as np
 import pytensor.tensor as pt
-import scipy.sparse as sp
 
 from ..._lazy_deps import pm, xr
 from ...samplers._registry import register
+from ...samplers._utils._sparsax_utils import CachedSparseSolver
 from .._base._nb import nb_alpha_fixed, nb_alpha_rv
 from .._base._panel import _EFFECTS_NAMES
 from .._mixins._count_panel import CountPanelFEMixin
@@ -170,9 +171,15 @@ class _CountPanel(CountPanelFEMixin):
         if not self._count_spatial:
             return Xb
         N, T = self._N, self._T
-        A = (sp.eye(N, format="csc") - rho * self._W_sparse).tocsc()
-        out = sp.linalg.splu(A).solve(np.ascontiguousarray(Xb.reshape(T, N).T))
+        out = self._filter_solver.solve(
+            [-rho], np.ascontiguousarray(Xb.reshape(T, N).T)
+        )
         return out.T.reshape(-1)
+
+    @cached_property
+    def _filter_solver(self) -> CachedSparseSolver:
+        """One period's ``I − ρW``, with the periods as right-hand sides."""
+        return CachedSparseSolver([self._W_sparse], self._N)
 
     def _posterior_predictive_panel(
         self,
@@ -188,16 +195,26 @@ class _CountPanel(CountPanelFEMixin):
         alpha = post["alpha"].values.reshape(-1)
         inner, outer = self._fe_draws(total)
         rng = np.random.default_rng(random_seed)
-        out = np.empty((total, self._N * self._T))
-        for g in range(total):
-            eta = self._eta_reduced(
-                None if rho is None else float(rho[g]),
-                beta[g],
-                None if inner is None else inner[g],
-            )
+        N, T = self._N, self._T
+        out = np.empty((total, N * T))
+        chunk = 64
+        for start in range(0, total, chunk):
+            idx = np.arange(start, min(start + chunk, total))
+            Xb = beta[idx] @ self._X.T
+            if inner is not None:
+                Xb = Xb + inner[idx]
+            eta = Xb
+            if self._count_spatial:
+                sol = self._filter_solver.solve_batch(
+                    -rho[idx, None],
+                    Xb.reshape(-1, T, N).transpose(0, 2, 1),
+                    pad_to=chunk,
+                )
+                eta = sol.transpose(0, 2, 1).reshape(idx.size, -1)
             if outer is not None:
-                eta = eta + outer[g]
-            out[g] = self._count_draw(rng, eta, float(alpha[g]))
+                eta = eta + outer[idx]
+            for i, g in enumerate(idx):
+                out[g] = self._count_draw(rng, eta[i], float(alpha[g]))
         return out
 
     def _fitted_mean_from_posterior_panel(self) -> np.ndarray:

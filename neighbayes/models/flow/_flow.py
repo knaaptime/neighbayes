@@ -38,6 +38,41 @@ from ..base import SpatialModel
 _EFFECT_KEYS = ("origin", "destination", "intraunit", "network", "total")
 
 
+def _moment_mats(left, right) -> np.ndarray:
+    """The twelve moment matrices of the flow effects, ``(12, a, b)``.
+
+    ``left`` and ``right`` are ``(R, C, D)``, row sums, column sums and diagonals
+    of the origin-side and destination-side operators, each ``(a, n)`` and
+    ``(b, n)``.  With (shock, statistic) running over the shocks and statistics
+    of :func:`_flow_effect_sums`, the sum for that pair is ``Σ_ab c_a e_b M_ab``.
+    """
+    Ra, Ca, Da = left
+    Rb, Cb, Db = right
+    ma, ta = Ra.sum(axis=1), Da.sum(axis=1)  # 1ᵀR, tr
+    mb, tb = Rb.sum(axis=1), Db.sum(axis=1)
+    # Statistics: total, intra, row j (origin = j, intra included), column j
+    # (destination = j).
+    return np.stack(
+        [
+            # destination shock 1·e_jᵀ: entry [o, d] = R[o] (W^q)_{dj}
+            np.outer(ma, mb),
+            Ra @ Db.T,
+            Ra @ Cb.T,
+            np.outer(ma, tb),
+            # origin shock e_j·1ᵀ: entry [o, d] = (W^p)_{oj} R[d]
+            np.outer(ma, mb),
+            Da @ Rb.T,
+            np.outer(ta, mb),
+            Ca @ Rb.T,
+            # intra shock e_j·e_jᵀ: entry [o, d] = (W^p)_{oj} (W^q)_{dj}
+            Ca @ Cb.T,
+            Da @ Db.T,
+            Da @ Cb.T,
+            Ca @ Db.T,
+        ]
+    )
+
+
 class _FlowEffectMoments:
     r"""W-only moments behind the exact LeSage flow-effects decomposition.
 
@@ -58,6 +93,11 @@ class _FlowEffectMoments:
     diagonals ``d_p = diag(W^p)``.  They are computed once per model and
     extended on demand; no ``n² × n²`` operator or ``(n², n)`` array is formed.
     ``diag(W^p)`` is taken in column blocks, so memory stays ``n × block``.
+
+    The series serves the unrestricted filter, whose ``C_pq`` does not factor.
+    Its order and its ``(12, P, P)`` moments grow as ``1/(1 − |ρ_d| − |ρ_o| −
+    |ρ_w|)``, so a draw near that wall is slow; the separable filter has its own
+    route (:func:`_separable_effect_sums`).
     """
 
     #: bytes allowed for one column block of the diag(W^p) recursion
@@ -92,51 +132,61 @@ class _FlowEffectMoments:
                 Z = W @ Z
                 D[p, a:b] = Z[cols, np.arange(b - a)]
         self.P = P
-        m = R.sum(axis=1)  # 1ᵀW^p1
-        t = D.sum(axis=1)  # tr(W^p)
-        # (shock, statistic) → (P+1)×(P+1) moment matrix M, so that the sum
-        # for that shock is Σ_pq C_pq M_pq.  Statistics: total, intra,
-        # row j (origin = j, intra included), column j (destination = j).
-        self.mats = np.stack(
-            [
-                # destination shock 1·e_jᵀ: entry [o, d] = R_p[o] (W^q)_{dj}
-                np.outer(m, m),
-                R @ D.T,
-                R @ C.T,
-                np.outer(m, t),
-                # origin shock e_j·1ᵀ: entry [o, d] = (W^p)_{oj} R_q[d]
-                np.outer(m, m),
-                D @ R.T,
-                np.outer(t, m),
-                C @ R.T,
-                # intra shock e_j·e_jᵀ: entry [o, d] = (W^p)_{oj} (W^q)_{dj}
-                C @ C.T,
-                D @ D.T,
-                D @ C.T,
-                C @ D.T,
-            ]
-        )
+        self.mats = _moment_mats((R, C, D), (R, C, D))
 
     def order_for(self, rd, ro, rw, tol: float = 1e-12) -> int:
         """Series order bounding the neglected tail below ``tol`` (relative)."""
         w = self.w_inf
-        rd, ro, rw = (np.asarray(x, dtype=np.float64) for x in (rd, ro, rw))
-        # A draw on the separable surface ρ_w = −ρ_d ρ_o has coefficients
-        # C_pq = ρ_o^p ρ_d^q, so its series converges whenever each ρ alone is
-        # inside the disc; the general bound would reject valid separable draws.
-        separable = np.abs(rw + rd * ro) <= 1e-12 * np.maximum(np.abs(rd * ro), 1e-300)
-        rd, ro, rw = np.abs(rd), np.abs(ro), np.abs(rw)
-        r_all = np.where(separable, np.maximum(rd, ro) * w, (ro + rd) * w + rw * w * w)
-        r = float(np.max(r_all, initial=0.0))
+        rd, ro, rw = (np.abs(np.asarray(x, dtype=np.float64)) for x in (rd, ro, rw))
+        r = float(np.max((ro + rd) * w + rw * w * w, initial=0.0))
         if r >= 1.0:
             raise ValueError(
-                "Flow effects need |rho_d| + |rho_o| + |rho_w| < 1 (or, on the "
-                "separable surface, |rho_d|, |rho_o| < 1) in the max-row-sum norm "
-                f"of W; a posterior draw reaches {r:.4f}."
+                "Flow effects need |rho_d| + |rho_o| + |rho_w| < 1 in the "
+                f"max-row-sum norm of W; a posterior draw reaches {r:.4f}."
             )
         if r == 0.0:
             return 1
         return int(np.clip(np.ceil(np.log(tol * (1.0 - r)) / np.log(r)), 1, 20_000))
+
+
+def _effect_sums(acc: np.ndarray, n: int) -> np.ndarray:
+    """``(G, 3, 4)`` from the twelve summed moments ``(12, G)``."""
+    acc = acc / float(n) ** 2
+    r = acc.reshape(3, 4, -1)  # (shock, [total, intra, row j, column j], draw)
+    tot, intra, row, col = r[:, 0], r[:, 1], r[:, 2], r[:, 3]
+    out = np.stack([tot, intra, row - intra, col - intra], axis=1)  # (3, 4, G)
+    return np.transpose(out, (2, 0, 1))
+
+
+def _separable_effect_sums(W, rd: np.ndarray, ro: np.ndarray) -> np.ndarray:
+    r"""The sums on the separable surface, from ``W``'s resolvent at each ``ρ``.
+
+    With :math:`\rho_w = -\rho_d \rho_o` the coefficients factor,
+    :math:`C_{pq} = \rho_o^p \rho_d^q`, so each series :math:`\sum_{pq} C_{pq}
+    M_{pq}` of :class:`_FlowEffectMoments` is a product of one in :math:`\rho_o`
+    and one in :math:`\rho_d`, and those sum to :math:`S(\rho)\mathbf 1`,
+    :math:`S(\rho)^\top \mathbf 1` and :math:`\operatorname{diag} S(\rho)`, with
+    :math:`S(\rho) = (I - \rho W)^{-1}`.  They are interpolated across the draws
+    (:class:`~neighbayes.samplers._utils._sparsax_utils.ResolventInterpolant`),
+    so the moment algebra stays the series' with the node values for its powers,
+    and the Lagrange weights for its :math:`\rho^p`.  The cost does not depend on
+    how near a draw comes to :math:`|\rho| = 1`, where the series would need
+    20,000 terms and 38 GB of moments.
+    """
+    from ...samplers._utils._sparsax_utils import ResolventInterpolant
+
+    origin, destination = (
+        ResolventInterpolant(W, r, row_sums=True, col_sums=True, diag=True)
+        for r in (ro, rd)
+    )
+    M = _moment_mats(
+        *(
+            (F.values["row_sums"], F.values["col_sums"], F.values["diag"])
+            for F in (origin, destination)
+        )
+    )
+    acc = np.sum((origin.weights(ro) @ M) * destination.weights(rd), axis=-1)
+    return _effect_sums(acc, W.shape[0])
 
 
 def _flow_effect_sums(moments: _FlowEffectMoments, rd, ro, rw) -> np.ndarray:
@@ -144,9 +194,17 @@ def _flow_effect_sums(moments: _FlowEffectMoments, rd, ro, rw) -> np.ndarray:
 
     Axis 1 is the shock (destination ``D+I``, origin ``O+I``, intra ``I``);
     axis 2 is (total, intra, origin, destination) as in LeSage's
-    ``calc_effects``, each divided by ``N = n²``.  Exact up to the series tail.
+    ``calc_effects``, each divided by ``N = n²``.  Exact up to the series tail
+    (unrestricted) or the interpolation tolerance (separable draws).
     """
     rd, ro, rw = (np.atleast_1d(np.asarray(x, dtype=np.float64)) for x in (rd, ro, rw))
+    if np.all(np.abs(rw + rd * ro) <= 1e-12 * np.maximum(np.abs(rd * ro), 1e-300)):
+        return _separable_effect_sums(moments.W, rd, ro)
+    return _series_effect_sums(moments, rd, ro, rw)
+
+
+def _series_effect_sums(moments: _FlowEffectMoments, rd, ro, rw) -> np.ndarray:
+    """:func:`_flow_effect_sums` by the double power series, for any ``ρ_w``."""
     P = moments.order_for(rd, ro, rw)
     moments.ensure(P)
     M = moments.mats[:, : P + 1, : P + 1]  # (12, P+1, P+1)
@@ -167,11 +225,7 @@ def _flow_effect_sums(moments: _FlowEffectMoments, rd, ro, rw) -> np.ndarray:
         pv = p_all[valid]
         acc += M[:, pv, k - pv] @ cur[pv]
         prev2, prev1 = prev1, cur
-    acc /= float(moments.n) ** 2
-    r = acc.reshape(3, 4, G)  # (shock, [total, intra, row j, column j], draw)
-    tot, intra, row, col = r[:, 0], r[:, 1], r[:, 2], r[:, 3]
-    out = np.stack([tot, intra, row - intra, col - intra], axis=1)  # (3, 4, G)
-    return np.transpose(out, (2, 0, 1))
+    return _effect_sums(acc, moments.n)
 
 
 def _compute_flow_effects(

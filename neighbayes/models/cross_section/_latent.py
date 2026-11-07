@@ -17,11 +17,14 @@ and :math:`m` the mean index, the outcome mean is
 :math:`w_i` the family gives: :math:`\mathbb{E}\,e^{m_i + u_i}` for the negative
 binomial and the density of :math:`u_i` at :math:`-m_i` for the logit.
 :meth:`LatentMixin._latent_outcome_effects` estimates :math:`w` by Monte Carlo
-over fresh disturbances, one batched sparse solve per posterior draw.
+over fresh disturbances, with the draws' sparse solves batched; the negative
+binomial's has a closed form (:func:`._latent_negbin.latent_count_effects`).
 """
 
 from __future__ import annotations
 
+import warnings
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 
 import numpy as np
@@ -29,7 +32,20 @@ import scipy.sparse as sp
 
 from ..._lazy_deps import xr
 from ...samplers._utils._idata import gibbs_to_inference_data
+from ...samplers._utils._sparsax_utils import (
+    _BATCH_BYTES,
+    CachedSparseSolver,
+    ResolventInterpolant,
+)
 from ...samplers._utils._sweeps import probe_sweep_midpoint, run_sweeps_with_midpoint
+
+#: Disturbance vectors per posterior draw.  The effects average over the units,
+#: so their Monte Carlo error falls with ``n`` as the posterior sd does.  For the
+#: bounded weights simulated here 32 leave it at 1-3% of the posterior sd (logit
+#: and probit, ``n`` = 2500), which widens an interval by far less than 1%.
+_OUTCOME_SIMS = 32
+#: Posterior draws solved in one batched call.
+_OUTCOME_CHUNK = 64
 
 
 def _chain_par(chain) -> float:
@@ -48,8 +64,8 @@ class LatentMixin:
     mixin sets ``_latent_chain_class``, its NumPy chain object, and
     ``_latent_chain_kw``, the keywords both backends' chains take beyond the
     shared ones, implements :meth:`_latent_priors`, :meth:`_latent_chains_jax`
-    and :meth:`_latent_disturbances`, and names its parameters beyond the
-    spatial one and ``beta`` in ``_latent_extra``.
+    and, if it simulates its fitted values, :meth:`_latent_disturbances`, and
+    names its parameters beyond the spatial one and ``beta`` in ``_latent_extra``.
     """
 
     _latent_process: str = "sar"
@@ -60,8 +76,6 @@ class LatentMixin:
     #: The scales impacts are reported on: the latent index and the outcome.
     _index_scale: str
     _outcome_scale: str
-    #: Largest ``n`` whose multiplier diagonal comes from the eigendecomposition.
-    _LATENT_EFFECTS_EIGEN_MAX_N: int = 2000
 
     @property
     def _latent_param(self) -> str:
@@ -420,48 +434,46 @@ class LatentMixin:
             scale=scale,
         )
 
-    def _latent_outcome_effects(
-        self, n_mc: int = 128, n_probes: int = 64, seed: int = 0
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Posterior draws of the outcome-scale direct, indirect and total effects.
-
-        See :func:`latent_outcome_effects`; the multiplier's diagonal is exact
-        from the eigendecomposition up to ``_LATENT_EFFECTS_EIGEN_MAX_N`` units
-        and a Hutchinson estimate (``n_probes`` probes) beyond.
-        """
+    def _latent_effect_args(self) -> dict:
+        """The posterior and design arguments of the outcome-scale effects."""
         post = self.inference_data.posterior
         par = post[self._latent_param].values.reshape(-1)
         X, _ = self._latent_design
-        sar = self._latent_process == "sar"
+        W = self._W_sparse.tocsr()
+        periods = self._T if self._is_panel else 1
         durbin = None
         if getattr(self, "_has_wx_in_beta", False):
-            W = self._latent_W
             durbin = (
                 self._X.shape[1],
                 list(self._beta_wx_column_indices),
-                np.asarray(W.sum(axis=1)).ravel(),
-                W.diagonal(),
+                np.tile(np.asarray(W.sum(axis=1)).ravel(), periods),
+                np.tile(W.diagonal(), periods),
             )
-        eigen = None
-        if self._W_sparse.shape[0] <= self._LATENT_EFFECTS_EIGEN_MAX_N:
-            eigs, V, Vinv = self._W_eigendecomposition
-            eigen = (eigs, V * Vinv.T)
+        return {
+            "par": par,
+            "beta": post["beta"].values.reshape(par.size, X.shape[1]),
+            "offset": self._latent_systematic(post),
+            "W": W,
+            "sar": self._latent_process == "sar",
+            "ni": None if durbin else list(self._beta_nonintercept_indices),
+            "durbin": durbin,
+            "periods": periods,
+        }
+
+    def _latent_outcome_effects(
+        self, n_mc: int = _OUTCOME_SIMS, seed: int = 0
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Posterior draws of the outcome-scale direct, indirect and total effects.
+
+        See :func:`latent_outcome_effects`.
+        """
+        post = self.inference_data.posterior
         direct, total = latent_outcome_effects(
-            par=par,
-            beta=post["beta"].values.reshape(par.size, X.shape[1]),
-            offset=self._latent_systematic(post),
+            **self._latent_effect_args(),
             extra={k: post[k].values.reshape(-1) for k in self._latent_extra},
-            W=self._latent_W,
-            sar=sar,
-            ni=None if durbin else list(self._beta_nonintercept_indices),
             noise=self._latent_noise,
             weight=self._latent_outcome_weight,
-            eigen=eigen,
-            row_sums=self._multiplier_row_sums if sar and self._is_row_std else None,
-            durbin=durbin,
-            periods=self._T if self._is_panel else 1,
             n_mc=n_mc,
-            n_probes=n_probes,
             seed=seed,
         )
         return direct, total - direct, total
@@ -475,12 +487,74 @@ class LatentMixin:
         Xb = self._latent_systematic(self._idata.posterior).mean(axis=0)
         n = Xb.shape[0]
         eps = self._latent_disturbances(np.random.default_rng(random_seed), (n, n_sims))
-        lu = sp.linalg.splu(
-            (sp.identity(n, format="csc") - par * self._latent_W).tocsc()
+        N = self._W_sparse.shape[0]
+        T = n // N
+        solver = CachedSparseSolver([self._W_sparse], N)
+        rhs = Xb[:, None] + eps if self._latent_process == "sar" else eps
+        x = stacked_columns(solver.solve([-par], period_columns(rhs, N, T)), N, T)
+        return x if self._latent_process == "sar" else Xb[:, None] + x
+
+
+def period_columns(B: np.ndarray, N: int, T: int) -> np.ndarray:
+    """A time-first stack ``(N T, M)`` as columns of one period's system, ``(N, T M)``."""
+    return B if T == 1 else B.reshape(T, N, -1).transpose(1, 0, 2).reshape(N, -1)
+
+
+def stacked_columns(X: np.ndarray, N: int, T: int) -> np.ndarray:
+    """The inverse of :func:`period_columns`."""
+    return X if T == 1 else X.reshape(N, T, -1).transpose(1, 0, 2).reshape(N * T, -1)
+
+
+def weighted_effects(w, d, rows, beta, ni, durbin) -> tuple[np.ndarray, np.ndarray]:
+    r"""``(direct, total)`` of draws ``beta`` ``(B, k)`` from their weights ``w`` ``(B, n)``.
+
+    The SAR's average diagonal and row sum of :math:`\operatorname{diag}(w)\,S`
+    (``d`` and ``rows``), the SEM's :math:`\bar w\beta` (``rows`` is ``None``),
+    and the SDEM's :math:`\bar w\beta` plus :math:`\overline{w\,W \mathbf
+    1}\,\theta` indirect (``durbin``).
+    """
+    mean = np.mean(w, axis=1, keepdims=True)
+    if durbin is not None:
+        k, wx_idx, w_rows, w_diag = durbin
+        own = mean * beta[:, :k][:, wx_idx]
+        lagged = beta[:, k:]
+        return (
+            own + np.mean(w * w_diag, axis=1, keepdims=True) * lagged,
+            own + np.mean(w * w_rows, axis=1, keepdims=True) * lagged,
         )
-        if self._latent_process == "sar":
-            return lu.solve(Xb[:, None] + eps)
-        return Xb[:, None] + lu.solve(eps)
+    b = beta[:, ni]
+    if rows is None:
+        return mean * b, mean * b
+    return (
+        np.mean(w * d, axis=1, keepdims=True) * b,
+        np.mean(w * rows, axis=1, keepdims=True) * b,
+    )
+
+
+def defined_effects(direct, total) -> tuple[np.ndarray, np.ndarray]:
+    """``(direct, total)`` less the draws with no expected count, with a warning.
+
+    A negative multiplier entry at or below ``-alpha`` makes a unit's expected
+    count infinite (a negative ``rho`` at small ``alpha``), though its log-mean
+    is finite.  The effects of the rest of the posterior are still defined.
+    """
+    keep = np.isfinite(direct).all(axis=1) & np.isfinite(total).all(axis=1)
+    if keep.all():
+        return direct, total
+    if not keep.any():
+        raise ValueError(
+            "No posterior draw has an expected count: a multiplier entry at or "
+            "below -alpha makes E[gamma^s] infinite (a negative rho at small "
+            "alpha).  The effects on the log-mean are still defined."
+        )
+    warnings.warn(
+        f"{keep.size - keep.sum()} of {keep.size} posterior draws have no expected "
+        "count (a multiplier entry at or below -alpha, from a negative rho at small "
+        "alpha) and are left out of the count-scale effects.",
+        UserWarning,
+        stacklevel=3,
+    )
+    return direct[keep], total[keep]
 
 
 def latent_outcome_effects(
@@ -494,82 +568,66 @@ def latent_outcome_effects(
     ni,
     noise,
     weight,
-    eigen=None,
-    row_sums=None,
     durbin=None,
     periods: int = 1,
-    n_mc: int = 128,
-    n_probes: int = 64,
+    n_mc: int = _OUTCOME_SIMS,
     seed: int = 0,
 ) -> tuple[np.ndarray, np.ndarray]:
     r"""Posterior draws ``(direct, total)`` of a latent model's outcome-scale effects.
 
     For each posterior draw, ``n_mc`` fresh disturbances ``noise(rng, size,
-    params)`` give the weights :math:`w = ` ``weight(m, U, E, d, params,
-    exact)`` (see the module); the effects are then the SAR's average diagonal
-    and row sum of :math:`\operatorname{diag}(w)\,S`, the SEM's :math:`\bar
-    w\beta`, and the SDEM's :math:`\bar w\beta` plus :math:`\overline{w\,W
-    \mathbf 1}\,\theta` indirect.
+    params)`` give the weights :math:`w = ` ``weight(m, U, E, d, params)`` (see
+    the module), which :func:`weighted_effects` turns into effects.  A weight
+    should be bounded: Monte Carlo cannot see the rare draws that dominate the
+    mean of an unbounded one at small dispersion, whatever ``n_mc``
+    (:func:`._latent_negbin.latent_count_effects`).
 
     ``par`` is ``(G,)``, ``beta`` ``(G, k)``, ``offset`` ``(G, n)`` each draw's
     systematic part, ``extra`` the family's other parameters by name, ``(G,)``
-    each, and ``W`` the filter's weights on the stack.  ``ni`` are the effect
-    columns of ``beta``; ``durbin`` is ``(k, wx_idx, w_rows, w_diag)`` for the
-    SDEM instead.  ``eigen`` is ``(eigs, V * Vinv.T)`` of the per-period
-    weights, for an exact multiplier diagonal (tiled over ``periods``), else
-    ``n_probes`` Hutchinson probes estimate it.  ``row_sums(r)`` gives a
-    row-standardized SAR's multiplier row sums, else they are solved for.
+    each, and ``W`` one period's weights, the stack holding ``periods`` of them.
+    ``ni`` are the effect columns of ``beta``; ``durbin`` is ``(k, wx_idx, w_rows,
+    w_diag)`` on the stack for the SDEM instead.  The multiplier's diagonal and
+    row sums are exact, interpolated across the draws
+    (:class:`~neighbayes.samplers._utils._sparsax_utils.ResolventInterpolant`),
+    and the disturbances' solves batched.  Each draw has its own random stream
+    and its simulations run on threads (the generators and ufuncs release the
+    GIL), so ``seed`` fixes the result whatever the chunking or thread count.
     """
-    from ..._ops import _make_cached_sparse_solver
-
     G = par.size
     n = offset.shape[1]
-    I_n = sp.identity(n, format="csc")
-    rng = np.random.default_rng(seed)
-    if eigen is not None:
-        eigs, VVinv = eigen
-    else:
-        Z = rng.choice(np.array([-1.0, 1.0]), size=(n, n_probes))
-    if durbin is not None:
-        k, wx_idx, w_rows, w_diag = durbin
+    N = W.shape[0]
+    F = ResolventInterpolant(W, par, diag=True, row_sums=sar)
+    L = F.weights(par)
+    solver = CachedSparseSolver([W], N)
+    cols = n_mc + int(sar)
+    chunk = int(np.clip(_BATCH_BYTES // (8 * n * cols), 1, _OUTCOME_CHUNK))
 
-    n_eff = len(wx_idx) if durbin is not None else len(ni)
+    n_eff = len(durbin[1]) if durbin is not None else len(ni)
     direct = np.empty((G, n_eff))
     total = np.empty((G, n_eff))
-    for g in range(G):
-        r = float(par[g])
-        A = (I_n - r * W).tocsc()
-        solver = _make_cached_sparse_solver(A) or sp.linalg.splu(A)
-        params = {k_: v[g] for k_, v in extra.items()}
-        E = noise(rng, (n, n_mc), params)
-        Xb = offset[g]
-        rhs = [E]
-        if sar:
-            rhs.append(Xb[:, None])
-            if row_sums is None:
-                rhs.append(np.ones((n, 1)))
-        if eigen is None:
-            rhs.append(Z)
-        sol = np.asarray(solver.solve(np.hstack(rhs)), dtype=np.float64)
-        U = sol[:, :n_mc]
-        if eigen is not None:
-            d = np.tile((VVinv @ (1.0 / (1.0 - r * eigs))).real, periods)
-        else:
-            d = np.mean(Z * sol[:, -n_probes:], axis=1)
-        m = sol[:, n_mc] if sar else Xb
-        w = weight(m, U, E, d, params, exact=eigen is not None)
-        if sar:
-            rows = (
-                np.tile(row_sums(r), periods)
-                if row_sums is not None
-                else sol[:, n_mc + 1]
+    with ThreadPoolExecutor() as pool:
+        for start in range(0, G, chunk):
+            idx = np.arange(start, min(start + chunk, G))
+            params = [{k_: v[g] for k_, v in extra.items()} for g in idx]
+
+            def simulate(i):
+                rng = np.random.default_rng([seed, int(idx[i])])
+                e = noise(rng, (n, n_mc), params[i])
+                rhs = np.column_stack([e, offset[idx[i]]]) if sar else e
+                return e, period_columns(rhs, N, periods)
+
+            E, rhs = zip(*pool.map(simulate, range(idx.size)))
+            sol = solver.solve_batch(-par[idx, None], np.stack(rhs), pad_to=chunk)
+            d = np.tile(L[idx] @ F.values["diag"], periods)
+
+            def weigh(i):
+                x = stacked_columns(sol[i], N, periods)
+                m = x[:, n_mc] if sar else offset[idx[i]]
+                return weight(m, x[:, :n_mc], E[i], d[i], params[i])
+
+            w = np.stack(list(pool.map(weigh, range(idx.size))))
+            rows = np.tile(L[idx] @ F.values["row_sums"], periods) if sar else None
+            direct[idx], total[idx] = weighted_effects(
+                w, d, rows, beta[idx], ni, durbin
             )
-            direct[g] = np.mean(w * d) * beta[g, ni]
-            total[g] = np.mean(w * rows) * beta[g, ni]
-        elif durbin is not None:
-            b1, b2 = beta[g, :k][wx_idx], beta[g, k:]
-            direct[g] = np.mean(w) * b1 + np.mean(w * w_diag) * b2
-            total[g] = np.mean(w) * b1 + np.mean(w * w_rows) * b2
-        else:
-            direct[g] = total[g] = np.mean(w) * beta[g, ni]
     return direct, total

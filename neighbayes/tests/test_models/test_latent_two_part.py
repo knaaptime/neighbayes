@@ -16,6 +16,7 @@ from neighbayes import dgp
 from neighbayes.models.cross_section._latent_two_part import (
     _draw_truncated_poisson,
     _truncated_mean,
+    _truncated_remainder,
 )
 
 MODELS = {
@@ -223,3 +224,58 @@ def test_panel_parts_carry_the_time_effects_term(which, zero_shift):
     m = cls(y=d["y"], X=d["X"], W=d["W_sparse"], N=16, T=3, **kw)
     assert m._part_level_shift(zero=False) == 3.0
     assert m._part_level_shift(zero=True) == zero_shift
+
+
+def test_truncated_remainder_is_bounded_and_matches_the_slope():
+    """``λ − λ g'(λ)``: at most ``λ/2`` and at most about 0.4, whatever ``λ``."""
+    lam = np.geomspace(1e-6, 1e6, 400)
+    r = _truncated_remainder(lam)
+    assert np.all(r >= 0.0) and np.all(r <= 0.5 * lam * (1 + 1e-9)) and r.max() < 0.5
+    assert r[-1] == 0.0
+    # The slope by central differences on log λ, away from the series' switch.
+    mid = lam[(lam > 0.05) & (lam < 50)]
+    h = 1e-5
+    slope = (_truncated_mean(mid * np.exp(h)) - _truncated_mean(mid * np.exp(-h))) / (
+        2 * h
+    )
+    np.testing.assert_allclose(_truncated_remainder(mid), mid - slope, atol=1e-7)
+    # Continuous where the series takes over.
+    np.testing.assert_allclose(
+        _truncated_remainder(np.array([0.99e-2])),
+        _truncated_remainder(np.array([1.01e-2])),
+        rtol=0.02,
+    )
+
+
+def test_hurdle_count_effects_match_a_long_simulation():
+    """At moderate alpha, where brute-force simulation can be trusted."""
+    from neighbayes.models.cross_section._latent import latent_outcome_effects
+    from neighbayes.samplers._utils._latent_loglik import log_gamma_noise
+
+    _, m = _model("hurdle", alpha=3.0, target_pi=0.6)
+    m.fit(**QUICK)
+    post = m.inference_data.posterior
+    keep = np.arange(0, 80, 20)
+    direct, total = m._latent_part_effects("count")
+
+    def brute(u, U, E, d, params):
+        lam = np.exp(np.minimum(u[:, None] + U, 30.0))
+        return np.mean(lam - _truncated_remainder(lam), axis=1)
+
+    alpha = post["alpha"].values.reshape(-1)[keep]
+    ref_d, ref_t = latent_outcome_effects(
+        par=post["rho"].values.reshape(-1)[keep],
+        beta=post["beta"].values.reshape(80, -1)[keep],
+        offset=m._part_systematic(False)[keep],
+        extra={"alpha": alpha},
+        W=m._W_sparse.tocsr(),
+        sar=True,
+        ni=list(m._nonintercept_indices),
+        noise=lambda rng, size, params: log_gamma_noise(
+            rng, float(params["alpha"]), size
+        ),
+        weight=brute,
+        n_mc=20000,
+    )
+    np.testing.assert_allclose(direct[keep], ref_d, rtol=0.03, atol=1e-3)
+    np.testing.assert_allclose(total[keep], ref_t, rtol=0.03, atol=1e-3)

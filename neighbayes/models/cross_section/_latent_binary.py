@@ -105,7 +105,7 @@ class LatentLogitMixin(LatentBinaryMixin):
         return rng.logistic(size=size)
 
     @staticmethod
-    def _latent_outcome_weight(m, U, E, d, params, exact) -> np.ndarray:
+    def _latent_outcome_weight(m, U, E, d, params) -> np.ndarray:
         """The density of ``u_i`` at ``-m_i``, Rao-Blackwellized over ``ε_i``.
 
         ``u_i = d_i ε_i + v_i``; given ``v_i`` the density is the logistic's,
@@ -141,7 +141,7 @@ class LatentProbitMixin(LatentBinaryMixin):
         return rng.standard_normal(size=size)
 
     @staticmethod
-    def _latent_outcome_weight(m, U, E, d, params, exact) -> np.ndarray:
+    def _latent_outcome_weight(m, U, E, d, params) -> np.ndarray:
         """The density of ``u_i`` at ``-m_i``, Rao-Blackwellized over ``ε_i``.
 
         ``u_i = d_i ε_i + v_i``; given ``v_i`` the density is the normal's,

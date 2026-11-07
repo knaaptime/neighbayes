@@ -28,6 +28,7 @@ the draws averaged.
 
 from __future__ import annotations
 
+from functools import cached_property
 from typing import Optional
 
 import numpy as np
@@ -37,7 +38,9 @@ from ..._lazy_deps import xr
 from ...samplers import two_part_latent as _two_part_latent  # noqa: F401
 from ...samplers._utils._idata import gibbs_to_inference_data
 from ...samplers._utils._latent_loglik import log_gamma_noise
+from ...samplers._utils._sparsax_utils import CachedSparseSolver
 from .._mixins._two_part import _SUMMARY_DRAWS, PART_SCALES
+from ._latent import _OUTCOME_SIMS, period_columns, stacked_columns
 
 #: Fresh disturbance vectors per posterior draw in the simulated summaries.
 _SUMMARY_SIMS = 64
@@ -49,12 +52,16 @@ def _truncated_mean(lam: np.ndarray) -> np.ndarray:
     return np.where(lam < 1e-8, 1.0 + 0.5 * lam, lam / np.where(q > 0, q, 1.0))
 
 
-def _truncated_slope(lam: np.ndarray) -> np.ndarray:
-    """``d/d log(lam)`` of the truncated mean: ``lam g'(lam)``, by series at small ``lam``."""
+def _truncated_remainder(lam: np.ndarray) -> np.ndarray:
+    r"""``lam − lam g'(lam)``, ``g`` the truncated Poisson's mean: bounded, at most ``lam/2``.
+
+    :math:`\lambda e^{-\lambda}(\lambda - q)/q^2` with :math:`q = 1 - e^{-\lambda}`,
+    by series at small :math:`\lambda`; it vanishes as :math:`\lambda` grows.
+    """
     q = -np.expm1(-lam)
     qs = np.where(lam < 1e-2, 1.0, q)
-    closed = lam * (qs - lam * np.exp(-lam)) / (qs * qs)
-    return np.where(lam < 1e-2, lam * (0.5 + lam / 6.0), closed)
+    closed = lam * np.exp(-lam) * (lam - qs) / (qs * qs)
+    return np.where(lam < 1e-2, lam * (0.5 - lam / 6.0), closed)
 
 
 def _with_periods(X: np.ndarray, priors, D_tau: np.ndarray, fp: dict):
@@ -118,8 +125,6 @@ class LatentTwoPartMixin:
 
     _two_part: str
     _zero_effects: bool
-    #: Largest ``n`` whose multiplier diagonal comes from the eigendecomposition.
-    _LATENT_EFFECTS_EIGEN_MAX_N: int = 2000
 
     def _latent_two_part_priors(self):
         """``(count priors, zero priors)`` for the sampler."""
@@ -535,80 +540,91 @@ class LatentTwoPartMixin:
         direct, total = self._latent_part_effects(equation)
         return direct, total - direct, total
 
-    def _latent_part_effects(self, equation: str, n_mc: int = 128, n_probes: int = 64):
+    def _latent_part_effects(self, equation: str, n_mc: int = _OUTCOME_SIMS):
         r"""Posterior draws ``(direct, total)`` of one part's outcome-scale effects.
 
-        The zero part's outcome is :math:`P(u_i > 0)`, the count part's the
-        expected count of an active unit, :math:`E e^{\eta_i}` (ZINB), or of a
-        positive count, :math:`E\,g(e^{\eta_i})`, :math:`g` the truncated
-        Poisson's mean (hurdle); see
-        :func:`~neighbayes.models.cross_section._latent.latent_outcome_effects`.
+        The zero part's outcome is :math:`P(u_i > 0)`, by Monte Carlo
+        (:func:`~neighbayes.models.cross_section._latent.latent_outcome_effects`).
+        The count part's is the expected count of an active unit,
+        :math:`E e^{\eta_i}` (ZINB), in closed form
+        (:func:`~neighbayes.models.cross_section._latent_negbin.latent_count_effects`),
+        or of a positive count, :math:`E\,g(e^{\eta_i})`, :math:`g` the truncated
+        Poisson's mean (hurdle).  That one's weight
+        :math:`E[\lambda g'(\lambda)]` is the same closed-form :math:`E\lambda`
+        less the mean of a bounded remainder, which Monte Carlo can estimate at
+        any :math:`\alpha` and which is at most half of it.
         """
-        from ._latent import latent_outcome_effects
+        from ._latent import defined_effects, latent_outcome_effects
         from ._latent_binary import LatentLogitMixin
-        from ._latent_negbin import LatentNegBinMixin
+        from ._latent_negbin import (
+            expected_count,
+            latent_count_effects,
+            log_moment_table,
+        )
 
         post = self.inference_data.posterior
         zero = equation == "zero"
         name = "_zero" if zero else ""
         par = post[f"rho{name}"].values.reshape(-1)
         X = self._Z if zero else self._X
-        beta = post[f"beta{name}"].values.reshape(par.size, X.shape[1])
-        # A period's weights; the effects act on their stack.
-        W = (self._W_zero_sparse if zero else self._W_sparse).tocsr()
-        if zero:
-            extra = {}
-
-            def noise(rng, size, params):
-                return rng.logistic(size=size)
-
-            weight = LatentLogitMixin._latent_outcome_weight
-        else:
-            extra = {"alpha": post["alpha"].values.reshape(-1)}
-
-            def noise(rng, size, params):
-                return log_gamma_noise(rng, float(params["alpha"]), size)
-
-            if self._two_part == "zinb":
-                weight = LatentNegBinMixin._latent_outcome_weight
-            else:
-
-                def weight(m, U, E, d, params, exact):
-                    lam = np.exp(np.clip(m[:, None] + U, -30, 30))
-                    return np.mean(_truncated_slope(lam), axis=1)
-
-        own_W = not zero or self._same_W
-        eigen = None
-        if W.shape[0] <= self._LATENT_EFFECTS_EIGEN_MAX_N:
-            if own_W:
-                eigs, V, Vinv = self._W_eigendecomposition
-            else:
-                eigs, V = np.linalg.eig(W.toarray())
-                Vinv = np.linalg.inv(V)
-            eigen = (eigs, V * Vinv.T)
-        row_std = self._is_sel_row_std if zero else self._is_row_std
-        return latent_outcome_effects(
+        args = dict(
             par=par,
-            beta=beta,
+            beta=post[f"beta{name}"].values.reshape(par.size, X.shape[1]),
             offset=self._part_systematic(zero),
-            extra=extra,
-            W=self._latent_stack(W),
+            # A period's weights; the effects act on their stack.
+            W=(self._W_zero_sparse if zero else self._W_sparse).tocsr(),
             sar=True,
             ni=list(
                 self._sel_nonintercept_indices if zero else self._nonintercept_indices
             ),
-            noise=noise,
-            weight=weight,
-            eigen=eigen,
-            row_sums=self._multiplier_row_sums if own_W and row_std else None,
             periods=self._latent_T,
-            n_mc=n_mc,
-            n_probes=n_probes,
+        )
+        if zero:
+            return latent_outcome_effects(
+                **args,
+                extra={},
+                noise=lambda rng, size, params: rng.logistic(size=size),
+                weight=LatentLogitMixin._latent_outcome_weight,
+                n_mc=n_mc,
+            )
+        alpha = post["alpha"].values.reshape(-1)
+        if self._two_part == "zinb":
+            return latent_count_effects(**args, alpha=alpha)
+
+        _, log_moments = log_moment_table(args["W"], par, alpha)
+        T = self._latent_T
+
+        def weight(m, U, E, d, params):
+            mean = expected_count(
+                m + np.tile(log_moments(np.array([params["draw"]]))[0], T)
+            )
+            lam = np.exp(np.minimum(m[:, None] + U, 30.0))
+            remainder = np.mean(_truncated_remainder(lam), axis=1)
+            return np.maximum(mean - remainder, 0.5 * mean)
+
+        return defined_effects(
+            *latent_outcome_effects(
+                **args,
+                extra={"alpha": alpha, "draw": np.arange(par.size)},
+                noise=lambda rng, size, params: log_gamma_noise(
+                    rng, float(params["alpha"]), size
+                ),
+                weight=weight,
+                n_mc=n_mc,
+            )
         )
 
     # ------------------------------------------------------------------
     # Simulated summaries
     # ------------------------------------------------------------------
+
+    @cached_property
+    def _part_solvers(self) -> dict:
+        """Each part's one-period filter solver, for the simulated summaries."""
+        N = self._W_sparse.shape[0]
+        count = CachedSparseSolver([self._W_sparse], N)
+        zero = count if self._same_W else CachedSparseSolver([self._W_zero_sparse], N)
+        return {"count": count, "zero": zero}
 
     def _latent_part_sims(
         self, g: int, n_sims: int, rng
@@ -618,22 +634,19 @@ class LatentTwoPartMixin:
         T = self._latent_T
         N = n // T
 
-        def solve(W, par, rhs):
+        def solve(part, par, rhs):
             # Each period's filter: the periods ride along as columns.
-            lu = sp.linalg.splu((sp.identity(N, format="csc") - par * W).tocsc())
-            cols = rhs.reshape(T, N, n_sims).transpose(1, 0, 2).reshape(N, -1)
-            return (
-                lu.solve(cols).reshape(N, T, n_sims).transpose(1, 0, 2).reshape(n, -1)
-            )
+            x = self._part_solvers[part].solve([-par], period_columns(rhs, N, T))
+            return stacked_columns(x, N, T)
 
         draw = {name: self._flat_draw(name)[g] for name in ("rho_zero", "rho", "alpha")}
         U = solve(
-            self._W_zero_sparse,
+            "zero",
             float(draw["rho_zero"]),
             self._part_systematic(True, g)[:, None] + rng.logistic(size=(n, n_sims)),
         )
         H = solve(
-            self._W_sparse,
+            "count",
             float(draw["rho"]),
             self._part_systematic(False, g)[:, None]
             + log_gamma_noise(rng, float(draw["alpha"]), (n, n_sims)),
