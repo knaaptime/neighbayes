@@ -1647,7 +1647,7 @@ asymmetry while landing on different logdet paths. We therefore key on the
     <span class="n">gdf</span> <span class="o">=</span> <span class="n">dgp</span><span class="o">.</span><span class="n">simulate_sar</span><span class="p">(</span><span class="n">n_side</span><span class="o">=</span><span class="n">n_side</span><span class="p">,</span> <span class="n">create_gdf</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">)</span>
     <span class="n">W</span> <span class="o">=</span> <span class="n">build_w</span><span class="p">(</span><span class="n">gdf</span><span class="p">,</span> <span class="n">kind</span><span class="p">)</span>
     <span class="n">sim</span> <span class="o">=</span> <span class="p">(</span><span class="n">dgp</span><span class="o">.</span><span class="n">simulate_sar_logit</span> <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"logit"</span> <span class="k">else</span> <span class="n">dgp</span><span class="o">.</span><span class="n">simulate_sar_negbin</span><span class="p">)(</span>
-        <span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span> <span class="n">gdf</span><span class="o">=</span><span class="n">gdf</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span>
+        <span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span> <span class="n">gdf</span><span class="o">=</span><span class="n">gdf</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span> <span class="n">latent</span><span class="o">=</span><span class="kc">False</span>
     <span class="p">)</span>
     <span class="n">y</span> <span class="o">=</span> <span class="n">sim</span><span class="p">[</span><span class="s2">"y"</span><span class="p">]</span><span class="o">.</span><span class="n">to_numpy</span><span class="p">()</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">sim</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="s2">"to_numpy"</span><span class="p">)</span> <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">sim</span><span class="p">[</span><span class="s2">"y"</span><span class="p">])</span>
     <span class="n">X_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">sim</span><span class="o">.</span><span class="n">columns</span> <span class="k">if</span> <span class="n">c</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">"X_"</span><span class="p">)]</span>
@@ -1658,7 +1658,7 @@ asymmetry while landing on different logdet paths. We therefore key on the
 <span class="k">def</span><span class="w"> </span><span class="nf">fit_and_time</span><span class="p">(</span><span class="n">model</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="p">,</span> <span class="n">W</span><span class="p">,</span> <span class="n">backend</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">draws</span><span class="p">,</span> <span class="n">tune</span><span class="p">,</span> <span class="n">chains</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">2026</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Fit one PG model on one backend; return timing + ESS + resolved logdet method."""</span>
     <span class="n">Model</span> <span class="o">=</span> <span class="n">SARLogit</span> <span class="k">if</span> <span class="n">model</span> <span class="o">==</span> <span class="s2">"logit"</span> <span class="k">else</span> <span class="n">SARNegBin</span>
-    <span class="n">m</span> <span class="o">=</span> <span class="n">Model</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">)</span>
+    <span class="n">m</span> <span class="o">=</span> <span class="n">Model</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span> <span class="n">latent</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>  <span class="c1"># the reduced form's PG sampler</span>
     <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
     <span class="n">idata</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
         <span class="n">draws</span><span class="o">=</span><span class="n">draws</span><span class="p">,</span>
@@ -1799,9 +1799,9 @@ n= 5041 | nb    | W=asym | backend=jax ...
   <tbody>
     <tr>
       <th>0</th>
-      <td>4.974331</td>
+      <td>2.816781</td>
       <td>528.670291</td>
-      <td>106.279686</td>
+      <td>187.685961</td>
       <td>0.160000</td>
       <td>eigenvalue</td>
       <td>400</td>
@@ -1811,10 +1811,10 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>1</th>
-      <td>2.672433</td>
-      <td>655.954796</td>
-      <td>245.452322</td>
-      <td>0.152471</td>
+      <td>1.668670</td>
+      <td>726.165233</td>
+      <td>435.176173</td>
+      <td>0.154656</td>
       <td>eigenvalue</td>
       <td>400</td>
       <td>logit</td>
@@ -1823,9 +1823,9 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>2</th>
-      <td>10.720322</td>
+      <td>6.158521</td>
       <td>609.198975</td>
-      <td>56.826557</td>
+      <td>98.919693</td>
       <td>0.130328</td>
       <td>eigenvalue</td>
       <td>400</td>
@@ -1835,10 +1835,10 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>3</th>
-      <td>2.579763</td>
-      <td>753.166296</td>
-      <td>291.951770</td>
-      <td>0.130395</td>
+      <td>1.412258</td>
+      <td>545.293228</td>
+      <td>386.114516</td>
+      <td>0.128933</td>
       <td>eigenvalue</td>
       <td>400</td>
       <td>logit</td>
@@ -1847,9 +1847,9 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>4</th>
-      <td>5.900832</td>
+      <td>3.668410</td>
       <td>440.322449</td>
-      <td>74.620402</td>
+      <td>120.030859</td>
       <td>0.309341</td>
       <td>eigenvalue</td>
       <td>400</td>
@@ -1859,10 +1859,10 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>5</th>
-      <td>2.754656</td>
-      <td>453.116757</td>
-      <td>164.491252</td>
-      <td>0.308800</td>
+      <td>1.360272</td>
+      <td>527.860841</td>
+      <td>388.055381</td>
+      <td>0.307686</td>
       <td>eigenvalue</td>
       <td>400</td>
       <td>nb</td>
@@ -1871,9 +1871,9 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>6</th>
-      <td>5.928422</td>
+      <td>3.623224</td>
       <td>578.274294</td>
-      <td>97.542706</td>
+      <td>159.602157</td>
       <td>0.481518</td>
       <td>eigenvalue</td>
       <td>400</td>
@@ -1883,10 +1883,10 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>7</th>
-      <td>2.667041</td>
-      <td>482.651077</td>
-      <td>180.968749</td>
-      <td>0.482332</td>
+      <td>1.411794</td>
+      <td>531.891301</td>
+      <td>376.748538</td>
+      <td>0.483036</td>
       <td>eigenvalue</td>
       <td>400</td>
       <td>nb</td>
@@ -1895,9 +1895,9 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>8</th>
-      <td>5.879581</td>
+      <td>3.652293</td>
       <td>624.807655</td>
-      <td>106.267384</td>
+      <td>171.072710</td>
       <td>0.488573</td>
       <td>chol_aaa</td>
       <td>900</td>
@@ -1907,10 +1907,10 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>9</th>
-      <td>2.715458</td>
-      <td>573.168093</td>
-      <td>211.076058</td>
-      <td>0.489239</td>
+      <td>1.599596</td>
+      <td>520.756814</td>
+      <td>325.555137</td>
+      <td>0.489691</td>
       <td>chol_aaa</td>
       <td>900</td>
       <td>logit</td>
@@ -1919,9 +1919,9 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>10</th>
-      <td>8.617277</td>
+      <td>5.066999</td>
       <td>446.927669</td>
-      <td>51.864144</td>
+      <td>88.203629</td>
       <td>0.462511</td>
       <td>lu_aaa</td>
       <td>900</td>
@@ -1931,10 +1931,10 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>11</th>
-      <td>2.650644</td>
-      <td>593.050313</td>
-      <td>223.738182</td>
-      <td>0.460038</td>
+      <td>1.535987</td>
+      <td>636.960301</td>
+      <td>414.691260</td>
+      <td>0.456870</td>
       <td>lu_aaa</td>
       <td>900</td>
       <td>logit</td>
@@ -1943,9 +1943,9 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>12</th>
-      <td>5.875980</td>
+      <td>3.927572</td>
       <td>573.920806</td>
-      <td>97.672362</td>
+      <td>146.126121</td>
       <td>0.320246</td>
       <td>chol_aaa</td>
       <td>900</td>
@@ -1955,10 +1955,10 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>13</th>
-      <td>3.400040</td>
-      <td>413.775378</td>
-      <td>121.697223</td>
-      <td>0.320538</td>
+      <td>1.631701</td>
+      <td>638.243666</td>
+      <td>391.152435</td>
+      <td>0.320430</td>
       <td>chol_aaa</td>
       <td>900</td>
       <td>nb</td>
@@ -1967,9 +1967,9 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>14</th>
-      <td>6.930206</td>
+      <td>4.589166</td>
       <td>568.991549</td>
-      <td>82.103122</td>
+      <td>123.985840</td>
       <td>0.371075</td>
       <td>lu_aaa</td>
       <td>900</td>
@@ -1979,10 +1979,10 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>15</th>
-      <td>3.556021</td>
-      <td>453.259706</td>
-      <td>127.462600</td>
-      <td>0.374301</td>
+      <td>1.805362</td>
+      <td>444.393619</td>
+      <td>246.152131</td>
+      <td>0.376566</td>
       <td>lu_aaa</td>
       <td>900</td>
       <td>nb</td>
@@ -1991,9 +1991,9 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>16</th>
-      <td>5.856057</td>
+      <td>3.894233</td>
       <td>490.844189</td>
-      <td>83.818199</td>
+      <td>126.043851</td>
       <td>0.300904</td>
       <td>chol_aaa</td>
       <td>2025</td>
@@ -2003,10 +2003,10 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>17</th>
-      <td>3.021089</td>
-      <td>505.734313</td>
-      <td>167.401322</td>
-      <td>0.296436</td>
+      <td>1.819388</td>
+      <td>607.298079</td>
+      <td>333.792590</td>
+      <td>0.300721</td>
       <td>chol_aaa</td>
       <td>2025</td>
       <td>logit</td>
@@ -2015,9 +2015,9 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>18</th>
-      <td>7.675538</td>
+      <td>4.878578</td>
       <td>583.466330</td>
-      <td>76.016345</td>
+      <td>119.597628</td>
       <td>0.341244</td>
       <td>lu_aaa</td>
       <td>2025</td>
@@ -2027,10 +2027,10 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>19</th>
-      <td>3.378194</td>
-      <td>638.351707</td>
-      <td>188.962395</td>
-      <td>0.341766</td>
+      <td>1.966846</td>
+      <td>572.931671</td>
+      <td>291.294695</td>
+      <td>0.342960</td>
       <td>lu_aaa</td>
       <td>2025</td>
       <td>logit</td>
@@ -2039,9 +2039,9 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>20</th>
-      <td>7.876686</td>
+      <td>4.604826</td>
       <td>424.479580</td>
-      <td>53.890630</td>
+      <td>92.181457</td>
       <td>0.370420</td>
       <td>chol_aaa</td>
       <td>2025</td>
@@ -2051,10 +2051,10 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>21</th>
-      <td>5.044891</td>
-      <td>537.320172</td>
-      <td>106.507784</td>
-      <td>0.370777</td>
+      <td>2.204693</td>
+      <td>504.498578</td>
+      <td>228.829403</td>
+      <td>0.368809</td>
       <td>chol_aaa</td>
       <td>2025</td>
       <td>nb</td>
@@ -2063,9 +2063,9 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>22</th>
-      <td>7.055600</td>
+      <td>4.793216</td>
       <td>494.936441</td>
-      <td>70.148033</td>
+      <td>103.257688</td>
       <td>0.404559</td>
       <td>lu_aaa</td>
       <td>2025</td>
@@ -2075,10 +2075,10 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>23</th>
-      <td>5.107569</td>
-      <td>572.001905</td>
-      <td>111.991018</td>
-      <td>0.407044</td>
+      <td>2.240387</td>
+      <td>550.430753</td>
+      <td>245.685599</td>
+      <td>0.405283</td>
       <td>lu_aaa</td>
       <td>2025</td>
       <td>nb</td>
@@ -2087,9 +2087,9 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>24</th>
-      <td>7.695689</td>
+      <td>4.970146</td>
       <td>472.874395</td>
-      <td>61.446660</td>
+      <td>95.142952</td>
       <td>0.335606</td>
       <td>chol_aaa</td>
       <td>5041</td>
@@ -2099,10 +2099,10 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>25</th>
-      <td>3.972638</td>
-      <td>568.621277</td>
-      <td>143.134430</td>
-      <td>0.333792</td>
+      <td>2.333909</td>
+      <td>609.415387</td>
+      <td>261.113602</td>
+      <td>0.336724</td>
       <td>chol_aaa</td>
       <td>5041</td>
       <td>logit</td>
@@ -2111,9 +2111,9 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>26</th>
-      <td>9.286188</td>
+      <td>5.589618</td>
       <td>682.187156</td>
-      <td>73.462559</td>
+      <td>122.045402</td>
       <td>0.304462</td>
       <td>lu_aaa</td>
       <td>5041</td>
@@ -2123,10 +2123,10 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>27</th>
-      <td>4.742163</td>
-      <td>619.913202</td>
-      <td>130.723732</td>
-      <td>0.302197</td>
+      <td>3.012184</td>
+      <td>496.245171</td>
+      <td>164.745942</td>
+      <td>0.300102</td>
       <td>lu_aaa</td>
       <td>5041</td>
       <td>logit</td>
@@ -2135,9 +2135,9 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>28</th>
-      <td>10.365288</td>
+      <td>7.303509</td>
       <td>523.579003</td>
-      <td>50.512733</td>
+      <td>71.688694</td>
       <td>0.387372</td>
       <td>chol_aaa</td>
       <td>5041</td>
@@ -2147,10 +2147,10 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>29</th>
-      <td>8.541499</td>
-      <td>416.678834</td>
-      <td>48.782872</td>
-      <td>0.386761</td>
+      <td>2.912166</td>
+      <td>523.105344</td>
+      <td>179.627582</td>
+      <td>0.385733</td>
       <td>chol_aaa</td>
       <td>5041</td>
       <td>nb</td>
@@ -2159,9 +2159,9 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>30</th>
-      <td>10.480956</td>
+      <td>6.571066</td>
       <td>395.112171</td>
-      <td>37.698106</td>
+      <td>60.129081</td>
       <td>0.393597</td>
       <td>lu_aaa</td>
       <td>5041</td>
@@ -2171,10 +2171,10 @@ n= 5041 | nb    | W=asym | backend=jax ...
     </tr>
     <tr>
       <th>31</th>
-      <td>8.742178</td>
-      <td>389.759682</td>
-      <td>44.583818</td>
-      <td>0.393391</td>
+      <td>2.863921</td>
+      <td>446.739827</td>
+      <td>155.988887</td>
+      <td>0.392613</td>
       <td>lu_aaa</td>
       <td>5041</td>
       <td>nb</td>
@@ -2256,60 +2256,60 @@ n= 5041 | nb    | W=asym | backend=jax ...
     <tr>
       <th rowspan="4" valign="top">logit</th>
       <th>400</th>
-      <td>2.58</td>
-      <td>10.72</td>
-      <td>2.67</td>
-      <td>4.97</td>
+      <td>1.41</td>
+      <td>6.16</td>
+      <td>1.67</td>
+      <td>2.82</td>
     </tr>
     <tr>
       <th>900</th>
-      <td>2.65</td>
-      <td>8.62</td>
-      <td>2.72</td>
-      <td>5.88</td>
+      <td>1.54</td>
+      <td>5.07</td>
+      <td>1.60</td>
+      <td>3.65</td>
     </tr>
     <tr>
       <th>2025</th>
-      <td>3.38</td>
-      <td>7.68</td>
-      <td>3.02</td>
-      <td>5.86</td>
+      <td>1.97</td>
+      <td>4.88</td>
+      <td>1.82</td>
+      <td>3.89</td>
     </tr>
     <tr>
       <th>5041</th>
-      <td>4.74</td>
-      <td>9.29</td>
-      <td>3.97</td>
-      <td>7.70</td>
+      <td>3.01</td>
+      <td>5.59</td>
+      <td>2.33</td>
+      <td>4.97</td>
     </tr>
     <tr>
       <th rowspan="4" valign="top">nb</th>
       <th>400</th>
-      <td>2.67</td>
-      <td>5.93</td>
-      <td>2.75</td>
-      <td>5.90</td>
+      <td>1.41</td>
+      <td>3.62</td>
+      <td>1.36</td>
+      <td>3.67</td>
     </tr>
     <tr>
       <th>900</th>
-      <td>3.56</td>
-      <td>6.93</td>
-      <td>3.40</td>
-      <td>5.88</td>
+      <td>1.81</td>
+      <td>4.59</td>
+      <td>1.63</td>
+      <td>3.93</td>
     </tr>
     <tr>
       <th>2025</th>
-      <td>5.11</td>
-      <td>7.06</td>
-      <td>5.04</td>
-      <td>7.88</td>
+      <td>2.24</td>
+      <td>4.79</td>
+      <td>2.20</td>
+      <td>4.60</td>
     </tr>
     <tr>
       <th>5041</th>
-      <td>8.74</td>
-      <td>10.48</td>
-      <td>8.54</td>
-      <td>10.37</td>
+      <td>2.86</td>
+      <td>6.57</td>
+      <td>2.91</td>
+      <td>7.30</td>
     </tr>
   </tbody>
 </table>
@@ -2368,7 +2368,7 @@ n= 5041 | nb    | W=asym | backend=jax ...
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/870ee74cd1e5da0d399186d71a991914170933ead3954fa4769d7ff335892eae.png" src="../_images/870ee74cd1e5da0d399186d71a991914170933ead3954fa4769d7ff335892eae.png" />
+<img alt="../_images/cca66efeb442b5f6b6fb6f5272446909f0ca8ceaefc183c003cae8a5fb4cbab6.png" src="../_images/cca66efeb442b5f6b6fb6f5272446909f0ca8ceaefc183c003cae8a5fb4cbab6.png" />
 </div>
 </div>
 <div class="cell docutils container">
@@ -2428,103 +2428,103 @@ n= 5041 | nb    | W=asym | backend=jax ...
       <th rowspan="8" valign="top">logit</th>
       <th rowspan="4" valign="top">asym</th>
       <th>400</th>
+      <td>0.129</td>
       <td>0.130</td>
-      <td>0.130</td>
-      <td>0.000</td>
-    </tr>
-    <tr>
-      <th>900</th>
-      <td>0.460</td>
-      <td>0.463</td>
-      <td>0.002</td>
-    </tr>
-    <tr>
-      <th>2025</th>
-      <td>0.342</td>
-      <td>0.341</td>
       <td>0.001</td>
     </tr>
     <tr>
-      <th>5041</th>
-      <td>0.302</td>
-      <td>0.304</td>
+      <th>900</th>
+      <td>0.457</td>
+      <td>0.463</td>
+      <td>0.006</td>
+    </tr>
+    <tr>
+      <th>2025</th>
+      <td>0.343</td>
+      <td>0.341</td>
       <td>0.002</td>
+    </tr>
+    <tr>
+      <th>5041</th>
+      <td>0.300</td>
+      <td>0.304</td>
+      <td>0.004</td>
     </tr>
     <tr>
       <th rowspan="4" valign="top">sym</th>
       <th>400</th>
-      <td>0.152</td>
+      <td>0.155</td>
       <td>0.160</td>
-      <td>0.008</td>
+      <td>0.005</td>
     </tr>
     <tr>
       <th>900</th>
-      <td>0.489</td>
+      <td>0.490</td>
       <td>0.489</td>
       <td>0.001</td>
     </tr>
     <tr>
       <th>2025</th>
-      <td>0.296</td>
       <td>0.301</td>
-      <td>0.004</td>
+      <td>0.301</td>
+      <td>0.000</td>
     </tr>
     <tr>
       <th>5041</th>
-      <td>0.334</td>
+      <td>0.337</td>
       <td>0.336</td>
-      <td>0.002</td>
+      <td>0.001</td>
     </tr>
     <tr>
       <th rowspan="8" valign="top">nb</th>
       <th rowspan="4" valign="top">asym</th>
       <th>400</th>
+      <td>0.483</td>
       <td>0.482</td>
-      <td>0.482</td>
-      <td>0.001</td>
+      <td>0.002</td>
     </tr>
     <tr>
       <th>900</th>
-      <td>0.374</td>
+      <td>0.377</td>
       <td>0.371</td>
-      <td>0.003</td>
+      <td>0.005</td>
     </tr>
     <tr>
       <th>2025</th>
-      <td>0.407</td>
       <td>0.405</td>
-      <td>0.002</td>
+      <td>0.405</td>
+      <td>0.001</td>
     </tr>
     <tr>
       <th>5041</th>
       <td>0.393</td>
       <td>0.394</td>
-      <td>0.000</td>
+      <td>0.001</td>
     </tr>
     <tr>
       <th rowspan="4" valign="top">sym</th>
       <th>400</th>
+      <td>0.308</td>
       <td>0.309</td>
-      <td>0.309</td>
-      <td>0.001</td>
+      <td>0.002</td>
     </tr>
     <tr>
       <th>900</th>
-      <td>0.321</td>
+      <td>0.320</td>
       <td>0.320</td>
       <td>0.000</td>
     </tr>
     <tr>
       <th>2025</th>
-      <td>0.371</td>
+      <td>0.369</td>
       <td>0.370</td>
-      <td>0.000</td>
+      <td>0.002</td>
     </tr>
     <tr>
       <th>5041</th>
+      <td>0.386</td>
       <td>0.387</td>
-      <td>0.387</td>
-      <td>0.001</td>
+      <td>0.002</td>
     </tr>
   </tbody>
 </table>

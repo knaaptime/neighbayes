@@ -1524,7 +1524,9 @@ excess zeros come from a <em>separate</em> process — units that are inactive
 altogether, not merely low-intensity. <code class="docutils literal notranslate"><span class="pre">SARZINB</span></code> fits the zero and count
 parts jointly, each with its own spatial structure and its own weights
 matrix, and decomposes the observed zeros between the two.</p>
-<p>It is Gibbs-only. Equations and constructor arguments are in
+<p>The unmarked <code class="docutils literal notranslate"><span class="pre">SARZINB</span></code> is the latent model, each part propagating its own
+disturbance; this guide fits the reduced form, <code class="docutils literal notranslate"><span class="pre">SARZINB(latent=False)</span></code>, whose
+spatial lags act on the linear predictors only. Both are Gibbs-only. Equations and constructor arguments are in
 <a class="reference internal" href="../models.html"><span class="std std-doc">Supported Models</span></a>.</p>
 <div class="important tip admonition">
 <p class="admonition-title">Important</p>
@@ -1577,6 +1579,7 @@ before reaching for this model.</p>
     <span class="n">beta_zero</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.3</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">]),</span>  <span class="c1"># Zero-part coefficients [intercept, slope]</span>
     <span class="n">target_pi</span><span class="o">=</span><span class="mf">0.7</span><span class="p">,</span>  <span class="c1"># Target activation probability</span>
     <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span>
+    <span class="n">latent</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span>
 
 <span class="n">y</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="s2">"y"</span><span class="p">]</span>
@@ -1633,6 +1636,7 @@ True parameters:
     <span class="n">X_zero</span><span class="o">=</span><span class="n">X_zero</span><span class="p">,</span>
     <span class="n">W</span><span class="o">=</span><span class="n">W_graph</span><span class="p">,</span>
     <span class="n">W_zero</span><span class="o">=</span><span class="n">W_zero_graph</span><span class="p">,</span>
+    <span class="n">latent</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
 <span class="p">)</span>
 
 <span class="n">idata</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
@@ -1654,7 +1658,7 @@ for Jupyter support
   warnings.warn('install "ipywidgets" for Jupyter support')
 </pre>
 </div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 51s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">237</span> draws/s<span style="font-weight: bold">)</span>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 25s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">488</span> draws/s<span style="font-weight: bold">)</span>
 </pre>
 </div></div>
 </div>
@@ -1693,18 +1697,18 @@ for Jupyter support
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>                 mean      sd eti89_lb eti89_ub ess_bulk ess_tail r_hat mcse_mean  mcse_sd
-rho             0.388  0.0395     0.32     0.45     5499     6172  1.00   0.00053  0.00039
-rho_zero        0.214   0.089    0.071     0.35     4456     5296  1.00    0.0013  0.00088
-alpha            5.06   0.379      4.5      5.7     5121     5485  1.00    0.0053   0.0041
-beta[x0]        1.028   0.066     0.93      1.1     5312     5948  1.00    0.0009  0.00065
-beta[x1]       0.5821  0.0177     0.55     0.61     4920     6468  1.00   0.00025  0.00015
-beta_zero[z0]   0.792   0.102     0.64     0.96     3903     5133  1.00    0.0016    0.001
-beta_zero[z1]   1.008   0.065      0.9      1.1     2328     3663  1.00    0.0014  0.00066
+rho             0.387  0.0405     0.32     0.45     6293     5841  1.00   0.00051  0.00043
+rho_zero        0.214   0.089    0.067     0.35     4637     5208  1.00    0.0013  0.00095
+alpha            5.06   0.372      4.5      5.7     4932     5879  1.00    0.0053   0.0038
+beta[x0]         1.03   0.067     0.93      1.1     6232     5934  1.00   0.00085  0.00071
+beta[x1]       0.5826  0.0179     0.55     0.61     5364     6698  1.00   0.00024  0.00015
+beta_zero[z0]   0.792   0.102     0.64     0.96     4070     5062  1.00    0.0016    0.001
+beta_zero[z1]   1.009   0.065     0.91      1.1     2228     3740  1.00    0.0014  0.00065
 
 --- Parameter Recovery ---
-ρ (count SAR):  true=0.40, posterior mean=0.388 ± 0.040
+ρ (count SAR):  true=0.40, posterior mean=0.387 ± 0.040
 ρ (zero SAR):   true=0.30, posterior mean=0.214 ± 0.089
-α (dispersion): true=5.00, posterior mean=5.065 ± 0.379
+α (dispersion): true=5.00, posterior mean=5.057 ± 0.372
 </code></pre></div>
 </div>
 </div>
@@ -1725,15 +1729,15 @@ beta_zero[z1]   1.008   0.065      0.9      1.1     2328     3663  1.00    0.001
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_6272/1222109080.py:3: UserWarning: The figure layout has changed to tight
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_5999/1222109080.py:3: UserWarning: The figure layout has changed to tight
   plt.tight_layout()
 </code></pre></div>
 </div>
-<img alt="../_images/133bacaced4c689579de38d7ee2df1fa652e8f796dc88742eab98d0da104ab71.png" src="../_images/133bacaced4c689579de38d7ee2df1fa652e8f796dc88742eab98d0da104ab71.png" />
+<img alt="../_images/d493aa0505d71e57a1cbe88b32aa68d31d679ceb41ff45ce5e0f48e0b046a881.png" src="../_images/d493aa0505d71e57a1cbe88b32aa68d31d679ceb41ff45ce5e0f48e0b046a881.png" />
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>         r_hat ess_bulk ess_tail
-rho       1.00     5499     6172
-rho_zero  1.00     4456     5296
-alpha     1.00     5121     5485
+rho       1.00     6293     5841
+rho_zero  1.00     4637     5208
+alpha     1.00     4932     5879
 </code></pre></div>
 </div>
 </div>
@@ -1773,15 +1777,15 @@ alpha     1.00     5121     5485
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Number of zero observations: 853
 
-Mean P(structural | y=0): 0.886
-Mean P(sampling | y=0):   0.114
+Mean P(structural | y=0): 0.887
+Mean P(sampling | y=0):   0.113
 </code></pre></div>
 </div>
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_6272/1143200135.py:19: UserWarning: The figure layout has changed to tight
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_5999/1143200135.py:19: UserWarning: The figure layout has changed to tight
   plt.tight_layout()
 </code></pre></div>
 </div>
-<img alt="../_images/4b0f44f1e9cea945e2eea59e2db623706c8fcfafd69fac450fd438525a125aa2.png" src="../_images/4b0f44f1e9cea945e2eea59e2db623706c8fcfafd69fac450fd438525a125aa2.png" />
+<img alt="../_images/072c0e629e9d6e1d75877e3c4bb3babc7f39944fc328b508ca26182d13079249.png" src="../_images/072c0e629e9d6e1d75877e3c4bb3babc7f39944fc328b508ca26182d13079249.png" />
 </div>
 </div>
 <h2 id="get-per-observation-activation-probabilities">Get per-observation activation probabilities<a class="headerlink" href="#get-per-observation-activation-probabilities" title="Link to this heading">¶</a></h2>
@@ -1821,11 +1825,11 @@ True activation rate: 0.705
 Estimated activation rate: 0.698
 </code></pre></div>
 </div>
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_6272/949050388.py:20: UserWarning: The figure layout has changed to tight
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_5999/949050388.py:20: UserWarning: The figure layout has changed to tight
   plt.tight_layout()
 </code></pre></div>
 </div>
-<img alt="../_images/eff2fa66d624995db597e82a379b4f2c6930ad05f0f4e9e2ca30b7c57176f73e.png" src="../_images/eff2fa66d624995db597e82a379b4f2c6930ad05f0f4e9e2ca30b7c57176f73e.png" />
+<img alt="../_images/aea5110a4ac0a2c0a61c609bda1ba6ca2b2f6a80a503de344aa728d7cb9551dc.png" src="../_images/aea5110a4ac0a2c0a61c609bda1ba6ca2b2f6a80a503de344aa728d7cb9551dc.png" />
 </div>
 </div>
 <h2 id="predict-expected-counts">Predict expected counts<a class="headerlink" href="#predict-expected-counts" title="Link to this heading">¶</a></h2>
@@ -1862,11 +1866,11 @@ Estimated activation rate: 0.698
 Mean observed count: 4.33
 </code></pre></div>
 </div>
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_6272/2483833273.py:21: UserWarning: The figure layout has changed to tight
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_5999/2483833273.py:21: UserWarning: The figure layout has changed to tight
   plt.tight_layout()
 </code></pre></div>
 </div>
-<img alt="../_images/7228a8fec1541ea6296e0baf328accedf76437c747d29ba43535b6c33eba65c5.png" src="../_images/7228a8fec1541ea6296e0baf328accedf76437c747d29ba43535b6c33eba65c5.png" />
+<img alt="../_images/f764e6cea5529090ab890afd15b2e35a2cbe244703f06740fe31cb0f3717538d.png" src="../_images/f764e6cea5529090ab890afd15b2e35a2cbe244703f06740fe31cb0f3717538d.png" />
 </div>
 </div>
 <h2 id="inspect-the-posteriors">Inspect the posteriors<a class="headerlink" href="#inspect-the-posteriors" title="Link to this heading">¶</a></h2>
@@ -1888,7 +1892,7 @@ Mean observed count: 4.33
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/a6b0964780edb2a198e1eda263c500ae56ee2972657d8f6ef9b5dbc2d6e06e80.png" src="../_images/a6b0964780edb2a198e1eda263c500ae56ee2972657d8f6ef9b5dbc2d6e06e80.png" />
+<img alt="../_images/26265774f006aeb90c73e5ed0073b8e48770706038629d2b34c96fee14621a7e.png" src="../_images/26265774f006aeb90c73e5ed0073b8e48770706038629d2b34c96fee14621a7e.png" />
 </div>
 </div>
 <h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Link to this heading">¶</a></h2>

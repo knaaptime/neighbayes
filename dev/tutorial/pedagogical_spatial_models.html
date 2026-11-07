@@ -1799,10 +1799,9 @@ y = X\beta + \epsilon
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 2 jobs)
 NUTS: [beta, sigma2]
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/pymc/sampling/mcmc.py:1178: FutureWarning: Passing `log_likelihood` via `idata_kwargs` is deprecated and will be removed in future versions. Call `pm.compute_log_likelihood(idata)` instead.
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/pymc/sampling/mcmc.py:1185: FutureWarning: Passing `log_likelihood` via `idata_kwargs` is deprecated and will be removed in future versions. Call `pm.compute_log_likelihood(idata)` instead.
   return _sample_return(
-Sampling 4 chains for 400 tune and 400 draw iterations (1_600 + 1_600 draws total) took 10 seconds.
-The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
+Sampling 4 chains for 400 tune and 400 draw iterations (1_600 + 1_600 draws total) took 4 seconds.
 </code></pre></div>
 </div>
 </div>
@@ -1832,87 +1831,87 @@ The rhat statistic is larger than 1.01 for some parameters. This indicates probl
   <tbody>
     <tr>
       <th>Intercept</th>
-      <td>41.094091</td>
-      <td>61.172442</td>
-      <td>-57.199088</td>
-      <td>137.80571</td>
-      <td>638.698528</td>
-      <td>693.314219</td>
-      <td>1.011611</td>
-      <td>2.430637</td>
-      <td>1.595939</td>
+      <td>33.080904</td>
+      <td>60.31254</td>
+      <td>-60.092235</td>
+      <td>128.14602</td>
+      <td>684.128168</td>
+      <td>772.272676</td>
+      <td>1.003898</td>
+      <td>2.307643</td>
+      <td>1.672892</td>
     </tr>
     <tr>
       <th>poverty</th>
-      <td>0.20413</td>
-      <td>0.335107</td>
-      <td>-0.324029</td>
-      <td>0.744928</td>
-      <td>1091.634302</td>
-      <td>876.117591</td>
-      <td>1.000699</td>
-      <td>0.010096</td>
-      <td>0.007508</td>
+      <td>0.213784</td>
+      <td>0.342433</td>
+      <td>-0.343576</td>
+      <td>0.755283</td>
+      <td>1069.116714</td>
+      <td>933.779633</td>
+      <td>1.00076</td>
+      <td>0.010469</td>
+      <td>0.007747</td>
     </tr>
     <tr>
       <th>rev_rating</th>
-      <td>0.309613</td>
-      <td>0.647791</td>
-      <td>-0.715514</td>
-      <td>1.365593</td>
-      <td>642.210817</td>
-      <td>730.44688</td>
-      <td>1.011975</td>
-      <td>0.02564</td>
-      <td>0.017007</td>
+      <td>0.396654</td>
+      <td>0.636779</td>
+      <td>-0.594375</td>
+      <td>1.392114</td>
+      <td>689.625327</td>
+      <td>726.542548</td>
+      <td>1.003349</td>
+      <td>0.024328</td>
+      <td>0.017655</td>
     </tr>
     <tr>
       <th>num_spots</th>
-      <td>0.121892</td>
-      <td>0.023699</td>
-      <td>0.084133</td>
-      <td>0.159198</td>
-      <td>1128.390547</td>
-      <td>920.092529</td>
-      <td>1.016113</td>
-      <td>0.00071</td>
-      <td>0.000703</td>
+      <td>0.12073</td>
+      <td>0.023704</td>
+      <td>0.083709</td>
+      <td>0.158427</td>
+      <td>1157.591543</td>
+      <td>1005.990945</td>
+      <td>1.003486</td>
+      <td>0.000696</td>
+      <td>0.000567</td>
     </tr>
     <tr>
       <th>crowded</th>
-      <td>-2.147002</td>
-      <td>0.965033</td>
-      <td>-3.625564</td>
-      <td>-0.537023</td>
-      <td>1041.775628</td>
-      <td>977.858935</td>
-      <td>1.003831</td>
-      <td>0.030007</td>
-      <td>0.023684</td>
+      <td>-2.215713</td>
+      <td>0.938063</td>
+      <td>-3.695608</td>
+      <td>-0.721026</td>
+      <td>1273.899561</td>
+      <td>1110.562741</td>
+      <td>1.002721</td>
+      <td>0.026262</td>
+      <td>0.021202</td>
     </tr>
     <tr>
       <th>sigma2</th>
-      <td>762</td>
-      <td>137</td>
-      <td>570</td>
+      <td>755</td>
+      <td>134</td>
+      <td>560</td>
+      <td>990</td>
+      <td>1055</td>
       <td>1000</td>
-      <td>1183</td>
-      <td>1020</td>
       <td>1.00</td>
       <td>4.1</td>
-      <td>4.6</td>
+      <td>3.3</td>
     </tr>
     <tr>
       <th>sigma</th>
-      <td>27.5</td>
+      <td>27.4</td>
       <td>2.4</td>
       <td>24</td>
-      <td>32</td>
-      <td>1183</td>
-      <td>1020</td>
+      <td>31</td>
+      <td>1055</td>
+      <td>1000</td>
       <td>1.00</td>
-      <td>0.072</td>
-      <td>0.071</td>
+      <td>0.074</td>
+      <td>0.055</td>
     </tr>
   </tbody>
 </table></div></div>
@@ -1946,9 +1945,10 @@ y = X\beta + WX\theta + \epsilon
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 2 jobs)
 NUTS: [beta, sigma2]
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/pymc/sampling/mcmc.py:1178: FutureWarning: Passing `log_likelihood` via `idata_kwargs` is deprecated and will be removed in future versions. Call `pm.compute_log_likelihood(idata)` instead.
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/pymc/sampling/mcmc.py:1185: FutureWarning: Passing `log_likelihood` via `idata_kwargs` is deprecated and will be removed in future versions. Call `pm.compute_log_likelihood(idata)` instead.
   return _sample_return(
-Sampling 4 chains for 400 tune and 400 draw iterations (1_600 + 1_600 draws total) took 14 seconds.
+Sampling 4 chains for 400 tune and 400 draw iterations (1_600 + 1_600 draws total) took 6 seconds.
+The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
 </code></pre></div>
 </div>
 <div class="output text_html"><div>
@@ -1983,135 +1983,135 @@ Sampling 4 chains for 400 tune and 400 draw iterations (1_600 + 1_600 draws tota
   <tbody>
     <tr>
       <th>Intercept</th>
-      <td>90.990</td>
-      <td>76.312</td>
-      <td>-34.741</td>
-      <td>212.496</td>
-      <td>1092.078</td>
-      <td>1097.979</td>
-      <td>1.004</td>
-      <td>2.308</td>
-      <td>1.763</td>
+      <td>90.808</td>
+      <td>78.919</td>
+      <td>-44.160</td>
+      <td>217.283</td>
+      <td>1157.473</td>
+      <td>1016.196</td>
+      <td>1.003</td>
+      <td>2.331</td>
+      <td>2.022</td>
     </tr>
     <tr>
       <th>poverty</th>
-      <td>-0.635</td>
-      <td>0.459</td>
-      <td>-1.363</td>
-      <td>0.079</td>
-      <td>946.198</td>
-      <td>980.132</td>
-      <td>1.004</td>
-      <td>0.015</td>
-      <td>0.012</td>
+      <td>-0.627</td>
+      <td>0.462</td>
+      <td>-1.380</td>
+      <td>0.080</td>
+      <td>660.816</td>
+      <td>864.005</td>
+      <td>1.013</td>
+      <td>0.018</td>
+      <td>0.011</td>
     </tr>
     <tr>
       <th>rev_rating</th>
-      <td>0.581</td>
-      <td>0.778</td>
-      <td>-0.652</td>
-      <td>1.848</td>
-      <td>1007.518</td>
-      <td>918.537</td>
-      <td>1.004</td>
-      <td>0.025</td>
-      <td>0.019</td>
+      <td>0.522</td>
+      <td>0.773</td>
+      <td>-0.691</td>
+      <td>1.817</td>
+      <td>1048.152</td>
+      <td>946.865</td>
+      <td>1.003</td>
+      <td>0.024</td>
+      <td>0.020</td>
     </tr>
     <tr>
       <th>num_spots</th>
-      <td>0.022</td>
-      <td>0.034</td>
-      <td>-0.031</td>
-      <td>0.075</td>
-      <td>948.163</td>
-      <td>848.625</td>
-      <td>0.999</td>
+      <td>0.021</td>
+      <td>0.032</td>
+      <td>-0.028</td>
+      <td>0.073</td>
+      <td>941.016</td>
+      <td>951.444</td>
+      <td>1.005</td>
       <td>0.001</td>
       <td>0.001</td>
     </tr>
     <tr>
       <th>crowded</th>
-      <td>-0.983</td>
-      <td>1.182</td>
-      <td>-2.934</td>
-      <td>0.876</td>
-      <td>980.767</td>
-      <td>1100.546</td>
-      <td>0.999</td>
-      <td>0.038</td>
-      <td>0.031</td>
+      <td>-1.022</td>
+      <td>1.215</td>
+      <td>-2.999</td>
+      <td>0.894</td>
+      <td>949.323</td>
+      <td>1122.320</td>
+      <td>1.003</td>
+      <td>0.039</td>
+      <td>0.029</td>
     </tr>
     <tr>
       <th>W*poverty</th>
-      <td>1.295</td>
-      <td>0.619</td>
-      <td>0.304</td>
-      <td>2.315</td>
-      <td>927.752</td>
-      <td>801.072</td>
-      <td>1.002</td>
-      <td>0.020</td>
+      <td>1.314</td>
+      <td>0.627</td>
+      <td>0.300</td>
+      <td>2.349</td>
+      <td>1051.239</td>
+      <td>1185.878</td>
+      <td>1.008</td>
+      <td>0.019</td>
       <td>0.017</td>
     </tr>
     <tr>
       <th>W*rev_rating</th>
-      <td>-0.956</td>
-      <td>0.955</td>
-      <td>-2.458</td>
-      <td>0.616</td>
-      <td>842.416</td>
-      <td>957.081</td>
-      <td>1.002</td>
-      <td>0.033</td>
-      <td>0.024</td>
+      <td>-0.901</td>
+      <td>0.978</td>
+      <td>-2.446</td>
+      <td>0.680</td>
+      <td>954.066</td>
+      <td>998.596</td>
+      <td>1.007</td>
+      <td>0.032</td>
+      <td>0.025</td>
     </tr>
     <tr>
       <th>W*num_spots</th>
-      <td>0.193</td>
-      <td>0.049</td>
-      <td>0.116</td>
-      <td>0.271</td>
-      <td>887.751</td>
-      <td>945.532</td>
-      <td>1.003</td>
-      <td>0.002</td>
+      <td>0.195</td>
+      <td>0.046</td>
+      <td>0.121</td>
+      <td>0.269</td>
+      <td>1011.587</td>
+      <td>985.270</td>
+      <td>1.002</td>
+      <td>0.001</td>
       <td>0.001</td>
     </tr>
     <tr>
       <th>W*crowded</th>
-      <td>-1.722</td>
-      <td>1.663</td>
-      <td>-4.348</td>
-      <td>0.906</td>
-      <td>1004.254</td>
-      <td>1107.009</td>
-      <td>1.001</td>
-      <td>0.052</td>
-      <td>0.042</td>
+      <td>-1.716</td>
+      <td>1.683</td>
+      <td>-4.327</td>
+      <td>1.008</td>
+      <td>997.937</td>
+      <td>777.618</td>
+      <td>1.002</td>
+      <td>0.054</td>
+      <td>0.044</td>
     </tr>
     <tr>
       <th>sigma2</th>
-      <td>603.501</td>
-      <td>108.361</td>
-      <td>452.747</td>
-      <td>792.817</td>
-      <td>1389.054</td>
-      <td>1058.861</td>
-      <td>1.002</td>
-      <td>2.933</td>
-      <td>2.826</td>
+      <td>602.011</td>
+      <td>110.482</td>
+      <td>451.288</td>
+      <td>793.132</td>
+      <td>1476.620</td>
+      <td>1246.976</td>
+      <td>1.001</td>
+      <td>3.007</td>
+      <td>3.653</td>
     </tr>
     <tr>
       <th>sigma</th>
-      <td>24.470</td>
-      <td>2.170</td>
-      <td>21.278</td>
-      <td>28.157</td>
-      <td>1389.054</td>
-      <td>1058.861</td>
-      <td>1.002</td>
+      <td>24.437</td>
+      <td>2.199</td>
+      <td>21.244</td>
+      <td>28.163</td>
+      <td>1476.620</td>
+      <td>1246.976</td>
+      <td>1.001</td>
       <td>0.059</td>
-      <td>0.053</td>
+      <td>0.064</td>
     </tr>
   </tbody>
 </table>
@@ -2165,63 +2165,63 @@ Sampling 4 chains for 400 tune and 400 draw iterations (1_600 + 1_600 draws tota
   <tbody>
     <tr>
       <th>poverty</th>
-      <td>-0.635090</td>
-      <td>-1.539867</td>
-      <td>0.270092</td>
-      <td>0.1775</td>
-      <td>1.295447</td>
-      <td>0.104925</td>
-      <td>2.496938</td>
+      <td>-0.627291</td>
+      <td>-1.554014</td>
+      <td>0.218764</td>
+      <td>0.15250</td>
+      <td>1.313919</td>
+      <td>0.128384</td>
+      <td>2.587115</td>
       <td>0.03000</td>
-      <td>0.660356</td>
-      <td>-0.147069</td>
-      <td>1.428582</td>
-      <td>0.10125</td>
+      <td>0.686628</td>
+      <td>-0.100432</td>
+      <td>1.479396</td>
+      <td>0.08000</td>
     </tr>
     <tr>
       <th>rev_rating</th>
-      <td>0.580644</td>
-      <td>-0.934007</td>
-      <td>2.113609</td>
-      <td>0.4650</td>
-      <td>-0.955706</td>
-      <td>-2.820131</td>
-      <td>0.951145</td>
-      <td>0.32000</td>
-      <td>-0.375062</td>
-      <td>-1.897946</td>
-      <td>1.236652</td>
-      <td>0.65750</td>
+      <td>0.521620</td>
+      <td>-0.937687</td>
+      <td>2.082333</td>
+      <td>0.51750</td>
+      <td>-0.901157</td>
+      <td>-2.785885</td>
+      <td>1.072277</td>
+      <td>0.36625</td>
+      <td>-0.379537</td>
+      <td>-2.011529</td>
+      <td>1.345402</td>
+      <td>0.62000</td>
     </tr>
     <tr>
       <th>num_spots</th>
-      <td>0.022310</td>
-      <td>-0.042111</td>
-      <td>0.091469</td>
-      <td>0.5000</td>
-      <td>0.193058</td>
-      <td>0.095586</td>
-      <td>0.287489</td>
+      <td>0.021003</td>
+      <td>-0.041745</td>
+      <td>0.083295</td>
+      <td>0.51375</td>
+      <td>0.194603</td>
+      <td>0.102073</td>
+      <td>0.286540</td>
       <td>0.00000</td>
-      <td>0.215369</td>
-      <td>0.153632</td>
-      <td>0.274077</td>
+      <td>0.215606</td>
+      <td>0.156175</td>
+      <td>0.277097</td>
       <td>0.00000</td>
     </tr>
     <tr>
       <th>crowded</th>
-      <td>-0.983077</td>
-      <td>-3.408974</td>
-      <td>1.266498</td>
-      <td>0.3875</td>
-      <td>-1.721982</td>
-      <td>-4.894845</td>
-      <td>1.617856</td>
-      <td>0.31875</td>
-      <td>-2.705059</td>
-      <td>-5.022153</td>
-      <td>-0.313075</td>
-      <td>0.02625</td>
+      <td>-1.021913</td>
+      <td>-3.351370</td>
+      <td>1.398370</td>
+      <td>0.41625</td>
+      <td>-1.715607</td>
+      <td>-4.859054</td>
+      <td>1.755357</td>
+      <td>0.31250</td>
+      <td>-2.737520</td>
+      <td>-5.069419</td>
+      <td>-0.305076</td>
+      <td>0.02875</td>
     </tr>
   </tbody>
 </table>
@@ -2264,92 +2264,92 @@ Sampling 4 chains for 400 tune and 400 draw iterations (1_600 + 1_600 draws tota
   <tbody>
     <tr>
       <th>beta[Intercept]</th>
-      <td>90.990</td>
-      <td>76.312</td>
-      <td>1092.078</td>
-      <td>1097.979</td>
-      <td>1.004</td>
-    </tr>
-    <tr>
-      <th>beta[poverty]</th>
-      <td>-0.635</td>
-      <td>0.459</td>
-      <td>946.198</td>
-      <td>980.132</td>
-      <td>1.004</td>
-    </tr>
-    <tr>
-      <th>beta[rev_rating]</th>
-      <td>0.581</td>
-      <td>0.778</td>
-      <td>1007.518</td>
-      <td>918.537</td>
-      <td>1.004</td>
-    </tr>
-    <tr>
-      <th>beta[num_spots]</th>
-      <td>0.022</td>
-      <td>0.034</td>
-      <td>948.163</td>
-      <td>848.625</td>
-      <td>0.999</td>
-    </tr>
-    <tr>
-      <th>beta[crowded]</th>
-      <td>-0.983</td>
-      <td>1.182</td>
-      <td>980.767</td>
-      <td>1100.546</td>
-      <td>0.999</td>
-    </tr>
-    <tr>
-      <th>beta[W*poverty]</th>
-      <td>1.295</td>
-      <td>0.619</td>
-      <td>927.752</td>
-      <td>801.072</td>
-      <td>1.002</td>
-    </tr>
-    <tr>
-      <th>beta[W*rev_rating]</th>
-      <td>-0.956</td>
-      <td>0.955</td>
-      <td>842.416</td>
-      <td>957.081</td>
-      <td>1.002</td>
-    </tr>
-    <tr>
-      <th>beta[W*num_spots]</th>
-      <td>0.193</td>
-      <td>0.049</td>
-      <td>887.751</td>
-      <td>945.532</td>
+      <td>90.808</td>
+      <td>78.919</td>
+      <td>1157.473</td>
+      <td>1016.196</td>
       <td>1.003</td>
     </tr>
     <tr>
+      <th>beta[poverty]</th>
+      <td>-0.627</td>
+      <td>0.462</td>
+      <td>660.816</td>
+      <td>864.005</td>
+      <td>1.013</td>
+    </tr>
+    <tr>
+      <th>beta[rev_rating]</th>
+      <td>0.522</td>
+      <td>0.773</td>
+      <td>1048.152</td>
+      <td>946.865</td>
+      <td>1.003</td>
+    </tr>
+    <tr>
+      <th>beta[num_spots]</th>
+      <td>0.021</td>
+      <td>0.032</td>
+      <td>941.016</td>
+      <td>951.444</td>
+      <td>1.005</td>
+    </tr>
+    <tr>
+      <th>beta[crowded]</th>
+      <td>-1.022</td>
+      <td>1.215</td>
+      <td>949.323</td>
+      <td>1122.320</td>
+      <td>1.003</td>
+    </tr>
+    <tr>
+      <th>beta[W*poverty]</th>
+      <td>1.314</td>
+      <td>0.627</td>
+      <td>1051.239</td>
+      <td>1185.878</td>
+      <td>1.008</td>
+    </tr>
+    <tr>
+      <th>beta[W*rev_rating]</th>
+      <td>-0.901</td>
+      <td>0.978</td>
+      <td>954.066</td>
+      <td>998.596</td>
+      <td>1.007</td>
+    </tr>
+    <tr>
+      <th>beta[W*num_spots]</th>
+      <td>0.195</td>
+      <td>0.046</td>
+      <td>1011.587</td>
+      <td>985.270</td>
+      <td>1.002</td>
+    </tr>
+    <tr>
       <th>beta[W*crowded]</th>
-      <td>-1.722</td>
-      <td>1.663</td>
-      <td>1004.254</td>
-      <td>1107.009</td>
-      <td>1.001</td>
+      <td>-1.716</td>
+      <td>1.683</td>
+      <td>997.937</td>
+      <td>777.618</td>
+      <td>1.002</td>
     </tr>
     <tr>
       <th>sigma</th>
-      <td>24.470</td>
-      <td>2.170</td>
-      <td>1389.054</td>
-      <td>1058.861</td>
-      <td>1.002</td>
+      <td>24.437</td>
+      <td>2.199</td>
+      <td>1476.620</td>
+      <td>1246.976</td>
+      <td>1.001</td>
     </tr>
   </tbody>
 </table>
-</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_9216/4086335195.py:11: UserWarning: The figure layout has changed to tight
+</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_8888/4086335195.py:11: UserWarning: The figure layout has changed to tight
   plt.tight_layout()
 </code></pre></div>
 </div>
-<img alt="../_images/08a6dc93da59d3b01fcfd245cb88352ba219d8b4890a8c1ac38d927311f21ddd.png" src="../_images/08a6dc93da59d3b01fcfd245cb88352ba219d8b4890a8c1ac38d927311f21ddd.png" />
-<img alt="../_images/67464870aa2a1996ce31af2a8d43eb27542cd22c8633269b830e56624511ff15.png" src="../_images/67464870aa2a1996ce31af2a8d43eb27542cd22c8633269b830e56624511ff15.png" />
+<img alt="../_images/6305ac0723b02eb3a30db192977e7f667bde7178e78bf0c7471e273b6480561e.png" src="../_images/6305ac0723b02eb3a30db192977e7f667bde7178e78bf0c7471e273b6480561e.png" />
+<img alt="../_images/3d4c44dd86fef7a8e23b7de7e0a2210fa895905545c97c85e1bd58f458e3ae0e.png" src="../_images/3d4c44dd86fef7a8e23b7de7e0a2210fa895905545c97c85e1bd58f458e3ae0e.png" />
 </div>
 </div>
 <h3 id="let-the-outcome-itself-spill-over-sar">Let the outcome itself spill over (SAR)<a class="headerlink" href="#let-the-outcome-itself-spill-over-sar" title="Link to this heading">¶</a></h3>
@@ -2718,7 +2718,7 @@ y = \rho Wy + X\beta + \epsilon
     </tr>
   </tbody>
 </table>
-</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_9216/4086335195.py:11: UserWarning: The figure layout has changed to tight
+</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_8888/4086335195.py:11: UserWarning: The figure layout has changed to tight
   plt.tight_layout()
 </code></pre></div>
 </div>
@@ -3084,7 +3084,7 @@ y = X\beta + u, \quad u = \lambda Wu + \epsilon
     </tr>
   </tbody>
 </table>
-</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_9216/4086335195.py:11: UserWarning: The figure layout has changed to tight
+</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_8888/4086335195.py:11: UserWarning: The figure layout has changed to tight
   plt.tight_layout()
 </code></pre></div>
 </div>
@@ -3530,7 +3530,7 @@ y = \rho Wy + X\beta + WX\theta + \epsilon
     </tr>
   </tbody>
 </table>
-</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_9216/4086335195.py:11: UserWarning: The figure layout has changed to tight
+</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_8888/4086335195.py:11: UserWarning: The figure layout has changed to tight
   plt.tight_layout()
 </code></pre></div>
 </div>
@@ -3976,7 +3976,7 @@ y = X\beta + WX\theta + u, \quad u = \lambda Wu + \epsilon
     </tr>
   </tbody>
 </table>
-</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_9216/4086335195.py:11: UserWarning: The figure layout has changed to tight
+</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_8888/4086335195.py:11: UserWarning: The figure layout has changed to tight
   plt.tight_layout()
 </code></pre></div>
 </div>
@@ -4167,57 +4167,57 @@ warns when any threshold is violated.</p>
   <tbody>
     <tr>
       <th>LM-Lag</th>
-      <td>6.295538</td>
-      <td>6.481167</td>
+      <td>6.480505</td>
+      <td>6.638677</td>
       <td>1</td>
-      <td>0.012104</td>
-      <td>2.711199</td>
-      <td>13.904441</td>
+      <td>0.010906</td>
+      <td>3.016579</td>
+      <td>14.113333</td>
     </tr>
     <tr>
       <th>LM-Error</th>
-      <td>1.495441</td>
-      <td>2.577574</td>
+      <td>1.596080</td>
+      <td>2.700520</td>
       <td>1</td>
-      <td>0.221374</td>
-      <td>0.408588</td>
-      <td>11.830425</td>
+      <td>0.206460</td>
+      <td>0.483748</td>
+      <td>12.616139</td>
     </tr>
     <tr>
       <th>LM-SDM-Joint</th>
-      <td>17.331868</td>
-      <td>18.095591</td>
+      <td>17.577346</td>
+      <td>18.243303</td>
       <td>5</td>
-      <td>0.003912</td>
-      <td>8.666282</td>
-      <td>34.776188</td>
+      <td>0.003526</td>
+      <td>9.166244</td>
+      <td>36.391089</td>
     </tr>
     <tr>
       <th>LM-SLX-Error-Joint</th>
-      <td>17.331868</td>
-      <td>19.703707</td>
+      <td>17.577346</td>
+      <td>19.747002</td>
       <td>5</td>
-      <td>0.003912</td>
-      <td>9.382349</td>
-      <td>38.887525</td>
+      <td>0.003526</td>
+      <td>9.771380</td>
+      <td>39.068473</td>
     </tr>
     <tr>
       <th>Robust-LM-Lag</th>
-      <td>10.751654</td>
-      <td>6.241059</td>
+      <td>10.656281</td>
+      <td>6.128832</td>
       <td>1</td>
-      <td>0.001042</td>
-      <td>0.098355</td>
-      <td>18.637816</td>
+      <td>0.001097</td>
+      <td>0.108880</td>
+      <td>18.678195</td>
     </tr>
     <tr>
       <th>Robust-LM-Error</th>
-      <td>5.951557</td>
-      <td>2.680010</td>
+      <td>5.771857</td>
+      <td>2.566712</td>
       <td>1</td>
-      <td>0.014704</td>
-      <td>0.012437</td>
-      <td>11.997502</td>
+      <td>0.016285</td>
+      <td>0.012426</td>
+      <td>11.034985</td>
     </tr>
   </tbody>
 </table>
@@ -4384,7 +4384,7 @@ warns when any threshold is violated.</p>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_9216/497883469.py:1: UserWarning: Bridge sampling with 1600 posterior samples for 'OLS' may yield imprecise marginal-likelihood estimates. A conservative rule of thumb is 40,000+ samples (Gronau, Singmann, &amp; Wagenmakers, 2017).
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_8888/497883469.py:1: UserWarning: Bridge sampling with 1600 posterior samples for 'OLS' may yield imprecise marginal-likelihood estimates. A conservative rule of thumb is 40,000+ samples (Gronau, Singmann, &amp; Wagenmakers, 2017).
   bayes_factor_compare_models(model_dict, method="bridge", log=True).round(3)
 </code></pre></div>
 </div>
@@ -4418,55 +4418,55 @@ warns when any threshold is violated.</p>
     <tr>
       <th>OLS</th>
       <td>0.000</td>
-      <td>2.999</td>
-      <td>-2.111</td>
-      <td>-1.447</td>
-      <td>3.578</td>
-      <td>3.139</td>
+      <td>3.009</td>
+      <td>-2.070</td>
+      <td>-1.411</td>
+      <td>3.605</td>
+      <td>3.181</td>
     </tr>
     <tr>
       <th>SLX</th>
-      <td>-2.999</td>
+      <td>-3.009</td>
       <td>0.000</td>
-      <td>-5.110</td>
-      <td>-4.446</td>
-      <td>0.579</td>
-      <td>0.139</td>
+      <td>-5.079</td>
+      <td>-4.420</td>
+      <td>0.596</td>
+      <td>0.172</td>
     </tr>
     <tr>
       <th>SAR</th>
-      <td>2.111</td>
-      <td>5.110</td>
+      <td>2.070</td>
+      <td>5.079</td>
       <td>0.000</td>
-      <td>0.664</td>
-      <td>5.689</td>
-      <td>5.249</td>
+      <td>0.659</td>
+      <td>5.675</td>
+      <td>5.251</td>
     </tr>
     <tr>
       <th>SEM</th>
-      <td>1.447</td>
-      <td>4.446</td>
-      <td>-0.664</td>
+      <td>1.411</td>
+      <td>4.420</td>
+      <td>-0.659</td>
       <td>0.000</td>
-      <td>5.025</td>
-      <td>4.585</td>
+      <td>5.016</td>
+      <td>4.592</td>
     </tr>
     <tr>
       <th>SDM</th>
-      <td>-3.578</td>
-      <td>-0.579</td>
-      <td>-5.689</td>
-      <td>-5.025</td>
+      <td>-3.605</td>
+      <td>-0.596</td>
+      <td>-5.675</td>
+      <td>-5.016</td>
       <td>0.000</td>
-      <td>-0.439</td>
+      <td>-0.424</td>
     </tr>
     <tr>
       <th>SDEM</th>
-      <td>-3.139</td>
-      <td>-0.139</td>
-      <td>-5.249</td>
-      <td>-4.585</td>
-      <td>0.439</td>
+      <td>-3.181</td>
+      <td>-0.172</td>
+      <td>-5.251</td>
+      <td>-4.592</td>
+      <td>0.424</td>
       <td>0.000</td>
     </tr>
   </tbody>
@@ -4510,25 +4510,25 @@ warns when any threshold is violated.</p>
     <tr>
       <th>OLS</th>
       <td>0.000</td>
-      <td>-1.054</td>
-      <td>-2.153</td>
-      <td>0.375</td>
-      <td>0.089</td>
-      <td>0.579</td>
+      <td>-1.387</td>
+      <td>-2.148</td>
+      <td>0.380</td>
+      <td>0.094</td>
+      <td>0.585</td>
     </tr>
     <tr>
       <th>SLX</th>
-      <td>1.054</td>
+      <td>1.387</td>
       <td>0.000</td>
-      <td>-1.099</td>
-      <td>1.429</td>
-      <td>1.142</td>
-      <td>1.633</td>
+      <td>-0.761</td>
+      <td>1.767</td>
+      <td>1.481</td>
+      <td>1.972</td>
     </tr>
     <tr>
       <th>SAR</th>
-      <td>2.153</td>
-      <td>1.099</td>
+      <td>2.148</td>
+      <td>0.761</td>
       <td>0.000</td>
       <td>2.528</td>
       <td>2.242</td>
@@ -4536,8 +4536,8 @@ warns when any threshold is violated.</p>
     </tr>
     <tr>
       <th>SEM</th>
-      <td>-0.375</td>
-      <td>-1.429</td>
+      <td>-0.380</td>
+      <td>-1.767</td>
       <td>-2.528</td>
       <td>0.000</td>
       <td>-0.286</td>
@@ -4545,8 +4545,8 @@ warns when any threshold is violated.</p>
     </tr>
     <tr>
       <th>SDM</th>
-      <td>-0.089</td>
-      <td>-1.142</td>
+      <td>-0.094</td>
+      <td>-1.481</td>
       <td>-2.242</td>
       <td>0.286</td>
       <td>0.000</td>
@@ -4554,8 +4554,8 @@ warns when any threshold is violated.</p>
     </tr>
     <tr>
       <th>SDEM</th>
-      <td>-0.579</td>
-      <td>-1.633</td>
+      <td>-0.585</td>
+      <td>-1.972</td>
       <td>-2.732</td>
       <td>-0.204</td>
       <td>-0.491</td>
@@ -4638,57 +4638,57 @@ warns when any threshold is violated.</p>
   <tbody>
     <tr>
       <th>LM-Lag</th>
-      <td>6.295538</td>
-      <td>6.481167</td>
+      <td>6.480505</td>
+      <td>6.638677</td>
       <td>1</td>
-      <td>0.012104</td>
-      <td>2.711199</td>
-      <td>13.904441</td>
+      <td>0.010906</td>
+      <td>3.016579</td>
+      <td>14.113333</td>
     </tr>
     <tr>
       <th>LM-Error</th>
-      <td>1.495441</td>
-      <td>2.577574</td>
+      <td>1.596080</td>
+      <td>2.700520</td>
       <td>1</td>
-      <td>0.221374</td>
-      <td>0.408588</td>
-      <td>11.830425</td>
+      <td>0.206460</td>
+      <td>0.483748</td>
+      <td>12.616139</td>
     </tr>
     <tr>
       <th>LM-SDM-Joint</th>
-      <td>17.331868</td>
-      <td>18.095591</td>
+      <td>17.577346</td>
+      <td>18.243303</td>
       <td>5</td>
-      <td>0.003912</td>
-      <td>8.666282</td>
-      <td>34.776188</td>
+      <td>0.003526</td>
+      <td>9.166244</td>
+      <td>36.391089</td>
     </tr>
     <tr>
       <th>LM-SLX-Error-Joint</th>
-      <td>17.331868</td>
-      <td>19.703707</td>
+      <td>17.577346</td>
+      <td>19.747002</td>
       <td>5</td>
-      <td>0.003912</td>
-      <td>9.382349</td>
-      <td>38.887525</td>
+      <td>0.003526</td>
+      <td>9.771380</td>
+      <td>39.068473</td>
     </tr>
     <tr>
       <th>Robust-LM-Lag</th>
-      <td>10.751654</td>
-      <td>6.241059</td>
+      <td>10.656281</td>
+      <td>6.128832</td>
       <td>1</td>
-      <td>0.001042</td>
-      <td>0.098355</td>
-      <td>18.637816</td>
+      <td>0.001097</td>
+      <td>0.108880</td>
+      <td>18.678195</td>
     </tr>
     <tr>
       <th>Robust-LM-Error</th>
-      <td>5.951557</td>
-      <td>2.680010</td>
+      <td>5.771857</td>
+      <td>2.566712</td>
       <td>1</td>
-      <td>0.014704</td>
-      <td>0.012437</td>
-      <td>11.997502</td>
+      <td>0.016285</td>
+      <td>0.012426</td>
+      <td>11.034985</td>
     </tr>
   </tbody>
 </table>

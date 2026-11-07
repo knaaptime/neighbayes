@@ -1612,7 +1612,7 @@ tuning difference — and this is the cheapest validation available.</p>
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 2 jobs)
 NUTS: [rho, beta, sigma2]
-Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 12 seconds.
+Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 5 seconds.
 </code></pre></div>
 </div>
 <div class="output text_html"><div>
@@ -1641,12 +1641,12 @@ Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws 
     <tr>
       <th>rho</th>
       <td>0.4076</td>
-      <td>0.4058</td>
+      <td>0.4101</td>
     </tr>
     <tr>
       <th>sigma</th>
       <td>10.4985</td>
-      <td>10.4952</td>
+      <td>10.4791</td>
     </tr>
   </tbody>
 </table>
@@ -1693,20 +1693,20 @@ Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws 
   <tbody>
     <tr>
       <th>Gibbs</th>
-      <td>2.571</td>
+      <td>1.553</td>
       <td>7560.816</td>
-      <td>2940.440</td>
+      <td>4868.212</td>
       <td>6275.383</td>
-      <td>2440.529</td>
+      <td>4040.555</td>
       <td>1.000</td>
     </tr>
     <tr>
       <th>NUTS</th>
-      <td>15.245</td>
-      <td>3540.462</td>
-      <td>232.244</td>
-      <td>4178.557</td>
-      <td>274.102</td>
+      <td>8.265</td>
+      <td>3665.266</td>
+      <td>443.465</td>
+      <td>4829.148</td>
+      <td>584.285</td>
       <td>1.001</td>
     </tr>
   </tbody>
@@ -1785,20 +1785,20 @@ path’s vectorized chains.</p>
   <tbody>
     <tr>
       <th>numpy</th>
-      <td>2.425</td>
+      <td>1.382</td>
       <td>7387.877</td>
-      <td>3047.137</td>
+      <td>5345.819</td>
       <td>6393.722</td>
-      <td>2637.097</td>
+      <td>4626.455</td>
       <td>1.001</td>
     </tr>
     <tr>
       <th>jax</th>
-      <td>0.184</td>
+      <td>0.088</td>
       <td>7560.816</td>
-      <td>41082.506</td>
+      <td>85654.229</td>
       <td>6275.383</td>
-      <td>34097.971</td>
+      <td>71091.948</td>
       <td>1.000</td>
     </tr>
   </tbody>
@@ -1834,11 +1834,11 @@ sampler adapts from there during warmup.</p>
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>draws kept per chain with thin=2: 1000
 </code></pre></div>
 </div>
-<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>seconds             2.832
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>seconds             1.488
 ess rho          4130.204
-ess/sec rho      1458.573
+ess/sec rho      2775.717
 ess sigma        3825.296
-ess/sec sigma    1350.895
+ess/sec sigma    2570.803
 max rhat            1.001
 Name: slice_width=0.25, thin=2, dtype: float64
 </code></pre></div>
@@ -1931,21 +1931,21 @@ On a small problem the exact answer is free, so there is no excuse not to.</p>
       <th>eigenvalue</th>
       <td>0.4076</td>
       <td>0.1249</td>
-      <td>0.1868</td>
+      <td>0.0865</td>
       <td>7560.8158</td>
     </tr>
     <tr>
       <th>cheb on chol</th>
       <td>0.3710</td>
       <td>0.1225</td>
-      <td>1.7680</td>
+      <td>1.0175</td>
       <td>7117.5967</td>
     </tr>
     <tr>
       <th>stochastic</th>
       <td>0.4073</td>
       <td>0.1250</td>
-      <td>1.9663</td>
+      <td>1.0865</td>
       <td>7343.7792</td>
     </tr>
   </tbody>

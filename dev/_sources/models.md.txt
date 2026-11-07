@@ -262,11 +262,10 @@ A binary outcome is the sign of a latent utility, $y_i = \mathbf{1}[y_i^* > 0]$.
 The latent SAR propagates the link's own disturbance through the multiplier,
 standard logistic for the logit and standard normal for the probit, so its
 $\rho = 0$ member is the aspatial model and no scale parameter is pinned: the
-link fixes it. The reduced form propagates only the covariates. An unmarked SAR
-class is the form its field means by the name (ADR 0003): the latent SAR for the
-probit, `SARProbit`, and the reduced form for the logit, `SARLogit`; `latent=`
-names the other. The SEM and SDEM classes are latent in both links and take no
-`latent` argument.
+link fixes it. The reduced form propagates only the covariates. The unmarked SAR
+class is the latent SAR in both links, as in every family (ADR 0004):
+`SARProbit` and `SARLogit`, with `latent=False` fitting the reduced form. The
+SEM and SDEM classes are latent too and take no `latent` argument.
 
 The latent models share one exact Gibbs sweep: the utilities from their
 truncated normal conditionals (Albert and Chib 1993), one at a time on NumPy or a
@@ -337,7 +336,7 @@ takes no unit or time effects, because a within transformation would mix censore
 and uncensored values in the likelihood. Impacts are on the latent scale, through
 the spatial multiplier within each period.
 
-### Panel count models (`SARNegBin`, `NegBin`)
+### Panel count models, reduced form (`SARNegBin(latent=False)`, `NegBin`)
 
 $$y_{it} \sim \operatorname{NegBin}(\mu_{it}, \alpha), \quad \log \boldsymbol{\mu}_t = (I - \rho W)^{-1} (X_t\beta + c) + \tau_t$$
 
@@ -382,13 +381,13 @@ Both classes default to Gibbs; `sampler="nuts"` runs the PyMC model. `priors={"a
 (10-20 times the typical mean count) gives an essentially Poisson model that
 keeps the exact Pólya–Gamma sampler.
 
-### SARNegBin (Reduced Form)
+### SARNegBin, reduced form (`latent=False`)
 
 $$y_i \sim \operatorname{NegBin}(\mu_i, \alpha), \quad \mu = \exp(\eta), \quad \eta = (I - \rho W)^{-1} X\beta$$
 
 No disturbance propagates — spatial dependence enters only through the mean propagator. Supports both NUTS and Pólya–Gamma Gibbs sampling. Unit effects need a panel (above): in a cross-section one draw per observation is a disturbance, not a unit effect.
 
-### SARNegBin, latent (`latent=True`)
+### SARNegBin (latent SAR)
 
 $$y_i \sim \operatorname{Poisson}(e^{\eta_i}), \quad (I - \rho W)\eta = X\beta + \varepsilon, \quad \varepsilon_i = \log\gamma_i,\ \gamma_i \sim \operatorname{Gamma}(\alpha, \alpha)$$
 
@@ -402,7 +401,14 @@ $\beta$ shifted along the least-squares fit of $W\eta$ on $X$, $\beta$ from a
 *t* at its Laplace approximation, and $\alpha$. Small counts pin $\eta$ only
 loosely, so two moves interweave the parametrization that holds the
 disturbances instead (Yu & Meng 2011): $\alpha$ with the standardized
-disturbances held, and $\rho$ with the disturbances held. There is no NUTS path.
+disturbances held, and $\rho$ with the disturbances held. When $\alpha$ is
+small and most counts are zero, $\rho$, $\alpha$ and the depth of the zeros'
+log-means move together, and every one-parameter move pins them; a last move
+draws $\rho$, $\log\alpha$ and the level of $X\beta$ jointly, holding the log-means
+at the positive counts and the standardized disturbances at the zeros, by a
+slice along the eigenvectors of its Hessian. On a 100 × 100 lattice with 95%
+zeros and $\alpha = 0.05$ it raised the effective sample size of $\rho$ from
+0.1% to 4.5% of the sweeps. There is no NUTS path.
 The pointwise log-likelihood
 (`idata_kwargs={"log_likelihood": True}`) integrates each observation's latent
 value out given the others, $p(y_i \mid \theta, \eta_{-i}) = \int p(y_i \mid
@@ -419,7 +425,14 @@ $(I - \rho W)\eta_t = X_t\beta + \tau_t + c + \varepsilon_t$, $c_i \sim
 N(\mu, \sigma_c^2)$ with $\sigma_c$ learned; each period's gamma disturbance
 propagates through the same filter, so the Jacobian is $T\log|I - \rho W|$.
 The sweep runs over the stacked periods, and a unit effect, entering only its
-own unit's equations, is drawn from a *t* at its conditional mode.
+own unit's equations, is drawn from a *t* at its conditional mode. With period
+effects and a row-standardized $W$, the target also carries Lee and Yu's (2010)
+time-effects term, $-T\log(1 - \rho)$, as the Gaussian panels do: a period
+effect inside the filter moves its period's log-mean level by
+$\tau_t/(1 - \rho)$, so priors flat on the $\tau_t$ themselves would leave a
+factor $1 - \rho$ per period in the marginal of $\rho$ and bias it down
+(by about one posterior sd at $N = 100$); the term makes them flat on the
+levels.
 
 Impacts are on the log-mean by default; `impacts(scale="count")` gives them on
 the expected count, which averages over the propagated heterogeneity. With $u =
@@ -428,12 +441,18 @@ S(\rho)\varepsilon$ and $m = S(\rho)X\beta$,
 $$\mathbb{E}\,y_i = e^{m_i}\prod_j \frac{\Gamma(\alpha + S_{ij})}{\Gamma(\alpha)\,\alpha^{S_{ij}}}, \qquad \frac{\partial\,\mathbb{E}\,y_i}{\partial x_{jk}} = \mathbb{E}\,y_i\,S_{ij}\beta_k,$$
 
 the reduced form's count-scale impact with each row scaled by the mean of the
-propagated heterogeneity. The product needs every entry of $S$, so each
-posterior draw estimates it by Monte Carlo over fresh disturbances (one batched
-sparse solve), taking the unit's own factor in closed form where the
-multiplier's diagonal is exact. The same holds, with $S$ replaced by $(I -
-\lambda W)^{-1}$ and no spillover through the mean, for `SEMNegBin` and
-`SDEMNegBin`.
+propagated heterogeneity. The product needs every entry of $S$, but depends on
+the parameters only through $(\rho, \alpha)$, so it is computed at a few values
+of those and interpolated across the draws, in $\operatorname{atanh}\rho$ and
+$\log\alpha$, with no factorization per draw beyond $m$. It is not simulated:
+at small $\alpha$ rare draws carry the mean of $e^{u_i}$, and at $\alpha = 0.05$
+128 simulations read 16–29% low at $\rho = 0.7$ and lose the effect entirely at
+$\rho = 0.9$. A draw with an entry $S_{ij} \le -\alpha$ (a negative $\rho$ at
+small $\alpha$) has no expected count; it is left out of the effects with a
+warning. The same holds, with $S$ replaced by $(I - \lambda W)^{-1}$ and no
+spillover through the mean, for `SEMNegBin` and `SDEMNegBin`, and for the count
+part of a latent `SARZINB`. The count part of a latent `SARHurdleNegBin` takes
+the same mean less a simulated bounded remainder, which is at most half of it.
 
 ### SEMNegBin
 
@@ -451,7 +470,7 @@ $$y_i \sim \operatorname{Poisson}(e^{\eta_i}), \quad \eta = X\beta + WX\theta + 
 $\beta$ and indirect $\theta$ (times the mean row sum of $W$), or with
 `scale="count"` on the expected count.
 
-### SARZINB
+### SARZINB, reduced form (`latent=False`)
 
 $$y_i \sim \operatorname{ZINB}(\mu_i, \alpha, \pi_i), \quad \log \boldsymbol{\mu} = (I - \rho W)^{-1} X\beta, \quad \operatorname{logit} \boldsymbol{\pi} = (I - \rho_z W_z)^{-1} X_z\beta_z$$
 
@@ -475,7 +494,7 @@ versus none" questions on sparse counts, use a hurdle model
 ({ref}`below <hurdle-models>`), whose zero part is fit to the observed
 zeros.
 
-### SARZINB, latent (`latent=True`)
+### SARZINB (latent)
 
 $$y_i = 0 \text{ if } u_i \le 0, \quad y_i \mid u_i > 0 \sim \operatorname{Poisson}(e^{\eta_i}), \quad (I - \rho_z W_z)u = X_z\beta_z + \varepsilon_z, \quad (I - \rho W)\eta = X\beta + \varepsilon$$
 
@@ -523,8 +542,10 @@ with pair effects, or the flow hurdle.
 $$P(y > 0) = \operatorname{logit}^{-1}(\eta_z), \quad y \mid y > 0 \sim \operatorname{NB}(\mu, \alpha) \text{ truncated at } 0, \quad \eta_z = (I - \rho_z W_z)^{-1} X_z\beta_z, \quad \log \boldsymbol{\mu} = (I - \rho W)^{-1} X\beta$$
 
 A hurdle separates *whether* a count is positive from *how large* it is when
-it is. Both parts are reduced-form SARs: the spatial lag acts on the linear
-predictor and no latent disturbance enters, so neither part has a Jacobian.
+it is. In the reduced form (`latent=False`) both parts are reduced-form SARs:
+the spatial lag acts on the linear predictor and no latent disturbance enters,
+so neither part has a Jacobian. The unmarked `SARHurdleNegBin` is the latent
+model (below).
 The zero part is named as in SARZINB (`rho_zero`, `beta_zero`, `X_zero`,
 `W_zero`).
 
@@ -568,14 +589,14 @@ a ridge, so they are drawn jointly by a slice sampler that moves along it.
 The halves share no parameters, so the posterior factorizes. Linking them
 through correlated unit (pair) effects is a planned extension.
 
-**Latent (`SARHurdleNegBin(latent=True)`).** Each part is a latent SAR with its
+**Latent (the unmarked `SARHurdleNegBin`).** Each part is a latent SAR with its
 own disturbance: a count is positive when the utility
 $u = (I - \rho_z W_z)^{-1}(X_z\beta_z + \varepsilon_z)$, $\varepsilon_z$
 logistic, is positive, and is then $\operatorname{Poisson}(e^{\eta_i})$
 truncated at zero, $\eta = (I - \rho W)^{-1}(X\beta + \varepsilon)$,
 $\varepsilon_i = \log\gamma_i$. The truncation conditions on $\eta_i$, as in
 hurdle models with random effects. The parts still share nothing: the zero
-part is `SARLogit(latent=True)` fitted to $\mathbf 1(y > 0)$, the count part
+part is the latent `SARLogit` fitted to $\mathbf 1(y > 0)$, the count part
 the latent SAR NB observing the positive counts only, and a sweep is one sweep
 of each. LOO and impacts work as for the latent SARZINB, the count part's
 outcome being the expected positive count. As a panel both parts take random
@@ -595,7 +616,7 @@ $$y_i \sim \operatorname{NegBin}(\mu_i, \alpha), \quad \log \boldsymbol{\mu} = X
 
 Non-spatial negative binomial baseline.
 
-### SARLogit (Reduced Form)
+### SARLogit, reduced form (`latent=False`)
 
 $$y_i \sim \operatorname{Bernoulli}(p_i), \quad \eta = (I - \rho W)^{-1}X\beta$$
 
@@ -609,7 +630,7 @@ $\lambda$, and binary outcomes barely constrain the trade: on 1,225 units with
 effects of sd 2, an SEM logit with such effects had its $\lambda$ near 0.3
 against 0.5 and the effects' sd at 6 ± 6, held only by its prior.
 
-### SARLogit, latent (`latent=True`)
+### SARLogit (latent SAR)
 
 $$y_i = \mathbf 1\{y^*_i > 0\}, \quad (I - \rho W) y^* = X\beta + \varepsilon, \quad \varepsilon_i \sim \operatorname{Logistic}(0, 1)$$
 
@@ -691,6 +712,46 @@ $$y_{ij} \sim \operatorname{NegBin}(\mu_{ij}, \alpha), \quad \log \boldsymbol{\m
 
 $$y_{ij} \sim \operatorname{NegBin}(\mu_{ij}, \alpha), \quad \log \boldsymbol{\mu} = A(\boldsymbol{\rho})^{-1} X\beta, \quad \rho_w = -\rho_d \rho_o$$
 
+`pair_effects="fixed"` (a panel) is the fixed-effects static panel: a level
+per origin–destination pair after the filter, under a flat prior,
+$\eta_{t,ij} = (A^{-1}X_t\beta)_{ij} + c_{ij} + \tau_t$. Under a flat prior a
+level inside the filter is a reparameterization of one after it. The pair
+levels absorb every time-invariant column (intercept, log distance, the intra
+indicator, time-invariant attributes), so $\rho$ and $\beta$ are identified by
+the within-pair variation of the time-varying columns, which is what makes the
+estimates robust to time-invariant confounding. A pair with no count in any
+period has no proper posterior and leaves the likelihood. The posterior
+integrates each level out rather than profiling it, and the NB2 log-mean is
+information-orthogonal to $\alpha$, so $\alpha$ escapes the leading
+$O(1/T)$ incidental-parameter bias of the dummy-variable estimator (Lancaster
+2002); in simulation at $T = 2$–16 its posterior mean showed no bias, where
+random pair levels pulled $\alpha$ low at small $T$.
+
+`origin_effects` and `destination_effects` (`"random"` or `"fixed"`) add a
+level per origin and per destination after the filter,
+$\eta_{ij} = (A^{-1}X\beta)_{ij} + \gamma_i + \kappa_j$; random levels are
+$\gamma_i \sim N(\mu_o, \tau_o^2)$, $\kappa_j \sim N(\mu_d, \tau_d^2)$ with
+both scales learned, fixed ones flat: the production-, attraction- or doubly
+constrained gravity model with balancing factors (Griffith & Fischer 2016).
+For a row-standardized $W$ the filter maps a column constant along each row to
+one again, so the levels absorb the intercept and the time-invariant origin
+(destination) attributes, which are dropped with a warning. The spatial
+parameters are then identified only by the remaining columns, such as
+distance; with distance alone they can sit near a bound, on any sampler. With
+origin levels alone $\rho_d$ is well identified, with destination levels alone
+$\rho_o$; with both, $\rho$ is weakly identified.
+
+`time_effects=True` adds period levels $\tau_t$: beside other effects the
+first period is the baseline; alone, every period has one and the intercept is
+absorbed. All of these run on the exact-likelihood Gibbs sampler, which moves
+the levels with the coefficients and with $\rho$ (otherwise they crawl
+against each other); `cell_mask` removes cells (the intraregional diagonal)
+from the likelihood. NUTS takes the random levels and the period effects only.
+The SAR NB flow takes no random pair effects: random pair effects inside the
+filter tie $\rho$ to the spatial pattern of the pair levels, and in
+simulation moved it by about ten posterior sd. The unrestricted SAR NB panel
+takes period effects only.
+
 ### SARPoissonFlow
 
 $$y_{ij} \sim \operatorname{Poisson}(\mu_{ij}), \quad \log \boldsymbol{\mu} = A(\boldsymbol{\rho})^{-1} X\beta$$
@@ -725,13 +786,14 @@ $$y = X\beta + u, \quad u = \lambda_d W_d u + \lambda_o W_o u - \lambda_d \lambd
 
 ## Panel Flow Models
 
-Stack the flow models above across $T$ periods in time-first order; any flow class is a panel when `T` is given, with `pair_effects` and `time_effects`. The NB
-panels take pair and period effects as parameters, the pair effects partially
-pooled,
+Stack the flow models above across $T$ periods in time-first order; any flow class is a panel when `T` is given, with `pair_effects` and `time_effects`. The
+SAR NB panel takes fixed pair effects after the filter (see `SARNegBinFlow`
+above). The ZINB and hurdle panels take pair and period effects as parameters,
+the pair effects partially pooled,
 $\log \boldsymbol{\mu}_t = A(\boldsymbol{\rho})^{-1} (X_t\beta + c) + \tau_t$,
 with one effect per origin-destination pair held as an index, never as $n^2$
-dummy columns; see the panel count models above. The separable panels (NB,
-ZINB, hurdle) keep their structured $n \times n$ sweep. Their $n^2 \times n^2$
+dummy columns; see the panel count models above. Their separable panels keep a
+structured $n \times n$ sweep. Their $n^2 \times n^2$
 effect block cannot be integrated out at scale, so the sweep holds the effects
 while $\rho$ moves (interweaving steps with the effects and with their
 propagated values held), draws them by conjugate gradients, and moves the
@@ -846,10 +908,12 @@ information, using the Fisher weights.
 
 The suites also carry LM-WX and Moran-Working, a Moran diagnostic on the
 Pólya–Gamma working residuals that is not the score test of a fitted model. At
-a reduced-form SAR null (`SARLogit`, `SARNegBin`) the suites are LM-Error, the
+a reduced-form SAR null (`SARLogit(latent=False)`, `SARNegBin(latent=False)`)
+the suites are LM-Error, the
 score of a latent error process added to the fitted model, and LM-WX; both are
 uncorrelated with the other scores there, so their robust forms are the same
-statistics.
+statistics. A fitted latent SAR, the default, has no such suite yet: the tests
+with the latent SAR as their null are not derived.
 
 `Logit.spatial_diagnostics_decision()` and `NegBin.spatial_diagnostics_decision()`
 read the tests as a pair (the table names the logit's classes; the negative
@@ -859,11 +923,11 @@ measures the departure from that proportion.
 
 | Robust LM-Lag | LM-Error | Robust LM-Error | Recommendation |
 |---|---|---|---|
-| significant | not | — | `SARLogit` (reduced form) |
-| significant | significant | not | `SARLogit(latent=True)` |
+| significant | not | — | `SARLogit(latent=False)` |
+| significant | significant | not | `SARLogit` |
 | significant | significant | significant | `SDEMLogit` |
 | not | significant | significant | `SEMLogit` |
-| not | significant | not | `SEMLogit` or `SARLogit(latent=True)` |
+| not | significant | not | `SEMLogit` or `SARLogit` |
 | not | not | — | `Logit` |
 
 The last but one row is ambiguous by construction: without a spillover term to
@@ -994,14 +1058,15 @@ The reduced form has no latent σ² — spatial dependence enters only through t
 
 ### Gibbs Sampler (NB flow models)
 
-NB flow models (`SARNegBinFlow`, unrestricted or separable, and `NegBinFlow`) support a Pólya–Gamma Gibbs sampler via `sampler="gibbs"`:
+NB flow models (`SARNegBinFlow`, unrestricted or separable, and `NegBinFlow`) support Gibbs sampling via `sampler="gibbs"`:
 
 ```python
 model = SARNegBinFlow(y_int, X, G)   # positional: (y, X, W)
 idata = model.fit(sampler="gibbs", draws=2000, tune=1000, chains=4)
 ```
 
-The sampler uses a reduced-form Pólya–Gamma augmentation strategy with no σ² parameter — spatial dependence enters only through the mean propagator $A^{-1}$:
+Spatial dependence enters only through the mean propagator $A^{-1}$; there is
+no σ² parameter. The unrestricted model uses Pólya–Gamma augmentation:
 
 | Block | Full conditional | Update |
 |---|---|---|
@@ -1010,7 +1075,27 @@ The sampler uses a reduced-form Pólya–Gamma augmentation strategy with no σ�
 | ρ \| ω, y | 1-D non-conjugate | Adaptive slice sampling (β marginalised) |
 | α \| y, η | 1-D non-conjugate | Slice sampling on log(α) |
 
-For the unrestricted model (`SARNegBinFlow`), each ρ parameter (ρ_d, ρ_o, ρ_w) is updated via independent 1-D slice sampling with β marginalised out. For the separable model (`separable=True`), ρ_w = −ρ_d·ρ_o is deterministic and only ρ_d and ρ_o are sampled. The aspatial `NegBinFlow` omits the ρ block entirely.
+Each ρ parameter (ρ_d, ρ_o, ρ_w) is updated by its own 1-D slice with β
+marginalised out. The aspatial `NegBinFlow` omits the ρ block entirely.
+
+The separable model (`separable=True`, cross-section or panel without pair
+effects) slices its exact NB2 likelihood instead, with no augmentation. At
+small α the Pólya–Gamma likelihood given ω is far more precise than the NB2
+one, and chains that condition on ω crawl: on a Los Angeles tract panel at
+α ≈ 0.015 their information ratio reached 71. The model has no latent field,
+only $k + 3$ parameters, so slicing the exact likelihood is cheap. With
+$a = -\log(1-\rho_d)$, $b = -\log(1-\rho_o)$ and $\theta = \beta /
+((1-\rho_d)(1-\rho_o))$, which holds the mean level fixed while ρ moves,
+
+| Block | Update |
+|---|---|
+| θ \| a, b, α | Slice along each eigenvector of the Fisher information ($\eta$ is linear in θ) |
+| (a, b) \| θ, α | Slice along each eigenvector of their warmup covariance |
+| α \| y, η | Slice sampling on log(α) |
+
+and ρ_w = −ρ_d·ρ_o is deterministic. Fixed pair effects, origin and
+destination effects and period effects are levels after the filter, drawn in
+blocks of their own and carried along by the θ and (a, b) moves.
 
 ## Log-Determinant Methods
 

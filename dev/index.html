@@ -1341,8 +1341,11 @@
 <a class="reference external" href="https://pysal.org/libpysal/stable/generated/libpysal.graph.Graph.html"><code class="docutils literal notranslate"><span class="pre">Graph</span></code></a>
 (or any <code class="docutils literal notranslate"><span class="pre">scipy.sparse</span></code> matrix) for the spatial weights <span class="math notranslate nohighlight">\(W\)</span>; <code class="docutils literal notranslate"><span class="pre">fit()</span></code> returns an
 ArviZ <code class="docutils literal notranslate"><span class="pre">DataTree</span></code> (an <code class="docutils literal notranslate"><span class="pre">xarray.DataTree</span></code>), so the standard posterior tooling
-(<code class="docutils literal notranslate"><span class="pre">az.plot_trace_dist</span></code>, <code class="docutils literal notranslate"><span class="pre">az.compare</span></code>, <code class="docutils literal notranslate"><span class="pre">az.loo</span></code>) works without translation (though
-exercise caution as LOO diagnostics aren’t valid for spatial models).</p>
+(<code class="docutils literal notranslate"><span class="pre">az.plot_trace_dist</span></code>, <code class="docutils literal notranslate"><span class="pre">az.compare</span></code>, <code class="docutils literal notranslate"><span class="pre">az.loo</span></code>) works without translation. The
+stored pointwise log-likelihood is each observation’s density given all the
+others, so <code class="docutils literal notranslate"><span class="pre">az.loo</span></code> is a leave-one-out estimate for spatial models too (Bürkner,
+Gabry &amp; Vehtari 2021); robust models with fixed effects or a lagged outcome, and
+robust Tobits, have no such term and warn.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">libpysal</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.dgp</span><span class="w"> </span><span class="kn">import</span> <span class="n">simulate_sar</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">OLS</span><span class="p">,</span> <span class="n">SAR</span>

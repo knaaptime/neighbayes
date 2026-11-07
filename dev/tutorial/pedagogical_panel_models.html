@@ -1874,8 +1874,6 @@ cross-sectional models did not have: unit effects <span class="math notranslate 
         <span class="n">chains</span><span class="o">=</span><span class="n">chains</span><span class="p">,</span>
         <span class="n">random_seed</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span>
         <span class="n">progressbar</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
-        <span class="c1"># Stored only on request (as in PyMC); az.loo needs it.</span>
-        <span class="n">idata_kwargs</span><span class="o">=</span><span class="p">{</span><span class="s2">"log_likelihood"</span><span class="p">:</span> <span class="kc">True</span><span class="p">},</span>
     <span class="p">)</span>
     <span class="n">summary</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="n">round_to</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
     <span class="n">effects_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">impacts</span><span class="p">())</span>
@@ -1916,11 +1914,9 @@ cross-sectional models did not have: unit effects <span class="math notranslate 
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/pymc/sampling/mcmc.py:1178: FutureWarning: Passing `log_likelihood` via `idata_kwargs` is deprecated and will be removed in future versions. Call `pm.compute_log_likelihood(idata)` instead.
-  return _sample_return(
-Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 4 seconds.
+Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
-/tmp/ipykernel_9094/2088117897.py:41: UserWarning: The figure layout has changed to tight
+/tmp/ipykernel_8774/4084804720.py:39: UserWarning: The figure layout has changed to tight
   plt.tight_layout()
 </code></pre></div>
 </div>
@@ -2237,7 +2233,7 @@ for Jupyter support
   warnings.warn('install "ipywidgets" for Jupyter support')
 </pre>
 </div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 2s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">3</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">359</span> draws/s<span style="font-weight: bold">)</span>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 1s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">6</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">549</span> draws/s<span style="font-weight: bold">)</span>
 </pre>
 </div><div class="output text_html"><div>
 <style scoped>
@@ -2541,7 +2537,7 @@ for Jupyter support
     </tr>
   </tbody>
 </table>
-</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_9094/2088117897.py:41: UserWarning: The figure layout has changed to tight
+</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_8774/4084804720.py:39: UserWarning: The figure layout has changed to tight
   plt.tight_layout()
 </code></pre></div>
 </div>
@@ -2571,7 +2567,7 @@ for Jupyter support
   warnings.warn('install "ipywidgets" for Jupyter support')
 </pre>
 </div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 2s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">3</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">158</span> draws/s<span style="font-weight: bold">)</span>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 1s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">5</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">873</span> draws/s<span style="font-weight: bold">)</span>
 </pre>
 </div><div class="output text_html"><div>
 <style scoped>
@@ -2875,7 +2871,7 @@ for Jupyter support
     </tr>
   </tbody>
 </table>
-</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_9094/2088117897.py:41: UserWarning: The figure layout has changed to tight
+</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_8774/4084804720.py:39: UserWarning: The figure layout has changed to tight
   plt.tight_layout()
 </code></pre></div>
 </div>
@@ -2905,7 +2901,7 @@ for Jupyter support
   warnings.warn('install "ipywidgets" for Jupyter support')
 </pre>
 </div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 2s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">3</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">407</span> draws/s<span style="font-weight: bold">)</span>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 1s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">7</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">045</span> draws/s<span style="font-weight: bold">)</span>
 </pre>
 </div><div class="output text_html"><div>
 <style scoped>
@@ -3289,7 +3285,7 @@ for Jupyter support
     </tr>
   </tbody>
 </table>
-</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_9094/2088117897.py:41: UserWarning: The figure layout has changed to tight
+</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_8774/4084804720.py:39: UserWarning: The figure layout has changed to tight
   plt.tight_layout()
 </code></pre></div>
 </div>
@@ -3319,7 +3315,7 @@ for Jupyter support
   warnings.warn('install "ipywidgets" for Jupyter support')
 </pre>
 </div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 2s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">797</span> draws/s<span style="font-weight: bold">)</span>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 1s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">5</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">522</span> draws/s<span style="font-weight: bold">)</span>
 </pre>
 </div><div class="output text_html"><div>
 <style scoped>
@@ -3703,7 +3699,7 @@ for Jupyter support
     </tr>
   </tbody>
 </table>
-</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_9094/2088117897.py:41: UserWarning: The figure layout has changed to tight
+</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_8774/4084804720.py:39: UserWarning: The figure layout has changed to tight
   plt.tight_layout()
 </code></pre></div>
 </div>
@@ -3802,11 +3798,9 @@ and HPDI stability for the spatial scalar.</p>
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2, unit_effect_sd, unit_effect_raw]
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/pymc/sampling/mcmc.py:1178: FutureWarning: Passing `log_likelihood` via `idata_kwargs` is deprecated and will be removed in future versions. Call `pm.compute_log_likelihood(idata)` instead.
-  return _sample_return(
-Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 6 seconds.
+Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 3 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
-/tmp/ipykernel_9094/2088117897.py:41: UserWarning: The figure layout has changed to tight
+/tmp/ipykernel_8774/4084804720.py:39: UserWarning: The figure layout has changed to tight
   plt.tight_layout()
 </code></pre></div>
 </div>
@@ -3847,37 +3841,37 @@ for Jupyter support
   <tbody>
     <tr>
       <th>Intercept</th>
-      <td>2.365</td>
+      <td>2.364</td>
       <td>0.040</td>
       <td>2.301</td>
       <td>2.429</td>
-      <td>2293.731</td>
-      <td>2614.189</td>
-      <td>1.001</td>
+      <td>1975.584</td>
+      <td>2305.179</td>
+      <td>1.002</td>
       <td>0.001</td>
       <td>0.001</td>
     </tr>
     <tr>
       <th>poverty</th>
-      <td>-0.777</td>
-      <td>0.027</td>
-      <td>-0.822</td>
-      <td>-0.734</td>
-      <td>5293.502</td>
-      <td>3164.101</td>
-      <td>1.000</td>
+      <td>-0.776</td>
+      <td>0.028</td>
+      <td>-0.820</td>
+      <td>-0.731</td>
+      <td>5242.946</td>
+      <td>3114.674</td>
+      <td>1.001</td>
       <td>0.000</td>
       <td>0.000</td>
     </tr>
     <tr>
       <th>rev_rating</th>
-      <td>0.605</td>
+      <td>0.604</td>
       <td>0.027</td>
       <td>0.562</td>
       <td>0.648</td>
-      <td>5769.690</td>
-      <td>3374.906</td>
-      <td>1.000</td>
+      <td>4552.950</td>
+      <td>2928.051</td>
+      <td>1.001</td>
       <td>0.000</td>
       <td>0.000</td>
     </tr>
@@ -3885,22 +3879,22 @@ for Jupyter support
       <th>num_spots</th>
       <td>0.433</td>
       <td>0.029</td>
-      <td>0.386</td>
+      <td>0.388</td>
       <td>0.480</td>
-      <td>6422.280</td>
-      <td>3077.186</td>
-      <td>1.000</td>
+      <td>4779.054</td>
+      <td>3115.193</td>
+      <td>1.001</td>
       <td>0.000</td>
       <td>0.001</td>
     </tr>
     <tr>
       <th>crowded</th>
-      <td>-0.554</td>
-      <td>0.027</td>
-      <td>-0.596</td>
-      <td>-0.511</td>
-      <td>5566.972</td>
-      <td>3253.892</td>
+      <td>-0.555</td>
+      <td>0.026</td>
+      <td>-0.595</td>
+      <td>-0.513</td>
+      <td>5256.410</td>
+      <td>3281.639</td>
       <td>1.001</td>
       <td>0.000</td>
       <td>0.000</td>
@@ -3919,61 +3913,61 @@ for Jupyter support
     </tr>
     <tr>
       <th>unit_effect[395]</th>
-      <td>0.252</td>
-      <td>0.382</td>
-      <td>-0.371</td>
-      <td>0.865</td>
-      <td>5762.377</td>
-      <td>3218.652</td>
-      <td>1.001</td>
-      <td>0.005</td>
-      <td>0.007</td>
-    </tr>
-    <tr>
-      <th>unit_effect[396]</th>
-      <td>-0.655</td>
-      <td>0.390</td>
-      <td>-1.294</td>
-      <td>-0.030</td>
-      <td>5636.416</td>
-      <td>3477.535</td>
-      <td>1.001</td>
-      <td>0.005</td>
-      <td>0.006</td>
-    </tr>
-    <tr>
-      <th>unit_effect[397]</th>
-      <td>0.224</td>
-      <td>0.399</td>
-      <td>-0.399</td>
-      <td>0.852</td>
-      <td>7698.632</td>
-      <td>2861.102</td>
+      <td>0.251</td>
+      <td>0.387</td>
+      <td>-0.386</td>
+      <td>0.869</td>
+      <td>6659.312</td>
+      <td>2956.796</td>
       <td>1.000</td>
       <td>0.005</td>
       <td>0.007</td>
     </tr>
     <tr>
-      <th>unit_effect[398]</th>
-      <td>0.653</td>
-      <td>0.404</td>
-      <td>-0.001</td>
-      <td>1.299</td>
-      <td>5950.016</td>
-      <td>3049.845</td>
+      <th>unit_effect[396]</th>
+      <td>-0.660</td>
+      <td>0.394</td>
+      <td>-1.302</td>
+      <td>-0.038</td>
+      <td>4994.403</td>
+      <td>3014.209</td>
       <td>1.001</td>
+      <td>0.006</td>
+      <td>0.006</td>
+    </tr>
+    <tr>
+      <th>unit_effect[397]</th>
+      <td>0.225</td>
+      <td>0.407</td>
+      <td>-0.428</td>
+      <td>0.875</td>
+      <td>7371.691</td>
+      <td>2551.886</td>
+      <td>1.000</td>
+      <td>0.005</td>
+      <td>0.008</td>
+    </tr>
+    <tr>
+      <th>unit_effect[398]</th>
+      <td>0.657</td>
+      <td>0.397</td>
+      <td>0.023</td>
+      <td>1.284</td>
+      <td>5740.633</td>
+      <td>2760.393</td>
+      <td>1.003</td>
       <td>0.005</td>
       <td>0.007</td>
     </tr>
     <tr>
       <th>unit_effect[399]</th>
-      <td>-0.346</td>
-      <td>0.401</td>
-      <td>-0.996</td>
-      <td>0.304</td>
-      <td>5708.178</td>
-      <td>2869.612</td>
-      <td>1.003</td>
+      <td>-0.344</td>
+      <td>0.398</td>
+      <td>-0.982</td>
+      <td>0.282</td>
+      <td>5508.197</td>
+      <td>3001.427</td>
+      <td>1.000</td>
       <td>0.005</td>
       <td>0.007</td>
     </tr>
@@ -4030,62 +4024,62 @@ for Jupyter support
   <tbody>
     <tr>
       <th>poverty</th>
-      <td>-0.776595</td>
-      <td>-0.831328</td>
-      <td>-0.722984</td>
+      <td>-0.776350</td>
+      <td>-0.829701</td>
+      <td>-0.722053</td>
       <td>0.0</td>
       <td>0.0</td>
       <td>0.0</td>
       <td>0.0</td>
       <td>0.0</td>
-      <td>-0.776595</td>
-      <td>-0.831328</td>
-      <td>-0.722984</td>
+      <td>-0.776350</td>
+      <td>-0.829701</td>
+      <td>-0.722053</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>rev_rating</th>
-      <td>0.604935</td>
-      <td>0.552334</td>
-      <td>0.658258</td>
+      <td>0.604495</td>
+      <td>0.549239</td>
+      <td>0.657875</td>
       <td>0.0</td>
       <td>0.0</td>
       <td>0.0</td>
       <td>0.0</td>
       <td>0.0</td>
-      <td>0.604935</td>
-      <td>0.552334</td>
-      <td>0.658258</td>
+      <td>0.604495</td>
+      <td>0.549239</td>
+      <td>0.657875</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>num_spots</th>
-      <td>0.432669</td>
-      <td>0.375926</td>
-      <td>0.490147</td>
+      <td>0.433485</td>
+      <td>0.377296</td>
+      <td>0.491230</td>
       <td>0.0</td>
       <td>0.0</td>
       <td>0.0</td>
       <td>0.0</td>
       <td>0.0</td>
-      <td>0.432669</td>
-      <td>0.375926</td>
-      <td>0.490147</td>
+      <td>0.433485</td>
+      <td>0.377296</td>
+      <td>0.491230</td>
       <td>0.0</td>
     </tr>
     <tr>
       <th>crowded</th>
-      <td>-0.553910</td>
-      <td>-0.605950</td>
-      <td>-0.502780</td>
+      <td>-0.554599</td>
+      <td>-0.605932</td>
+      <td>-0.503026</td>
       <td>0.0</td>
       <td>0.0</td>
       <td>0.0</td>
       <td>0.0</td>
       <td>0.0</td>
-      <td>-0.553910</td>
-      <td>-0.605950</td>
-      <td>-0.502780</td>
+      <td>-0.554599</td>
+      <td>-0.605932</td>
+      <td>-0.503026</td>
       <td>0.0</td>
     </tr>
   </tbody>
@@ -4118,63 +4112,63 @@ for Jupyter support
   <tbody>
     <tr>
       <th>beta[Intercept]</th>
-      <td>2.365</td>
+      <td>2.364</td>
       <td>0.040</td>
-      <td>2293.731</td>
-      <td>2614.189</td>
-      <td>1.001</td>
+      <td>1975.584</td>
+      <td>2305.179</td>
+      <td>1.002</td>
     </tr>
     <tr>
       <th>beta[poverty]</th>
-      <td>-0.777</td>
-      <td>0.027</td>
-      <td>5293.502</td>
-      <td>3164.101</td>
-      <td>1.000</td>
+      <td>-0.776</td>
+      <td>0.028</td>
+      <td>5242.946</td>
+      <td>3114.674</td>
+      <td>1.001</td>
     </tr>
     <tr>
       <th>beta[rev_rating]</th>
-      <td>0.605</td>
+      <td>0.604</td>
       <td>0.027</td>
-      <td>5769.690</td>
-      <td>3374.906</td>
-      <td>1.000</td>
+      <td>4552.950</td>
+      <td>2928.051</td>
+      <td>1.001</td>
     </tr>
     <tr>
       <th>beta[num_spots]</th>
       <td>0.433</td>
       <td>0.029</td>
-      <td>6422.280</td>
-      <td>3077.186</td>
-      <td>1.000</td>
+      <td>4779.054</td>
+      <td>3115.193</td>
+      <td>1.001</td>
     </tr>
     <tr>
       <th>beta[crowded]</th>
-      <td>-0.554</td>
-      <td>0.027</td>
-      <td>5566.972</td>
-      <td>3253.892</td>
+      <td>-0.555</td>
+      <td>0.026</td>
+      <td>5256.410</td>
+      <td>3281.639</td>
       <td>1.001</td>
     </tr>
     <tr>
       <th>sigma</th>
       <td>1.027</td>
-      <td>0.020</td>
-      <td>3443.674</td>
-      <td>3059.122</td>
-      <td>1.002</td>
+      <td>0.021</td>
+      <td>3330.189</td>
+      <td>2863.393</td>
+      <td>1.000</td>
     </tr>
     <tr>
       <th>unit_effect_sd</th>
       <td>0.605</td>
       <td>0.038</td>
-      <td>1632.739</td>
-      <td>2452.711</td>
-      <td>1.002</td>
+      <td>1605.281</td>
+      <td>2636.910</td>
+      <td>1.001</td>
     </tr>
   </tbody>
 </table>
-</div></div><img alt="../_images/71e381596a613dfad035ff543f88c6d18761604ceecec8a0bed28063dbc19a7a.png" src="../_images/71e381596a613dfad035ff543f88c6d18761604ceecec8a0bed28063dbc19a7a.png" />
+</div></div><img alt="../_images/5532ed7edc78008cad4acb09362b2fb5ea485e5f2b730fbb449d19968f9aa381.png" src="../_images/5532ed7edc78008cad4acb09362b2fb5ea485e5f2b730fbb449d19968f9aa381.png" />
 </div>
 </div>
 <h3 id="random-effects-with-a-spatial-lag">Random effects with a spatial lag<a class="headerlink" href="#random-effects-with-a-spatial-lag" title="Link to this heading">¶</a></h3>
@@ -4206,7 +4200,7 @@ for Jupyter support
   warnings.warn('install "ipywidgets" for Jupyter support')
 </pre>
 </div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 2s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">901</span> draws/s<span style="font-weight: bold">)</span>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 1s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">7</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">050</span> draws/s<span style="font-weight: bold">)</span>
 </pre>
 </div><div class="output text_html"><div>
 <style scoped>
@@ -4575,7 +4569,7 @@ for Jupyter support
     </tr>
   </tbody>
 </table>
-</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_9094/2088117897.py:41: UserWarning: The figure layout has changed to tight
+</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_8774/4084804720.py:39: UserWarning: The figure layout has changed to tight
   plt.tight_layout()
 </code></pre></div>
 </div>
@@ -4611,7 +4605,7 @@ for Jupyter support
   warnings.warn('install "ipywidgets" for Jupyter support')
 </pre>
 </div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 23s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">262</span> draws/s<span style="font-weight: bold">)</span>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 9s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">665</span> draws/s<span style="font-weight: bold">)</span>
 </pre>
 </div><div class="output text_html"><div>
 <style scoped>
@@ -4980,7 +4974,7 @@ for Jupyter support
     </tr>
   </tbody>
 </table>
-</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_9094/2088117897.py:41: UserWarning: The figure layout has changed to tight
+</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_8774/4084804720.py:39: UserWarning: The figure layout has changed to tight
   plt.tight_layout()
 </code></pre></div>
 </div>
@@ -4988,49 +4982,41 @@ for Jupyter support
 </div>
 </div>
 <h2 id="compare-what-you-have-fitted">Compare what you have fitted<a class="headerlink" href="#compare-what-you-have-fitted" title="Link to this heading">¶</a></h2>
+<p>Models with the same unit effects describe the same outcomes, so bridge sampling
+can give each a marginal likelihood. Each entry below is the log Bayes factor for
+the row’s model over the column’s, so positive values favor the row.</p>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="c1"># Collect all fitted panel models for comparison</span>
-<span class="n">panel_models</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">"OLS (FE)"</span><span class="p">:</span> <span class="n">ols_panel</span><span class="p">,</span>
-    <span class="s2">"SAR (FE)"</span><span class="p">:</span> <span class="n">sar_panel</span><span class="p">,</span>
-    <span class="s2">"SEM (FE)"</span><span class="p">:</span> <span class="n">sem_panel</span><span class="p">,</span>
-    <span class="s2">"SDM (FE)"</span><span class="p">:</span> <span class="n">sdm_panel</span><span class="p">,</span>
-    <span class="s2">"SDEM (FE)"</span><span class="p">:</span> <span class="n">sdem_panel</span><span class="p">,</span>
-    <span class="s2">"OLS (RE)"</span><span class="p">:</span> <span class="n">ols_panel_re</span><span class="p">,</span>
-    <span class="s2">"SAR (RE)"</span><span class="p">:</span> <span class="n">sar_panel_re</span><span class="p">,</span>
-    <span class="s2">"SEM (RE)"</span><span class="p">:</span> <span class="n">sem_panel_re</span><span class="p">,</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.diagnostics</span><span class="w"> </span><span class="kn">import</span> <span class="n">bayes_factor_compare_models</span>
+
+<span class="n">fixed</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"OLS"</span><span class="p">:</span> <span class="n">ols_panel</span><span class="p">,</span>
+    <span class="s2">"SAR"</span><span class="p">:</span> <span class="n">sar_panel</span><span class="p">,</span>
+    <span class="s2">"SEM"</span><span class="p">:</span> <span class="n">sem_panel</span><span class="p">,</span>
+    <span class="s2">"SDM"</span><span class="p">:</span> <span class="n">sdm_panel</span><span class="p">,</span>
+    <span class="s2">"SDEM"</span><span class="p">:</span> <span class="n">sdem_panel</span><span class="p">,</span>
 <span class="p">}</span>
-<span class="n">idata_dict</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">m</span><span class="o">.</span><span class="n">inference_data</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">panel_models</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+<span class="n">random</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"OLS"</span><span class="p">:</span> <span class="n">ols_panel_re</span><span class="p">,</span> <span class="s2">"SAR"</span><span class="p">:</span> <span class="n">sar_panel_re</span><span class="p">,</span> <span class="s2">"SEM"</span><span class="p">:</span> <span class="n">sem_panel_re</span><span class="p">}</span>
 
-<span class="c1"># LOO comparison (ArviZ 1.x computes PSIS-LOO; WAIC is no longer offered)</span>
-<span class="k">try</span><span class="p">:</span>
-    <span class="n">cmp</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">compare</span><span class="p">(</span><span class="n">idata_dict</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">"bb-pseudo-bma"</span><span class="p">)</span>
-    <span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">LOO comparison"</span><span class="p">)</span>
-    <span class="n">display</span><span class="p">(</span><span class="n">cmp</span><span class="p">)</span>
-<span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"LOO comparison not available: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-
-<span class="c1"># Per-model IC table</span>
-<span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
-<span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">model</span> <span class="ow">in</span> <span class="n">panel_models</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-    <span class="n">idata</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">inference_data</span>
-    <span class="n">row</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"model"</span><span class="p">:</span> <span class="n">name</span><span class="p">}</span>
-    <span class="k">try</span><span class="p">:</span>
-        <span class="n">loo_res</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">loo</span><span class="p">(</span><span class="n">idata</span><span class="p">)</span>
-        <span class="n">row</span><span class="p">[</span><span class="s2">"elpd_loo"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">loo_res</span><span class="o">.</span><span class="n">elpd</span><span class="p">)</span>
-        <span class="n">row</span><span class="p">[</span><span class="s2">"p_loo"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">loo_res</span><span class="o">.</span><span class="n">p</span><span class="p">)</span>
-    <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
-        <span class="n">row</span><span class="p">[</span><span class="s2">"elpd_loo"</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
-        <span class="n">row</span><span class="p">[</span><span class="s2">"p_loo"</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
-    <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">row</span><span class="p">)</span>
-
-<span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s2">"model"</span><span class="p">)</span><span class="o">.</span><span class="n">reset_index</span><span class="p">(</span><span class="n">drop</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">models</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"Fixed effects"</span><span class="p">:</span> <span class="n">fixed</span><span class="p">,</span> <span class="s2">"Random effects"</span><span class="p">:</span> <span class="n">random</span><span class="p">}</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">label</span><span class="p">)</span>
+    <span class="n">display</span><span class="p">(</span>
+        <span class="n">bayes_factor_compare_models</span><span class="p">(</span>
+            <span class="n">models</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">"bridge"</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="p">)</span>
 </code></pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>LOO comparison
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Fixed effects
+Random effects
+</code></pre></div>
+</div>
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_8774/1402646083.py:15: UserWarning: Bridge sampling with 4000 posterior samples for 'OLS' may yield imprecise marginal-likelihood estimates. A conservative rule of thumb is 40,000+ samples (Gronau, Singmann, &amp; Wagenmakers, 2017).
+  bayes_factor_compare_models(
+/tmp/ipykernel_8774/1402646083.py:15: UserWarning: Bridge sampling with 4000 posterior samples for 'OLS' may yield imprecise marginal-likelihood estimates. A conservative rule of thumb is 40,000+ samples (Gronau, Singmann, &amp; Wagenmakers, 2017).
+  bayes_factor_compare_models(
 </code></pre></div>
 </div>
 <div class="output text_html"><div>
@@ -5051,122 +5037,53 @@ for Jupyter support
   <thead>
     <tr style="text-align: right;">
       <th></th>
-      <th>rank</th>
-      <th>elpd_diff</th>
-      <th>dse</th>
-      <th>p_worse</th>
-      <th>diag_diff</th>
-      <th>diag_elpd</th>
-      <th>p</th>
-      <th>elpd</th>
-      <th>se</th>
-      <th>weight</th>
+      <th>OLS</th>
+      <th>SAR</th>
+      <th>SEM</th>
+      <th>SDM</th>
+      <th>SDEM</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <th>SAR (FE)</th>
-      <td>0</td>
+      <th>OLS</th>
       <td>0.0</td>
-      <td>0.0</td>
-      <td>NaN</td>
-      <td></td>
-      <td></td>
-      <td>4.3</td>
-      <td>-2070.0</td>
-      <td>21.0</td>
-      <td>0.60</td>
+      <td>-29.4</td>
+      <td>-22.7</td>
+      <td>-11.2</td>
+      <td>-12.2</td>
     </tr>
     <tr>
-      <th>SDEM (FE)</th>
-      <td>1</td>
+      <th>SAR</th>
+      <td>29.4</td>
+      <td>0.0</td>
+      <td>6.6</td>
+      <td>18.2</td>
+      <td>17.1</td>
+    </tr>
+    <tr>
+      <th>SEM</th>
+      <td>22.7</td>
+      <td>-6.6</td>
+      <td>0.0</td>
+      <td>11.5</td>
+      <td>10.5</td>
+    </tr>
+    <tr>
+      <th>SDM</th>
+      <td>11.2</td>
+      <td>-18.2</td>
+      <td>-11.5</td>
+      <td>0.0</td>
       <td>-1.0</td>
-      <td>1.4</td>
-      <td>0.74</td>
-      <td>|elpd_diff| &lt; 4</td>
-      <td></td>
-      <td>7.0</td>
-      <td>-2070.0</td>
-      <td>21.0</td>
-      <td>0.27</td>
     </tr>
     <tr>
-      <th>SDM (FE)</th>
-      <td>2</td>
-      <td>-2.0</td>
-      <td>1.3</td>
-      <td>0.91</td>
-      <td>|elpd_diff| &lt; 4</td>
-      <td></td>
-      <td>7.0</td>
-      <td>-2070.0</td>
-      <td>21.0</td>
-      <td>0.11</td>
-    </tr>
-    <tr>
-      <th>SEM (FE)</th>
-      <td>3</td>
-      <td>-8.0</td>
-      <td>4.0</td>
-      <td>0.98</td>
-      <td></td>
-      <td></td>
-      <td>4.2</td>
-      <td>-2070.0</td>
-      <td>21.0</td>
-      <td>0.02</td>
-    </tr>
-    <tr>
-      <th>OLS (FE)</th>
-      <td>4</td>
-      <td>-50.0</td>
-      <td>5.5</td>
-      <td>1.00</td>
-      <td></td>
-      <td></td>
-      <td>3.7</td>
-      <td>-2110.0</td>
-      <td>21.0</td>
-      <td>0.00</td>
-    </tr>
-    <tr>
-      <th>SAR (RE)</th>
-      <td>5</td>
-      <td>-330.0</td>
-      <td>14.0</td>
-      <td>1.00</td>
-      <td></td>
-      <td></td>
-      <td>222.5</td>
-      <td>-2400.0</td>
-      <td>28.0</td>
-      <td>0.00</td>
-    </tr>
-    <tr>
-      <th>SEM (RE)</th>
-      <td>6</td>
-      <td>-350.0</td>
-      <td>15.0</td>
-      <td>1.00</td>
-      <td></td>
-      <td></td>
-      <td>219.8</td>
-      <td>-2410.0</td>
-      <td>29.0</td>
-      <td>0.00</td>
-    </tr>
-    <tr>
-      <th>OLS (RE)</th>
-      <td>7</td>
-      <td>-370.0</td>
-      <td>15.0</td>
-      <td>1.00</td>
-      <td></td>
-      <td></td>
-      <td>224.8</td>
-      <td>-2440.0</td>
-      <td>28.0</td>
-      <td>0.00</td>
+      <th>SDEM</th>
+      <td>12.2</td>
+      <td>-17.1</td>
+      <td>-10.5</td>
+      <td>1.0</td>
+      <td>0.0</td>
     </tr>
   </tbody>
 </table>
@@ -5188,64 +5105,124 @@ for Jupyter support
   <thead>
     <tr style="text-align: right;">
       <th></th>
-      <th>model</th>
-      <th>elpd_loo</th>
-      <th>p_loo</th>
+      <th>OLS</th>
+      <th>SAR</th>
+      <th>SEM</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <th>0</th>
-      <td>OLS (FE)</td>
-      <td>-2111.033081</td>
-      <td>3.744504</td>
+      <th>OLS</th>
+      <td>0.0</td>
+      <td>-42.6</td>
+      <td>-29.4</td>
     </tr>
     <tr>
-      <th>1</th>
-      <td>OLS (RE)</td>
-      <td>-2439.962703</td>
-      <td>224.847470</td>
+      <th>SAR</th>
+      <td>42.6</td>
+      <td>0.0</td>
+      <td>13.2</td>
     </tr>
     <tr>
-      <th>2</th>
-      <td>SAR (FE)</td>
-      <td>-2065.696039</td>
-      <td>4.268697</td>
-    </tr>
-    <tr>
-      <th>3</th>
-      <td>SAR (RE)</td>
-      <td>-2396.115593</td>
-      <td>222.484144</td>
-    </tr>
-    <tr>
-      <th>4</th>
-      <td>SDEM (FE)</td>
-      <td>-2066.640073</td>
-      <td>6.968221</td>
-    </tr>
-    <tr>
-      <th>5</th>
-      <td>SDM (FE)</td>
-      <td>-2067.501091</td>
-      <td>7.006281</td>
-    </tr>
-    <tr>
-      <th>6</th>
-      <td>SEM (FE)</td>
-      <td>-2073.893672</td>
-      <td>4.151015</td>
-    </tr>
-    <tr>
-      <th>7</th>
-      <td>SEM (RE)</td>
-      <td>-2410.985853</td>
-      <td>219.785071</td>
+      <th>SEM</th>
+      <td>29.4</td>
+      <td>-13.2</td>
+      <td>0.0</td>
     </tr>
   </tbody>
 </table>
 </div></div></div>
 </div>
+<p>Fixed and random effects cannot be compared this way. A fixed-effects likelihood
+is the random-effects likelihood under a flat prior on the effects, which is
+improper, so it has no marginal likelihood. <code class="docutils literal notranslate"><span class="pre">az.loo</span></code> can compare them, because
+each model stores every observation’s density given all the others, but it
+measures prediction: random effects gain from pooling whether or not their
+assumptions hold, so a better score does not show that their estimates are right.</p>
+<p>Compare the estimates instead, which is the logic of a Hausman test. Unit effects
+related to the covariates move both <span class="math notranslate nohighlight">\(\beta\)</span> and <span class="math notranslate nohighlight">\(\rho\)</span> under random effects; a
+spatial pattern in the effects that the covariates do not explain moves <span class="math notranslate nohighlight">\(\rho\)</span> and
+leaves <span class="math notranslate nohighlight">\(\beta\)</span> alone.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">fe_estimates</span> <span class="o">=</span> <span class="n">sar_panel</span><span class="o">.</span><span class="n">summary</span><span class="p">()</span>
+<span class="n">re_estimates</span> <span class="o">=</span> <span class="n">sar_panel_re</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s2">"~unit_effect"</span><span class="p">])</span>
+<span class="n">shared</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"rho"</span><span class="p">,</span> <span class="o">*</span><span class="n">xcols</span><span class="p">]</span>
+
+<span class="n">contrast</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+    <span class="p">{</span>
+        <span class="s2">"fixed"</span><span class="p">:</span> <span class="n">fe_estimates</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">shared</span><span class="p">,</span> <span class="s2">"mean"</span><span class="p">],</span>
+        <span class="s2">"random"</span><span class="p">:</span> <span class="n">re_estimates</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">shared</span><span class="p">,</span> <span class="s2">"mean"</span><span class="p">],</span>
+    <span class="p">}</span>
+<span class="p">)</span>
+<span class="n">contrast</span><span class="p">[</span><span class="s2">"gap in fixed-effects SDs"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">contrast</span><span class="p">[</span><span class="s2">"random"</span><span class="p">]</span> <span class="o">-</span> <span class="n">contrast</span><span class="p">[</span><span class="s2">"fixed"</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">/</span> <span class="n">fe_estimates</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">shared</span><span class="p">,</span> <span class="s2">"sd"</span><span class="p">]</span>
+<span class="n">contrast</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>fixed</th>
+      <th>random</th>
+      <th>gap in fixed-effects SDs</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>rho</th>
+      <td>0.303</td>
+      <td>0.314</td>
+      <td>0.307</td>
+    </tr>
+    <tr>
+      <th>poverty</th>
+      <td>-0.753</td>
+      <td>-0.773</td>
+      <td>-0.691</td>
+    </tr>
+    <tr>
+      <th>rev_rating</th>
+      <td>0.583</td>
+      <td>0.589</td>
+      <td>0.204</td>
+    </tr>
+    <tr>
+      <th>num_spots</th>
+      <td>0.449</td>
+      <td>0.425</td>
+      <td>-0.792</td>
+    </tr>
+    <tr>
+      <th>crowded</th>
+      <td>-0.526</td>
+      <td>-0.543</td>
+      <td>-0.624</td>
+    </tr>
+  </tbody>
+</table>
+</div></div></div>
+</div>
+<p>On this panel the two sets of estimates agree, with every gap under one posterior
+standard deviation, so nothing here argues against random effects.</p>
 <h2 id="let-the-tests-pick-the-specification">Let the tests pick the specification<a class="headerlink" href="#let-the-tests-pick-the-specification" title="Link to this heading">¶</a></h2>
 <p>The <code class="docutils literal notranslate"><span class="pre">neighbayes.diagnostics</span></code> module provides a full suite of Bayesian Lagrange Multiplier (LM) tests for panel models, following the framework of Dogan et al. (2021) with panel-specific formulas from Anselin (2008), Elhorst (2014), and Koley &amp; Bera (2024).</p>
 <p>These tests help answer the question: <em>which spatial panel specification is most appropriate?</em> They test for omitted spatial lag (<span class="math notranslate nohighlight">\(\rho\)</span>), spatial error (<span class="math notranslate nohighlight">\(\lambda\)</span>), and spatially lagged covariates (<span class="math notranslate nohighlight">\(\gamma\)</span>), both individually and jointly, with robust variants that account for the presence of the other terms.</p>
@@ -5491,9 +5468,7 @@ for Jupyter support
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-/home/runner/micromamba/envs/test/lib/python3.14/site-packages/pymc/sampling/mcmc.py:1178: FutureWarning: Passing `log_likelihood` via `idata_kwargs` is deprecated and will be removed in future versions. Call `pm.compute_log_likelihood(idata)` instead.
-  return _sample_return(
-Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 4 seconds.
+Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 </code></pre></div>
 </div>
