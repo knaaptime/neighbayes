@@ -823,6 +823,10 @@ def _bic_logml(idata, return_diagnostics=False, model=None):
     # Sum log-likelihood over observations for each draw
     per_draw_ll = [v.values.sum(axis=-1) for v in log_like_group.data_vars.values()]
     log_like_total = np.sum(per_draw_ll, axis=0)
+    # A Gaussian spatial model's pointwise terms are conditionals, which do not
+    # sum to the joint; it keeps the joint separately.
+    if "log_joint" in idata.children:
+        log_like_total = idata["log_joint"]["obs"].values
     if log_like_total.ndim > 1:
         log_like_total = log_like_total.reshape(-1)
     # ML log-likelihood: maximum of posterior log-likelihoods.

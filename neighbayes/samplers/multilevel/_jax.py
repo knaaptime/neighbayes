@@ -113,7 +113,7 @@ def _consts_and_static(st: MultilevelStructure, priors: MultilevelGibbsPriors):
         ),
         "Wt": tuple(
             jsparse.BCOO.from_scipy_sparse(lv.W.T.tocsr())
-            if (lv.W is not None and lv.process == "error")
+            if (lv.W is not None and lv.process in ("lag", "error"))
             else None
             for lv in levels
         ),
@@ -124,6 +124,10 @@ def _consts_and_static(st: MultilevelStructure, priors: MultilevelGibbsPriors):
         c["yy"] = jnp.float64(y @ y)
         c["yWy"] = jnp.float64(y @ Wy)
         c["WyWy"] = jnp.float64(Wy @ Wy)
+    if procs[0] in ("lag", "error"):
+        W0 = levels[0].W.tocsr()
+        c["Wdiag0"] = jnp.asarray(W0.diagonal())
+        c["Wsq0"] = jnp.asarray(np.asarray(W0.multiply(W0).sum(axis=0)).ravel())
     if procs[0] == "lag":
         c["Ctw"] = jnp.asarray(st.Ctw)
     if procs[0] == "error":
@@ -656,10 +660,18 @@ def _make_sweep(
             trace["theta"] = tuple(theta(z, ell) for ell in range(1, L + 1))
         if store_log_lik:
             e = unit_resid(c, z, rho[0])
-            ll = -0.5 * e * e / sig2[0] - 0.5 * jnp.log(2.0 * jnp.pi * sig2[0])
+            own = -0.5 * e * e / sig2[0] - 0.5 * jnp.log(2.0 * jnp.pi * sig2[0])
+            joint = jnp.sum(own)
             if spatial[0]:
-                ll = ll + logdet_at(c, 0, rho[0]) / J[0]
-            trace["log_lik"] = ll
+                # Each unit given the others and the effects (unit_loglik_pointwise).
+                joint = joint + logdet_at(c, 0, rho[0])
+                g = (e - rho[0] * (c["Wt"][0] @ e)) / sig2[0]
+                q = (1.0 - 2.0 * rho[0] * c["Wdiag0"] + rho[0] ** 2 * c["Wsq0"]) / sig2[
+                    0
+                ]
+                own = -0.5 * jnp.log(2.0 * jnp.pi) + 0.5 * jnp.log(q) - 0.5 * g * g / q
+            trace["log_lik"] = own
+            trace["log_joint"] = joint
         return new_state, trace
 
     return sweep
@@ -772,5 +784,6 @@ def run_multilevel_jax(
                 ]
         if store_log_lik:
             res["log_lik"] = np.asarray(traces["log_lik"][ch])[sl][:n_keep]
+            res["log_joint"] = np.asarray(traces["log_joint"][ch])[sl][:n_keep]
         out.append(res)
     return out

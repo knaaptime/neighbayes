@@ -225,6 +225,32 @@ class TestSARHurdleNB:
 # ---------------------------------------------------------------------------
 
 
+def test_panel_zero_formula_keeps_row_order():
+    # Unit labels out of sorted order: both designs must stay in W's order.
+    d = _panel()
+    labels = np.random.default_rng(0).permutation(25)
+    df = pd.DataFrame(
+        {
+            "y": d["y"],
+            "x1": d["X"][:, 1],
+            "z1": d["X_zero"][:, 1],
+            "u": labels[d["unit"]],
+            "t": d["time"],
+        }
+    )
+    m = SARHurdleNegBin(
+        formula="y ~ x1",
+        data=df,
+        formula_zero="~ z1",
+        W=d["W_graph"],
+        unit_col="u",
+        time_col="t",
+        latent=False,
+    )
+    np.testing.assert_array_equal(m._y, d["y"])
+    np.testing.assert_array_equal(m._Z[:, 1], d["X_zero"][:, 1])
+
+
 @pytest.mark.parametrize("cls", [SARHurdleNegBin, HurdleNegBin])
 @pytest.mark.parametrize("effects", [0, 1, 2, 3])
 @pytest.mark.parametrize("sampler", ["gibbs", "nuts"])

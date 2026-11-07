@@ -59,8 +59,8 @@ class ZeroPartMixin:
         """
         if formula_zero is not None and data is not None and self._is_panel:
             # The panel's rows, sorted as the base class sorted them.
-            order = list(self._panel_index.columns)
-            data = data.sort_values(order).reset_index(drop=True)
+            time_col = self._panel_index.columns[0]
+            data = data.sort_values(time_col, kind="stable").reset_index(drop=True)
         self._Z, self._sel_feature_names = _selection_design(
             X_zero, formula_zero, data, self._N * self._T
         )

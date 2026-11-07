@@ -139,6 +139,65 @@ class _SpatialTobitBase(SpatialModel):
         self._censored_mask = self._y <= self.censoring
         self._censored_idx = np.where(self._censored_mask)[0]
 
+    def _store_conditional_log_likelihood(self, idata):
+        """Store ``log p(y_i | y_-i, theta)``, each draw's latent outcome completed.
+
+        Given the latent values :math:`y^*_{-i}`, :math:`y^*_i` is normal with the
+        moments of Bürkner, Gabry and Vehtari's (2021) Prop. 1, which do not depend
+        on :math:`y^*_i`: an uncensored observation contributes that density at
+        :math:`y_i`, a censored one its probability below the threshold.  The
+        stored term moves to ``log_joint``.  A robust model, whose conditional is
+        a truncated integral, keeps the stored term, with a warning.
+        """
+        import warnings
+
+        from scipy.special import log_ndtr
+
+        from .._base._conditional import LinearOperator, conditional_moments
+
+        if "log_likelihood" not in idata.children:
+            return idata
+        if self.robust:
+            warnings.warn(
+                "A robust Tobit has no closed-form conditional density p(y_i | y_-i); "
+                "its stored log-likelihood is not a leave-one-out term.",
+                UserWarning,
+                stacklevel=3,
+            )
+            return idata
+        post = idata.posterior
+        name = "rho" if "rho" in post else "lam"
+        par = post[name].values.reshape(-1)
+        S = par.size
+        sigma = post["sigma"].values.reshape(-1)
+        Z = np.hstack([self._X, self._WX]) if self._has_wx_in_beta else self._X
+        fitted = post["beta"].values.reshape(S, Z.shape[1]) @ Z.T
+        y = np.asarray(self._y, dtype=np.float64)
+        y_star = np.tile(y, (S, 1))
+        if self._censored_idx.size:
+            gap = post["y_cens_gap"].values.reshape(S, -1)
+            y_star[:, self._censored_idx] = self.censoring - gap
+        if name == "rho":
+            e = y_star - par[:, None] * self._batch_sparse_lag(y_star) - fitted
+        else:
+            r = y_star - fitted
+            e = r - par[:, None] * self._batch_sparse_lag(r)
+        T = self._T if self._is_panel else 1
+        own = LinearOperator.filter(self._W_sparse, par, S)
+        g, q = conditional_moments(e, sigma**2, own, T=T)
+        mean, sd = y_star - g / q, 1.0 / np.sqrt(q)
+        ll = -0.5 * np.log(2.0 * np.pi) - np.log(sd) - 0.5 * ((y - mean) / sd) ** 2
+        if self._censored_idx.size:
+            idx = self._censored_idx
+            ll[:, idx] = log_ndtr((self.censoring - mean[:, idx]) / sd[:, idx])
+        stored = idata.log_likelihood["obs"].values
+        idata["log_joint"] = xr.Dataset(
+            {"obs": (("chain", "draw"), stored.sum(axis=-1))}
+        )
+        chains, draws = post.sizes["chain"], post.sizes["draw"]
+        _write_log_likelihood_to_idata(idata, ll.reshape(chains, draws, -1))
+        return idata
+
     @classmethod
     def _resolve_design(cls, kw: dict) -> tuple[str, dict]:
         """``"static"`` — a cross-section or a pooled panel — and the base's arguments."""

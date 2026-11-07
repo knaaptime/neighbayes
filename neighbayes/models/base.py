@@ -333,21 +333,29 @@ class SpatialModel(SharedSpatialMethods, ABC):
         return y_arr, X_arr
 
     def _parse_panel_data(self, formula, data, y, X, unit_col, time_col, N, T):
-        """Stacked ``(y, X)`` of a balanced panel, sorted by period, then unit."""
+        """Stacked ``(y, X)`` of a balanced panel, sorted by period.
+
+        Each period keeps the frame's row order, which must be ``W``'s: as in a
+        cross-section, a row's position is what links it to ``W``.
+        """
         if formula is not None:
             if data is None:
                 raise ValueError("data is required with formula mode.")
             if unit_col is None or time_col is None:
                 raise ValueError("unit_col and time_col are required in formula mode.")
-            d = data.sort_values([time_col, unit_col]).reset_index(drop=True)
+            d = data.sort_values(time_col, kind="stable").reset_index(drop=True)
             y_arr, X_arr, self._feature_names, self._model_spec = (
                 self._parse_formula_with_spec(formula, d)
             )
             units = d[unit_col].nunique()
             times = d[time_col].nunique()
             if units * times != len(d):
+                raise ValueError("Data are not a balanced panel.")
+            by_period = d[unit_col].to_numpy().reshape(times, units)
+            if (by_period != by_period[0]).any():
                 raise ValueError(
-                    "Data are not a balanced panel after sorting by time/unit."
+                    f"Every period must list {unit_col!r} in the same order, the "
+                    "order of W's rows."
                 )
             self._N, self._T = units, times
             self._panel_index = d[[time_col, unit_col]].copy()
@@ -687,6 +695,7 @@ class SpatialModel(SharedSpatialMethods, ABC):
                 **family_opts,
             )
             self._idata = self._postprocess_idata(self._idata)
+            self._idata = self._store_conditional_log_likelihood(self._idata)
             return self._idata
 
         nuts_sampler = backend
@@ -719,9 +728,132 @@ class SpatialModel(SharedSpatialMethods, ABC):
                     T_eff=self._T,
                 )
         self._idata = self._postprocess_idata(self._idata)
+        self._idata = self._store_conditional_log_likelihood(self._idata)
         return self._idata
 
         # _fit_nuts inherited from SharedSpatialMethods.
+
+    def _store_conditional_log_likelihood(self, idata):
+        """Store ``log p(y_i | y_-i, theta)``; keep the joint in ``log_joint``.
+
+        A Gaussian model's conditional is closed form and a robust model's a
+        one-dimensional integral (``_base/_conditional.py``).  Random effects are
+        integrated out under a lag process and conditioned on otherwise.  A robust
+        model with fixed effects or a lagged outcome has neither form and keeps the
+        stored term, with a warning.
+        """
+        from .panel._dynamic import _DynamicPanelMixin
+
+        if "log_likelihood" not in idata.children or self._W_sparse.shape[0] != self._N:
+            return idata
+        # A dynamic panel's class leaves ``_likelihood`` unset; its design is Gaussian.
+        dynamic = isinstance(self, _DynamicPanelMixin) and "phi" in idata.posterior
+        if self._likelihood != "gaussian" and not dynamic:
+            return idata
+        post = idata.posterior
+        if self.robust and (self._fe_unit or self._fe_time or dynamic):
+            warnings.warn(
+                "A robust model with fixed effects or a lagged outcome has no "
+                "conditional density p(y_i | y_-i) in closed or one-dimensional "
+                "form; its stored log-likelihood spreads the joint density over "
+                "observations, so az.loo on it is not leave-one-out.",
+                UserWarning,
+                stacklevel=3,
+            )
+            return idata
+        from ._base._conditional import (
+            gaussian_conditional_loglik,
+            student_t_conditional_loglik,
+        )
+        from ._base._shared import _write_log_likelihood_to_idata
+
+        stored = idata.log_likelihood["obs"].values
+        idata["log_joint"] = xr.Dataset(
+            {"obs": (("chain", "draw"), stored.sum(axis=-1))}
+        )
+        chains, draws = post.sizes["chain"], post.sizes["draw"]
+        sigma = post["sigma"].values.reshape(-1)
+        name = self._jacobian_param
+        if name is None:
+            # A dynamic panel names its spatial parameter only in the posterior.
+            name = next((v for v in ("rho", "lam") if v in post), None)
+        par = post[name].values.reshape(-1) if name else np.zeros_like(sigma)
+        T, lag = self._T, None
+        if dynamic:
+            e, lag = self._dynamic_innovations(post, name, par)
+            T = self._n_time_eff
+        else:
+            e = self._static_innovations(post, name, par)
+        c = 1.0 / T if self._fe_unit else 0.0
+        if "unit_effect_sd" in post and name != "lam" and not self.robust:
+            sa2 = post["unit_effect_sd"].values.reshape(-1) ** 2
+            c = sa2 / (sigma**2 + T * sa2)
+        if self.robust:
+            ll = student_t_conditional_loglik(
+                e, par, sigma, self._nu, self._W_sparse, T=T
+            )
+        else:
+            ll = gaussian_conditional_loglik(
+                e,
+                par,
+                sigma**2,
+                self._W_sparse,
+                T=T,
+                c=c,
+                time_effects=self._fe_time,
+                next_period=lag,
+            )
+        _write_log_likelihood_to_idata(idata, ll.reshape(chains, draws, -1))
+        return idata
+
+    def _static_innovations(self, post, name, par):
+        """Innovations ``e = A y - h`` per draw, sampled effects removed."""
+        y = np.asarray(self._y, dtype=np.float64)
+        Z = np.hstack([self._X, self._WX]) if self._has_wx_in_beta else self._X
+        fitted = post["beta"].values.reshape(-1, Z.shape[1]) @ Z.T
+        if "unit_effect_sd" in post and (name == "lam" or self.robust):
+            alpha = post["unit_effect"].values.reshape(-1, self._N)
+            fitted = fitted + alpha[:, np.asarray(self._unit_idx, dtype=np.int64)]
+        if name == "lam":
+            r = y[None, :] - fitted
+            return r - par[:, None] * self._batch_sparse_lag(r)
+        e = y[None, :] - fitted
+        if name:
+            e = e - par[:, None] * self._spatial_lag(y)[None, :]
+        return e
+
+    def _dynamic_innovations(self, post, name, par):
+        """A dynamic panel's innovations and the lag operator ``L`` on ``y_{t-1}``."""
+        from ._base._conditional import LinearOperator
+        from .panel._dynamic import _SDMRestrictedDynamic
+
+        self._prepare_dynamic_design()
+        n_draws = post.sizes["chain"] * post.sizes["draw"]
+        beta = post["beta"].values.reshape(n_draws, -1)
+        if beta.shape[1] == self._X_dyn.shape[1]:
+            design = self._X_dyn
+        else:
+            design = np.hstack([self._X_dyn, self._WX_dyn])
+        phi = post["phi"].values.reshape(-1)
+        r = self._y_dyn[None, :] - phi[:, None] * self._y_lag[None, :] - beta @ design.T
+        if name == "lam":
+            e = r - par[:, None] * self._batch_sparse_lag(r, T_eff=self._n_time_eff)
+            coefs = np.column_stack([phi, -phi * par])
+        else:
+            e = r - par[:, None] * self._Wy_dyn[None, :]
+            if "theta" in post:
+                theta = post["theta"].values.reshape(-1)
+                e = e - theta[:, None] * self._Wy_lag[None, :]
+                coefs = np.column_stack([phi, theta])
+            elif isinstance(self, _SDMRestrictedDynamic):
+                e = e + (par * phi)[:, None] * self._Wy_lag[None, :]
+                coefs = np.column_stack([phi, -par * phi])
+            else:
+                coefs = np.column_stack([phi, np.zeros_like(phi)])
+        lag = LinearOperator(
+            [sp.identity(self._N, format="csr"), self._W_sparse], coefs
+        )
+        return e, lag
 
     def _reconstruct_cross_sectional_log_likelihood(
         self,

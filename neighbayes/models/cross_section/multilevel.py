@@ -843,6 +843,10 @@ class Multilevel(SpatialModel):
             coords=self._model_coords(),
             dims=dims,
         )
+        if log_likelihood:
+            # The pointwise terms are conditionals; BIC reads the joint here.
+            joint = np.stack([c["log_joint"] for c in results])
+            self._idata["log_joint"] = xr.Dataset({"obs": (("chain", "draw"), joint)})
         return self._idata
 
     # ------------------------------------------------------------------

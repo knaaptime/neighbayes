@@ -8,8 +8,11 @@
 [`Graph`](https://pysal.org/libpysal/stable/generated/libpysal.graph.Graph.html)
 (or any `scipy.sparse` matrix) for the spatial weights $W$; `fit()` returns an
 ArviZ `DataTree` (an `xarray.DataTree`), so the standard posterior tooling
-(`az.plot_trace_dist`, `az.compare`, `az.loo`) works without translation (though
-exercise caution as LOO diagnostics aren't valid for spatial models).
+(`az.plot_trace_dist`, `az.compare`, `az.loo`) works without translation. The
+stored pointwise log-likelihood is each observation's density given all the
+others, so `az.loo` is a leave-one-out estimate for spatial models too (Bürkner,
+Gabry & Vehtari 2021); robust models with fixed effects or a lagged outcome, and
+robust Tobits, have no such term and warn.
 
 ```python
 import libpysal
