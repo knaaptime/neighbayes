@@ -93,10 +93,8 @@ from .suites import (  # noqa: E402
     SAR_NEGBIN_SUITE,
     SAR_PROBIT_SUITE,
     SAR_SUITE,
-    SAR_TOBIT_SUITE,
     SDEM_SUITE,
     SDM_SUITE,
-    SDM_TOBIT_SUITE,
     SEM_SUITE,
     SLX_SUITE,
 )
@@ -110,9 +108,9 @@ _register("neighbayes.models.cross_section.sdm.SDM", SDM_SUITE)
 _register("neighbayes.models.cross_section.sdem.SDEM", SDEM_SUITE)
 
 # Tobit
-_register("neighbayes.models.cross_section.tobit.SARTobit", SAR_TOBIT_SUITE)
+_register("neighbayes.models.cross_section.tobit.SARTobit", SAR_SUITE)
 _register("neighbayes.models.cross_section.tobit.SEMTobit", SEM_SUITE)
-_register("neighbayes.models.cross_section.tobit.SDMTobit", SDM_TOBIT_SUITE)
+_register("neighbayes.models.cross_section.tobit.SDMTobit", SDM_SUITE)
 
 # NegBin: the count panels have no suite.
 _register("neighbayes.models.cross_section.sar_negbin.SARNegBin", SAR_NEGBIN_SUITE)
@@ -148,27 +146,26 @@ from .suites import (  # noqa: E402
     SAR_PANEL_SUITE,
     SDEM_PANEL_SUITE,
     SDM_PANEL_SUITE,
-    SEM_PANEL_DYNAMIC_SUITE,
     SEM_PANEL_SUITE,
-    SLX_PANEL_DYNAMIC_SUITE,
     SLX_PANEL_SUITE,
 )
 
-# The Gaussian processes' panels: static and random effects, then dynamic
+# The Gaussian processes' panels: static, random effects and dynamic alike,
+# since every test reads its null from the fit.
 _CS = "neighbayes.models.cross_section"
-for _path, _panel, _dynamic in (
-    (f"{_CS}.ols.OLS", OLS_PANEL_SUITE, OLS_PANEL_SUITE),
-    (f"{_CS}.sar.SAR", SAR_PANEL_SUITE, SAR_PANEL_SUITE),
-    (f"{_CS}.sem.SEM", SEM_PANEL_SUITE, SEM_PANEL_DYNAMIC_SUITE),
-    (f"{_CS}.sdm.SDM", SDM_PANEL_SUITE, SDM_PANEL_SUITE),
-    (f"{_CS}.sdem.SDEM", SDEM_PANEL_SUITE, SDEM_PANEL_SUITE),
-    (f"{_CS}.slx.SLX", SLX_PANEL_SUITE, SLX_PANEL_DYNAMIC_SUITE),
+for _path, _suite in (
+    (f"{_CS}.ols.OLS", OLS_PANEL_SUITE),
+    (f"{_CS}.sar.SAR", SAR_PANEL_SUITE),
+    (f"{_CS}.sem.SEM", SEM_PANEL_SUITE),
+    (f"{_CS}.sdm.SDM", SDM_PANEL_SUITE),
+    (f"{_CS}.sdem.SDEM", SDEM_PANEL_SUITE),
+    (f"{_CS}.slx.SLX", SLX_PANEL_SUITE),
 ):
-    _register(_path, _panel, variant="panel")
-    _register(_path, _dynamic, variant="dynamic")
+    _register(_path, _suite, variant="panel")
+    _register(_path, _suite, variant="dynamic")
 
 # Pooled Tobit panels
 _register(f"{_CS}.tobit.SARTobit", SAR_PANEL_SUITE, variant="panel")
-_register(f"{_CS}.tobit.SEMTobit", SEM_PANEL_DYNAMIC_SUITE, variant="panel")
+_register(f"{_CS}.tobit.SEMTobit", SEM_PANEL_SUITE, variant="panel")
 
 _register("neighbayes.models.flow._gaussian.OLSFlow", FLOW_PANEL_SUITE, variant="panel")

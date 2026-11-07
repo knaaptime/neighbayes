@@ -67,10 +67,10 @@ def bayesian_lm_error_test(model) -> BayesianLMTestResult:
 
 
 def bayesian_lm_wx_test(model) -> BayesianLMTestResult:
-    r"""LM test for omitted :math:`WX` at a SAR fit (H₀: θ = 0 | SAR).
+    r"""LM test for omitted :math:`WX` at an OLS or SAR fit (H₀: θ = 0).
 
-    Whether the SAR should be the SDM; the score of the :math:`WX` block,
-    orthogonal to :math:`(\beta, \rho, \sigma^2)`
+    Whether the OLS should be the SLX, or the SAR the SDM; the score of the
+    :math:`WX` block, orthogonal to what the null estimates
     (:cite:p:`koley2024UseNot`).
 
     Returns
@@ -258,23 +258,6 @@ def bayesian_lm_error_sdm_test(model) -> BayesianLMTestResult:
     return _score_test(model, ("lam",), test_type="bayesian_lm_error_sdm")
 
 
-def bayesian_robust_lm_error_sdm_test(model) -> BayesianLMTestResult:
-    r"""Robust LM-error at an SDM fit (H₀: λ = 0 | SDM).
-
-    Robust to the lag, which the SDM estimates: the efficient score is
-    orthogonal to it already, and the general nesting model leaves no other
-    direction at zero, so this is :func:`bayesian_lm_error_sdm_test`.
-
-    Returns
-    -------
-    BayesianLMTestResult
-        Per-draw LM samples, summary statistics and ``df = 1``.
-    """
-    return _score_test(
-        model, ("lam",), test_type="bayesian_robust_lm_error_sdm", wx=True
-    )
-
-
 def bayesian_lm_lag_sdem_test(model) -> BayesianLMTestResult:
     r"""LM test for a spatial lag at an SDEM fit (H₀: ρ = 0 | SDEM).
 
@@ -289,25 +272,13 @@ def bayesian_lm_lag_sdem_test(model) -> BayesianLMTestResult:
     return _score_test(model, ("rho",), test_type="bayesian_lm_lag_sdem")
 
 
-def bayesian_robust_lm_lag_sdem_test(model) -> BayesianLMTestResult:
-    r"""Robust LM-lag at an SDEM fit (H₀: ρ = 0 | SDEM).
-
-    Robust to the error process, which the SDEM estimates, so this is
-    :func:`bayesian_lm_lag_sdem_test`.
-
-    Returns
-    -------
-    BayesianLMTestResult
-        Per-draw LM samples, summary statistics and ``df = 1``.
-    """
-    return _score_test(model, ("rho",), test_type="bayesian_robust_lm_lag_sdem")
-
-
 def bayesian_robust_lm_lag_sem_test(model) -> BayesianLMTestResult:
-    r"""Robust LM-lag at a SEM fit (H₀: ρ = 0, robust to a local θ).
+    r"""Robust LM-lag at an OLS or SEM fit (H₀: ρ = 0, robust to a local θ).
 
-    The lag score of :func:`bayesian_lm_lag_test` at the SEM, net of the
-    :math:`WX` direction.
+    The lag score of :func:`bayesian_lm_lag_test`, net of the :math:`WX`
+    direction.  At the OLS fit, where the lag score is the error score plus
+    :math:`\hat\beta^\top` times the :math:`WX` score, it is the LM-Error
+    statistic: the Robust LM-Lag-SDM of :cite:t:`koley2024UseNot` there.
 
     Returns
     -------
@@ -320,10 +291,11 @@ def bayesian_robust_lm_lag_sem_test(model) -> BayesianLMTestResult:
 
 
 def bayesian_robust_lm_wx_sem_test(model) -> BayesianLMTestResult:
-    r"""Robust LM-WX at a SEM fit (H₀: θ = 0, robust to a local ρ).
+    r"""Robust LM-WX at an OLS or SEM fit (H₀: θ = 0, robust to a local ρ).
 
-    The :math:`WX` score of :func:`bayesian_lm_wx_sem_test` net of the lag
-    direction.
+    The :math:`WX` score net of the lag direction.  At the OLS fit it is the
+    Robust LM-WX of :cite:t:`koley2024UseNot`, which with LM-Lag sums to the
+    joint LM-SDM.
 
     Returns
     -------

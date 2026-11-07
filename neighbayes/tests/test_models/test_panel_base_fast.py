@@ -680,7 +680,7 @@ class TestPanelDiagnosticsDecision:
         assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SLX"
 
     def test_sar_panel_fe_error_and_wx(self, W_graph, monkeypatch):
-        """SAR panel: LM-Error significant, Robust-LM-WX significant → SDM."""
+        """SAR panel: both plain tests reject and only robust LM-WX does → SDM."""
         rng = np.random.default_rng(0)
         model = SAR(
             y=rng.standard_normal(12),
@@ -692,14 +692,19 @@ class TestPanelDiagnosticsDecision:
         import pandas as pd
 
         df = pd.DataFrame(
-            {"p_value": [0.001, 0.001, 0.001]},
-            index=["Panel-LM-Error", "Panel-LM-WX", "Panel-Robust-LM-WX"],
+            {"p_value": [0.001, 0.001, 0.001, 0.5]},
+            index=[
+                "Panel-LM-Error",
+                "Panel-LM-WX",
+                "Panel-Robust-LM-WX",
+                "Panel-Robust-LM-Error",
+            ],
         )
         monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
         assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SDM"
 
     def test_sem_panel_fe_lag_and_wx(self, W_graph, monkeypatch):
-        """SEM panel: LM-Lag significant, LM-WX significant → SDEM."""
+        """SEM panel: both plain tests reject and only robust LM-WX does → SDEM."""
         rng = np.random.default_rng(0)
         model = SEM(
             y=rng.standard_normal(12),
@@ -711,8 +716,13 @@ class TestPanelDiagnosticsDecision:
         import pandas as pd
 
         df = pd.DataFrame(
-            {"p_value": [0.001, 0.001]},
-            index=["Panel-LM-Lag", "Panel-LM-WX"],
+            {"p_value": [0.001, 0.001, 0.5, 0.001]},
+            index=[
+                "Panel-LM-Lag",
+                "Panel-LM-WX",
+                "Panel-Robust-LM-Lag",
+                "Panel-Robust-LM-WX",
+            ],
         )
         monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
         assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SDEM"

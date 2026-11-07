@@ -28,8 +28,6 @@ from neighbayes.diagnostics.lmtests import (
     bayesian_panel_robust_lm_lag_test,
     bayesian_panel_robust_lm_wx_test,
     bayesian_robust_lm_error_sdem_test,
-    bayesian_robust_lm_error_sdm_test,
-    bayesian_robust_lm_lag_sdem_test,
     bayesian_robust_lm_lag_sdm_test,
     bayesian_robust_lm_wx_test,
 )
@@ -515,19 +513,64 @@ class TestBayesianLMErrorSDMTest:
 class TestEstimatedDirectionsAreOrthogonalizedAway:
     """A test robust only to a parameter its null estimates is the plain one."""
 
-    def test_sdm_robust_lm_error_is_lm_error_sdm(self):
+    def test_sdm_error_test_robust_to_the_lag_is_the_plain_one(self):
+        from neighbayes.diagnostics.lmtests._gaussian import orthogonal_lm
+
         y, X, WX, W_dense, W_sparse = _make_data_with_wx(n=20, k_wx=2)
         model = _make_mock_sdm_model(y, X, WX, W_sparse, draws=200)
-        plain = bayesian_lm_error_sdm_test(model)
-        robust = bayesian_robust_lm_error_sdm_test(model)
-        np.testing.assert_allclose(robust.lm_samples, plain.lm_samples)
+        plain = orthogonal_lm(model, ("lam",), (), test_name="plain")
+        robust = orthogonal_lm(model, ("lam",), ("rho",), test_name="robust")
+        np.testing.assert_allclose(robust[0], plain[0])
+        assert robust[1] == plain[1]
 
-    def test_sdem_robust_lm_lag_is_lm_lag_sdem(self):
+    def test_sdem_lag_test_robust_to_the_error_is_the_plain_one(self):
+        from neighbayes.diagnostics.lmtests._gaussian import orthogonal_lm
+
         y, X, WX, W_dense, W_sparse = _make_data_with_wx(n=20, k_wx=2)
         model = _make_mock_sdem_model(y, X, WX, W_sparse, draws=200)
-        plain = bayesian_lm_lag_sdem_test(model)
-        robust = bayesian_robust_lm_lag_sdem_test(model)
-        np.testing.assert_allclose(robust.lm_samples, plain.lm_samples)
+        plain = orthogonal_lm(model, ("rho",), (), test_name="plain")
+        robust = orthogonal_lm(model, ("rho",), ("lam",), test_name="robust")
+        np.testing.assert_allclose(robust[0], plain[0])
+        assert robust[1] == plain[1]
+
+
+class TestOLSNullIdentities:
+    """At the OLS fit the lag score is the error score plus β̂ᵀ times the WX score."""
+
+    def _model(self):
+        from neighbayes.models import OLS
+
+        y, X, W_dense, W_sparse = make_sar_sem_data(n=16)
+        return TestSpatialDiagnosticsMethod()._make_model_with_class(
+            y, X, W_sparse, OLS, WX=W_sparse @ X[:, 1:]
+        )
+
+    def test_the_joint_tests_split_both_ways(self):
+        from neighbayes.diagnostics.lmtests._gaussian import orthogonal_lm
+
+        model = self._model()
+
+        def stat(tested, robust=()):
+            return orthogonal_lm(model, tested, robust, test_name="t")[1]
+
+        joint = stat(("rho", "theta"))
+        assert joint == pytest.approx(stat(("lam", "theta")), rel=1e-10)
+        assert joint == pytest.approx(
+            stat(("rho",)) + stat(("theta",), ("rho",)), rel=1e-10
+        )
+        assert joint == pytest.approx(stat(("lam",)) + stat(("theta",)), rel=1e-10)
+
+    def test_the_lag_robust_to_wx_is_the_error_test(self):
+        from neighbayes.diagnostics.lmtests._gaussian import orthogonal_lm
+
+        model = self._model()
+
+        def stat(tested, robust=()):
+            return orthogonal_lm(model, tested, robust, test_name="t")[1]
+
+        assert stat(("rho",), ("theta",)) == pytest.approx(stat(("lam",)), rel=1e-10)
+        assert stat(("lam",), ("theta",)) == pytest.approx(stat(("lam",)), rel=1e-10)
+        assert stat(("theta",), ("lam",)) == pytest.approx(stat(("theta",)), rel=1e-10)
 
 
 class TestBayesianLMLagSDEMTest:
@@ -1003,7 +1046,7 @@ class TestSpatialDiagnosticsMethod:
         return obj
 
     def test_ols_spatial_diagnostics_returns_dataframe(self):
-        """OLS.spatial_diagnostics() should return a DataFrame with 6 tests."""
+        """OLS.spatial_diagnostics() should return a DataFrame with 8 tests."""
         from neighbayes.models import OLS
 
         y, X, W_dense, W_sparse = make_sar_sem_data(n=16)
@@ -1012,14 +1055,16 @@ class TestSpatialDiagnosticsMethod:
         df = model.spatial_diagnostics()
 
         assert isinstance(df, pd.DataFrame)
-        assert len(df) == 6
+        assert len(df) == 8
         assert set(df.index) == {
             "LM-Lag",
             "LM-Error",
+            "LM-WX",
             "LM-SDM-Joint",
             "LM-SLX-Error-Joint",
             "Robust-LM-Lag",
             "Robust-LM-Error",
+            "Robust-LM-WX",
         }
         assert "statistic" in df.columns
         assert "p_value" in df.columns
@@ -1073,11 +1118,10 @@ class TestSpatialDiagnosticsMethod:
         df = model.spatial_diagnostics()
 
         assert isinstance(df, pd.DataFrame)
-        assert len(df) == 2
-        assert set(df.index) == {"LM-Error-SDM", "Robust-LM-Error-SDM"}
+        assert list(df.index) == ["LM-Error-SDM"]
 
     def test_sdem_spatial_diagnostics_returns_dataframe(self):
-        """SDEM.spatial_diagnostics() should return a DataFrame with 2 tests."""
+        """SDEM.spatial_diagnostics() should return a DataFrame with 1 test."""
         from neighbayes.models import SDEM
 
         y, X, WX, W_dense, W_sparse = _make_data_with_wx(n=20, k_wx=2)
@@ -1086,8 +1130,7 @@ class TestSpatialDiagnosticsMethod:
         df = model.spatial_diagnostics()
 
         assert isinstance(df, pd.DataFrame)
-        assert len(df) == 2
-        assert set(df.index) == {"LM-Lag-SDEM", "Robust-LM-Lag-SDEM"}
+        assert list(df.index) == ["LM-Lag-SDEM"]
 
     def test_sem_spatial_diagnostics_returns_dataframe(self):
         """SEM.spatial_diagnostics() should return a DataFrame with 4 tests."""
@@ -1141,7 +1184,8 @@ class TestSpatialDiagnosticsMethod:
         from neighbayes.models import OLS
 
         y, X, W_dense, W_sparse = make_sar_sem_data(n=16)
-        model = self._make_model_with_class(y, X, W_sparse, OLS)
+        WX = W_sparse @ X[:, 1:]
+        model = self._make_model_with_class(y, X, W_sparse, OLS, WX=WX)
 
         df = model.spatial_diagnostics()
         assert (df["p_value"] >= 0).all()
@@ -1152,11 +1196,12 @@ class TestSpatialDiagnosticsMethod:
         from neighbayes.models import OLS
 
         y, X, W_dense, W_sparse = make_sar_sem_data(n=16)
-        model = self._make_model_with_class(y, X, W_sparse, OLS)
+        WX = W_sparse @ X[:, 1:]
+        model = self._make_model_with_class(y, X, W_sparse, OLS, WX=WX)
 
         df = model.spatial_diagnostics()
         raw = df.attrs.get("_raw_results", {})
-        assert len(raw) == 6
+        assert len(raw) == 8
         for label, result in raw.items():
             assert isinstance(result, BayesianLMTestResult)
 
@@ -1172,21 +1217,11 @@ class TestSpatialDiagnosticsMethod:
         y, X, WX, W_dense, W_sparse = _make_data_with_wx(n=20, k_wx=2)
         model = self._make_model_with_class(y, X, W_sparse, SDM, WX=WX)
 
-        # Monkeypatch spatial_diagnostics to return a controlled DataFrame.
-        # The new SDM tree requires both naive ``LM-Error-SDM`` and the
-        # robust-after-naive ``Robust-LM-Error-SDM`` gate to fire before
-        # escalating to GNS.
-        df = pd.DataFrame(
-            {"p_value": [0.001, 0.001]},
-            index=["LM-Error-SDM", "Robust-LM-Error-SDM"],
-        )
+        df = pd.DataFrame({"p_value": [0.001]}, index=["LM-Error-SDM"])
         monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
         assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "GNS"
 
-        df2 = pd.DataFrame(
-            {"p_value": [0.9, 0.9]},
-            index=["LM-Error-SDM", "Robust-LM-Error-SDM"],
-        )
+        df2 = pd.DataFrame({"p_value": [0.9]}, index=["LM-Error-SDM"])
         monkeypatch.setattr(model, "spatial_diagnostics", lambda: df2)
         assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "SDM"
 
@@ -1197,10 +1232,7 @@ class TestSpatialDiagnosticsMethod:
         y, X, WX, W_dense, W_sparse = _make_data_with_wx(n=20, k_wx=2)
         model = self._make_model_with_class(y, X, W_sparse, SDEM, WX=WX)
 
-        df = pd.DataFrame(
-            {"p_value": [0.001, 0.001]},
-            index=["LM-Lag-SDEM", "Robust-LM-Lag-SDEM"],
-        )
+        df = pd.DataFrame({"p_value": [0.001]}, index=["LM-Lag-SDEM"])
         monkeypatch.setattr(model, "spatial_diagnostics", lambda: df)
         assert model.spatial_diagnostics_decision(alpha=0.05, format="model") == "GNS"
 

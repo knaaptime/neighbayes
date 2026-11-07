@@ -185,8 +185,6 @@ Bayesian Diagnostics
    bayesian_robust_lm_wx_test
    bayesian_robust_lm_error_sdem_test
    bayesian_robust_lm_error_sar_test
-   bayesian_robust_lm_error_sdm_test
-   bayesian_robust_lm_lag_sdem_test
    bayesian_robust_lm_lag_sem_test
    bayesian_robust_lm_wx_sem_test
 
@@ -222,11 +220,13 @@ Panel Bayesian LM Tests
    bayesian_panel_lm_slx_error_joint_test
    bayesian_panel_lm_error_sdm_test
    bayesian_panel_lm_lag_sdem_test
-   bayesian_panel_robust_lm_lag_sdem_test
    bayesian_panel_lm_wx_sem_test
    bayesian_panel_robust_lm_lag_sdm_test
    bayesian_panel_robust_lm_wx_test
    bayesian_panel_robust_lm_error_sdem_test
+   bayesian_panel_robust_lm_error_sar_test
+   bayesian_panel_robust_lm_lag_sem_test
+   bayesian_panel_robust_lm_wx_sem_test
 
 
 Flow Bayesian LM Tests
@@ -266,16 +266,12 @@ and the decision-tree renderers.
    OLS_PANEL_SUITE
    SAR_SUITE
    SAR_PANEL_SUITE
-   SAR_TOBIT_SUITE
    SEM_SUITE
    SEM_PANEL_SUITE
-   SEM_PANEL_DYNAMIC_SUITE
    SLX_SUITE
    SLX_PANEL_SUITE
-   SLX_PANEL_DYNAMIC_SUITE
    SDM_SUITE
    SDM_PANEL_SUITE
-   SDM_TOBIT_SUITE
    SDEM_SUITE
    SDEM_PANEL_SUITE
    FLOW_SUITE

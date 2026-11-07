@@ -80,10 +80,14 @@ OLS_SUITE = DiagnosticSuite(
     tests=_suite(
         ("bayesian_lm_lag_test", "LM-Lag"),
         ("bayesian_lm_error_test", "LM-Error"),
+        ("bayesian_lm_wx_test", "LM-WX"),
         ("bayesian_lm_sdm_joint_test", "LM-SDM-Joint"),
         ("bayesian_lm_slx_error_joint_test", "LM-SLX-Error-Joint"),
         ("bayesian_robust_lm_lag_test", "Robust-LM-Lag"),
         ("bayesian_robust_lm_error_test", "Robust-LM-Error"),
+        # WX robust to the lag (Koley and Bera 2024).  Their lag robust to WX
+        # is LM-Error at the OLS fit, so it is not run twice.
+        ("bayesian_robust_lm_wx_sem_test", "Robust-LM-WX"),
     ),
 )
 
@@ -121,7 +125,6 @@ SDM_SUITE = DiagnosticSuite(
     name="SDM",
     tests=_suite(
         ("bayesian_lm_error_sdm_test", "LM-Error-SDM"),
-        ("bayesian_robust_lm_error_sdm_test", "Robust-LM-Error-SDM"),
     ),
 )
 
@@ -129,21 +132,6 @@ SDEM_SUITE = DiagnosticSuite(
     name="SDEM",
     tests=_suite(
         ("bayesian_lm_lag_sdem_test", "LM-Lag-SDEM"),
-        ("bayesian_robust_lm_lag_sdem_test", "Robust-LM-Lag-SDEM"),
-    ),
-)
-
-# Tobit variants — the Tobit SAR and SDM specifications use ``bayesian_lm_error_test``
-# (which subtracts a fitted-value residual) rather than the SAR/SDM-null
-# variants, matching the pre-suite behavior preserved verbatim here.
-
-SAR_TOBIT_SUITE = DiagnosticSuite(
-    name="SARTobit",
-    tests=_suite(
-        ("bayesian_lm_error_test", "LM-Error"),
-        ("bayesian_lm_wx_test", "LM-WX"),
-        ("bayesian_robust_lm_wx_test", "Robust-LM-WX"),
-        ("bayesian_robust_lm_error_sar_test", "Robust-LM-Error"),
     ),
 )
 
@@ -173,15 +161,6 @@ SAR_LOGIT_SUITE = DiagnosticSuite(name="SARLogit", tests=_suite(*_GLM_SAR_TESTS)
 SAR_PROBIT_SUITE = DiagnosticSuite(name="SARProbit", tests=_suite(*_GLM_SAR_TESTS))
 SAR_NEGBIN_SUITE = DiagnosticSuite(name="SARNegBin", tests=_suite(*_GLM_SAR_TESTS))
 
-SDM_TOBIT_SUITE = DiagnosticSuite(
-    name="SDMTobit",
-    tests=_suite(
-        ("bayesian_lm_error_test", "LM-Error"),
-        ("bayesian_robust_lm_error_sdm_test", "Robust-LM-Error"),
-    ),
-)
-
-
 # ---------------------------------------------------------------------------
 # Flow (origin-destination) suites
 # ---------------------------------------------------------------------------
@@ -201,8 +180,7 @@ FLOW_SUITE = DiagnosticSuite(
 
 
 # ---------------------------------------------------------------------------
-# Panel suites (fixed effects and pooled — also reused by random effects
-# and most dynamic-panel variants where the test list is identical).
+# Panel suites: every pooled, fixed-effects, random-effects and dynamic panel.
 # ---------------------------------------------------------------------------
 
 OLS_PANEL_SUITE = DiagnosticSuite(
@@ -210,10 +188,12 @@ OLS_PANEL_SUITE = DiagnosticSuite(
     tests=_suite(
         ("bayesian_panel_lm_lag_test", "Panel-LM-Lag"),
         ("bayesian_panel_lm_error_test", "Panel-LM-Error"),
+        ("bayesian_panel_lm_wx_test", "Panel-LM-WX"),
         ("bayesian_panel_lm_sdm_joint_test", "Panel-LM-SDM-Joint"),
         ("bayesian_panel_lm_slx_error_joint_test", "Panel-LM-SLX-Error-Joint"),
         ("bayesian_panel_robust_lm_lag_test", "Panel-Robust-LM-Lag"),
         ("bayesian_panel_robust_lm_error_test", "Panel-Robust-LM-Error"),
+        ("bayesian_panel_robust_lm_wx_sem_test", "Panel-Robust-LM-WX"),
     ),
 )
 
@@ -223,6 +203,7 @@ SAR_PANEL_SUITE = DiagnosticSuite(
         ("bayesian_panel_lm_error_test", "Panel-LM-Error"),
         ("bayesian_panel_lm_wx_test", "Panel-LM-WX"),
         ("bayesian_panel_robust_lm_wx_test", "Panel-Robust-LM-WX"),
+        ("bayesian_panel_robust_lm_error_sar_test", "Panel-Robust-LM-Error"),
     ),
 )
 
@@ -231,6 +212,8 @@ SEM_PANEL_SUITE = DiagnosticSuite(
     tests=_suite(
         ("bayesian_panel_lm_lag_test", "Panel-LM-Lag"),
         ("bayesian_panel_lm_wx_sem_test", "Panel-LM-WX"),
+        ("bayesian_panel_robust_lm_lag_sem_test", "Panel-Robust-LM-Lag"),
+        ("bayesian_panel_robust_lm_wx_sem_test", "Panel-Robust-LM-WX"),
     ),
 )
 
@@ -253,26 +236,6 @@ SLX_PANEL_SUITE = DiagnosticSuite(
     tests=_suite(
         ("bayesian_panel_lm_lag_test", "Panel-LM-Lag"),
         ("bayesian_panel_lm_error_test", "Panel-LM-Error"),
-        ("bayesian_panel_robust_lm_lag_sdm_test", "Panel-Robust-LM-Lag-SDM"),
-        ("bayesian_panel_robust_lm_error_sdem_test", "Panel-Robust-LM-Error-SDEM"),
-    ),
-)
-
-
-# Dynamic-panel-only variants — these differ from the FE/RE menus above and
-# must remain separate to preserve existing behavior.
-
-SEM_PANEL_DYNAMIC_SUITE = DiagnosticSuite(
-    name="SEM-Panel-Dynamic",
-    tests=_suite(
-        ("bayesian_panel_lm_lag_sdem_test", "Panel-LM-Lag-SDEM"),
-        ("bayesian_panel_robust_lm_lag_sdem_test", "Panel-Robust-LM-Lag-SDEM"),
-    ),
-)
-
-SLX_PANEL_DYNAMIC_SUITE = DiagnosticSuite(
-    name="SLX-Panel-Dynamic",
-    tests=_suite(
         ("bayesian_panel_robust_lm_lag_sdm_test", "Panel-Robust-LM-Lag-SDM"),
         ("bayesian_panel_robust_lm_error_sdem_test", "Panel-Robust-LM-Error-SDEM"),
     ),
@@ -308,14 +271,12 @@ __all__ = [
     "SEM_SUITE",
     "SDM_SUITE",
     "SDEM_SUITE",
-    "SAR_TOBIT_SUITE",
     "LOGIT_SUITE",
     "PROBIT_SUITE",
     "NEGBIN_SUITE",
     "SAR_LOGIT_SUITE",
     "SAR_PROBIT_SUITE",
     "SAR_NEGBIN_SUITE",
-    "SDM_TOBIT_SUITE",
     "FLOW_SUITE",
     "OLS_PANEL_SUITE",
     "SAR_PANEL_SUITE",
@@ -323,7 +284,5 @@ __all__ = [
     "SDM_PANEL_SUITE",
     "SDEM_PANEL_SUITE",
     "SLX_PANEL_SUITE",
-    "SEM_PANEL_DYNAMIC_SUITE",
-    "SLX_PANEL_DYNAMIC_SUITE",
     "FLOW_PANEL_SUITE",
 ]
