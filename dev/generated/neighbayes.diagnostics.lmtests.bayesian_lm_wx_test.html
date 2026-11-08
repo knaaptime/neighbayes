@@ -1251,7 +1251,7 @@
       <span aria-label="Python function" class="objinfo-icon objinfo-icon__procedure" title="Python function">F</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.diagnostics.lmtests.bayesian_lm_wx_test (Python function) — LM test for omitted WX at a SAR fit (H₀: θ = 0 | SAR)."><span>neighbayes.<wbr>diagnostics.<wbr>lmtests.<wbr>bayesian_<wbr>lm_<wbr>wx_<wbr>test</span></span>
+      <span title="neighbayes.diagnostics.lmtests.bayesian_lm_wx_test (Python function) — LM test for omitted WX at an OLS or SAR fit (H₀: θ = 0)."><span>neighbayes.<wbr>diagnostics.<wbr>lmtests.<wbr>bayesian_<wbr>lm_<wbr>wx_<wbr>test</span></span>
     </span>
   </a>
   
@@ -1570,54 +1570,6 @@
   
   <span class="md-ellipsis">
     <span>neighbayes.<wbr>diagnostics.<wbr>lmtests.<wbr>bayesian_<wbr>robust_<wbr>lm_<wbr>error_<wbr>sar_<wbr>test</span>
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="neighbayes.diagnostics.lmtests.bayesian_robust_lm_error_sdm_test.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    <span>neighbayes.<wbr>diagnostics.<wbr>lmtests.<wbr>bayesian_<wbr>robust_<wbr>lm_<wbr>error_<wbr>sdm_<wbr>test</span>
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="neighbayes.diagnostics.lmtests.bayesian_robust_lm_lag_sdem_test.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    <span>neighbayes.<wbr>diagnostics.<wbr>lmtests.<wbr>bayesian_<wbr>robust_<wbr>lm_<wbr>lag_<wbr>sdem_<wbr>test</span>
     
   </span>
   
@@ -2238,7 +2190,7 @@
       <span aria-label="Python function" class="objinfo-icon objinfo-icon__procedure" title="Python function">F</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.diagnostics.lmtests.bayesian_lm_wx_test (Python function) — LM test for omitted WX at a SAR fit (H₀: θ = 0 | SAR)."><span>neighbayes.<wbr>diagnostics.<wbr>lmtests.<wbr>bayesian_<wbr>lm_<wbr>wx_<wbr>test</span></span>
+      <span title="neighbayes.diagnostics.lmtests.bayesian_lm_wx_test (Python function) — LM test for omitted WX at an OLS or SAR fit (H₀: θ = 0)."><span>neighbayes.<wbr>diagnostics.<wbr>lmtests.<wbr>bayesian_<wbr>lm_<wbr>wx_<wbr>test</span></span>
     </span>
   </a>
   
@@ -2298,9 +2250,9 @@
 <dl class="py function objdesc">
 <dt class="sig sig-object highlight py" id="neighbayes.diagnostics.lmtests.bayesian_lm_wx_test">
 <span class="sig-prename descclassname"><span class="pre">neighbayes.diagnostics.lmtests.</span></span><span class="sig-name descname"><span class="pre">bayesian_lm_wx_test</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.lmtests.bayesian_lm_wx_test" title="neighbayes.diagnostics.lmtests.bayesian_lm_wx_test.model (Python parameter)"><span class="n"><span class="pre">model</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/diagnostics/lmtests/cross_sectional.py#L69-L81"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.diagnostics.lmtests.bayesian_lm_wx_test" title="Link to this definition">¶</a></dt>
-<dd><p>LM test for omitted <span class="math notranslate nohighlight">\(WX\)</span> at a SAR fit (H₀: θ = 0 | SAR).</p>
-<p>Whether the SAR should be the SDM; the score of the <span class="math notranslate nohighlight">\(WX\)</span> block,
-orthogonal to <span class="math notranslate nohighlight">\((\beta, \rho, \sigma^2)\)</span>
+<dd><p>LM test for omitted <span class="math notranslate nohighlight">\(WX\)</span> at an OLS or SAR fit (H₀: θ = 0).</p>
+<p>Whether the OLS should be the SLX, or the SAR the SDM; the score of the
+<span class="math notranslate nohighlight">\(WX\)</span> block, orthogonal to what the null estimates
 (<span class="bibtex-citation" id="id1">[<a class="reference internal" href="../references.html#id28" title="Malabika Koley and Anil K. Bera. To use, or not to use the spatial Durbin model? – that is the question. Spatial Economic Analysis, 19(1):30–56, 2024. URL: https://doi.org/10.1080/17421772.2023.2256810 (visited on 2025-05-21), doi:10.1080/17421772.2023.2256810.">Koley and Bera, 2024</a>]</span>).</p>
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.diagnostics.lmtests.bayesian_lm_wx_test-returns">Returns<span class="colon">:</span><a class="headerlink" href="#neighbayes.diagnostics.lmtests.bayesian_lm_wx_test-returns" title="Permalink to this headline">¶</a></dt>

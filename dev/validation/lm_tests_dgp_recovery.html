@@ -1686,6 +1686,7 @@ SDEM   n=144  X.shape=(144, 2)  true params: ['lam', 'beta1', 'beta2', 'sigma']
     <span class="p">(</span><span class="s2">"OLS"</span><span class="p">,</span> <span class="n">OLS</span><span class="p">,</span> <span class="s2">"OLS"</span><span class="p">),</span>
     <span class="p">(</span><span class="s2">"SAR"</span><span class="p">,</span> <span class="n">OLS</span><span class="p">,</span> <span class="s2">"SAR"</span><span class="p">),</span>
     <span class="p">(</span><span class="s2">"SEM"</span><span class="p">,</span> <span class="n">OLS</span><span class="p">,</span> <span class="s2">"SEM"</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">"SLX"</span><span class="p">,</span> <span class="n">OLS</span><span class="p">,</span> <span class="s2">"SLX"</span><span class="p">),</span>
     <span class="p">(</span><span class="s2">"SLX"</span><span class="p">,</span> <span class="n">SLX</span><span class="p">,</span> <span class="s2">"SLX"</span><span class="p">),</span>
     <span class="p">(</span><span class="s2">"SDM"</span><span class="p">,</span> <span class="n">SAR</span><span class="p">,</span> <span class="s2">"SDM"</span><span class="p">),</span>
     <span class="p">(</span><span class="s2">"SDM"</span><span class="p">,</span> <span class="n">SLX</span><span class="p">,</span> <span class="s2">"SDM"</span><span class="p">),</span>
@@ -1719,32 +1720,37 @@ SDEM   n=144  X.shape=(144, 2)  true params: ['lam', 'beta1', 'beta2', 'sigma']
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 1 seconds.
+Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 1 seconds.
+Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 1 seconds.
+Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 1 seconds.
+Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 1 seconds.
+Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 1 seconds.
+Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 2 seconds.
+We recommend running at least 4 chains for robust computation of convergence diagnostics
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (2 chains in 2 jobs)
+NUTS: [beta, sigma2]
+Sampling 2 chains for 600 tune and 600 draw iterations (1_200 + 1_200 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 </code></pre></div>
 </div>
@@ -1801,13 +1807,21 @@ We recommend running at least 4 chains for robust computation of convergence dia
     <tr>
       <th>3</th>
       <td>SLX</td>
-      <td>SLX</td>
+      <td>OLS</td>
       <td>SLX</td>
       <td>SLX</td>
       <td>yes</td>
     </tr>
     <tr>
       <th>4</th>
+      <td>SLX</td>
+      <td>SLX</td>
+      <td>SLX</td>
+      <td>SLX</td>
+      <td>yes</td>
+    </tr>
+    <tr>
+      <th>5</th>
       <td>SDM</td>
       <td>SAR</td>
       <td>SDM</td>
@@ -1815,7 +1829,7 @@ We recommend running at least 4 chains for robust computation of convergence dia
       <td>yes</td>
     </tr>
     <tr>
-      <th>5</th>
+      <th>6</th>
       <td>SDM</td>
       <td>SLX</td>
       <td>SDM</td>
@@ -1823,7 +1837,7 @@ We recommend running at least 4 chains for robust computation of convergence dia
       <td>yes</td>
     </tr>
     <tr>
-      <th>6</th>
+      <th>7</th>
       <td>SDEM</td>
       <td>SEM</td>
       <td>SDEM</td>
@@ -1831,7 +1845,7 @@ We recommend running at least 4 chains for robust computation of convergence dia
       <td>yes</td>
     </tr>
     <tr>
-      <th>7</th>
+      <th>8</th>
       <td>SDEM</td>
       <td>SLX</td>
       <td>SDEM</td>
@@ -1860,30 +1874,48 @@ We recommend running at least 4 chains for robust computation of convergence dia
 test                                      
 LM-Lag                 0.3824   1   0.5363
 LM-Error               0.0399   1   0.8418
+LM-WX                  0.8636   1   0.3527
 LM-SDM-Joint           0.9035   2   0.6365
 LM-SLX-Error-Joint     0.9035   2   0.6365
 Robust-LM-Lag          0.8636   1   0.3527
 Robust-LM-Error        0.5210   1   0.4704
+Robust-LM-WX           0.5210   1   0.4704
 
 === DGP=SAR | start=OLS | recommended=SAR (yes expected SAR) ===
                     statistic  df  p_value
 test                                      
 LM-Lag                58.4777   1   0.0000
 LM-Error              23.7705   1   0.0000
+LM-WX                 34.7593   1   0.0000
 LM-SDM-Joint          58.5299   2   0.0000
 LM-SLX-Error-Joint    58.5299   2   0.0000
 Robust-LM-Lag         34.7593   1   0.0000
 Robust-LM-Error        0.0522   1   0.8193
+Robust-LM-WX           0.0522   1   0.8193
 
 === DGP=SEM | start=OLS | recommended=SEM (yes expected SEM) ===
                     statistic  df  p_value
 test                                      
 LM-Lag                 7.3034   1   0.0069
 LM-Error              27.5617   1   0.0000
+LM-WX                  1.2535   1   0.2629
 LM-SDM-Joint          28.8153   2   0.0000
 LM-SLX-Error-Joint    28.8153   2   0.0000
 Robust-LM-Lag          1.2535   1   0.2629
 Robust-LM-Error       21.5118   1   0.0000
+Robust-LM-WX          21.5118   1   0.0000
+
+=== DGP=SLX | start=OLS | recommended=SLX (yes expected SLX) ===
+                    statistic  df  p_value
+test                                      
+LM-Lag                20.3652   1   0.0000
+LM-Error               0.2460   1   0.6199
+LM-WX                 40.2810   1   0.0000
+LM-SDM-Joint          40.5270   2   0.0000
+LM-SLX-Error-Joint    40.5270   2   0.0000
+Robust-LM-Lag         40.2810   1   0.0000
+Robust-LM-Error       20.1618   1   0.0000
+Robust-LM-WX          20.1618   1   0.0000
 
 === DGP=SLX | start=SLX | recommended=SLX (yes expected SLX) ===
                       statistic  df  p_value
@@ -1942,42 +1974,31 @@ Robust-LM-Error-SDEM     6.0840   1   0.0136
 │   ├── &lt;sig&gt; Robust-LM-Lag-SDM *  (p=0.0022, alpha=0.05)
 │   │   ├── &lt;sig&gt; Robust-LM-Error-SDEM *  (p=0.8914, alpha=0.05)
 │   │   │   ├── &lt;sig&gt; Robust-LM-Lag-SDM p &lt;= Robust-LM-Error-SDEM p
-│   │   │   │   ├── [SDM]
-│   │   │   │   └── [SDEM]
-│   │   │   └── [SDM] * ← SELECTED
+│   │   │   │   ├── &lt;true&gt; [SDM]
+│   │   │   │   └── &lt;false&gt; [SDEM]
+│   │   │   └── &lt;not sig&gt; [SDM] * ← SELECTED
 │   │   └── &lt;not sig&gt; Robust-LM-Error-SDEM
-│   │       ├── [SDEM]
-│   │       └── [SLX]
-│   └── &lt;not sig&gt; Robust-LM-Lag-SDM
-│       ├── [SDM]
-│       └── [SLX]
+│   │       ├── &lt;sig&gt; [SDEM]
+│   │       └── &lt;not sig&gt; Robust-LM-Lag-SDM p &lt;= Robust-LM-Error-SDEM p
+│   │           ├── &lt;true&gt; [SDM]
+│   │           └── &lt;false&gt; [SDEM]
+│   └── &lt;not sig&gt; [SDM]
 └── &lt;not sig&gt; LM-Error
-    ├── &lt;sig&gt; Robust-LM-Error-SDEM
-    │   ├── [SDEM]
-    │   └── [SLX]
-    └── [SLX]
+    ├── &lt;sig&gt; [SDEM]
+    └── &lt;not sig&gt; [SLX]
 </code></pre></div>
 </div>
 </div>
 </div>
-<p><strong>Recovery findings.</strong> OLS, SAR, SEM, and SLX scenarios are recovered cleanly
-from their natural starting models.  The SDM and SDEM scenarios are <em>not</em>
-recovered when starting from SAR/SEM/SLX: the tree escalates to <code class="docutils literal notranslate"><span class="pre">SARAR</span></code> (from
-SAR/SEM) or <code class="docutils literal notranslate"><span class="pre">GNS</span></code> (from SLX) because both the lag and the error / WX
-channels register significant simultaneously.  This is the <em>expected</em> behaviour
-of the Koley &amp; Bera tree — treat <code class="docutils literal notranslate"><span class="pre">SARAR</span></code>/<code class="docutils literal notranslate"><span class="pre">GNS</span></code> as a flag to fit both <code class="docutils literal notranslate"><span class="pre">SDM</span></code>
-and <code class="docutils literal notranslate"><span class="pre">SDEM</span></code> and compare with <code class="docutils literal notranslate"><span class="pre">bayes_factor_compare_models</span></code>.</p>
-<p>Other things to keep in mind:</p>
-<ul class="simple">
-<li><p>These experiments use <strong>strong-signal</strong> parameters; weaker spatial dependence
-(<span class="math notranslate nohighlight">\(\rho \approx 0.1\)</span>) leads the tree toward simpler models, which is the
-correct small-sample behaviour.</p></li>
-<li><p>The <code class="docutils literal notranslate"><span class="pre">OLS</span></code> starting tree cannot reach SDM/SDEM/SLX terminals — it can only
-flag SAR/SEM/SARAR/OLS.  Use <code class="docutils literal notranslate"><span class="pre">SAR</span></code>, <code class="docutils literal notranslate"><span class="pre">SEM</span></code>, or <code class="docutils literal notranslate"><span class="pre">SLX</span></code> starting points to
-diagnose Durbin-style alternatives.</p></li>
-<li><p>The decision tree thresholds at a single <code class="docutils literal notranslate"><span class="pre">alpha</span></code>; for borderline cases
-inspect <code class="docutils literal notranslate"><span class="pre">spatial_diagnostics()</span></code> directly.</p></li>
-</ul>
+<p><strong>Reading the table.</strong> Each scenario is one simulated dataset with a strong
+signal, so a miss here points to routing rather than to low power. Note what each
+starting model can reach: the OLS tree ends at OLS, SAR, SEM or SLX, so a
+Durbin model is reached by fitting the model the tree points to and asking again.
+<code class="docutils literal notranslate"><span class="pre">SARAR</span></code> and <code class="docutils literal notranslate"><span class="pre">GNS</span></code> are where the tests point when both remaining terms register;
+neighbayes does not fit them, so fit the SDM and the SDEM and compare them with
+<code class="docutils literal notranslate"><span class="pre">bayes_factor_compare_models</span></code>.</p>
+<p>The tree thresholds at a single <code class="docutils literal notranslate"><span class="pre">alpha</span></code>; for borderline cases read
+<code class="docutils literal notranslate"><span class="pre">spatial_diagnostics()</span></code> directly.</p>
 <h2 id="panel-recovery">Panel recovery<a class="headerlink" href="#panel-recovery" title="Link to this heading">¶</a></h2>
 <p>The same sweep over the fixed-effects panel DGPs.</p>
 <div class="cell docutils container">
@@ -2036,6 +2057,7 @@ inspect <code class="docutils literal notranslate"><span class="pre">spatial_dia
     <span class="p">(</span><span class="s2">"OLS"</span><span class="p">,</span> <span class="n">OLS</span><span class="p">,</span> <span class="s2">"OLS"</span><span class="p">),</span>
     <span class="p">(</span><span class="s2">"SAR"</span><span class="p">,</span> <span class="n">OLS</span><span class="p">,</span> <span class="s2">"SAR"</span><span class="p">),</span>
     <span class="p">(</span><span class="s2">"SEM"</span><span class="p">,</span> <span class="n">OLS</span><span class="p">,</span> <span class="s2">"SEM"</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">"SLX"</span><span class="p">,</span> <span class="n">OLS</span><span class="p">,</span> <span class="s2">"SLX"</span><span class="p">),</span>
     <span class="p">(</span><span class="s2">"SLX"</span><span class="p">,</span> <span class="n">SLX</span><span class="p">,</span> <span class="s2">"SLX"</span><span class="p">),</span>
     <span class="p">(</span><span class="s2">"SDM"</span><span class="p">,</span> <span class="n">SAR</span><span class="p">,</span> <span class="s2">"SDM"</span><span class="p">),</span>
     <span class="p">(</span><span class="s2">"SDM"</span><span class="p">,</span> <span class="n">SLX</span><span class="p">,</span> <span class="s2">"SDM"</span><span class="p">),</span>
@@ -2069,32 +2091,38 @@ inspect <code class="docutils literal notranslate"><span class="pre">spatial_dia
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 1 seconds.
+Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 1 seconds.
+Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 1 seconds.
+Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 1 seconds.
+Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 2 seconds.
+We recommend running at least 4 chains for robust computation of convergence diagnostics
+The rhat statistic is larger than 1.01 for some parameters. This indicates problems during sampling. See https://arxiv.org/abs/1903.08008 for details
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (2 chains in 2 jobs)
+NUTS: [beta, sigma2]
+Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 1 seconds.
+Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (2 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 1 seconds.
+Sampling 2 chains for 400 tune and 400 draw iterations (800 + 800 draws total) took 2 seconds.
 We recommend running at least 4 chains for robust computation of convergence diagnostics
 </code></pre></div>
 </div>
@@ -2151,13 +2179,21 @@ We recommend running at least 4 chains for robust computation of convergence dia
     <tr>
       <th>3</th>
       <td>SLX</td>
-      <td>SLX</td>
+      <td>OLS</td>
       <td>SLX</td>
       <td>SLX</td>
       <td>yes</td>
     </tr>
     <tr>
       <th>4</th>
+      <td>SLX</td>
+      <td>SLX</td>
+      <td>SLX</td>
+      <td>SLX</td>
+      <td>yes</td>
+    </tr>
+    <tr>
+      <th>5</th>
       <td>SDM</td>
       <td>SAR</td>
       <td>SDM</td>
@@ -2165,7 +2201,7 @@ We recommend running at least 4 chains for robust computation of convergence dia
       <td>yes</td>
     </tr>
     <tr>
-      <th>5</th>
+      <th>6</th>
       <td>SDM</td>
       <td>SLX</td>
       <td>SDM</td>
@@ -2173,7 +2209,7 @@ We recommend running at least 4 chains for robust computation of convergence dia
       <td>yes</td>
     </tr>
     <tr>
-      <th>6</th>
+      <th>7</th>
       <td>SDEM</td>
       <td>SEM</td>
       <td>SDEM</td>
@@ -2181,7 +2217,7 @@ We recommend running at least 4 chains for robust computation of convergence dia
       <td>yes</td>
     </tr>
     <tr>
-      <th>7</th>
+      <th>8</th>
       <td>SDEM</td>
       <td>SLX</td>
       <td>SDEM</td>
@@ -2212,30 +2248,48 @@ We recommend running at least 4 chains for robust computation of convergence dia
 test                                            
 Panel-LM-Lag                 0.2817   1   0.5956
 Panel-LM-Error               0.0006   1   0.9811
+Panel-LM-WX                  0.4026   1   0.5258
 Panel-LM-SDM-Joint           0.4031   2   0.8174
 Panel-LM-SLX-Error-Joint     0.4031   2   0.8174
 Panel-Robust-LM-Lag          0.4026   1   0.5258
 Panel-Robust-LM-Error        0.1215   1   0.7274
+Panel-Robust-LM-WX           0.1215   1   0.7274
 
 === DGP=SAR | start=OLS | recommended=SAR (yes expected SAR) ===
                           statistic  df  p_value
 test                                            
 Panel-LM-Lag               124.0337   1   0.0000
 Panel-LM-Error              38.8659   1   0.0000
+Panel-LM-WX                 86.2147   1   0.0000
 Panel-LM-SDM-Joint         125.0806   2   0.0000
 Panel-LM-SLX-Error-Joint   125.0806   2   0.0000
 Panel-Robust-LM-Lag         86.2147   1   0.0000
 Panel-Robust-LM-Error        1.0469   1   0.3062
+Panel-Robust-LM-WX           1.0469   1   0.3062
 
 === DGP=SEM | start=OLS | recommended=SEM (yes expected SEM) ===
                           statistic  df  p_value
 test                                            
 Panel-LM-Lag                13.3731   1   0.0003
 Panel-LM-Error              47.4830   1   0.0000
+Panel-LM-WX                  0.6353   1   0.4254
 Panel-LM-SDM-Joint          48.1184   2   0.0000
 Panel-LM-SLX-Error-Joint    48.1184   2   0.0000
 Panel-Robust-LM-Lag          0.6353   1   0.4254
 Panel-Robust-LM-Error       34.7453   1   0.0000
+Panel-Robust-LM-WX          34.7453   1   0.0000
+
+=== DGP=SLX | start=OLS | recommended=SLX (yes expected SLX) ===
+                          statistic  df  p_value
+test                                            
+Panel-LM-Lag                76.9249   1   0.0000
+Panel-LM-Error               0.1998   1   0.6549
+Panel-LM-WX                141.7907   1   0.0000
+Panel-LM-SDM-Joint         141.9905   2   0.0000
+Panel-LM-SLX-Error-Joint   141.9905   2   0.0000
+Panel-Robust-LM-Lag        141.7907   1   0.0000
+Panel-Robust-LM-Error       65.0657   1   0.0000
+Panel-Robust-LM-WX          65.0657   1   0.0000
 
 === DGP=SLX | start=SLX | recommended=SLX (yes expected SLX) ===
                             statistic  df  p_value
@@ -2246,11 +2300,12 @@ Panel-Robust-LM-Lag-SDM        0.0498   1   0.8234
 Panel-Robust-LM-Error-SDEM     0.0297   1   0.8631
 
 === DGP=SDM | start=SAR | recommended=SDM (yes expected SDM) ===
-                    statistic  df  p_value
-test                                      
-Panel-LM-Error        27.6323   1      0.0
-Panel-LM-WX           76.9247   1      0.0
-Panel-Robust-LM-WX    49.6594   1      0.0
+                       statistic  df  p_value
+test                                         
+Panel-LM-Error           27.6323   1   0.0000
+Panel-LM-WX              76.9247   1   0.0000
+Panel-Robust-LM-WX       49.6594   1   0.0000
+Panel-Robust-LM-Error     0.3669   1   0.5447
 
 === DGP=SDM | start=SLX | recommended=SDM (yes expected SDM) ===
                             statistic  df  p_value
@@ -2261,10 +2316,12 @@ Panel-Robust-LM-Lag-SDM       26.2594   1   0.0000
 Panel-Robust-LM-Error-SDEM     0.8871   1   0.3463
 
 === DGP=SDEM | start=SEM | recommended=SDEM (yes expected SDEM) ===
-              statistic  df  p_value
-test                                
-Panel-LM-Lag   123.9686   1      0.0
-Panel-LM-WX    140.4812   1      0.0
+                     statistic  df  p_value
+test                                       
+Panel-LM-Lag          123.9686   1   0.0000
+Panel-LM-WX           140.4812   1   0.0000
+Panel-Robust-LM-Lag     5.1293   1   0.0235
+Panel-Robust-LM-WX     21.6418   1   0.0000
 
 === DGP=SDEM | start=SLX | recommended=SDEM (yes expected SDEM) ===
                             statistic  df  p_value
@@ -2277,13 +2334,8 @@ Panel-Robust-LM-Error-SDEM    10.5209   1   0.0012
 </div>
 </div>
 </div>
-<p><strong>Recovery findings (panel).</strong> All six panel DGPs are recovered correctly.
-The redesigned <code class="docutils literal notranslate"><span class="pre">_panel_sar_spec</span></code> / <code class="docutils literal notranslate"><span class="pre">_panel_sem_spec</span></code> / <code class="docutils literal notranslate"><span class="pre">_panel_slx_spec</span></code>
-decision trees disambiguate Durbin-family alternatives by checking the
-robust LM-WX channel from a SAR fit, the LM-WX channel from a SEM fit,
-and — from an SLX start — by tie-breaking the joint Lag-SDM /
-Error-SDEM signal with the <code class="docutils literal notranslate"><span class="pre">panel_lag_sdm_pval_le_error_sdem_pval</span></code>
-predicate (smaller p wins).</p>
+<p><strong>Reading the table (panel).</strong> The panel trees are the cross-sectional ones run
+on the <code class="docutils literal notranslate"><span class="pre">Panel-</span></code> tests, so the same reading applies.</p>
 
 
 
@@ -2353,8 +2405,6 @@ predicate (smaller p wins).</p>
         <script src="../_static/sphinx_immaterial_theme.32136f45f91ae6956.min.js?v=a7a9472a"></script>
         <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
         <script src="../_static/copybutton.js?v=f281be69"></script>
-        <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
-        <script id="MathJax-script" src="../_static/mathjax/tex-mml-chtml.js"></script>
     
   </body>
 </html>

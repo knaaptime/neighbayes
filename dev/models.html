@@ -3308,9 +3308,9 @@ effects, and the random-effects models <code class="docutils literal notranslate
 <div class="math notranslate nohighlight">
 \[y_{it} = x_{it}' \beta + \alpha_i + \tau_t + \epsilon_{it}, \quad \alpha_i \sim N(0, \sigma_\alpha^2)\]</div>
 <p>The random-effects Gibbs sampler (this and the spatial variants below) updates
-<span class="math notranslate nohighlight">\(\sigma_\alpha\)</span> by interweaving a centred step (<span class="math notranslate nohighlight">\(\sigma_\alpha \mid \alpha\)</span>) with
-a non-centred one (<span class="math notranslate nohighlight">\(\sigma_\alpha \mid \alpha/\sigma_\alpha\)</span>, exact under the
-Gaussian likelihood). The centred step alone mixes at about 1% of draws when the
+<span class="math notranslate nohighlight">\(\sigma_\alpha\)</span> by interweaving a centered step (<span class="math notranslate nohighlight">\(\sigma_\alpha \mid \alpha\)</span>) with
+a non-centered one (<span class="math notranslate nohighlight">\(\sigma_\alpha \mid \alpha/\sigma_\alpha\)</span>, exact under the
+Gaussian likelihood). The centered step alone mixes at about 1% of draws when the
 unit effects are small against <span class="math notranslate nohighlight">\(\sigma/\sqrt{T}\)</span>, the common many-units,
 few-periods spatial panel.</p>
 <h3 id="sar-panel-random-effects">SAR panel (Random Effects)<a class="headerlink" href="#sar-panel-random-effects" title="Link to this heading">¶</a></h3>
@@ -3338,7 +3338,7 @@ place of the lag (<code class="docutils literal notranslate"><span class="pre">&
 <span class="math notranslate nohighlight">\(v_\ell = \lambda_\ell W_\ell v_\ell + \varepsilon_\ell\)</span>, or none (<code class="docutils literal notranslate"><span class="pre">None</span></code>), and
 any level may add the Durbin terms <span class="math notranslate nohighlight">\(W_\ell X_\ell\)</span> (<code class="docutils literal notranslate"><span class="pre">&quot;SDM&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;SDEM&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;SLX&quot;</span></code>).</p>
 <p>Every graph spans all groups at its level, whatever their parent: a West Texas
-county neighbours New Mexico counties. Because each level’s effect passes
+county neighbors New Mexico counties. Because each level’s effect passes
 through the filter of the level below, a shift at the top reaches the units
 through every filter beneath it. In the reduced form with a lag at every level,</p>
 <div class="math notranslate nohighlight">
@@ -3406,7 +3406,7 @@ ran:</p>
 <li><p>2–10× faster than NumPy with about 600 units;</p></li>
 <li><p>1.5–4× faster with 14,400 units, where the collapsed scheme’s cost is
 CHOLMOD’s own factorization. <code class="docutils literal notranslate"><span class="pre">sampler=&quot;nuts&quot;</span></code> fits the same model
-non-centred. Gibbs and NUTS agree across lag, error and no-process
+non-centered. Gibbs and NUTS agree across lag, error and no-process
 configurations. The units’ intercept is heavy-tailed: its spread grows as the top
 level’s <span class="math notranslate nohighlight">\(\rho\)</span> nears 1, where NUTS diverges.</p></li>
 </ul>
@@ -3463,7 +3463,7 @@ class is the latent SAR in both links, as in every family (ADR 0004):
 SEM and SDEM classes are latent too and take no <code class="docutils literal notranslate"><span class="pre">latent</span></code> argument.</p>
 <p>The latent models share one exact Gibbs sweep: the utilities from their
 truncated normal conditionals (Albert and Chib 1993), one at a time on NumPy or a
-colour class at a time on JAX (the default), then <span class="math notranslate nohighlight">\(\rho\)</span> or <span class="math notranslate nohighlight">\(\lambda\)</span> with
+color class at a time on JAX (the default), then <span class="math notranslate nohighlight">\(\rho\)</span> or <span class="math notranslate nohighlight">\(\lambda\)</span> with
 <span class="math notranslate nohighlight">\(\beta\)</span> integrated out, then <span class="math notranslate nohighlight">\(\beta\)</span>, and a scale move on <span class="math notranslate nohighlight">\((y^*, \beta)\)</span>. The
 logit adds the Kolmogorov scales that make its disturbance a normal scale
 mixture (Holmes and Held 2006). The likelihood is an orthant probability, so
@@ -3547,8 +3547,8 @@ a fixed prior and absorb the columns that vary only over time. Pooling assumes
 the effects are unrelated to <span class="math notranslate nohighlight">\(X\)</span>; when they are not, <code class="docutils literal notranslate"><span class="pre">mundlak=True</span></code> adds the
 unit means of the time-varying columns to the design inside the filter (Mundlak
 1978), which absorbs the correlation (in a nonlinear model only approximately).
-The Gibbs sampler updates <span class="math notranslate nohighlight">\(\sigma\)</span> by interweaving a centred step
-(<span class="math notranslate nohighlight">\(\sigma \mid c\)</span>) with a non-centred one (<span class="math notranslate nohighlight">\(\sigma \mid \tilde c\)</span>,
+The Gibbs sampler updates <span class="math notranslate nohighlight">\(\sigma\)</span> by interweaving a centered step
+(<span class="math notranslate nohighlight">\(\sigma \mid c\)</span>) with a non-centered one (<span class="math notranslate nohighlight">\(\sigma \mid \tilde c\)</span>,
 <span class="math notranslate nohighlight">\(\tilde c = (c - \mu)/\sigma\)</span>; Yu &amp; Meng 2011), the latter on the exact
 likelihood rather than the Pólya–Gamma working one, so no augmentation layer
 stands between <span class="math notranslate nohighlight">\(\sigma\)</span> and the data (Papaspiliopoulos, Roberts &amp; Sermaidis
@@ -3568,7 +3568,7 @@ keeps the exact Pólya–Gamma sampler.</p>
 disturbance, so <span class="math notranslate nohighlight">\(\rho = 0\)</span> is <code class="docutils literal notranslate"><span class="pre">NegBin</span></code> and the GLM suite’s LM-Lag is its score
 test. The Gibbs sampler carries the log-means <span class="math notranslate nohighlight">\(\eta\)</span>, given which the
 disturbances are a sparse linear map and every conditional is log-concave: the
-log-means are drawn one at a time by slice on NumPy and a colour class at a time
+log-means are drawn one at a time by slice on NumPy and a color class at a time
 by independence Metropolis–Hastings on JAX (the default), then <span class="math notranslate nohighlight">\(\rho\)</span> with
 <span class="math notranslate nohighlight">\(\beta\)</span> shifted along the least-squares fit of <span class="math notranslate nohighlight">\(W\eta\)</span> on <span class="math notranslate nohighlight">\(X\)</span>, <span class="math notranslate nohighlight">\(\beta\)</span> from a
 <em>t</em> at its Laplace approximation, and <span class="math notranslate nohighlight">\(\alpha\)</span>. Small counts pin <span class="math notranslate nohighlight">\(\eta\)</span> only
@@ -3786,7 +3786,7 @@ integrated out, then <span class="math notranslate nohighlight">\(\beta\)</span>
 utilities and <span class="math notranslate nohighlight">\(\beta\)</span> together (Liu and Wu 1999), which keeps <span class="math notranslate nohighlight">\(\rho\)</span> mixing as
 it nears one (at <span class="math notranslate nohighlight">\(\rho = 0.97\)</span> it quadruples its effective draws). It runs on
 JAX by default, drawing the
-utilities a colour class at a time (classes of utilities that share no row of
+utilities a color class at a time (classes of utilities that share no row of
 <span class="math notranslate nohighlight">\(I - \rho W\)</span> are conditionally independent), and on NumPy one at a time. There
 is no NUTS path (the likelihood is an orthant probability). Its pointwise
 log-likelihood integrates each utility out as the negative binomial’s does, the
@@ -4021,41 +4021,47 @@ estimates is the plain test.</p>
 </tr>
 <tr class="row-even"><td><p>LM-WX</p></td>
 <td><p><span class="math notranslate nohighlight">\(\theta = 0\)</span></p></td>
-<td><p>SAR, SEM</p></td>
+<td><p>OLS, SAR, SEM</p></td>
 <td><p></p></td>
 <td><p><span class="math notranslate nohighlight">\(k_{wx}\)</span></p></td>
 </tr>
 <tr class="row-odd"><td><p>Robust LM-WX</p></td>
 <td><p><span class="math notranslate nohighlight">\(\theta = 0\)</span></p></td>
+<td><p>OLS</p></td>
+<td><p><span class="math notranslate nohighlight">\(\rho\)</span></p></td>
+<td><p><span class="math notranslate nohighlight">\(k_{wx}\)</span></p></td>
+</tr>
+<tr class="row-even"><td><p>Robust LM-WX</p></td>
+<td><p><span class="math notranslate nohighlight">\(\theta = 0\)</span></p></td>
 <td><p>SAR</p></td>
 <td><p><span class="math notranslate nohighlight">\(\lambda\)</span></p></td>
 <td><p><span class="math notranslate nohighlight">\(k_{wx}\)</span></p></td>
 </tr>
-<tr class="row-even"><td><p>Robust LM-Error</p></td>
+<tr class="row-odd"><td><p>Robust LM-Error</p></td>
 <td><p><span class="math notranslate nohighlight">\(\lambda = 0\)</span></p></td>
 <td><p>SAR</p></td>
 <td><p><span class="math notranslate nohighlight">\(\theta\)</span></p></td>
 <td><p>1</p></td>
 </tr>
-<tr class="row-odd"><td><p>Robust LM-Lag</p></td>
+<tr class="row-even"><td><p>Robust LM-Lag</p></td>
 <td><p><span class="math notranslate nohighlight">\(\rho = 0\)</span></p></td>
 <td><p>SEM</p></td>
 <td><p><span class="math notranslate nohighlight">\(\theta\)</span></p></td>
 <td><p>1</p></td>
 </tr>
-<tr class="row-even"><td><p>Robust LM-WX</p></td>
+<tr class="row-odd"><td><p>Robust LM-WX</p></td>
 <td><p><span class="math notranslate nohighlight">\(\theta = 0\)</span></p></td>
 <td><p>SEM</p></td>
 <td><p><span class="math notranslate nohighlight">\(\rho\)</span></p></td>
 <td><p><span class="math notranslate nohighlight">\(k_{wx}\)</span></p></td>
 </tr>
-<tr class="row-odd"><td><p>LM-Error-SDM</p></td>
+<tr class="row-even"><td><p>LM-Error-SDM</p></td>
 <td><p><span class="math notranslate nohighlight">\(\lambda = 0\)</span></p></td>
 <td><p>SDM</p></td>
 <td><p></p></td>
 <td><p>1</p></td>
 </tr>
-<tr class="row-even"><td><p>LM-Lag-SDEM</p></td>
+<tr class="row-odd"><td><p>LM-Lag-SDEM</p></td>
 <td><p><span class="math notranslate nohighlight">\(\rho = 0\)</span></p></td>
 <td><p>SDEM</p></td>
 <td><p></p></td>
@@ -4073,6 +4079,29 @@ data give (traces counted <span class="math notranslate nohighlight">\(T - 1\)</
 coefficients carrying their prior, and a dynamic panel conditions on its first
 period with the lagged outcome as a regressor; the functions carry the
 <code class="docutils literal notranslate"><span class="pre">bayesian_panel_lm_*</span></code> prefix.</p>
+<p>At the OLS null the lag score is the error score plus <span class="math notranslate nohighlight">\(\hat\beta^\top\)</span> times
+the WX score, and the error and WX scores are uncorrelated. So the two joint tests
+are one statistic, which splits two ways: LM-SDM-Joint = LM-Lag + Robust LM-WX
+(Koley &amp; Bera 2024) = LM-Error + LM-WX. The lag robust to WX, their Robust
+LM-Lag-SDM, is therefore LM-Error there, and the error and WX tests robust to
+each other are the plain ones; the OLS suite runs none of these duplicates.</p>
+<p><code class="docutils literal notranslate"><span class="pre">spatial_diagnostics_decision()</span></code> reads a fitted model’s tests by the rule of
+Anselin et al. (1996), the one <code class="docutils literal notranslate"><span class="pre">spreg</span></code>’s <code class="docutils literal notranslate"><span class="pre">stge_classic</span></code> implements. A model that
+leaves two directions untested (OLS: lag and error; SAR: WX and error; SEM: lag
+and WX; SLX: lag and error) is kept when neither plain test rejects, and gains
+the direction whose plain test rejects when one does. When both do, it gains the
+direction whose robust test rejects, or, when both or neither do, the one with
+the smaller robust p-value. A plain test is valid when the other direction is
+absent and a robust one either way, at a cost in power, so the robust pair only
+settles a double rejection. The OLS fit also leaves WX untested, and a lone WX
+rejection there adds it (the SLX). The lag and the error together go to their
+robust pair whether or not WX also rejects, and the SAR or SEM fit then tests WX.
+The lag and WX go to Koley &amp; Bera’s robust pair, whose lag test is LM-Error
+there: it has not rejected, so WX goes ahead if Robust LM-WX rejects, and the
+smaller p-value of the two decides otherwise. The error and WX go to the smaller
+p-value. The SDM and SDEM read their one test. The trees name
+SARAR and GNS where the tests point, though neighbayes does not fit them; panel
+and Tobit models follow the same trees.</p>
 <h3 id="logit-and-negative-binomial">Logit and negative binomial<a class="headerlink" href="#logit-and-negative-binomial" title="Link to this heading">¶</a></h3>
 <p>At the GLM null (<code class="docutils literal notranslate"><span class="pre">Logit</span></code>, <code class="docutils literal notranslate"><span class="pre">NegBin</span></code>) the tests are the score tests of the latent
 SAR, <span class="math notranslate nohighlight">\(\eta = S(\rho)(X\beta + \varepsilon)\)</span> with <span class="math notranslate nohighlight">\(\varepsilon\)</span> the family’s own
@@ -4244,7 +4273,7 @@ random-effects and Tobit models still require NUTS.</p>
 <table class="docutils data align-default">
 <thead>
 <tr class="row-odd"><th class="head"><p>Value</p></th>
-<th class="head"><p>Behaviour</p></th>
+<th class="head"><p>Behavior</p></th>
 </tr>
 </thead>
 <tbody>
@@ -4405,7 +4434,7 @@ blocks of their own and carried along by the θ and (a, b) moves.</p>
 <p>The log-determinant <span class="math notranslate nohighlight">\(\log|I - \rho W|\)</span> is evaluated at every MCMC draw, and is
 the term that makes large problems expensive. Two arguments of the <strong>model</strong>
 constructor (not of <code class="docutils literal notranslate"><span class="pre">fit()</span></code>) choose how it is computed, and both samplers
-honour them:</p>
+honor them:</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">logdet_method</span></code> is the method: <code class="docutils literal notranslate"><span class="pre">&quot;eigenvalue&quot;</span></code> sums over the eigenvalues of
 <span class="math notranslate nohighlight">\(W\)</span> from one dense eigendecomposition; <code class="docutils literal notranslate"><span class="pre">&quot;cheb&quot;</span></code>, <code class="docutils literal notranslate"><span class="pre">&quot;aaa&quot;</span></code> and <code class="docutils literal notranslate"><span class="pre">&quot;spline&quot;</span></code>
@@ -4466,7 +4495,7 @@ incur:</p>
 <tr class="row-even"><td><p>≤ 60000</p></td>
 <td><p>directed</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">aaa</span></code> on <code class="docutils literal notranslate"><span class="pre">lu</span></code></p></td>
-<td><p>the same rational scheme over sparse LU (KLU or UMFPACK) — k-nearest-neighbour, travel time, migration</p></td>
+<td><p>the same rational scheme over sparse LU (KLU or UMFPACK) — k-nearest-neighbor, travel time, migration</p></td>
 </tr>
 <tr class="row-odd"><td><p>&gt; 60000</p></td>
 <td><p>any</p></td>

@@ -2669,8 +2669,8 @@
 <div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
 Sequential sampling (1 chains in 1 job)
 NUTS: [lam, beta, unit_effect_sd, unit_effect_raw]
-Sampling 1 chain for 220 tune and 220 draw iterations (220 + 220 draws total) took 3 seconds.
-There were 8 divergences after tuning. Increase `target_accept` or reparameterize.
+Sampling 1 chain for 220 tune and 220 draw iterations (220 + 220 draws total) took 4 seconds.
+There were 4 divergences after tuning. Increase `target_accept` or reparameterize.
 Only one chain was sampled, this makes it impossible to run some convergence checks
 </code></pre></div>
 </div>
@@ -2706,75 +2706,75 @@ Only one chain was sampled, this makes it impossible to run some convergence che
   <tbody>
     <tr>
       <th>Intercept</th>
-      <td>0.9128</td>
-      <td>0.3436</td>
-      <td>0.4459</td>
-      <td>1.4870</td>
-      <td>34.1736</td>
-      <td>46.4700</td>
+      <td>0.8681</td>
+      <td>0.4419</td>
+      <td>0.3074</td>
+      <td>1.6144</td>
+      <td>17.2862</td>
+      <td>28.0494</td>
       <td>NaN</td>
-      <td>0.0569</td>
-      <td>0.0470</td>
+      <td>0.1066</td>
+      <td>0.0421</td>
     </tr>
     <tr>
       <th>x1</th>
-      <td>0.8656</td>
-      <td>0.0429</td>
-      <td>0.7975</td>
-      <td>0.9339</td>
-      <td>259.0674</td>
-      <td>184.5240</td>
+      <td>0.8669</td>
+      <td>0.0399</td>
+      <td>0.8068</td>
+      <td>0.9279</td>
+      <td>123.7409</td>
+      <td>165.7819</td>
       <td>NaN</td>
-      <td>0.0026</td>
-      <td>0.0025</td>
-    </tr>
-    <tr>
-      <th>x2</th>
-      <td>-0.6222</td>
-      <td>0.0396</td>
-      <td>-0.6886</td>
-      <td>-0.5655</td>
-      <td>206.9943</td>
-      <td>154.7614</td>
-      <td>NaN</td>
-      <td>0.0028</td>
+      <td>0.0036</td>
       <td>0.0027</td>
     </tr>
     <tr>
-      <th>x3</th>
-      <td>0.5326</td>
-      <td>0.0457</td>
-      <td>0.4609</td>
-      <td>0.6034</td>
-      <td>182.8441</td>
-      <td>104.5239</td>
+      <th>x2</th>
+      <td>-0.6227</td>
+      <td>0.0354</td>
+      <td>-0.6851</td>
+      <td>-0.5702</td>
+      <td>181.5795</td>
+      <td>163.2809</td>
       <td>NaN</td>
-      <td>0.0035</td>
-      <td>0.0044</td>
+      <td>0.0027</td>
+      <td>0.0021</td>
+    </tr>
+    <tr>
+      <th>x3</th>
+      <td>0.5368</td>
+      <td>0.0383</td>
+      <td>0.4804</td>
+      <td>0.5948</td>
+      <td>131.2275</td>
+      <td>144.6861</td>
+      <td>NaN</td>
+      <td>0.0033</td>
+      <td>0.0031</td>
     </tr>
     <tr>
       <th>lam</th>
-      <td>0.3635</td>
-      <td>0.1933</td>
-      <td>0.0829</td>
-      <td>0.6625</td>
-      <td>27.5157</td>
-      <td>55.4590</td>
+      <td>0.4165</td>
+      <td>0.1900</td>
+      <td>0.1130</td>
+      <td>0.6951</td>
+      <td>17.7372</td>
+      <td>17.7702</td>
       <td>NaN</td>
-      <td>0.0387</td>
-      <td>0.0148</td>
+      <td>0.0450</td>
+      <td>0.0186</td>
     </tr>
     <tr>
       <th>unit_effect_sd</th>
-      <td>1.3296</td>
-      <td>0.1406</td>
-      <td>1.1132</td>
-      <td>1.5854</td>
-      <td>50.6287</td>
-      <td>68.0914</td>
+      <td>1.2817</td>
+      <td>0.1317</td>
+      <td>1.0805</td>
+      <td>1.5097</td>
+      <td>54.8339</td>
+      <td>53.0328</td>
       <td>NaN</td>
-      <td>0.0198</td>
-      <td>0.0113</td>
+      <td>0.0179</td>
+      <td>0.0094</td>
     </tr>
   </tbody>
 </table>
@@ -2804,7 +2804,7 @@ Only one chain was sampled, this makes it impossible to run some convergence che
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Unit-effects RMSE: 0.5660
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Unit-effects RMSE: 0.5292
 SEMProbit semip-style pass rate: 0.8
 </code></pre></div>
 </div>
@@ -2839,45 +2839,45 @@ SEMProbit semip-style pass rate: 0.8
       <th>0</th>
       <td>lam</td>
       <td>0.45</td>
-      <td>0.363462</td>
-      <td>0.086538</td>
-      <td>19.230612</td>
+      <td>0.416457</td>
+      <td>0.033543</td>
+      <td>7.454053</td>
       <td>True</td>
     </tr>
     <tr>
       <th>1</th>
       <td>Intercept</td>
       <td>0.40</td>
-      <td>0.912840</td>
-      <td>0.512840</td>
-      <td>128.209924</td>
+      <td>0.868138</td>
+      <td>0.468138</td>
+      <td>117.034518</td>
       <td>False</td>
     </tr>
     <tr>
       <th>2</th>
       <td>x1</td>
       <td>0.80</td>
-      <td>0.865610</td>
-      <td>0.065610</td>
-      <td>8.201264</td>
+      <td>0.866854</td>
+      <td>0.066854</td>
+      <td>8.356773</td>
       <td>True</td>
     </tr>
     <tr>
       <th>3</th>
       <td>x2</td>
       <td>-0.60</td>
-      <td>-0.622172</td>
-      <td>0.022172</td>
-      <td>3.695318</td>
+      <td>-0.622694</td>
+      <td>0.022694</td>
+      <td>3.782339</td>
       <td>True</td>
     </tr>
     <tr>
       <th>4</th>
       <td>x3</td>
       <td>0.50</td>
-      <td>0.532583</td>
-      <td>0.032583</td>
-      <td>6.516560</td>
+      <td>0.536795</td>
+      <td>0.036795</td>
+      <td>7.358923</td>
       <td>True</td>
     </tr>
   </tbody>

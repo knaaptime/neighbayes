@@ -11,7 +11,7 @@
       
       
       
-        <link rel="prev" href="neighbayes.diagnostics.lmtests.bayesian_robust_lm_lag_sdem_test.html">
+        <link rel="prev" href="neighbayes.diagnostics.lmtests.bayesian_robust_lm_error_sar_test.html">
       
       
         <link rel="next" href="neighbayes.diagnostics.lmtests.bayesian_robust_lm_wx_sem_test.html">
@@ -1507,54 +1507,6 @@
                 
   
   
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="neighbayes.diagnostics.lmtests.bayesian_robust_lm_error_sdm_test.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    <span>neighbayes.<wbr>diagnostics.<wbr>lmtests.<wbr>bayesian_<wbr>robust_<wbr>lm_<wbr>error_<wbr>sdm_<wbr>test</span>
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="neighbayes.diagnostics.lmtests.bayesian_robust_lm_lag_sdem_test.html" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    <span>neighbayes.<wbr>diagnostics.<wbr>lmtests.<wbr>bayesian_<wbr>robust_<wbr>lm_<wbr>lag_<wbr>sdem_<wbr>test</span>
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
     
   
     
@@ -1611,7 +1563,7 @@
       <span aria-label="Python function" class="objinfo-icon objinfo-icon__procedure" title="Python function">F</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.diagnostics.lmtests.bayesian_robust_lm_lag_sem_test (Python function) — Robust LM-lag at a SEM fit (H₀: ρ = 0, robust to a local θ)."><span>neighbayes.<wbr>diagnostics.<wbr>lmtests.<wbr>bayesian_<wbr>robust_<wbr>lm_<wbr>lag_<wbr>sem_<wbr>test</span></span>
+      <span title="neighbayes.diagnostics.lmtests.bayesian_robust_lm_lag_sem_test (Python function) — Robust LM-lag at an OLS or SEM fit (H₀: ρ = 0, robust to a local θ)."><span>neighbayes.<wbr>diagnostics.<wbr>lmtests.<wbr>bayesian_<wbr>robust_<wbr>lm_<wbr>lag_<wbr>sem_<wbr>test</span></span>
     </span>
   </a>
   
@@ -2238,7 +2190,7 @@
       <span aria-label="Python function" class="objinfo-icon objinfo-icon__procedure" title="Python function">F</span>
     
     <span class="md-ellipsis">
-      <span title="neighbayes.diagnostics.lmtests.bayesian_robust_lm_lag_sem_test (Python function) — Robust LM-lag at a SEM fit (H₀: ρ = 0, robust to a local θ)."><span>neighbayes.<wbr>diagnostics.<wbr>lmtests.<wbr>bayesian_<wbr>robust_<wbr>lm_<wbr>lag_<wbr>sem_<wbr>test</span></span>
+      <span title="neighbayes.diagnostics.lmtests.bayesian_robust_lm_lag_sem_test (Python function) — Robust LM-lag at an OLS or SEM fit (H₀: ρ = 0, robust to a local θ)."><span>neighbayes.<wbr>diagnostics.<wbr>lmtests.<wbr>bayesian_<wbr>robust_<wbr>lm_<wbr>lag_<wbr>sem_<wbr>test</span></span>
     </span>
   </a>
   
@@ -2297,10 +2249,12 @@
 <h1 id="neighbayes-diagnostics-lmtests-bayesian-robust-lm-lag-sem-test">neighbayes.diagnostics.lmtests.bayesian_robust_lm_lag_sem_test<a class="headerlink" href="#neighbayes-diagnostics-lmtests-bayesian-robust-lm-lag-sem-test" title="Link to this heading">¶</a></h1>
 <dl class="py function objdesc">
 <dt class="sig sig-object highlight sig-wrap py" id="neighbayes.diagnostics.lmtests.bayesian_robust_lm_lag_sem_test">
-<span class="sig-prename descclassname"><span class="pre">neighbayes.diagnostics.lmtests.</span></span><span class="sig-name descname"><span class="pre">bayesian_robust_lm_lag_sem_test</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.lmtests.bayesian_robust_lm_lag_sem_test" title="neighbayes.diagnostics.lmtests.bayesian_robust_lm_lag_sem_test.model (Python parameter)"><span class="n"><span class="pre">model</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/diagnostics/lmtests/cross_sectional.py#L306-L319"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.diagnostics.lmtests.bayesian_robust_lm_lag_sem_test" title="Link to this definition">¶</a></dt>
-<dd><p>Robust LM-lag at a SEM fit (H₀: ρ = 0, robust to a local θ).</p>
-<p>The lag score of <a class="reference internal" href="neighbayes.diagnostics.lmtests.bayesian_lm_lag_test.html#neighbayes.diagnostics.lmtests.bayesian_lm_lag_test" title="neighbayes.diagnostics.lmtests.bayesian_lm_lag_test (Python function) — LM test for an omitted spatial lag (H₀: ρ = 0)."><code class="xref py py-func docutils literal notranslate"><span class="pre">bayesian_lm_lag_test()</span></code></a> at the SEM, net of the
-<span class="math notranslate nohighlight">\(WX\)</span> direction.</p>
+<span class="sig-prename descclassname"><span class="pre">neighbayes.diagnostics.lmtests.</span></span><span class="sig-name descname"><span class="pre">bayesian_robust_lm_lag_sem_test</span></span><span class="sig-paren">(</span><span class="sig-param-decl"><em class="sig-param"><a class="n reference internal" href="#neighbayes.diagnostics.lmtests.bayesian_robust_lm_lag_sem_test" title="neighbayes.diagnostics.lmtests.bayesian_robust_lm_lag_sem_test.model (Python parameter)"><span class="n"><span class="pre">model</span></span></a></em></span><span class="sig-paren">)</span><a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/diagnostics/lmtests/cross_sectional.py#L275-L290"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#neighbayes.diagnostics.lmtests.bayesian_robust_lm_lag_sem_test" title="Link to this definition">¶</a></dt>
+<dd><p>Robust LM-lag at an OLS or SEM fit (H₀: ρ = 0, robust to a local θ).</p>
+<p>The lag score of <a class="reference internal" href="neighbayes.diagnostics.lmtests.bayesian_lm_lag_test.html#neighbayes.diagnostics.lmtests.bayesian_lm_lag_test" title="neighbayes.diagnostics.lmtests.bayesian_lm_lag_test (Python function) — LM test for an omitted spatial lag (H₀: ρ = 0)."><code class="xref py py-func docutils literal notranslate"><span class="pre">bayesian_lm_lag_test()</span></code></a>, net of the <span class="math notranslate nohighlight">\(WX\)</span>
+direction.  At the OLS fit, where the lag score is the error score plus
+<span class="math notranslate nohighlight">\(\hat\beta^\top\)</span> times the <span class="math notranslate nohighlight">\(WX\)</span> score, it is the LM-Error
+statistic: the Robust LM-Lag-SDM of <span class="bibtex-citation" id="id1">Koley and Bera [<a class="reference internal" href="../references.html#id28" title="Malabika Koley and Anil K. Bera. To use, or not to use the spatial Durbin model? – that is the question. Spatial Economic Analysis, 19(1):30–56, 2024. URL: https://doi.org/10.1080/17421772.2023.2256810 (visited on 2025-05-21), doi:10.1080/17421772.2023.2256810.">2024</a>]</span> there.</p>
 <dl class="field-list simple">
 <dt class="field-odd" id="neighbayes.diagnostics.lmtests.bayesian_robust_lm_lag_sem_test-returns">Returns<span class="colon">:</span><a class="headerlink" href="#neighbayes.diagnostics.lmtests.bayesian_robust_lm_lag_sem_test-returns" title="Permalink to this headline">¶</a></dt>
 <dd class="field-odd"><p>Per-draw LM samples, summary statistics and <code class="docutils literal notranslate"><span class="pre">df</span> <span class="pre">=</span> <span class="pre">1</span></code>.</p>

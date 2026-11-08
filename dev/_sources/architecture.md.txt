@@ -279,7 +279,7 @@ Every fitted model exposes `spatial_diagnostics()`, which runs the battery of Ba
 tests appropriate to its specification — lag, error, WX, joint, and the Neyman-orthogonal
 robust variants — defined separately for cross-sectional, GLM, panel, and flow models and
 resolved through a registry of test suites. `spatial_diagnostics_decision()` walks those
-results through a decision tree and reports both the favoured model and the path it took
+results through a decision tree and reports both the favored model and the path it took
 to reach it, so the recommendation can be audited rather than taken on faith.
 
 `impacts()` decomposes a change in $X$ through the spatial multiplier

@@ -8,8 +8,8 @@
     "# Bayesian spatial models: a walkthrough\n",
     "\n",
     "By the end of this lesson you will have fitted six models to one dataset,\n",
-    "watched OLS fail a diagnostic that the spatial models pass, and used the\n",
-    "package's own tests to arrive at the specification the data support.\n",
+    "followed the package's specification tests from OLS to the model they point to,\n",
+    "and used Bayes factors to rank the models those tests leave standing.\n",
     "\n",
     "You do not need to know the spatial econometrics beforehand — each model is\n",
     "introduced when the previous one runs out of road. Work through the cells in\n",
@@ -214,7 +214,7 @@
    "id": "13",
    "metadata": {},
    "source": [
-    "### Add the neighbours' covariates (SLX)\n",
+    "### Add the neighbors' covariates (SLX)\n",
     "\n",
     "Model:\n",
     "\n",
@@ -492,13 +492,34 @@
    ]
   },
   {
-   "cell_type": "code",
-   "execution_count": null,
+   "cell_type": "markdown",
    "id": "31",
    "metadata": {},
-   "outputs": [],
    "source": [
-    "sdm.spatial_diagnostics()"
+    "## Let the tests pick the specification\n",
+    "\n",
+    "Every fitted model can test for the spatial terms it leaves out. The tests are\n",
+    "Lagrange-multiplier (score) tests, which need only the fit you already have:\n",
+    "`model.spatial_diagnostics()` runs the ones that apply to that model, and\n",
+    "`model.spatial_diagnostics_decision()` reads them and recommends a model.\n",
+    "\n",
+    "A fitted model that leaves out two terms has a plain and a robust test for\n",
+    "each. SAR leaves out the neighbors' covariates $WX\\theta$ and the error process\n",
+    "$\\lambda Wu$; OLS leaves out both and the lag $\\rho Wy$ as well. A plain\n",
+    "test is valid when the other term is absent. A robust test stays valid when the\n",
+    "other term is present, and pays for that in power. So the decision reads them in\n",
+    "order:\n",
+    "\n",
+    "1. Neither plain test rejects: keep the model.\n",
+    "2. One rejects: add that term.\n",
+    "3. Both reject: add the term whose robust test rejects; if both or neither do,\n",
+    "   the one with the smaller robust p-value.\n",
+    "\n",
+    "This is the specific-to-general strategy of Anselin et al. (1996), the one\n",
+    "`spreg`'s `stge_classic` implements. You fit the recommended model and ask\n",
+    "again, until the tests stop rejecting. The p-values here are Bayesian: each\n",
+    "statistic is evaluated at the posterior mean, and its posterior spread gives\n",
+    "the credible interval beside it."
    ]
   },
   {
@@ -508,17 +529,34 @@
    "metadata": {},
    "outputs": [],
    "source": [
-    "ols.spatial_diagnostics()"
+    "def read_tests(model, alpha=0.05):\n",
+    "    \"\"\"Show a fitted model's LM tests and say which reject.\"\"\"\n",
+    "    diag = model.spatial_diagnostics()\n",
+    "    rejecting = diag.index[diag[\"p_value\"] < alpha].tolist()\n",
+    "    name = type(model).__name__\n",
+    "    print(f\"{name}: tests rejecting at {alpha}: {', '.join(rejecting) or 'none'}\")\n",
+    "    print(\n",
+    "        f\"{name}: recommended model: \"\n",
+    "        f\"{model.spatial_diagnostics_decision(alpha=alpha, format='model')}\"\n",
+    "    )\n",
+    "    return diag[[\"statistic\", \"df\", \"p_value\", \"ci_lower\", \"ci_upper\"]].round(3)"
    ]
   },
   {
-   "cell_type": "code",
-   "execution_count": null,
+   "cell_type": "markdown",
    "id": "33",
    "metadata": {},
-   "outputs": [],
    "source": [
-    "sar.spatial_diagnostics_decision()"
+    "### Start from OLS\n",
+    "\n",
+    "The OLS tests ask whether the outcome, the errors or the neighbors' covariates\n",
+    "carry spatial dependence. A lone rejection points to the SAR, SEM or SLX. When\n",
+    "the lag and the error both reject, their robust pair decides, and the $WX$\n",
+    "question waits for the SAR or SEM fit. When the lag and $WX$ both reject,\n",
+    "Koley and Bera's robust pair decides: $WX$ robust to the lag (Robust-LM-WX), and\n",
+    "the lag robust to $WX$, which at the OLS fit is the error test. The lag's score\n",
+    "there is the error's score plus a fixed combination of the $WX$ scores, which is\n",
+    "also why the two joint tests reported beside the tree are one statistic."
    ]
   },
   {
@@ -528,7 +566,7 @@
    "metadata": {},
    "outputs": [],
    "source": [
-    "sem.spatial_diagnostics()"
+    "read_tests(ols)"
    ]
   },
   {
@@ -538,12 +576,67 @@
    "metadata": {},
    "outputs": [],
    "source": [
-    "report"
+    "ols.spatial_diagnostics_decision()"
    ]
   },
   {
    "cell_type": "markdown",
    "id": "36",
+   "metadata": {},
+   "source": [
+    "### Refit, and ask again\n",
+    "\n",
+    "The OLS tree names the model to fit next, and that model tests the terms it\n",
+    "still leaves out:\n",
+    "\n",
+    "- the SAR, the neighbors' covariates (towards the SDM) and the error process\n",
+    "  (towards SARAR, a SAR with spatial errors, which neighbayes does not fit);\n",
+    "- the SLX, the lag (towards the SDM) and the error process (towards the SDEM);\n",
+    "- the SEM, the lag (towards SARAR) and the neighbors' covariates (towards the\n",
+    "  SDEM);\n",
+    "- the SDM and SDEM, one term each, whose test decides whether to go on to the\n",
+    "  general nesting model (GNS).\n",
+    "\n",
+    "The walk ends at the first model whose tests do not reject. The cell below\n",
+    "follows the recommendations through the models fitted above and draws each tree\n",
+    "it consults."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "37",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def walk(start, fitted, alpha=0.05, show=True):\n",
+    "    \"\"\"Follow the recommendations from ``start`` through the fitted models.\"\"\"\n",
+    "    model, path = start, [type(start).__name__]\n",
+    "    while True:\n",
+    "        nxt = model.spatial_diagnostics_decision(alpha=alpha, format=\"model\")\n",
+    "        if nxt == path[-1]:\n",
+    "            break\n",
+    "        if nxt not in fitted:\n",
+    "            path.append(f\"{nxt} (not fitted here)\")\n",
+    "            break\n",
+    "        model = fitted[nxt]\n",
+    "        path.append(nxt)\n",
+    "        if show:\n",
+    "            print(f\"--- at the {nxt} fit ---\")\n",
+    "            display(read_tests(model, alpha))\n",
+    "            display(model.spatial_diagnostics_decision(alpha=alpha))\n",
+    "    if show:\n",
+    "        print(\" → \".join(path))\n",
+    "    return path\n",
+    "\n",
+    "\n",
+    "fitted = {\"SLX\": slx, \"SAR\": sar, \"SEM\": sem, \"SDM\": sdm, \"SDEM\": sdem}\n",
+    "path = walk(ols, fitted)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "38",
    "metadata": {},
    "source": [
     "## Compare what you have fitted\n"
@@ -552,7 +645,7 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "id": "37",
+   "id": "39",
    "metadata": {},
    "outputs": [],
    "source": [
@@ -570,69 +663,60 @@
   },
   {
    "cell_type": "markdown",
-   "id": "38",
-   "metadata": {},
-   "source": [
-    "### Bayes Factor Model Comparison\n",
-    "\n",
-    "Bayes factors provide an alternative to information criteria for comparing competing models. While WAIC and LOO assess _predictive_ performance, Bayes factors compare _marginal likelihoods_ — the probability of the data under each model, integrated over all parameter values weighted by the prior:\n",
-    "\n",
-    "$$BF\\_{ij} = \\frac{p(y \\mid \\mathcal{M}\\_i)}{p(y \\mid \\mathcal{M}\\_j)} = \\frac{ML\\_i}{ML\\_j}$$\n",
-    "\n",
-    "This makes Bayes factors sensitive to the _prior_: models with diffuse priors on unnecessary parameters are penalized more heavily, because the marginal likelihood averages over all possible parameter values weighted by the prior. In spatial models, this means that models with many WX coefficients under wide priors (e.g., SLX, SDM, SDEM) can receive substantially lower marginal likelihoods than more parsimonious alternatives (e.g., OLS, SAR, SEM) — even if their log-likelihoods are similar.\n",
-    "\n",
-    "__Interpreting Bayes factors__ (Kass & Raftery, 1995):\n",
-    "\n",
-    "| BF range | Evidence strength |\n",
-    "| -------- | ----------------- |\n",
-    "| 1 – 3    | Anecdotal         |\n",
-    "| 3 – 10   | Moderate          |\n",
-    "| 10 – 30  | Strong            |\n",
-    "| 30 – 100 | Very strong       |\n",
-    "| > 100    | Extreme           |\n",
-    "\n",
-    "__Method.__ We use bridge sampling (Meng & Wong, 1996) to estimate each model's log marginal likelihood, following the R `bridgesampling` package (Gronau et al., 2020). The implementation uses ESS weighting, two-phase convergence, and MCSE diagnostics. For reliable estimates, 40,000+ posterior samples are recommended.\n",
-    "\n",
-    "__Important caveat.__ Bayes factors can be very sensitive to prior specification. Models with diffuse priors on many parameters will tend to have lower marginal likelihoods. This is by design — it is the Bayesian Occam's razor at work — but it means that Bayes factors and information criteria may disagree when priors are uninformative.\n"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "39",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "bayes_factor_compare_models(model_dict, method=\"bridge\", log=True).round(3)"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
    "id": "40",
    "metadata": {},
-   "outputs": [],
    "source": [
-    "bayes_factor_compare_models(model_dict, method=\"bic\", log=True).round(3)"
+    "### Bayes factors\n",
+    "\n",
+    "The LM tests are misspecification tests: each asks whether a fitted model has\n",
+    "left spatial dependence behind. A Bayes factor asks something else, how well a\n",
+    "model fits overall. It compares marginal likelihoods, the probability of the\n",
+    "data under each model averaged over its prior:\n",
+    "\n",
+    "$$BF_{ij} = \\frac{p(y \\mid \\mathcal{M}_i)}{p(y \\mid \\mathcal{M}_j)}.$$\n",
+    "\n",
+    "Because the average is over the prior, a coefficient the data do not need costs\n",
+    "its model: the prior spreads probability over values the data rule out. This is\n",
+    "the Bayesian Occam's razor.\n",
+    "\n",
+    "For these six Gaussian models the marginal likelihood reduces to a\n",
+    "two-dimensional integral, so `method=\"quadrature\"` computes it exactly, with no\n",
+    "Monte Carlo error and no fit. Bridge sampling (`method=\"bridge\"`) estimates the\n",
+    "same quantity from the posterior draws, and is what models without that form\n",
+    "use; BIC approximates it as if each prior held one observation's worth of\n",
+    "information. The table gives each model's log marginal likelihood relative to\n",
+    "the best, so 0 marks the best model and $-\\log 10 \\approx -2.3$ a Bayes factor\n",
+    "of 10 against.\n",
+    "\n",
+    "| Bayes factor | Evidence (Kass & Raftery, 1995) |\n",
+    "| ------------ | ------------------------------- |\n",
+    "| 1 – 3        | Anecdotal                       |\n",
+    "| 3 – 10       | Moderate                        |\n",
+    "| 10 – 30      | Strong                          |\n",
+    "| 30 – 100     | Very strong                     |\n",
+    "| > 100        | Extreme                         |"
    ]
   },
   {
-   "cell_type": "markdown",
+   "cell_type": "code",
+   "execution_count": null,
    "id": "41",
    "metadata": {},
+   "outputs": [],
    "source": [
-    "#### Bridge Sampling vs. BIC\n",
+    "from neighbayes.diagnostics import post_prob\n",
     "\n",
-    "* BIC: SAR > SLX > OLS > SEM (SAR wins, SLX is moderate, SEM is worst)\n",
-    "* Bridge: SAR > SEM > OLS (SAR wins, SEM is moderate)\n",
-    "\n",
-    "The two methods can produce qualitatively different model rankings. This is expected and reflects a fundamental difference in what they assume about priors:\n",
-    "\n",
-    "* __BIC__ approximates $\\log(ML) \\approx \\hat\\ell\\_{\\max} - \\frac{k}{2}\\log(n)$, which assumes _unit-information priors_ (priors containing as much information as a single observation). The penalty per parameter is fixed at $\\frac{1}{2}\\log(n) \\approx 2.1$ for $n = 77$.\n",
-    "\n",
-    "* __Bridge sampling__ integrates over the _actual_ priors in the model. When priors are wide (e.g., `Normal(0, 100)` on WX coefficients), the marginal likelihood penalizes each such parameter by roughly $\\log(\\sigma\\_{\\text{prior}} / \\sigma\\_{\\text{post}})$, which can be 5–10× larger than the BIC penalty.\n",
-    "\n",
-    "This is why models with many WX terms (SLX, SDM, SDEM) may look reasonable under BIC but receive extreme Bayes factors under bridge sampling: the wide priors on the WX coefficients are \"wasted\" — they spread probability mass over implausible parameter values, reducing the marginal likelihood. This is __Bayesian Occam's razor__ at work, and bridge sampling is generally more trustworthy because it accounts for the actual prior specification.\n"
+    "log_bf = {\n",
+    "    method: bayes_factor_compare_models(model_dict, method=method, log=True)\n",
+    "    for method in (\"quadrature\", \"bridge\", \"bic\")\n",
+    "}\n",
+    "exact = log_bf[\"quadrature\"]\n",
+    "best = exact.sum(axis=1).idxmax()  # the row that beats every column\n",
+    "comparison = pd.DataFrame({m: bf[best] for m, bf in log_bf.items()})\n",
+    "comparison[\"posterior probability\"] = post_prob(\n",
+    "    comparison[\"quadrature\"].to_numpy(), model_names=list(comparison.index)\n",
+    ")\n",
+    "comparison.sort_values(\"quadrature\", ascending=False).round(3)"
    ]
   },
   {
@@ -640,24 +724,10 @@
    "id": "42",
    "metadata": {},
    "source": [
-    "## Let the tests pick the specification\n",
-    "\n",
-    "The `neighbayes.diagnostics` module provides Bayesian Lagrange-multiplier tests that operate on posterior draws rather than point estimates. These replace the frequentist LM tests that were previously available.\n",
-    "\n",
-    "Below we run the Bayesian LM tests from the fitted OLS model:\n",
-    "\n",
-    "* `bayesian_lm_lag_test` — tests $H\\_0: \\rho = 0$ (no spatial lag)\n",
-    "* `bayesian_lm_error_test` — tests $H\\_0: \\lambda = 0$ (no spatial error)\n",
-    "* `bayesian_lm_wx_test` — tests $H\\_0: \\gamma = 0$ (no WX, from SAR null)\n",
-    "* `bayesian_lm_sdm_joint_test` — joint test for SDM ($H\\_0: \\rho = 0$ and $\\gamma = 0$)\n",
-    "* `bayesian_lm_slx_error_joint_test` — joint test for SDEM ($H\\_0: \\lambda = 0$ and $\\gamma = 0$)\n",
-    "* `bayesian_robust_lm_lag_test` / `bayesian_robust_lm_error_test` — Anselin–Florax robust pair (SAR vs SEM)\n",
-    "* `bayesian_robust_lm_lag_sdm_test` / `bayesian_robust_lm_wx_test` / `bayesian_robust_lm_error_sdem_test` — Neyman-orthogonal robust tests\n",
-    "* `bayesian_lm_error_sdm_test` / `bayesian_lm_lag_sdem_test` — SDM/SDEM-aware tests using correctly filtered residuals\n",
-    "\n",
-    "In practice, prefer the method API: `model.spatial_diagnostics()` runs the tests wired to that model class, and `model.spatial_diagnostics_decision()` returns a recommended specification.\n",
-    "\n",
-    "Each returns a `BayesianLMTestResult` with posterior summary statistics and a Bayesian p-value.\n"
+    "`bayes_factor_compare_models` returns the full matrix of pairwise log Bayes\n",
+    "factors. Each entry is the row model over the column model, so a positive\n",
+    "entry favors the row; the column above is the matrix's column for the best\n",
+    "model."
    ]
   },
   {
@@ -667,14 +737,61 @@
    "metadata": {},
    "outputs": [],
    "source": [
-    "# `spatial_diagnostics()` runs all tests wired to a model class\n",
-    "# and returns a tidy DataFrame.\n",
-    "ols.spatial_diagnostics()"
+    "exact.round(2)"
    ]
   },
   {
    "cell_type": "markdown",
    "id": "44",
+   "metadata": {},
+   "source": [
+    "### Rank only the models that pass their tests\n",
+    "\n",
+    "Because the two measure different things, they need not agree. A model can fit\n",
+    "well overall and still leave residual spatial dependence (in the outcome, the\n",
+    "errors or the neighbors' covariates), and its estimates are then biased or\n",
+    "inefficient. So a model that fails an LM test cannot be trusted however its\n",
+    "Bayes factor ranks it. Use the tests to screen the models and the Bayes factors\n",
+    "to rank the ones that pass.\n",
+    "\n",
+    "The cell below lists each fitted model's rejecting tests beside its log marginal\n",
+    "likelihood, and picks the best model among those that pass."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "45",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "alpha = 0.05\n",
+    "\n",
+    "\n",
+    "def rejecting(model):\n",
+    "    diag = model.spatial_diagnostics()\n",
+    "    return \", \".join(diag.index[diag[\"p_value\"] < alpha]) or \"none\"\n",
+    "\n",
+    "\n",
+    "screen = pd.DataFrame(\n",
+    "    {\n",
+    "        \"rejecting tests\": {name: rejecting(m) for name, m in model_dict.items()},\n",
+    "        \"log ML vs best\": exact[best],\n",
+    "    }\n",
+    ")\n",
+    "passing = screen.index[screen[\"rejecting tests\"] == \"none\"]\n",
+    "print(f\"Best by Bayes factor alone: {best}\")\n",
+    "print(\n",
+    "    f\"Best among the models that pass their tests: \"\n",
+    "    f\"{screen.loc[passing, 'log ML vs best'].idxmax() if len(passing) else 'none'}\"\n",
+    ")\n",
+    "print(f\"End of the walk: {path[-1]}\")\n",
+    "screen.sort_values(\"log ML vs best\", ascending=False).round(3)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "46",
    "metadata": {},
    "source": [
     "## See how the spatial parameter moves across models\n",
@@ -688,7 +805,7 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "id": "45",
+   "id": "47",
    "metadata": {},
    "outputs": [],
    "source": [
@@ -710,7 +827,7 @@
   },
   {
    "cell_type": "markdown",
-   "id": "46",
+   "id": "48",
    "metadata": {},
    "source": [
     "## Where to go next\n",

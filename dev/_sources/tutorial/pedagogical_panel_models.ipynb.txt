@@ -9,7 +9,7 @@
     "\n",
     "By the end of this lesson you will have built a balanced panel, fitted the\n",
     "fixed-effects and random-effects families to it, compared them, and used the\n",
-    "panel specification tests to decide which one the data support.\n",
+    "panel specification tests to choose the spatial terms the data support.\n",
     "\n",
     "It assumes you have been through\n",
     "[the cross-sectional walkthrough](pedagogical_spatial_models.ipynb); the models\n",
@@ -293,7 +293,7 @@
    "source": [
     "### Check the chains before comparing anything\n",
     "\n",
-    "Panel SAR/SDEM models inherit the slow-mixing behaviour of $\\rho$\n",
+    "Panel SAR/SDEM models inherit the slow-mixing behavior of $\\rho$\n",
     "(or $\\lambda$) documented by Wolf, Anselin & Arribas-Bel (2018)\n",
     "{cite:p}`wolf2018StochasticEfficiency`. The\n",
     "`spatial_mcmc_diagnostic` helper checks ESS, sampler yield, $\\hat{R}$,\n",
@@ -418,7 +418,7 @@
   },
   {
    "cell_type": "markdown",
-   "id": "d1ae1066",
+   "id": "26",
    "metadata": {},
    "source": [
     "## Compare what you have fitted\n",
@@ -431,7 +431,7 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "id": "b90ebe9d",
+   "id": "27",
    "metadata": {},
    "outputs": [],
    "source": [
@@ -457,7 +457,7 @@
   },
   {
    "cell_type": "markdown",
-   "id": "feafa3bb",
+   "id": "28",
    "metadata": {},
    "source": [
     "Fixed and random effects cannot be compared this way. A fixed-effects likelihood\n",
@@ -476,7 +476,7 @@
   {
    "cell_type": "code",
    "execution_count": null,
-   "id": "0d6a1c7c",
+   "id": "29",
    "metadata": {},
    "outputs": [],
    "source": [
@@ -493,50 +493,10 @@
     "contrast[\"gap in fixed-effects SDs\"] = (\n",
     "    contrast[\"random\"] - contrast[\"fixed\"]\n",
     ") / fe_estimates.loc[shared, \"sd\"]\n",
-    "contrast.round(3)"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "cd65cb3c",
-   "metadata": {},
-   "source": [
-    "On this panel the two sets of estimates agree, with every gap under one posterior\n",
-    "standard deviation, so nothing here argues against random effects."
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "28",
-   "metadata": {},
-   "source": [
-    "## Let the tests pick the specification\n",
-    "\n",
-    "The `neighbayes.diagnostics` module provides a full suite of Bayesian Lagrange Multiplier (LM) tests for panel models, following the framework of Dogan et al. (2021) with panel-specific formulas from Anselin (2008), Elhorst (2014), and Koley & Bera (2024).\n",
-    "\n",
-    "These tests help answer the question: *which spatial panel specification is most appropriate?* They test for omitted spatial lag ($\\rho$), spatial error ($\\lambda$), and spatially lagged covariates ($\\gamma$), both individually and jointly, with robust variants that account for the presence of the other terms.\n",
-    "\n",
-    "The decision tree mirrors the classical Anselin (1988) / Koley-Bera (2024) approach, but uses the full posterior distribution rather than point estimates — yielding Bayesian p-values and credible intervals for each LM statistic."
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "29",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "from neighbayes.diagnostics.lmtests import (\n",
-    "    bayesian_panel_lm_error_test,\n",
-    "    bayesian_panel_lm_lag_test,\n",
-    "    bayesian_panel_lm_sdm_joint_test,\n",
-    "    bayesian_panel_lm_slx_error_joint_test,\n",
-    "    bayesian_panel_lm_wx_test,\n",
-    "    bayesian_panel_robust_lm_error_sdem_test,\n",
-    "    bayesian_panel_robust_lm_error_test,\n",
-    "    bayesian_panel_robust_lm_lag_sdm_test,\n",
-    "    bayesian_panel_robust_lm_lag_test,\n",
-    "    bayesian_panel_robust_lm_wx_test,\n",
+    "display(contrast.round(3))\n",
+    "print(\n",
+    "    \"largest gap: \"\n",
+    "    f\"{contrast['gap in fixed-effects SDs'].abs().max():.2f} fixed-effects SDs\"\n",
     ")"
    ]
   },
@@ -545,76 +505,72 @@
    "id": "30",
    "metadata": {},
    "source": [
-    "### The standard tests\n",
-    "\n",
-    "The four standard panel LM tests use the OLS panel model as the null. They test for spatial lag, spatial error, and joint SDM/SDEM alternatives."
+    "Gaps under about one posterior standard deviation give no reason to doubt the\n",
+    "random effects. Larger ones, in $\\beta$ especially, point to unit effects that\n",
+    "move with the covariates, which only the fixed effects absorb."
    ]
   },
   {
-   "cell_type": "code",
-   "execution_count": null,
+   "cell_type": "markdown",
    "id": "31",
    "metadata": {},
-   "outputs": [],
    "source": [
-    "# Standard panel LM tests (from OLS null)\n",
-    "panel_standard = pd.DataFrame(\n",
-    "    [\n",
-    "        bayesian_panel_lm_lag_test(ols_panel).to_series(),\n",
-    "        bayesian_panel_lm_error_test(ols_panel).to_series(),\n",
-    "        bayesian_panel_lm_sdm_joint_test(ols_panel).to_series(),\n",
-    "        bayesian_panel_lm_slx_error_joint_test(ols_panel).to_series(),\n",
-    "    ],\n",
-    "    index=[\"LM-Lag\", \"LM-Error\", \"LM-SDM Joint\", \"LM-SLX-Error Joint\"],\n",
-    ")\n",
+    "## Let the tests pick the specification\n",
     "\n",
-    "panel_standard"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "32",
-   "metadata": {},
-   "source": [
-    "### The robust variants\n",
+    "The panel models run the cross-section's Lagrange-multiplier tests, written for\n",
+    "the panel and named with a `Panel-` prefix. Under fixed effects they score the\n",
+    "transformed likelihood the demeaned data give (Lee & Yu 2010); under random\n",
+    "effects the unit effects enter as coefficients carrying their prior.\n",
+    "`spatial_diagnostics()` runs the tests that apply to a fitted model, and\n",
+    "`spatial_diagnostics_decision()` reads them by the rule of the cross-sectional\n",
+    "walkthrough: a lone plain rejection adds its term, and the robust pair only\n",
+    "settles a double rejection. Fit the recommended model and ask again until the\n",
+    "tests stop rejecting.\n",
     "\n",
-    "The robust variants (Elhorst, 2014) test one spatial effect while accounting for the possible local presence of the other. For example, the robust LM-Lag tests for $\\rho$ robust to $\\lambda$, and vice versa."
+    "The panel was simulated from a SAR with no $WX$ term, so the walk should end at\n",
+    "the SAR."
    ]
   },
   {
    "cell_type": "code",
    "execution_count": null,
-   "id": "33",
+   "id": "32",
    "metadata": {},
    "outputs": [],
    "source": [
-    "# Robust panel LM tests (from OLS null)\n",
-    "panel_robust = pd.DataFrame(\n",
-    "    [\n",
-    "        bayesian_panel_robust_lm_lag_test(ols_panel).to_series(),\n",
-    "        bayesian_panel_robust_lm_error_test(ols_panel).to_series(),\n",
-    "    ],\n",
-    "    index=[\"Robust LM-Lag\", \"Robust LM-Error\"],\n",
-    ")\n",
-    "\n",
-    "panel_robust"
+    "def read_tests(model, alpha=0.05):\n",
+    "    \"\"\"Show a fitted model's LM tests and say which reject.\"\"\"\n",
+    "    diag = model.spatial_diagnostics()\n",
+    "    rejecting = diag.index[diag[\"p_value\"] < alpha].tolist()\n",
+    "    name = type(model).__name__\n",
+    "    print(f\"{name}: tests rejecting at {alpha}: {', '.join(rejecting) or 'none'}\")\n",
+    "    print(\n",
+    "        f\"{name}: recommended model: \"\n",
+    "        f\"{model.spatial_diagnostics_decision(alpha=alpha, format='model')}\"\n",
+    "    )\n",
+    "    return diag[[\"statistic\", \"df\", \"p_value\", \"ci_lower\", \"ci_upper\"]].round(3)"
    ]
   },
   {
    "cell_type": "markdown",
-   "id": "34",
+   "id": "33",
    "metadata": {},
    "source": [
-    "### Durbin-aware variants\n",
+    "### Start from the fixed-effects OLS panel\n",
     "\n",
-    "These tests address the Koley & Bera (2024) decision tree for choosing between SAR/SEM and SDM/SDEM specifications. They require fitting intermediate models (SAR or SLX) as the alternative model.\n",
-    "\n",
-    "- **LM-WX** (from SAR null): Should we extend SAR → SDM by adding $\\gamma$?\n",
-    "- **Robust LM-Lag-SDM** (from SLX null): Should we extend SLX → SDM by adding $\\rho$, robust to $\\gamma$?\n",
-    "- **Robust LM-WX** (from SAR null): Should we extend SAR → SDM by adding $\\gamma$, robust to $\\rho$?\n",
-    "- **Robust LM-Error-SDEM** (from SLX null): Should we extend SLX → SDEM by adding $\\lambda$, robust to $\\gamma$?\n",
-    "\n",
-    "We need to fit an SLX panel model first to serve as the null for the robust SDM/SDEM tests."
+    "The OLS panel's tests ask whether the outcome, the errors or the neighbors'\n",
+    "covariates carry spatial dependence once the unit and period effects are\n",
+    "removed."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "34",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "read_tests(ols_panel)"
    ]
   },
   {
@@ -624,143 +580,76 @@
    "metadata": {},
    "outputs": [],
    "source": [
-    "from neighbayes.models import SLX\n",
-    "\n",
-    "slx_panel, summary_slx, effects_slx = fit_panel_model(\n",
-    "    SLX, formula, panel, W, unit_effects=\"fixed\", time_effects=True\n",
-    ")\n",
-    "display(summary_slx)"
+    "ols_panel.spatial_diagnostics_decision()"
    ]
   },
   {
-   "cell_type": "code",
-   "execution_count": null,
+   "cell_type": "markdown",
    "id": "36",
    "metadata": {},
-   "outputs": [],
    "source": [
-    "# SDM/SDEM variant panel LM tests\n",
-    "panel_sdem = pd.DataFrame(\n",
-    "    [\n",
-    "        bayesian_panel_lm_wx_test(sar_panel).to_series(),\n",
-    "        bayesian_panel_robust_lm_lag_sdm_test(slx_panel).to_series(),\n",
-    "        bayesian_panel_robust_lm_wx_test(sar_panel).to_series(),\n",
-    "        bayesian_panel_robust_lm_error_sdem_test(slx_panel).to_series(),\n",
-    "    ],\n",
-    "    index=[\"LM-WX\", \"Robust LM-Lag-SDM\", \"Robust LM-WX\", \"Robust LM-Error-SDEM\"],\n",
-    ")\n",
+    "### Refit, and ask again\n",
     "\n",
-    "panel_sdem"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "37",
-   "metadata": {},
-   "source": [
-    "### Reading the decision tree\n",
-    "\n",
-    "The panel LM tests follow the same decision logic as the classical Anselin/Koley-Bera approach, but with Bayesian p-values:\n",
-    "\n",
-    "| Scenario | Significant? | Interpretation |\n",
-    "|---|---|---|\n",
-    "| LM-Lag ✓, LM-Error ✗ | Lag only | Choose SAR panel |\n",
-    "| LM-Lag ✗, LM-Error ✓ | Error only | Choose SEM panel |\n",
-    "| Both significant → check robust tests | | |\n",
-    "| Robust LM-Lag ✓, Robust LM-Error ✗ | Lag dominates | Choose SAR panel |\n",
-    "| Robust LM-Lag ✗, Robust LM-Error ✓ | Error dominates | Choose SEM panel |\n",
-    "| Both robust significant | Both effects | Consider SDM or SDEM |\n",
-    "| Joint LM-SDM ✓ | SDM preferred over OLS | Fit SDM panel |\n",
-    "| Joint LM-SLX-Error ✓ | SDEM preferred over OLS | Fit SDEM panel |\n",
-    "| LM-WX ✓ (from SAR) | WX effects present | Extend SAR → SDM |\n",
-    "| Robust LM-Lag-SDM ✓ (from SLX) | Lag needed beyond WX | Extend SLX → SDM |\n",
-    "| Robust LM-WX ✓ (from SAR) | WX needed beyond lag | Extend SAR → SDM |\n",
-    "| Robust LM-Error-SDEM ✓ (from SLX) | Error needed beyond WX | Extend SLX → SDEM |\n",
-    "\n",
-    "A Bayesian p-value below 0.05 (or a threshold you choose) indicates evidence against the null hypothesis. The `credible_interval` field shows the posterior uncertainty in the LM statistic itself."
+    "The OLS panel's tree names the model to fit next, and that model tests the terms\n",
+    "it still leaves out; at the SAR panel, the neighbors' covariates (towards the\n",
+    "SDM) and the error process (towards SARAR, which neighbayes does not fit). The\n",
+    "cell below follows the recommendations through the fixed-effects models fitted\n",
+    "above until a model's tests stop rejecting."
    ]
   },
   {
    "cell_type": "code",
    "execution_count": null,
-   "id": "38",
+   "id": "37",
    "metadata": {},
    "outputs": [],
    "source": [
-    "from scipy import stats as sp_stats\n",
+    "def walk(start, fitted, alpha=0.05, show=True):\n",
+    "    \"\"\"Follow the recommendations from ``start`` through the fitted models.\"\"\"\n",
+    "    model, path = start, [type(start).__name__]\n",
+    "    while True:\n",
+    "        nxt = model.spatial_diagnostics_decision(alpha=alpha, format=\"model\")\n",
+    "        if nxt == path[-1]:\n",
+    "            break\n",
+    "        if nxt not in fitted:\n",
+    "            path.append(f\"{nxt} (not fitted here)\")\n",
+    "            break\n",
+    "        model = fitted[nxt]\n",
+    "        path.append(nxt)\n",
+    "        if show:\n",
+    "            print(f\"--- at the {nxt} fit ---\")\n",
+    "            display(read_tests(model, alpha))\n",
+    "            display(model.spatial_diagnostics_decision(alpha=alpha))\n",
+    "    if show:\n",
+    "        print(\" → \".join(path))\n",
+    "    return path\n",
     "\n",
-    "# All panel LM tests in a single table\n",
-    "all_panel = pd.concat([panel_standard, panel_robust, panel_sdem])\n",
     "\n",
-    "# Add chi-squared reference values\n",
-    "all_panel[\"chi2_ref_95\"] = all_panel[\"df\"].apply(lambda df: sp_stats.chi2.ppf(0.95, df))\n",
-    "\n",
-    "all_panel"
+    "fitted = {\"SAR\": sar_panel, \"SEM\": sem_panel, \"SDM\": sdm_panel, \"SDEM\": sdem_panel}\n",
+    "path = walk(ols_panel, fitted)"
    ]
   },
   {
    "cell_type": "markdown",
-   "id": "39",
+   "id": "38",
    "metadata": {},
    "source": [
-    "- LM-Lag is highly significant (p=0.002) — correctly detecting the spatial lag used in the DGP\n",
-    "\n",
-    "- Robust LM-Lag remains significant (p=0.039) while Robust LM-Error is not (p=0.66) — pointing to SAR over SEM\n",
-    "\n",
-    "- Joint LM-SDM and Joint LM-SLX-Error are both significant — suggesting spatial structure beyond OLS\n",
-    "\n",
-    "- LM-WX from SAR null is not significant (p=0.17) — the DGP had no WX effects, so SAR is sufficient\n",
-    "\n",
-    "- Robust LM-Error-SDEM is marginally significant (p=0.036) — slight error signal when WX is present"
+    "A random-effects fit runs the same tests through the same tree."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "39",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "read_tests(sar_panel_re)"
    ]
   },
   {
    "cell_type": "markdown",
    "id": "40",
-   "metadata": {},
-   "source": [
-    "## Get a recommendation from any fitted model\n",
-    "\n",
-    "Every fitted panel model exposes `spatial_diagnostics()` (a tidy DataFrame of all wired tests) and `spatial_diagnostics_decision()` (a recommended specification). The registries are class-aware, so the right tests are run for each model.\n"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "41",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "ols_panel.spatial_diagnostics()"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "42",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "print(\n",
-    "    \"OLS panel recommends:\",\n",
-    ")\n",
-    "ols_panel.spatial_diagnostics_decision()"
-   ]
-  },
-  {
-   "cell_type": "code",
-   "execution_count": null,
-   "id": "43",
-   "metadata": {},
-   "outputs": [],
-   "source": [
-    "print(\"SAR panel recommends:\")\n",
-    "sar_panel.spatial_diagnostics_decision()"
-   ]
-  },
-  {
-   "cell_type": "markdown",
-   "id": "44",
    "metadata": {},
    "source": [
     "## Where to go next\n",
