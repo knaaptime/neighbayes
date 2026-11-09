@@ -1695,7 +1695,7 @@ GM_Error
 Initializing NUTS using jitter+adapt_diag...
 Multiprocess sampling (4 chains in 2 jobs)
 NUTS: [beta, sigma2]
-Sampling 4 chains for 1_000 tune and 1_000 draw iterations (4_000 + 4_000 draws total) took 11 seconds.
+Sampling 4 chains for 1_000 tune and 1_000 draw iterations (4_000 + 4_000 draws total) took 12 seconds.
 </code></pre></div>
 </div>
 </div>
@@ -2520,7 +2520,7 @@ for Jupyter support
   warnings.warn('install "ipywidgets" for Jupyter support')
 </pre>
 </div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
-</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 2s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">6</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">203</span> draws/s<span style="font-weight: bold">)</span>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 2s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">6</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">128</span> draws/s<span style="font-weight: bold">)</span>
 </pre>
 </div><div class="output text_html"><table border="1" class="dataframe">
   <thead>
@@ -2540,63 +2540,63 @@ for Jupyter support
   <tbody>
     <tr>
       <th>rho</th>
-      <td>0.5205</td>
-      <td>0.0271</td>
-      <td>0.48</td>
-      <td>0.56</td>
-      <td>7426</td>
-      <td>6111</td>
+      <td>0.4782</td>
+      <td>0.0286</td>
+      <td>0.43</td>
+      <td>0.52</td>
+      <td>7506</td>
+      <td>5822</td>
       <td>1.00</td>
-      <td>0.00031</td>
-      <td>0.0003</td>
+      <td>0.00033</td>
+      <td>0.00033</td>
     </tr>
     <tr>
       <th>sigma</th>
-      <td>1.0488</td>
-      <td>0.0186</td>
+      <td>1.0149</td>
+      <td>0.0181</td>
+      <td>0.99</td>
       <td>1</td>
-      <td>1.1</td>
-      <td>7679</td>
-      <td>7844</td>
+      <td>7687</td>
+      <td>7484</td>
       <td>1.00</td>
       <td>0.00021</td>
       <td>0.00015</td>
     </tr>
     <tr>
       <th>sigma2</th>
-      <td>1.1004</td>
-      <td>0.0392</td>
-      <td>1</td>
-      <td>1.2</td>
-      <td>7679</td>
-      <td>7844</td>
+      <td>1.0303</td>
+      <td>0.0368</td>
+      <td>0.97</td>
+      <td>1.1</td>
+      <td>7687</td>
+      <td>7484</td>
       <td>1.00</td>
-      <td>0.00045</td>
-      <td>0.00032</td>
+      <td>0.00042</td>
+      <td>0.0003</td>
     </tr>
     <tr>
       <th>Intercept</th>
-      <td>0.972374</td>
-      <td>0.059838</td>
-      <td>0.877989</td>
-      <td>1.06882</td>
-      <td>7526.037017</td>
-      <td>6420.893688</td>
-      <td>1.000393</td>
-      <td>0.00069</td>
-      <td>0.000612</td>
+      <td>1.069649</td>
+      <td>0.065774</td>
+      <td>0.964162</td>
+      <td>1.175777</td>
+      <td>7625.257089</td>
+      <td>6685.721707</td>
+      <td>1.000563</td>
+      <td>0.000754</td>
+      <td>0.000697</td>
     </tr>
     <tr>
       <th>X_1</th>
-      <td>-1.027445</td>
-      <td>0.026175</td>
-      <td>-1.069296</td>
-      <td>-0.985532</td>
-      <td>8034.530727</td>
-      <td>7853.238856</td>
-      <td>1.000459</td>
-      <td>0.000292</td>
-      <td>0.000207</td>
+      <td>-1.02811</td>
+      <td>0.026606</td>
+      <td>-1.070692</td>
+      <td>-0.985458</td>
+      <td>7943.495409</td>
+      <td>7861.139564</td>
+      <td>1.000354</td>
+      <td>0.000299</td>
+      <td>0.000217</td>
     </tr>
   </tbody>
 </table></div></div>
@@ -2658,17 +2658,17 @@ for Jupyter support
   <tbody>
     <tr>
       <th>X_1</th>
-      <td>-1.07862</td>
-      <td>-1.131808</td>
-      <td>-1.024196</td>
+      <td>-1.069625</td>
+      <td>-1.124501</td>
+      <td>-1.014448</td>
       <td>0.0</td>
-      <td>-1.07053</td>
-      <td>-1.310013</td>
-      <td>-0.861596</td>
+      <td>-0.906286</td>
+      <td>-1.121235</td>
+      <td>-0.717517</td>
       <td>0.0</td>
-      <td>-2.14915</td>
-      <td>-2.415389</td>
-      <td>-1.915193</td>
+      <td>-1.975911</td>
+      <td>-2.215307</td>
+      <td>-1.76013</td>
       <td>0.0</td>
     </tr>
   </tbody>
@@ -2706,29 +2706,29 @@ SUMMARY OF OUTPUT: SPATIAL TWO STAGE LEAST SQUARES
 Data set            :     unknown
 Weights matrix      :     unknown
 Dependent Variable  :           y                Number of Observations:        1600
-Mean dependent var  :      1.9977                Number of Variables   :           3
-S.D. dependent var  :      1.6165                Degrees of Freedom    :        1597
-Pseudo R-squared    :      0.5820
-Spatial Pseudo R-squared:  0.5124
+Mean dependent var  :      2.1306                Number of Variables   :           3
+S.D. dependent var  :      1.5047                Degrees of Freedom    :        1597
+Pseudo R-squared    :      0.5404
+Spatial Pseudo R-squared:  0.4769
 
 ------------------------------------------------------------------------------------
             Variable     Coefficient       Std.Error     z-Statistic     Probability
 ------------------------------------------------------------------------------------
-            CONSTANT         0.93652         0.08997        10.40899         0.00000
-                 X_1        -1.02462         0.02657       -38.56827         0.00000
-                 W_y         0.53875         0.04322        12.46617         0.00000
+            CONSTANT         1.22752         0.11385        10.78147         0.00000
+                 X_1        -1.03456         0.02719       -38.04315         0.00000
+                 W_y         0.40360         0.05233         7.71321         0.00000
 ------------------------------------------------------------------------------------
 Instrumented: W_y
 Instruments: W_X_1
 
 DIAGNOSTICS FOR SPATIAL DEPENDENCE
 TEST                              DF         VALUE           PROB
-Anselin-Kelejian Test             1          0.258           0.6115
+Anselin-Kelejian Test             1          2.403           0.1211
 
 SPATIAL LAG MODEL IMPACTS
 Impacts computed using the 'simple' method.
             Variable         Direct        Indirect          Total
-                 X_1        -1.0246         -1.1968         -2.2214
+                 X_1        -1.0346         -0.7001         -1.7347
 ================================ END OF REPORT =====================================
 </code></pre></div>
 </div>
