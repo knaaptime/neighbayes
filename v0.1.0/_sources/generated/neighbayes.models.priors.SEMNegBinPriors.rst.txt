@@ -1,0 +1,37 @@
+﻿neighbayes.models.priors.SEMNegBinPriors
+========================================
+
+.. currentmodule:: neighbayes.models.priors
+
+.. autoclass:: SEMNegBinPriors
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SEMNegBinPriors.__init__
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SEMNegBinPriors.alpha_fixed
+      ~SEMNegBinPriors.alpha_nu
+      ~SEMNegBinPriors.alpha_sigma
+      ~SEMNegBinPriors.beta_mu
+      ~SEMNegBinPriors.beta_sigma
+      ~SEMNegBinPriors.lam_lower
+      ~SEMNegBinPriors.lam_upper
+      ~SEMNegBinPriors.nu
+      ~SEMNegBinPriors.sigma2_alpha
+      ~SEMNegBinPriors.sigma2_beta
+   
+   

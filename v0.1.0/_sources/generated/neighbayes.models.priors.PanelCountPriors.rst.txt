@@ -1,0 +1,41 @@
+﻿neighbayes.models.priors.PanelCountPriors
+=========================================
+
+.. currentmodule:: neighbayes.models.priors
+
+.. autoclass:: PanelCountPriors
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~PanelCountPriors.__init__
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~PanelCountPriors.alpha_fixed
+      ~PanelCountPriors.alpha_nu
+      ~PanelCountPriors.alpha_sigma
+      ~PanelCountPriors.beta_mu
+      ~PanelCountPriors.beta_sigma
+      ~PanelCountPriors.nu
+      ~PanelCountPriors.rho_lower
+      ~PanelCountPriors.rho_upper
+      ~PanelCountPriors.sigma2_alpha
+      ~PanelCountPriors.sigma2_beta
+      ~PanelCountPriors.time_effect_mu
+      ~PanelCountPriors.time_effect_sigma
+      ~PanelCountPriors.unit_effect_mu
+      ~PanelCountPriors.unit_effect_sd_scale
+   
+   

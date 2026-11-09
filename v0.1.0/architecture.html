@@ -1,0 +1,1978 @@
+
+
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="concept.html">
+      
+      
+        <link rel="next" href="models.html">
+      
+      
+      <link rel="icon" href="_static/pysal_favicon.ico">
+    
+    
+      
+        <title>Architecture - neighbayes</title>
+      
+    
+    
+      
+        
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+        <link rel="stylesheet" type="text/css" href="_static/sphinx_immaterial_theme.6efbe22605a23fcd6.min.css?v=b2ceb110" />
+        <link rel="stylesheet" type="text/css" href="_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
+        <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
+        <link rel="stylesheet" type="text/css" href="_static/custom.css?v=93c5fc88" />
+    <script>__md_scope=new URL(".",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#design-goals" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="index.html" title="neighbayes" class="md-header__button md-logo" aria-label="neighbayes" data-md-component="logo">
+      <img src="_static/pysal_logo.svg" alt="logo">
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            neighbayes
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Architecture
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="red"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7M9 21a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-1H9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="red"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7M9 21v-1h6v1a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1m3-17a5 5 0 0 0-5 5c0 2.05 1.23 3.81 3 4.58V16h4v-2.42c1.77-.77 3-2.53 3-4.58a5 5 0 0 0-5-5"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/pysal/neighbayes/" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    pysal/neighbayes
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="index.html" title="neighbayes" class="md-nav__button md-logo" aria-label="neighbayes" data-md-component="logo">
+      <img src="_static/pysal_logo.svg" alt="logo">
+    </a>
+    neighbayes
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/pysal/neighbayes/" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    pysal/neighbayes
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Home</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="installation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Installation</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>Tutorial</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Tutorial</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="tutorial/quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Getting Started with neighbayes</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="tutorial/pedagogical_spatial_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Bayesian spatial models:<wbr> a walkthrough</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="tutorial/pedagogical_panel_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Spatial panel models:<wbr> a walkthrough</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>How-<wbr>to guides</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            <span>How-<wbr>to guides</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="how-to/priors.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to set priors</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="how-to/gibbs_sampler.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to choose and configure the Gibbs sampler</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="how-to/spatial_logit.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to fit a spatial logit model</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="how-to/negbin_estimation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to estimate spatial negative binomial models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="how-to/zinb_estimation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to fit zero-<wbr>inflated SAR negative binomial models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="how-to/poisson_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to estimate Poisson origin–destination flow models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="how-to/tobit_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to fit spatial tobit models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="how-to/tobit_panel_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to fit spatial tobit panel models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="how-to/flow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to estimate origin–destination flow models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="how-to/panel_flow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to estimate panel flow models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="how-to/bayesian_lmtests.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to run Bayesian LM specification tests</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="how-to/spatial_cv_demo.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to run spatial block cross-<wbr>validation</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="how-to/prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>Explanation</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Explanation</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="concept.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Why neighbayes</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    <span>Architecture</span>
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="#" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Architecture</span>
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary">
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#design-goals" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Design goals</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-layers" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>The layers</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#models-are-declarations" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Models are declarations</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Models are declarations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cross-section-and-panel-share-one-implementation" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Cross-<wbr>section and panel share one implementation</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#priors-mirror-model-inheritance" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Priors mirror model inheritance</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-log-determinant-subsystem" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>The log-<wbr>determinant subsystem</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sampler-dispatch" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Sampler dispatch</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sampler dispatch">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#two-samplers-behind-one-object" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Two samplers behind one object</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backends-are-a-runtime-choice-not-a-fork" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Backends are a runtime choice, not a fork</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#every-model-has-a-simulator" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Every model has a simulator</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#diagnostics-are-part-of-the-model-not-an-add-on" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Diagnostics are part of the model, not an add-<wbr>on</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Configuration</span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>Reference</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Reference</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Supported Models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="api.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>API reference</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="references.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>References</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>Validation</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Validation</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="validation/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>External Validation &amp; Replication</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>Performance</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Performance</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="performance/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Performance &amp; Profiling</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>For contributors</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            <span>For contributors</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/knaaptime/neighbayes" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Git<wbr>Hub</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/knaaptime/neighbayes/releases" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Changelog</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary">
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#design-goals" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Design goals</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-layers" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>The layers</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#models-are-declarations" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Models are declarations</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Models are declarations">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#cross-section-and-panel-share-one-implementation" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Cross-<wbr>section and panel share one implementation</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#priors-mirror-model-inheritance" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Priors mirror model inheritance</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-log-determinant-subsystem" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>The log-<wbr>determinant subsystem</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#sampler-dispatch" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Sampler dispatch</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Sampler dispatch">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#two-samplers-behind-one-object" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Two samplers behind one object</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#backends-are-a-runtime-choice-not-a-fork" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Backends are a runtime choice, not a fork</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#every-model-has-a-simulator" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Every model has a simulator</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#diagnostics-are-part-of-the-model-not-an-add-on" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Diagnostics are part of the model, not an add-<wbr>on</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Configuration</span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset" role="main">
+                
+                
+                  
+
+
+  
+    <a href="https://github.com/pysal/neighbayes/blob/main/docs/architecture.md" title="Edit this page" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 9h5.5L13 3.5zM6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4c0-1.11.89-2 2-2m.12 13.5 3.74 3.74 1.42-1.41-2.33-2.33 2.33-2.33-1.42-1.41zm11.16 0-3.74-3.74-1.42 1.41 2.33 2.33-2.33 2.33 1.42 1.41z"/></svg>
+    </a>
+  
+  
+
+<h1 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Link to this heading">¶</a></h1>
+<p>This page describes how <code class="docutils literal notranslate"><span class="pre">neighbayes</span></code> is put together and why. It is aimed at
+contributors, and at users who want to know what the library is doing on their behalf
+before they trust a posterior. For the models themselves see
+<a class="reference internal" href="models.html"><span class="doc std std-doc">Supported Models</span></a>, and for measured numbers see
+<a class="reference internal" href="performance/index.html"><span class="doc std std-doc">Performance</span></a>.</p>
+<h2 id="design-goals">Design goals<a class="headerlink" href="#design-goals" title="Link to this heading">¶</a></h2>
+<p>The package is organised around four commitments.</p>
+<p><strong>One implementation of each hard thing.</strong> The log-determinant, the spatial lag, the
+effects decomposition, and the diagnostics battery are each written once and shared by
+every model that needs them. A new model should be a declaration of its structure, not a
+new copy of the machinery.</p>
+<p><strong>Exact by default, approximate on request.</strong> Where an exact computation is affordable,
+the defaults take it. Stochastic estimators are available, but a user has to ask for
+them — noise in the log-density is a property of the posterior you sample, not an
+implementation detail to be chosen silently on a user’s behalf.</p>
+<p><strong>Automatic choices are overridable.</strong> The library picks a log-determinant method, a
+sampler, a sparse backend, and a set of priors for you. Every one of them can be
+replaced by an explicit argument — <code class="docutils literal notranslate"><span class="pre">logdet_method=</span></code>, <code class="docutils literal notranslate"><span class="pre">sampler=</span></code>, <code class="docutils literal notranslate"><span class="pre">backend=</span></code>,
+<code class="docutils literal notranslate"><span class="pre">priors=</span></code> — and the resolved log-determinant method is recorded on the model as
+<code class="docutils literal notranslate"><span class="pre">_resolved_logdet_method</span></code>. Nothing is chosen in a way you cannot see or change.</p>
+<p><strong>No bespoke result objects.</strong> <code class="docutils literal notranslate"><span class="pre">fit()</span></code> returns an ArviZ <code class="docutils literal notranslate"><span class="pre">DataTree</span></code> (<code class="docutils literal notranslate"><span class="pre">xarray.DataTree</span></code>). The posterior
+belongs to the wider PyData ecosystem, not to this package.</p>
+<h2 id="the-layers">The layers<a class="headerlink" href="#the-layers" title="Link to this heading">¶</a></h2>
+<div class="highlight-default notranslate"><div class="highlight"><pre><span></span><code>models/          SAR, SDM, panel FE, flow …  — thin, declarative
+  _base/         shared methods + structure strategies
+  _mixins/       likelihood-specific model building
+  priors.py      frozen dataclasses, inheritance mirrors the models
+samplers/        Gibbs runners, one per (likelihood, structure)
+  _registry.py   dispatch: (likelihood, structure) -&gt; runner
+_logdet/         log|I - rho W|: methods, factories, auto-selection
+_ops/            sparse/dense linear algebra, Kronecker helpers, backends
+diagnostics/     LM tests, decision trees, effects, Bayes factors, spatial CV
+dgp/             a simulator for every model
+</code></pre></div>
+</div>
+<p>Dependencies run downward. <code class="docutils literal notranslate"><span class="pre">_logdet</span></code> and <code class="docutils literal notranslate"><span class="pre">_ops</span></code> know nothing about models; the models
+know nothing about which sampler will be used until <code class="docutils literal notranslate"><span class="pre">fit()</span></code> is called.</p>
+<h2 id="models-are-declarations">Models are declarations<a class="headerlink" href="#models-are-declarations" title="Link to this heading">¶</a></h2>
+<p>A model class carries almost no code. It states what it <em>is</em> through class attributes,
+and inherits the behaviour from <code class="docutils literal notranslate"><span class="pre">SharedSpatialMethods</span></code> in
+<a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_shared.py"><code class="docutils literal notranslate"><span class="pre">models/_base/_shared.py</span></code></a>.
+The whole of <code class="docutils literal notranslate"><span class="pre">SAR</span></code>’s structural definition is:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">SAR</span><span class="p">(</span><span class="n">GaussianLikelihoodMixin</span><span class="p">,</span> <span class="n">SpatialModel</span><span class="p">):</span>
+    <span class="n">_priors_cls</span> <span class="o">=</span> <span class="n">SARPriors</span>
+    <span class="n">_spatial_params</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"rho"</span><span class="p">,)</span>        <span class="c1"># autoregressive parameters</span>
+    <span class="n">_lag_terms</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"Wy"</span><span class="p">,)</span>              <span class="c1"># which lags appear in the specification</span>
+    <span class="n">_jacobian_param</span> <span class="o">=</span> <span class="s2">"rho"</span>           <span class="c1"># the parameter inside log|I - .W|, or None</span>
+    <span class="n">_has_wx_in_beta</span> <span class="o">=</span> <span class="kc">False</span>           <span class="c1"># is the design matrix [X, WX] or just X?</span>
+    <span class="n">_model_type</span> <span class="o">=</span> <span class="s2">"sar"</span>
+    <span class="n">_likelihood</span> <span class="o">=</span> <span class="s2">"gaussian"</span>
+    <span class="n">_gibbs_key</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"gaussian"</span><span class="p">,</span> <span class="s2">"cross_section"</span><span class="p">)</span>
+</code></pre></div>
+</div>
+<p>Those attributes are what the shared machinery reads. <code class="docutils literal notranslate"><span class="pre">_jacobian_param</span></code> tells the base
+class whether to build a log-determinant at all and which parameter to feed it —
+<code class="docutils literal notranslate"><span class="pre">&quot;rho&quot;</span></code> for SAR and SDM, <code class="docutils literal notranslate"><span class="pre">&quot;lam&quot;</span></code> for SEM and SDEM, <code class="docutils literal notranslate"><span class="pre">None</span></code> for OLS and SLX, which
+therefore skip the Jacobian entirely. <code class="docutils literal notranslate"><span class="pre">_lag_terms</span></code> and <code class="docutils literal notranslate"><span class="pre">_has_wx_in_beta</span></code> drive design
+matrix assembly and coefficient labelling. <code class="docutils literal notranslate"><span class="pre">_spatial_params</span></code> drives which diagnostics
+and effects decompositions apply.</p>
+<p>The payoff is that the differences between the fifty-odd model classes are legible in a
+few lines each, and a bug fixed in the shared path is fixed everywhere at once. The cost
+is that adding a genuinely novel structure means extending the shared machinery rather
+than writing a self-contained class, which is the right trade for a package whose models
+are variations on a small number of themes.</p>
+<h3 id="cross-section-and-panel-share-one-implementation">Cross-section and panel share one implementation<a class="headerlink" href="#cross-section-and-panel-share-one-implementation" title="Link to this heading">¶</a></h3>
+<p>A cross-section is the <code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">=</span> <span class="pre">1</span></code> panel. One base class,
+<a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/base.py"><code class="docutils literal notranslate"><span class="pre">SpatialModel</span></code></a>,
+parses either kind of data: given time (<code class="docutils literal notranslate"><span class="pre">time_col</span></code>, or <code class="docutils literal notranslate"><span class="pre">T</span></code>), it sorts and stacks the
+panel by period, then unit, and applies the within transformation its fixed effects
+need; without time it holds <code class="docutils literal notranslate"><span class="pre">N</span> <span class="pre">=</span> <span class="pre">n</span></code> units and <code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">=</span> <span class="pre">1</span></code> period. The operations that
+depend on that layout are isolated in the <code class="docutils literal notranslate"><span class="pre">SpatialStructure</span></code> of
+<a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/_base/_structure.py"><code class="docutils literal notranslate"><span class="pre">models/_base/_structure.py</span></code></a>:</p>
+<table class="docutils data align-default">
+<colgroup>
+<col style="width: 30.0%" />
+<col style="width: 70.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>operation</p></th>
+<th class="head"><p>what it does</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">spatial_lag(x)</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">W</span></code> applied within each period of the stacked data (<code class="docutils literal notranslate"><span class="pre">W</span> <span class="pre">&#64;</span> <span class="pre">x</span></code> in a cross-section)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">batch_spatial_lag(resid)</span></code></p></td>
+<td><p>the same lag for a batch of residual draws, one sparse multiply</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">W_sparse_NT()</span></code></p></td>
+<td><p>the <code class="docutils literal notranslate"><span class="pre">(N·T)×(N·T)</span></code> block <code class="docutils literal notranslate"><span class="pre">I_T</span> <span class="pre">⊗</span> <span class="pre">W</span></code>, so one multiply lags a stacked panel; <code class="docutils literal notranslate"><span class="pre">W</span></code>
+itself in a cross-section</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">logdet_W_operand()</span></code></p></td>
+<td><p>the sparse <code class="docutils literal notranslate"><span class="pre">W</span></code> handed to the log-determinant factory</p></td>
+</tr>
+</tbody>
+</table>
+<p>Everything else is behaviour-identical across the two, so panel models inherit the
+diagnostics, effects, and prior handling of their cross-sectional counterparts without
+re-implementation. The fixed-effects likelihood dimensions (Lee and Yu 2010) reduce to
+the cross-section’s when there are no effects and <code class="docutils literal notranslate"><span class="pre">T</span> <span class="pre">=</span> <span class="pre">1</span></code>.</p>
+<h3 id="priors-mirror-model-inheritance">Priors mirror model inheritance<a class="headerlink" href="#priors-mirror-model-inheritance" title="Link to this heading">¶</a></h3>
+<p>Priors are frozen dataclasses in
+<a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/models/priors.py"><code class="docutils literal notranslate"><span class="pre">models/priors.py</span></code></a>,
+and their inheritance graph tracks the models’: <code class="docutils literal notranslate"><span class="pre">SDMPriors</span></code> extends <code class="docutils literal notranslate"><span class="pre">SARPriors</span></code>,
+<code class="docutils literal notranslate"><span class="pre">SDEMPriors</span></code> extends <code class="docutils literal notranslate"><span class="pre">SEMPriors</span></code>, and <code class="docutils literal notranslate"><span class="pre">SARNegBinPriors</span></code> extends both <code class="docutils literal notranslate"><span class="pre">SARPriors</span></code> and
+<code class="docutils literal notranslate"><span class="pre">NegBinPriors</span></code>. A model declares its prior class as <code class="docutils literal notranslate"><span class="pre">_priors_cls</span></code> and users override
+individual hyperparameters through the <code class="docutils literal notranslate"><span class="pre">priors=</span></code> dict. Because the dataclasses are
+frozen and typed, an unrecognised prior key is an error rather than a silently ignored
+keyword.</p>
+<h2 id="the-log-determinant-subsystem">The log-determinant subsystem<a class="headerlink" href="#the-log-determinant-subsystem" title="Link to this heading">¶</a></h2>
+<p>The Jacobian <span class="math notranslate nohighlight">\(\log|I - \rho W|\)</span> is evaluated at every <span class="math notranslate nohighlight">\(\rho\)</span> the sampler proposes, which
+makes it the dominant cost in a spatial fit and the reason <code class="docutils literal notranslate"><span class="pre">_logdet</span></code> is a subsystem
+rather than a function. Three design decisions shape it.</p>
+<p><strong>Precompute once, evaluate many times.</strong> Every method splits into a <code class="docutils literal notranslate"><span class="pre">*_precompute</span></code>
+step that does the expensive linear algebra and an <code class="docutils literal notranslate"><span class="pre">*_eval</span></code> step that answers a single
+<span class="math notranslate nohighlight">\(\rho\)</span>. The sampler pays the setup once per model and then evaluates in microseconds.
+This is what makes exact interpolation competitive: <code class="docutils literal notranslate"><span class="pre">cheb</span></code> on <code class="docutils literal notranslate"><span class="pre">chol</span></code> factorises at a
+handful of Chebyshev nodes and then costs ~1.3 μs per <span class="math notranslate nohighlight">\(\rho\)</span> via Clenshaw recurrence;
+<code class="docutils literal notranslate"><span class="pre">aaa</span></code> factorises on an adaptive coarse grid, selects ~7 support points, and costs ~5 μs.
+Both are accurate to near machine precision, and both need far fewer factorisations than
+the common practice of factorising a dense grid and splining between the results.</p>
+<p><strong>One term, several computational dialects.</strong> The same log-determinant has to be
+available as a plain Python float (for the NumPy Gibbs sampler), as a vectorised array
+operation, as a gradient, as a PyTensor symbolic expression (for PyMC and NUTS), and
+under JAX. The factories in
+<a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/_logdet/_factories.py"><code class="docutils literal notranslate"><span class="pre">_logdet/_factories.py</span></code></a>
+emit each of these from the same precomputed data:</p>
+<table class="docutils data align-default">
+<colgroup>
+<col style="width: 45.0%" />
+<col style="width: 55.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>factory</p></th>
+<th class="head"><p>returns</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">make_logdet_numpy_fn</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(rho:</span> <span class="pre">float)</span> <span class="pre">-&gt;</span> <span class="pre">float</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">make_logdet_numpy_vec_fn</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(rho_arr)</span> <span class="pre">-&gt;</span> <span class="pre">ndarray</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">make_logdet_grad_numpy_fn</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(rho:</span> <span class="pre">float)</span> <span class="pre">-&gt;</span> <span class="pre">float</span></code>, the derivative</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">make_logdet_fn</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">(rho)</span> <span class="pre">-&gt;</span> <span class="pre">pytensor</span></code> symbolic expression</p></td>
+</tr>
+</tbody>
+</table>
+<p>The gradient factory matters beyond sampling: the direct-effects computation rides the
+resolvent identity <span class="math notranslate nohighlight">\(\operatorname{tr}(S)/n = 1 - (\rho/n)\,g\)</span> with
+<span class="math notranslate nohighlight">\(g = \tfrac{d}{d\rho}\log|I-\rho W|\)</span> and <span class="math notranslate nohighlight">\(S = (I-\rho W)^{-1}\)</span>, so the effects
+decomposition needs no <span class="math notranslate nohighlight">\(O(n^3)\)</span> eigendecomposition either.</p>
+<p>Built callables are cached by a signature of <span class="math notranslate nohighlight">\(W\)</span> and the resolved bounds
+(<code class="docutils literal notranslate"><span class="pre">get_cached_logdet_fn</span></code>), so refitting a model, or fitting several models on the same
+graph, reuses the setup.</p>
+<p><strong>Auto-selection from the shape of the problem.</strong> A model names its log-determinant
+by <code class="docutils literal notranslate"><span class="pre">logdet_method</span></code> (the approximation over ρ) and <code class="docutils literal notranslate"><span class="pre">logdet_decomp</span></code> (what supplies exact
+values), and <code class="docutils literal notranslate"><span class="pre">logdet_key</span></code> resolves the pair to one internal key that the factories
+and samplers dispatch on. Left to auto, <code class="docutils literal notranslate"><span class="pre">resolve_logdet_method</span></code> picks from the size
+and symmetry of <span class="math notranslate nohighlight">\(W\)</span>: <code class="docutils literal notranslate"><span class="pre">exact</span></code> on <code class="docutils literal notranslate"><span class="pre">eig</span></code> below <span class="math notranslate nohighlight">\(n=500\)</span>; <code class="docutils literal notranslate"><span class="pre">aaa</span></code> on <code class="docutils literal notranslate"><span class="pre">chol</span></code> for undirected <span class="math notranslate nohighlight">\(W\)</span>
+and on <code class="docutils literal notranslate"><span class="pre">lu</span></code> for directed <span class="math notranslate nohighlight">\(W\)</span> (KNN, travel time, migration flows) up to <span class="math notranslate nohighlight">\(n=60{,}000\)</span>; and
+<code class="docutils literal notranslate"><span class="pre">stochastic</span></code> above it, where factorisation fill-in stops being affordable. The
+symmetry test uses <code class="docutils literal notranslate"><span class="pre">Graph.asymmetry(intrinsic=False)</span></code> for libpysal graphs and never
+densifies a sparse matrix to check. Both cutoffs are environment variables, and the two
+arguments override the choice outright.</p>
+<h2 id="sampler-dispatch">Sampler dispatch<a class="headerlink" href="#sampler-dispatch" title="Link to this heading">¶</a></h2>
+<p>Sampler selection is a module-level dict keyed by <code class="docutils literal notranslate"><span class="pre">(likelihood,</span> <span class="pre">structure)</span></code> in
+<a class="reference external" href="https://github.com/pysal/neighbayes/blob/main/neighbayes/samplers/_registry.py"><code class="docutils literal notranslate"><span class="pre">samplers/_registry.py</span></code></a>
+— no plugin system and no entry points, because three structures times seven likelihoods
+is well below the size at which anything fancier pays for itself. A model names its key
+as <code class="docutils literal notranslate"><span class="pre">_gibbs_key</span></code>; a model with no entry simply has no Gibbs sampler, and <code class="docutils literal notranslate"><span class="pre">fit()</span></code> routes
+it to NUTS.</p>
+<p>Each entry is a <code class="docutils literal notranslate"><span class="pre">GibbsEntry</span></code> recording the runner plus what the base <code class="docutils literal notranslate"><span class="pre">fit()</span></code> needs to
+know about it:</p>
+<dl class="simple myst">
+<dt><code class="docutils literal notranslate"><span class="pre">run</span></code></dt><dd><p>The callable, which takes the model and resolved controls and returns a <strong>finished</strong>
+<code class="docutils literal notranslate"><span class="pre">DataTree</span></code>. Returning finished output rather than raw chains is deliberate: it
+lets class-based families keep their own <code class="docutils literal notranslate"><span class="pre">fit</span></code> and function-based families keep
+<code class="docutils literal notranslate"><span class="pre">run_chains</span></code> + <code class="docutils literal notranslate"><span class="pre">gibbs_to_inference_data</span></code>. The registry unifies dispatch, not sampler
+internals.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">backends</span></code></dt><dd><p>Which of <code class="docutils literal notranslate"><span class="pre">{&quot;jax&quot;,</span> <span class="pre">&quot;numpy&quot;}</span></code> the family supports; <code class="docutils literal notranslate"><span class="pre">&quot;auto&quot;</span></code> takes JAX when the family
+supports it and JAX is installed. The JAX path solves with sparse
+factorizations (sparsax), compiles once per model structure, and draws Pólya–Gamma
+variables exactly (augax), where the NumPy path’s draws carry a known bias in the
+<code class="docutils literal notranslate"><span class="pre">polyagamma</span></code> package and warn. The random-effects, count-panel and hurdle families
+are NumPy-only.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">options</span></code></dt><dd><p>The family-specific <code class="docutils literal notranslate"><span class="pre">fit</span></code> keywords this runner accepts, e.g. <code class="docutils literal notranslate"><span class="pre">slice_width</span></code>,
+<code class="docutils literal notranslate"><span class="pre">krylov_degree</span></code>. The base <code class="docutils literal notranslate"><span class="pre">fit()</span></code> pops exactly these and raises on anything left over,
+replacing a silent <code class="docutils literal notranslate"><span class="pre">**kwargs</span></code> swallow — a misspelled tuning parameter is an error, not
+a setting that quietly did nothing.</p>
+</dd>
+<dt><code class="docutils literal notranslate"><span class="pre">supports_robust</span></code></dt><dd><p>Whether the family handles a Student-t likelihood, so the base class can raise one
+clear error instead of each runner re-checking.</p>
+</dd>
+</dl>
+<h3 id="two-samplers-behind-one-object">Two samplers behind one object<a class="headerlink" href="#two-samplers-behind-one-object" title="Link to this heading">¶</a></h3>
+<p>Most models are estimated by a blocked Gibbs sampler written for this posterior. The
+Gaussian families use a partially collapsed sweep (van Dyk &amp; Park, 2008): a conjugate
+draw of <span class="math notranslate nohighlight">\(\sigma^2\)</span>, then <span class="math notranslate nohighlight">\(\rho\)</span> by slice sampling <span class="math notranslate nohighlight">\(p(\rho \mid \sigma^2, y)\)</span> with
+<span class="math notranslate nohighlight">\(\beta\)</span> integrated out under its Normal prior, then <span class="math notranslate nohighlight">\(\beta \mid \rho, \sigma^2\)</span>. The
+<span class="math notranslate nohighlight">\(\beta\)</span> draw must follow the <span class="math notranslate nohighlight">\(\rho\)</span> draw that integrated it out, or the stored
+<span class="math notranslate nohighlight">\((\beta, \rho)\)</span> pairs stop being joint draws even though every marginal looks right.
+Integrating <span class="math notranslate nohighlight">\(\beta\)</span> out is what makes the sampler robust to the strong
+<span class="math notranslate nohighlight">\(\rho\)</span>–<span class="math notranslate nohighlight">\(\beta\)</span> correlation that frustrates generic samplers, and it is also why
+per-<span class="math notranslate nohighlight">\(\rho\)</span> log-determinant cost is the thing worth optimising. Robust (Student-t)
+errors add one block, the scale-mixture variances, and weight every cross-product by
+their inverses.</p>
+<p>Models without a registered Gibbs sampler are built as PyMC models and sampled with
+NUTS. Both paths are reachable from the same object through <code class="docutils literal notranslate"><span class="pre">fit(sampler=...)</span></code>, which
+exists so that a Gibbs result can be checked against an independent NUTS result on
+identical data — the check the package’s own validation notebooks run.</p>
+<h2 id="backends-are-a-runtime-choice-not-a-fork">Backends are a runtime choice, not a fork<a class="headerlink" href="#backends-are-a-runtime-choice-not-a-fork" title="Link to this heading">¶</a></h2>
+<p>There is one model code path. Acceleration is selected at run time and degrades to a
+working default rather than an error:</p>
+<ul class="simple">
+<li><p><strong>JAX</strong> is optional. <code class="docutils literal notranslate"><span class="pre">backend=&quot;auto&quot;</span></code> uses it when it is installed and the
+family prefers it, NumPy otherwise. Requesting <code class="docutils literal notranslate"><span class="pre">&quot;jax&quot;</span></code> explicitly without JAX
+installed raises, because a silent downgrade of an explicit request would be
+misleading.</p></li>
+<li><p><strong>Sparse solves</strong> use KLU or UMFPACK (both from <code class="docutils literal notranslate"><span class="pre">scikit-sparse</span></code> and <code class="docutils literal notranslate"><span class="pre">sparsax</span></code>), chosen
+for each sparsity pattern by the work per factor entry of its factorization: KLU on
+the sparse graphs of contiguity and few-neighbour KNN weights, UMFPACK once the
+factor’s fronts grow dense. The choice depends on the pattern alone, never on a
+timing, so a fixed seed reproduces the same draws. Without <code class="docutils literal notranslate"><span class="pre">scikit-sparse</span></code> they fall
+back to SciPy’s SuperLU, with a one-time advisory warning so the performance loss is
+visible.</p></li>
+<li><p><strong>A dense LAPACK fast path</strong> handles small problems: below <code class="docutils literal notranslate"><span class="pre">NEIGHBAYES_KRON_DENSE_MAX</span></code>
+(512), <code class="docutils literal notranslate"><span class="pre">lu_factor</span></code> on a dense <span class="math notranslate nohighlight">\(I - \rho W\)</span> beats <code class="docutils literal notranslate"><span class="pre">splu</span></code>, because SuperLU spends most of
+its time in symbolic-factorisation overhead at that size while <code class="docutils literal notranslate"><span class="pre">dgetrf</span></code> is a single
+BLAS-3 kernel. One factorisation serves both the forward and adjoint solves.</p></li>
+</ul>
+<p>Heavy dependencies load lazily. PyMC and ArviZ together cost roughly three seconds to
+import and are needed only when a model is <em>fit</em>, never when a model class is
+<em>imported</em>, so they are deferred behind proxies in <code class="docutils literal notranslate"><span class="pre">_lazy_deps.py</span></code> following
+<a class="reference external" href="https://scientific-python.org/specs/spec-0001/">SPEC 1</a>. JAX imports stay inside
+function bodies for the same reason.</p>
+<h2 id="every-model-has-a-simulator">Every model has a simulator<a class="headerlink" href="#every-model-has-a-simulator" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">neighbayes.dgp</span></code> mirrors <code class="docutils literal notranslate"><span class="pre">neighbayes.models</span></code>: each model has a generator that samples
+from its data-generating process. This is a deliberate testing strategy rather than a
+convenience. Bayesian spatial models have no closed-form answer to check against, so
+correctness is established by simulating data with known parameters and confirming the
+posterior recovers them, across the whole catalog. The same generators are what make the
+documentation reproducible, and what users should reach for when they want to know
+whether a specification can identify the effect they care about at their sample size.</p>
+<h2 id="diagnostics-are-part-of-the-model-not-an-add-on">Diagnostics are part of the model, not an add-on<a class="headerlink" href="#diagnostics-are-part-of-the-model-not-an-add-on" title="Link to this heading">¶</a></h2>
+<p>Every fitted model exposes <code class="docutils literal notranslate"><span class="pre">spatial_diagnostics()</span></code>, which runs the battery of Bayesian LM
+tests appropriate to its specification — lag, error, WX, joint, and the Neyman-orthogonal
+robust variants — defined separately for cross-sectional, GLM, panel, and flow models and
+resolved through a registry of test suites. <code class="docutils literal notranslate"><span class="pre">spatial_diagnostics_decision()</span></code> walks those
+results through a decision tree and reports both the favored model and the path it took
+to reach it, so the recommendation can be audited rather than taken on faith.</p>
+<p><code class="docutils literal notranslate"><span class="pre">impacts()</span></code> decomposes a change in <span class="math notranslate nohighlight">\(X\)</span> through the spatial multiplier
+<span class="math notranslate nohighlight">\((I - \rho W)^{-1}\)</span> into direct, indirect, and total effects, computed from the posterior
+draws. These are distributions, not delta-method approximations — which is much of the
+argument for estimating these models in a Bayesian framework in the first place.</p>
+<h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Link to this heading">¶</a></h2>
+<p>Runtime knobs are environment variables so they can be set for a session or a job
+without touching model code:</p>
+<table class="docutils data align-default">
+<colgroup>
+<col style="width: 42.0%" />
+<col style="width: 58.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>variable</p></th>
+<th class="head"><p>effect</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NEIGHBAYES_LOGDET_EIGEN_MAX_N</span></code></p></td>
+<td><p>largest <code class="docutils literal notranslate"><span class="pre">n</span></code> auto-routed to exact eigendecomposition (default 500)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NEIGHBAYES_LOGDET_FACTOR_MAX_N</span></code></p></td>
+<td><p>largest <code class="docutils literal notranslate"><span class="pre">n</span></code> auto-routed to a factorization (default 60000)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NEIGHBAYES_SPARSE_BACKEND</span></code></p></td>
+<td><p>force a sparse solver instead of auto-detecting</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NEIGHBAYES_SPARSE_STRICT</span></code></p></td>
+<td><p>raise instead of falling back when the requested backend is unavailable</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">NEIGHBAYES_KRON_DENSE_MAX</span></code></p></td>
+<td><p>largest <code class="docutils literal notranslate"><span class="pre">n</span></code> using dense LAPACK over SuperLU (default 512)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">NEIGHBAYES_OP_INSTRUMENT</span></code></p></td>
+<td><p>record per-operation timings for profiling</p></td>
+</tr>
+</tbody>
+</table>
+<p>All of these are read at the point of use except <code class="docutils literal notranslate"><span class="pre">NEIGHBAYES_OP_INSTRUMENT</span></code>, which is
+snapshotted at import time in <code class="docutils literal notranslate"><span class="pre">_config.py</span></code>.</p>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  
+  
+  <div class="md-footer-meta md-typeset">
+    
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-footer-copyright__highlight">
+        &#169; Copyright 2018-, pysal developers.
+        
+    </div>
+  
+    Created using
+    <a href="https://www.sphinx-doc.org/" target="_blank" rel="noopener">Sphinx</a>
+    9.2.0.
+     and
+    <a href="https://github.com/jbms/sphinx-immaterial/" target="_blank" rel="noopener">Sphinx-Immaterial</a>
+  
+</div>
+      
+    </div>
+    
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": ".", "features": ["navigation.sections", "navigation.top", "search.share", "search.suggest", "toc.follow", "toc.sticky", "content.code.copy", "content.action.edit"], "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike", "staticVersions": null, "versionPath": "https://pysal.org/neighbayes/versions.json"}}</script>
+    
+      
+        <script src="_static/sphinx_immaterial_theme.32136f45f91ae6956.min.js?v=a7a9472a"></script>
+        <script src="_static/clipboard.min.js?v=a7894cd8"></script>
+        <script src="_static/copybutton.js?v=f281be69"></script>
+        <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+        <script id="MathJax-script" src="_static/mathjax/tex-mml-chtml.js"></script>
+    
+  </body>
+</html>

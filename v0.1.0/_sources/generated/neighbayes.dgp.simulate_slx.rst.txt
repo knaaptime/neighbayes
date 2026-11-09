@@ -1,0 +1,6 @@
+﻿neighbayes.dgp.simulate\_slx
+============================
+
+.. currentmodule:: neighbayes.dgp
+
+.. autofunction:: simulate_slx

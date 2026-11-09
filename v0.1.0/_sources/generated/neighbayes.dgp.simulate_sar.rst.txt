@@ -1,0 +1,6 @@
+﻿neighbayes.dgp.simulate\_sar
+============================
+
+.. currentmodule:: neighbayes.dgp
+
+.. autofunction:: simulate_sar

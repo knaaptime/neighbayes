@@ -1,0 +1,6 @@
+﻿neighbayes.graph.flow\_weight\_matrices
+=======================================
+
+.. currentmodule:: neighbayes.graph
+
+.. autofunction:: flow_weight_matrices

@@ -1,0 +1,6 @@
+﻿neighbayes.graph.od\_weights
+============================
+
+.. currentmodule:: neighbayes.graph
+
+.. autofunction:: od_weights

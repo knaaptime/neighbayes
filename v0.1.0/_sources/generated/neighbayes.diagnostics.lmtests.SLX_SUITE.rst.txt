@@ -1,0 +1,6 @@
+﻿neighbayes.diagnostics.lmtests.SLX\_SUITE
+=========================================
+
+.. currentmodule:: neighbayes.diagnostics.lmtests
+
+.. autodata:: SLX_SUITE

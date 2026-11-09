@@ -1,0 +1,6 @@
+﻿neighbayes.diagnostics.lmtests.FLOW\_PANEL\_SUITE
+=================================================
+
+.. currentmodule:: neighbayes.diagnostics.lmtests
+
+.. autodata:: FLOW_PANEL_SUITE

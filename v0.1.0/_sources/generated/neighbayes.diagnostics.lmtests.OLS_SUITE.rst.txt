@@ -1,0 +1,6 @@
+﻿neighbayes.diagnostics.lmtests.OLS\_SUITE
+=========================================
+
+.. currentmodule:: neighbayes.diagnostics.lmtests
+
+.. autodata:: OLS_SUITE

@@ -1,0 +1,6 @@
+﻿neighbayes.dgp.simulate\_sem\_probit
+====================================
+
+.. currentmodule:: neighbayes.dgp
+
+.. autofunction:: simulate_sem_probit

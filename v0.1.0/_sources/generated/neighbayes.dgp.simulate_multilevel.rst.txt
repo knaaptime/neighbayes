@@ -1,0 +1,6 @@
+﻿neighbayes.dgp.simulate\_multilevel
+===================================
+
+.. currentmodule:: neighbayes.dgp
+
+.. autofunction:: simulate_multilevel

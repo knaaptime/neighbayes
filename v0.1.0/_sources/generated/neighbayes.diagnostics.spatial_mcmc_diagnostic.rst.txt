@@ -1,0 +1,6 @@
+﻿neighbayes.diagnostics.spatial\_mcmc\_diagnostic
+================================================
+
+.. currentmodule:: neighbayes.diagnostics
+
+.. autofunction:: spatial_mcmc_diagnostic

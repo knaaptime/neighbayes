@@ -1,0 +1,36 @@
+﻿neighbayes.models.Level
+=======================
+
+.. currentmodule:: neighbayes.models
+
+.. autoclass:: Level
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Level.__init__
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~Level.W
+      ~Level.X
+      ~Level.data
+      ~Level.formula
+      ~Level.groups
+      ~Level.key
+      ~Level.name
+      ~Level.process
+      ~Level.y
+   
+   

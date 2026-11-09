@@ -1,0 +1,6 @@
+﻿neighbayes.dgp.simulate\_sar\_hurdle\_negbin\_flow
+==================================================
+
+.. currentmodule:: neighbayes.dgp
+
+.. autofunction:: simulate_sar_hurdle_negbin_flow

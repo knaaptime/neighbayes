@@ -1,0 +1,38 @@
+﻿neighbayes.models.OLS
+=====================
+
+.. currentmodule:: neighbayes.models
+
+.. autoclass:: OLS
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~OLS.__init__
+      ~OLS.fit
+      ~OLS.fitted_values
+      ~OLS.impacts
+      ~OLS.predict
+      ~OLS.predict_in_sample
+      ~OLS.residuals
+      ~OLS.spatial_diagnostics
+      ~OLS.spatial_diagnostics_decision
+      ~OLS.summary
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~OLS.inference_data
+      ~OLS.pymc_model
+   
+   

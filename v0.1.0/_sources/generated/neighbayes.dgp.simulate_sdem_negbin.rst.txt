@@ -1,0 +1,6 @@
+﻿neighbayes.dgp.simulate\_sdem\_negbin
+=====================================
+
+.. currentmodule:: neighbayes.dgp
+
+.. autofunction:: simulate_sdem_negbin

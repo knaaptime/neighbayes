@@ -1,0 +1,6 @@
+﻿neighbayes.dgp.simulate\_hurdle\_negbin
+=======================================
+
+.. currentmodule:: neighbayes.dgp
+
+.. autofunction:: simulate_hurdle_negbin

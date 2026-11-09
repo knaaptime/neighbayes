@@ -1,0 +1,37 @@
+﻿neighbayes.models.SDEMLogit
+===========================
+
+.. currentmodule:: neighbayes.models
+
+.. autoclass:: SDEMLogit
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SDEMLogit.__init__
+      ~SDEMLogit.fit
+      ~SDEMLogit.fitted_probabilities
+      ~SDEMLogit.fitted_values
+      ~SDEMLogit.impacts
+      ~SDEMLogit.residuals
+      ~SDEMLogit.spatial_diagnostics
+      ~SDEMLogit.spatial_diagnostics_decision
+      ~SDEMLogit.summary
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SDEMLogit.inference_data
+      ~SDEMLogit.pymc_model
+   
+   

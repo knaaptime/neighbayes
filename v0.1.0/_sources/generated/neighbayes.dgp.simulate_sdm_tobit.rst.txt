@@ -1,0 +1,6 @@
+﻿neighbayes.dgp.simulate\_sdm\_tobit
+===================================
+
+.. currentmodule:: neighbayes.dgp
+
+.. autofunction:: simulate_sdm_tobit
