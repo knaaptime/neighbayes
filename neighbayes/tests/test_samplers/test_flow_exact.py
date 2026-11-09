@@ -327,7 +327,7 @@ def test_pair_summary_is_the_moments_of_the_draws(backend):
         )
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.parametrize(
     "T, levels",
     [(1, None), (2, None), (1, "origin"), (1, "both"), (2, "both"),
@@ -442,7 +442,7 @@ def _jax_sweep_z(T, reps, seed, levels=None, prior_scale=1.0):
     return _z(np.asarray(diffs))
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.requires_jax
 @pytest.mark.parametrize(
     "T, levels",
@@ -454,7 +454,7 @@ def test_jax_sweep_is_invariant(T, levels):
     assert np.all(np.abs(z) < 4.0), z
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.requires_jax
 def test_jax_invariance_check_has_power():
     """The same check fails when the sampler's prior on β is not the draws'."""

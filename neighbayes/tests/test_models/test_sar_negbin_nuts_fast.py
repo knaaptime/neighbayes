@@ -54,6 +54,18 @@ def test_sar_negbin_build_pymc_model():
     assert "z" not in pymc_model.named_vars
 
 
+def test_sar_negbin_nuts_logp_and_gradient_are_finite(monkeypatch):
+    """The reduced model's log density and gradient run through the sparse SAR solve."""
+    monkeypatch.setenv(
+        "NEIGHBAYES_KRON_DENSE_MAX", "0"
+    )  # the sparse path, as at large n
+    y, X, W = _count_data()
+    model = SARNegBin(y=y, X=X, W=W, latent=False)._build_pymc_model()
+    point = model.initial_point()
+    assert np.isfinite(model.compile_logp()(point))
+    assert np.all(np.isfinite(model.compile_dlogp()(point)))
+
+
 def test_sar_negbin_rejects_noninteger_or_negative_y():
     _, X, W = _count_data(seed=102)
 
@@ -69,7 +81,6 @@ def test_sar_negbin_rejects_noninteger_or_negative_y():
 
 def test_sar_negbin_fitted_values_and_effects_with_mock_posterior():
     y, X, W = _count_data(seed=103)
-    n = X.shape[0]
     model = SARNegBin(y=y, X=X, W=W, latent=False)
 
     # Reduced form: only β, ρ, α — no σ, no z.
@@ -126,7 +137,6 @@ def test_sar_negbin_count_effects_match_the_dense_multiplier():
 
 def test_sar_negbin_impacts_rejects_unknown_scale():
     y, X, W = _count_data(seed=104)
-    n = X.shape[0]
     model = SARNegBin(y=y, X=X, W=W, latent=False)
     model._idata = _idata(
         {

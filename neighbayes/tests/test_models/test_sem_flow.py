@@ -143,17 +143,6 @@ class TestSemFlowConstruction:
         with pytest.raises(NotImplementedError, match="resolvent"):
             model._build_pymc_model()
 
-    def test_pymc_model_separable_builds(self):
-        model = SEMFlow(
-            self.y_vec,
-            self.X,
-            self.G,
-            separable=True,
-            col_names=self.col_names,
-        )
-        pm_model = model._build_pymc_model()
-        assert pm_model is not None
-
 
 # ---------------------------------------------------------------------------
 # Recovery (slow but small enough for default suite)

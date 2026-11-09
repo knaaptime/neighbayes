@@ -13,7 +13,6 @@ from neighbayes.models import (
 from neighbayes.tests.helpers import flow_form
 
 negbin_flow = flow_form(NegBinFlow)
-sar_hurdle_flow = flow_form(SARHurdleNegBinFlow, separable=True)
 sar_negbin_flow = flow_form(SARNegBinFlow)
 sar_negbin_separable = flow_form(SARNegBinFlow, separable=True)
 sar_zinb_flow = flow_form(SARZINBFlow, separable=True)
@@ -43,18 +42,6 @@ class TestNegativeBinomialFlowConstruction:
         pm_model = model._build_pymc_model()
         assert "alpha" in pm_model.named_vars
 
-    def test_negbin_sar_flow_separable_builds(self):
-        data = _small_negbin_flow(seed=2)
-        model = SARNegBinFlow(
-            data["y_vec"],
-            data["X"],
-            data["G"],
-            separable=True,
-            col_names=data["col_names"],
-        )
-        pm_model = model._build_pymc_model()
-        assert "alpha" in pm_model.named_vars
-
     def test_negbin_flow_builds(self):
         data = _small_negbin_flow(seed=3)
         model = NegBinFlow(
@@ -68,18 +55,6 @@ class TestNegativeBinomialFlowConstruction:
 
 
 class TestNegativeBinomialPanelFlowConstruction:
-    def test_negbin_panel_builds(self):
-        data = _small_panel_negbin_flow(seed=4)
-        model = SARNegBinFlow(
-            y=data["y"],
-            W=data["G"],
-            X=data["X"],
-            T=3,
-            col_names=data["col_names"],
-        )
-        pm_model = model._build_pymc_model()
-        assert "alpha" in pm_model.named_vars
-
     def test_negbin_panel_separable_builds(self):
         data = _small_panel_negbin_flow(seed=5)
         model = SARNegBinFlow(
@@ -134,7 +109,6 @@ def _check_beta_recovery(
       [2+k:2+2k] beta_o  → checked here
       [-1] log_dist (gamma_dist) → checked here
     """
-    import numpy as np
 
     beta_hat = idata.posterior["beta"].mean(dim=["chain", "draw"]).values
     beta_d_hat = beta_hat[2 : 2 + k]

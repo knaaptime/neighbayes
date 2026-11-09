@@ -39,12 +39,12 @@ classifiers = [
 dependencies = [
     "pymc>=6.3",
     "pytensor>=3.3.2",
-    "arviz>=1.1",
+    "arviz>=1.2",
     "libpysal>=4.9",
-    "formulaic>=1.0",
+    "formulaic>=1.2",
     "lazy_loader>=0.4",
-    "numpy>=2.0",
-    "scipy>=1.14",
+    "numpy>=2.1",
+    "scipy>=1.15",
     "pandas>=2.2",
     "polyagamma>=2.0",
     "scikit-sparse>=0.5",
@@ -68,12 +68,12 @@ neighbayes = ["py.typed", "*.pyi", "**/*.pyi"]
 
 [tool.pytest.ini_options]
 testpaths = ["neighbayes/tests"]
-addopts = "-m 'not slow and not octave'"   # octave: LeSage-toolbox validation — run with -m octave after installing Octave + the toolbox
+addopts = "-m 'not slow and not validation'"   # each runs on request: -m slow, -m validation
 markers = [
     "slow: marks tests as slow (MCMC parameter recovery — deselected by default)",
+    "validation: statistical validation — posterior agreement between samplers, backends or references (the LeSage toolbox under Octave among them), sweep invariance, null size and power by simulation (deselected by default and in CI; .github/workflows/validation.yml runs them weekly)",
     "recovery: marks parameter recovery tests (fit model, assert posterior ≈ true params)",
     "requires_jax: marks tests that activate a JAX backend (gibbs_backend='jax', numpyro/blackjax NUTS) — auto-skipped on Windows",
-    "octave: marks the LeSage-toolbox validation tests (shell out to Octave, deselected by default; a bespoke Actions workflow parallel to standard CI runs them with -m octave — see wiki page lesage-toolbox-validation)",
 ]
 # The NumPy count samplers are tested on purpose; their known-bias warning
 # would otherwise fill the summary.  pytest.warns still sees it.

@@ -29,11 +29,8 @@ from neighbayes.diagnostics.lmtests import (
     bayesian_lm_lag_test,
     bayesian_lm_sdm_joint_test,
     bayesian_lm_slx_error_joint_test,
-    bayesian_panel_lm_error_sdm_test,
     bayesian_panel_lm_error_test,
-    bayesian_panel_lm_lag_sdem_test,
     bayesian_panel_lm_lag_test,
-    bayesian_panel_lm_wx_test,
     bayesian_robust_lm_error_sdem_test,
     bayesian_robust_lm_lag_sdm_test,
 )
@@ -93,40 +90,6 @@ def _mock_ols(y, X, WX, W_sp, T_ww, beta_hat, sigma_hat=1.0, draws=1):
     model._T_ww = T_ww
     model.inference_data = _idata(
         beta=np.tile(beta_hat, (draws, 1)),
-        sigma=np.full(draws, sigma_hat),
-    )
-    return model
-
-
-def _mock_sar(y, X, WX, W_sp, T_ww, beta_hat, rho_hat, sigma_hat=1.0, draws=1):
-    Wy = np.asarray(W_sp @ y, dtype=np.float64)
-    model = gaussian_mock(X, W_sp)
-    model._y = y
-    model._X = X
-    model._WX = WX
-    model._Wy = Wy
-    model._W_sparse = W_sp
-    model._T_ww = T_ww
-    model.inference_data = _idata(
-        beta=np.tile(beta_hat, (draws, 1)),
-        rho=np.full(draws, rho_hat),
-        sigma=np.full(draws, sigma_hat),
-    )
-    return model
-
-
-def _mock_sem(y, X, WX, W_sp, T_ww, beta_hat, lam_hat, sigma_hat=1.0, draws=1):
-    Wy = np.asarray(W_sp @ y, dtype=np.float64)
-    model = gaussian_mock(X, W_sp)
-    model._y = y
-    model._X = X
-    model._WX = WX
-    model._Wy = Wy
-    model._W_sparse = W_sp
-    model._T_ww = T_ww
-    model.inference_data = _idata(
-        beta=np.tile(beta_hat, (draws, 1)),
-        lam=np.full(draws, lam_hat),
         sigma=np.full(draws, sigma_hat),
     )
     return model
@@ -415,72 +378,6 @@ def _mock_panel_ols(y, X, WX, Wn_sp, T_ww, beta_hat, sigma_hat, N, T, draws=1):
     model._nonintercept_indices = list(range(X.shape[1]))
     model.inference_data = _idata(
         beta=np.tile(beta_hat, (draws, 1)),
-        sigma=np.full(draws, sigma_hat),
-    )
-    return model
-
-
-def _mock_panel_sar(y, X, WX, Wn_sp, T_ww, beta_hat, rho_hat, sigma_hat, N, T, draws=1):
-    Wy = _panel_spatial_lag(Wn_sp, np.asarray(y), N, T)
-    model = panel_mock(X, Wn_sp, N, T)
-    model._y = y
-    model._X = X
-    model._WX = WX
-    model._Wy = np.asarray(Wy)
-    model._W_sparse = Wn_sp
-    model._T_ww = T_ww
-    model._N = N
-    model._T = T
-    model._nonintercept_indices = list(range(X.shape[1]))
-    model.inference_data = _idata(
-        beta=np.tile(beta_hat, (draws, 1)),
-        rho=np.full(draws, rho_hat),
-        sigma=np.full(draws, sigma_hat),
-    )
-    return model
-
-
-def _mock_panel_sdm(y, X, WX, Wn_sp, T_ww, beta_hat, rho_hat, sigma_hat, N, T, draws=1):
-    """Mock SDM panel model: beta covers [X, WX] and rho is in posterior."""
-    Wy = _panel_spatial_lag(Wn_sp, np.asarray(y), N, T)
-    model = panel_mock(X, Wn_sp, N, T)
-    model._y = y
-    model._X = X
-    model._WX = WX
-    model._Wy = np.asarray(Wy)
-    model._W_sparse = Wn_sp
-    model._W_dense = np.kron(np.eye(T), Wn_sp.toarray())
-    model._T_ww = T_ww
-    model._N = N
-    model._T = T
-    model._nonintercept_indices = list(range(X.shape[1]))
-    model.inference_data = _idata(
-        beta=np.tile(beta_hat, (draws, 1)),
-        rho=np.full(draws, rho_hat),
-        sigma=np.full(draws, sigma_hat),
-    )
-    return model
-
-
-def _mock_panel_sdem(
-    y, X, WX, Wn_sp, T_ww, beta_hat, lam_hat, sigma_hat, N, T, draws=1
-):
-    """Mock SDEM panel model: beta covers [X, WX] and lam is in posterior."""
-    Wy = _panel_spatial_lag(Wn_sp, np.asarray(y), N, T)
-    model = panel_mock(X, Wn_sp, N, T)
-    model._y = y
-    model._X = X
-    model._WX = WX
-    model._Wy = np.asarray(Wy)
-    model._W_sparse = Wn_sp
-    model._W_dense = np.kron(np.eye(T), Wn_sp.toarray())
-    model._T_ww = T_ww
-    model._N = N
-    model._T = T
-    model._nonintercept_indices = list(range(X.shape[1]))
-    model.inference_data = _idata(
-        beta=np.tile(beta_hat, (draws, 1)),
-        lam=np.full(draws, lam_hat),
         sigma=np.full(draws, sigma_hat),
     )
     return model

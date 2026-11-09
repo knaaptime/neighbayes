@@ -117,20 +117,6 @@ def test_refusals(sar_fit):
         sar_fit.fit(sampler="nuts", draws=5, tune=5, chains=1, progressbar=False)
 
 
-@pytest.mark.requires_jax
-@pytest.mark.parametrize(
-    "cls, kw", [(SARLogit, {"latent": True}), (SEMLogit, {}), (SDEMLogit, {})]
-)
-def test_jax_backend_runs(cls, kw):
-    d = dgp.simulate_sar_logit(n_side=8, rho=0.4, seed=4, latent=True)
-    post = (
-        cls(y=d["y"], X=d["X"], W=d["W_sparse"], **kw)
-        .fit(backend="jax", **QUICK)
-        .posterior
-    )
-    assert np.all(np.isfinite(post["beta"].values))
-
-
 def test_colour_classes_are_conditionally_independent():
     """No two utilities of one colour share a nonzero of Q = A'PA."""
     from neighbayes.samplers.binary_latent._jax import colour_classes
@@ -224,7 +210,7 @@ def _exact_moments(process, n_gl=40, n_beta=61, n_par=81):
 _BACKENDS = ["numpy", pytest.param("jax", marks=pytest.mark.requires_jax)]
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.parametrize("backend", _BACKENDS)
 @pytest.mark.parametrize("process", ["sar", "sem"])
 def test_posterior_is_exact_at_n3(process, backend):

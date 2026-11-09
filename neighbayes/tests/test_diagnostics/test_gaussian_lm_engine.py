@@ -104,7 +104,7 @@ def test_a_direction_the_null_estimates_is_refused():
         bayesian_lm_lag_test(_mock(y, B3, rho=0.2))
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.parametrize("null", ["OLS", "SAR", "SEM"])
 def test_information_is_the_scores_expected_outer_product(null):
     """Monte Carlo ``E[g g']`` at the truth, against the closed form."""
@@ -154,7 +154,7 @@ def _smooth_data(null, seed, n_side=30):
     return y, Xs, Wg
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.parametrize("null", ["OLS", "SLX", "SAR", "SEM", "SDM", "SDEM"])
 def test_suites_hold_their_size_at_their_null(null):
     """Mean LM/df near one at the null; the defect gave 3 to 105."""
@@ -317,7 +317,7 @@ def test_panel_scores_are_the_loglikelihood_gradient(panel, spatial):
     np.testing.assert_allclose(gs.scores[0], ref, rtol=1e-6, atol=1e-6)
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.parametrize("spatial", ["rho", "lam"])
 @pytest.mark.parametrize("panel", ["unit FE", "two-way FE"])
 def test_panel_information_is_the_scores_expected_outer_product(panel, spatial):
@@ -396,7 +396,7 @@ def _panel_data(null, design, seed, n_side=10, T=5):
     return np.concatenate(ys), np.vstack(Xs), Wg, N, T
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.parametrize("design", ["pooled", "fixed", "random"])
 @pytest.mark.parametrize("null", ["OLS", "SAR", "SEM"])
 def test_panel_suites_hold_their_size_at_their_null(null, design):

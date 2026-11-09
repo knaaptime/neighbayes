@@ -58,11 +58,6 @@ def _W_to_graph_raw(W: np.ndarray):
     return Graph.from_arrays(rows, cols, vals.astype(float))
 
 
-from neighbayes.tests.helpers import (
-    set_posterior_means as _set_posterior_means,  # noqa: E402
-)
-
-
 def _set_posterior_draws(
     model, beta_draws: np.ndarray, rho_draws: np.ndarray | None = None
 ) -> None:

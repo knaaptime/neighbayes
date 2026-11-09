@@ -23,7 +23,6 @@ _COMPILE_EVENT = "/jax/core/compile/backend_compile_duration"
 
 
 def _cases():
-    from functools import partial
 
     from neighbayes import dgp
     from neighbayes import models as M

@@ -77,6 +77,7 @@ def _fit(data, backend, **kw):
 
 @pytest.mark.parametrize("backend", BACKENDS)
 class TestRefitDoesNotMoveThePosterior:
+    @pytest.mark.validation
     def test_agrees_with_the_unrefitted_fit(self, data, backend):
         """Any shift must be inside Monte Carlo error."""
         import arviz as az

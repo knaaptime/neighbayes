@@ -216,7 +216,7 @@ def _exact_moments(process, n_beta=61, n_par=81):
 _BACKENDS = ["numpy", pytest.param("jax", marks=pytest.mark.requires_jax)]
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.parametrize("backend", _BACKENDS)
 @pytest.mark.parametrize("process", ["sar", "sem", "reduced"])
 def test_posterior_is_exact_at_n3(process, backend):

@@ -119,7 +119,6 @@ def test_krylov_basis_accuracy():
 
     from neighbayes.samplers._utils._spatial_normal import CholmodFactor
     from neighbayes.samplers.negbin_reduced._core import (
-        ReducedKrylovBasis,
         _build_krylov_basis,
         _CholmodNormalEqSolver,
         _eval_U_from_basis,

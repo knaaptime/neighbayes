@@ -32,7 +32,6 @@ from neighbayes.models import (
     SEMTobit,
 )
 from neighbayes.models.base import SpatialModel
-from neighbayes.models.cross_section.tobit import _SpatialTobitBase
 from neighbayes.tests.helpers import W_to_graph, make_line_W
 
 # ---------------------------------------------------------------------------

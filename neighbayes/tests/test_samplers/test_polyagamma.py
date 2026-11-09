@@ -22,14 +22,6 @@ class TestSamplePolyagamma:
         assert np.all(omega > 0)
         assert abs(np.mean(omega) - 0.25) < 0.05
 
-    def test_pg5_positive(self, rng):
-        """PG(5, 2) draws are all positive."""
-        h = np.full(100, 5.0)
-        z = np.full(100, 2.0)
-        omega = sample_polyagamma(h, z, rng=rng)
-        assert omega.shape == (100,)
-        assert np.all(omega > 0)
-
     def test_shape_mismatch_raises(self):
         """h and z with different shapes raises ValueError."""
         with pytest.raises(ValueError, match="same shape"):

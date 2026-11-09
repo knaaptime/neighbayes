@@ -1,0 +1,47 @@
+name: test
+channels:
+  - conda-forge
+dependencies:
+  - python=3.15
+  - libpysal
+  - arviz
+  - formulaic
+  - pymc
+  - spreg
+  - statsmodels
+  - geopandas
+  - geodatasets
+  - codecov
+  - coverage
+  - pytest
+  - pytest-cov
+  - pytest-mpl
+  - pytest-xdist
+  - openpyxl
+  - lazy_loader
+  - fastprogress
+  - nutpie
+  - polyagamma
+  - scikit-sparse
+  - pip
+  - pip:
+    - jax # force from pip to allow windows 
+    - augax
+    - blackjax
+    - numpyro
+    - sparsax
+    - equinox
+
+  # docs
+  - numpydoc
+  - nbsphinx
+  - myst-parser
+  - sphinx-autodoc2
+  - geodatasets
+  - watermark
+  - myst-nb
+  - sphinx
+  - sphinxcontrib-bibtex
+  - sphinx-autosummary-accessors
+  - sphinx-copybutton
+  - sphinx-immaterial

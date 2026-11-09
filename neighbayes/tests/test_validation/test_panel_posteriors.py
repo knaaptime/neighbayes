@@ -27,7 +27,7 @@ from neighbayes.models import SAR
 from neighbayes.tests.test_validation import _mcse, _octave
 from neighbayes.tests.test_validation import conftest as setup
 
-pytestmark = pytest.mark.octave
+pytestmark = pytest.mark.validation
 
 TB_POST = setup.TB_DRAWS - setup.TB_OMIT
 

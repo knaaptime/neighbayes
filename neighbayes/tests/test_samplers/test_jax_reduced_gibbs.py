@@ -34,10 +34,8 @@ from neighbayes.samplers.negbin_reduced._jax import (
     _build_krylov_basis_jax,
     _build_sparse_ctx,
     _eval_U_from_basis_jax,
-    _make_reduced_gibbs_step,
     _make_sparse_solvers,
     _rho_log_density_marginal_jax,
-    _sample_alpha_jax_reduced,
     _slice_sample_rho_jax,
     run_chains_jax_reduced,
 )
@@ -88,7 +86,6 @@ class TestKrylovBasis:
         n, k = X.shape
         degree = 4
         X_jax = jnp.asarray(X)
-        W_jax = jnp.asarray(W.toarray())
         rho_c = jnp.float64(0.3)
 
         V_stack = _krylov_basis(W, X_jax, rho_c, n, k, degree)
@@ -115,7 +112,6 @@ class TestKrylovBasis:
         y, X, W = problem
         n, k = X.shape
         X_jax = jnp.asarray(X)
-        W_jax = jnp.asarray(W.toarray())
         rho_c = jnp.float64(0.3)
 
         V_stack = _krylov_basis(W, X_jax, rho_c, n, k, 8)
@@ -161,7 +157,6 @@ class TestRhoLogDensity:
         y, X, W = problem
         n, k = X.shape
         X_jax = jnp.asarray(X)
-        W_jax = jnp.asarray(W.toarray())
         y_jax = jnp.asarray(y)
         rho_c = jnp.float64(0.3)
 
@@ -192,7 +187,6 @@ class TestRhoLogDensity:
         y, X, W = problem
         n, k = X.shape
         X_jax = jnp.asarray(X)
-        W_jax = jnp.asarray(W.toarray())
         y_jax = jnp.asarray(y)
         rho_c = jnp.float64(0.3)
 
@@ -238,7 +232,6 @@ class TestSliceSampleRho:
         y, X, W = problem
         n, k = X.shape
         X_jax = jnp.asarray(X)
-        W_jax = jnp.asarray(W.toarray())
         y_jax = jnp.asarray(y)
         rho_c = jnp.float64(0.3)
 

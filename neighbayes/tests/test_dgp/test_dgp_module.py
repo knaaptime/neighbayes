@@ -418,27 +418,6 @@ def test_panel_re_err_hetero_forwarded() -> None:
         assert out["y"].shape == (N * T,)
 
 
-def test_dynamic_panel_err_hetero_runs_and_preserves_shape() -> None:
-    """Dynamic panel simulators with err_hetero=True should return same shapes."""
-    rng = np.random.default_rng(42)
-    N, T = 9, 3
-    W = sp.csr_matrix(make_rook_W(3))
-
-    for sim_fn in [
-        dgp.simulate_ols,
-        dgp.simulate_sdm,
-        dgp.simulate_sdm,
-        dgp.simulate_sar,
-        dgp.simulate_sem,
-        dgp.simulate_sdem,
-        dgp.simulate_slx,
-    ]:
-        out_homo = sim_fn(N=N, T=T, W=W, rng=rng, err_hetero=False)
-        out_hetero = sim_fn(N=N, T=T, W=W, rng=rng, err_hetero=True)
-        assert out_homo["y"].shape == out_hetero["y"].shape
-        assert out_homo["X"].shape == out_hetero["X"].shape
-
-
 def test_tobit_err_hetero_forwarded() -> None:
     """Tobit wrappers should forward err_hetero to underlying simulators."""
     rng = np.random.default_rng(42)

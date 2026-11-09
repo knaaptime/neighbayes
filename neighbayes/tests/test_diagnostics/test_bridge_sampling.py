@@ -10,8 +10,6 @@ Tests follow the R bridgesampling package's validation approach:
 7. Repetitions
 """
 
-import warnings
-
 import arviz as az
 import numpy as np
 import pandas as pd
@@ -546,7 +544,6 @@ class TestCompileLogPosterior:
 
     def test_constrained_to_unconstrained(self, pymc_model):
         """Test that constrained_to_unconstrained correctly transforms samples."""
-        import pymc as pm
 
         logp_fn, names, info, to_unconstrained = compile_log_posterior(pymc_model)
 

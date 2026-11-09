@@ -37,8 +37,6 @@ from typing import ClassVar, Optional
 
 import numpy as np
 
-from .._lazy_deps import az
-
 
 @dataclass
 class SpatialMCMCReport:
@@ -168,6 +166,8 @@ def _flatten_chain(da) -> np.ndarray:
 
 def _hpdi_width(samples: np.ndarray, hdi_prob: float = 0.95) -> float:
     """Return the width of an equal-tailed HDI for a 1-D sample."""
+    import arviz as az
+
     lo, hi = np.asarray(az.hdi(samples, prob=hdi_prob))
     return float(hi - lo)
 
@@ -272,6 +272,8 @@ def spatial_mcmc_diagnostic(
     .. bibliography::
        :filter: docname in docnames
     """
+    import arviz as az
+
     idata = getattr(model, "inference_data", None)
     if idata is None or "posterior" not in idata.children:
         raise RuntimeError(

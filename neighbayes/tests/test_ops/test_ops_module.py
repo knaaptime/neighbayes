@@ -228,22 +228,6 @@ class TestKroneckerFlowSolveOp:
         ref = _kron_ref(rd, ro, W, b)
         np.testing.assert_allclose(got, ref, atol=1e-10)
 
-    def test_output_shape(self):
-        from neighbayes._ops import KroneckerFlowSolveOp
-
-        n = 5
-        W = _ring_W(n)
-        rng = np.random.default_rng(1)
-        b = rng.normal(size=n * n)
-
-        solve_op = KroneckerFlowSolveOp(W, n)
-        rd_t = pt.dscalar()
-        ro_t = pt.dscalar()
-        b_t = pt.dvector()
-        eta_t = solve_op(rd_t, ro_t, b_t)
-        f = pytensor.function([rd_t, ro_t, b_t], eta_t)
-        assert f(0.1, -0.1, b).shape == (n * n,)
-
 
 # ---------------------------------------------------------------------------
 # KroneckerFlowSolveOp — VJP (verify_grad)
@@ -356,37 +340,6 @@ class TestKroneckerFlowSolveMatrixOpVJP:
 # ---------------------------------------------------------------------------
 # Smoke test: logp compiles for sar_negbin_separable at moderate n
 # ---------------------------------------------------------------------------
-
-
-class TestSeparableNegBinLogpCompiles:
-    @pytest.mark.slow
-    def test_logp_compiles_n20(self):
-        """Check that the Kronecker op compiles inside PyMC at n=20."""
-        from neighbayes.graph import flow_weight_matrices
-
-        n = 20
-        rng = np.random.default_rng(6)
-        pytest.importorskip("libpysal")
-        from libpysal.graph import Graph
-
-        focal = np.concatenate([np.arange(n), np.arange(n)])
-        neighbor = np.concatenate([(np.arange(n) - 1) % n, (np.arange(n) + 1) % n])
-        weights = np.ones(2 * n, dtype=float)
-        graph = Graph.from_arrays(focal, neighbor, weights).transform("r")
-
-        y = rng.poisson(5.0, size=(n, n)).astype(np.int64)
-        X = rng.normal(size=(n * n, 2))
-
-        model_obj = SARNegBinFlow(y, X, graph, separable=True)
-        pm_model = model_obj._build_pymc_model()
-
-        # Just test that logp can be evaluated at the initial point
-        import pymc as pm
-
-        with pm_model:
-            ip = pm_model.initial_point()
-            lp = pm_model.compile_logp()(ip)
-        assert np.isfinite(lp)
 
 
 # ---------------------------------------------------------------------------

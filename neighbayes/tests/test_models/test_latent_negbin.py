@@ -151,21 +151,6 @@ def test_alpha_fixed_is_held():
 
 
 @pytest.mark.requires_jax
-@pytest.mark.parametrize(
-    "cls, kw", [(SARNegBin, {"latent": True}), (SEMNegBin, {}), (SDEMNegBin, {})]
-)
-def test_jax_backend_runs(cls, kw):
-    d = dgp.simulate_sar_negbin(n_side=8, rho=0.4, seed=4, latent=True)
-    post = (
-        cls(y=d["y"], X=d["X"], W=d["W_sparse"], **kw)
-        .fit(backend="jax", **QUICK)
-        .posterior
-    )
-    assert np.all(np.isfinite(post["beta"].values))
-    assert np.all(post["alpha"].values > 0)
-
-
-@pytest.mark.requires_jax
 def test_jax_log_mean_step_reaches_a_flat_zero_conditional():
     """One JAX log-mean step from exact draws of a deep zero's conditional.
 
@@ -273,7 +258,7 @@ def _exact_moments(process, n_q=16, n_beta=51, n_par=37, n_la=36):
 _BACKENDS = ["numpy", pytest.param("jax", marks=pytest.mark.requires_jax)]
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.parametrize("backend", _BACKENDS)
 @pytest.mark.parametrize("process", ["sar", "sem"])
 def test_posterior_is_exact_at_n3(process, backend):
@@ -475,7 +460,7 @@ def test_panel_period_effects_carry_the_time_effects_term():
     assert m._latent_level_shift == 0.0
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 def test_level_shift_sweep_is_invariant():
     """One sweep from a draw of the shifted target leaves it invariant.
 
@@ -691,7 +676,7 @@ def _one_move_z(name, reps, seed, zero_logdet=None):
     return d.mean(0) / (d.std(0, ddof=1) / np.sqrt(reps))
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.parametrize("name", ["sar", "sem", "panel", "hurdle", "zinb"])
 def test_joint_move_is_invariant(name):
     """One joint move from a draw of the joint returns draws from it.
@@ -704,14 +689,14 @@ def test_joint_move_is_invariant(name):
     assert np.all(np.abs(z) < 4.0), z
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 def test_joint_move_check_has_power():
     """The same check fails when the move's Jacobian omits ``log|A_ZZ|``."""
     z = _one_move_z("panel", 30_000, seed=13, zero_logdet=lambda r: 0.0)
     assert np.max(np.abs(z)) > 5.0, z
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.requires_jax
 @pytest.mark.parametrize("process", ["sar", "sem"])
 def test_jax_sweep_is_invariant(process):

@@ -15,7 +15,6 @@ import scipy.sparse as sp
 from libpysal.graph import Graph
 
 from neighbayes.models import OLS
-from neighbayes.models import base as base_mod
 
 # ---------------------------------------------------------------------------
 # Fixtures

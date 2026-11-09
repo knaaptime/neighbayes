@@ -17,7 +17,6 @@ import importlib.util
 
 import numpy as np
 import pytest
-import scipy.sparse as sp
 
 _HAS_JAX = importlib.util.find_spec("jax") is not None
 _HAS_BLACKJAX = importlib.util.find_spec("blackjax") is not None

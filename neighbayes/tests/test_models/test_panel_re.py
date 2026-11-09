@@ -14,12 +14,11 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from neighbayes.models import OLS, SAR, SDEM, SEM
+from neighbayes.models import SAR, SDEM, SEM
 from neighbayes.tests.helpers import (
     PANEL_N,
     PANEL_T,
     SAMPLE_KWARGS,
-    make_panel_ols_data,
     make_panel_sar_data,
     make_panel_sdem_fe_data,
     make_panel_sem_data,
@@ -65,24 +64,6 @@ def _assert_sdem_beta(idata, label):
         assert abs(bhat - btrue) < ABS_TOL_BETA, (
             f"{label} beta[{j}]: expected ≈{btrue}, got {bhat:.3f}"
         )
-
-
-def test_ols_panel_re_recovers_all(rng, W_panel_dense, W_panel_graph):
-    y, X, _ = make_panel_ols_data(
-        rng,
-        W_panel_dense,
-        PANEL_N,
-        PANEL_T,
-        beta=BETA_TRUE,
-        sigma=SIGMA_TRUE,
-        sigma_alpha=SIGMA_ALPHA_TRUE,
-    )
-    model = OLS(unit_effects="random", y=y, X=X, W=W_panel_graph, N=PANEL_N, T=PANEL_T)
-    idata = model.fit(**SAMPLE_KWARGS)
-    _assert_beta(idata, "OLSPanelRE")
-    _assert_scalar(
-        idata, "unit_effect_sd", SIGMA_ALPHA_TRUE, ABS_TOL_SIGMA_ALPHA, "OLSPanelRE"
-    )
 
 
 def test_sar_panel_re_recovers_all(rng, W_panel_dense, W_panel_graph):

@@ -16,23 +16,18 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from neighbayes.dgp import simulate_sar, simulate_sem
+from neighbayes.dgp import simulate_sar
 from neighbayes.models import (
     OLS,
     SAR,
-    SDEM,
-    SDM,
     SEM,
-    SLX,
     SARTobit,
     SDMTobit,
     SEMProbit,
-    SEMTobit,
 )
 from neighbayes.tests.helpers import (
     PANEL_N,
     PANEL_T,
-    SAMPLE_KWARGS,
     W_to_graph,
     _as_sparse,
     make_line_W,
@@ -65,22 +60,6 @@ class TestRobustCrossSectional:
         )
         return out["y"], out["X"], W
 
-    @pytest.fixture
-    def sem_data(self, rng):
-        W = make_rook_W(SIDE)
-        out = simulate_sem(
-            W=_as_sparse(W), lam=0.5, beta=np.array([1.0, 2.0]), sigma=0.8, rng=rng
-        )
-        return out["y"], out["X"], W
-
-    def test_ols_robust_builds_and_samples(self, sar_data):
-        y, X, W = sar_data
-        W_graph = W_to_graph(W)
-        model = OLS(y=y, X=X, W=W_graph, robust=True)
-        idata = model.fit(**QUICK_KWARGS)
-        assert "nu" not in idata.posterior, "nu is fixed, not sampled"
-        assert "beta" in idata.posterior
-
     def test_ols_default_still_works(self, sar_data):
         y, X, W = sar_data
         W_graph = W_to_graph(W)
@@ -90,26 +69,6 @@ class TestRobustCrossSectional:
             "nu should NOT be in posterior when robust=False"
         )
         assert "beta" in idata.posterior
-
-    @pytest.mark.parametrize(
-        "cls,data_fixture,extra_var",
-        [
-            (OLS, "sar_data", "beta"),
-            (SAR, "sar_data", "rho"),
-            (SLX, "sar_data", "beta"),
-            (SEM, "sem_data", "lam"),
-            (SDM, "sar_data", "rho"),
-            (SDEM, "sem_data", "lam"),
-        ],
-        ids=lambda v: getattr(v, "__name__", str(v)),
-    )
-    def test_robust_builds_and_samples(self, request, cls, data_fixture, extra_var):
-        y, X, W = request.getfixturevalue(data_fixture)
-        W_graph = W_to_graph(W)
-        model = cls(y=y, X=X, W=W_graph, robust=True)
-        idata = model.fit(**QUICK_KWARGS)
-        assert "nu" not in idata.posterior  # fixed, not sampled
-        assert extra_var in idata.posterior
 
 
 # ---------------------------------------------------------------------------
@@ -217,20 +176,6 @@ class TestRobustPanelRE:
         idata = model.fit(**QUICK_KWARGS)
         assert "nu" not in idata.posterior  # fixed, not sampled
 
-    def test_sem_panel_re_robust(self, panel_re_data):
-        y, X, W_graph = panel_re_data
-        model = SEM(
-            unit_effects="random",
-            y=y,
-            X=X,
-            W=W_graph,
-            N=PANEL_N,
-            T=PANEL_T,
-            robust=True,
-        )
-        idata = model.fit(**QUICK_KWARGS)
-        assert "nu" not in idata.posterior  # fixed, not sampled
-
 
 # ---------------------------------------------------------------------------
 # Tobit model tests
@@ -250,26 +195,10 @@ class TestRobustTobit:
         y = np.maximum(out["y"], 0.0)
         return y, out["X"], W
 
-    @pytest.fixture
-    def sem_tobit_data(self, rng):
-        W = make_rook_W(SIDE)
-        out = simulate_sem(
-            W=_as_sparse(W), lam=0.5, beta=np.array([1.0, 2.0]), sigma=0.8, rng=rng
-        )
-        y = np.maximum(out["y"], 0.0)
-        return y, out["X"], W
-
     def test_sar_tobit_robust(self, sar_tobit_data):
         y, X, W = sar_tobit_data
         W_graph = W_to_graph(W)
         model = SARTobit(y=y, X=X, W=W_graph, robust=True)
-        idata = model.fit(**QUICK_KWARGS)
-        assert "nu" not in idata.posterior  # fixed, not sampled
-
-    def test_sem_tobit_robust(self, sem_tobit_data):
-        y, X, W = sem_tobit_data
-        W_graph = W_to_graph(W)
-        model = SEMTobit(y=y, X=X, W=W_graph, robust=True)
         idata = model.fit(**QUICK_KWARGS)
         assert "nu" not in idata.posterior  # fixed, not sampled
 

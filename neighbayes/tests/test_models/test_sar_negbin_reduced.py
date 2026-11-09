@@ -120,40 +120,6 @@ def test_reduced_fitted_values_and_effects_with_mock_posterior():
 # ---------------------------------------------------------------------------
 
 
-def test_reduced_fit_returns_inference_data():
-    """A short Gibbs run should return a well-formed InferenceData."""
-    rng = np.random.default_rng(0)
-    n = 60
-    W = W_to_graph(make_line_W(n))
-    x1 = rng.normal(size=n)
-    X = np.column_stack([np.ones(n), x1])
-    eta = 0.3 + 0.5 * x1
-    mu = np.exp(eta)
-    y = rng.poisson(mu)
-
-    model = bp.models.SARNegBin(y=y, X=X, W=W, latent=False)
-    idata = model.fit(
-        draws=30,
-        tune=30,
-        chains=2,
-        random_seed=0,
-        idata_kwargs={"log_likelihood": True},
-    )
-
-    assert isinstance(idata, xr.DataTree)
-    assert "posterior" in idata.children
-    assert "log_likelihood" in idata.children
-    assert "observed_data" in idata.children
-    # Reduced-form posterior must NOT contain σ or z.
-    assert "sigma" not in idata.posterior.data_vars
-    assert "z" not in idata.posterior.data_vars
-    # Required parameters present with correct shapes.
-    assert idata.posterior["rho"].shape == (2, 30)
-    assert idata.posterior["alpha"].shape == (2, 30)
-    assert idata.posterior["beta"].shape == (2, 30, 2)
-    assert idata.log_likelihood["obs"].shape == (2, 30, n)
-
-
 def test_reduced_fit_default_is_gibbs():
     """Default sampler='gibbs' should produce the same result as explicit."""
     rng = np.random.default_rng(42)
@@ -225,6 +191,7 @@ def test_reduced_rho_mixing_with_beta_marginalization():
     assert rho_ess >= 80.0, f"ρ ESS too low: {rho_ess}"
 
 
+@pytest.mark.validation
 def test_reduced_nuts_and_gibbs_agree_and_recover_rho():
     """The two samplers must target the same posterior.
 

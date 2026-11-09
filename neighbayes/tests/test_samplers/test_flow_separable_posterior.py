@@ -110,7 +110,7 @@ def panel_reference(panel_model):
 BACKENDS = ["numpy", pytest.param("jax", marks=pytest.mark.requires_jax)]
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.parametrize("backend", BACKENDS)
 def test_separable_posterior_matches_pg_reference(data, reference, backend):
     idata = _model(data).fit(
@@ -124,7 +124,7 @@ def test_separable_posterior_matches_pg_reference(data, reference, backend):
     _assert_matches(idata, reference)
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.parametrize("backend", BACKENDS)
 def test_separable_panel_posterior_matches_pg_reference(
     panel_model, panel_reference, backend

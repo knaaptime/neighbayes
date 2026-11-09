@@ -1,8 +1,9 @@
-"""Fixtures for the LeSage-toolbox validation tests (pytest marker ``octave``).
+"""Fixtures for the LeSage-toolbox validation tests (pytest marker ``validation``).
 
-These tests are deselected by default (``addopts`` skips ``octave``); the
-bespoke Actions workflow runs ``pytest -m octave`` after installing Octave
-and fetching the toolbox at its pinned URL.
+These tests are deselected by default (``addopts`` skips ``validation``) and
+skip without Octave or the toolbox; the validation workflow runs
+``pytest -m validation`` after installing Octave and fetching the toolbox at its
+pinned URL.
 """
 
 from __future__ import annotations

@@ -9,7 +9,6 @@ the stochastic gradient against the exact eigenvalue reference.
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
 from neighbayes._logdet._flow_resolvent import (
     FlowKron,

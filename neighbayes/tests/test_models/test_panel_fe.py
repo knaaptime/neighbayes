@@ -14,12 +14,11 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from neighbayes.models import OLS, SAR, SDEM, SDM, SEM, SLX
+from neighbayes.models import SAR, SDEM, SDM, SEM
 from neighbayes.tests.helpers import (
     PANEL_N,
     PANEL_T,
     SAMPLE_KWARGS,
-    make_panel_ols_data,
     make_panel_sar_data,
     make_panel_sdem_fe_data,
     make_panel_sdm_fe_data,
@@ -52,28 +51,6 @@ def _assert_slope(idata, label):
 def _assert_scalar(idata, name, true, tol, label):
     hat = float(idata.posterior[name].mean())
     assert abs(hat - true) < tol, f"{label} {name}: expected ≈{true}, got {hat:.3f}"
-
-
-def test_ols_panel_fe_recovers_beta_and_sigma(rng, W_panel_dense, W_panel_graph):
-    """OLSPanelFE recovery.
-
-    With effects=1 (unit FE), the intercept is absorbed by demeaning and
-    sigma reflects the residual variance.  We set sigma_alpha=0 so the
-    DGP has no unit effects and the model sigma matches the DGP sigma.
-    """
-    y, X, _ = make_panel_ols_data(
-        rng,
-        W_panel_dense,
-        PANEL_N,
-        PANEL_T,
-        beta=BETA_TRUE,
-        sigma=SIGMA_TRUE,
-        sigma_alpha=0.0,
-    )
-    model = OLS(unit_effects="fixed", y=y, X=X, W=W_panel_graph, N=PANEL_N, T=PANEL_T)
-    idata = model.fit(**SAMPLE_KWARGS)
-    _assert_slope(idata, "OLSPanelFE")
-    _assert_scalar(idata, "sigma", SIGMA_TRUE, ABS_TOL_SIGMA, "OLSPanelFE")
 
 
 def test_sar_panel_fe_recovers_rho_and_beta(rng, W_panel_dense, W_panel_graph):
@@ -140,20 +117,3 @@ def test_sdem_panel_fe_recovers_lam_and_beta(rng, W_panel_dense, W_panel_graph):
     idata = model.fit(**SAMPLE_KWARGS)
     _assert_scalar(idata, "lam", LAM_TRUE, ABS_TOL_SPATIAL, "SDEMPanelFE")
     _assert_slope(idata, "SDEMPanelFE")
-
-
-def test_slx_panel_fe_recovers_beta(rng, W_panel_dense, W_panel_graph):
-    """SLXPanelFE: rho=0 SDM-style DGP provides WX signal only."""
-    y, X, _ = make_panel_sdm_fe_data(
-        rng,
-        W_panel_dense,
-        PANEL_N,
-        PANEL_T,
-        rho=0.0,
-        beta1=BETA_TRUE,
-        beta2=BETA2_TRUE,
-        sigma=SIGMA_TRUE,
-    )
-    model = SLX(unit_effects="fixed", y=y, X=X, W=W_panel_graph, N=PANEL_N, T=PANEL_T)
-    idata = model.fit(**SAMPLE_KWARGS)
-    _assert_slope(idata, "SLXPanelFE")

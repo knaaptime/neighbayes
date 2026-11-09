@@ -389,7 +389,7 @@ def test_flow_zinb_guards():
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.parametrize(
     "backend", ["numpy", pytest.param("jax", marks=pytest.mark.requires_jax)]
 )
@@ -419,7 +419,7 @@ def test_sarzinb_gibbs_matches_nuts(backend, alpha_fixed):
         _agree(g, n, var)
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 def test_generic_kernel_matches_sarzinb():
     from neighbayes.samplers.count_panel import CountPanelFE
     from neighbayes.samplers.count_panel._filters import SARFilter
@@ -459,7 +459,7 @@ def test_generic_kernel_matches_sarzinb():
         assert np.all(np.abs(x.mean(0) - r.mean(0)) < 0.2 * r.std(0)), var
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 def test_zinb_panel_gibbs_matches_nuts():
     d = dgp.simulate_sar_zinb(N=49, T=4, n_side=7, seed=2, fe_x_corr=0.5, unit_effects="random", unit_effect_sd=0.6, time_effects=True, time_effect_sd=0.3, latent=False)  # fmt: skip
     m = SARZINB(
@@ -527,7 +527,7 @@ def test_flow_zinb_panel_pair_effects_identify_selection():
         assert float(az.rhat(g[..., j])) < 1.05, j
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.requires_jax
 def test_flow_zinb_jax_matches_numpy():
     # Data on which the selection half is identified and mixes: on a tiny,

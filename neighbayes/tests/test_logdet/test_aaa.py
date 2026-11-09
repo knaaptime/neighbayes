@@ -476,7 +476,6 @@ class TestFactory:
 
     def test_factory_nonsymmetric(self, small_nonsymmetric_W):
         """Factory should work with non-symmetric W via AAA."""
-        n = small_nonsymmetric_W.shape[0]
         eigs = np.linalg.eigvals(small_nonsymmetric_W.toarray())
         fn = make_logdet_numpy_fn(
             small_nonsymmetric_W, eigs, method="lu_aaa", rho_min=0.1, rho_max=0.8

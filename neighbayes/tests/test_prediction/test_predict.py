@@ -262,7 +262,7 @@ def test_predictive_interval_coverage_at_true_parameters(cls):
     assert 0.87 <= coverage <= 0.93, coverage
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.parametrize("cls", [SAR, SEM])
 def test_predictive_interval_coverage(cls):
     """90% intervals for a held-out block reach nominal coverage after fitting.

@@ -3,9 +3,7 @@
 from __future__ import annotations
 
 import numpy as np
-import pandas as pd
 import pytest
-import scipy.sparse as sp
 from scipy.stats import multivariate_normal
 
 from neighbayes import dgp
@@ -445,7 +443,7 @@ def _flat(post, var):
     return x.reshape(-1, *x.shape[2:])
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.parametrize(
     "processes",
     [
@@ -485,7 +483,7 @@ def test_gibbs_matches_nuts(processes):
             )
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.parametrize(
     "processes",
     [

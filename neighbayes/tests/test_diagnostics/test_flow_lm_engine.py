@@ -133,7 +133,7 @@ def test_a_spatial_or_count_flow_is_refused():
         bayesian_lm_flow_joint_test(nb)
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.parametrize("design", [None, 1, 2, 3], ids=IDS[:1] + IDS[2:])
 def test_information_is_the_scores_expected_outer_product(design):
     rng = np.random.default_rng(3)
@@ -153,7 +153,7 @@ def test_information_is_the_scores_expected_outer_product(design):
     assert (np.abs(C - J) / se).max() < 4.5
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.parametrize("effects", [None, 1, 2, 3])
 def test_suites_hold_their_size_at_their_null(effects):
     """Mean LM/df near one at the OLSFlow null with a large intercept."""

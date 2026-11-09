@@ -1,20 +1,22 @@
 ---
-# Posteriors against the LeSage MATLAB toolbox, run under Octave.
+# Statistical validation: the tests marked ``validation``.  Posterior agreement
+# between samplers, backends and reference implementations (among them the
+# LeSage MATLAB toolbox, run under Octave), sweep invariance, and null size and
+# power by simulation.  They check that the samplers are right, not that the
+# code runs, so they stay out of the per-push CI and run weekly or on request.
+# A pull request that touches the toolbox harness runs the toolbox tests alone.
 #
-# Parallel to the standard CI, not inside it: the flagged tests (pytest
-# marker ``octave``, deselected by default) shell out to Octave and run long
-# MCMC chains on both sides.  The toolbox is the author's served artifact,
-# fetched at a pinned URL and checked against a pinned sha256; nothing in the
-# repository vendors it.
-name: LeSage toolbox validation
+# The toolbox is the author's served artifact, fetched at a pinned URL and
+# checked against a pinned sha256; nothing in the repository vendors it.
+name: Statistical validation
 
 on:
   schedule:
-    - cron: "0 7 * * 1"
+    - cron: "0 6 * * 0"
   pull_request:
     paths:
       - "neighbayes/tests/test_validation/**"
-      - ".github/workflows/lesage_validation.yml"
+      - ".github/workflows/validation.yml"
   workflow_dispatch:
 
 env:
@@ -24,9 +26,9 @@ env:
 
 jobs:
   validation:
-    name: neighbayes vs LeSage toolbox
+    name: validation tests
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 360
 
     defaults:
       run:
@@ -35,6 +37,8 @@ jobs:
     steps:
       - name: checkout repo
         uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: setup micromamba
         uses: mamba-org/setup-micromamba@v3
@@ -42,8 +46,8 @@ jobs:
           environment-file: ci/314-latest.yml
           micromamba-version: "latest"
 
-      # Octave gets its own environment, so its library stack never enters
-      # the solve for the package's.
+      # Octave in its own environment, so its pins never constrain the test
+      # environment; a wrapper on NEIGHBAYES_OCTAVE runs it from there.
       - name: install Octave
         run: |
           micromamba create -y -n octave -c conda-forge "octave=${OCTAVE_VERSION}"
@@ -76,15 +80,25 @@ jobs:
         run: echo "NEIGHBAYES_TOOLBOX_DIR=$RUNNER_TEMP/lesage/toolbox_may2021" >> "$GITHUB_ENV"
 
       - name: install package
-        run: pip install -e . --no-deps
+        run: "pip install -e . --no-deps"
+
+      - name: Download test files
+        run: |
+          python -c "
+          import libpysal
+
+          libpysal.examples.fetch_all()
+          "
 
       # The toolbox's progress bars need a figure handle; xvfb gives the
       # headless runner a display to create it on.
       - name: run validation tests
+        env:
+          TARGET: ${{ github.event_name == 'pull_request' && 'neighbayes/tests/test_validation' || 'neighbayes' }}
         run: |
-          xvfb-run -a python -m pytest neighbayes/tests/test_validation \
-            -m octave \
-            -n auto \
+          xvfb-run -a python -m pytest "$TARGET" \
+            -m validation \
+            -n logical \
             -v \
             -r a \
             --color yes
