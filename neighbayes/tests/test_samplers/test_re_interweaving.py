@@ -41,7 +41,7 @@ def test_sigma_alpha_mixes_with_weak_effects():
     assert float(az.ess(x)) > 0.05 * x.size
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.parametrize(
     "cls, sim, spatial",
     [

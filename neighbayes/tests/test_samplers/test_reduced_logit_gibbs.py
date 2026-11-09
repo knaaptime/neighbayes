@@ -87,17 +87,6 @@ def _run(y, X, W, seed, draws=1200, tune=800):
 
 
 class TestReducedLogitNumpy:
-    def test_shapes_and_finite(self):
-        y, X, W, _, _ = _sar_logit_data(side=8)
-        res = _run(y, X, W, seed=0, draws=200, tune=100)
-        n, k = X.shape
-        assert res["rho"].shape == (200,)
-        assert res["beta"].shape == (200, k)
-        assert res["log_lik"].shape == (200, n)
-        assert np.all(np.isfinite(res["rho"]))
-        assert np.all(np.isfinite(res["beta"]))
-        assert np.all(res["rho"] > -1.0) and np.all(res["rho"] < 1.0)
-
     def test_recovers_parameters(self):
         # Binary reduced-form ρ attenuates strongly toward 0 at small n (the
         # model warns n≥900), so assert the sampler detects clear positive
@@ -120,6 +109,7 @@ class TestReducedLogitNumpy:
 class TestReducedLogitBackendParity:
     """The model's NumPy and JAX backends fit the same reduced-form model."""
 
+    @pytest.mark.validation
     def test_numpy_jax_agree(self):
         import neighbayes  # configure CPU devices before jax import
         from neighbayes.models import SARLogit

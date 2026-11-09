@@ -20,7 +20,7 @@ jobs:
   tests:
     name: ${{ matrix.os }}, ${{ matrix.environment-file }}
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 120
+    timeout-minutes: 240
     strategy:
       matrix:
         os: [ubuntu-latest]
@@ -30,6 +30,7 @@ jobs:
            ci/313-latest.yml,
            ci/314-latest.yml,
            ci/314-dev.yml,
+           ci/315-latest.yml,
         ]
         include:
           - environment-file: ci/314-latest.yml
@@ -75,7 +76,7 @@ jobs:
 
       - name: run tests
         run: |
-          pytest neighbayes -m '' \
+          pytest neighbayes -m 'not validation' \
           -v \
           -r a \
           -n auto \

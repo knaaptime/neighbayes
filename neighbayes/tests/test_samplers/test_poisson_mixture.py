@@ -182,6 +182,7 @@ class TestAugmentation:
         assert np.all(np.abs(post - beta_true) < 4 * se)
 
 
+@pytest.mark.validation
 @pytest.mark.parametrize("count", [1, 10, 60, 150, 400])
 def test_augmented_gibbs_matches_exact_posterior(count):
     """One observation, ``η ~ N(0, 3²)``: Gibbs on the augmentation vs quadrature.

@@ -5,7 +5,6 @@ from __future__ import annotations
 import arviz as az
 import numpy as np
 import pytest
-import scipy.sparse as sp
 import xarray as xr
 
 from neighbayes import dgp
@@ -39,13 +38,6 @@ def _idata(vars_dict: dict[str, np.ndarray]) -> xr.DataTree:
 
 class TestConstruction:
     """SARLogit construction and validation."""
-
-    def test_construct_matrix_mode(self):
-        """Model can be constructed in matrix mode."""
-        y, X, W = _binary_data()
-        model = SARLogit(y=y, X=X, W=W)
-        assert model._y.shape == (20,)
-        assert model._X.shape == (20, 2)
 
     def test_rejects_non_binary_y(self):
         """Model should reject y with values outside {0, 1}."""

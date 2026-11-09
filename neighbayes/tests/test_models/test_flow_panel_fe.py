@@ -216,7 +216,7 @@ def test_old_sigma_sigma_key_is_rejected():
         m._build_pymc_model()
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 def test_sar_flow_panel_nuts_and_gibbs_agree():
     """Same likelihood, same priors: the two samplers share a posterior."""
     d = simulate_sar_flow(

@@ -42,7 +42,7 @@ def test_panel_models_no_frequentist_diagnostics():
         assert not hasattr(cls, "hausman_test")
 
 
-from neighbayes.models import SDEM, SDM, SLX, NegBinFlow
+from neighbayes.models import NegBinFlow
 from neighbayes.models.flow import OLSFlow, SARFlow
 from neighbayes.tests.helpers import flow_form
 
@@ -278,7 +278,6 @@ def test_flow_models_expose_decision_api():
 
 def test_flow_decision_tree_dispatch():
     """get_flow_spec and get_panel_flow_spec dispatch to correct tree roots."""
-    import pandas as pd
 
     from neighbayes.diagnostics import _decision_trees as _dt
 

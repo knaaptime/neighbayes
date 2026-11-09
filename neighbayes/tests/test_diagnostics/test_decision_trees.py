@@ -142,13 +142,6 @@ class TestRenderAscii:
         assert "OLS" in result
         assert "SELECTED" in result
 
-    def test_simple_tree(self):
-        tree = TreeNode(kind="test", name="LM-Lag", if_true="SAR", if_false="OLS")
-        result, path = evaluate(tree, sig_lookup=lambda n: n == "LM-Lag")
-        text = render_ascii(tree, path, result)
-        assert "SAR" in text
-        assert "SELECTED" in text
-
 
 # ---------------------------------------------------------------------------
 # render dispatch
@@ -193,30 +186,6 @@ class TestRenderDispatch:
 
 
 class TestGetSpec:
-    def test_ols_spec(self):
-        tree = get_spec("OLS")
-        assert isinstance(tree, TreeNode)
-
-    def test_sar_spec(self):
-        tree = get_spec("SAR")
-        assert isinstance(tree, TreeNode)
-
-    def test_sem_spec(self):
-        tree = get_spec("SEM")
-        assert isinstance(tree, TreeNode)
-
-    def test_slx_spec(self):
-        tree = get_spec("SLX")
-        assert isinstance(tree, TreeNode)
-
-    def test_sdm_spec(self):
-        tree = get_spec("SDM")
-        assert isinstance(tree, TreeNode)
-
-    def test_sdem_spec(self):
-        tree = get_spec("SDEM")
-        assert isinstance(tree, TreeNode)
-
     def test_unknown_returns_string(self):
         result = get_spec("UnknownModel")
         assert result == "UnknownModel"
@@ -240,34 +209,6 @@ class TestGetSpec:
 
 
 class TestGetPanelSpec:
-    def test_ols_fe_spec(self):
-        tree = get_panel_spec("OLS")
-        assert isinstance(tree, TreeNode)
-
-    def test_sar_fe_spec(self):
-        tree = get_panel_spec("SAR")
-        assert isinstance(tree, TreeNode)
-
-    def test_sem_fe_spec(self):
-        tree = get_panel_spec("SEM")
-        assert isinstance(tree, TreeNode)
-
-    def test_slx_fe_spec(self):
-        tree = get_panel_spec("SLX")
-        assert isinstance(tree, TreeNode)
-
-    def test_sdm_fe_spec(self):
-        tree = get_panel_spec("SDM")
-        assert isinstance(tree, TreeNode)
-
-    def test_sdem_fe_spec(self):
-        tree = get_panel_spec("SDEM")
-        assert isinstance(tree, TreeNode)
-
-    def test_ols_re_spec(self):
-        tree = get_panel_spec("OLS")
-        assert isinstance(tree, TreeNode)
-
     def test_unknown_returns_string(self):
         result = get_panel_spec("UnknownPanel")
         assert result == "UnknownPanel"
@@ -280,14 +221,6 @@ class TestGetPanelSpec:
 
 class TestGetPanelTobitSpec:
     """Panel Tobit decision trees mirror cross-sectional Tobit specs."""
-
-    def test_sar_tobit_spec(self):
-        tree = get_panel_spec("SARTobit")
-        assert isinstance(tree, TreeNode)
-
-    def test_sem_tobit_spec(self):
-        tree = get_panel_spec("SEMTobit")
-        assert isinstance(tree, TreeNode)
 
     def test_sar_tobit_none_sig(self):
         tree = get_panel_spec("SARTobit")

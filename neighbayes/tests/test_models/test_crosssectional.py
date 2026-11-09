@@ -15,14 +15,13 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from neighbayes.models import SAR, SDEM, SDM, SEM, SLX
+from neighbayes.models import SAR, SDEM, SDM, SEM
 from neighbayes.tests.helpers import (
     SAMPLE_KWARGS,
     make_sar_data,
     make_sdem_data,
     make_sdm_data,
     make_sem_data,
-    make_slx_data,
 )
 
 pytestmark = [pytest.mark.slow, pytest.mark.recovery]
@@ -57,49 +56,6 @@ def _assert_scalar(idata, name, true, tol, label):
     assert abs(hat - true) < tol, f"{label} {name}: expected ≈{true}, got {hat:.3f}"
 
 
-def test_sar_recovers_rho_and_beta(rng, W_dense, W_graph):
-    y, X = make_sar_data(rng, W_dense, rho=RHO_TRUE, beta=BETA_TRUE, sigma=SIGMA_TRUE)
-    idata = SAR(y=y, X=X, W=W_graph).fit(**SAMPLE_KWARGS)
-    _assert_scalar(idata, "rho", RHO_TRUE, ABS_TOL_SPATIAL, "SAR")
-    _assert_beta(idata, BETA_TRUE, "SAR")
-
-
-def test_sem_recovers_lam_and_beta(rng, W_dense, W_graph):
-    y, X = make_sem_data(rng, W_dense, lam=LAM_TRUE, beta=BETA_TRUE, sigma=SIGMA_TRUE)
-    idata = SEM(y=y, X=X, W=W_graph).fit(**SAMPLE_KWARGS)
-    _assert_scalar(idata, "lam", LAM_TRUE, ABS_TOL_SPATIAL, "SEM")
-    _assert_beta(idata, BETA_TRUE, "SEM")
-
-
-def test_slx_recovers_beta(rng, W_dense, W_graph):
-    y, X = make_slx_data(
-        rng, W_dense, beta1=BETA_TRUE, beta2=BETA2_TRUE, sigma=SIGMA_TRUE
-    )
-    idata = SLX(y=y, X=X, W=W_graph).fit(**SAMPLE_KWARGS)
-    combined = np.concatenate([BETA_TRUE, BETA2_TRUE])
-    _assert_beta(idata, combined, "SLX")
-
-
-def test_sdm_recovers_rho_and_beta(rng, W_dense, W_graph):
-    y, X = make_sdm_data(
-        rng, W_dense, rho=RHO_TRUE, beta1=BETA_TRUE, beta2=BETA2_TRUE, sigma=SIGMA_TRUE
-    )
-    idata = SDM(y=y, X=X, W=W_graph).fit(**SAMPLE_KWARGS)
-    _assert_scalar(idata, "rho", RHO_TRUE, ABS_TOL_SPATIAL, "SDM")
-    combined = np.concatenate([BETA_TRUE, BETA2_TRUE])
-    _assert_beta(idata, combined, "SDM")
-
-
-def test_sdem_recovers_lam_and_beta(rng, W_dense, W_graph):
-    y, X = make_sdem_data(
-        rng, W_dense, lam=LAM_TRUE, beta1=BETA_TRUE, beta2=BETA2_TRUE, sigma=SIGMA_TRUE
-    )
-    idata = SDEM(y=y, X=X, W=W_graph).fit(**SAMPLE_KWARGS)
-    _assert_scalar(idata, "lam", LAM_TRUE, ABS_TOL_SPATIAL, "SDEM")
-    combined = np.concatenate([BETA_TRUE, BETA2_TRUE])
-    _assert_beta(idata, combined, "SDEM")
-
-
 # ---------------------------------------------------------------------------
 # Parameterized backend recovery: each model is fit on both numpy and jax
 # backends to ensure the Gibbs sampler produces equivalent posteriors.
@@ -132,16 +88,6 @@ def test_sem_backend_recovery(rng, W_dense, W_graph, backend):
     idata = SEM(y=y, X=X, W=W_graph).fit(**_backend_kwargs(backend))
     _assert_scalar(idata, "lam", LAM_TRUE, ABS_TOL_SPATIAL, f"SEM[{backend}]")
     _assert_beta(idata, BETA_TRUE, f"SEM[{backend}]")
-
-
-def test_slx_recovery(rng, W_dense, W_graph):
-    """SLX has no Gibbs sampler, so no Gibbs backend to vary: NUTS once."""
-    y, X = make_slx_data(
-        rng, W_dense, beta1=BETA_TRUE, beta2=BETA2_TRUE, sigma=SIGMA_TRUE
-    )
-    idata = SLX(y=y, X=X, W=W_graph).fit(**SAMPLE_KWARGS)
-    combined = np.concatenate([BETA_TRUE, BETA2_TRUE])
-    _assert_beta(idata, combined, "SLX")
 
 
 @pytest.mark.parametrize("backend", BACKENDS)

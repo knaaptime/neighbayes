@@ -19,12 +19,11 @@ from __future__ import annotations
 
 import re
 
-import numpy as np
 import pytest
 
 from neighbayes.tests.test_validation import _mcse, _octave
 
-pytestmark = pytest.mark.octave
+pytestmark = pytest.mark.validation
 
 QUAL_SEED = 3
 

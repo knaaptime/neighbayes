@@ -32,7 +32,7 @@ import scipy.sparse as sp
 from neighbayes.models import SARProbit
 from neighbayes.tests.test_validation import _mcse, _octave
 
-pytestmark = pytest.mark.octave
+pytestmark = pytest.mark.validation
 
 # The toolbox's single-site sweep mixes slowly in beta (ESS about 4% of the
 # draws), so its chain is long.

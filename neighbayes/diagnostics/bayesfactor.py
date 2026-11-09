@@ -35,7 +35,6 @@ import numpy as np
 import pandas as pd
 from scipy.stats import multivariate_normal
 
-from .._lazy_deps import az
 from ._native_log_posterior import native_log_posterior
 
 _BAYES_FACTOR_METHODS = {}
@@ -449,6 +448,8 @@ def _run_iterative_scheme(
     # package, which recomputes coda's single-sequence ESS per iteration;
     # the logml estimate is identical either way — only the error bar moves.
     if use_neff:
+        import arviz as az
+
         # ArviZ's ``ess`` needs a (chain, draw) array; a flattened sequence is
         # one chain.  A 1-D array raised here and the error bar silently fell
         # back to the nominal N1.

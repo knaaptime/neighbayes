@@ -39,7 +39,7 @@ sar.impacts()
 with a matching simulator in `neighbayes.dgp`. Every fit comes with Bayesian LM
 diagnostics (with a decision tree for specification search) and posterior decompositions
 of direct, indirect, and total effects. Every model (almost) has a custom Gibbs sampler
-for [better mixing](https://onlinelibrary.wiley.com/doi/abs/10.1111/gean.12135) (with both numby and jax implementations), but can fall back to PyMC if requested.
+for [better mixing](https://onlinelibrary.wiley.com/doi/abs/10.1111/gean.12135) (with both numpy and jax implementations), but can fall back to PyMC if requested.
 
 ## Installation
 

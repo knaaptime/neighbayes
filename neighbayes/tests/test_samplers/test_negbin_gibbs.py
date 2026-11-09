@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
 from neighbayes.models.priors import ReducedGibbsPriors
 from neighbayes.samplers.negbin._core import GibbsState, _sample_alpha

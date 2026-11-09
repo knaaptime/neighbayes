@@ -10,7 +10,7 @@ from typing import Sequence
 
 import numpy as np
 
-from ..._lazy_deps import az, xr
+from ..._lazy_deps import xr
 
 
 def gibbs_to_inference_data(
@@ -52,6 +52,8 @@ def gibbs_to_inference_data(
         ``log_likelihood`` (if provided), ``observed_data`` (if provided),
         and ``sample_stats`` (if provided) groups.
     """
+    import arviz as az
+
     groups: dict[str, dict[str, np.ndarray]] = {"posterior": posterior_samples}
     if warmup_samples is not None:
         groups["warmup_posterior"] = warmup_samples

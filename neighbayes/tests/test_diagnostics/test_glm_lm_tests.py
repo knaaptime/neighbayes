@@ -437,7 +437,7 @@ def _ml_beta(family, y, X, r=None):
     return beta
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.parametrize("family", ["logit", "probit", "negbin"])
 def test_null_size(family):
     """Rejection rates at 5% stay within 3.5 Monte Carlo s.e. of nominal."""

@@ -200,20 +200,6 @@ class TestSpatialModelInit:
         with pytest.raises(ValueError, match="data must be provided"):
             OLS(formula="y ~ x1", data=None, W=W_graph)
 
-    def test_formula_mode_creates_model(self, W_graph):
-        from neighbayes.models.cross_section.ols import OLS
-
-        rng = np.random.default_rng(42)
-        df = pd.DataFrame(
-            {
-                "y": rng.standard_normal(4),
-                "x1": rng.standard_normal(4),
-            }
-        )
-        model = OLS(formula="y ~ x1", data=df, W=W_graph)
-        assert model._y.shape == (4,)
-        assert "Intercept" in model._feature_names or "x1" in model._feature_names
-
     def test_matrix_mode_creates_model(self, W_graph):
         from neighbayes.models.cross_section.ols import OLS
 

@@ -15,12 +15,12 @@ dependencies:
   # runtime floors — keep in sync with pyproject.toml
   - pymc=6.3
   - pytensor=3.3.2
-  - arviz=1.1
+  - arviz=1.2  # arviz-plots 1.1 fails to import under matplotlib >= 3.11
   - libpysal=4.9
-  - formulaic=1.0
+  - formulaic=1.2  # 1.0 and 1.1 cannot build a design from a GeoDataFrame
   - lazy_loader=0.4
-  - numpy=2.0
-  - scipy=1.14
+  - numpy=2.1
+  - scipy=1.15
   - pandas=2.2
   - polyagamma=2.0
   - scikit-sparse=0.5
@@ -41,6 +41,10 @@ dependencies:
   - nutpie
   - pip
   - pip:
+    # jax >= 0.11.1 (sparsax, augax) needs numpy >= 2.1 and scipy >= 1.15;
+    # without these pins pip upgrades both to their latest releases.
+    - numpy==2.1.*
+    - scipy==1.15.*
     - jax # force from pip to allow windows
     - augax
     - blackjax

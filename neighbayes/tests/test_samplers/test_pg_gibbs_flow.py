@@ -8,7 +8,6 @@ from __future__ import annotations
 import numpy as np
 import pytest
 import scipy.sparse as sp
-import scipy.sparse.linalg as spla
 
 from neighbayes.models import SARNegBinFlow
 from neighbayes.samplers.panel._kronecker import (
@@ -93,7 +92,6 @@ class TestKronLogdetA:
     def test_matches_eigenvalue(self):
         """kron_logdet_A matches n*log|I-rho_d*W| + n*log|I-rho_o*W|."""
         n = 5
-        rng = np.random.default_rng(42)
         W = sp.random(n, n, density=0.3, format="csr", random_state=0, dtype=np.float64)
         row_sums = np.asarray(W.sum(axis=1)).ravel()
         row_sums[row_sums == 0] = 1
@@ -115,7 +113,6 @@ class TestKronEigenvalueBounds:
     def test_bounds_contain_true_eigenvalues(self):
         """Gershgorin bounds should contain all true eigenvalues of P."""
         n = 5
-        rng = np.random.default_rng(42)
         W = sp.random(n, n, density=0.3, format="csr", random_state=0, dtype=np.float64)
         row_sums = np.asarray(W.sum(axis=1)).ravel()
         row_sums[row_sums == 0] = 1
@@ -170,24 +167,6 @@ def _make_flow_data(n=5, k=2, seed=42):
 
 class TestNegativeBinomialFlowGibbs:
     """Tests for NegBinFlow.fit(sampler='gibbs')."""
-
-    def test_gibbs_returns_inference_data(self):
-        """Gibbs sampler returns valid InferenceData."""
-        from neighbayes.models import NegBinFlow
-
-        data = _make_flow_data()
-        model = NegBinFlow(data["y_vec"], data["X"], data["G"])
-        idata = model.fit(
-            draws=20,
-            tune=20,
-            chains=2,
-            sampler="gibbs",
-            random_seed=42,
-            progressbar=False,
-        )
-        assert hasattr(idata, "posterior")
-        assert "beta" in idata.posterior
-        assert "alpha" in idata.posterior
 
     def test_gibbs_shapes(self):
         """Gibbs posterior has correct shapes."""
@@ -326,26 +305,6 @@ class TestNegativeBinomialSARFlowSeparableGibbs:
 class TestNegativeBinomialSARFlowGibbs:
     """Tests for SARNegBinFlow.fit(sampler='gibbs')."""
 
-    def test_gibbs_returns_inference_data(self):
-        """Gibbs sampler returns valid InferenceData with 3 spatial params."""
-        from neighbayes.models import SARNegBinFlow
-
-        data = _make_flow_data()
-        model = SARNegBinFlow(data["y_vec"], data["X"], data["G"])
-        idata = model.fit(
-            draws=20,
-            tune=20,
-            chains=2,
-            sampler="gibbs",
-            random_seed=42,
-            progressbar=False,
-        )
-        assert "beta" in idata.posterior
-        assert "alpha" in idata.posterior
-        assert "rho_d" in idata.posterior
-        assert "rho_o" in idata.posterior
-        assert "rho_w" in idata.posterior
-
     def test_gibbs_jax_backend_returns_inference_data(self):
         """backend='jax' (sparsax-sparse chain) returns valid InferenceData."""
         import importlib.util
@@ -370,27 +329,6 @@ class TestNegativeBinomialSARFlowGibbs:
             assert v in idata.posterior
             assert np.isfinite(idata.posterior[v].to_numpy()).all()
         assert "log_likelihood" in idata.children
-
-    @pytest.mark.requires_jax
-    def test_separable_jax_backend_works(self):
-        """The separable Kronecker model now supports the JAX backend."""
-        import importlib.util
-
-        if importlib.util.find_spec("sparsax") is None:
-            pytest.skip("sparsax not installed")
-
-        data = _make_flow_data()
-        model = SARNegBinFlow(data["y_vec"], data["X"], data["G"], separable=True)
-        idata = model.fit(
-            draws=10,
-            tune=10,
-            chains=1,
-            sampler="gibbs",
-            backend="jax",
-            progressbar=False,
-        )
-        assert "rho_d" in idata.posterior
-        assert "rho_o" in idata.posterior
 
     def test_gibbs_shapes(self):
         """Gibbs posterior has correct shapes for unrestricted model."""

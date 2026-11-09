@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 import scipy.sparse as sp
 
-from ..._lazy_deps import az, xr
+from ..._lazy_deps import xr
 
 _KIND = {None: "iid", "rho": "lag", "lam": "error"}
 
@@ -209,6 +209,8 @@ class GaussianPredictionMixin:
 
         coords = {"obs_new": _row_labels(X_new, oos)}
         dims = {k: ["obs_new"] for k in out}
+        import arviz as az
+
         # ArviZ applies pred_coords / pred_dims to the predictions groups.
         return az.from_dict(
             {"predictions": out, "predictions_constant_data": {"X_new": Xo}},
@@ -292,6 +294,8 @@ class GaussianPredictionMixin:
                 out["y_tc"][c, d] = mu
                 out["y_bp"][c, d] = m
                 out["y"][c, d] = m + sd * rng.standard_normal(n)
+
+        import arviz as az
 
         return az.from_dict(
             {"predictions": out},

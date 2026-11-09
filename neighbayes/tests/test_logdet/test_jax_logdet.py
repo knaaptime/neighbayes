@@ -54,44 +54,6 @@ def _exact_logdet(rho: float, W: np.ndarray) -> float:
     return float(np.linalg.slogdet(np.eye(n) - rho * W)[1])
 
 
-def _exact_logdet_eigenvalue(rho: float, eigs: np.ndarray) -> float:
-    """Exact log|I - rho*W| from eigenvalues."""
-    return float(np.sum(np.log(np.abs(1.0 - rho * eigs))))
-
-
-def _rook_row_standardized(side: int) -> np.ndarray:
-    """Row-standardized rook-contiguity W on a ``side × side`` grid.
-
-    Symmetric sparsity pattern (undirected graph).
-    """
-    n = side * side
-    A = np.zeros((n, n), dtype=float)
-    for r in range(side):
-        for c in range(side):
-            i = r * side + c
-            for dr, dc in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-                rr, cc = r + dr, c + dc
-                if 0 <= rr < side and 0 <= cc < side:
-                    A[i, rr * side + cc] = 1.0
-    return A / A.sum(axis=1, keepdims=True)
-
-
-def _knn_row_standardized(n: int, k: int) -> np.ndarray:
-    """Row-standardized k-nearest-neighbor W on random 2-D points.
-
-    Asymmetric sparsity pattern (directed graph).
-    """
-    rng = np.random.default_rng(0)
-    pts = rng.random((n, 2))
-    A = np.zeros((n, n), dtype=float)
-    for i in range(n):
-        d = np.sum((pts - pts[i]) ** 2, axis=1)
-        d[i] = np.inf
-        for j in np.argsort(d)[:k]:
-            A[i, j] = 1.0
-    return A / A.sum(axis=1, keepdims=True)
-
-
 # ---------------------------------------------------------------------------
 # jax_logdet_chebyshev
 # ---------------------------------------------------------------------------

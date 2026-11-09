@@ -24,7 +24,7 @@ from ..._backends.sampler_helpers import (
     prepare_idata_kwargs,
     use_jax_likelihood,
 )
-from ..._lazy_deps import az, pm, xr
+from ..._lazy_deps import pm, xr
 from ..._logdet import (
     make_logdet_fn,
     make_logdet_grad_numpy_vec_fn,
@@ -955,6 +955,8 @@ class SharedSpatialMethods(metaclass=ABCMeta):
         pandas.DataFrame
             Posterior summary statistics.
         """
+        import arviz as az
+
         self._require_fit()
         summary_df = az.summary(self._idata, var_names=var_names, **kwargs)
         return self._rename_summary_index(summary_df)

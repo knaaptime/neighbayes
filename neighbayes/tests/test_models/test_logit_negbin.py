@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import numpy as np
-import pymc as pm
 import pytest
 
 from neighbayes.models import Logit, NegBin
@@ -22,15 +21,6 @@ def _binary_data(seed: int = 0, n: int = 200):
     p = 1.0 / (1.0 + np.exp(-X @ beta))
     y = (rng.uniform(size=n) < p).astype(float)
     return y, X, beta
-
-
-def test_logit_build_pymc_model():
-    y, X, _ = _binary_data()
-    m = Logit(y=y, X=X)
-    pymc_model = m._build_pymc_model()
-    assert isinstance(pymc_model, pm.Model)
-    assert "beta" in pymc_model.named_vars
-    assert "obs" in pymc_model.named_vars
 
 
 def test_logit_rejects_non_binary_y():
@@ -86,16 +76,6 @@ def _count_data(seed: int = 0, n: int = 300, alpha_true: float = 2.0):
     mu = np.exp(X @ beta)
     y = rng.negative_binomial(alpha_true, alpha_true / (alpha_true + mu)).astype(float)
     return y, X, beta, alpha_true
-
-
-def test_negbin_build_pymc_model():
-    y, X, _, _ = _count_data()
-    m = NegBin(y=y, X=X)
-    pymc_model = m._build_pymc_model()
-    assert isinstance(pymc_model, pm.Model)
-    assert "beta" in pymc_model.named_vars
-    assert "alpha" in pymc_model.named_vars
-    assert "obs" in pymc_model.named_vars
 
 
 def test_negbin_rejects_noninteger_or_negative_y():

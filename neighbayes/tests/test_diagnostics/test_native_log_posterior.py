@@ -20,7 +20,6 @@ from neighbayes.models.cross_section.sar import SAR
 from neighbayes.models.cross_section.sdem import SDEM
 from neighbayes.models.cross_section.sdm import SDM
 from neighbayes.models.cross_section.sem import SEM
-from neighbayes.models.cross_section.slx import SLX
 from neighbayes.tests.helpers import make_rook_W
 
 

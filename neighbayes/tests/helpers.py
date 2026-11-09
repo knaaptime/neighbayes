@@ -5,12 +5,9 @@ Import from here rather than from conftest.py to avoid sys.path issues.
 
 from __future__ import annotations
 
-import importlib.util
-
 import arviz as az
 import numpy as np
 import pandas as pd
-import pytest
 import scipy.sparse as sp
 import xarray as xr
 from libpysal.graph import Graph
@@ -34,10 +31,6 @@ from neighbayes.dgp.panel_dynamic import (
 # Optional-dependency skip helpers
 # ---------------------------------------------------------------------------
 
-requires_nutpie = pytest.mark.skipif(
-    importlib.util.find_spec("nutpie") is None,
-    reason="nutpie is not installed",
-)
 
 # ---------------------------------------------------------------------------
 # Sampling settings

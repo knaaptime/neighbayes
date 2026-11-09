@@ -106,13 +106,6 @@ class TestFlowModelConstruction:
         )
         assert "jacobian" in [p.name for p in model._build_pymc_model().potentials]
 
-    def test_pymc_model_separable_builds_without_error(self):
-        model = SARFlow(
-            self.y_vec, self.X, self.G, separable=True, col_names=self.col_names
-        )
-        pm_model = model._build_pymc_model()
-        assert pm_model is not None
-
 
 # ---------------------------------------------------------------------------
 # DGP
@@ -313,24 +306,6 @@ class TestSARFlowFitSmoke:
         self.y = out["y_vec"]
         self.X = out["X"]  # (N, p) full O-D design matrix
         self.col_names = out["col_names"]
-
-    def test_sar_flow_fit_posterior_keys(self):
-        from neighbayes.models.flow import SARFlow
-
-        model = SARFlow(
-            self.y,
-            self.X,
-            self.G,
-            col_names=self.col_names,
-            nonnegative_dependence=True,
-        )
-        idata = model.fit(draws=50, tune=50, chains=1, progressbar=False, random_seed=0)
-        posterior = idata.posterior
-        assert "rho_d" in posterior
-        assert "rho_o" in posterior
-        assert "rho_w" in posterior
-        assert "beta" in posterior
-        assert "sigma" in posterior
 
     def test_sar_flow_separable_fit_posterior_keys(self):
         model = SARFlow(
@@ -543,7 +518,6 @@ FLOW_N_SEP = 12  # 144 O-D pairs (vs 64 for unrestricted model)
 ABS_TOL_RHO = 0.20
 ABS_TOL_RHO_SEP = 0.25  # separable model: slightly wider
 ABS_TOL_BETA = 0.35
-ABS_TOL_BETA_SEP = 0.40
 ABS_TOL_SIGMA = 0.35
 
 
@@ -581,10 +555,6 @@ class TestSARFlowSeparableLogdetMethods:
         )
         idata = model.fit(**{**SAMPLE_KWARGS, "draws": 50, "tune": 50, "chains": 1})
         return idata, request.param
-
-    def test_posterior_has_rho_d(self, fitted_model):
-        idata, _ = fitted_model
-        assert "rho_d" in idata.posterior
 
     def test_posterior_has_rho_o(self, fitted_model):
         idata, _ = fitted_model
@@ -797,7 +767,6 @@ class TestFlowSpatialEffectsAndPPC:
             sigma=1.0,
             seed=11,
         )
-        G = data["G"]
         model = SARFlow(
             data["y_vec"],
             data["X"],

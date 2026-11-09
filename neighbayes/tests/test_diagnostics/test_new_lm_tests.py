@@ -9,7 +9,6 @@ mock models with synthetic posteriors.
 from __future__ import annotations
 
 import numpy as np
-import pytest
 
 from neighbayes.diagnostics.lmtests import (
     bayesian_lm_error_sdm_test,

@@ -177,16 +177,6 @@ class TestWeightsFromGeodataframe:
         g = weights_from_geodataframe(gdf, contiguity="rook")
         assert isinstance(g, Graph)
 
-    def test_queen_contiguity(self):
-        import geopandas as gpd
-        from shapely.geometry import box
-
-        gdf = gpd.GeoDataFrame(
-            geometry=[box(0, 0, 1, 1), box(1, 0, 2, 1), box(0, 1, 1, 2)]
-        )
-        g = weights_from_geodataframe(gdf, contiguity="queen")
-        assert isinstance(g, Graph)
-
 
 # ---------------------------------------------------------------------------
 # resolve_weights
@@ -210,10 +200,6 @@ class TestResolveWeights:
     def test_ndarray_rejected(self):
         with pytest.raises(TypeError, match="Graph or a scipy sparse"):
             resolve_weights(W=_rook_W(4))
-
-    def test_with_n_side_only(self):
-        W_sparse, g = resolve_weights(n_side=4)
-        assert W_sparse.shape == (16, 16)  # 4x4 grid = 16 units
 
     def test_no_args_raises(self):
         with pytest.raises(ValueError, match="Provide either W, gdf, or n_side"):

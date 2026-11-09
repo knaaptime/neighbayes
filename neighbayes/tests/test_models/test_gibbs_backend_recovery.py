@@ -320,6 +320,7 @@ def sar_zinb_small_data():
     )
 
 
+@pytest.mark.validation
 def test_sar_zinb_backends_agree(sar_zinb_small_data):
     """Both ZINB backends must sample the *same* posterior, not merely a
     posterior near the truth.
@@ -377,6 +378,7 @@ _AGREEMENT_CASES = [
 ]
 
 
+@pytest.mark.validation
 @pytest.mark.parametrize("model_name,fixture_name,tols", _AGREEMENT_CASES)
 def test_backends_agree(request, model_name, fixture_name, tols):
     """Every dual-backend family must sample the *same* posterior.
@@ -425,6 +427,7 @@ def nb_flow_sep_data():
     )
 
 
+@pytest.mark.validation
 def test_nb_flow_separable_backends_agree(nb_flow_sep_data):
     """Both separable-flow backends must sample the same posterior."""
 

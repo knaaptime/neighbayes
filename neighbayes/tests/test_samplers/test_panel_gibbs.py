@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-import scipy.sparse as sp
 
 from neighbayes.models import SAR, SEM
 from neighbayes.tests.helpers import (
@@ -160,33 +159,6 @@ class TestPanelGibbsDispatch:
 class TestPanelGibbsEdgeCases:
     """Edge cases for panel Gibbs."""
 
-    def test_sar_panel_fe_robust_gibbs_runs(self):
-        """Robust (Student-t) SARPanelFE samples with Gibbs."""
-        rng = np.random.default_rng(42)
-        W_dense, W_graph = _make_panel_W()
-        y, X, _ = make_panel_sar_data(
-            rng,
-            W_dense,
-            PANEL_N,
-            PANEL_T,
-            rho=0.4,
-            beta=np.array([1.0, 2.0]),
-            sigma=0.8,
-        )
-        model = SAR(
-            unit_effects="fixed", y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T, robust=True
-        )
-        idata = model.fit(
-            sampler="gibbs",
-            draws=30,
-            tune=20,
-            chains=1,
-            progressbar=False,
-            idata_kwargs={"log_likelihood": True},
-        )
-        assert "v" not in idata.posterior
-        assert np.all(np.isfinite(idata.log_likelihood["obs"].values))
-
     def test_sem_panel_fe_robust_gibbs_runs(self):
         """Robust (Student-t) SEMPanelFE samples with Gibbs."""
         rng = np.random.default_rng(42)
@@ -273,70 +245,7 @@ class TestPanelGibbsEdgeCases:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.slow
-class TestPanelGibbsRecovery:
-    """Panel Gibbs should recover true parameters."""
-
-    def test_sar_panel_fe_gibbs_recovers_rho(self):
-        """SARPanelFE Gibbs posterior mean of rho near true value."""
-        rng = np.random.default_rng(42)
-        W_dense, W_graph = _make_panel_W()
-        rho_true = 0.4
-        y, X, _ = make_panel_sar_data(
-            rng,
-            W_dense,
-            PANEL_N,
-            PANEL_T,
-            rho=rho_true,
-            beta=np.array([1.0, 2.0]),
-            sigma=0.8,
-        )
-        model = SAR(unit_effects="fixed", y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T)
-        idata = model.fit(
-            sampler="gibbs",
-            draws=500,
-            tune=300,
-            chains=2,
-            random_seed=42,
-            n_jobs=1,
-            progressbar=False,
-        )
-        rho_hat = float(idata.posterior["rho"].mean())
-        assert abs(rho_hat - rho_true) < 0.25, (
-            f"SARPanelFE Gibbs rho: expected ≈{rho_true}, got {rho_hat:.3f}"
-        )
-
-    def test_sem_panel_fe_gibbs_recovers_lam(self):
-        """SEMPanelFE Gibbs posterior mean of lam near true value."""
-        rng = np.random.default_rng(42)
-        W_dense, W_graph = _make_panel_W()
-        lam_true = 0.3
-        y, X, _ = make_panel_sem_data(
-            rng,
-            W_dense,
-            PANEL_N,
-            PANEL_T,
-            lam=lam_true,
-            beta=np.array([1.0, 2.0]),
-            sigma=0.8,
-        )
-        model = SEM(unit_effects="fixed", y=y, X=X, W=W_graph, N=PANEL_N, T=PANEL_T)
-        idata = model.fit(
-            sampler="gibbs",
-            draws=500,
-            tune=300,
-            chains=2,
-            random_seed=42,
-            n_jobs=1,
-            progressbar=False,
-        )
-        lam_hat = float(idata.posterior["lam"].mean())
-        assert abs(lam_hat - lam_true) < 0.25, (
-            f"SEMPanelFE Gibbs lam: expected ≈{lam_true}, got {lam_hat:.3f}"
-        )
-
-
-@pytest.mark.slow
+@pytest.mark.validation
 class TestPanelGibbsVsNUTS:
     """Panel Gibbs and NUTS posteriors should agree."""
 

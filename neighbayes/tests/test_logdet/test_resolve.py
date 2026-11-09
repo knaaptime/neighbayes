@@ -99,7 +99,6 @@ def _knn_graph(n: int, k: int, seed: int = 42):
 def test_fillin_guard_routes_dense_to_stochastic():
     """Dense W at medium n should auto-select stoch_cheb with a warning."""
     import numpy as np
-    import scipy.sparse as sp
 
     n = 2000
     W_dense = np.ones((n, n)) - np.eye(n)  # fully dense, symmetric
@@ -126,9 +125,7 @@ def test_fillin_guard_preserves_low_degree_sparse():
     rows = np.array([0, 1, 1, 2, 2, 3, 3, 0])
     cols = np.array([1, 0, 2, 1, 3, 2, 0, 3])
     vals = np.ones(len(rows))
-    W = sp.csr_matrix((vals, (rows, cols)), shape=(4, 4))
-    # n=4 is below eigen_cutoff (500), so this hits eigenvalue, not the guard.
-    # Use n in the medium range with a sparse W.
+    # n past eigen_cutoff (500), so the fill-in guard runs.
     n = 1000
     W_sparse = sp.csr_matrix((vals, (rows, cols)), shape=(n, n))
     W_sparse = W_sparse + W_sparse.T

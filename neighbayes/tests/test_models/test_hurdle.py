@@ -372,7 +372,7 @@ def _quadrature(y, prior_sd=2.5, a_sigma=2.5, a_nu=3.0):
     return (mb, np.sqrt(wb @ (bg - mb) ** 2)), (ma, np.sqrt(wa @ (A - ma) ** 2))
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.parametrize("mu", [0.3, 1.0, 5.0])
 def test_truncated_count_matches_quadrature(mu):
     """Intercept-only count half through the full kernel vs a 2-D quadrature.
@@ -415,7 +415,7 @@ def test_truncated_count_matches_quadrature(mu):
     assert abs(a.mean() - qa) < 0.1 * sa and abs(a.std() / sa - 1) < 0.15
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 def test_binary_half_matches_sar_logit():
     """With unlinked halves the binary half is exactly SARLogit fit on d."""
     from neighbayes.models import SARLogit
@@ -443,7 +443,7 @@ def test_binary_half_matches_sar_logit():
     np.testing.assert_allclose(g.std(0), gr.std(0), rtol=0.15)
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.parametrize("alpha_fixed", [None, 5.0])
 def test_sarhurdle_gibbs_matches_nuts(alpha_fixed):
     d = _xs(n_side=10, seed=4)
@@ -467,7 +467,7 @@ def test_sarhurdle_gibbs_matches_nuts(alpha_fixed):
         _agree(g.posterior, n.posterior, var)
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 def test_hurdle_panel_gibbs_matches_nuts():
     d = _panel(seed=2)
     with warnings.catch_warnings():
@@ -582,6 +582,21 @@ def test_flow_hurdle_alpha_fixed_and_summaries(backend):
     assert {"pair_effect_summary", "pair_effect_summary_zero"} <= set(idata.children)
 
 
+def test_flow_target_pi_reports_the_generating_beta_zero():
+    """``target_pi`` shifts the selection intercept inside the filter, and reports it."""
+    from neighbayes.dgp.flows import _graph_to_csr
+
+    f = dgp.simulate_sar_hurdle_negbin_flow(
+        n=6, T=2, rho_d_zero=0.4, rho_o_zero=0.3, target_pi=0.6, seed=3, separable=True
+    )
+    W = _graph_to_csr(f["G"]).toarray()
+    eye = np.eye(W.shape[0])
+    A = np.kron(eye - 0.3 * W, eye - 0.4 * W)
+    Xt = f["X"].reshape(2, A.shape[0], -1)
+    expected = np.concatenate([np.linalg.solve(A, x @ f["beta_zero"]) for x in Xt])
+    np.testing.assert_allclose(f["eta_zero"], expected, atol=1e-10)
+
+
 def test_flow_hurdle_guards():
     from neighbayes.models import SARHurdleNegBinFlow
 
@@ -610,7 +625,7 @@ def test_flow_hurdle_guards():
         m.impacts("zero")
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 def test_flow_hurdle_structured_matches_generic():
     """The structured n × n sweep against the materialized-U kernel (pair effects)."""
     from neighbayes.models import SARHurdleNegBinFlow
@@ -682,7 +697,7 @@ def test_flow_hurdle_structured_matches_generic():
         np.testing.assert_allclose(x.std(0), r.std(0), rtol=0.15, err_msg=var)
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 def test_flow_hurdle_matches_nuts():
     from neighbayes.models import SARHurdleNegBinFlow
 
@@ -703,7 +718,7 @@ def test_flow_hurdle_matches_nuts():
     np.testing.assert_allclose(la.std(), lr.std(), rtol=0.15)
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.requires_jax
 def test_flow_hurdle_jax_matches_numpy():
     from neighbayes.models import SARHurdleNegBinFlow

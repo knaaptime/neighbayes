@@ -445,7 +445,7 @@ def test_flow_separable_pair_effects_recovery():
         assert _covers(post["beta"].values[..., names.index(side)], truth)
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.requires_jax
 def test_separable_fixed_effects_jax_matches_numpy():
     data = simulate_sar_negbin_flow(
@@ -529,7 +529,7 @@ def test_fitted_mean_puts_unit_effects_inside_the_filter():
     np.testing.assert_allclose(m._fitted_mean_from_posterior(), np.exp(eta), rtol=1e-10)
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 def test_spatial_unit_effects_gibbs_matches_nuts():
     """Effects inside the filter: Gibbs (collapsed SAR effect block) vs PyMC."""
     d = simulate_sar_negbin(N=64, T=4, n_side=8, rho=0.5, alpha=3.0, seed=43, unit_effects="random", unit_effect_sd=0.6, time_effects=True, time_effect_sd=0.3, latent=False)  # fmt: skip
@@ -548,7 +548,7 @@ def test_spatial_unit_effects_gibbs_matches_nuts():
         np.testing.assert_allclose(a.std(0), b.std(0), rtol=0.2)
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 @pytest.mark.parametrize("alpha_fixed", [None, 30.0])
 def test_unit_effects_gibbs_matches_nuts(alpha_fixed):
     d = simulate_sar_negbin(N=64, T=4, n_side=8, rho=0.0, alpha=3.0, seed=41, fe_x_corr=0.5, unit_effects="random", unit_effect_sd=0.7, time_effects=True, time_effect_sd=0.3, latent=False)  # fmt: skip

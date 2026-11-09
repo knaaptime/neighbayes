@@ -101,7 +101,6 @@ def test_sdem_panel_re_builds_and_computes_effects():
     pymc_model = sdem._build_pymc_model()
     assert isinstance(pymc_model, pm.Model)
 
-    k = X.shape[1]
     k_wx = len(sdem._wx_column_indices)
     beta_full = np.concatenate([np.array([0.2, 0.8]), np.full(k_wx, 0.1)])
     alpha = np.array([0.1, -0.05, 0.02, -0.01])

@@ -638,7 +638,7 @@ class TestChainRunner:
 # ===================================================================
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 class TestGibbsVsNUTS:
     """Gibbs and NUTS posteriors should agree for Gaussian models.
 
@@ -837,7 +837,7 @@ class TestJointPosterior:
         assert np.all(np.abs(z) < 5), z
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 class TestRobustGibbsVsNUTS:
     """Robust Gibbs (normal scale mixture) matches NUTS on Student-t data."""
 
@@ -887,7 +887,7 @@ class TestRobustGibbsVsNUTS:
             np.testing.assert_allclose(b.std(axis=0), a.std(axis=0), rtol=0.15)
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 class TestGibbsJointVsNUTS:
     """Gibbs reproduces the NUTS joint posterior, including cross-correlations."""
 
@@ -1013,24 +1013,6 @@ class TestJAXGaussianGibbs:
         assert "rho" in idata.posterior.data_vars
         assert "sigma" in idata.posterior.data_vars
         assert float(idata.posterior["rho"].mean()) != 0  # not stuck at init
-
-    def test_sem_jax_produces_valid_idata(self):
-        from neighbayes.models.cross_section.sem import SEM
-
-        y, X, W_dense, n = _make_sem_data()
-        W = W_to_graph(W_dense)
-        model = SEM(y=y, X=X, W=W)
-        idata = model.fit(
-            sampler="gibbs",
-            draws=50,
-            tune=20,
-            chains=1,
-            random_seed=42,
-            n_jobs=1,
-            progressbar=False,
-            backend="jax",
-        )
-        assert "lam" in idata.posterior.data_vars
 
     def test_sdm_jax_produces_valid_idata(self):
         from neighbayes.models.cross_section.sdm import SDM
@@ -1462,8 +1444,7 @@ class TestChainParallelism:
 
     def test_vectorized_runner_valid_results(self):
         """JAX vectorized runner returns valid multi-chain slice results."""
-        jax = pytest.importorskip("jax")
-        import jax.numpy as jnp
+        pytest.importorskip("jax")
         import scipy.sparse as sp
 
         from neighbayes._logdet import (
@@ -1473,7 +1454,6 @@ class TestChainParallelism:
         )
         from neighbayes.samplers.gaussian._core import (
             GaussianGibbsCache,
-            GaussianGibbsState,
             _initialize_gaussian_gibbs,
         )
         from neighbayes.samplers.gaussian._estimation import GaussianGibbsPriors
@@ -1482,7 +1462,6 @@ class TestChainParallelism:
         )
 
         y, X, W_dense, n = _make_sar_data()
-        W = W_to_graph(W_dense)
         Wy = W_dense @ y
         W_sparse = sp.csr_matrix(W_dense)
 

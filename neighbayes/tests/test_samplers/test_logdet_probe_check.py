@@ -67,6 +67,7 @@ def _fit(model_cls, data, backend, **kw):
 @pytest.mark.parametrize("backend", BACKENDS)
 @pytest.mark.parametrize("model_cls", [SAR, SEM])
 class TestProbeCheckFit:
+    @pytest.mark.validation
     def test_agrees_with_the_exact_logdet(self, data, backend, model_cls):
         import arviz as az
 

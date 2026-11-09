@@ -62,7 +62,7 @@ def test_old_half_normal_key_is_rejected():
         )
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 def test_nuts_and_gibbs_share_the_posterior():
     """Non-centered NUTS and conjugate Gibbs agree on the SAR-RE posterior."""
     import arviz as az

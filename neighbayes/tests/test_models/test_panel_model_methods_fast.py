@@ -6,13 +6,11 @@ import warnings
 
 import arviz as az
 import numpy as np
-import pymc as pm
 import pytest
 import xarray as xr
 from libpysal.graph import Graph
 
 from neighbayes.models import OLS, SAR, SDEM, SDM, SEM, SLX
-from neighbayes.models.base import SpatialModel
 from neighbayes.tests.helpers import W_to_graph, make_line_W
 
 
@@ -36,23 +34,6 @@ def _graph_from_dense_without_transform(W_dense: np.ndarray) -> Graph:
     rows, cols = np.nonzero(W_dense)
     weights = W_dense[rows, cols]
     return Graph.from_arrays(rows, cols, weights.astype(float))
-
-
-def test_panel_fe_build_pymc_models():
-    y, X, W, N, T = _panel_data()
-
-    models = [
-        OLS(unit_effects="fixed", y=y, X=X, W=W, N=N, T=T),
-        SAR(unit_effects="fixed", y=y, X=X, W=W, N=N, T=T),
-        SEM(unit_effects="fixed", y=y, X=X, W=W, N=N, T=T),
-        SDM(unit_effects="fixed", y=y, X=X, W=W, N=N, T=T),
-        SDEM(unit_effects="fixed", y=y, X=X, W=W, N=N, T=T),
-        SLX(unit_effects="fixed", y=y, X=X, W=W, N=N, T=T),
-    ]
-
-    for model in models:
-        pymc_model = model._build_pymc_model()
-        assert isinstance(pymc_model, pm.Model)
 
 
 def test_panel_fe_fitted_values_and_effects_with_mock_posteriors():

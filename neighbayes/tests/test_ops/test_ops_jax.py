@@ -462,7 +462,6 @@ def test_sparse_sar_jax_eigen_autodiff_vs_manual_vjp(monkeypatch, sar_env_reset)
     eigs_j = jnp.asarray(eigs_np.astype(np.complex128))
     V_j = jnp.asarray(V_np.astype(np.complex128))
     Vinv_j = jnp.asarray(Vinv_np.astype(np.complex128))
-    W_j = jnp.asarray(W_dense, dtype=jnp.float64)
 
     def eigen_solve(rho, b):
         inv_eigs = 1.0 / (1.0 - rho * eigs_j)

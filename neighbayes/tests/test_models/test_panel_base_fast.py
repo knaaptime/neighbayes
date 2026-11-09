@@ -203,11 +203,6 @@ class TestAsDenseW:
         result = _as_dense_W(W_graph, N=3, T=2)
         assert result.shape == (6, 6)
 
-    def test_sparse_to_dense(self):
-        W_sp = sp.csr_matrix(_rook_W(3))
-        result = _as_dense_W(W_sp, N=3, T=2)
-        assert result.shape == (6, 6)
-
     def test_ndarray_to_dense(self):
         W_arr = _rook_W(3)
         result = _as_dense_W(W_arr, N=3, T=2)
@@ -824,7 +819,6 @@ class TestWDenseMemoryWarning:
 
     def test_large_panel_triggers_warning(self):
         """Matrices exceeding the threshold trigger ResourceWarning."""
-        import warnings
 
         W_graph = _W_to_graph(_rook_W(4))
         from neighbayes.models.base import SpatialModel

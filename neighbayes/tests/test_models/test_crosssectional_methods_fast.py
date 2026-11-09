@@ -9,11 +9,10 @@ from __future__ import annotations
 
 import arviz as az
 import numpy as np
-import pymc as pm
 import pytest
 import xarray as xr
 
-from neighbayes.models import SDEM, SDM, SEM, SLX
+from neighbayes.models import SAR, SDEM, SDM, SEM, SLX
 from neighbayes.tests.helpers import W_to_graph, make_line_W
 
 _EXPECTED_EFFECT_COLUMNS = {
@@ -37,6 +36,19 @@ def _idata(vars_dict: dict[str, np.ndarray]) -> xr.DataTree:
     return az.from_dict({"posterior": payload})
 
 
+def test_sar_nuts_logp_and_gradient_are_finite():
+    """The SAR NUTS model's log density and gradient compile and evaluate.
+
+    With the pointwise log-likelihood requested, the likelihood is a custom
+    density carrying the Jacobian per observation.
+    """
+    y, X, W = _cs_data()
+    model = SAR(y=y, X=X, W=W)._build_pymc_model(compute_log_likelihood=True)
+    point = model.initial_point()
+    assert np.isfinite(model.compile_logp()(point))
+    assert np.all(np.isfinite(model.compile_dlogp()(point)))
+
+
 def _cs_data(seed: int = 90, *, intercept: bool = True):
     rng = np.random.default_rng(seed)
     n = 8
@@ -50,13 +62,6 @@ def _cs_data(seed: int = 90, *, intercept: bool = True):
         y = 0.8 * x1 - 0.3 * x2 + rng.normal(scale=0.3, size=n)
     W = W_to_graph(make_line_W(n))
     return y, X, W
-
-
-@pytest.mark.parametrize("model_cls", [SLX, SEM, SDEM, SDM])
-def test_build_pymc_model(model_cls):
-    y, X, W = _cs_data()
-    model = model_cls(y=y, X=X, W=W)
-    assert isinstance(model._build_pymc_model(), pm.Model)
 
 
 @pytest.mark.parametrize("model_cls", [SLX, SDEM, SDM])

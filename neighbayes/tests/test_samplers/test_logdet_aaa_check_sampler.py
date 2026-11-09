@@ -88,6 +88,7 @@ class TestAAANodeCheck:
         assert idata.attrs["logdet_aaa_nodes"] > 14
         assert idata.attrs["logdet_aaa_check_passed"] == 1
 
+    @pytest.mark.validation
     def test_agrees_with_the_exact_jacobian(self, high, backend):
         """Any shift from the eigenvalue Jacobian must be inside Monte Carlo error."""
         import arviz as az

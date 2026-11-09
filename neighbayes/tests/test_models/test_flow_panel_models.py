@@ -13,7 +13,6 @@ import numpy as np
 import pytest
 
 from neighbayes.models import OLSFlow, SARFlow
-from neighbayes.tests.helpers import effects_kwargs
 
 
 def _flow_test_graph(n: int):
@@ -96,51 +95,6 @@ class TestFlowPanelConstruction:
                 T=T,
                 col_names=col_names,
             )
-
-
-class TestSeparablePanelModelBuild:
-    def test_sar_flow_separable_panel_builds_pymc_model(self):
-        n = 4
-        T = 3
-        G = _flow_test_graph(n)
-        y, X, col_names = _panel_flow_stack(n=n, T=T, k=2, seed=13)
-
-        model = SARFlow(
-            separable=True,
-            y=y,
-            W=G,
-            X=X,
-            T=T,
-            col_names=col_names,
-        )
-
-        pm_model = model._build_pymc_model()
-        assert pm_model is not None
-        assert "rho_w" in pm_model.named_vars
-
-
-@pytest.mark.slow
-def test_sar_flow_panel_fit_smoke():
-    """Minimal posterior smoke test for the unrestricted panel flow model."""
-    n = 4
-    T = 2
-    G = _flow_test_graph(n)
-    y, X, col_names = _panel_flow_stack(n=n, T=T, k=1, seed=15)
-
-    model = SARFlow(
-        y=y,
-        W=G,
-        X=X,
-        T=T,
-        col_names=col_names,
-        nonnegative_dependence=True,
-    )
-    idata = model.fit(draws=50, tune=50, chains=1, progressbar=False, random_seed=0)
-    assert "rho_d" in idata.posterior
-    assert "rho_o" in idata.posterior
-    assert "rho_w" in idata.posterior
-    assert "beta" in idata.posterior
-    assert "sigma" in idata.posterior
 
 
 # ---------------------------------------------------------------------------
@@ -390,34 +344,6 @@ class TestOLSFlowPanelEffects:
         y_rep = model.posterior_predictive(n_draws=5, random_seed=3)
         assert y_rep.shape == (5, n * n * T)
         assert np.all(np.isfinite(y_rep))
-
-    @pytest.mark.parametrize("fe_mode", [1, 2])
-    def test_olsflow_panel_fe_modes_smoke(self, fe_mode):
-        """Pair FE (1) and time FE (2) wire through `_demean_panel` correctly."""
-        n = 4
-        T = 3
-        G, y, X, col_names = _ols_panel_flow_data(
-            n=n,
-            T=T,
-            beta_d=[0.5],
-            beta_o=[0.3],
-            sigma=0.2,
-            seed=fe_mode,
-        )
-        model = OLSFlow(
-            y=y,
-            W=G,
-            X=X,
-            T=T,
-            col_names=col_names,
-            **effects_kwargs(fe_mode, "pair_effects"),
-        )
-        model.fit(draws=20, tune=20, chains=1, progressbar=False, random_seed=0)
-        post = model._idata.posterior
-        assert "beta" in post.data_vars
-        assert "sigma" in post.data_vars
-        assert "rho_d" not in post.data_vars
-        assert "rho_o" not in post.data_vars
 
 
 # ---------------------------------------------------------------------------

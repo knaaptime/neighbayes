@@ -1,5 +1,3 @@
-from unittest.mock import MagicMock
-
 import arviz as az
 import numpy as np
 import pandas as pd
@@ -14,10 +12,7 @@ from neighbayes.diagnostics.lmtests import (
     bayesian_lm_sdm_joint_test,
     bayesian_lm_slx_error_joint_test,
     bayesian_lm_wx_test,
-    bayesian_panel_lm_error_sdm_test,
     bayesian_panel_lm_error_test,
-    bayesian_panel_lm_lag_sdem_test,
-    # Panel LM tests
     bayesian_panel_lm_lag_test,
     bayesian_panel_lm_sdm_joint_test,
     bayesian_panel_lm_slx_error_joint_test,
@@ -135,7 +130,6 @@ def test_bayesian_lm_result_df_field():
 def _make_mock_ols_model_with_wx(y, X, WX, W_sparse, beta_noise=0.1, draws=100):
     """Build a mock OLS model with WX columns (for joint tests)."""
     n, k = X.shape
-    Z = np.hstack([X, WX])  # OLS uses only X for residuals, but has WX available
     beta_ols = np.linalg.lstsq(X, y, rcond=None)[0]  # OLS on X only
     beta_samples = np.tile(beta_ols, (draws, 1))
     rng = np.random.default_rng(42)
@@ -200,7 +194,6 @@ def _make_mock_sar_model(y, X, WX, W_sparse, beta_noise=0.1, rho_noise=0.05, dra
 def _make_mock_slx_model(y, X, WX, W_sparse, beta_noise=0.1, draws=100):
     """Build a mock SLX model (beta covers [X, WX], no spatial params)."""
     n, k = X.shape
-    k_wx = WX.shape[1]
     Z = np.hstack([X, WX])
     beta_slx = np.linalg.lstsq(Z, y, rcond=None)[0]
     beta_samples = np.tile(beta_slx, (draws, 1))

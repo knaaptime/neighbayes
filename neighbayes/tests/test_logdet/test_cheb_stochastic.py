@@ -287,23 +287,19 @@ class TestFactoryIntegration:
 
         assert resolve_logdet_method(None, n=200000) == "stoch_cheb"
 
-    def test_eval_speed(self, small_W):
-        """Eval should be O(20) Clenshaw, ~2μs per call."""
-        import time
+    def test_evaluation_does_not_read_W(self, small_W):
+        """A call is a Clenshaw sum over the precomputed coefficients.
 
+        Its cost is the series' order whatever the size of ``W``: wiping ``W``
+        after the factory returns leaves every value unchanged.
+        """
         fn = make_logdet_numpy_fn(
             small_W, eigs=None, method="stoch_cheb", rho_min=-0.95, rho_max=0.95
         )
-        # Warm up
-        fn(0.5)
-        # Benchmark
-        rhos = np.linspace(-0.9, 0.9, 1000)
-        t0 = time.perf_counter()
-        for r in rhos:
-            fn(float(r))
-        per_call = (time.perf_counter() - t0) / 1000 * 1e6
-        # Should be < 10μs (Clenshaw O(20))
-        assert per_call < 15.0, f"per_call={per_call:.1f}μs"
+        rhos = np.linspace(-0.9, 0.9, 7)
+        before = [fn(r) for r in rhos]
+        small_W.data[:] = np.nan
+        np.testing.assert_array_equal([fn(r) for r in rhos], before)
 
 
 # ---------------------------------------------------------------------------

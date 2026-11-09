@@ -112,7 +112,7 @@ def test_unknown_kwarg_rejected():
         )
 
 
-@pytest.mark.slow
+@pytest.mark.validation
 def test_agrees_with_bridge_sampling():
     """Bridge sampling estimates the same quantity, up to its own error."""
     y, X, G = _data(seed=2, side=12)
