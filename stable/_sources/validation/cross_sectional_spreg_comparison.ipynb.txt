@@ -1,0 +1,573 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "0",
+   "metadata": {
+    "language": "markdown"
+   },
+   "source": [
+    "# Cross-Sectional Model Comparison: neighbayes vs spreg"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "1",
+   "metadata": {},
+   "source": [
+    "## Columbus example\n",
+    "\n",
+    "This notebook compares equivalent cross-sectional models between `neighbayes` and `spreg` on a real example dataset from the PySAL/spreg ecosystem.\n",
+    "\n",
+    "The dependent variable is `HOVAL`, with `INC` and `CRIME` used as explanatory variables.\n",
+    "\n",
+    "Model mapping used:\n",
+    "\n",
+    "- `SLX` (neighbayes) vs `spreg.OLS(slx_lags=1)`\n",
+    "- `SAR` (neighbayes) vs `spreg.GM_Lag`\n",
+    "- `SEM` (neighbayes) vs `spreg.GM_Error`\n",
+    "- `SDM` (neighbayes) vs `spreg.GM_Lag(slx_lags=1, w_lags=2)`\n",
+    "- `SDEM` (neighbayes) vs `spreg.GM_Error(slx_lags=1)`\n",
+    "\n",
+    "Dataset: **Columbus** neighborhood data from `libpysal.examples`."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "2",
+   "metadata": {
+    "language": "python"
+   },
+   "outputs": [],
+   "source": [
+    "import geopandas as gpd\n",
+    "import libpysal\n",
+    "import numpy as np\n",
+    "import pandas as pd\n",
+    "import spreg\n",
+    "from IPython.display import display\n",
+    "from spreg.sputils import _sp_effects, spmultiplier\n",
+    "\n",
+    "from neighbayes.models import SAR, SDEM, SDM, SEM, SLX"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "3",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "columbus = gpd.read_file(libpysal.examples.get_path(\"columbus.shp\"))\n",
+    "columbus.plot(\"HOVAL\", scheme=\"quantiles\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "4",
+   "metadata": {
+    "language": "python"
+   },
+   "outputs": [],
+   "source": [
+    "w = libpysal.graph.Graph.build_contiguity(columbus).transform(\"r\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "5",
+   "metadata": {
+    "language": "python"
+   },
+   "outputs": [],
+   "source": [
+    "y = columbus.HOVAL.values\n",
+    "X = columbus[[\"INC\", \"CRIME\"]]\n",
+    "\n",
+    "spreg_results = {\n",
+    "    \"SLX\": spreg.OLS(y, X, w=w, slx_lags=1, name_y=\"HOVAL\", name_x=[\"INC\", \"CRIME\"]),\n",
+    "    \"SAR\": spreg.ML_Lag(y, X, w=w, name_y=\"HOVAL\", name_x=[\"INC\", \"CRIME\"]),\n",
+    "    \"SEM\": spreg.ML_Error(y, X, w=w, name_y=\"HOVAL\", name_x=[\"INC\", \"CRIME\"]),\n",
+    "    \"SDM\": spreg.ML_Lag(\n",
+    "        y, X, w=w, slx_lags=1, w_lags=2, name_y=\"HOVAL\", name_x=[\"INC\", \"CRIME\"]\n",
+    "    ),\n",
+    "    \"SDEM\": spreg.GM_Error(\n",
+    "        y, X, w=w, slx_lags=1, name_y=\"HOVAL\", name_x=[\"INC\", \"CRIME\"]\n",
+    "    ),\n",
+    "}\n",
+    "\n",
+    "spec = \"HOVAL ~  1 + INC + CRIME\"\n",
+    "sample_kwargs = dict(draws=1000, tune=1000, chains=4, random_seed=42, progressbar=False)\n",
+    "bayes_models = {\n",
+    "    \"SLX\": SLX(spec, data=columbus, W=w),\n",
+    "    \"SAR\": SAR(spec, data=columbus, W=w),\n",
+    "    \"SEM\": SEM(spec, data=columbus, W=w),\n",
+    "    \"SDM\": SDM(spec, data=columbus, W=w),\n",
+    "    \"SDEM\": SDEM(spec, data=columbus, W=w),\n",
+    "}\n",
+    "bayes_idata = {name: model.fit(**sample_kwargs) for name, model in bayes_models.items()}"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "6",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "bayes_models[\"SAR\"].summary()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "938b142a",
+   "metadata": {},
+   "source": [
+    "### Sampler adequacy for $\\rho$\n",
+    "\n",
+    "Before trusting the SAR posterior summary above, verify that the\n",
+    "spatial parameter $\\rho$ has been sampled efficiently. Wolf, Anselin\n",
+    "& Arribas-Bel (2018) {cite:p}`wolf2018StochasticEfficiency` show that\n",
+    "$\\rho$ tends to mix slowly, so a chain that converges in mean can\n",
+    "still under-cover the tails by 10–12 %.\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "ea9c7d82",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from neighbayes.diagnostics import spatial_mcmc_diagnostic\n",
+    "\n",
+    "spatial_mcmc_diagnostic(bayes_models[\"SAR\"], emit_warnings=False).to_frame()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "7",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "print(spreg_results[\"SAR\"].summary)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "8",
+   "metadata": {
+    "language": "python"
+   },
+   "outputs": [],
+   "source": [
+    "def extract_spreg_params(model):\n",
+    "    names = list(getattr(model, \"name_x\", []))\n",
+    "    betas = np.asarray(model.betas).flatten()\n",
+    "    if len(betas) == len(names) + 1 and type(model).__name__ == \"GM_Lag\":\n",
+    "        names = names + [\"rho\"]\n",
+    "    if len(names) != len(betas):\n",
+    "        names = [f\"param_{i}\" for i in range(len(betas))]\n",
+    "    return pd.Series(betas, index=names, dtype=float)\n",
+    "\n",
+    "\n",
+    "def extract_neighbayes_params(model_name, model, idata):\n",
+    "    out = {}\n",
+    "    beta_mean = idata.posterior[\"beta\"].mean((\"chain\", \"draw\")).values\n",
+    "    beta_names = (\n",
+    "        model._beta_names()\n",
+    "        if model_name in {\"SLX\", \"SDM\", \"SDEM\"}\n",
+    "        else list(model._feature_names)\n",
+    "    )\n",
+    "    for name, val in zip(beta_names, beta_mean):\n",
+    "        out[name] = float(val)\n",
+    "    if model_name in {\"SAR\", \"SDM\"}:\n",
+    "        out[\"rho\"] = float(idata.posterior[\"rho\"].mean())\n",
+    "    if model_name in {\"SEM\", \"SDEM\"}:\n",
+    "        out[\"lambda\"] = float(idata.posterior[\"lam\"].mean())\n",
+    "    harmonized = {}\n",
+    "    for k, v in out.items():\n",
+    "        key = k.replace(\"W*\", \"W_\")\n",
+    "        if key.lower() == \"intercept\":\n",
+    "            key = \"CONSTANT\"\n",
+    "        harmonized[key] = v\n",
+    "    return pd.Series(harmonized, dtype=float)\n",
+    "\n",
+    "\n",
+    "def bayes_effects_df(model):\n",
+    "    eff = model.impacts()\n",
+    "    # impacts() returns a DataFrame indexed by feature names\n",
+    "    return pd.DataFrame(\n",
+    "        {\n",
+    "            \"feature\": eff.index.tolist(),\n",
+    "            \"direct_neighbayes\": eff[\"direct\"].values,\n",
+    "            \"indirect_neighbayes\": eff[\"indirect\"].values,\n",
+    "            \"total_neighbayes\": eff[\"total\"].values,\n",
+    "        }\n",
+    "    )\n",
+    "\n",
+    "\n",
+    "def spreg_effects_df(model_name, sp_model):\n",
+    "    if model_name == \"SEM\":\n",
+    "        # SEM has no spatial multiplier on the systematic component,\n",
+    "        # so direct = coefficient, indirect = 0, total = coefficient.\n",
+    "        # neighbayes excludes the intercept from effects, so we\n",
+    "        # only compare non-constant covariates here.\n",
+    "        sp_params = extract_spreg_params(sp_model)\n",
+    "        features = [f for f in [\"INC\", \"CRIME\"] if f in sp_params.index]\n",
+    "        return pd.DataFrame(\n",
+    "            {\n",
+    "                \"feature\": features,\n",
+    "                \"direct_spreg\": [float(sp_params[f]) for f in features],\n",
+    "                \"indirect_spreg\": [0.0 for _ in features],\n",
+    "                \"total_spreg\": [float(sp_params[f]) for f in features],\n",
+    "            }\n",
+    "        )\n",
+    "\n",
+    "    output = sp_model.output.copy()\n",
+    "    output[\"regime\"] = \"global\"\n",
+    "\n",
+    "    def classify_var(var_name):\n",
+    "        if var_name == \"CONSTANT\":\n",
+    "            return \"o\"\n",
+    "        if var_name in {\"lambda\", \"W_HOVAL\"}:\n",
+    "            return \"rho\"\n",
+    "        if var_name.startswith(\"W_\"):\n",
+    "            return \"wx\"\n",
+    "        return \"x\"\n",
+    "\n",
+    "    output[\"var_type\"] = output[\"var_names\"].map(classify_var)\n",
+    "    sp_model.output = output\n",
+    "\n",
+    "    vars_x = output.query(\"var_type == 'x'\")\n",
+    "    rho = (\n",
+    "        float(np.squeeze(getattr(sp_model, \"rho\", 0.0)))\n",
+    "        if hasattr(sp_model, \"rho\")\n",
+    "        else 0.0\n",
+    "    )\n",
+    "    multipliers = spmultiplier(w, rho)\n",
+    "    slx_lags = getattr(sp_model, \"slx_lags\", 0) or (\n",
+    "        1 if model_name in {\"SLX\", \"SDEM\"} else 0\n",
+    "    )\n",
+    "    slx_vars = getattr(sp_model, \"slx_vars\", None)\n",
+    "    if slx_vars is None:\n",
+    "        slx_vars = \"All\"\n",
+    "\n",
+    "    total_spreg, direct_spreg, indirect_spreg = _sp_effects(\n",
+    "        sp_model,\n",
+    "        vars_x,\n",
+    "        multipliers,\n",
+    "        slx_lags=slx_lags,\n",
+    "        slx_vars=slx_vars,\n",
+    "    )\n",
+    "\n",
+    "    return pd.DataFrame(\n",
+    "        {\n",
+    "            \"feature\": vars_x[\"var_names\"].tolist(),\n",
+    "            \"direct_spreg\": np.asarray(direct_spreg).flatten(),\n",
+    "            \"indirect_spreg\": np.asarray(indirect_spreg).flatten(),\n",
+    "            \"total_spreg\": np.asarray(total_spreg).flatten(),\n",
+    "        }\n",
+    "    )\n",
+    "\n",
+    "\n",
+    "coef_rows = []\n",
+    "effect_tables = {}\n",
+    "\n",
+    "for model_name in [\"SLX\", \"SAR\", \"SEM\", \"SDM\", \"SDEM\"]:\n",
+    "    sp = extract_spreg_params(spreg_results[model_name])\n",
+    "    by = extract_neighbayes_params(\n",
+    "        model_name, bayes_models[model_name], bayes_idata[model_name]\n",
+    "    )\n",
+    "\n",
+    "    common = sorted(set(sp.index).intersection(set(by.index)))\n",
+    "    for param in common:\n",
+    "        coef_rows.append(\n",
+    "            {\n",
+    "                \"model\": model_name,\n",
+    "                \"parameter\": param,\n",
+    "                \"neighbayes_posterior_mean\": by[param],\n",
+    "                \"spreg_estimate\": sp[param],\n",
+    "                \"difference\": by[param] - sp[param],\n",
+    "            }\n",
+    "        )\n",
+    "\n",
+    "    beff = bayes_effects_df(bayes_models[model_name]).copy()\n",
+    "    seff = spreg_effects_df(model_name, spreg_results[model_name]).copy()\n",
+    "    merged = beff.merge(seff, on=\"feature\", how=\"inner\")\n",
+    "    if not merged.empty:\n",
+    "        merged[\"direct_difference\"] = (\n",
+    "            merged[\"direct_neighbayes\"] - merged[\"direct_spreg\"]\n",
+    "        )\n",
+    "        merged[\"indirect_difference\"] = (\n",
+    "            merged[\"indirect_neighbayes\"] - merged[\"indirect_spreg\"]\n",
+    "        )\n",
+    "        merged[\"total_difference\"] = merged[\"total_neighbayes\"] - merged[\"total_spreg\"]\n",
+    "        merged.insert(0, \"model\", model_name)\n",
+    "    effect_tables[model_name] = merged\n",
+    "\n",
+    "comparison = (\n",
+    "    pd.DataFrame(coef_rows).sort_values([\"model\", \"parameter\"]).reset_index(drop=True)\n",
+    ")\n",
+    "impacts_comparison = pd.concat(\n",
+    "    [tbl for tbl in effect_tables.values() if not tbl.empty],\n",
+    "    ignore_index=True,\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "9",
+   "metadata": {},
+   "source": [
+    "### Coefficient comparison"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "10",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "display(comparison)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "11",
+   "metadata": {},
+   "source": [
+    "### Direct/Indirect/Total effects comparison"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "12",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "display(impacts_comparison)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "13",
+   "metadata": {
+    "language": "markdown"
+   },
+   "source": [
+    "`neighbayes` uses Bayesian inference while `spreg` reports frequentist point estimates, so exact equality is not expected. The coefficient and effects tables are intended to verify directional and numerical agreement under matched model formulas with `HOVAL` as the dependent variable.\n",
+    "\n",
+    "For effects, this notebook now uses `spreg`'s own spatial-impact utilities: `spreg.sputils.spmultiplier` and `spreg.sputils._sp_effects`. SEM is the one exception, since it has no spatial multiplier on the systematic component and therefore uses direct = coefficient, indirect = 0, total = coefficient.\n",
+    "\n",
+    "**Note on intercept exclusion**: `neighbayes` excludes the intercept from impacts for all model types, since the intercept has no meaningful spatial impact interpretation. This is consistent with `spreg`'s `_sp_effects`, which also excludes the constant (`CONSTANT`) from its impact calculations."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "14",
+   "metadata": {},
+   "source": [
+    "## Example: Synthetic Data on a 30x30 Grid\n",
+    "\n",
+    "This example demonstrates how to generate synthetic spatial data on a 30x30 regular grid, construct a spatial weights matrix, and fit a cross-sectional spatial regression model using the neighbayes package."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "15",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from neighbayes import dgp\n",
+    "from neighbayes.models import SAR\n",
+    "\n",
+    "# Set random seed for reproducibility\n",
+    "np.random.seed(42)\n",
+    "\n",
+    "# True parameters\n",
+    "beta_true = np.array([1.0, -1.0])\n",
+    "rho_true = 0.5\n",
+    "sigma_true = 1.0\n",
+    "\n",
+    "gdf = dgp.simulate_sar(\n",
+    "    n_side=40,\n",
+    "    beta=beta_true,\n",
+    "    rho=rho_true,\n",
+    "    sigma=sigma_true,\n",
+    "    create_gdf=True,\n",
+    "    contiguity=\"queen\",\n",
+    ")\n",
+    "\n",
+    "w = libpysal.graph.Graph.build_contiguity(gdf, rook=False).transform(\"r\")\n",
+    "\n",
+    "# Fit SAR model\n",
+    "model = SAR(\"y ~ X_1\", W=w, data=gdf)\n",
+    "res = model.fit()\n",
+    "\n",
+    "model.summary()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "6bcc2558",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "model.impacts()"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "16",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "sim_spreg = spreg.GM_Lag(\n",
+    "    gdf[\"y\"],\n",
+    "    gdf[\"X_1\"],\n",
+    "    w=w,\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "17",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "print(sim_spreg.summary)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "db4f2119",
+   "metadata": {},
+   "outputs": [],
+   "source": []
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "bayespreg",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.14.4"
+  },
+  "widgets": {
+   "application/vnd.jupyter.widget-state+json": {
+    "state": {
+     "015ba196d7784ab294a148c8442c00dc": {
+      "model_module": "@jupyter-widgets/base",
+      "model_module_version": "2.0.0",
+      "model_name": "LayoutModel",
+      "state": {
+       "_model_module": "@jupyter-widgets/base",
+       "_model_module_version": "2.0.0",
+       "_model_name": "LayoutModel",
+       "_view_count": null,
+       "_view_module": "@jupyter-widgets/base",
+       "_view_module_version": "2.0.0",
+       "_view_name": "LayoutView",
+       "align_content": null,
+       "align_items": null,
+       "align_self": null,
+       "border_bottom": null,
+       "border_left": null,
+       "border_right": null,
+       "border_top": null,
+       "bottom": null,
+       "display": null,
+       "flex": null,
+       "flex_flow": null,
+       "grid_area": null,
+       "grid_auto_columns": null,
+       "grid_auto_flow": null,
+       "grid_auto_rows": null,
+       "grid_column": null,
+       "grid_gap": null,
+       "grid_row": null,
+       "grid_template_areas": null,
+       "grid_template_columns": null,
+       "grid_template_rows": null,
+       "height": null,
+       "justify_content": null,
+       "justify_items": null,
+       "left": null,
+       "margin": null,
+       "max_height": null,
+       "max_width": null,
+       "min_height": null,
+       "min_width": null,
+       "object_fit": null,
+       "object_position": null,
+       "order": null,
+       "overflow": null,
+       "padding": null,
+       "right": null,
+       "top": null,
+       "visibility": null,
+       "width": null
+      }
+     },
+     "77b93b8e7c184a2a84f8ee834e0b3c47": {
+      "model_module": "@jupyter-widgets/output",
+      "model_module_version": "1.0.0",
+      "model_name": "OutputModel",
+      "state": {
+       "_dom_classes": [],
+       "_model_module": "@jupyter-widgets/output",
+       "_model_module_version": "1.0.0",
+       "_model_name": "OutputModel",
+       "_view_count": null,
+       "_view_module": "@jupyter-widgets/output",
+       "_view_module_version": "1.0.0",
+       "_view_name": "OutputView",
+       "layout": "IPY_MODEL_015ba196d7784ab294a148c8442c00dc",
+       "msg_id": "",
+       "outputs": [
+        {
+         "data": {
+          "text/html": "<pre style=\"white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace\">                                                                                                                   \n <span style=\"font-weight: bold\"> Progress                </span> <span style=\"font-weight: bold\"> Draws </span> <span style=\"font-weight: bold\"> Divergences </span> <span style=\"font-weight: bold\"> Step size </span> <span style=\"font-weight: bold\"> Grad evals </span> <span style=\"font-weight: bold\"> Sampling Speed   </span> <span style=\"font-weight: bold\"> Elapsed </span> <span style=\"font-weight: bold\"> Remaining </span> \n ───────────────────────────────────────────────────────────────────────────────────────────────────────────────── \n  <span style=\"color: #1f77b4; text-decoration-color: #1f77b4\">━━━━━━━━━━━━━━━━━━━━━━━</span>   2999    0             0.313       15           1586.38 drawss/s   0:00:01   0:00:00    \n  <span style=\"color: #1f77b4; text-decoration-color: #1f77b4\">━━━━━━━━━━━━━━━━━━━━━━━</span>   2999    0             0.357       3            1618.53 drawss/s   0:00:01   0:00:00    \n  <span style=\"color: #1f77b4; text-decoration-color: #1f77b4\">━━━━━━━━━━━━━━━━━━━━━━━</span>   2999    0             0.437       15           1557.56 drawss/s   0:00:01   0:00:00    \n  <span style=\"color: #1f77b4; text-decoration-color: #1f77b4\">━━━━━━━━━━━━━━━━━━━━━━━</span>   2999    0             0.296       7            1582.67 drawss/s   0:00:01   0:00:00    \n                                                                                                                   \n</pre>\n",
+          "text/plain": "                                                                                                                   \n \u001b[1m \u001b[0m\u001b[1mProgress               \u001b[0m\u001b[1m \u001b[0m \u001b[1m \u001b[0m\u001b[1mDraws\u001b[0m\u001b[1m \u001b[0m \u001b[1m \u001b[0m\u001b[1mDivergences\u001b[0m\u001b[1m \u001b[0m \u001b[1m \u001b[0m\u001b[1mStep size\u001b[0m\u001b[1m \u001b[0m \u001b[1m \u001b[0m\u001b[1mGrad evals\u001b[0m\u001b[1m \u001b[0m \u001b[1m \u001b[0m\u001b[1mSampling Speed  \u001b[0m\u001b[1m \u001b[0m \u001b[1m \u001b[0m\u001b[1mElapsed\u001b[0m\u001b[1m \u001b[0m \u001b[1m \u001b[0m\u001b[1mRemaining\u001b[0m\u001b[1m \u001b[0m \n ───────────────────────────────────────────────────────────────────────────────────────────────────────────────── \n  \u001b[38;2;31;119;180m━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m   2999    0             0.313       15           1586.38 drawss/s   0:00:01   0:00:00    \n  \u001b[38;2;31;119;180m━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m   2999    0             0.357       3            1618.53 drawss/s   0:00:01   0:00:00    \n  \u001b[38;2;31;119;180m━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m   2999    0             0.437       15           1557.56 drawss/s   0:00:01   0:00:00    \n  \u001b[38;2;31;119;180m━━━━━━━━━━━━━━━━━━━━━━━\u001b[0m   2999    0             0.296       7            1582.67 drawss/s   0:00:01   0:00:00    \n                                                                                                                   \n"
+         },
+         "metadata": {},
+         "output_type": "display_data"
+        }
+       ],
+       "tabbable": null,
+       "tooltip": null
+      }
+     }
+    },
+    "version_major": 2,
+    "version_minor": 0
+   }
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

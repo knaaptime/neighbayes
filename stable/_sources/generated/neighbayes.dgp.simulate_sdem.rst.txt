@@ -1,0 +1,6 @@
+﻿neighbayes.dgp.simulate\_sdem
+=============================
+
+.. currentmodule:: neighbayes.dgp
+
+.. autofunction:: simulate_sdem

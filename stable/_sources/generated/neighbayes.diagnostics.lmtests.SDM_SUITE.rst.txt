@@ -1,0 +1,6 @@
+﻿neighbayes.diagnostics.lmtests.SDM\_SUITE
+=========================================
+
+.. currentmodule:: neighbayes.diagnostics.lmtests
+
+.. autodata:: SDM_SUITE

@@ -1,0 +1,6 @@
+﻿neighbayes.diagnostics.spatial\_kfold
+=====================================
+
+.. currentmodule:: neighbayes.diagnostics
+
+.. autofunction:: spatial_kfold

@@ -1,0 +1,6 @@
+﻿neighbayes.diagnostics.lmtests.bayesian\_lm\_error\_from\_sar\_test
+===================================================================
+
+.. currentmodule:: neighbayes.diagnostics.lmtests
+
+.. autofunction:: bayesian_lm_error_from_sar_test

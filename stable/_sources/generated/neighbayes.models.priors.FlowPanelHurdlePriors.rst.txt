@@ -1,0 +1,49 @@
+﻿neighbayes.models.priors.FlowPanelHurdlePriors
+==============================================
+
+.. currentmodule:: neighbayes.models.priors
+
+.. autoclass:: FlowPanelHurdlePriors
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~FlowPanelHurdlePriors.__init__
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~FlowPanelHurdlePriors.alpha_fixed
+      ~FlowPanelHurdlePriors.alpha_nu
+      ~FlowPanelHurdlePriors.alpha_sigma
+      ~FlowPanelHurdlePriors.beta_mu
+      ~FlowPanelHurdlePriors.beta_mu_zero
+      ~FlowPanelHurdlePriors.beta_sigma
+      ~FlowPanelHurdlePriors.beta_sigma_zero
+      ~FlowPanelHurdlePriors.nu
+      ~FlowPanelHurdlePriors.pair_effect_mu
+      ~FlowPanelHurdlePriors.pair_effect_mu_zero
+      ~FlowPanelHurdlePriors.pair_effect_sd_scale
+      ~FlowPanelHurdlePriors.pair_effect_sd_scale_zero
+      ~FlowPanelHurdlePriors.rho_lower
+      ~FlowPanelHurdlePriors.rho_lower_zero
+      ~FlowPanelHurdlePriors.rho_upper
+      ~FlowPanelHurdlePriors.rho_upper_zero
+      ~FlowPanelHurdlePriors.sigma2_alpha
+      ~FlowPanelHurdlePriors.sigma2_beta
+      ~FlowPanelHurdlePriors.time_effect_mu
+      ~FlowPanelHurdlePriors.time_effect_mu_zero
+      ~FlowPanelHurdlePriors.time_effect_sigma
+      ~FlowPanelHurdlePriors.time_effect_sigma_zero
+   
+   

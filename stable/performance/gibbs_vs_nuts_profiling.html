@@ -1,0 +1,2805 @@
+
+
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="logdet_profiling.html">
+      
+      
+        <link rel="next" href="sem_backend_profiling.html">
+      
+      
+      <link rel="icon" href="../_static/pysal_favicon.ico">
+    
+    
+      
+        <title>Gibbs vs NUTS Profiling: Cross-Sectional Models - neighbayes</title>
+      
+    
+    
+      
+        
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.6efbe22605a23fcd6.min.css?v=b2ceb110" />
+        <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
+        <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+        <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=93c5fc88" />
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#setup" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="neighbayes" class="md-header__button md-logo" aria-label="neighbayes" data-md-component="logo">
+      <img src="../_static/pysal_logo.svg" alt="logo">
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            neighbayes
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Gibbs vs NUTS Profiling: Cross-Sectional Models
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="red"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7M9 21a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-1H9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="red"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7M9 21v-1h6v1a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1m3-17a5 5 0 0 0-5 5c0 2.05 1.23 3.81 3 4.58V16h4v-2.42c1.77-.77 3-2.53 3-4.58a5 5 0 0 0-5-5"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/pysal/neighbayes/" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    pysal/neighbayes
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="neighbayes" class="md-nav__button md-logo" aria-label="neighbayes" data-md-component="logo">
+      <img src="../_static/pysal_logo.svg" alt="logo">
+    </a>
+    neighbayes
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/pysal/neighbayes/" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    pysal/neighbayes
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Home</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Installation</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>Tutorial</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Tutorial</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorial/quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Getting Started with neighbayes</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorial/pedagogical_spatial_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Bayesian spatial models:<wbr> a walkthrough</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../tutorial/pedagogical_panel_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Spatial panel models:<wbr> a walkthrough</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>How-<wbr>to guides</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            <span>How-<wbr>to guides</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/priors.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to set priors</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/gibbs_sampler.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to choose and configure the Gibbs sampler</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/spatial_logit.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to fit a spatial logit model</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/negbin_estimation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to estimate spatial negative binomial models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/zinb_estimation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to fit zero-<wbr>inflated SAR negative binomial models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/poisson_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to estimate Poisson origin–destination flow models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/tobit_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to fit spatial tobit models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/tobit_panel_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to fit spatial tobit panel models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/flow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to estimate origin–destination flow models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/panel_flow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to estimate panel flow models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/bayesian_lmtests.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to run Bayesian LM specification tests</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/spatial_cv_demo.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to run spatial block cross-<wbr>validation</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>Explanation</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Explanation</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concept.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Why neighbayes</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Architecture</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>Reference</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Reference</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Supported Models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>API reference</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../references.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>References</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>Validation</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Validation</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validation/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>External Validation &amp; Replication</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>Performance</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Performance</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_1" checked>
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="index.html" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    <span>Performance &amp; Profiling</span>
+    
+  </span>
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_8_1" id="__nav_8_1_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_1_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8_1">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Performance &amp; Profiling</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="logdet_profiling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Log-<wbr>Determinant Methods</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    <span>Gibbs vs NUTS <wbr>(SAR)</span>
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="#" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Gibbs vs NUTS <wbr>(SAR)</span>
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary">
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#setup" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Setup</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generate-synthetic-data" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>1.<wbr> Generate Synthetic Data</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#define-the-profiling-function" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>2.<wbr> Define the Profiling Function</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#profile-all-models" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>3.<wbr> Profile All Models</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#results-summary" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>4.<wbr> Results Summary</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#speedup-comparison" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>5.<wbr> Speedup Comparison</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#posterior-comparison" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>6.<wbr> Posterior Comparison</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#b-diagnostics-gibbs-mixing-for-sem-sdem" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>6b.<wbr> Diagnostics:<wbr> Gibbs Mixing for SEM/SDEM</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scaling-effect-of-n-on-gibbs-vs-nuts-time" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>7.<wbr> Scaling:<wbr> Effect of n on Gibbs vs NUTS Time</span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="sem_backend_profiling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Gibbs vs NUTS <wbr>(SEM)</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="sampling_backend_profiling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>NUTS Sampling Backends</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="mala_vs_slice_profiling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>MALA vs Slice</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="pg_backend_profiling.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Pólya-<wbr>Gamma Backends</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>For contributors</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            <span>For contributors</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/knaaptime/neighbayes" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Git<wbr>Hub</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/knaaptime/neighbayes/releases" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Changelog</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary">
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#setup" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Setup</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#generate-synthetic-data" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>1.<wbr> Generate Synthetic Data</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#define-the-profiling-function" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>2.<wbr> Define the Profiling Function</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#profile-all-models" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>3.<wbr> Profile All Models</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#results-summary" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>4.<wbr> Results Summary</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#speedup-comparison" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>5.<wbr> Speedup Comparison</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#posterior-comparison" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>6.<wbr> Posterior Comparison</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#b-diagnostics-gibbs-mixing-for-sem-sdem" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>6b.<wbr> Diagnostics:<wbr> Gibbs Mixing for SEM/SDEM</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scaling-effect-of-n-on-gibbs-vs-nuts-time" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>7.<wbr> Scaling:<wbr> Effect of n on Gibbs vs NUTS Time</span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset" role="main">
+                
+                
+                  
+
+
+  
+    <a href="https://github.com/pysal/neighbayes/blob/main/docs/performance/gibbs_vs_nuts_profiling.ipynb" title="Edit this page" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 9h5.5L13 3.5zM6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4c0-1.11.89-2 2-2m.12 13.5 3.74 3.74 1.42-1.41-2.33-2.33 2.33-2.33-1.42-1.41zm11.16 0-3.74-3.74-1.42 1.41 2.33 2.33-2.33 2.33 1.42 1.41z"/></svg>
+    </a>
+  
+  
+
+<h1 id="gibbs-vs-nuts-profiling-cross-sectional-models">Gibbs vs NUTS Profiling: Cross-Sectional Models<a class="headerlink" href="#gibbs-vs-nuts-profiling-cross-sectional-models" title="Link to this heading">¶</a></h1>
+<p>This notebook profiles the four Gaussian cross-sectional spatial models (SAR, SEM, SDM, SDEM) under both the <strong>NUTS</strong> and <strong>Gibbs</strong> sampling backends, comparing wall-clock time and posterior summary statistics.</p>
+<h2 id="setup">Setup<a class="headerlink" href="#setup" title="Link to this heading">¶</a></h2>
+<ul class="simple">
+<li><p><strong>NUTS</strong>: PyMC’s default NUTS sampler (via <code class="docutils literal notranslate"><span class="pre">nutpie</span></code> or <code class="docutils literal notranslate"><span class="pre">pymc</span></code>)</p></li>
+<li><p><strong>Gibbs (NumPy)</strong>: 3-block Gibbs with adaptive slice sampling, <code class="docutils literal notranslate"><span class="pre">n_jobs=-1</span></code> (parallel via joblib)</p></li>
+<li><p><strong>Gibbs (JAX)</strong>: 3-block Gibbs with MALA, <code class="docutils literal notranslate"><span class="pre">chain_method=&quot;vectorized&quot;</span></code> (JAX vmap)</p></li>
+</ul>
+<p>All models use the same synthetic data generated from a 6×6 rook-contiguity lattice (n=49, k=3).</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">arviz</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">az</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">libpysal.graph</span><span class="w"> </span><span class="kn">import</span> <span class="n">Graph</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">SAR</span><span class="p">,</span> <span class="n">SDEM</span><span class="p">,</span> <span class="n">SDM</span><span class="p">,</span> <span class="n">SEM</span>
+
+<span class="c1"># Try importing JAX to check availability</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">jax</span>  <span class="c1"># noqa: F401</span>
+
+    <span class="n">HAS_JAX</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="n">HAS_JAX</span> <span class="o">=</span> <span class="kc">False</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"JAX available: </span><span class="si">{</span><span class="n">HAS_JAX</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>JAX available: True
+</code></pre></div>
+</div>
+</div>
+</div>
+<h2 id="generate-synthetic-data">1. Generate Synthetic Data<a class="headerlink" href="#generate-synthetic-data" title="Link to this heading">¶</a></h2>
+<p>We use a 7×7 rook-contiguity lattice (n=49) with 3 regressors (intercept + 2 covariates). Each model type generates data from its own DGP so the spatial parameter is well-identified.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">SIDE</span> <span class="o">=</span> <span class="mi">7</span>  <span class="c1"># 7x7 grid → n=49</span>
+<span class="n">SEED</span> <span class="o">=</span> <span class="mi">42</span>
+<span class="n">DRAWS</span> <span class="o">=</span> <span class="mi">2000</span>
+<span class="n">TUNE</span> <span class="o">=</span> <span class="mi">1000</span>
+<span class="n">CHAINS</span> <span class="o">=</span> <span class="mi">4</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">make_rook_W</span><span class="p">(</span><span class="n">side</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Row-standardized rook-contiguity weights on a side x side grid."""</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="n">side</span> <span class="o">*</span> <span class="n">side</span>
+    <span class="n">W</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">n</span><span class="p">,</span> <span class="n">n</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">side</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">side</span><span class="p">):</span>
+            <span class="n">i</span> <span class="o">=</span> <span class="n">r</span> <span class="o">*</span> <span class="n">side</span> <span class="o">+</span> <span class="n">c</span>
+            <span class="k">if</span> <span class="n">r</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">W</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">r</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">side</span> <span class="o">+</span> <span class="n">c</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+            <span class="k">if</span> <span class="n">r</span> <span class="o">&lt;</span> <span class="n">side</span> <span class="o">-</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">W</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">(</span><span class="n">r</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">side</span> <span class="o">+</span> <span class="n">c</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span>
+            <span class="k">if</span> <span class="n">c</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">W</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">r</span> <span class="o">*</span> <span class="n">side</span> <span class="o">+</span> <span class="p">(</span><span class="n">c</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">1</span>
+            <span class="k">if</span> <span class="n">c</span> <span class="o">&lt;</span> <span class="n">side</span> <span class="o">-</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">W</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">r</span> <span class="o">*</span> <span class="n">side</span> <span class="o">+</span> <span class="p">(</span><span class="n">c</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">row_sums</span> <span class="o">=</span> <span class="n">W</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">keepdims</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">W</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">row_sums</span> <span class="o">==</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">row_sums</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">W_to_graph</span><span class="p">(</span><span class="n">W_dense</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Graph</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Convert a dense weight matrix to a libpysal Graph."""</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="n">W_dense</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">focal</span><span class="p">,</span> <span class="n">neighbor</span><span class="p">,</span> <span class="n">weight</span> <span class="o">=</span> <span class="p">[],</span> <span class="p">[],</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">W_dense</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="n">focal</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">i</span><span class="p">)</span>
+                <span class="n">neighbor</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">j</span><span class="p">)</span>
+                <span class="n">weight</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">W_dense</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">])</span>
+    <span class="k">return</span> <span class="n">Graph</span><span class="o">.</span><span class="n">from_arrays</span><span class="p">(</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">focal</span><span class="p">),</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">neighbor</span><span class="p">),</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">weight</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">),</span>
+    <span class="p">)</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="s2">"r"</span><span class="p">)</span>
+
+
+<span class="n">W_dense</span> <span class="o">=</span> <span class="n">make_rook_W</span><span class="p">(</span><span class="n">SIDE</span><span class="p">)</span>
+<span class="n">W</span> <span class="o">=</span> <span class="n">W_to_graph</span><span class="p">(</span><span class="n">W_dense</span><span class="p">)</span>
+<span class="n">n</span> <span class="o">=</span> <span class="n">SIDE</span> <span class="o">*</span> <span class="n">SIDE</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"n = </span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s2">, W shape = </span><span class="si">{</span><span class="n">W_dense</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>n = 49, W shape = (49, 49)
+</code></pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.dgp</span><span class="w"> </span><span class="kn">import</span> <span class="n">simulate_sar</span><span class="p">,</span> <span class="n">simulate_sdem</span><span class="p">,</span> <span class="n">simulate_sdm</span><span class="p">,</span> <span class="n">simulate_sem</span>
+
+<span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="n">SEED</span><span class="p">)</span>
+
+<span class="c1"># SAR data</span>
+<span class="n">sar_out</span> <span class="o">=</span> <span class="n">simulate_sar</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">)</span>
+<span class="n">y_sar</span><span class="p">,</span> <span class="n">X_sar</span> <span class="o">=</span> <span class="n">sar_out</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">sar_out</span><span class="p">[</span><span class="s2">"X"</span><span class="p">]</span>
+
+<span class="c1"># SEM data</span>
+<span class="n">sem_out</span> <span class="o">=</span> <span class="n">simulate_sem</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span> <span class="n">lam</span><span class="o">=</span><span class="mf">0.6</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">)</span>
+<span class="n">y_sem</span><span class="p">,</span> <span class="n">X_sem</span> <span class="o">=</span> <span class="n">sem_out</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">sem_out</span><span class="p">[</span><span class="s2">"X"</span><span class="p">]</span>
+
+<span class="c1"># SDM data</span>
+<span class="n">sdm_out</span> <span class="o">=</span> <span class="n">simulate_sdm</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">)</span>
+<span class="n">y_sdm</span><span class="p">,</span> <span class="n">X_sdm</span> <span class="o">=</span> <span class="n">sdm_out</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">sdm_out</span><span class="p">[</span><span class="s2">"X"</span><span class="p">]</span>
+
+<span class="c1"># SDEM data</span>
+<span class="n">sdem_out</span> <span class="o">=</span> <span class="n">simulate_sdem</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span> <span class="n">lam</span><span class="o">=</span><span class="mf">0.4</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">)</span>
+<span class="n">y_sdem</span><span class="p">,</span> <span class="n">X_sdem</span> <span class="o">=</span> <span class="n">sdem_out</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">sdem_out</span><span class="p">[</span><span class="s2">"X"</span><span class="p">]</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SAR:  y=</span><span class="si">{</span><span class="n">y_sar</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">, X=</span><span class="si">{</span><span class="n">X_sar</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SEM:  y=</span><span class="si">{</span><span class="n">y_sem</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">, X=</span><span class="si">{</span><span class="n">X_sem</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SDM:  y=</span><span class="si">{</span><span class="n">y_sdm</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">, X=</span><span class="si">{</span><span class="n">X_sdm</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"SDEM: y=</span><span class="si">{</span><span class="n">y_sdem</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">, X=</span><span class="si">{</span><span class="n">X_sdem</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>SAR:  y=(49,), X=(49, 2)
+SEM:  y=(49,), X=(49, 2)
+SDM:  y=(49,), X=(49, 2)
+SDEM: y=(49,), X=(49, 2)
+</code></pre></div>
+</div>
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
+</code></pre></div>
+</div>
+</div>
+</div>
+<h2 id="define-the-profiling-function">2. Define the Profiling Function<a class="headerlink" href="#define-the-profiling-function" title="Link to this heading">¶</a></h2>
+<p>We time each sampler configuration and collect:</p>
+<ul class="simple">
+<li><p><strong>Wall-clock time</strong> (seconds)</p></li>
+<li><p><strong>Posterior means</strong> for key parameters</p></li>
+<li><p><strong>R-hat</strong> and <strong>ESS</strong> diagnostics</p></li>
+</ul>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">profile_model</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">sampler_config</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">label</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Fit a model with a given sampler config and return timing + diagnostics."""</span>
+    <span class="n">t0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
+    <span class="n">idata</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="o">**</span><span class="n">sampler_config</span><span class="p">)</span>
+    <span class="n">elapsed</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span>
+
+    <span class="c1"># Extract spatial parameter name (rho for SAR/SDM, lam for SEM/SDEM)</span>
+    <span class="n">spatial_vars</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">idata</span><span class="o">.</span><span class="n">posterior</span><span class="o">.</span><span class="n">data_vars</span> <span class="k">if</span> <span class="n">p</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"rho"</span><span class="p">,</span> <span class="s2">"lam"</span><span class="p">)]</span>
+    <span class="n">spatial_param</span> <span class="o">=</span> <span class="n">spatial_vars</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">spatial_vars</span> <span class="k">else</span> <span class="kc">None</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">"label"</span><span class="p">:</span> <span class="n">label</span><span class="p">,</span>
+        <span class="s2">"elapsed_s"</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="n">elapsed</span><span class="p">,</span> <span class="mi">2</span><span class="p">),</span>
+    <span class="p">}</span>
+
+    <span class="c1"># Posterior means (scalar parameters only)</span>
+    <span class="c1"># beta is (chain, draw, k) — report intercept (first coefficient)</span>
+    <span class="n">result</span><span class="p">[</span><span class="s2">"intercept_mean"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span>
+        <span class="n">idata</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s2">"beta"</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">dim</span><span class="o">=</span><span class="p">[</span><span class="s2">"chain"</span><span class="p">,</span> <span class="s2">"draw"</span><span class="p">])</span><span class="o">.</span><span class="n">values</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="p">)</span>
+    <span class="n">result</span><span class="p">[</span><span class="s2">"sigma_mean"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">idata</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="s2">"sigma"</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span>
+    <span class="k">if</span> <span class="n">spatial_param</span><span class="p">:</span>
+        <span class="n">result</span><span class="p">[</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">spatial_param</span><span class="si">}</span><span class="s2">_mean"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">idata</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="n">spatial_param</span><span class="p">]</span><span class="o">.</span><span class="n">mean</span><span class="p">())</span>
+
+    <span class="c1"># Diagnostics — include all parameters for thorough R-hat / ESS checks</span>
+    <span class="n">diag_vars</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"beta"</span><span class="p">,</span> <span class="s2">"sigma"</span><span class="p">]</span> <span class="o">+</span> <span class="p">([</span><span class="n">spatial_param</span><span class="p">]</span> <span class="k">if</span> <span class="n">spatial_param</span> <span class="k">else</span> <span class="p">[])</span>
+    <span class="n">summary</span> <span class="o">=</span> <span class="n">az</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="n">idata</span><span class="p">,</span> <span class="n">var_names</span><span class="o">=</span><span class="n">diag_vars</span><span class="p">)</span>
+    <span class="n">result</span><span class="p">[</span><span class="s2">"rhat_max"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">round</span><span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="n">summary</span><span class="p">[</span><span class="s2">"r_hat"</span><span class="p">]</span><span class="o">.</span><span class="n">max</span><span class="p">()),</span> <span class="mi">3</span><span class="p">)</span>
+    <span class="n">result</span><span class="p">[</span><span class="s2">"ess_bulk_min"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">summary</span><span class="p">[</span><span class="s2">"ess_bulk"</span><span class="p">]</span><span class="o">.</span><span class="n">min</span><span class="p">())</span>
+
+    <span class="k">return</span> <span class="n">result</span>
+</code></pre></div>
+</div>
+</div>
+</div>
+<h2 id="profile-all-models">3. Profile All Models<a class="headerlink" href="#profile-all-models" title="Link to this heading">¶</a></h2>
+<p>We profile each of the 4 models under 3 sampler configurations:</p>
+<table class="docutils data align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Config</p></th>
+<th class="head"><p>Backend</p></th>
+<th class="head"><p>Key settings</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>NUTS</p></td>
+<td><p>PyMC NUTS</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">target_accept=0.9</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p>Gibbs NumPy</p></td>
+<td><p>Slice sampling (adaptive)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">n_jobs=-1</span></code> (parallel via joblib)</p></td>
+</tr>
+<tr class="row-even"><td><p>Gibbs JAX</p></td>
+<td><p>Slice sampling (JIT)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">chain_method=&quot;vectorized&quot;</span></code> (default)</p></td>
+</tr>
+</tbody>
+</table>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">COMMON</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+    <span class="n">draws</span><span class="o">=</span><span class="n">DRAWS</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="n">TUNE</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="n">CHAINS</span><span class="p">,</span> <span class="n">random_seed</span><span class="o">=</span><span class="n">SEED</span><span class="p">,</span> <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span>
+<span class="p">)</span>
+
+<span class="n">configs</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"NUTS"</span><span class="p">:</span> <span class="nb">dict</span><span class="p">(</span><span class="n">sampler</span><span class="o">=</span><span class="s2">"nuts"</span><span class="p">,</span> <span class="n">target_accept</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span> <span class="o">**</span><span class="n">COMMON</span><span class="p">),</span>
+    <span class="s2">"Gibbs-NumPy"</span><span class="p">:</span> <span class="nb">dict</span><span class="p">(</span><span class="n">sampler</span><span class="o">=</span><span class="s2">"gibbs"</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">"numpy"</span><span class="p">,</span> <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="o">**</span><span class="n">COMMON</span><span class="p">),</span>
+<span class="p">}</span>
+
+<span class="k">if</span> <span class="n">HAS_JAX</span><span class="p">:</span>
+    <span class="n">configs</span><span class="p">[</span><span class="s2">"Gibbs-JAX"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">sampler</span><span class="o">=</span><span class="s2">"gibbs"</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">"jax"</span><span class="p">,</span> <span class="o">**</span><span class="n">COMMON</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Configs: </span><span class="si">{</span><span class="nb">list</span><span class="p">(</span><span class="n">configs</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Configs: ['NUTS', 'Gibbs-NumPy', 'Gibbs-JAX']
+</code></pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
+
+<span class="n">models_and_data</span> <span class="o">=</span> <span class="p">[</span>
+    <span class="p">(</span><span class="s2">"SAR"</span><span class="p">,</span> <span class="n">SAR</span><span class="p">,</span> <span class="n">y_sar</span><span class="p">,</span> <span class="n">X_sar</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">"SEM"</span><span class="p">,</span> <span class="n">SEM</span><span class="p">,</span> <span class="n">y_sem</span><span class="p">,</span> <span class="n">X_sem</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">"SDM"</span><span class="p">,</span> <span class="n">SDM</span><span class="p">,</span> <span class="n">y_sdm</span><span class="p">,</span> <span class="n">X_sdm</span><span class="p">),</span>
+    <span class="p">(</span><span class="s2">"SDEM"</span><span class="p">,</span> <span class="n">SDEM</span><span class="p">,</span> <span class="n">y_sdem</span><span class="p">,</span> <span class="n">X_sdem</span><span class="p">),</span>
+<span class="p">]</span>
+
+<span class="k">for</span> <span class="n">model_name</span><span class="p">,</span> <span class="n">ModelClass</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">X</span> <span class="ow">in</span> <span class="n">models_and_data</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="se">\n</span><span class="si">{</span><span class="s1">'='</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">60</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"Model: </span><span class="si">{</span><span class="n">model_name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="s1">'='</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="mi">60</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">config_name</span><span class="p">,</span> <span class="n">config</span> <span class="ow">in</span> <span class="n">configs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">label</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">model_name</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">config_name</span><span class="si">}</span><span class="s2">"</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  Running </span><span class="si">{</span><span class="n">label</span><span class="si">}</span><span class="s2">..."</span><span class="p">,</span> <span class="n">end</span><span class="o">=</span><span class="s2">" "</span><span class="p">,</span> <span class="n">flush</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">model</span> <span class="o">=</span> <span class="n">ModelClass</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">profile_model</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">label</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">'elapsed_s'</span><span class="p">]</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">s  ρ̂=</span><span class="si">{</span><span class="n">result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'rho_mean'</span><span class="p">,</span><span class="w"> </span><span class="n">result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s1">'lam_mean'</span><span class="p">,</span><span class="w"> </span><span class="s1">'N/A'</span><span class="p">))</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">  r̂=</span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">'rhat_max'</span><span class="p">]</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">  ESS=</span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">'ess_bulk_min'</span><span class="p">]</span><span class="si">}</span><span class="s2">"</span>
+            <span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"label"</span><span class="p">:</span> <span class="n">label</span><span class="p">,</span> <span class="s2">"elapsed_s"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">"error"</span><span class="p">:</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)}</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"FAILED: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+
+        <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Done! </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">results</span><span class="p">)</span><span class="si">}</span><span class="s2"> configurations profiled."</span><span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>============================================================
+Model: SAR
+============================================================
+  Running SAR/NUTS...
+6.8s  ρ̂=0.4057  r̂=1.001  ESS=4042
+  Running SAR/Gibbs-NumPy...
+1.7s  ρ̂=0.4048  r̂=1.000  ESS=6932
+  Running SAR/Gibbs-JAX...
+1.6s  ρ̂=0.4037  r̂=1.001  ESS=6401
+
+============================================================
+Model: SEM
+============================================================
+  Running SEM/NUTS...
+7.7s  ρ̂=0.7632  r̂=1.001  ESS=3657
+  Running SEM/Gibbs-NumPy...
+4.0s  ρ̂=0.7660  r̂=1.000  ESS=5556
+  Running SEM/Gibbs-JAX...
+1.4s  ρ̂=0.7643  r̂=1.001  ESS=5547
+
+============================================================
+Model: SDM
+============================================================
+  Running SDM/NUTS...
+6.2s  ρ̂=0.2812  r̂=1.001  ESS=3442
+  Running SDM/Gibbs-NumPy...
+2.1s  ρ̂=0.2811  r̂=1.000  ESS=6135
+  Running SDM/Gibbs-JAX...
+1.2s  ρ̂=0.2757  r̂=1.000  ESS=6419
+
+============================================================
+Model: SDEM
+============================================================
+  Running SDEM/NUTS...
+5.9s  ρ̂=0.4472  r̂=1.001  ESS=5179
+  Running SDEM/Gibbs-NumPy...
+4.3s  ρ̂=0.4528  r̂=1.001  ESS=6618
+  Running SDEM/Gibbs-JAX...
+1.5s  ρ̂=0.4461  r̂=1.001  ESS=6177
+
+Done! 12 configurations profiled.
+</code></pre></div>
+</div>
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (4 chains in 2 jobs)
+NUTS: [rho, beta, sigma2]
+Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 5 seconds.
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (4 chains in 2 jobs)
+NUTS: [lam, beta, sigma2]
+Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 5 seconds.
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (4 chains in 2 jobs)
+NUTS: [rho, beta, sigma2]
+Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 5 seconds.
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (4 chains in 2 jobs)
+NUTS: [lam, beta, sigma2]
+Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 4 seconds.
+</code></pre></div>
+</div>
+</div>
+</div>
+<h2 id="results-summary">4. Results Summary<a class="headerlink" href="#results-summary" title="Link to this heading">¶</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="c1"># Build a clean results DataFrame</span>
+<span class="n">rows</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="n">results</span><span class="p">:</span>
+    <span class="k">if</span> <span class="s2">"error"</span> <span class="ow">in</span> <span class="n">r</span><span class="p">:</span>
+        <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+            <span class="p">{</span><span class="s2">"Model/Sampler"</span><span class="p">:</span> <span class="n">r</span><span class="p">[</span><span class="s2">"label"</span><span class="p">],</span> <span class="s2">"Time (s)"</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span> <span class="s2">"Error"</span><span class="p">:</span> <span class="n">r</span><span class="p">[</span><span class="s2">"error"</span><span class="p">]}</span>
+        <span class="p">)</span>
+        <span class="k">continue</span>
+    <span class="n">model_name</span><span class="p">,</span> <span class="n">config_name</span> <span class="o">=</span> <span class="n">r</span><span class="p">[</span><span class="s2">"label"</span><span class="p">]</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">"/"</span><span class="p">)</span>
+    <span class="n">spatial_key</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="s2">"rho_mean"</span> <span class="k">if</span> <span class="s2">"rho_mean"</span> <span class="ow">in</span> <span class="n">r</span> <span class="k">else</span> <span class="p">(</span><span class="s2">"lam_mean"</span> <span class="k">if</span> <span class="s2">"lam_mean"</span> <span class="ow">in</span> <span class="n">r</span> <span class="k">else</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="p">)</span>
+    <span class="n">rows</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+        <span class="p">{</span>
+            <span class="s2">"Model"</span><span class="p">:</span> <span class="n">model_name</span><span class="p">,</span>
+            <span class="s2">"Sampler"</span><span class="p">:</span> <span class="n">config_name</span><span class="p">,</span>
+            <span class="s2">"Time (s)"</span><span class="p">:</span> <span class="n">r</span><span class="p">[</span><span class="s2">"elapsed_s"</span><span class="p">],</span>
+            <span class="s2">"Intercept"</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="s2">"intercept_mean"</span><span class="p">],</span> <span class="mi">4</span><span class="p">),</span>
+            <span class="s2">"σ̂"</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="n">r</span><span class="p">[</span><span class="s2">"sigma_mean"</span><span class="p">],</span> <span class="mi">4</span><span class="p">),</span>
+            <span class="s2">"ρ̂/λ̂"</span><span class="p">:</span> <span class="nb">round</span><span class="p">(</span><span class="n">r</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">spatial_key</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="s2">"nan"</span><span class="p">)),</span> <span class="mi">4</span><span class="p">)</span> <span class="k">if</span> <span class="n">spatial_key</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+            <span class="s2">"max R̂"</span><span class="p">:</span> <span class="n">r</span><span class="p">[</span><span class="s2">"rhat_max"</span><span class="p">],</span>
+            <span class="s2">"min ESS"</span><span class="p">:</span> <span class="n">r</span><span class="p">[</span><span class="s2">"ess_bulk_min"</span><span class="p">],</span>
+        <span class="p">}</span>
+    <span class="p">)</span>
+
+<span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">rows</span><span class="p">)</span>
+<span class="c1"># Drop duplicates in case cells were re-run</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">(</span><span class="n">subset</span><span class="o">=</span><span class="p">[</span><span class="s2">"Model"</span><span class="p">,</span> <span class="s2">"Sampler"</span><span class="p">],</span> <span class="n">keep</span><span class="o">=</span><span class="s2">"last"</span><span class="p">)</span>
+<span class="n">df</span><span class="o">.</span><span class="n">style</span><span class="o">.</span><span class="n">format</span><span class="p">(</span>
+    <span class="p">{</span><span class="s2">"Time (s)"</span><span class="p">:</span> <span class="s2">"</span><span class="si">{:.1f}</span><span class="s2">"</span><span class="p">,</span> <span class="s2">"Intercept"</span><span class="p">:</span> <span class="s2">"</span><span class="si">{:.4f}</span><span class="s2">"</span><span class="p">,</span> <span class="s2">"σ̂"</span><span class="p">:</span> <span class="s2">"</span><span class="si">{:.4f}</span><span class="s2">"</span><span class="p">,</span> <span class="s2">"ρ̂/λ̂"</span><span class="p">:</span> <span class="s2">"</span><span class="si">{:.4f}</span><span class="s2">"</span><span class="p">}</span>
+<span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><style type="text/css">
+</style>
+<table id="T_f494a">
+  <thead>
+    <tr>
+      <th class="blank level0" >&nbsp;</th>
+      <th id="T_f494a_level0_col0" class="col_heading level0 col0" >Model</th>
+      <th id="T_f494a_level0_col1" class="col_heading level0 col1" >Sampler</th>
+      <th id="T_f494a_level0_col2" class="col_heading level0 col2" >Time (s)</th>
+      <th id="T_f494a_level0_col3" class="col_heading level0 col3" >Intercept</th>
+      <th id="T_f494a_level0_col4" class="col_heading level0 col4" >σ̂</th>
+      <th id="T_f494a_level0_col5" class="col_heading level0 col5" >ρ̂/λ̂</th>
+      <th id="T_f494a_level0_col6" class="col_heading level0 col6" >max R̂</th>
+      <th id="T_f494a_level0_col7" class="col_heading level0 col7" >min ESS</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th id="T_f494a_level0_row0" class="row_heading level0 row0" >0</th>
+      <td id="T_f494a_row0_col0" class="data row0 col0" >SAR</td>
+      <td id="T_f494a_row0_col1" class="data row0 col1" >NUTS</td>
+      <td id="T_f494a_row0_col2" class="data row0 col2" >6.8</td>
+      <td id="T_f494a_row0_col3" class="data row0 col3" >1.3207</td>
+      <td id="T_f494a_row0_col4" class="data row0 col4" >0.8343</td>
+      <td id="T_f494a_row0_col5" class="data row0 col5" >0.4057</td>
+      <td id="T_f494a_row0_col6" class="data row0 col6" >1.001000</td>
+      <td id="T_f494a_row0_col7" class="data row0 col7" >4042</td>
+    </tr>
+    <tr>
+      <th id="T_f494a_level0_row1" class="row_heading level0 row1" >1</th>
+      <td id="T_f494a_row1_col0" class="data row1 col0" >SAR</td>
+      <td id="T_f494a_row1_col1" class="data row1 col1" >Gibbs-NumPy</td>
+      <td id="T_f494a_row1_col2" class="data row1 col2" >1.7</td>
+      <td id="T_f494a_row1_col3" class="data row1 col3" >1.3260</td>
+      <td id="T_f494a_row1_col4" class="data row1 col4" >0.8364</td>
+      <td id="T_f494a_row1_col5" class="data row1 col5" >0.4048</td>
+      <td id="T_f494a_row1_col6" class="data row1 col6" >1.000000</td>
+      <td id="T_f494a_row1_col7" class="data row1 col7" >6932</td>
+    </tr>
+    <tr>
+      <th id="T_f494a_level0_row2" class="row_heading level0 row2" >2</th>
+      <td id="T_f494a_row2_col0" class="data row2 col0" >SAR</td>
+      <td id="T_f494a_row2_col1" class="data row2 col1" >Gibbs-JAX</td>
+      <td id="T_f494a_row2_col2" class="data row2 col2" >1.6</td>
+      <td id="T_f494a_row2_col3" class="data row2 col3" >1.3267</td>
+      <td id="T_f494a_row2_col4" class="data row2 col4" >0.8379</td>
+      <td id="T_f494a_row2_col5" class="data row2 col5" >0.4037</td>
+      <td id="T_f494a_row2_col6" class="data row2 col6" >1.001000</td>
+      <td id="T_f494a_row2_col7" class="data row2 col7" >6401</td>
+    </tr>
+    <tr>
+      <th id="T_f494a_level0_row3" class="row_heading level0 row3" >3</th>
+      <td id="T_f494a_row3_col0" class="data row3 col0" >SEM</td>
+      <td id="T_f494a_row3_col1" class="data row3 col1" >NUTS</td>
+      <td id="T_f494a_row3_col2" class="data row3 col2" >7.7</td>
+      <td id="T_f494a_row3_col3" class="data row3 col3" >1.0458</td>
+      <td id="T_f494a_row3_col4" class="data row3 col4" >0.9339</td>
+      <td id="T_f494a_row3_col5" class="data row3 col5" >0.7632</td>
+      <td id="T_f494a_row3_col6" class="data row3 col6" >1.001000</td>
+      <td id="T_f494a_row3_col7" class="data row3 col7" >3657</td>
+    </tr>
+    <tr>
+      <th id="T_f494a_level0_row4" class="row_heading level0 row4" >4</th>
+      <td id="T_f494a_row4_col0" class="data row4 col0" >SEM</td>
+      <td id="T_f494a_row4_col1" class="data row4 col1" >Gibbs-NumPy</td>
+      <td id="T_f494a_row4_col2" class="data row4 col2" >4.0</td>
+      <td id="T_f494a_row4_col3" class="data row4 col3" >1.0425</td>
+      <td id="T_f494a_row4_col4" class="data row4 col4" >0.9334</td>
+      <td id="T_f494a_row4_col5" class="data row4 col5" >0.7660</td>
+      <td id="T_f494a_row4_col6" class="data row4 col6" >1.000000</td>
+      <td id="T_f494a_row4_col7" class="data row4 col7" >5556</td>
+    </tr>
+    <tr>
+      <th id="T_f494a_level0_row5" class="row_heading level0 row5" >5</th>
+      <td id="T_f494a_row5_col0" class="data row5 col0" >SEM</td>
+      <td id="T_f494a_row5_col1" class="data row5 col1" >Gibbs-JAX</td>
+      <td id="T_f494a_row5_col2" class="data row5 col2" >1.4</td>
+      <td id="T_f494a_row5_col3" class="data row5 col3" >1.0507</td>
+      <td id="T_f494a_row5_col4" class="data row5 col4" >0.9351</td>
+      <td id="T_f494a_row5_col5" class="data row5 col5" >0.7643</td>
+      <td id="T_f494a_row5_col6" class="data row5 col6" >1.001000</td>
+      <td id="T_f494a_row5_col7" class="data row5 col7" >5547</td>
+    </tr>
+    <tr>
+      <th id="T_f494a_level0_row6" class="row_heading level0 row6" >6</th>
+      <td id="T_f494a_row6_col0" class="data row6 col0" >SDM</td>
+      <td id="T_f494a_row6_col1" class="data row6 col1" >NUTS</td>
+      <td id="T_f494a_row6_col2" class="data row6 col2" >6.2</td>
+      <td id="T_f494a_row6_col3" class="data row6 col3" >1.2825</td>
+      <td id="T_f494a_row6_col4" class="data row6 col4" >1.1647</td>
+      <td id="T_f494a_row6_col5" class="data row6 col5" >0.2812</td>
+      <td id="T_f494a_row6_col6" class="data row6 col6" >1.001000</td>
+      <td id="T_f494a_row6_col7" class="data row6 col7" >3442</td>
+    </tr>
+    <tr>
+      <th id="T_f494a_level0_row7" class="row_heading level0 row7" >7</th>
+      <td id="T_f494a_row7_col0" class="data row7 col0" >SDM</td>
+      <td id="T_f494a_row7_col1" class="data row7 col1" >Gibbs-NumPy</td>
+      <td id="T_f494a_row7_col2" class="data row7 col2" >2.1</td>
+      <td id="T_f494a_row7_col3" class="data row7 col3" >1.2820</td>
+      <td id="T_f494a_row7_col4" class="data row7 col4" >1.1642</td>
+      <td id="T_f494a_row7_col5" class="data row7 col5" >0.2811</td>
+      <td id="T_f494a_row7_col6" class="data row7 col6" >1.000000</td>
+      <td id="T_f494a_row7_col7" class="data row7 col7" >6135</td>
+    </tr>
+    <tr>
+      <th id="T_f494a_level0_row8" class="row_heading level0 row8" >8</th>
+      <td id="T_f494a_row8_col0" class="data row8 col0" >SDM</td>
+      <td id="T_f494a_row8_col1" class="data row8 col1" >Gibbs-JAX</td>
+      <td id="T_f494a_row8_col2" class="data row8 col2" >1.2</td>
+      <td id="T_f494a_row8_col3" class="data row8 col3" >1.2919</td>
+      <td id="T_f494a_row8_col4" class="data row8 col4" >1.1662</td>
+      <td id="T_f494a_row8_col5" class="data row8 col5" >0.2757</td>
+      <td id="T_f494a_row8_col6" class="data row8 col6" >1.000000</td>
+      <td id="T_f494a_row8_col7" class="data row8 col7" >6419</td>
+    </tr>
+    <tr>
+      <th id="T_f494a_level0_row9" class="row_heading level0 row9" >9</th>
+      <td id="T_f494a_row9_col0" class="data row9 col0" >SDEM</td>
+      <td id="T_f494a_row9_col1" class="data row9 col1" >NUTS</td>
+      <td id="T_f494a_row9_col2" class="data row9 col2" >5.9</td>
+      <td id="T_f494a_row9_col3" class="data row9 col3" >1.0022</td>
+      <td id="T_f494a_row9_col4" class="data row9 col4" >1.1653</td>
+      <td id="T_f494a_row9_col5" class="data row9 col5" >0.4472</td>
+      <td id="T_f494a_row9_col6" class="data row9 col6" >1.001000</td>
+      <td id="T_f494a_row9_col7" class="data row9 col7" >5179</td>
+    </tr>
+    <tr>
+      <th id="T_f494a_level0_row10" class="row_heading level0 row10" >10</th>
+      <td id="T_f494a_row10_col0" class="data row10 col0" >SDEM</td>
+      <td id="T_f494a_row10_col1" class="data row10 col1" >Gibbs-NumPy</td>
+      <td id="T_f494a_row10_col2" class="data row10 col2" >4.3</td>
+      <td id="T_f494a_row10_col3" class="data row10 col3" >0.9923</td>
+      <td id="T_f494a_row10_col4" class="data row10 col4" >1.1658</td>
+      <td id="T_f494a_row10_col5" class="data row10 col5" >0.4528</td>
+      <td id="T_f494a_row10_col6" class="data row10 col6" >1.001000</td>
+      <td id="T_f494a_row10_col7" class="data row10 col7" >6618</td>
+    </tr>
+    <tr>
+      <th id="T_f494a_level0_row11" class="row_heading level0 row11" >11</th>
+      <td id="T_f494a_row11_col0" class="data row11 col0" >SDEM</td>
+      <td id="T_f494a_row11_col1" class="data row11 col1" >Gibbs-JAX</td>
+      <td id="T_f494a_row11_col2" class="data row11 col2" >1.5</td>
+      <td id="T_f494a_row11_col3" class="data row11 col3" >0.9921</td>
+      <td id="T_f494a_row11_col4" class="data row11 col4" >1.1673</td>
+      <td id="T_f494a_row11_col5" class="data row11 col5" >0.4461</td>
+      <td id="T_f494a_row11_col6" class="data row11 col6" >1.001000</td>
+      <td id="T_f494a_row11_col7" class="data row11 col7" >6177</td>
+    </tr>
+  </tbody>
+</table>
+</div></div>
+</div>
+<h2 id="speedup-comparison">5. Speedup Comparison<a class="headerlink" href="#speedup-comparison" title="Link to this heading">¶</a></h2>
+<p>How much faster is Gibbs compared to NUTS for each model?</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="c1"># Pivot to compare times (use drop_duplicates to guard against re-runs)</span>
+<span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">df</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="s2">"Time (s)"</span> <span class="ow">in</span> <span class="n">df</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+    <span class="n">pivot</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">drop_duplicates</span><span class="p">(</span><span class="n">subset</span><span class="o">=</span><span class="p">[</span><span class="s2">"Model"</span><span class="p">,</span> <span class="s2">"Sampler"</span><span class="p">],</span> <span class="n">keep</span><span class="o">=</span><span class="s2">"last"</span><span class="p">)</span><span class="o">.</span><span class="n">pivot</span><span class="p">(</span>
+        <span class="n">index</span><span class="o">=</span><span class="s2">"Model"</span><span class="p">,</span> <span class="n">columns</span><span class="o">=</span><span class="s2">"Sampler"</span><span class="p">,</span> <span class="n">values</span><span class="o">=</span><span class="s2">"Time (s)"</span>
+    <span class="p">)</span>
+    <span class="k">if</span> <span class="s2">"NUTS"</span> <span class="ow">in</span> <span class="n">pivot</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">col</span> <span class="ow">in</span> <span class="n">pivot</span><span class="o">.</span><span class="n">columns</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">col</span> <span class="o">!=</span> <span class="s2">"NUTS"</span><span class="p">:</span>
+                <span class="n">pivot</span><span class="p">[</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">col</span><span class="si">}</span><span class="s2">/NUTS"</span><span class="p">]</span> <span class="o">=</span> <span class="n">pivot</span><span class="p">[</span><span class="n">col</span><span class="p">]</span> <span class="o">/</span> <span class="n">pivot</span><span class="p">[</span><span class="s2">"NUTS"</span><span class="p">]</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">"Time relative to NUTS (&lt; 1 means faster):"</span><span class="p">)</span>
+        <span class="n">speedup_cols</span> <span class="o">=</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">pivot</span><span class="o">.</span><span class="n">columns</span> <span class="k">if</span> <span class="s2">"/NUTS"</span> <span class="ow">in</span> <span class="n">c</span><span class="p">]</span>
+        <span class="n">display</span><span class="p">(</span>
+            <span class="n">pivot</span><span class="p">[</span>
+                <span class="p">[</span><span class="s2">"NUTS"</span><span class="p">]</span>
+                <span class="o">+</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="n">pivot</span><span class="o">.</span><span class="n">columns</span> <span class="k">if</span> <span class="n">c</span> <span class="o">!=</span> <span class="s2">"NUTS"</span> <span class="ow">and</span> <span class="s2">"/NUTS"</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">c</span><span class="p">]</span>
+                <span class="o">+</span> <span class="n">speedup_cols</span>
+            <span class="p">]</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">display</span><span class="p">(</span><span class="n">pivot</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"No results to display."</span><span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Time relative to NUTS (&lt; 1 means faster):
+</code></pre></div>
+</div>
+<div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th>Sampler</th>
+      <th>NUTS</th>
+      <th>Gibbs-JAX</th>
+      <th>Gibbs-NumPy</th>
+      <th>Gibbs-JAX/NUTS</th>
+      <th>Gibbs-NumPy/NUTS</th>
+    </tr>
+    <tr>
+      <th>Model</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>SAR</th>
+      <td>6.83</td>
+      <td>1.60</td>
+      <td>1.71</td>
+      <td>0.23</td>
+      <td>0.25</td>
+    </tr>
+    <tr>
+      <th>SDEM</th>
+      <td>5.90</td>
+      <td>1.50</td>
+      <td>4.27</td>
+      <td>0.25</td>
+      <td>0.72</td>
+    </tr>
+    <tr>
+      <th>SDM</th>
+      <td>6.16</td>
+      <td>1.16</td>
+      <td>2.07</td>
+      <td>0.19</td>
+      <td>0.34</td>
+    </tr>
+    <tr>
+      <th>SEM</th>
+      <td>7.73</td>
+      <td>1.38</td>
+      <td>3.96</td>
+      <td>0.18</td>
+      <td>0.51</td>
+    </tr>
+  </tbody>
+</table>
+</div></div></div>
+</div>
+<h2 id="posterior-comparison">6. Posterior Comparison<a class="headerlink" href="#posterior-comparison" title="Link to this heading">¶</a></h2>
+<p>Compare posterior distributions across samplers for each model. The Gibbs and NUTS posteriors should agree closely for well-identified parameters.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+
+<span class="c1"># Re-fit all models and store idatas for comparison plots</span>
+<span class="n">idatas</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="k">for</span> <span class="n">model_name</span><span class="p">,</span> <span class="n">ModelClass</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">X</span> <span class="ow">in</span> <span class="n">models_and_data</span><span class="p">:</span>
+    <span class="n">idatas</span><span class="p">[</span><span class="n">model_name</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">config_name</span><span class="p">,</span> <span class="n">config</span> <span class="ow">in</span> <span class="n">configs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">label</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">model_name</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">config_name</span><span class="si">}</span><span class="s2">"</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">ModelClass</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">idata</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="o">**</span><span class="n">config</span><span class="p">)</span>
+            <span class="n">idatas</span><span class="p">[</span><span class="n">model_name</span><span class="p">][</span><span class="n">config_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">idata</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">pass</span>
+
+<span class="c1"># Plot comparison for each model</span>
+<span class="n">spatial_param_map</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"SAR"</span><span class="p">:</span> <span class="s2">"rho"</span><span class="p">,</span> <span class="s2">"SEM"</span><span class="p">:</span> <span class="s2">"lam"</span><span class="p">,</span> <span class="s2">"SDM"</span><span class="p">:</span> <span class="s2">"rho"</span><span class="p">,</span> <span class="s2">"SDEM"</span><span class="p">:</span> <span class="s2">"lam"</span><span class="p">}</span>
+
+<span class="n">fig</span><span class="p">,</span> <span class="n">axes</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">16</span><span class="p">,</span> <span class="mi">8</span><span class="p">))</span>
+
+<span class="k">for</span> <span class="n">col</span><span class="p">,</span> <span class="n">model_name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">([</span><span class="s2">"SAR"</span><span class="p">,</span> <span class="s2">"SEM"</span><span class="p">,</span> <span class="s2">"SDM"</span><span class="p">,</span> <span class="s2">"SDEM"</span><span class="p">]):</span>
+    <span class="n">param</span> <span class="o">=</span> <span class="n">spatial_param_map</span><span class="p">[</span><span class="n">model_name</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">row</span><span class="p">,</span> <span class="n">param_name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">([</span><span class="n">param</span><span class="p">,</span> <span class="s2">"sigma"</span><span class="p">]):</span>
+        <span class="n">ax</span> <span class="o">=</span> <span class="n">axes</span><span class="p">[</span><span class="n">row</span><span class="p">,</span> <span class="n">col</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">config_name</span> <span class="ow">in</span> <span class="n">configs</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">config_name</span> <span class="ow">in</span> <span class="n">idatas</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">model_name</span><span class="p">,</span> <span class="p">{}):</span>
+                <span class="n">idata</span> <span class="o">=</span> <span class="n">idatas</span><span class="p">[</span><span class="n">model_name</span><span class="p">][</span><span class="n">config_name</span><span class="p">]</span>
+                <span class="n">samples</span> <span class="o">=</span> <span class="n">idata</span><span class="o">.</span><span class="n">posterior</span><span class="p">[</span><span class="n">param_name</span><span class="p">]</span><span class="o">.</span><span class="n">values</span><span class="o">.</span><span class="n">flatten</span><span class="p">()</span>
+                <span class="n">ax</span><span class="o">.</span><span class="n">hist</span><span class="p">(</span><span class="n">samples</span><span class="p">,</span> <span class="n">bins</span><span class="o">=</span><span class="mi">50</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">density</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">config_name</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">model_name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">param_name</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">row</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">(</span><span class="n">fontsize</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="s2">"Posterior Comparison: Gibbs vs NUTS"</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.02</span><span class="p">,</span> <span class="n">fontsize</span><span class="o">=</span><span class="mi">14</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (4 chains in 2 jobs)
+NUTS: [rho, beta, sigma2]
+Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 5 seconds.
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (4 chains in 2 jobs)
+NUTS: [lam, beta, sigma2]
+Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 5 seconds.
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (4 chains in 2 jobs)
+NUTS: [rho, beta, sigma2]
+Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 5 seconds.
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (4 chains in 2 jobs)
+NUTS: [lam, beta, sigma2]
+Sampling 4 chains for 1_000 tune and 2_000 draw iterations (4_000 + 8_000 draws total) took 5 seconds.
+</code></pre></div>
+</div>
+<img alt="../_images/0c299f9a388bf645ea61a00bcff54712a4ea2656f100cdd0efe71b6bf669189a.png" src="../_images/0c299f9a388bf645ea61a00bcff54712a4ea2656f100cdd0efe71b6bf669189a.png" />
+</div>
+</div>
+<h2 id="b-diagnostics-gibbs-mixing-for-sem-sdem">6b. Diagnostics: Gibbs Mixing for SEM/SDEM<a class="headerlink" href="#b-diagnostics-gibbs-mixing-for-sem-sdem" title="Link to this heading">¶</a></h2>
+<p>The Gibbs sampler now uses <strong>collapsed</strong> updates for all spatial parameters:</p>
+<ul class="simple">
+<li><p><strong>SAR/SDM</strong>: <strong>Collapsed</strong> update for ρ — integrates out β and σ² analytically, giving a marginal density <code class="docutils literal notranslate"><span class="pre">log</span> <span class="pre">p(ρ</span> <span class="pre">|</span> <span class="pre">y)</span></code> that doesn’t depend on current β and σ² draws. This produces excellent mixing.</p></li>
+<li><p><strong>SEM/SDEM</strong>: <strong>Collapsed</strong> update for λ — also integrates out β and σ² analytically. The collapsed density includes an extra Jacobian term <code class="docutils literal notranslate"><span class="pre">-(1/2)log|X*^T</span> <span class="pre">X*|</span></code> because the transformed design matrix X* = (I - λW)X depends on λ (unlike SAR where X is fixed).</p></li>
+</ul>
+<p>The cell below compares trace plots and posterior summaries for the spatial parameter across samplers.</p>
+<h2 id="scaling-effect-of-n-on-gibbs-vs-nuts-time">7. Scaling: Effect of n on Gibbs vs NUTS Time<a class="headerlink" href="#scaling-effect-of-n-on-gibbs-vs-nuts-time" title="Link to this heading">¶</a></h2>
+<p>How does wall-clock time scale with the number of spatial units?</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">SCALE_DRAWS</span> <span class="o">=</span> <span class="mi">2000</span>
+<span class="n">SCALE_TUNE</span> <span class="o">=</span> <span class="mi">1000</span>
+<span class="n">SCALE_CHAINS</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">SIDES</span> <span class="o">=</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">75</span><span class="p">]</span>  <span class="c1"># n = 16, 36, 64, 100</span>
+
+<span class="n">scale_results</span> <span class="o">=</span> <span class="p">[]</span>
+
+<span class="n">scale_configs</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"NUTS"</span><span class="p">:</span> <span class="nb">dict</span><span class="p">(</span>
+        <span class="n">sampler</span><span class="o">=</span><span class="s2">"nuts"</span><span class="p">,</span>
+        <span class="n">target_accept</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span>
+        <span class="n">draws</span><span class="o">=</span><span class="n">SCALE_DRAWS</span><span class="p">,</span>
+        <span class="n">tune</span><span class="o">=</span><span class="n">SCALE_TUNE</span><span class="p">,</span>
+        <span class="n">chains</span><span class="o">=</span><span class="n">SCALE_CHAINS</span><span class="p">,</span>
+        <span class="n">random_seed</span><span class="o">=</span><span class="n">SEED</span><span class="p">,</span>
+        <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="s2">"Gibbs-NumPy"</span><span class="p">:</span> <span class="nb">dict</span><span class="p">(</span>
+        <span class="n">sampler</span><span class="o">=</span><span class="s2">"gibbs"</span><span class="p">,</span>
+        <span class="n">backend</span><span class="o">=</span><span class="s2">"numpy"</span><span class="p">,</span>
+        <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">draws</span><span class="o">=</span><span class="n">SCALE_DRAWS</span><span class="p">,</span>
+        <span class="n">tune</span><span class="o">=</span><span class="n">SCALE_TUNE</span><span class="p">,</span>
+        <span class="n">chains</span><span class="o">=</span><span class="n">SCALE_CHAINS</span><span class="p">,</span>
+        <span class="n">random_seed</span><span class="o">=</span><span class="n">SEED</span><span class="p">,</span>
+        <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">),</span>
+<span class="p">}</span>
+<span class="k">if</span> <span class="n">HAS_JAX</span><span class="p">:</span>
+    <span class="n">scale_configs</span><span class="p">[</span><span class="s2">"Gibbs-JAX"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+        <span class="n">sampler</span><span class="o">=</span><span class="s2">"gibbs"</span><span class="p">,</span>
+        <span class="n">backend</span><span class="o">=</span><span class="s2">"jax"</span><span class="p">,</span>
+        <span class="n">draws</span><span class="o">=</span><span class="n">SCALE_DRAWS</span><span class="p">,</span>
+        <span class="n">tune</span><span class="o">=</span><span class="n">SCALE_TUNE</span><span class="p">,</span>
+        <span class="n">chains</span><span class="o">=</span><span class="n">SCALE_CHAINS</span><span class="p">,</span>
+        <span class="n">random_seed</span><span class="o">=</span><span class="n">SEED</span><span class="p">,</span>
+        <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">scale_configs</span><span class="p">[</span><span class="s2">"NUTS-JAX"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+        <span class="n">sampler</span><span class="o">=</span><span class="s2">"nuts"</span><span class="p">,</span>
+        <span class="n">backend</span><span class="o">=</span><span class="s2">"blackjax"</span><span class="p">,</span>
+        <span class="n">draws</span><span class="o">=</span><span class="n">SCALE_DRAWS</span><span class="p">,</span>
+        <span class="n">tune</span><span class="o">=</span><span class="n">SCALE_TUNE</span><span class="p">,</span>
+        <span class="n">chains</span><span class="o">=</span><span class="n">SCALE_CHAINS</span><span class="p">,</span>
+        <span class="n">random_seed</span><span class="o">=</span><span class="n">SEED</span><span class="p">,</span>
+        <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+
+<span class="k">for</span> <span class="n">side</span> <span class="ow">in</span> <span class="n">SIDES</span><span class="p">:</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="n">side</span> <span class="o">*</span> <span class="n">side</span>
+    <span class="n">W_dense_s</span> <span class="o">=</span> <span class="n">make_rook_W</span><span class="p">(</span><span class="n">side</span><span class="p">)</span>
+    <span class="n">W_s</span> <span class="o">=</span> <span class="n">W_to_graph</span><span class="p">(</span><span class="n">W_dense_s</span><span class="p">)</span>
+    <span class="n">rng_s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="n">SEED</span><span class="p">)</span>
+    <span class="n">out_s</span> <span class="o">=</span> <span class="n">simulate_sar</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W_s</span><span class="p">,</span> <span class="n">rho</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng_s</span><span class="p">)</span>
+    <span class="n">y_s</span><span class="p">,</span> <span class="n">X_s</span> <span class="o">=</span> <span class="n">out_s</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">out_s</span><span class="p">[</span><span class="s2">"X"</span><span class="p">]</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="se">\n</span><span class="s2">n = </span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s2"> (side=</span><span class="si">{</span><span class="n">side</span><span class="si">}</span><span class="s2">)"</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">config_name</span><span class="p">,</span> <span class="n">config</span> <span class="ow">in</span> <span class="n">scale_configs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">label</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"n=</span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">config_name</span><span class="si">}</span><span class="s2">"</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">SAR</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y_s</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X_s</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W_s</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">profile_model</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">label</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  </span><span class="si">{</span><span class="n">config_name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">'elapsed_s'</span><span class="p">]</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">s"</span><span class="p">)</span>
+            <span class="n">result</span><span class="p">[</span><span class="s2">"n"</span><span class="p">]</span> <span class="o">=</span> <span class="n">n</span>
+            <span class="n">result</span><span class="p">[</span><span class="s2">"sampler"</span><span class="p">]</span> <span class="o">=</span> <span class="n">config_name</span>
+            <span class="n">scale_results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  </span><span class="si">{</span><span class="n">config_name</span><span class="si">}</span><span class="s2">: FAILED (</span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">)"</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Scaling benchmark complete."</span><span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>n = 100 (side=10)
+  NUTS: 3.6s
+  Gibbs-NumPy: 1.4s
+  Gibbs-JAX: 1.3s
+  NUTS-JAX: FAILED (build_kernel.&lt;locals&gt;.kernel() got an unexpected keyword argument 'progress_bar')
+
+n = 400 (side=20)
+  NUTS: 4.0s
+  Gibbs-NumPy: 1.6s
+  Gibbs-JAX: 1.3s
+  NUTS-JAX: FAILED (build_kernel.&lt;locals&gt;.kernel() got an unexpected keyword argument 'progress_bar')
+
+n = 2500 (side=50)
+  NUTS: 4.0s
+  Gibbs-NumPy: 1.4s
+  Gibbs-JAX: 1.1s
+  NUTS-JAX: FAILED (build_kernel.&lt;locals&gt;.kernel() got an unexpected keyword argument 'progress_bar')
+
+n = 5625 (side=75)
+  NUTS: 4.2s
+  Gibbs-NumPy: 5.3s
+  Gibbs-JAX: 4.0s
+  NUTS-JAX: FAILED (build_kernel.&lt;locals&gt;.kernel() got an unexpected keyword argument 'progress_bar')
+
+Scaling benchmark complete.
+</code></pre></div>
+</div>
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (2 chains in 2 jobs)
+NUTS: [rho, beta, sigma2]
+Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 2 seconds.
+We recommend running at least 4 chains for robust computation of convergence diagnostics
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_base/_shared.py:817: FutureWarning: `nuts_sampler_kwargs` is deprecated. Pass NUTS keyword arguments via the `nuts={...}` argument to `pm.sample`.
+  self._idata = pm.sample(
+NUTS[blackjax]: [rho, beta, sigma2]
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (2 chains in 2 jobs)
+NUTS: [rho, beta, sigma2]
+Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 3 seconds.
+We recommend running at least 4 chains for robust computation of convergence diagnostics
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_base/_shared.py:817: FutureWarning: `nuts_sampler_kwargs` is deprecated. Pass NUTS keyword arguments via the `nuts={...}` argument to `pm.sample`.
+  self._idata = pm.sample(
+NUTS[blackjax]: [rho, beta, sigma2]
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (2 chains in 2 jobs)
+NUTS: [rho, beta, sigma2]
+Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 3 seconds.
+We recommend running at least 4 chains for robust computation of convergence diagnostics
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_base/_shared.py:817: FutureWarning: `nuts_sampler_kwargs` is deprecated. Pass NUTS keyword arguments via the `nuts={...}` argument to `pm.sample`.
+  self._idata = pm.sample(
+NUTS[blackjax]: [rho, beta, sigma2]
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (2 chains in 2 jobs)
+NUTS: [rho, beta, sigma2]
+Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 3 seconds.
+We recommend running at least 4 chains for robust computation of convergence diagnostics
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/base.py:1042: RuntimeWarning: The warmup posterior of the spatial parameter, [0.4621, 0.5325], lies nearer a singularity of the Jacobian than an AAA fit of 62 nodes resolves; the log-determinant may bias the posterior there.
+  self._idata = gibbs.fit(
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/samplers/gaussian/_jax.py:1065: RuntimeWarning: The warmup posterior of the spatial parameter, [0.4601, 0.5336], lies nearer a singularity of the Jacobian than an AAA fit of 62 nodes resolves; the log-determinant may bias the posterior there.
+  refit = refit_hook(by_chain, draws=draws, chains=chains)
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_base/_shared.py:817: FutureWarning: `nuts_sampler_kwargs` is deprecated. Pass NUTS keyword arguments via the `nuts={...}` argument to `pm.sample`.
+  self._idata = pm.sample(
+NUTS[blackjax]: [rho, beta, sigma2]
+</code></pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="c1"># Plot scaling results</span>
+<span class="k">if</span> <span class="n">scale_results</span><span class="p">:</span>
+    <span class="n">scale_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">scale_results</span><span class="p">)</span>
+    <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">sampler</span> <span class="ow">in</span> <span class="n">scale_df</span><span class="p">[</span><span class="s2">"sampler"</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">():</span>
+        <span class="n">sub</span> <span class="o">=</span> <span class="n">scale_df</span><span class="p">[</span><span class="n">scale_df</span><span class="p">[</span><span class="s2">"sampler"</span><span class="p">]</span> <span class="o">==</span> <span class="n">sampler</span><span class="p">]</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s2">"n"</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">sub</span><span class="p">[</span><span class="s2">"n"</span><span class="p">],</span> <span class="n">sub</span><span class="p">[</span><span class="s2">"elapsed_s"</span><span class="p">],</span> <span class="n">marker</span><span class="o">=</span><span class="s2">"o"</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">sampler</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">"Number of spatial units (n)"</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">"Wall-clock time (seconds)"</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">"SAR Scaling: Gibbs vs NUTS (draws=</span><span class="si">{</span><span class="n">SCALE_DRAWS</span><span class="si">}</span><span class="s2">, tune=</span><span class="si">{</span><span class="n">SCALE_TUNE</span><span class="si">}</span><span class="s2">, chains=</span><span class="si">{</span><span class="n">SCALE_CHAINS</span><span class="si">}</span><span class="s2">)"</span>
+    <span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"No scaling results to plot."</span><span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/939bd2d76eade30533e02774967a972e274bde458f20cfc17818197177326315.png" src="../_images/939bd2d76eade30533e02774967a972e274bde458f20cfc17818197177326315.png" />
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">SCALE_DRAWS</span> <span class="o">=</span> <span class="mi">2000</span>
+<span class="n">SCALE_TUNE</span> <span class="o">=</span> <span class="mi">1000</span>
+<span class="n">SCALE_CHAINS</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">SIDES</span> <span class="o">=</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">50</span><span class="p">,</span> <span class="mi">75</span><span class="p">]</span>  <span class="c1"># n = 16, 36, 64, 100</span>
+
+<span class="n">scale_results</span> <span class="o">=</span> <span class="p">[]</span>
+
+<span class="n">scale_configs</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"NUTS"</span><span class="p">:</span> <span class="nb">dict</span><span class="p">(</span>
+        <span class="n">sampler</span><span class="o">=</span><span class="s2">"nuts"</span><span class="p">,</span>
+        <span class="n">target_accept</span><span class="o">=</span><span class="mf">0.9</span><span class="p">,</span>
+        <span class="n">draws</span><span class="o">=</span><span class="n">SCALE_DRAWS</span><span class="p">,</span>
+        <span class="n">tune</span><span class="o">=</span><span class="n">SCALE_TUNE</span><span class="p">,</span>
+        <span class="n">chains</span><span class="o">=</span><span class="n">SCALE_CHAINS</span><span class="p">,</span>
+        <span class="n">random_seed</span><span class="o">=</span><span class="n">SEED</span><span class="p">,</span>
+        <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">),</span>
+    <span class="s2">"Gibbs-NumPy"</span><span class="p">:</span> <span class="nb">dict</span><span class="p">(</span>
+        <span class="n">sampler</span><span class="o">=</span><span class="s2">"gibbs"</span><span class="p">,</span>
+        <span class="n">backend</span><span class="o">=</span><span class="s2">"numpy"</span><span class="p">,</span>
+        <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">draws</span><span class="o">=</span><span class="n">SCALE_DRAWS</span><span class="p">,</span>
+        <span class="n">tune</span><span class="o">=</span><span class="n">SCALE_TUNE</span><span class="p">,</span>
+        <span class="n">chains</span><span class="o">=</span><span class="n">SCALE_CHAINS</span><span class="p">,</span>
+        <span class="n">random_seed</span><span class="o">=</span><span class="n">SEED</span><span class="p">,</span>
+        <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">),</span>
+<span class="p">}</span>
+<span class="k">if</span> <span class="n">HAS_JAX</span><span class="p">:</span>
+    <span class="n">scale_configs</span><span class="p">[</span><span class="s2">"Gibbs-JAX"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+        <span class="n">sampler</span><span class="o">=</span><span class="s2">"gibbs"</span><span class="p">,</span>
+        <span class="n">backend</span><span class="o">=</span><span class="s2">"jax"</span><span class="p">,</span>
+        <span class="n">draws</span><span class="o">=</span><span class="n">SCALE_DRAWS</span><span class="p">,</span>
+        <span class="n">tune</span><span class="o">=</span><span class="n">SCALE_TUNE</span><span class="p">,</span>
+        <span class="n">chains</span><span class="o">=</span><span class="n">SCALE_CHAINS</span><span class="p">,</span>
+        <span class="n">random_seed</span><span class="o">=</span><span class="n">SEED</span><span class="p">,</span>
+        <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">scale_configs</span><span class="p">[</span><span class="s2">"NUTS-JAX"</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+        <span class="n">sampler</span><span class="o">=</span><span class="s2">"nuts"</span><span class="p">,</span>
+        <span class="n">backend</span><span class="o">=</span><span class="s2">"blackjax"</span><span class="p">,</span>
+        <span class="n">draws</span><span class="o">=</span><span class="n">SCALE_DRAWS</span><span class="p">,</span>
+        <span class="n">tune</span><span class="o">=</span><span class="n">SCALE_TUNE</span><span class="p">,</span>
+        <span class="n">chains</span><span class="o">=</span><span class="n">SCALE_CHAINS</span><span class="p">,</span>
+        <span class="n">random_seed</span><span class="o">=</span><span class="n">SEED</span><span class="p">,</span>
+        <span class="n">progressbar</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span>
+
+<span class="k">for</span> <span class="n">side</span> <span class="ow">in</span> <span class="n">SIDES</span><span class="p">:</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="n">side</span> <span class="o">*</span> <span class="n">side</span>
+    <span class="n">W_dense_s</span> <span class="o">=</span> <span class="n">make_rook_W</span><span class="p">(</span><span class="n">side</span><span class="p">)</span>
+    <span class="n">W_s</span> <span class="o">=</span> <span class="n">W_to_graph</span><span class="p">(</span><span class="n">W_dense_s</span><span class="p">)</span>
+    <span class="n">rng_s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="n">SEED</span><span class="p">)</span>
+    <span class="n">out_s</span> <span class="o">=</span> <span class="n">simulate_sem</span><span class="p">(</span><span class="n">W</span><span class="o">=</span><span class="n">W_s</span><span class="p">,</span> <span class="n">lam</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">rng</span><span class="o">=</span><span class="n">rng_s</span><span class="p">)</span>
+    <span class="n">y_s</span><span class="p">,</span> <span class="n">X_s</span> <span class="o">=</span> <span class="n">out_s</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span> <span class="n">out_s</span><span class="p">[</span><span class="s2">"X"</span><span class="p">]</span>
+
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="se">\n</span><span class="s2">n = </span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s2"> (side=</span><span class="si">{</span><span class="n">side</span><span class="si">}</span><span class="s2">)"</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">config_name</span><span class="p">,</span> <span class="n">config</span> <span class="ow">in</span> <span class="n">scale_configs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">label</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"n=</span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">config_name</span><span class="si">}</span><span class="s2">"</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">SEM</span><span class="p">(</span><span class="n">y</span><span class="o">=</span><span class="n">y_s</span><span class="p">,</span> <span class="n">X</span><span class="o">=</span><span class="n">X_s</span><span class="p">,</span> <span class="n">W</span><span class="o">=</span><span class="n">W_s</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">profile_model</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">config</span><span class="p">,</span> <span class="n">label</span><span class="p">)</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  </span><span class="si">{</span><span class="n">config_name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">result</span><span class="p">[</span><span class="s1">'elapsed_s'</span><span class="p">]</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">s"</span><span class="p">)</span>
+            <span class="n">result</span><span class="p">[</span><span class="s2">"n"</span><span class="p">]</span> <span class="o">=</span> <span class="n">n</span>
+            <span class="n">result</span><span class="p">[</span><span class="s2">"sampler"</span><span class="p">]</span> <span class="o">=</span> <span class="n">config_name</span>
+            <span class="n">scale_results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">result</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"  </span><span class="si">{</span><span class="n">config_name</span><span class="si">}</span><span class="s2">: FAILED (</span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">)"</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">"</span><span class="se">\n</span><span class="s2">Scaling benchmark complete."</span><span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>n = 100 (side=10)
+  NUTS: 3.9s
+  Gibbs-NumPy: 2.4s
+  Gibbs-JAX: 1.3s
+  NUTS-JAX: FAILED (build_kernel.&lt;locals&gt;.kernel() got an unexpected keyword argument 'progress_bar')
+
+n = 400 (side=20)
+  NUTS: 4.2s
+  Gibbs-NumPy: 2.5s
+  Gibbs-JAX: 1.5s
+  NUTS-JAX: FAILED (build_kernel.&lt;locals&gt;.kernel() got an unexpected keyword argument 'progress_bar')
+
+n = 2500 (side=50)
+  NUTS: 4.0s
+  Gibbs-NumPy: 2.5s
+  Gibbs-JAX: 1.3s
+  NUTS-JAX: FAILED (build_kernel.&lt;locals&gt;.kernel() got an unexpected keyword argument 'progress_bar')
+
+n = 5625 (side=75)
+  NUTS: 4.5s
+  Gibbs-NumPy: 4.3s
+  Gibbs-JAX: 1.4s
+  NUTS-JAX: FAILED (build_kernel.&lt;locals&gt;.kernel() got an unexpected keyword argument 'progress_bar')
+
+Scaling benchmark complete.
+</code></pre></div>
+</div>
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (2 chains in 2 jobs)
+NUTS: [lam, beta, sigma2]
+Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 2 seconds.
+We recommend running at least 4 chains for robust computation of convergence diagnostics
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_base/_shared.py:817: FutureWarning: `nuts_sampler_kwargs` is deprecated. Pass NUTS keyword arguments via the `nuts={...}` argument to `pm.sample`.
+  self._idata = pm.sample(
+NUTS[blackjax]: [lam, beta, sigma2]
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (2 chains in 2 jobs)
+NUTS: [lam, beta, sigma2]
+Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 3 seconds.
+We recommend running at least 4 chains for robust computation of convergence diagnostics
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_base/_shared.py:817: FutureWarning: `nuts_sampler_kwargs` is deprecated. Pass NUTS keyword arguments via the `nuts={...}` argument to `pm.sample`.
+  self._idata = pm.sample(
+NUTS[blackjax]: [lam, beta, sigma2]
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (2 chains in 2 jobs)
+NUTS: [lam, beta, sigma2]
+Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 3 seconds.
+We recommend running at least 4 chains for robust computation of convergence diagnostics
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_base/_shared.py:817: FutureWarning: `nuts_sampler_kwargs` is deprecated. Pass NUTS keyword arguments via the `nuts={...}` argument to `pm.sample`.
+  self._idata = pm.sample(
+NUTS[blackjax]: [lam, beta, sigma2]
+Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (2 chains in 2 jobs)
+NUTS: [lam, beta, sigma2]
+Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 3 seconds.
+We recommend running at least 4 chains for robust computation of convergence diagnostics
+/home/runner/micromamba/envs/test/lib/python3.14/site-packages/neighbayes/models/_base/_shared.py:817: FutureWarning: `nuts_sampler_kwargs` is deprecated. Pass NUTS keyword arguments via the `nuts={...}` argument to `pm.sample`.
+  self._idata = pm.sample(
+NUTS[blackjax]: [lam, beta, sigma2]
+</code></pre></div>
+</div>
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="c1"># Plot scaling results</span>
+<span class="k">if</span> <span class="n">scale_results</span><span class="p">:</span>
+    <span class="n">scale_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">scale_results</span><span class="p">)</span>
+    <span class="n">fig</span><span class="p">,</span> <span class="n">ax</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplots</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">5</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">sampler</span> <span class="ow">in</span> <span class="n">scale_df</span><span class="p">[</span><span class="s2">"sampler"</span><span class="p">]</span><span class="o">.</span><span class="n">unique</span><span class="p">():</span>
+        <span class="n">sub</span> <span class="o">=</span> <span class="n">scale_df</span><span class="p">[</span><span class="n">scale_df</span><span class="p">[</span><span class="s2">"sampler"</span><span class="p">]</span> <span class="o">==</span> <span class="n">sampler</span><span class="p">]</span><span class="o">.</span><span class="n">sort_values</span><span class="p">(</span><span class="s2">"n"</span><span class="p">)</span>
+        <span class="n">ax</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">sub</span><span class="p">[</span><span class="s2">"n"</span><span class="p">],</span> <span class="n">sub</span><span class="p">[</span><span class="s2">"elapsed_s"</span><span class="p">],</span> <span class="n">marker</span><span class="o">=</span><span class="s2">"o"</span><span class="p">,</span> <span class="n">label</span><span class="o">=</span><span class="n">sampler</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_xlabel</span><span class="p">(</span><span class="s2">"Number of spatial units (n)"</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_ylabel</span><span class="p">(</span><span class="s2">"Wall-clock time (seconds)"</span><span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">set_title</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">"SAR Scaling: Gibbs vs NUTS (draws=</span><span class="si">{</span><span class="n">SCALE_DRAWS</span><span class="si">}</span><span class="s2">, tune=</span><span class="si">{</span><span class="n">SCALE_TUNE</span><span class="si">}</span><span class="s2">, chains=</span><span class="si">{</span><span class="n">SCALE_CHAINS</span><span class="si">}</span><span class="s2">)"</span>
+    <span class="p">)</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">legend</span><span class="p">()</span>
+    <span class="n">ax</span><span class="o">.</span><span class="n">grid</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.3</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+<span class="k">else</span><span class="p">:</span>
+    <span class="nb">print</span><span class="p">(</span><span class="s2">"No scaling results to plot."</span><span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/90518a9601cc17c086672778b10dc4e257972e6e57cdcb82402c273fe8e44ae6.png" src="../_images/90518a9601cc17c086672778b10dc4e257972e6e57cdcb82402c273fe8e44ae6.png" />
+</div>
+</div>
+<p>Gibbs is <strong>way</strong> faster with better ESS than NUTS. The JAX-based Gibbs sampler wins across the board in time/ESS tradeoff.</p>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  
+  
+  <div class="md-footer-meta md-typeset">
+    
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-footer-copyright__highlight">
+        &#169; Copyright 2018-, pysal developers.
+        
+    </div>
+  
+    Created using
+    <a href="https://www.sphinx-doc.org/" target="_blank" rel="noopener">Sphinx</a>
+    9.2.0.
+     and
+    <a href="https://github.com/jbms/sphinx-immaterial/" target="_blank" rel="noopener">Sphinx-Immaterial</a>
+  
+</div>
+      
+    </div>
+    
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.sections", "navigation.top", "search.share", "search.suggest", "toc.follow", "toc.sticky", "content.code.copy", "content.action.edit"], "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike", "staticVersions": null, "versionPath": "https://pysal.org/neighbayes/versions.json"}}</script>
+    
+      
+        <script src="../_static/sphinx_immaterial_theme.32136f45f91ae6956.min.js?v=a7a9472a"></script>
+        <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+        <script src="../_static/copybutton.js?v=f281be69"></script>
+    
+  </body>
+</html>

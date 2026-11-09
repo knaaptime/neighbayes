@@ -1,0 +1,38 @@
+﻿neighbayes.models.priors.MultilevelPriors
+=========================================
+
+.. currentmodule:: neighbayes.models.priors
+
+.. autoclass:: MultilevelPriors
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~MultilevelPriors.__init__
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~MultilevelPriors.beta_mu
+      ~MultilevelPriors.beta_sigma
+      ~MultilevelPriors.level_beta_mu
+      ~MultilevelPriors.level_beta_sigma
+      ~MultilevelPriors.nu
+      ~MultilevelPriors.rho_lower
+      ~MultilevelPriors.rho_upper
+      ~MultilevelPriors.sigma2_alpha
+      ~MultilevelPriors.sigma2_beta
+      ~MultilevelPriors.sigma_nu
+      ~MultilevelPriors.sigma_scale
+   
+   

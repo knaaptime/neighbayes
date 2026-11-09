@@ -1,0 +1,6 @@
+﻿neighbayes.diagnostics.lmtests.SAR\_PANEL\_SUITE
+================================================
+
+.. currentmodule:: neighbayes.diagnostics.lmtests
+
+.. autodata:: SAR_PANEL_SUITE

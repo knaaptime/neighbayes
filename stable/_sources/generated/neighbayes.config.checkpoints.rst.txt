@@ -1,0 +1,6 @@
+﻿neighbayes.config.checkpoints
+=============================
+
+.. currentmodule:: neighbayes.config
+
+.. autofunction:: checkpoints

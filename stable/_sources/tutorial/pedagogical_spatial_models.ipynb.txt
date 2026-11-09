@@ -1,0 +1,865 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "0",
+   "metadata": {},
+   "source": [
+    "# Bayesian spatial models: a walkthrough\n",
+    "\n",
+    "By the end of this lesson you will have fitted six models to one dataset,\n",
+    "followed the package's specification tests from OLS to the model they point to,\n",
+    "and used Bayes factors to rank the models those tests leave standing.\n",
+    "\n",
+    "You do not need to know the spatial econometrics beforehand — each model is\n",
+    "introduced when the previous one runs out of road. Work through the cells in\n",
+    "order; every step produces something you can look at."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "1",
+   "metadata": {},
+   "source": [
+    "Every model here accepts a formula and a weights graph:\n",
+    "\n",
+    "```python\n",
+    "SAR(formula=\"y ~ x1 + x2\", data=gdf, W=W)\n",
+    "```\n",
+    "\n",
+    "The equations behind each one are in [Supported Models](../models.md) if you\n",
+    "want them; you will not need them to follow along."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "2",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import arviz as az\n",
+    "import geodatasets\n",
+    "import geopandas as gpd\n",
+    "import matplotlib.pyplot as plt\n",
+    "import pandas as pd\n",
+    "from libpysal.graph import Graph\n",
+    "\n",
+    "from neighbayes.diagnostics.bayesfactor import bayes_factor_compare_models\n",
+    "from neighbayes.models import OLS, SAR, SDEM, SDM, SEM, SLX\n",
+    "\n",
+    "az.style.use(\"arviz-variat\")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "3",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Load sample spatial dataset\n",
+    "gdf = gpd.read_file(geodatasets.data.geoda.airbnb.url)\n",
+    "xcols = [\"poverty\", \"rev_rating\", \"num_spots\", \"crowded\"]\n",
+    "ycol = \"price_pp\"\n",
+    "gdf = gdf.dropna(subset=xcols + [ycol]).copy()\n",
+    "\n",
+    "# Build contiguity graph (queen)\n",
+    "W = Graph.build_contiguity(gdf, rook=False).transform(\"r\")\n",
+    "\n",
+    "print(f\"Observations: {len(gdf)}\")\n",
+    "print(f\"Predictors: {xcols}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "4",
+   "metadata": {},
+   "source": [
+    "__Helper Functions__\n",
+    "\n",
+    "To keep each model section focused, we use utility functions to:\n",
+    "\n",
+    "* fit with consistent MCMC settings,\n",
+    "* print posterior summaries,\n",
+    "* tabulate direct/indirect/total effects.\n",
+    "\n",
+    "For a quick pedagogical run, we use small draw counts. Increase these for real inference.\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "5",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def fit_and_report(model_cls, formula, data, W, draws=400, tune=400, chains=4, seed=42):\n",
+    "    \"\"\"Fit a spatial model and return (model, summary, effects_df).\n",
+    "\n",
+    "    Uses minimal MCMC settings for pedagogical demonstration.\n",
+    "    Increase draws/tune for real analyses.\n",
+    "    \"\"\"\n",
+    "    model = model_cls(formula=formula, data=data, W=W, logdet_method=\"eigenvalue\")\n",
+    "    model.fit(\n",
+    "        draws=draws,\n",
+    "        tune=tune,\n",
+    "        chains=chains,\n",
+    "        random_seed=seed,\n",
+    "        progressbar=False,\n",
+    "        idata_kwargs={\"log_likelihood\": True},\n",
+    "    )\n",
+    "    summary = model.summary(round_to=3)\n",
+    "    effects_df = pd.DataFrame(model.impacts())\n",
+    "    return model, summary, effects_df"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "6",
+   "metadata": {},
+   "source": [
+    "__Convergence Diagnostics Helper__\n",
+    "\n",
+    "For each fitted model, we will inspect:\n",
+    "\n",
+    "* `r_hat` (target close to 1.00)\n",
+    "* effective sample sizes (`ess_bulk`, `ess_tail`)\n",
+    "* trace plots for key parameters.\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "7",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def diagnostics_table(idata, var_names):\n",
+    "    \"\"\"Show key MCMC diagnostics for the given parameters.\"\"\"\n",
+    "    cols = [\"mean\", \"sd\", \"ess_bulk\", \"ess_tail\", \"r_hat\"]\n",
+    "    return az.summary(idata, var_names=var_names, round_to=3)[cols]\n",
+    "\n",
+    "\n",
+    "def show_trace(idata, var_names, title):\n",
+    "    \"\"\"Plot trace plots for the given parameters.\"\"\"\n",
+    "    az.plot_trace_dist(idata, var_names=var_names)\n",
+    "    plt.suptitle(title, y=1.02)\n",
+    "    plt.tight_layout()\n",
+    "    plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "8",
+   "metadata": {},
+   "source": [
+    "## The models, one at a time\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "9",
+   "metadata": {},
+   "source": [
+    "### Start with OLS, and see what it misses\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "10",
+   "metadata": {},
+   "source": [
+    "Model:\n",
+    "\n",
+    "$$\n",
+    "y = X\\beta + \\epsilon\n",
+    "$$\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "11",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "ols = OLS(\n",
+    "    formula=\"price_pp ~ poverty + rev_rating + num_spots + crowded\",\n",
+    "    data=gdf,\n",
+    "    W=W,\n",
+    ")\n",
+    "olsfit = ols.fit(\n",
+    "    draws=400,\n",
+    "    tune=400,\n",
+    "    chains=4,\n",
+    "    random_seed=42,\n",
+    "    progressbar=False,\n",
+    "    idata_kwargs={\"log_likelihood\": True},\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "12",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "ols.summary()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "13",
+   "metadata": {},
+   "source": [
+    "### Add the neighbors' covariates (SLX)\n",
+    "\n",
+    "Model:\n",
+    "\n",
+    "$$\n",
+    "y = X\\beta + WX\\theta + \\epsilon\n",
+    "$$\n",
+    "\n",
+    "Interpretation:\n",
+    "\n",
+    "* `beta` captures local covariate effects.\n",
+    "* `theta` captures neighbor-covariate spillovers.\n",
+    "* No spatial lag on $y$, so no autoregressive propagation through outcomes.\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "14",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "slx, summary_slx, effects_slx = fit_and_report(\n",
+    "    SLX,\n",
+    "    formula=\"price_pp ~ poverty + rev_rating + num_spots + crowded\",\n",
+    "    data=gdf,\n",
+    "    W=W,\n",
+    ")\n",
+    "display(summary_slx)\n",
+    "display(effects_slx)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "15",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "az.plot_forest(slx.inference_data)\n",
+    "display(diagnostics_table(slx.inference_data, [\"beta\", \"sigma\"]))\n",
+    "show_trace(slx.inference_data, [\"sigma\"], \"SLX Trace: sigma\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "16",
+   "metadata": {},
+   "source": [
+    "### Let the outcome itself spill over (SAR)\n",
+    "\n",
+    "Model:\n",
+    "\n",
+    "$$\n",
+    "y = \\rho Wy + X\\beta + \\epsilon\n",
+    "$$\n",
+    "\n",
+    "Interpretation:\n",
+    "\n",
+    "* $\\rho$ controls feedback from neighboring outcomes.\n",
+    "* Effects are amplified through $(I - \\rho W)^{-1}$, so direct and indirect impacts differ from raw $\\beta$.\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "17",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "sar, summary_sar, effects_sar = fit_and_report(\n",
+    "    SAR,\n",
+    "    formula=\"price_pp ~ poverty + rev_rating + num_spots + crowded\",\n",
+    "    data=gdf,\n",
+    "    W=W,\n",
+    ")\n",
+    "summary_sar"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "18",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "effects_sar"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "19",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "az.plot_forest(sar.inference_data)\n",
+    "display(diagnostics_table(sar.inference_data, [\"rho\", \"beta\", \"sigma\"]))\n",
+    "show_trace(sar.inference_data, [\"rho\", \"sigma\"], \"SAR Trace: rho, sigma\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "20",
+   "metadata": {},
+   "source": [
+    "### Treat the clustering as nuisance instead (SEM)\n",
+    "\n",
+    "Model:\n",
+    "\n",
+    "$$\n",
+    "y = X\\beta + u, \\quad u = \\lambda Wu + \\epsilon\n",
+    "$$\n",
+    "\n",
+    "Interpretation:\n",
+    "\n",
+    "* Spatial dependence is moved to latent shocks rather than outcome feedback.\n",
+    "* Useful when omitted spatial factors induce correlated residuals.\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "21",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "sem, summary_sem, effects_sem = fit_and_report(\n",
+    "    SEM,\n",
+    "    formula=\"price_pp ~ poverty + rev_rating + num_spots + crowded\",\n",
+    "    data=gdf,\n",
+    "    W=W,\n",
+    ")\n",
+    "display(summary_sem)\n",
+    "display(effects_sem)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "22",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "az.plot_forest(sem.inference_data)\n",
+    "display(diagnostics_table(sem.inference_data, [\"lam\", \"beta\", \"sigma\"]))\n",
+    "show_trace(sem.inference_data, [\"lam\", \"sigma\"], \"SEM Trace: lam, sigma\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "23",
+   "metadata": {},
+   "source": [
+    "### Combine both channels (SDM)\n",
+    "\n",
+    "Model:\n",
+    "\n",
+    "$$\n",
+    "y = \\rho Wy + X\\beta + WX\\theta + \\epsilon\n",
+    "$$\n",
+    "\n",
+    "Interpretation:\n",
+    "\n",
+    "* Includes both outcome feedback and neighbor-covariate channels.\n",
+    "* Often used as a flexible nesting model for SAR/SLX.\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "24",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "sdm, summary_sdm, effects_sdm = fit_and_report(\n",
+    "    SDM,\n",
+    "    formula=\"price_pp ~ poverty + rev_rating + num_spots + crowded\",\n",
+    "    data=gdf,\n",
+    "    W=W,\n",
+    ")\n",
+    "display(summary_sdm)\n",
+    "display(effects_sdm)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "25",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "az.plot_forest(sdm.inference_data)\n",
+    "display(diagnostics_table(sdm.inference_data, [\"rho\", \"beta\", \"sigma\"]))\n",
+    "show_trace(sdm.inference_data, [\"rho\", \"sigma\"], \"SDM Trace: rho, sigma\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "26",
+   "metadata": {},
+   "source": [
+    "### The error-side combination (SDEM)\n",
+    "\n",
+    "Model:\n",
+    "\n",
+    "$$\n",
+    "y = X\\beta + WX\\theta + u, \\quad u = \\lambda Wu + \\epsilon\n",
+    "$$\n",
+    "\n",
+    "Interpretation:\n",
+    "\n",
+    "* Neighbor covariates matter directly (through $WX$),\n",
+    "* and unmodeled shocks are spatially correlated (through $u$).\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "27",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "sdem, summary_sdem, effects_sdem = fit_and_report(\n",
+    "    SDEM,\n",
+    "    formula=\"price_pp ~ poverty + rev_rating + num_spots + crowded\",\n",
+    "    data=gdf,\n",
+    "    W=W,\n",
+    ")\n",
+    "display(summary_sdem)\n",
+    "display(effects_sdem)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "28",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "az.plot_forest(sdem.inference_data)\n",
+    "display(diagnostics_table(sdem.inference_data, [\"lam\", \"beta\", \"sigma\"]))\n",
+    "show_trace(sdem.inference_data, [\"lam\", \"sigma\"], \"SDEM Trace: lam, sigma\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "29",
+   "metadata": {},
+   "source": [
+    "### Check the chains before comparing anything\n",
+    "\n",
+    "Bayesian estimation of spatial models has a well-known efficiency\n",
+    "pitfall: the spatial dependence parameter $\\rho$ (or $\\lambda$) often\n",
+    "mixes slowly, so a chain that _looks_ converged in its point estimate\n",
+    "can still produce posterior credible intervals that are 10–12 % too\n",
+    "narrow because the sampler has not visited the tails enough times\n",
+    "{cite:p}`wolf2018StochasticEfficiency`. The\n",
+    "`spatial_mcmc_diagnostic` helper checks effective sample size, sampler\n",
+    "yield, $\\hat{R}$, and HPDI stability for the spatial parameter and\n",
+    "warns when any threshold is violated.\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "30",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from neighbayes.diagnostics import spatial_mcmc_diagnostic\n",
+    "\n",
+    "# Run on the SDM (most parameters; both rho and impact summaries depend on it)\n",
+    "report = spatial_mcmc_diagnostic(sdm, emit_warnings=False)\n",
+    "report.to_frame()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "31",
+   "metadata": {},
+   "source": [
+    "## Let the tests pick the specification\n",
+    "\n",
+    "Every fitted model can test for the spatial terms it leaves out. The tests are\n",
+    "Lagrange-multiplier (score) tests, which need only the fit you already have:\n",
+    "`model.spatial_diagnostics()` runs the ones that apply to that model, and\n",
+    "`model.spatial_diagnostics_decision()` reads them and recommends a model.\n",
+    "\n",
+    "A fitted model that leaves out two terms has a plain and a robust test for\n",
+    "each. SAR leaves out the neighbors' covariates $WX\\theta$ and the error process\n",
+    "$\\lambda Wu$; OLS leaves out both and the lag $\\rho Wy$ as well. A plain\n",
+    "test is valid when the other term is absent. A robust test stays valid when the\n",
+    "other term is present, and pays for that in power. So the decision reads them in\n",
+    "order:\n",
+    "\n",
+    "1. Neither plain test rejects: keep the model.\n",
+    "2. One rejects: add that term.\n",
+    "3. Both reject: add the term whose robust test rejects; if both or neither do,\n",
+    "   the one with the smaller robust p-value.\n",
+    "\n",
+    "This is the specific-to-general strategy of Anselin et al. (1996), the one\n",
+    "`spreg`'s `stge_classic` implements. You fit the recommended model and ask\n",
+    "again, until the tests stop rejecting. The p-values here are Bayesian: each\n",
+    "statistic is evaluated at the posterior mean, and its posterior spread gives\n",
+    "the credible interval beside it."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "32",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def read_tests(model, alpha=0.05):\n",
+    "    \"\"\"Show a fitted model's LM tests and say which reject.\"\"\"\n",
+    "    diag = model.spatial_diagnostics()\n",
+    "    rejecting = diag.index[diag[\"p_value\"] < alpha].tolist()\n",
+    "    name = type(model).__name__\n",
+    "    print(f\"{name}: tests rejecting at {alpha}: {', '.join(rejecting) or 'none'}\")\n",
+    "    print(\n",
+    "        f\"{name}: recommended model: \"\n",
+    "        f\"{model.spatial_diagnostics_decision(alpha=alpha, format='model')}\"\n",
+    "    )\n",
+    "    return diag[[\"statistic\", \"df\", \"p_value\", \"ci_lower\", \"ci_upper\"]].round(3)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "33",
+   "metadata": {},
+   "source": [
+    "### Start from OLS\n",
+    "\n",
+    "The OLS tests ask whether the outcome, the errors or the neighbors' covariates\n",
+    "carry spatial dependence. A lone rejection points to the SAR, SEM or SLX. When\n",
+    "the lag and the error both reject, their robust pair decides, and the $WX$\n",
+    "question waits for the SAR or SEM fit. When the lag and $WX$ both reject,\n",
+    "Koley and Bera's robust pair decides: $WX$ robust to the lag (Robust-LM-WX), and\n",
+    "the lag robust to $WX$, which at the OLS fit is the error test. The lag's score\n",
+    "there is the error's score plus a fixed combination of the $WX$ scores, which is\n",
+    "also why the two joint tests reported beside the tree are one statistic."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "34",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "read_tests(ols)"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "35",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "ols.spatial_diagnostics_decision()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "36",
+   "metadata": {},
+   "source": [
+    "### Refit, and ask again\n",
+    "\n",
+    "The OLS tree names the model to fit next, and that model tests the terms it\n",
+    "still leaves out:\n",
+    "\n",
+    "- the SAR, the neighbors' covariates (towards the SDM) and the error process\n",
+    "  (towards SARAR, a SAR with spatial errors, which neighbayes does not fit);\n",
+    "- the SLX, the lag (towards the SDM) and the error process (towards the SDEM);\n",
+    "- the SEM, the lag (towards SARAR) and the neighbors' covariates (towards the\n",
+    "  SDEM);\n",
+    "- the SDM and SDEM, one term each, whose test decides whether to go on to the\n",
+    "  general nesting model (GNS).\n",
+    "\n",
+    "The walk ends at the first model whose tests do not reject. The cell below\n",
+    "follows the recommendations through the models fitted above and draws each tree\n",
+    "it consults."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "37",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def walk(start, fitted, alpha=0.05, show=True):\n",
+    "    \"\"\"Follow the recommendations from ``start`` through the fitted models.\"\"\"\n",
+    "    model, path = start, [type(start).__name__]\n",
+    "    while True:\n",
+    "        nxt = model.spatial_diagnostics_decision(alpha=alpha, format=\"model\")\n",
+    "        if nxt == path[-1]:\n",
+    "            break\n",
+    "        if nxt not in fitted:\n",
+    "            path.append(f\"{nxt} (not fitted here)\")\n",
+    "            break\n",
+    "        model = fitted[nxt]\n",
+    "        path.append(nxt)\n",
+    "        if show:\n",
+    "            print(f\"--- at the {nxt} fit ---\")\n",
+    "            display(read_tests(model, alpha))\n",
+    "            display(model.spatial_diagnostics_decision(alpha=alpha))\n",
+    "    if show:\n",
+    "        print(\" → \".join(path))\n",
+    "    return path\n",
+    "\n",
+    "\n",
+    "fitted = {\"SLX\": slx, \"SAR\": sar, \"SEM\": sem, \"SDM\": sdm, \"SDEM\": sdem}\n",
+    "path = walk(ols, fitted)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "38",
+   "metadata": {},
+   "source": [
+    "## Compare what you have fitted\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "39",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Collect all fitted models for comparison\n",
+    "model_dict = {\n",
+    "    \"OLS\": ols,\n",
+    "    \"SLX\": slx,\n",
+    "    \"SAR\": sar,\n",
+    "    \"SEM\": sem,\n",
+    "    \"SDM\": sdm,\n",
+    "    \"SDEM\": sdem,\n",
+    "}\n",
+    "idata_dict = {name: m.inference_data for name, m in model_dict.items()}"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "40",
+   "metadata": {},
+   "source": [
+    "### Bayes factors\n",
+    "\n",
+    "The LM tests are misspecification tests: each asks whether a fitted model has\n",
+    "left spatial dependence behind. A Bayes factor asks something else, how well a\n",
+    "model fits overall. It compares marginal likelihoods, the probability of the\n",
+    "data under each model averaged over its prior:\n",
+    "\n",
+    "$$BF_{ij} = \\frac{p(y \\mid \\mathcal{M}_i)}{p(y \\mid \\mathcal{M}_j)}.$$\n",
+    "\n",
+    "Because the average is over the prior, a coefficient the data do not need costs\n",
+    "its model: the prior spreads probability over values the data rule out. This is\n",
+    "the Bayesian Occam's razor.\n",
+    "\n",
+    "For these six Gaussian models the marginal likelihood reduces to a\n",
+    "two-dimensional integral, so `method=\"quadrature\"` computes it exactly, with no\n",
+    "Monte Carlo error and no fit. Bridge sampling (`method=\"bridge\"`) estimates the\n",
+    "same quantity from the posterior draws, and is what models without that form\n",
+    "use; BIC approximates it as if each prior held one observation's worth of\n",
+    "information. The table gives each model's log marginal likelihood relative to\n",
+    "the best, so 0 marks the best model and $-\\log 10 \\approx -2.3$ a Bayes factor\n",
+    "of 10 against.\n",
+    "\n",
+    "| Bayes factor | Evidence (Kass & Raftery, 1995) |\n",
+    "| ------------ | ------------------------------- |\n",
+    "| 1 – 3        | Anecdotal                       |\n",
+    "| 3 – 10       | Moderate                        |\n",
+    "| 10 – 30      | Strong                          |\n",
+    "| 30 – 100     | Very strong                     |\n",
+    "| > 100        | Extreme                         |"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "41",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "from neighbayes.diagnostics import post_prob\n",
+    "\n",
+    "log_bf = {\n",
+    "    method: bayes_factor_compare_models(model_dict, method=method, log=True)\n",
+    "    for method in (\"quadrature\", \"bridge\", \"bic\")\n",
+    "}\n",
+    "exact = log_bf[\"quadrature\"]\n",
+    "best = exact.sum(axis=1).idxmax()  # the row that beats every column\n",
+    "comparison = pd.DataFrame({m: bf[best] for m, bf in log_bf.items()})\n",
+    "comparison[\"posterior probability\"] = post_prob(\n",
+    "    comparison[\"quadrature\"].to_numpy(), model_names=list(comparison.index)\n",
+    ")\n",
+    "comparison.sort_values(\"quadrature\", ascending=False).round(3)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "42",
+   "metadata": {},
+   "source": [
+    "`bayes_factor_compare_models` returns the full matrix of pairwise log Bayes\n",
+    "factors. Each entry is the row model over the column model, so a positive\n",
+    "entry favors the row; the column above is the matrix's column for the best\n",
+    "model."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "43",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "exact.round(2)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "44",
+   "metadata": {},
+   "source": [
+    "### Rank only the models that pass their tests\n",
+    "\n",
+    "Because the two measure different things, they need not agree. A model can fit\n",
+    "well overall and still leave residual spatial dependence (in the outcome, the\n",
+    "errors or the neighbors' covariates), and its estimates are then biased or\n",
+    "inefficient. So a model that fails an LM test cannot be trusted however its\n",
+    "Bayes factor ranks it. Use the tests to screen the models and the Bayes factors\n",
+    "to rank the ones that pass.\n",
+    "\n",
+    "The cell below lists each fitted model's rejecting tests beside its log marginal\n",
+    "likelihood, and picks the best model among those that pass."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "45",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "alpha = 0.05\n",
+    "\n",
+    "\n",
+    "def rejecting(model):\n",
+    "    diag = model.spatial_diagnostics()\n",
+    "    return \", \".join(diag.index[diag[\"p_value\"] < alpha]) or \"none\"\n",
+    "\n",
+    "\n",
+    "screen = pd.DataFrame(\n",
+    "    {\n",
+    "        \"rejecting tests\": {name: rejecting(m) for name, m in model_dict.items()},\n",
+    "        \"log ML vs best\": exact[best],\n",
+    "    }\n",
+    ")\n",
+    "passing = screen.index[screen[\"rejecting tests\"] == \"none\"]\n",
+    "print(f\"Best by Bayes factor alone: {best}\")\n",
+    "print(\n",
+    "    f\"Best among the models that pass their tests: \"\n",
+    "    f\"{screen.loc[passing, 'log ML vs best'].idxmax() if len(passing) else 'none'}\"\n",
+    ")\n",
+    "print(f\"End of the walk: {path[-1]}\")\n",
+    "screen.sort_values(\"log ML vs best\", ascending=False).round(3)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "46",
+   "metadata": {},
+   "source": [
+    "## See how the spatial parameter moves across models\n",
+    "\n",
+    "This cell compares posterior means/intervals for the spatial scalar where present:\n",
+    "\n",
+    "* `rho` in SAR/SDM\n",
+    "* `lam` in SEM/SDEM\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "47",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Compare spatial parameters across models\n",
+    "spatial_rows = []\n",
+    "for name, model, var in [\n",
+    "    (\"SAR\", sar, \"rho\"),\n",
+    "    (\"SEM\", sem, \"lam\"),\n",
+    "    (\"SDM\", sdm, \"rho\"),\n",
+    "    (\"SDEM\", sdem, \"lam\"),\n",
+    "]:\n",
+    "    if var in model.inference_data.posterior:\n",
+    "        summary = az.summary(model.inference_data, var_names=[var], round_to=3)\n",
+    "        summary.insert(0, \"model\", name)\n",
+    "        spatial_rows.append(summary)\n",
+    "\n",
+    "pd.concat(spatial_rows)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "48",
+   "metadata": {},
+   "source": [
+    "## Where to go next\n",
+    "\n",
+    "- [How to run Bayesian LM specification tests](../how-to/bayesian_lmtests.ipynb)\n",
+    "  — the tests used above, in full\n",
+    "- [How to run spatial block cross-validation](../how-to/spatial_cv_demo.ipynb)\n",
+    "  — an out-of-sample check on the specification you chose\n",
+    "- [How to set priors](../how-to/priors.ipynb)\n",
+    "- [Supported Models](../models.md) — every model and its equations"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "bayespreg",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.14.4"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

@@ -1,0 +1,5610 @@
+
+
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="pedagogical_spatial_models.html">
+      
+      
+        <link rel="next" href="../how-to/priors.html">
+      
+      
+      <link rel="icon" href="../_static/pysal_favicon.ico">
+    
+    
+      
+        <title>Spatial panel models: a walkthrough - neighbayes</title>
+      
+    
+    
+      
+        
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+        <link rel="stylesheet" type="text/css" href="../_static/sphinx_immaterial_theme.6efbe22605a23fcd6.min.css?v=b2ceb110" />
+        <link rel="stylesheet" type="text/css" href="../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
+        <link rel="stylesheet" type="text/css" href="../_static/copybutton.css?v=76b2166b" />
+        <link rel="stylesheet" type="text/css" href="../_static/custom.css?v=93c5fc88" />
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#build-the-panel" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="neighbayes" class="md-header__button md-logo" aria-label="neighbayes" data-md-component="logo">
+      <img src="../_static/pysal_logo.svg" alt="logo">
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            neighbayes
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Spatial panel models: a walkthrough
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="m14.3 16-.7-2h-3.2l-.7 2H7.8L11 7h2l3.2 9zM20 8.69V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12zm-9.15 3.96h2.3L12 9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="black" data-md-color-accent="red"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_2" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-7 7c0 2.38 1.19 4.47 3 5.74V17a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1v-2.26c1.81-1.27 3-3.36 3-5.74a7 7 0 0 0-7-7M9 21a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1v-1H9z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="black" data-md-color-accent="red"  aria-label="Switch to system preference"  type="radio" name="__palette" id="__palette_2">
+    
+      <label class="md-header__button md-icon" title="Switch to system preference" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 1 7 7c0 2.38-1.19 4.47-3 5.74V17a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1v-2.26C6.19 13.47 5 11.38 5 9a7 7 0 0 1 7-7M9 21v-1h6v1a1 1 0 0 1-1 1h-4a1 1 0 0 1-1-1m3-17a5 5 0 0 0-5 5c0 2.05 1.23 3.81 3 4.58V16h4v-2.42c1.77-.77 3-2.53 3-4.58a5 5 0 0 0-5-5"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      <label class="md-header__button md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+      </label>
+      <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/pysal/neighbayes/" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    pysal/neighbayes
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="neighbayes" class="md-nav__button md-logo" aria-label="neighbayes" data-md-component="logo">
+      <img src="../_static/pysal_logo.svg" alt="logo">
+    </a>
+    neighbayes
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/pysal/neighbayes/" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 496 512"><!--! Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2024 Fonticons, Inc.--><path d="M165.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M244.8 8C106.1 8 0 113.3 0 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C428.2 457.8 496 362.9 496 252 496 113.3 383.5 8 244.8 8M97.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    pysal/neighbayes
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Home</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Installation</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>Tutorial</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Tutorial</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="quickstart.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Getting Started with neighbayes</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="pedagogical_spatial_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Bayesian spatial models:<wbr> a walkthrough</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    <span>Spatial panel models:<wbr> a walkthrough</span>
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="#" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Spatial panel models:<wbr> a walkthrough</span>
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary">
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#build-the-panel" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Build the panel</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-helper-to-keep-the-fits-short" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>A helper to keep the fits short</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#start-without-any-spatial-term" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Start without any spatial term</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#add-a-spatial-lag-on-the-outcome" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Add a spatial lag on the outcome</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#try-spatial-structure-in-the-errors-instead" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Try spatial structure in the errors instead</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#combine-both-channels" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Combine both channels</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-error-side-combination" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>The error-<wbr>side combination</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The error-side combination">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#check-the-chains-before-comparing-anything" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Check the chains before comparing anything</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#swap-fixed-effects-for-random-effects" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Swap fixed effects for random effects</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Swap fixed effects for random effects">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-non-spatial-random-effects-baseline" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>The non-<wbr>spatial random-<wbr>effects baseline</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#random-effects-with-a-spatial-lag" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Random effects with a spatial lag</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#random-effects-with-spatial-errors" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Random effects with spatial errors</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compare-what-you-have-fitted" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Compare what you have fitted</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#let-the-tests-pick-the-specification" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Let the tests pick the specification</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Let the tests pick the specification">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#start-from-the-fixed-effects-ols-panel" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Start from the fixed-<wbr>effects OLS panel</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refit-and-ask-again" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Refit, and ask again</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-go-next" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Where to go next</span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>How-<wbr>to guides</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            <span>How-<wbr>to guides</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/priors.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to set priors</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/gibbs_sampler.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to choose and configure the Gibbs sampler</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/spatial_logit.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to fit a spatial logit model</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/negbin_estimation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to estimate spatial negative binomial models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/zinb_estimation.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to fit zero-<wbr>inflated SAR negative binomial models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/poisson_flow.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to estimate Poisson origin–destination flow models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/tobit_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to fit spatial tobit models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/tobit_panel_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to fit spatial tobit panel models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/flow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to estimate origin–destination flow models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/panel_flow_models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to estimate panel flow models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/bayesian_lmtests.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to run Bayesian LM specification tests</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/spatial_cv_demo.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to run spatial block cross-<wbr>validation</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../how-to/prediction.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>How to predict at new locations</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>Explanation</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Explanation</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../concept.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Why neighbayes</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../architecture.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Architecture</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>Reference</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Reference</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../models.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Supported Models</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>API reference</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../references.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>References</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>Validation</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Validation</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../validation/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>External Validation &amp; Replication</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>Performance</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            <span>Performance</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../performance/index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Performance &amp; Profiling</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    <span>For contributors</span>
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            <span>For contributors</span>
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/knaaptime/neighbayes" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Git<wbr>Hub</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://github.com/knaaptime/neighbayes/releases" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    <span>Changelog</span>
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary">
+  
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#build-the-panel" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Build the panel</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#a-helper-to-keep-the-fits-short" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>A helper to keep the fits short</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#start-without-any-spatial-term" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Start without any spatial term</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#add-a-spatial-lag-on-the-outcome" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Add a spatial lag on the outcome</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#try-spatial-structure-in-the-errors-instead" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Try spatial structure in the errors instead</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#combine-both-channels" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Combine both channels</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-error-side-combination" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>The error-<wbr>side combination</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="The error-side combination">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#check-the-chains-before-comparing-anything" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Check the chains before comparing anything</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#swap-fixed-effects-for-random-effects" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Swap fixed effects for random effects</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Swap fixed effects for random effects">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-non-spatial-random-effects-baseline" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>The non-<wbr>spatial random-<wbr>effects baseline</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#random-effects-with-a-spatial-lag" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Random effects with a spatial lag</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#random-effects-with-spatial-errors" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Random effects with spatial errors</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#compare-what-you-have-fitted" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Compare what you have fitted</span>
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#let-the-tests-pick-the-specification" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Let the tests pick the specification</span>
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Let the tests pick the specification">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#start-from-the-fixed-effects-ols-panel" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Start from the fixed-<wbr>effects OLS panel</span>
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#refit-and-ask-again" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Refit, and ask again</span>
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#where-to-go-next" class="md-nav__link">
+    
+    <span class="md-ellipsis">
+      <span>Where to go next</span>
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              <article class="md-content__inner md-typeset" role="main">
+                
+                
+                  
+
+
+  
+    <a href="https://github.com/pysal/neighbayes/blob/main/docs/tutorial/pedagogical_panel_models.ipynb" title="Edit this page" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 9h5.5L13 3.5zM6 2h8l6 6v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4c0-1.11.89-2 2-2m.12 13.5 3.74 3.74 1.42-1.41-2.33-2.33 2.33-2.33-1.42-1.41zm11.16 0-3.74-3.74-1.42 1.41 2.33 2.33-2.33 2.33 1.42 1.41z"/></svg>
+    </a>
+  
+  
+
+<h1 id="spatial-panel-models-a-walkthrough">Spatial panel models: a walkthrough<a class="headerlink" href="#spatial-panel-models-a-walkthrough" title="Link to this heading">¶</a></h1>
+<p>By the end of this lesson you will have built a balanced panel, fitted the
+fixed-effects and random-effects families to it, compared them, and used the
+panel specification tests to choose the spatial terms the data support.</p>
+<p>It assumes you have been through
+<a class="reference internal" href="pedagogical_spatial_models.html"><span class="std std-doc">the cross-sectional walkthrough</span></a>; the models
+here are its panel counterparts. Work through the cells in order.</p>
+<p>A panel stacks the same units across periods, which adds two things the
+cross-sectional models did not have: unit effects <span class="math notranslate nohighlight">\(a_i\)</span> and time effects
+<span class="math notranslate nohighlight">\(\tau_t\)</span>. The <code class="docutils literal notranslate"><span class="pre">effects</span></code> argument controls which are included.</p>
+<p>The equations for each class are in <a class="reference internal" href="../models.html"><span class="std std-doc">Supported Models</span></a>.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">arviz</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">az</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">matplotlib.pyplot</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">plt</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">libpysal.graph</span><span class="w"> </span><span class="kn">import</span> <span class="n">Graph</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes</span><span class="w"> </span><span class="kn">import</span> <span class="n">dgp</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.models</span><span class="w"> </span><span class="kn">import</span> <span class="n">OLS</span><span class="p">,</span> <span class="n">SAR</span><span class="p">,</span> <span class="n">SDEM</span><span class="p">,</span> <span class="n">SDM</span><span class="p">,</span> <span class="n">SEM</span>
+
+<span class="n">az</span><span class="o">.</span><span class="n">style</span><span class="o">.</span><span class="n">use</span><span class="p">(</span><span class="s2">"arviz-variat"</span><span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+</div>
+<h2 id="build-the-panel">Build the panel<a class="headerlink" href="#build-the-panel" title="Link to this heading">¶</a></h2>
+<p>For pedagogy, we generate synthetic panel data from the <code class="docutils literal notranslate"><span class="pre">neighbayes.dgp</span></code> module on a regular polygon grid and then assemble a formula-ready DataFrame.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="c1"># Generate base geometry via cross-sectional DGP, then simulate panel data via panel DGP.</span>
+<span class="n">rng</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">default_rng</span><span class="p">(</span><span class="mi">2026</span><span class="p">)</span>
+<span class="n">xcols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"poverty"</span><span class="p">,</span> <span class="s2">"rev_rating"</span><span class="p">,</span> <span class="s2">"num_spots"</span><span class="p">,</span> <span class="s2">"crowded"</span><span class="p">]</span>
+<span class="n">ycol</span> <span class="o">=</span> <span class="s2">"price_pp"</span>
+
+<span class="n">base_gdf</span> <span class="o">=</span> <span class="n">dgp</span><span class="o">.</span><span class="n">simulate_sar</span><span class="p">(</span>
+    <span class="n">n_side</span><span class="o">=</span><span class="mi">20</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">2026</span><span class="p">,</span> <span class="n">create_gdf</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">geometry_type</span><span class="o">=</span><span class="s2">"polygon"</span>
+<span class="p">)</span>
+<span class="n">W</span> <span class="o">=</span> <span class="n">Graph</span><span class="o">.</span><span class="n">build_contiguity</span><span class="p">(</span><span class="n">base_gdf</span><span class="p">,</span> <span class="n">rook</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">transform</span><span class="p">(</span><span class="s2">"r"</span><span class="p">)</span>
+<span class="n">N</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">base_gdf</span><span class="p">)</span>
+<span class="n">T</span> <span class="o">=</span> <span class="mi">4</span>
+<span class="n">beta</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">1.5</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.8</span><span class="p">,</span> <span class="mf">0.6</span><span class="p">,</span> <span class="mf">0.4</span><span class="p">,</span> <span class="o">-</span><span class="mf">0.5</span><span class="p">],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+
+<span class="n">panel_sim</span> <span class="o">=</span> <span class="n">dgp</span><span class="o">.</span><span class="n">simulate_sar</span><span class="p">(</span>
+    <span class="n">N</span><span class="o">=</span><span class="n">N</span><span class="p">,</span>
+    <span class="n">T</span><span class="o">=</span><span class="n">T</span><span class="p">,</span>
+    <span class="n">rho</span><span class="o">=</span><span class="mf">0.35</span><span class="p">,</span>
+    <span class="n">beta</span><span class="o">=</span><span class="n">beta</span><span class="p">,</span>
+    <span class="n">sigma</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">rng</span><span class="o">=</span><span class="n">rng</span><span class="p">,</span>
+    <span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span>
+    <span class="n">unit_effects</span><span class="o">=</span><span class="s2">"fixed"</span><span class="p">,</span>
+    <span class="n">unit_effect_sd</span><span class="o">=</span><span class="mf">0.5</span><span class="p">,</span>
+<span class="p">)</span>
+
+<span class="n">panel</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+    <span class="p">{</span>
+        <span class="s2">"unit"</span><span class="p">:</span> <span class="n">panel_sim</span><span class="p">[</span><span class="s2">"unit"</span><span class="p">],</span>
+        <span class="s2">"time"</span><span class="p">:</span> <span class="n">panel_sim</span><span class="p">[</span><span class="s2">"time"</span><span class="p">],</span>
+        <span class="n">ycol</span><span class="p">:</span> <span class="n">panel_sim</span><span class="p">[</span><span class="s2">"y"</span><span class="p">],</span>
+    <span class="p">}</span>
+<span class="p">)</span>
+<span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">name</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">xcols</span><span class="p">,</span> <span class="n">start</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+    <span class="n">panel</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">panel_sim</span><span class="p">[</span><span class="s2">"X"</span><span class="p">][:,</span> <span class="n">j</span><span class="p">]</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/home/runner/micromamba/envs/test/lib/python3.14/site-packages/tqdm/auto.py:21: TqdmWarning: IProgress not found. Please update jupyter and ipywidgets. See https://ipywidgets.readthedocs.io/en/stable/user_install.html
+  from .autonotebook import tqdm as notebook_tqdm
+</code></pre></div>
+</div>
+</div>
+</div>
+<h2 id="a-helper-to-keep-the-fits-short">A helper to keep the fits short<a class="headerlink" href="#a-helper-to-keep-the-fits-short" title="Link to this heading">¶</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">fit_panel_model</span><span class="p">(</span>
+    <span class="n">model_cls</span><span class="p">,</span> <span class="n">formula</span><span class="p">,</span> <span class="n">data</span><span class="p">,</span> <span class="n">W</span><span class="p">,</span> <span class="n">draws</span><span class="o">=</span><span class="mi">2000</span><span class="p">,</span> <span class="n">tune</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">chains</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span><span class="p">,</span> <span class="o">**</span><span class="n">design</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Fit a panel model and return (model, summary, effects_df).</span>
+
+<span class="sd">    Uses minimal MCMC settings for pedagogical demonstration.</span>
+<span class="sd">    Increase draws/tune for real analyses.</span>
+<span class="sd">    """</span>
+    <span class="n">m</span> <span class="o">=</span> <span class="n">model_cls</span><span class="p">(</span>
+        <span class="n">formula</span><span class="o">=</span><span class="n">formula</span><span class="p">,</span>
+        <span class="n">data</span><span class="o">=</span><span class="n">data</span><span class="p">,</span>
+        <span class="n">W</span><span class="o">=</span><span class="n">W</span><span class="p">,</span>
+        <span class="n">unit_col</span><span class="o">=</span><span class="s2">"unit"</span><span class="p">,</span>
+        <span class="n">time_col</span><span class="o">=</span><span class="s2">"time"</span><span class="p">,</span>
+        <span class="o">**</span><span class="n">design</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">m</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span>
+        <span class="n">draws</span><span class="o">=</span><span class="n">draws</span><span class="p">,</span>
+        <span class="n">tune</span><span class="o">=</span><span class="n">tune</span><span class="p">,</span>
+        <span class="n">chains</span><span class="o">=</span><span class="n">chains</span><span class="p">,</span>
+        <span class="n">random_seed</span><span class="o">=</span><span class="n">seed</span><span class="p">,</span>
+        <span class="n">progressbar</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">summary</span> <span class="o">=</span> <span class="n">m</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="n">round_to</span><span class="o">=</span><span class="mi">3</span><span class="p">)</span>
+    <span class="n">effects_df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span><span class="n">m</span><span class="o">.</span><span class="n">impacts</span><span class="p">())</span>
+    <span class="k">return</span> <span class="n">m</span><span class="p">,</span> <span class="n">summary</span><span class="p">,</span> <span class="n">effects_df</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">diagnostics_table</span><span class="p">(</span><span class="n">idata</span><span class="p">,</span> <span class="n">var_names</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Show key MCMC diagnostics for the given parameters."""</span>
+    <span class="n">cols</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"mean"</span><span class="p">,</span> <span class="s2">"sd"</span><span class="p">,</span> <span class="s2">"ess_bulk"</span><span class="p">,</span> <span class="s2">"ess_tail"</span><span class="p">,</span> <span class="s2">"r_hat"</span><span class="p">]</span>
+    <span class="k">return</span> <span class="n">az</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="n">idata</span><span class="p">,</span> <span class="n">var_names</span><span class="o">=</span><span class="n">var_names</span><span class="p">,</span> <span class="n">round_to</span><span class="o">=</span><span class="mi">3</span><span class="p">)[</span><span class="n">cols</span><span class="p">]</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">show_trace</span><span class="p">(</span><span class="n">idata</span><span class="p">,</span> <span class="n">var_names</span><span class="p">,</span> <span class="n">title</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Plot trace plots for the given parameters."""</span>
+    <span class="n">az</span><span class="o">.</span><span class="n">plot_trace_dist</span><span class="p">(</span><span class="n">idata</span><span class="p">,</span> <span class="n">var_names</span><span class="o">=</span><span class="n">var_names</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">suptitle</span><span class="p">(</span><span class="n">title</span><span class="p">,</span> <span class="n">y</span><span class="o">=</span><span class="mf">1.02</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">tight_layout</span><span class="p">()</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">show</span><span class="p">()</span>
+</code></pre></div>
+</div>
+</div>
+</div>
+<h2 id="start-without-any-spatial-term">Start without any spatial term<a class="headerlink" href="#start-without-any-spatial-term" title="Link to this heading">¶</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">formula</span> <span class="o">=</span> <span class="s2">"price_pp ~ poverty + rev_rating + num_spots + crowded"</span>
+<span class="n">ols_panel</span><span class="p">,</span> <span class="n">summary_ols</span><span class="p">,</span> <span class="n">effects_ols</span> <span class="o">=</span> <span class="n">fit_panel_model</span><span class="p">(</span>
+    <span class="n">OLS</span><span class="p">,</span> <span class="n">formula</span><span class="p">,</span> <span class="n">panel</span><span class="p">,</span> <span class="n">W</span><span class="p">,</span> <span class="n">unit_effects</span><span class="o">=</span><span class="s2">"fixed"</span><span class="p">,</span> <span class="n">time_effects</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">)</span>
+<span class="n">display</span><span class="p">(</span><span class="n">summary_ols</span><span class="p">)</span>
+<span class="n">display</span><span class="p">(</span><span class="n">effects_ols</span><span class="p">)</span>
+<span class="n">display</span><span class="p">(</span><span class="n">diagnostics_table</span><span class="p">(</span><span class="n">ols_panel</span><span class="o">.</span><span class="n">inference_data</span><span class="p">,</span> <span class="p">[</span><span class="s2">"beta"</span><span class="p">,</span> <span class="s2">"sigma"</span><span class="p">]))</span>
+<span class="n">show_trace</span><span class="p">(</span><span class="n">ols_panel</span><span class="o">.</span><span class="n">inference_data</span><span class="p">,</span> <span class="p">[</span><span class="s2">"sigma"</span><span class="p">],</span> <span class="s2">"OLS, two-way fixed effects: trace"</span><span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (2 chains in 2 jobs)
+NUTS: [beta, sigma2]
+Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 2 seconds.
+We recommend running at least 4 chains for robust computation of convergence diagnostics
+/tmp/ipykernel_8842/4084804720.py:39: UserWarning: The figure layout has changed to tight
+  plt.tight_layout()
+</code></pre></div>
+</div>
+<div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">/home/runner/micromamba/envs/test/lib/python3.14/site-packages/rich/live.py:260: UserWarning: install "ipywidgets" 
+for Jupyter support
+  warnings.warn('install "ipywidgets" for Jupyter support')
+</pre>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
+</div><div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>mean</th>
+      <th>sd</th>
+      <th>eti89_lb</th>
+      <th>eti89_ub</th>
+      <th>ess_bulk</th>
+      <th>ess_tail</th>
+      <th>r_hat</th>
+      <th>mcse_mean</th>
+      <th>mcse_sd</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>poverty</th>
+      <td>-0.753</td>
+      <td>0.029</td>
+      <td>-0.799</td>
+      <td>-0.706</td>
+      <td>5146.424</td>
+      <td>3241.347</td>
+      <td>1.000</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>rev_rating</th>
+      <td>0.596</td>
+      <td>0.030</td>
+      <td>0.548</td>
+      <td>0.644</td>
+      <td>5144.201</td>
+      <td>3061.237</td>
+      <td>1.000</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>num_spots</th>
+      <td>0.453</td>
+      <td>0.030</td>
+      <td>0.405</td>
+      <td>0.502</td>
+      <td>4937.642</td>
+      <td>3021.793</td>
+      <td>1.000</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>crowded</th>
+      <td>-0.538</td>
+      <td>0.029</td>
+      <td>-0.584</td>
+      <td>-0.493</td>
+      <td>5460.414</td>
+      <td>3128.393</td>
+      <td>1.000</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>sigma2</th>
+      <td>1.054</td>
+      <td>0.044</td>
+      <td>0.986</td>
+      <td>1.125</td>
+      <td>4319.773</td>
+      <td>2998.505</td>
+      <td>1.001</td>
+      <td>0.001</td>
+      <td>0.001</td>
+    </tr>
+    <tr>
+      <th>sigma</th>
+      <td>1.026</td>
+      <td>0.021</td>
+      <td>0.993</td>
+      <td>1.061</td>
+      <td>4319.773</td>
+      <td>2998.505</td>
+      <td>1.001</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>direct</th>
+      <th>direct_ci_lower</th>
+      <th>direct_ci_upper</th>
+      <th>direct_pvalue</th>
+      <th>indirect</th>
+      <th>indirect_ci_lower</th>
+      <th>indirect_ci_upper</th>
+      <th>indirect_pvalue</th>
+      <th>total</th>
+      <th>total_ci_lower</th>
+      <th>total_ci_upper</th>
+      <th>total_pvalue</th>
+    </tr>
+    <tr>
+      <th>variable</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>poverty</th>
+      <td>-0.752649</td>
+      <td>-0.808878</td>
+      <td>-0.695722</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>-0.752649</td>
+      <td>-0.808878</td>
+      <td>-0.695722</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>rev_rating</th>
+      <td>0.596407</td>
+      <td>0.537113</td>
+      <td>0.653747</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.596407</td>
+      <td>0.537113</td>
+      <td>0.653747</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>num_spots</th>
+      <td>0.453416</td>
+      <td>0.393250</td>
+      <td>0.513407</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.453416</td>
+      <td>0.393250</td>
+      <td>0.513407</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>crowded</th>
+      <td>-0.538292</td>
+      <td>-0.593885</td>
+      <td>-0.482205</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>-0.538292</td>
+      <td>-0.593885</td>
+      <td>-0.482205</td>
+      <td>0.0</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>mean</th>
+      <th>sd</th>
+      <th>ess_bulk</th>
+      <th>ess_tail</th>
+      <th>r_hat</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>beta[poverty]</th>
+      <td>-0.753</td>
+      <td>0.029</td>
+      <td>5146.424</td>
+      <td>3241.347</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>beta[rev_rating]</th>
+      <td>0.596</td>
+      <td>0.030</td>
+      <td>5144.201</td>
+      <td>3061.237</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>beta[num_spots]</th>
+      <td>0.453</td>
+      <td>0.030</td>
+      <td>4937.642</td>
+      <td>3021.793</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>beta[crowded]</th>
+      <td>-0.538</td>
+      <td>0.029</td>
+      <td>5460.414</td>
+      <td>3128.393</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>sigma</th>
+      <td>1.026</td>
+      <td>0.021</td>
+      <td>4319.773</td>
+      <td>2998.505</td>
+      <td>1.001</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><img alt="../_images/ff0e7eda80b4fbb991b79d917d8b8afbdbc76c3a6c0013be7dbaf1ab6292a390.png" src="../_images/ff0e7eda80b4fbb991b79d917d8b8afbdbc76c3a6c0013be7dbaf1ab6292a390.png" />
+</div>
+</div>
+<h2 id="add-a-spatial-lag-on-the-outcome">Add a spatial lag on the outcome<a class="headerlink" href="#add-a-spatial-lag-on-the-outcome" title="Link to this heading">¶</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">sar_panel</span><span class="p">,</span> <span class="n">summary_sar</span><span class="p">,</span> <span class="n">effects_sar</span> <span class="o">=</span> <span class="n">fit_panel_model</span><span class="p">(</span>
+    <span class="n">SAR</span><span class="p">,</span> <span class="n">formula</span><span class="p">,</span> <span class="n">panel</span><span class="p">,</span> <span class="n">W</span><span class="p">,</span> <span class="n">unit_effects</span><span class="o">=</span><span class="s2">"fixed"</span><span class="p">,</span> <span class="n">time_effects</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">)</span>
+<span class="n">display</span><span class="p">(</span><span class="n">summary_sar</span><span class="p">)</span>
+<span class="n">display</span><span class="p">(</span><span class="n">effects_sar</span><span class="p">)</span>
+<span class="n">display</span><span class="p">(</span><span class="n">diagnostics_table</span><span class="p">(</span><span class="n">sar_panel</span><span class="o">.</span><span class="n">inference_data</span><span class="p">,</span> <span class="p">[</span><span class="s2">"rho"</span><span class="p">,</span> <span class="s2">"beta"</span><span class="p">,</span> <span class="s2">"sigma"</span><span class="p">]))</span>
+<span class="n">show_trace</span><span class="p">(</span>
+    <span class="n">sar_panel</span><span class="o">.</span><span class="n">inference_data</span><span class="p">,</span> <span class="p">[</span><span class="s2">"rho"</span><span class="p">,</span> <span class="s2">"sigma"</span><span class="p">],</span> <span class="s2">"SAR, two-way fixed effects: trace"</span>
+<span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Gibbs sampling <span style="font-weight: bold">(</span>sar<span style="font-weight: bold">)</span>: <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span> chains for <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> tune and <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> draw iterations <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span> x <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">3</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> = <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">6</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> draws total<span style="font-weight: bold">)</span>
+</pre>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">/home/runner/micromamba/envs/test/lib/python3.14/site-packages/rich/live.py:260: UserWarning: install "ipywidgets" 
+for Jupyter support
+  warnings.warn('install "ipywidgets" for Jupyter support')
+</pre>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 1s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">608</span> draws/s<span style="font-weight: bold">)</span>
+</pre>
+</div><div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>mean</th>
+      <th>sd</th>
+      <th>eti89_lb</th>
+      <th>eti89_ub</th>
+      <th>ess_bulk</th>
+      <th>ess_tail</th>
+      <th>r_hat</th>
+      <th>mcse_mean</th>
+      <th>mcse_sd</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>rho</th>
+      <td>0.303</td>
+      <td>0.037</td>
+      <td>0.244</td>
+      <td>0.362</td>
+      <td>4128.046</td>
+      <td>2941.614</td>
+      <td>1.000</td>
+      <td>0.001</td>
+      <td>0.001</td>
+    </tr>
+    <tr>
+      <th>sigma</th>
+      <td>0.992</td>
+      <td>0.020</td>
+      <td>0.960</td>
+      <td>1.026</td>
+      <td>3530.036</td>
+      <td>3616.713</td>
+      <td>1.000</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>sigma2</th>
+      <td>0.985</td>
+      <td>0.041</td>
+      <td>0.921</td>
+      <td>1.052</td>
+      <td>3530.036</td>
+      <td>3616.713</td>
+      <td>1.000</td>
+      <td>0.001</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>poverty</th>
+      <td>-0.753</td>
+      <td>0.029</td>
+      <td>-0.799</td>
+      <td>-0.706</td>
+      <td>4045.926</td>
+      <td>3877.529</td>
+      <td>1.001</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>rev_rating</th>
+      <td>0.583</td>
+      <td>0.029</td>
+      <td>0.537</td>
+      <td>0.629</td>
+      <td>4114.031</td>
+      <td>3967.458</td>
+      <td>1.000</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>num_spots</th>
+      <td>0.449</td>
+      <td>0.030</td>
+      <td>0.402</td>
+      <td>0.496</td>
+      <td>3919.654</td>
+      <td>3741.270</td>
+      <td>1.000</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>crowded</th>
+      <td>-0.526</td>
+      <td>0.028</td>
+      <td>-0.569</td>
+      <td>-0.480</td>
+      <td>4104.054</td>
+      <td>3875.785</td>
+      <td>1.000</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>direct</th>
+      <th>direct_ci_lower</th>
+      <th>direct_ci_upper</th>
+      <th>direct_pvalue</th>
+      <th>indirect</th>
+      <th>indirect_ci_lower</th>
+      <th>indirect_ci_upper</th>
+      <th>indirect_pvalue</th>
+      <th>total</th>
+      <th>total_ci_lower</th>
+      <th>total_ci_upper</th>
+      <th>total_pvalue</th>
+    </tr>
+    <tr>
+      <th>variable</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>poverty</th>
+      <td>-0.763838</td>
+      <td>-0.821304</td>
+      <td>-0.705877</td>
+      <td>0.0</td>
+      <td>-0.318541</td>
+      <td>-0.434341</td>
+      <td>-0.213726</td>
+      <td>0.0</td>
+      <td>-1.082379</td>
+      <td>-1.228900</td>
+      <td>-0.949123</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>rev_rating</th>
+      <td>0.591966</td>
+      <td>0.536176</td>
+      <td>0.648355</td>
+      <td>0.0</td>
+      <td>0.246746</td>
+      <td>0.166032</td>
+      <td>0.335478</td>
+      <td>0.0</td>
+      <td>0.838711</td>
+      <td>0.727284</td>
+      <td>0.959190</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>num_spots</th>
+      <td>0.455488</td>
+      <td>0.396960</td>
+      <td>0.515855</td>
+      <td>0.0</td>
+      <td>0.189872</td>
+      <td>0.127004</td>
+      <td>0.262877</td>
+      <td>0.0</td>
+      <td>0.645360</td>
+      <td>0.544333</td>
+      <td>0.754890</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>crowded</th>
+      <td>-0.533414</td>
+      <td>-0.587766</td>
+      <td>-0.478410</td>
+      <td>0.0</td>
+      <td>-0.222288</td>
+      <td>-0.303142</td>
+      <td>-0.150861</td>
+      <td>0.0</td>
+      <td>-0.755702</td>
+      <td>-0.867996</td>
+      <td>-0.652710</td>
+      <td>0.0</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>mean</th>
+      <th>sd</th>
+      <th>ess_bulk</th>
+      <th>ess_tail</th>
+      <th>r_hat</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>rho</th>
+      <td>0.303</td>
+      <td>0.037</td>
+      <td>4128.046</td>
+      <td>2941.614</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>beta[poverty]</th>
+      <td>-0.753</td>
+      <td>0.029</td>
+      <td>4045.926</td>
+      <td>3877.529</td>
+      <td>1.001</td>
+    </tr>
+    <tr>
+      <th>beta[rev_rating]</th>
+      <td>0.583</td>
+      <td>0.029</td>
+      <td>4114.031</td>
+      <td>3967.458</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>beta[num_spots]</th>
+      <td>0.449</td>
+      <td>0.030</td>
+      <td>3919.654</td>
+      <td>3741.270</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>beta[crowded]</th>
+      <td>-0.526</td>
+      <td>0.028</td>
+      <td>4104.054</td>
+      <td>3875.785</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>sigma</th>
+      <td>0.992</td>
+      <td>0.020</td>
+      <td>3530.036</td>
+      <td>3616.713</td>
+      <td>1.000</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_8842/4084804720.py:39: UserWarning: The figure layout has changed to tight
+  plt.tight_layout()
+</code></pre></div>
+</div>
+<img alt="../_images/3d660c61daf9196ff57cd98c2960da5071e6bc816d4cf0e6709509677a7a7b3f.png" src="../_images/3d660c61daf9196ff57cd98c2960da5071e6bc816d4cf0e6709509677a7a7b3f.png" />
+</div>
+</div>
+<h2 id="try-spatial-structure-in-the-errors-instead">Try spatial structure in the errors instead<a class="headerlink" href="#try-spatial-structure-in-the-errors-instead" title="Link to this heading">¶</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">sem_panel</span><span class="p">,</span> <span class="n">summary_sem</span><span class="p">,</span> <span class="n">effects_sem</span> <span class="o">=</span> <span class="n">fit_panel_model</span><span class="p">(</span>
+    <span class="n">SEM</span><span class="p">,</span> <span class="n">formula</span><span class="p">,</span> <span class="n">panel</span><span class="p">,</span> <span class="n">W</span><span class="p">,</span> <span class="n">unit_effects</span><span class="o">=</span><span class="s2">"fixed"</span><span class="p">,</span> <span class="n">time_effects</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">)</span>
+<span class="n">display</span><span class="p">(</span><span class="n">summary_sem</span><span class="p">)</span>
+<span class="n">display</span><span class="p">(</span><span class="n">effects_sem</span><span class="p">)</span>
+<span class="n">display</span><span class="p">(</span><span class="n">diagnostics_table</span><span class="p">(</span><span class="n">sem_panel</span><span class="o">.</span><span class="n">inference_data</span><span class="p">,</span> <span class="p">[</span><span class="s2">"lam"</span><span class="p">,</span> <span class="s2">"beta"</span><span class="p">,</span> <span class="s2">"sigma"</span><span class="p">]))</span>
+<span class="n">show_trace</span><span class="p">(</span>
+    <span class="n">sem_panel</span><span class="o">.</span><span class="n">inference_data</span><span class="p">,</span> <span class="p">[</span><span class="s2">"lam"</span><span class="p">,</span> <span class="s2">"sigma"</span><span class="p">],</span> <span class="s2">"SEM, two-way fixed effects: trace"</span>
+<span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Gibbs sampling <span style="font-weight: bold">(</span>sem<span style="font-weight: bold">)</span>: <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span> chains for <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> tune and <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> draw iterations <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span> x <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">3</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> = <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">6</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> draws total<span style="font-weight: bold">)</span>
+</pre>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">/home/runner/micromamba/envs/test/lib/python3.14/site-packages/rich/live.py:260: UserWarning: install "ipywidgets" 
+for Jupyter support
+  warnings.warn('install "ipywidgets" for Jupyter support')
+</pre>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 1s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">243</span> draws/s<span style="font-weight: bold">)</span>
+</pre>
+</div><div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>mean</th>
+      <th>sd</th>
+      <th>eti89_lb</th>
+      <th>eti89_ub</th>
+      <th>ess_bulk</th>
+      <th>ess_tail</th>
+      <th>r_hat</th>
+      <th>mcse_mean</th>
+      <th>mcse_sd</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>lam</th>
+      <td>0.345</td>
+      <td>0.047</td>
+      <td>0.270</td>
+      <td>0.420</td>
+      <td>3895.287</td>
+      <td>2628.273</td>
+      <td>1.0</td>
+      <td>0.001</td>
+      <td>0.001</td>
+    </tr>
+    <tr>
+      <th>sigma</th>
+      <td>0.996</td>
+      <td>0.020</td>
+      <td>0.963</td>
+      <td>1.029</td>
+      <td>3445.294</td>
+      <td>3650.738</td>
+      <td>1.0</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>sigma2</th>
+      <td>0.992</td>
+      <td>0.041</td>
+      <td>0.928</td>
+      <td>1.059</td>
+      <td>3445.294</td>
+      <td>3650.738</td>
+      <td>1.0</td>
+      <td>0.001</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>poverty</th>
+      <td>-0.745</td>
+      <td>0.029</td>
+      <td>-0.790</td>
+      <td>-0.699</td>
+      <td>4049.175</td>
+      <td>3710.660</td>
+      <td>1.0</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>rev_rating</th>
+      <td>0.576</td>
+      <td>0.029</td>
+      <td>0.530</td>
+      <td>0.622</td>
+      <td>4081.620</td>
+      <td>3988.041</td>
+      <td>1.0</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>num_spots</th>
+      <td>0.443</td>
+      <td>0.029</td>
+      <td>0.396</td>
+      <td>0.489</td>
+      <td>3919.668</td>
+      <td>3667.374</td>
+      <td>1.0</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>crowded</th>
+      <td>-0.519</td>
+      <td>0.028</td>
+      <td>-0.562</td>
+      <td>-0.474</td>
+      <td>4092.137</td>
+      <td>3914.557</td>
+      <td>1.0</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>direct</th>
+      <th>direct_ci_lower</th>
+      <th>direct_ci_upper</th>
+      <th>direct_pvalue</th>
+      <th>indirect</th>
+      <th>indirect_ci_lower</th>
+      <th>indirect_ci_upper</th>
+      <th>indirect_pvalue</th>
+      <th>total</th>
+      <th>total_ci_lower</th>
+      <th>total_ci_upper</th>
+      <th>total_pvalue</th>
+    </tr>
+    <tr>
+      <th>variable</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>poverty</th>
+      <td>-0.744559</td>
+      <td>-0.800803</td>
+      <td>-0.689103</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>-0.744559</td>
+      <td>-0.800803</td>
+      <td>-0.689103</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>rev_rating</th>
+      <td>0.575939</td>
+      <td>0.520599</td>
+      <td>0.632185</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.575939</td>
+      <td>0.520599</td>
+      <td>0.632185</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>num_spots</th>
+      <td>0.443124</td>
+      <td>0.386502</td>
+      <td>0.502108</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.443124</td>
+      <td>0.386502</td>
+      <td>0.502108</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>crowded</th>
+      <td>-0.518565</td>
+      <td>-0.572012</td>
+      <td>-0.464581</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>-0.518565</td>
+      <td>-0.572012</td>
+      <td>-0.464581</td>
+      <td>0.0</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>mean</th>
+      <th>sd</th>
+      <th>ess_bulk</th>
+      <th>ess_tail</th>
+      <th>r_hat</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>lam</th>
+      <td>0.345</td>
+      <td>0.047</td>
+      <td>3895.287</td>
+      <td>2628.273</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>beta[poverty]</th>
+      <td>-0.745</td>
+      <td>0.029</td>
+      <td>4049.175</td>
+      <td>3710.660</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>beta[rev_rating]</th>
+      <td>0.576</td>
+      <td>0.029</td>
+      <td>4081.620</td>
+      <td>3988.041</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>beta[num_spots]</th>
+      <td>0.443</td>
+      <td>0.029</td>
+      <td>3919.668</td>
+      <td>3667.374</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>beta[crowded]</th>
+      <td>-0.519</td>
+      <td>0.028</td>
+      <td>4092.137</td>
+      <td>3914.557</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>sigma</th>
+      <td>0.996</td>
+      <td>0.020</td>
+      <td>3445.294</td>
+      <td>3650.738</td>
+      <td>1.0</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_8842/4084804720.py:39: UserWarning: The figure layout has changed to tight
+  plt.tight_layout()
+</code></pre></div>
+</div>
+<img alt="../_images/c053b209c77e3e8ccedef2cb022d20deb8aba956e8d37c43dc00ad2490c6571c.png" src="../_images/c053b209c77e3e8ccedef2cb022d20deb8aba956e8d37c43dc00ad2490c6571c.png" />
+</div>
+</div>
+<h2 id="combine-both-channels">Combine both channels<a class="headerlink" href="#combine-both-channels" title="Link to this heading">¶</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">sdm_panel</span><span class="p">,</span> <span class="n">summary_sdm</span><span class="p">,</span> <span class="n">effects_sdm</span> <span class="o">=</span> <span class="n">fit_panel_model</span><span class="p">(</span>
+    <span class="n">SDM</span><span class="p">,</span> <span class="n">formula</span><span class="p">,</span> <span class="n">panel</span><span class="p">,</span> <span class="n">W</span><span class="p">,</span> <span class="n">unit_effects</span><span class="o">=</span><span class="s2">"fixed"</span><span class="p">,</span> <span class="n">time_effects</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">)</span>
+<span class="n">display</span><span class="p">(</span><span class="n">summary_sdm</span><span class="p">)</span>
+<span class="n">display</span><span class="p">(</span><span class="n">effects_sdm</span><span class="p">)</span>
+<span class="n">display</span><span class="p">(</span><span class="n">diagnostics_table</span><span class="p">(</span><span class="n">sdm_panel</span><span class="o">.</span><span class="n">inference_data</span><span class="p">,</span> <span class="p">[</span><span class="s2">"rho"</span><span class="p">,</span> <span class="s2">"beta"</span><span class="p">,</span> <span class="s2">"sigma"</span><span class="p">]))</span>
+<span class="n">show_trace</span><span class="p">(</span>
+    <span class="n">sdm_panel</span><span class="o">.</span><span class="n">inference_data</span><span class="p">,</span> <span class="p">[</span><span class="s2">"rho"</span><span class="p">,</span> <span class="s2">"sigma"</span><span class="p">],</span> <span class="s2">"SDM, two-way fixed effects: trace"</span>
+<span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Gibbs sampling <span style="font-weight: bold">(</span>sdm<span style="font-weight: bold">)</span>: <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span> chains for <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> tune and <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> draw iterations <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span> x <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">3</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> = <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">6</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> draws total<span style="font-weight: bold">)</span>
+</pre>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">/home/runner/micromamba/envs/test/lib/python3.14/site-packages/rich/live.py:260: UserWarning: install "ipywidgets" 
+for Jupyter support
+  warnings.warn('install "ipywidgets" for Jupyter support')
+</pre>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 1s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">4</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">804</span> draws/s<span style="font-weight: bold">)</span>
+</pre>
+</div><div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>mean</th>
+      <th>sd</th>
+      <th>eti89_lb</th>
+      <th>eti89_ub</th>
+      <th>ess_bulk</th>
+      <th>ess_tail</th>
+      <th>r_hat</th>
+      <th>mcse_mean</th>
+      <th>mcse_sd</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>rho</th>
+      <td>0.328</td>
+      <td>0.048</td>
+      <td>0.249</td>
+      <td>0.402</td>
+      <td>3816.393</td>
+      <td>2426.803</td>
+      <td>1.000</td>
+      <td>0.001</td>
+      <td>0.001</td>
+    </tr>
+    <tr>
+      <th>sigma</th>
+      <td>0.992</td>
+      <td>0.020</td>
+      <td>0.960</td>
+      <td>1.025</td>
+      <td>3478.192</td>
+      <td>3583.421</td>
+      <td>1.000</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>sigma2</th>
+      <td>0.984</td>
+      <td>0.041</td>
+      <td>0.921</td>
+      <td>1.051</td>
+      <td>3478.192</td>
+      <td>3583.421</td>
+      <td>1.000</td>
+      <td>0.001</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>poverty</th>
+      <td>-0.751</td>
+      <td>0.029</td>
+      <td>-0.797</td>
+      <td>-0.705</td>
+      <td>4036.534</td>
+      <td>3774.100</td>
+      <td>1.000</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>rev_rating</th>
+      <td>0.583</td>
+      <td>0.029</td>
+      <td>0.537</td>
+      <td>0.629</td>
+      <td>4058.639</td>
+      <td>4013.994</td>
+      <td>1.000</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>num_spots</th>
+      <td>0.447</td>
+      <td>0.030</td>
+      <td>0.400</td>
+      <td>0.494</td>
+      <td>3876.568</td>
+      <td>3782.999</td>
+      <td>1.000</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>crowded</th>
+      <td>-0.524</td>
+      <td>0.028</td>
+      <td>-0.568</td>
+      <td>-0.479</td>
+      <td>4087.255</td>
+      <td>4022.301</td>
+      <td>1.000</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>W*poverty</th>
+      <td>0.122</td>
+      <td>0.085</td>
+      <td>-0.017</td>
+      <td>0.257</td>
+      <td>4170.718</td>
+      <td>3850.074</td>
+      <td>1.000</td>
+      <td>0.001</td>
+      <td>0.001</td>
+    </tr>
+    <tr>
+      <th>W*rev_rating</th>
+      <td>0.006</td>
+      <td>0.085</td>
+      <td>-0.129</td>
+      <td>0.144</td>
+      <td>3878.824</td>
+      <td>3871.117</td>
+      <td>1.000</td>
+      <td>0.001</td>
+      <td>0.001</td>
+    </tr>
+    <tr>
+      <th>W*num_spots</th>
+      <td>-0.067</td>
+      <td>0.083</td>
+      <td>-0.202</td>
+      <td>0.065</td>
+      <td>3937.851</td>
+      <td>3882.432</td>
+      <td>1.001</td>
+      <td>0.001</td>
+      <td>0.001</td>
+    </tr>
+    <tr>
+      <th>W*crowded</th>
+      <td>-0.001</td>
+      <td>0.077</td>
+      <td>-0.125</td>
+      <td>0.119</td>
+      <td>4018.013</td>
+      <td>3797.017</td>
+      <td>1.000</td>
+      <td>0.001</td>
+      <td>0.001</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>direct</th>
+      <th>direct_ci_lower</th>
+      <th>direct_ci_upper</th>
+      <th>direct_pvalue</th>
+      <th>indirect</th>
+      <th>indirect_ci_lower</th>
+      <th>indirect_ci_upper</th>
+      <th>indirect_pvalue</th>
+      <th>total</th>
+      <th>total_ci_lower</th>
+      <th>total_ci_upper</th>
+      <th>total_pvalue</th>
+    </tr>
+    <tr>
+      <th>variable</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>poverty</th>
+      <td>-0.757681</td>
+      <td>-0.815142</td>
+      <td>-0.699400</td>
+      <td>0.0</td>
+      <td>-0.178760</td>
+      <td>-0.397406</td>
+      <td>0.042636</td>
+      <td>0.1030</td>
+      <td>-0.936441</td>
+      <td>-1.179873</td>
+      <td>-0.693781</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>rev_rating</th>
+      <td>0.593194</td>
+      <td>0.535665</td>
+      <td>0.650864</td>
+      <td>0.0</td>
+      <td>0.284146</td>
+      <td>0.054713</td>
+      <td>0.515726</td>
+      <td>0.0165</td>
+      <td>0.877339</td>
+      <td>0.621938</td>
+      <td>1.125549</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>num_spots</th>
+      <td>0.451037</td>
+      <td>0.392042</td>
+      <td>0.513830</td>
+      <td>0.0</td>
+      <td>0.114394</td>
+      <td>-0.122135</td>
+      <td>0.338179</td>
+      <td>0.3095</td>
+      <td>0.565431</td>
+      <td>0.303530</td>
+      <td>0.820773</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>crowded</th>
+      <td>-0.533645</td>
+      <td>-0.588956</td>
+      <td>-0.477566</td>
+      <td>0.0</td>
+      <td>-0.248304</td>
+      <td>-0.455261</td>
+      <td>-0.050543</td>
+      <td>0.0145</td>
+      <td>-0.781949</td>
+      <td>-1.013597</td>
+      <td>-0.563729</td>
+      <td>0.0</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>mean</th>
+      <th>sd</th>
+      <th>ess_bulk</th>
+      <th>ess_tail</th>
+      <th>r_hat</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>rho</th>
+      <td>0.328</td>
+      <td>0.048</td>
+      <td>3816.393</td>
+      <td>2426.803</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>beta[poverty]</th>
+      <td>-0.751</td>
+      <td>0.029</td>
+      <td>4036.534</td>
+      <td>3774.100</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>beta[rev_rating]</th>
+      <td>0.583</td>
+      <td>0.029</td>
+      <td>4058.639</td>
+      <td>4013.994</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>beta[num_spots]</th>
+      <td>0.447</td>
+      <td>0.030</td>
+      <td>3876.568</td>
+      <td>3782.999</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>beta[crowded]</th>
+      <td>-0.524</td>
+      <td>0.028</td>
+      <td>4087.255</td>
+      <td>4022.301</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>beta[W*poverty]</th>
+      <td>0.122</td>
+      <td>0.085</td>
+      <td>4170.718</td>
+      <td>3850.074</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>beta[W*rev_rating]</th>
+      <td>0.006</td>
+      <td>0.085</td>
+      <td>3878.824</td>
+      <td>3871.117</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>beta[W*num_spots]</th>
+      <td>-0.067</td>
+      <td>0.083</td>
+      <td>3937.851</td>
+      <td>3882.432</td>
+      <td>1.001</td>
+    </tr>
+    <tr>
+      <th>beta[W*crowded]</th>
+      <td>-0.001</td>
+      <td>0.077</td>
+      <td>4018.013</td>
+      <td>3797.017</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>sigma</th>
+      <td>0.992</td>
+      <td>0.020</td>
+      <td>3478.192</td>
+      <td>3583.421</td>
+      <td>1.000</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_8842/4084804720.py:39: UserWarning: The figure layout has changed to tight
+  plt.tight_layout()
+</code></pre></div>
+</div>
+<img alt="../_images/0380fcb6ee844c287bc1c272d224850bdf5e49edf1b46069bcb61b883e625ff2.png" src="../_images/0380fcb6ee844c287bc1c272d224850bdf5e49edf1b46069bcb61b883e625ff2.png" />
+</div>
+</div>
+<h2 id="the-error-side-combination">The error-side combination<a class="headerlink" href="#the-error-side-combination" title="Link to this heading">¶</a></h2>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">sdem_panel</span><span class="p">,</span> <span class="n">summary_sdem</span><span class="p">,</span> <span class="n">effects_sdem</span> <span class="o">=</span> <span class="n">fit_panel_model</span><span class="p">(</span>
+    <span class="n">SDEM</span><span class="p">,</span> <span class="n">formula</span><span class="p">,</span> <span class="n">panel</span><span class="p">,</span> <span class="n">W</span><span class="p">,</span> <span class="n">unit_effects</span><span class="o">=</span><span class="s2">"fixed"</span><span class="p">,</span> <span class="n">time_effects</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">)</span>
+<span class="n">display</span><span class="p">(</span><span class="n">summary_sdem</span><span class="p">)</span>
+<span class="n">display</span><span class="p">(</span><span class="n">effects_sdem</span><span class="p">)</span>
+<span class="n">display</span><span class="p">(</span><span class="n">diagnostics_table</span><span class="p">(</span><span class="n">sdem_panel</span><span class="o">.</span><span class="n">inference_data</span><span class="p">,</span> <span class="p">[</span><span class="s2">"lam"</span><span class="p">,</span> <span class="s2">"beta"</span><span class="p">,</span> <span class="s2">"sigma"</span><span class="p">]))</span>
+<span class="n">show_trace</span><span class="p">(</span>
+    <span class="n">sdem_panel</span><span class="o">.</span><span class="n">inference_data</span><span class="p">,</span> <span class="p">[</span><span class="s2">"lam"</span><span class="p">,</span> <span class="s2">"sigma"</span><span class="p">],</span> <span class="s2">"SDEM, two-way fixed effects: trace"</span>
+<span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Gibbs sampling <span style="font-weight: bold">(</span>sdem<span style="font-weight: bold">)</span>: <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span> chains for <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> tune and <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> draw iterations <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span> x <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">3</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> = <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">6</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> draws total<span style="font-weight: bold">)</span>
+</pre>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">/home/runner/micromamba/envs/test/lib/python3.14/site-packages/rich/live.py:260: UserWarning: install "ipywidgets" 
+for Jupyter support
+  warnings.warn('install "ipywidgets" for Jupyter support')
+</pre>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 2s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">3</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">743</span> draws/s<span style="font-weight: bold">)</span>
+</pre>
+</div><div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>mean</th>
+      <th>sd</th>
+      <th>eti89_lb</th>
+      <th>eti89_ub</th>
+      <th>ess_bulk</th>
+      <th>ess_tail</th>
+      <th>r_hat</th>
+      <th>mcse_mean</th>
+      <th>mcse_sd</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>lam</th>
+      <td>0.337</td>
+      <td>0.047</td>
+      <td>0.261</td>
+      <td>0.411</td>
+      <td>3907.902</td>
+      <td>2766.580</td>
+      <td>1.001</td>
+      <td>0.001</td>
+      <td>0.001</td>
+    </tr>
+    <tr>
+      <th>sigma</th>
+      <td>0.991</td>
+      <td>0.020</td>
+      <td>0.959</td>
+      <td>1.024</td>
+      <td>3489.943</td>
+      <td>3567.745</td>
+      <td>1.000</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>sigma2</th>
+      <td>0.982</td>
+      <td>0.041</td>
+      <td>0.919</td>
+      <td>1.049</td>
+      <td>3489.943</td>
+      <td>3567.745</td>
+      <td>1.000</td>
+      <td>0.001</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>poverty</th>
+      <td>-0.758</td>
+      <td>0.030</td>
+      <td>-0.806</td>
+      <td>-0.711</td>
+      <td>3968.129</td>
+      <td>3859.696</td>
+      <td>1.000</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>rev_rating</th>
+      <td>0.593</td>
+      <td>0.029</td>
+      <td>0.546</td>
+      <td>0.640</td>
+      <td>4031.515</td>
+      <td>3971.097</td>
+      <td>1.000</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>num_spots</th>
+      <td>0.449</td>
+      <td>0.031</td>
+      <td>0.401</td>
+      <td>0.499</td>
+      <td>3860.441</td>
+      <td>3803.152</td>
+      <td>1.000</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>crowded</th>
+      <td>-0.534</td>
+      <td>0.029</td>
+      <td>-0.580</td>
+      <td>-0.489</td>
+      <td>4110.969</td>
+      <td>4003.074</td>
+      <td>1.000</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>W*poverty</th>
+      <td>-0.155</td>
+      <td>0.087</td>
+      <td>-0.294</td>
+      <td>-0.015</td>
+      <td>4154.836</td>
+      <td>3822.265</td>
+      <td>1.002</td>
+      <td>0.001</td>
+      <td>0.001</td>
+    </tr>
+    <tr>
+      <th>W*rev_rating</th>
+      <td>0.235</td>
+      <td>0.092</td>
+      <td>0.089</td>
+      <td>0.380</td>
+      <td>3888.949</td>
+      <td>3682.768</td>
+      <td>1.000</td>
+      <td>0.001</td>
+      <td>0.001</td>
+    </tr>
+    <tr>
+      <th>W*num_spots</th>
+      <td>0.073</td>
+      <td>0.092</td>
+      <td>-0.076</td>
+      <td>0.220</td>
+      <td>3974.408</td>
+      <td>3933.013</td>
+      <td>1.001</td>
+      <td>0.001</td>
+      <td>0.001</td>
+    </tr>
+    <tr>
+      <th>W*crowded</th>
+      <td>-0.210</td>
+      <td>0.084</td>
+      <td>-0.344</td>
+      <td>-0.078</td>
+      <td>4002.621</td>
+      <td>3781.014</td>
+      <td>1.000</td>
+      <td>0.001</td>
+      <td>0.001</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>direct</th>
+      <th>direct_ci_lower</th>
+      <th>direct_ci_upper</th>
+      <th>direct_pvalue</th>
+      <th>indirect</th>
+      <th>indirect_ci_lower</th>
+      <th>indirect_ci_upper</th>
+      <th>indirect_pvalue</th>
+      <th>total</th>
+      <th>total_ci_lower</th>
+      <th>total_ci_upper</th>
+      <th>total_pvalue</th>
+    </tr>
+    <tr>
+      <th>variable</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>poverty</th>
+      <td>-0.757950</td>
+      <td>-0.815718</td>
+      <td>-0.699951</td>
+      <td>0.0</td>
+      <td>-0.154850</td>
+      <td>-0.325206</td>
+      <td>0.017886</td>
+      <td>0.0745</td>
+      <td>-0.912800</td>
+      <td>-1.110067</td>
+      <td>-0.715273</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>rev_rating</th>
+      <td>0.592842</td>
+      <td>0.535133</td>
+      <td>0.649795</td>
+      <td>0.0</td>
+      <td>0.234925</td>
+      <td>0.049938</td>
+      <td>0.413909</td>
+      <td>0.0120</td>
+      <td>0.827767</td>
+      <td>0.619166</td>
+      <td>1.027433</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>num_spots</th>
+      <td>0.449289</td>
+      <td>0.390449</td>
+      <td>0.511144</td>
+      <td>0.0</td>
+      <td>0.072909</td>
+      <td>-0.113211</td>
+      <td>0.247810</td>
+      <td>0.4175</td>
+      <td>0.522198</td>
+      <td>0.312261</td>
+      <td>0.727066</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>crowded</th>
+      <td>-0.534346</td>
+      <td>-0.590447</td>
+      <td>-0.478324</td>
+      <td>0.0</td>
+      <td>-0.210196</td>
+      <td>-0.377282</td>
+      <td>-0.049640</td>
+      <td>0.0130</td>
+      <td>-0.744542</td>
+      <td>-0.937623</td>
+      <td>-0.560528</td>
+      <td>0.0</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>mean</th>
+      <th>sd</th>
+      <th>ess_bulk</th>
+      <th>ess_tail</th>
+      <th>r_hat</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>lam</th>
+      <td>0.337</td>
+      <td>0.047</td>
+      <td>3907.902</td>
+      <td>2766.580</td>
+      <td>1.001</td>
+    </tr>
+    <tr>
+      <th>beta[poverty]</th>
+      <td>-0.758</td>
+      <td>0.030</td>
+      <td>3968.129</td>
+      <td>3859.696</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>beta[rev_rating]</th>
+      <td>0.593</td>
+      <td>0.029</td>
+      <td>4031.515</td>
+      <td>3971.097</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>beta[num_spots]</th>
+      <td>0.449</td>
+      <td>0.031</td>
+      <td>3860.441</td>
+      <td>3803.152</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>beta[crowded]</th>
+      <td>-0.534</td>
+      <td>0.029</td>
+      <td>4110.969</td>
+      <td>4003.074</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>beta[W*poverty]</th>
+      <td>-0.155</td>
+      <td>0.087</td>
+      <td>4154.836</td>
+      <td>3822.265</td>
+      <td>1.002</td>
+    </tr>
+    <tr>
+      <th>beta[W*rev_rating]</th>
+      <td>0.235</td>
+      <td>0.092</td>
+      <td>3888.949</td>
+      <td>3682.768</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>beta[W*num_spots]</th>
+      <td>0.073</td>
+      <td>0.092</td>
+      <td>3974.408</td>
+      <td>3933.013</td>
+      <td>1.001</td>
+    </tr>
+    <tr>
+      <th>beta[W*crowded]</th>
+      <td>-0.210</td>
+      <td>0.084</td>
+      <td>4002.621</td>
+      <td>3781.014</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>sigma</th>
+      <td>0.991</td>
+      <td>0.020</td>
+      <td>3489.943</td>
+      <td>3567.745</td>
+      <td>1.000</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_8842/4084804720.py:39: UserWarning: The figure layout has changed to tight
+  plt.tight_layout()
+</code></pre></div>
+</div>
+<img alt="../_images/d4b0c3a31e3ab9b633a6b7fa23661b24d6a1e2cea243f650c78d72c8709a461a.png" src="../_images/d4b0c3a31e3ab9b633a6b7fa23661b24d6a1e2cea243f650c78d72c8709a461a.png" />
+</div>
+</div>
+<h3 id="check-the-chains-before-comparing-anything">Check the chains before comparing anything<a class="headerlink" href="#check-the-chains-before-comparing-anything" title="Link to this heading">¶</a></h3>
+<p>Panel SAR/SDEM models inherit the slow-mixing behavior of <span class="math notranslate nohighlight">\(\rho\)</span>
+(or <span class="math notranslate nohighlight">\(\lambda\)</span>) documented by Wolf, Anselin &amp; Arribas-Bel (2018)
+<span class="bibtex-citation" id="id1">[<a class="reference internal" href="../references.html#id58" title="Levi John Wolf, Luc Anselin, and Daniel Arribas-Bel. Stochastic Efficiency of Bayesian Markov Chain Monte Carlo in Spatial Econometric Models: An Empirical Comparison of Exact Sampling Methods. Geographical Analysis, 50(1):97–119, 2018. URL: https://onlinelibrary.wiley.com/doi/abs/10.1111/gean.12135 (visited on 2026-04-20), doi:10.1111/gean.12135.">Wolf <em>et al.</em>, 2018</a>]</span>. The
+<code class="docutils literal notranslate"><span class="pre">spatial_mcmc_diagnostic</span></code> helper checks ESS, sampler yield, <span class="math notranslate nohighlight">\(\hat{R}\)</span>,
+and HPDI stability for the spatial scalar.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.diagnostics</span><span class="w"> </span><span class="kn">import</span> <span class="n">spatial_mcmc_diagnostic</span>
+
+<span class="n">spatial_mcmc_diagnostic</span><span class="p">(</span><span class="n">sdm_panel</span><span class="p">,</span> <span class="n">emit_warnings</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span><span class="o">.</span><span class="n">to_frame</span><span class="p">()</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>ess_bulk</th>
+      <th>ess_tail</th>
+      <th>r_hat</th>
+      <th>mcse_mean</th>
+      <th>yield_pct</th>
+      <th>hpdi_drift_pct</th>
+      <th>adequate</th>
+    </tr>
+    <tr>
+      <th>parameter</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>rho</th>
+      <td>3816.393072</td>
+      <td>2426.803366</td>
+      <td>1.00026</td>
+      <td>0.000775</td>
+      <td>95.409827</td>
+      <td>5.200287</td>
+      <td>False</td>
+    </tr>
+  </tbody>
+</table>
+</div></div></div>
+</div>
+<h2 id="swap-fixed-effects-for-random-effects">Swap fixed effects for random effects<a class="headerlink" href="#swap-fixed-effects-for-random-effects" title="Link to this heading">¶</a></h2>
+<p>The random-effects models replace deterministic unit fixed effects with latent unit intercepts <span class="math notranslate nohighlight">\(\alpha_i \sim N(0, \sigma_\alpha^2)\)</span>. That lets the notebook estimate the variance of unit heterogeneity directly and compare FE and RE behavior on the same synthetic balanced panel.</p>
+<h3 id="the-non-spatial-random-effects-baseline">The non-spatial random-effects baseline<a class="headerlink" href="#the-non-spatial-random-effects-baseline" title="Link to this heading">¶</a></h3>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">ols_panel_re</span><span class="p">,</span> <span class="n">summary_ols_re</span><span class="p">,</span> <span class="n">effects_ols_re</span> <span class="o">=</span> <span class="n">fit_panel_model</span><span class="p">(</span>
+    <span class="n">OLS</span><span class="p">,</span> <span class="n">formula</span><span class="p">,</span> <span class="n">panel</span><span class="p">,</span> <span class="n">W</span><span class="p">,</span> <span class="n">unit_effects</span><span class="o">=</span><span class="s2">"random"</span>
+<span class="p">)</span>
+<span class="n">display</span><span class="p">(</span><span class="n">summary_ols_re</span><span class="p">)</span>
+<span class="n">display</span><span class="p">(</span><span class="n">effects_ols_re</span><span class="p">)</span>
+<span class="n">display</span><span class="p">(</span>
+    <span class="n">diagnostics_table</span><span class="p">(</span><span class="n">ols_panel_re</span><span class="o">.</span><span class="n">inference_data</span><span class="p">,</span> <span class="p">[</span><span class="s2">"beta"</span><span class="p">,</span> <span class="s2">"sigma"</span><span class="p">,</span> <span class="s2">"unit_effect_sd"</span><span class="p">])</span>
+<span class="p">)</span>
+<span class="n">show_trace</span><span class="p">(</span>
+    <span class="n">ols_panel_re</span><span class="o">.</span><span class="n">inference_data</span><span class="p">,</span>
+    <span class="p">[</span><span class="s2">"sigma"</span><span class="p">,</span> <span class="s2">"unit_effect_sd"</span><span class="p">],</span>
+    <span class="s2">"OLS, random effects: trace"</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Initializing NUTS using jitter+adapt_diag...
+Multiprocess sampling (2 chains in 2 jobs)
+NUTS: [beta, sigma2, unit_effect_sd, unit_effect_raw]
+Sampling 2 chains for 1_000 tune and 2_000 draw iterations (2_000 + 4_000 draws total) took 4 seconds.
+We recommend running at least 4 chains for robust computation of convergence diagnostics
+/tmp/ipykernel_8842/4084804720.py:39: UserWarning: The figure layout has changed to tight
+  plt.tight_layout()
+</code></pre></div>
+</div>
+<div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">/home/runner/micromamba/envs/test/lib/python3.14/site-packages/rich/live.py:260: UserWarning: install "ipywidgets" 
+for Jupyter support
+  warnings.warn('install "ipywidgets" for Jupyter support')
+</pre>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
+</div><div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>mean</th>
+      <th>sd</th>
+      <th>eti89_lb</th>
+      <th>eti89_ub</th>
+      <th>ess_bulk</th>
+      <th>ess_tail</th>
+      <th>r_hat</th>
+      <th>mcse_mean</th>
+      <th>mcse_sd</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>Intercept</th>
+      <td>2.364</td>
+      <td>0.040</td>
+      <td>2.301</td>
+      <td>2.429</td>
+      <td>1975.584</td>
+      <td>2305.179</td>
+      <td>1.002</td>
+      <td>0.001</td>
+      <td>0.001</td>
+    </tr>
+    <tr>
+      <th>poverty</th>
+      <td>-0.776</td>
+      <td>0.028</td>
+      <td>-0.820</td>
+      <td>-0.731</td>
+      <td>5242.946</td>
+      <td>3114.674</td>
+      <td>1.001</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>rev_rating</th>
+      <td>0.604</td>
+      <td>0.027</td>
+      <td>0.562</td>
+      <td>0.648</td>
+      <td>4552.950</td>
+      <td>2928.051</td>
+      <td>1.001</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>num_spots</th>
+      <td>0.433</td>
+      <td>0.029</td>
+      <td>0.388</td>
+      <td>0.480</td>
+      <td>4779.054</td>
+      <td>3115.193</td>
+      <td>1.001</td>
+      <td>0.000</td>
+      <td>0.001</td>
+    </tr>
+    <tr>
+      <th>crowded</th>
+      <td>-0.555</td>
+      <td>0.026</td>
+      <td>-0.595</td>
+      <td>-0.513</td>
+      <td>5256.410</td>
+      <td>3281.639</td>
+      <td>1.001</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>...</th>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+    </tr>
+    <tr>
+      <th>unit_effect[395]</th>
+      <td>0.251</td>
+      <td>0.387</td>
+      <td>-0.386</td>
+      <td>0.869</td>
+      <td>6659.312</td>
+      <td>2956.796</td>
+      <td>1.000</td>
+      <td>0.005</td>
+      <td>0.007</td>
+    </tr>
+    <tr>
+      <th>unit_effect[396]</th>
+      <td>-0.660</td>
+      <td>0.394</td>
+      <td>-1.302</td>
+      <td>-0.038</td>
+      <td>4994.403</td>
+      <td>3014.209</td>
+      <td>1.001</td>
+      <td>0.006</td>
+      <td>0.006</td>
+    </tr>
+    <tr>
+      <th>unit_effect[397]</th>
+      <td>0.225</td>
+      <td>0.407</td>
+      <td>-0.428</td>
+      <td>0.875</td>
+      <td>7371.691</td>
+      <td>2551.886</td>
+      <td>1.000</td>
+      <td>0.005</td>
+      <td>0.008</td>
+    </tr>
+    <tr>
+      <th>unit_effect[398]</th>
+      <td>0.657</td>
+      <td>0.397</td>
+      <td>0.023</td>
+      <td>1.284</td>
+      <td>5740.633</td>
+      <td>2760.393</td>
+      <td>1.003</td>
+      <td>0.005</td>
+      <td>0.007</td>
+    </tr>
+    <tr>
+      <th>unit_effect[399]</th>
+      <td>-0.344</td>
+      <td>0.398</td>
+      <td>-0.982</td>
+      <td>0.282</td>
+      <td>5508.197</td>
+      <td>3001.427</td>
+      <td>1.000</td>
+      <td>0.005</td>
+      <td>0.007</td>
+    </tr>
+  </tbody>
+</table>
+<p>808 rows × 9 columns</p>
+</div></div><div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>direct</th>
+      <th>direct_ci_lower</th>
+      <th>direct_ci_upper</th>
+      <th>direct_pvalue</th>
+      <th>indirect</th>
+      <th>indirect_ci_lower</th>
+      <th>indirect_ci_upper</th>
+      <th>indirect_pvalue</th>
+      <th>total</th>
+      <th>total_ci_lower</th>
+      <th>total_ci_upper</th>
+      <th>total_pvalue</th>
+    </tr>
+    <tr>
+      <th>variable</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>poverty</th>
+      <td>-0.776350</td>
+      <td>-0.829701</td>
+      <td>-0.722053</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>-0.776350</td>
+      <td>-0.829701</td>
+      <td>-0.722053</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>rev_rating</th>
+      <td>0.604495</td>
+      <td>0.549239</td>
+      <td>0.657875</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.604495</td>
+      <td>0.549239</td>
+      <td>0.657875</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>num_spots</th>
+      <td>0.433485</td>
+      <td>0.377296</td>
+      <td>0.491230</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.433485</td>
+      <td>0.377296</td>
+      <td>0.491230</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>crowded</th>
+      <td>-0.554599</td>
+      <td>-0.605932</td>
+      <td>-0.503026</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>-0.554599</td>
+      <td>-0.605932</td>
+      <td>-0.503026</td>
+      <td>0.0</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>mean</th>
+      <th>sd</th>
+      <th>ess_bulk</th>
+      <th>ess_tail</th>
+      <th>r_hat</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>beta[Intercept]</th>
+      <td>2.364</td>
+      <td>0.040</td>
+      <td>1975.584</td>
+      <td>2305.179</td>
+      <td>1.002</td>
+    </tr>
+    <tr>
+      <th>beta[poverty]</th>
+      <td>-0.776</td>
+      <td>0.028</td>
+      <td>5242.946</td>
+      <td>3114.674</td>
+      <td>1.001</td>
+    </tr>
+    <tr>
+      <th>beta[rev_rating]</th>
+      <td>0.604</td>
+      <td>0.027</td>
+      <td>4552.950</td>
+      <td>2928.051</td>
+      <td>1.001</td>
+    </tr>
+    <tr>
+      <th>beta[num_spots]</th>
+      <td>0.433</td>
+      <td>0.029</td>
+      <td>4779.054</td>
+      <td>3115.193</td>
+      <td>1.001</td>
+    </tr>
+    <tr>
+      <th>beta[crowded]</th>
+      <td>-0.555</td>
+      <td>0.026</td>
+      <td>5256.410</td>
+      <td>3281.639</td>
+      <td>1.001</td>
+    </tr>
+    <tr>
+      <th>sigma</th>
+      <td>1.027</td>
+      <td>0.021</td>
+      <td>3330.189</td>
+      <td>2863.393</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>unit_effect_sd</th>
+      <td>0.605</td>
+      <td>0.038</td>
+      <td>1605.281</td>
+      <td>2636.910</td>
+      <td>1.001</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><img alt="../_images/5532ed7edc78008cad4acb09362b2fb5ea485e5f2b730fbb449d19968f9aa381.png" src="../_images/5532ed7edc78008cad4acb09362b2fb5ea485e5f2b730fbb449d19968f9aa381.png" />
+</div>
+</div>
+<h3 id="random-effects-with-a-spatial-lag">Random effects with a spatial lag<a class="headerlink" href="#random-effects-with-a-spatial-lag" title="Link to this heading">¶</a></h3>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">sar_panel_re</span><span class="p">,</span> <span class="n">summary_sar_re</span><span class="p">,</span> <span class="n">effects_sar_re</span> <span class="o">=</span> <span class="n">fit_panel_model</span><span class="p">(</span>
+    <span class="n">SAR</span><span class="p">,</span> <span class="n">formula</span><span class="p">,</span> <span class="n">panel</span><span class="p">,</span> <span class="n">W</span><span class="p">,</span> <span class="n">unit_effects</span><span class="o">=</span><span class="s2">"random"</span>
+<span class="p">)</span>
+<span class="n">display</span><span class="p">(</span><span class="n">summary_sar_re</span><span class="p">)</span>
+<span class="n">display</span><span class="p">(</span><span class="n">effects_sar_re</span><span class="p">)</span>
+<span class="n">display</span><span class="p">(</span>
+    <span class="n">diagnostics_table</span><span class="p">(</span>
+        <span class="n">sar_panel_re</span><span class="o">.</span><span class="n">inference_data</span><span class="p">,</span> <span class="p">[</span><span class="s2">"rho"</span><span class="p">,</span> <span class="s2">"beta"</span><span class="p">,</span> <span class="s2">"sigma"</span><span class="p">,</span> <span class="s2">"unit_effect_sd"</span><span class="p">]</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+<span class="n">show_trace</span><span class="p">(</span>
+    <span class="n">sar_panel_re</span><span class="o">.</span><span class="n">inference_data</span><span class="p">,</span>
+    <span class="p">[</span><span class="s2">"rho"</span><span class="p">,</span> <span class="s2">"sigma"</span><span class="p">,</span> <span class="s2">"unit_effect_sd"</span><span class="p">],</span>
+    <span class="s2">"SAR, random effects: trace"</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Gibbs sampling <span style="font-weight: bold">(</span>re_sar<span style="font-weight: bold">)</span>: <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span> chains for <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> tune and <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> draw iterations <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span> x <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">3</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> = <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">6</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> draws total<span style="font-weight: bold">)</span>
+</pre>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">/home/runner/micromamba/envs/test/lib/python3.14/site-packages/rich/live.py:260: UserWarning: install "ipywidgets" 
+for Jupyter support
+  warnings.warn('install "ipywidgets" for Jupyter support')
+</pre>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 1s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">5</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">097</span> draws/s<span style="font-weight: bold">)</span>
+</pre>
+</div><div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>mean</th>
+      <th>sd</th>
+      <th>eti89_lb</th>
+      <th>eti89_ub</th>
+      <th>ess_bulk</th>
+      <th>ess_tail</th>
+      <th>r_hat</th>
+      <th>mcse_mean</th>
+      <th>mcse_sd</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>rho</th>
+      <td>0.314</td>
+      <td>0.032</td>
+      <td>0.260</td>
+      <td>0.365</td>
+      <td>200.413</td>
+      <td>346.241</td>
+      <td>1.009</td>
+      <td>0.002</td>
+      <td>0.001</td>
+    </tr>
+    <tr>
+      <th>sigma</th>
+      <td>0.993</td>
+      <td>0.020</td>
+      <td>0.962</td>
+      <td>1.026</td>
+      <td>2138.832</td>
+      <td>3027.420</td>
+      <td>1.001</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>unit_effect_sd</th>
+      <td>0.576</td>
+      <td>0.036</td>
+      <td>0.518</td>
+      <td>0.635</td>
+      <td>1910.728</td>
+      <td>2557.352</td>
+      <td>1.003</td>
+      <td>0.001</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>Intercept</th>
+      <td>1.617</td>
+      <td>0.087</td>
+      <td>1.480</td>
+      <td>1.763</td>
+      <td>178.954</td>
+      <td>332.591</td>
+      <td>1.010</td>
+      <td>0.006</td>
+      <td>0.003</td>
+    </tr>
+    <tr>
+      <th>poverty</th>
+      <td>-0.773</td>
+      <td>0.026</td>
+      <td>-0.814</td>
+      <td>-0.732</td>
+      <td>2534.099</td>
+      <td>3131.858</td>
+      <td>1.000</td>
+      <td>0.001</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>...</th>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+    </tr>
+    <tr>
+      <th>unit_effect[395]</th>
+      <td>0.270</td>
+      <td>0.374</td>
+      <td>-0.332</td>
+      <td>0.875</td>
+      <td>3782.867</td>
+      <td>3916.299</td>
+      <td>1.000</td>
+      <td>0.006</td>
+      <td>0.004</td>
+    </tr>
+    <tr>
+      <th>unit_effect[396]</th>
+      <td>-0.669</td>
+      <td>0.377</td>
+      <td>-1.281</td>
+      <td>-0.059</td>
+      <td>4015.743</td>
+      <td>4190.504</td>
+      <td>1.000</td>
+      <td>0.006</td>
+      <td>0.004</td>
+    </tr>
+    <tr>
+      <th>unit_effect[397]</th>
+      <td>0.179</td>
+      <td>0.384</td>
+      <td>-0.442</td>
+      <td>0.777</td>
+      <td>3722.386</td>
+      <td>3720.754</td>
+      <td>1.000</td>
+      <td>0.006</td>
+      <td>0.004</td>
+    </tr>
+    <tr>
+      <th>unit_effect[398]</th>
+      <td>0.686</td>
+      <td>0.389</td>
+      <td>0.056</td>
+      <td>1.311</td>
+      <td>3905.632</td>
+      <td>3151.826</td>
+      <td>1.000</td>
+      <td>0.006</td>
+      <td>0.005</td>
+    </tr>
+    <tr>
+      <th>unit_effect[399]</th>
+      <td>-0.502</td>
+      <td>0.372</td>
+      <td>-1.097</td>
+      <td>0.099</td>
+      <td>4032.282</td>
+      <td>3895.630</td>
+      <td>1.000</td>
+      <td>0.006</td>
+      <td>0.004</td>
+    </tr>
+  </tbody>
+</table>
+<p>408 rows × 9 columns</p>
+</div></div><div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>direct</th>
+      <th>direct_ci_lower</th>
+      <th>direct_ci_upper</th>
+      <th>direct_pvalue</th>
+      <th>indirect</th>
+      <th>indirect_ci_lower</th>
+      <th>indirect_ci_upper</th>
+      <th>indirect_pvalue</th>
+      <th>total</th>
+      <th>total_ci_lower</th>
+      <th>total_ci_upper</th>
+      <th>total_pvalue</th>
+    </tr>
+    <tr>
+      <th>variable</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>poverty</th>
+      <td>-0.784985</td>
+      <td>-0.836969</td>
+      <td>-0.733842</td>
+      <td>0.0</td>
+      <td>-0.343581</td>
+      <td>-0.450899</td>
+      <td>-0.246403</td>
+      <td>0.0</td>
+      <td>-1.128566</td>
+      <td>-1.262838</td>
+      <td>-1.006681</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>rev_rating</th>
+      <td>0.598589</td>
+      <td>0.544083</td>
+      <td>0.653381</td>
+      <td>0.0</td>
+      <td>0.261874</td>
+      <td>0.187071</td>
+      <td>0.341621</td>
+      <td>0.0</td>
+      <td>0.860464</td>
+      <td>0.757643</td>
+      <td>0.970875</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>num_spots</th>
+      <td>0.432085</td>
+      <td>0.376952</td>
+      <td>0.487480</td>
+      <td>0.0</td>
+      <td>0.189098</td>
+      <td>0.133217</td>
+      <td>0.251703</td>
+      <td>0.0</td>
+      <td>0.621183</td>
+      <td>0.526731</td>
+      <td>0.722215</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>crowded</th>
+      <td>-0.551668</td>
+      <td>-0.603241</td>
+      <td>-0.499921</td>
+      <td>0.0</td>
+      <td>-0.241391</td>
+      <td>-0.316339</td>
+      <td>-0.170914</td>
+      <td>0.0</td>
+      <td>-0.793059</td>
+      <td>-0.899461</td>
+      <td>-0.694007</td>
+      <td>0.0</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>mean</th>
+      <th>sd</th>
+      <th>ess_bulk</th>
+      <th>ess_tail</th>
+      <th>r_hat</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>rho</th>
+      <td>0.314</td>
+      <td>0.032</td>
+      <td>200.413</td>
+      <td>346.241</td>
+      <td>1.009</td>
+    </tr>
+    <tr>
+      <th>beta[Intercept]</th>
+      <td>1.617</td>
+      <td>0.087</td>
+      <td>178.954</td>
+      <td>332.591</td>
+      <td>1.010</td>
+    </tr>
+    <tr>
+      <th>beta[poverty]</th>
+      <td>-0.773</td>
+      <td>0.026</td>
+      <td>2534.099</td>
+      <td>3131.858</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>beta[rev_rating]</th>
+      <td>0.589</td>
+      <td>0.027</td>
+      <td>2737.863</td>
+      <td>3053.990</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>beta[num_spots]</th>
+      <td>0.425</td>
+      <td>0.028</td>
+      <td>2892.627</td>
+      <td>3212.416</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>beta[crowded]</th>
+      <td>-0.543</td>
+      <td>0.026</td>
+      <td>3066.786</td>
+      <td>3417.202</td>
+      <td>1.001</td>
+    </tr>
+    <tr>
+      <th>sigma</th>
+      <td>0.993</td>
+      <td>0.020</td>
+      <td>2138.832</td>
+      <td>3027.420</td>
+      <td>1.001</td>
+    </tr>
+    <tr>
+      <th>unit_effect_sd</th>
+      <td>0.576</td>
+      <td>0.036</td>
+      <td>1910.728</td>
+      <td>2557.352</td>
+      <td>1.003</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_8842/4084804720.py:39: UserWarning: The figure layout has changed to tight
+  plt.tight_layout()
+</code></pre></div>
+</div>
+<img alt="../_images/97b05374940aa45af585a0169775d7121fbf213975c1415e32d7c1128be5b878.png" src="../_images/97b05374940aa45af585a0169775d7121fbf213975c1415e32d7c1128be5b878.png" />
+</div>
+</div>
+<h3 id="random-effects-with-spatial-errors">Random effects with spatial errors<a class="headerlink" href="#random-effects-with-spatial-errors" title="Link to this heading">¶</a></h3>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">sem_panel_re</span><span class="p">,</span> <span class="n">summary_sem_re</span><span class="p">,</span> <span class="n">effects_sem_re</span> <span class="o">=</span> <span class="n">fit_panel_model</span><span class="p">(</span>
+    <span class="n">SEM</span><span class="p">,</span> <span class="n">formula</span><span class="p">,</span> <span class="n">panel</span><span class="p">,</span> <span class="n">W</span><span class="p">,</span> <span class="n">unit_effects</span><span class="o">=</span><span class="s2">"random"</span>
+<span class="p">)</span>
+<span class="n">display</span><span class="p">(</span><span class="n">summary_sem_re</span><span class="p">)</span>
+<span class="n">display</span><span class="p">(</span><span class="n">effects_sem_re</span><span class="p">)</span>
+<span class="n">display</span><span class="p">(</span>
+    <span class="n">diagnostics_table</span><span class="p">(</span>
+        <span class="n">sem_panel_re</span><span class="o">.</span><span class="n">inference_data</span><span class="p">,</span> <span class="p">[</span><span class="s2">"lam"</span><span class="p">,</span> <span class="s2">"beta"</span><span class="p">,</span> <span class="s2">"sigma"</span><span class="p">,</span> <span class="s2">"unit_effect_sd"</span><span class="p">]</span>
+    <span class="p">)</span>
+<span class="p">)</span>
+<span class="n">show_trace</span><span class="p">(</span>
+    <span class="n">sem_panel_re</span><span class="o">.</span><span class="n">inference_data</span><span class="p">,</span>
+    <span class="p">[</span><span class="s2">"lam"</span><span class="p">,</span> <span class="s2">"sigma"</span><span class="p">,</span> <span class="s2">"unit_effect_sd"</span><span class="p">],</span>
+    <span class="s2">"SEM, random effects: trace"</span><span class="p">,</span>
+<span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Gibbs sampling <span style="font-weight: bold">(</span>re_sem<span style="font-weight: bold">)</span>: <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span> chains for <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">1</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> tune and <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> draw iterations <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">2</span> x <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">3</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> = <span style="color: #008080; text-decoration-color: #008080; font-weight: bold">6</span>,<span style="color: #008080; text-decoration-color: #008080; font-weight: bold">000</span> draws total<span style="font-weight: bold">)</span>
+</pre>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">/home/runner/micromamba/envs/test/lib/python3.14/site-packages/rich/live.py:260: UserWarning: install "ipywidgets" 
+for Jupyter support
+  warnings.warn('install "ipywidgets" for Jupyter support')
+</pre>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace"></pre>
+</div><div class="output text_html"><pre style="white-space:pre;overflow-x:auto;line-height:normal;font-family:Menlo,'DejaVu Sans Mono',consolas,'Courier New',monospace">Sampling took 13s <span style="font-weight: bold">(</span><span style="color: #008080; text-decoration-color: #008080; font-weight: bold">458</span> draws/s<span style="font-weight: bold">)</span>
+</pre>
+</div><div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>mean</th>
+      <th>sd</th>
+      <th>eti89_lb</th>
+      <th>eti89_ub</th>
+      <th>ess_bulk</th>
+      <th>ess_tail</th>
+      <th>r_hat</th>
+      <th>mcse_mean</th>
+      <th>mcse_sd</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>lam</th>
+      <td>0.375</td>
+      <td>0.043</td>
+      <td>0.307</td>
+      <td>0.444</td>
+      <td>3666.683</td>
+      <td>3175.478</td>
+      <td>1.002</td>
+      <td>0.001</td>
+      <td>0.001</td>
+    </tr>
+    <tr>
+      <th>sigma</th>
+      <td>0.999</td>
+      <td>0.021</td>
+      <td>0.966</td>
+      <td>1.033</td>
+      <td>1947.701</td>
+      <td>2663.574</td>
+      <td>1.001</td>
+      <td>0.000</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>unit_effect_sd</th>
+      <td>0.574</td>
+      <td>0.039</td>
+      <td>0.512</td>
+      <td>0.638</td>
+      <td>1583.203</td>
+      <td>2047.355</td>
+      <td>1.001</td>
+      <td>0.001</td>
+      <td>0.001</td>
+    </tr>
+    <tr>
+      <th>Intercept</th>
+      <td>2.365</td>
+      <td>0.050</td>
+      <td>2.284</td>
+      <td>2.446</td>
+      <td>2091.980</td>
+      <td>2815.732</td>
+      <td>1.000</td>
+      <td>0.001</td>
+      <td>0.001</td>
+    </tr>
+    <tr>
+      <th>poverty</th>
+      <td>-0.765</td>
+      <td>0.027</td>
+      <td>-0.809</td>
+      <td>-0.723</td>
+      <td>2501.696</td>
+      <td>3079.949</td>
+      <td>1.001</td>
+      <td>0.001</td>
+      <td>0.000</td>
+    </tr>
+    <tr>
+      <th>...</th>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+      <td>...</td>
+    </tr>
+    <tr>
+      <th>unit_effect[395]</th>
+      <td>0.244</td>
+      <td>0.377</td>
+      <td>-0.359</td>
+      <td>0.855</td>
+      <td>3998.064</td>
+      <td>3751.711</td>
+      <td>1.000</td>
+      <td>0.006</td>
+      <td>0.004</td>
+    </tr>
+    <tr>
+      <th>unit_effect[396]</th>
+      <td>-0.723</td>
+      <td>0.381</td>
+      <td>-1.325</td>
+      <td>-0.113</td>
+      <td>4002.272</td>
+      <td>3765.360</td>
+      <td>1.000</td>
+      <td>0.006</td>
+      <td>0.004</td>
+    </tr>
+    <tr>
+      <th>unit_effect[397]</th>
+      <td>0.173</td>
+      <td>0.382</td>
+      <td>-0.432</td>
+      <td>0.787</td>
+      <td>3929.339</td>
+      <td>3683.848</td>
+      <td>1.000</td>
+      <td>0.006</td>
+      <td>0.004</td>
+    </tr>
+    <tr>
+      <th>unit_effect[398]</th>
+      <td>0.656</td>
+      <td>0.388</td>
+      <td>0.039</td>
+      <td>1.276</td>
+      <td>3885.017</td>
+      <td>3870.476</td>
+      <td>1.001</td>
+      <td>0.006</td>
+      <td>0.005</td>
+    </tr>
+    <tr>
+      <th>unit_effect[399]</th>
+      <td>-0.398</td>
+      <td>0.383</td>
+      <td>-1.013</td>
+      <td>0.210</td>
+      <td>4030.113</td>
+      <td>3872.713</td>
+      <td>1.000</td>
+      <td>0.006</td>
+      <td>0.004</td>
+    </tr>
+  </tbody>
+</table>
+<p>408 rows × 9 columns</p>
+</div></div><div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>direct</th>
+      <th>direct_ci_lower</th>
+      <th>direct_ci_upper</th>
+      <th>direct_pvalue</th>
+      <th>indirect</th>
+      <th>indirect_ci_lower</th>
+      <th>indirect_ci_upper</th>
+      <th>indirect_pvalue</th>
+      <th>total</th>
+      <th>total_ci_lower</th>
+      <th>total_ci_upper</th>
+      <th>total_pvalue</th>
+    </tr>
+    <tr>
+      <th>variable</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>poverty</th>
+      <td>-0.765314</td>
+      <td>-0.819180</td>
+      <td>-0.712121</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>-0.765314</td>
+      <td>-0.819180</td>
+      <td>-0.712121</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>rev_rating</th>
+      <td>0.581759</td>
+      <td>0.530346</td>
+      <td>0.634204</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.581759</td>
+      <td>0.530346</td>
+      <td>0.634204</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>num_spots</th>
+      <td>0.419700</td>
+      <td>0.365175</td>
+      <td>0.474444</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.419700</td>
+      <td>0.365175</td>
+      <td>0.474444</td>
+      <td>0.0</td>
+    </tr>
+    <tr>
+      <th>crowded</th>
+      <td>-0.535229</td>
+      <td>-0.583658</td>
+      <td>-0.486370</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>0.0</td>
+      <td>-0.535229</td>
+      <td>-0.583658</td>
+      <td>-0.486370</td>
+      <td>0.0</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>mean</th>
+      <th>sd</th>
+      <th>ess_bulk</th>
+      <th>ess_tail</th>
+      <th>r_hat</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>lam</th>
+      <td>0.375</td>
+      <td>0.043</td>
+      <td>3666.683</td>
+      <td>3175.478</td>
+      <td>1.002</td>
+    </tr>
+    <tr>
+      <th>beta[Intercept]</th>
+      <td>2.365</td>
+      <td>0.050</td>
+      <td>2091.980</td>
+      <td>2815.732</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>beta[poverty]</th>
+      <td>-0.765</td>
+      <td>0.027</td>
+      <td>2501.696</td>
+      <td>3079.949</td>
+      <td>1.001</td>
+    </tr>
+    <tr>
+      <th>beta[rev_rating]</th>
+      <td>0.582</td>
+      <td>0.027</td>
+      <td>2803.223</td>
+      <td>3233.560</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>beta[num_spots]</th>
+      <td>0.420</td>
+      <td>0.028</td>
+      <td>2869.612</td>
+      <td>3412.580</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>beta[crowded]</th>
+      <td>-0.535</td>
+      <td>0.026</td>
+      <td>2819.541</td>
+      <td>3107.645</td>
+      <td>1.000</td>
+    </tr>
+    <tr>
+      <th>sigma</th>
+      <td>0.999</td>
+      <td>0.021</td>
+      <td>1947.701</td>
+      <td>2663.574</td>
+      <td>1.001</td>
+    </tr>
+    <tr>
+      <th>unit_effect_sd</th>
+      <td>0.574</td>
+      <td>0.039</td>
+      <td>1583.203</td>
+      <td>2047.355</td>
+      <td>1.001</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_8842/4084804720.py:39: UserWarning: The figure layout has changed to tight
+  plt.tight_layout()
+</code></pre></div>
+</div>
+<img alt="../_images/2c923338064681baafbf676eab076a6ffc083c2ea77f8b16649ec5be1c7cee69.png" src="../_images/2c923338064681baafbf676eab076a6ffc083c2ea77f8b16649ec5be1c7cee69.png" />
+</div>
+</div>
+<h2 id="compare-what-you-have-fitted">Compare what you have fitted<a class="headerlink" href="#compare-what-you-have-fitted" title="Link to this heading">¶</a></h2>
+<p>Models with the same unit effects describe the same outcomes, so bridge sampling
+can give each a marginal likelihood. Each entry below is the log Bayes factor for
+the row’s model over the column’s, so positive values favor the row.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">neighbayes.diagnostics</span><span class="w"> </span><span class="kn">import</span> <span class="n">bayes_factor_compare_models</span>
+
+<span class="n">fixed</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">"OLS"</span><span class="p">:</span> <span class="n">ols_panel</span><span class="p">,</span>
+    <span class="s2">"SAR"</span><span class="p">:</span> <span class="n">sar_panel</span><span class="p">,</span>
+    <span class="s2">"SEM"</span><span class="p">:</span> <span class="n">sem_panel</span><span class="p">,</span>
+    <span class="s2">"SDM"</span><span class="p">:</span> <span class="n">sdm_panel</span><span class="p">,</span>
+    <span class="s2">"SDEM"</span><span class="p">:</span> <span class="n">sdem_panel</span><span class="p">,</span>
+<span class="p">}</span>
+<span class="n">random</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"OLS"</span><span class="p">:</span> <span class="n">ols_panel_re</span><span class="p">,</span> <span class="s2">"SAR"</span><span class="p">:</span> <span class="n">sar_panel_re</span><span class="p">,</span> <span class="s2">"SEM"</span><span class="p">:</span> <span class="n">sem_panel_re</span><span class="p">}</span>
+
+<span class="k">for</span> <span class="n">label</span><span class="p">,</span> <span class="n">models</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">"Fixed effects"</span><span class="p">:</span> <span class="n">fixed</span><span class="p">,</span> <span class="s2">"Random effects"</span><span class="p">:</span> <span class="n">random</span><span class="p">}</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+    <span class="nb">print</span><span class="p">(</span><span class="n">label</span><span class="p">)</span>
+    <span class="n">display</span><span class="p">(</span>
+        <span class="n">bayes_factor_compare_models</span><span class="p">(</span>
+            <span class="n">models</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s2">"bridge"</span><span class="p">,</span> <span class="n">log</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">0</span>
+        <span class="p">)</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+    <span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>Fixed effects
+Random effects
+</code></pre></div>
+</div>
+<div class="output stderr highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>/tmp/ipykernel_8842/1402646083.py:15: UserWarning: Bridge sampling with 4000 posterior samples for 'OLS' may yield imprecise marginal-likelihood estimates. A conservative rule of thumb is 40,000+ samples (Gronau, Singmann, &amp; Wagenmakers, 2017).
+  bayes_factor_compare_models(
+/tmp/ipykernel_8842/1402646083.py:15: UserWarning: Bridge sampling with 4000 posterior samples for 'OLS' may yield imprecise marginal-likelihood estimates. A conservative rule of thumb is 40,000+ samples (Gronau, Singmann, &amp; Wagenmakers, 2017).
+  bayes_factor_compare_models(
+</code></pre></div>
+</div>
+<div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>OLS</th>
+      <th>SAR</th>
+      <th>SEM</th>
+      <th>SDM</th>
+      <th>SDEM</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>OLS</th>
+      <td>0.0</td>
+      <td>-29.4</td>
+      <td>-22.7</td>
+      <td>-11.2</td>
+      <td>-12.2</td>
+    </tr>
+    <tr>
+      <th>SAR</th>
+      <td>29.4</td>
+      <td>0.0</td>
+      <td>6.6</td>
+      <td>18.2</td>
+      <td>17.1</td>
+    </tr>
+    <tr>
+      <th>SEM</th>
+      <td>22.7</td>
+      <td>-6.6</td>
+      <td>0.0</td>
+      <td>11.5</td>
+      <td>10.5</td>
+    </tr>
+    <tr>
+      <th>SDM</th>
+      <td>11.2</td>
+      <td>-18.2</td>
+      <td>-11.5</td>
+      <td>0.0</td>
+      <td>-1.0</td>
+    </tr>
+    <tr>
+      <th>SDEM</th>
+      <td>12.2</td>
+      <td>-17.1</td>
+      <td>-10.5</td>
+      <td>1.0</td>
+      <td>0.0</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>OLS</th>
+      <th>SAR</th>
+      <th>SEM</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>OLS</th>
+      <td>0.0</td>
+      <td>-42.6</td>
+      <td>-29.4</td>
+    </tr>
+    <tr>
+      <th>SAR</th>
+      <td>42.6</td>
+      <td>0.0</td>
+      <td>13.2</td>
+    </tr>
+    <tr>
+      <th>SEM</th>
+      <td>29.4</td>
+      <td>-13.2</td>
+      <td>0.0</td>
+    </tr>
+  </tbody>
+</table>
+</div></div></div>
+</div>
+<p>Fixed and random effects cannot be compared this way. A fixed-effects likelihood
+is the random-effects likelihood under a flat prior on the effects, which is
+improper, so it has no marginal likelihood. <code class="docutils literal notranslate"><span class="pre">az.loo</span></code> can compare them, because
+each model stores every observation’s density given all the others, but it
+measures prediction: random effects gain from pooling whether or not their
+assumptions hold, so a better score does not show that their estimates are right.</p>
+<p>Compare the estimates instead, which is the logic of a Hausman test. Unit effects
+related to the covariates move both <span class="math notranslate nohighlight">\(\beta\)</span> and <span class="math notranslate nohighlight">\(\rho\)</span> under random effects; a
+spatial pattern in the effects that the covariates do not explain moves <span class="math notranslate nohighlight">\(\rho\)</span> and
+leaves <span class="math notranslate nohighlight">\(\beta\)</span> alone.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">fe_estimates</span> <span class="o">=</span> <span class="n">sar_panel</span><span class="o">.</span><span class="n">summary</span><span class="p">()</span>
+<span class="n">re_estimates</span> <span class="o">=</span> <span class="n">sar_panel_re</span><span class="o">.</span><span class="n">summary</span><span class="p">(</span><span class="n">var_names</span><span class="o">=</span><span class="p">[</span><span class="s2">"~unit_effect"</span><span class="p">])</span>
+<span class="n">shared</span> <span class="o">=</span> <span class="p">[</span><span class="s2">"rho"</span><span class="p">,</span> <span class="o">*</span><span class="n">xcols</span><span class="p">]</span>
+
+<span class="n">contrast</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">(</span>
+    <span class="p">{</span>
+        <span class="s2">"fixed"</span><span class="p">:</span> <span class="n">fe_estimates</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">shared</span><span class="p">,</span> <span class="s2">"mean"</span><span class="p">],</span>
+        <span class="s2">"random"</span><span class="p">:</span> <span class="n">re_estimates</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">shared</span><span class="p">,</span> <span class="s2">"mean"</span><span class="p">],</span>
+    <span class="p">}</span>
+<span class="p">)</span>
+<span class="n">contrast</span><span class="p">[</span><span class="s2">"gap in fixed-effects SDs"</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+    <span class="n">contrast</span><span class="p">[</span><span class="s2">"random"</span><span class="p">]</span> <span class="o">-</span> <span class="n">contrast</span><span class="p">[</span><span class="s2">"fixed"</span><span class="p">]</span>
+<span class="p">)</span> <span class="o">/</span> <span class="n">fe_estimates</span><span class="o">.</span><span class="n">loc</span><span class="p">[</span><span class="n">shared</span><span class="p">,</span> <span class="s2">"sd"</span><span class="p">]</span>
+<span class="n">display</span><span class="p">(</span><span class="n">contrast</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">3</span><span class="p">))</span>
+<span class="nb">print</span><span class="p">(</span>
+    <span class="s2">"largest gap: "</span>
+    <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">contrast</span><span class="p">[</span><span class="s1">'gap in fixed-effects SDs'</span><span class="p">]</span><span class="o">.</span><span class="n">abs</span><span class="p">()</span><span class="o">.</span><span class="n">max</span><span class="p">()</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> fixed-effects SDs"</span>
+<span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>fixed</th>
+      <th>random</th>
+      <th>gap in fixed-effects SDs</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>rho</th>
+      <td>0.303</td>
+      <td>0.314</td>
+      <td>0.307</td>
+    </tr>
+    <tr>
+      <th>poverty</th>
+      <td>-0.753</td>
+      <td>-0.773</td>
+      <td>-0.691</td>
+    </tr>
+    <tr>
+      <th>rev_rating</th>
+      <td>0.583</td>
+      <td>0.589</td>
+      <td>0.204</td>
+    </tr>
+    <tr>
+      <th>num_spots</th>
+      <td>0.449</td>
+      <td>0.425</td>
+      <td>-0.792</td>
+    </tr>
+    <tr>
+      <th>crowded</th>
+      <td>-0.526</td>
+      <td>-0.543</td>
+      <td>-0.624</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>largest gap: 0.79 fixed-effects SDs
+</code></pre></div>
+</div>
+</div>
+</div>
+<p>Gaps under about one posterior standard deviation give no reason to doubt the
+random effects. Larger ones, in <span class="math notranslate nohighlight">\(\beta\)</span> especially, point to unit effects that
+move with the covariates, which only the fixed effects absorb.</p>
+<h2 id="let-the-tests-pick-the-specification">Let the tests pick the specification<a class="headerlink" href="#let-the-tests-pick-the-specification" title="Link to this heading">¶</a></h2>
+<p>The panel models run the cross-section’s Lagrange-multiplier tests, written for
+the panel and named with a <code class="docutils literal notranslate"><span class="pre">Panel-</span></code> prefix. Under fixed effects they score the
+transformed likelihood the demeaned data give (Lee &amp; Yu 2010); under random
+effects the unit effects enter as coefficients carrying their prior.
+<code class="docutils literal notranslate"><span class="pre">spatial_diagnostics()</span></code> runs the tests that apply to a fitted model, and
+<code class="docutils literal notranslate"><span class="pre">spatial_diagnostics_decision()</span></code> reads them by the rule of the cross-sectional
+walkthrough: a lone plain rejection adds its term, and the robust pair only
+settles a double rejection. Fit the recommended model and ask again until the
+tests stop rejecting.</p>
+<p>The panel was simulated from a SAR with no <span class="math notranslate nohighlight">\(WX\)</span> term, so the walk should end at
+the SAR.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">read_tests</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.05</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Show a fitted model's LM tests and say which reject."""</span>
+    <span class="n">diag</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">spatial_diagnostics</span><span class="p">()</span>
+    <span class="n">rejecting</span> <span class="o">=</span> <span class="n">diag</span><span class="o">.</span><span class="n">index</span><span class="p">[</span><span class="n">diag</span><span class="p">[</span><span class="s2">"p_value"</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">alpha</span><span class="p">]</span><span class="o">.</span><span class="n">tolist</span><span class="p">()</span>
+    <span class="n">name</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="n">model</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: tests rejecting at </span><span class="si">{</span><span class="n">alpha</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="s1">', '</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">rejecting</span><span class="p">)</span><span class="w"> </span><span class="ow">or</span><span class="w"> </span><span class="s1">'none'</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+    <span class="nb">print</span><span class="p">(</span>
+        <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">: recommended model: "</span>
+        <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">model</span><span class="o">.</span><span class="n">spatial_diagnostics_decision</span><span class="p">(</span><span class="n">alpha</span><span class="o">=</span><span class="n">alpha</span><span class="p">,</span><span class="w"> </span><span class="nb">format</span><span class="o">=</span><span class="s1">'model'</span><span class="p">)</span><span class="si">}</span><span class="s2">"</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">diag</span><span class="p">[[</span><span class="s2">"statistic"</span><span class="p">,</span> <span class="s2">"df"</span><span class="p">,</span> <span class="s2">"p_value"</span><span class="p">,</span> <span class="s2">"ci_lower"</span><span class="p">,</span> <span class="s2">"ci_upper"</span><span class="p">]]</span><span class="o">.</span><span class="n">round</span><span class="p">(</span><span class="mi">3</span><span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+</div>
+<h3 id="start-from-the-fixed-effects-ols-panel">Start from the fixed-effects OLS panel<a class="headerlink" href="#start-from-the-fixed-effects-ols-panel" title="Link to this heading">¶</a></h3>
+<p>The OLS panel’s tests ask whether the outcome, the errors or the neighbors’
+covariates carry spatial dependence once the unit and period effects are
+removed.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">read_tests</span><span class="p">(</span><span class="n">ols_panel</span><span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>OLS: tests rejecting at 0.05: Panel-LM-Lag, Panel-LM-Error, Panel-LM-WX, Panel-LM-SDM-Joint, Panel-LM-SLX-Error-Joint, Panel-Robust-LM-Lag
+OLS: recommended model: SAR
+</code></pre></div>
+</div>
+<div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>statistic</th>
+      <th>df</th>
+      <th>p_value</th>
+      <th>ci_lower</th>
+      <th>ci_upper</th>
+    </tr>
+    <tr>
+      <th>test</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>Panel-LM-Lag</th>
+      <td>72.916</td>
+      <td>1</td>
+      <td>0.000</td>
+      <td>61.790</td>
+      <td>85.980</td>
+    </tr>
+    <tr>
+      <th>Panel-LM-Error</th>
+      <td>56.481</td>
+      <td>1</td>
+      <td>0.000</td>
+      <td>46.815</td>
+      <td>68.072</td>
+    </tr>
+    <tr>
+      <th>Panel-LM-WX</th>
+      <td>20.576</td>
+      <td>4</td>
+      <td>0.000</td>
+      <td>17.504</td>
+      <td>24.222</td>
+    </tr>
+    <tr>
+      <th>Panel-LM-SDM-Joint</th>
+      <td>77.057</td>
+      <td>5</td>
+      <td>0.000</td>
+      <td>65.224</td>
+      <td>90.947</td>
+    </tr>
+    <tr>
+      <th>Panel-LM-SLX-Error-Joint</th>
+      <td>77.057</td>
+      <td>5</td>
+      <td>0.000</td>
+      <td>64.567</td>
+      <td>92.117</td>
+    </tr>
+    <tr>
+      <th>Panel-Robust-LM-Lag</th>
+      <td>18.663</td>
+      <td>1</td>
+      <td>0.000</td>
+      <td>15.284</td>
+      <td>22.522</td>
+    </tr>
+    <tr>
+      <th>Panel-Robust-LM-Error</th>
+      <td>2.228</td>
+      <td>1</td>
+      <td>0.136</td>
+      <td>1.195</td>
+      <td>3.645</td>
+    </tr>
+    <tr>
+      <th>Panel-Robust-LM-WX</th>
+      <td>4.141</td>
+      <td>4</td>
+      <td>0.387</td>
+      <td>3.460</td>
+      <td>4.958</td>
+    </tr>
+  </tbody>
+</table>
+</div></div></div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">ols_panel</span><span class="o">.</span><span class="n">spatial_diagnostics_decision</span><span class="p">()</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<img alt="../_images/768e11d9bf7e5053281ec5f5caf6a7fac6cd8175d84cf8f736e50446b4454ca0.svg" src="../_images/768e11d9bf7e5053281ec5f5caf6a7fac6cd8175d84cf8f736e50446b4454ca0.svg" />
+</div>
+</div>
+<h3 id="refit-and-ask-again">Refit, and ask again<a class="headerlink" href="#refit-and-ask-again" title="Link to this heading">¶</a></h3>
+<p>The OLS panel’s tree names the model to fit next, and that model tests the terms
+it still leaves out; at the SAR panel, the neighbors’ covariates (towards the
+SDM) and the error process (towards SARAR, which neighbayes does not fit). The
+cell below follows the recommendations through the fixed-effects models fitted
+above until a model’s tests stop rejecting.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">walk</span><span class="p">(</span><span class="n">start</span><span class="p">,</span> <span class="n">fitted</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">show</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">"""Follow the recommendations from ``start`` through the fitted models."""</span>
+    <span class="n">model</span><span class="p">,</span> <span class="n">path</span> <span class="o">=</span> <span class="n">start</span><span class="p">,</span> <span class="p">[</span><span class="nb">type</span><span class="p">(</span><span class="n">start</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">]</span>
+    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="n">nxt</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">spatial_diagnostics_decision</span><span class="p">(</span><span class="n">alpha</span><span class="o">=</span><span class="n">alpha</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="s2">"model"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">nxt</span> <span class="o">==</span> <span class="n">path</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]:</span>
+            <span class="k">break</span>
+        <span class="k">if</span> <span class="n">nxt</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">fitted</span><span class="p">:</span>
+            <span class="n">path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">nxt</span><span class="si">}</span><span class="s2"> (not fitted here)"</span><span class="p">)</span>
+            <span class="k">break</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">fitted</span><span class="p">[</span><span class="n">nxt</span><span class="p">]</span>
+        <span class="n">path</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">nxt</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">show</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">"--- at the </span><span class="si">{</span><span class="n">nxt</span><span class="si">}</span><span class="s2"> fit ---"</span><span class="p">)</span>
+            <span class="n">display</span><span class="p">(</span><span class="n">read_tests</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">alpha</span><span class="p">))</span>
+            <span class="n">display</span><span class="p">(</span><span class="n">model</span><span class="o">.</span><span class="n">spatial_diagnostics_decision</span><span class="p">(</span><span class="n">alpha</span><span class="o">=</span><span class="n">alpha</span><span class="p">))</span>
+    <span class="k">if</span> <span class="n">show</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">" → "</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">path</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">path</span>
+
+
+<span class="n">fitted</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"SAR"</span><span class="p">:</span> <span class="n">sar_panel</span><span class="p">,</span> <span class="s2">"SEM"</span><span class="p">:</span> <span class="n">sem_panel</span><span class="p">,</span> <span class="s2">"SDM"</span><span class="p">:</span> <span class="n">sdm_panel</span><span class="p">,</span> <span class="s2">"SDEM"</span><span class="p">:</span> <span class="n">sdem_panel</span><span class="p">}</span>
+<span class="n">path</span> <span class="o">=</span> <span class="n">walk</span><span class="p">(</span><span class="n">ols_panel</span><span class="p">,</span> <span class="n">fitted</span><span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>--- at the SAR fit ---
+SAR: tests rejecting at 0.05: none
+SAR: recommended model: SAR
+OLS → SAR
+</code></pre></div>
+</div>
+<div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>statistic</th>
+      <th>df</th>
+      <th>p_value</th>
+      <th>ci_lower</th>
+      <th>ci_upper</th>
+    </tr>
+    <tr>
+      <th>test</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>Panel-LM-Error</th>
+      <td>1.360</td>
+      <td>1</td>
+      <td>0.243</td>
+      <td>1.079</td>
+      <td>2.198</td>
+    </tr>
+    <tr>
+      <th>Panel-LM-WX</th>
+      <td>2.679</td>
+      <td>4</td>
+      <td>0.613</td>
+      <td>2.215</td>
+      <td>3.109</td>
+    </tr>
+    <tr>
+      <th>Panel-Robust-LM-WX</th>
+      <td>1.916</td>
+      <td>4</td>
+      <td>0.751</td>
+      <td>1.657</td>
+      <td>4.561</td>
+    </tr>
+    <tr>
+      <th>Panel-Robust-LM-Error</th>
+      <td>0.598</td>
+      <td>1</td>
+      <td>0.439</td>
+      <td>0.298</td>
+      <td>4.005</td>
+    </tr>
+  </tbody>
+</table>
+</div></div><img alt="../_images/23191a096102f81e57a0dd1f16ce71a88671feb84aad801513909699ae27743b.svg" src="../_images/23191a096102f81e57a0dd1f16ce71a88671feb84aad801513909699ae27743b.svg" />
+</div>
+</div>
+<p>A random-effects fit runs the same tests through the same tree.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><code><span class="n">read_tests</span><span class="p">(</span><span class="n">sar_panel_re</span><span class="p">)</span>
+</code></pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span><code>SAR: tests rejecting at 0.05: none
+SAR: recommended model: SAR
+</code></pre></div>
+</div>
+<div class="output text_html"><div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>statistic</th>
+      <th>df</th>
+      <th>p_value</th>
+      <th>ci_lower</th>
+      <th>ci_upper</th>
+    </tr>
+    <tr>
+      <th>test</th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>Panel-LM-Error</th>
+      <td>0.124</td>
+      <td>1</td>
+      <td>0.724</td>
+      <td>0.002</td>
+      <td>4.331</td>
+    </tr>
+    <tr>
+      <th>Panel-LM-WX</th>
+      <td>2.960</td>
+      <td>4</td>
+      <td>0.565</td>
+      <td>1.977</td>
+      <td>3.025</td>
+    </tr>
+    <tr>
+      <th>Panel-Robust-LM-WX</th>
+      <td>4.929</td>
+      <td>4</td>
+      <td>0.295</td>
+      <td>1.747</td>
+      <td>9.868</td>
+    </tr>
+    <tr>
+      <th>Panel-Robust-LM-Error</th>
+      <td>2.094</td>
+      <td>1</td>
+      <td>0.148</td>
+      <td>0.002</td>
+      <td>10.848</td>
+    </tr>
+  </tbody>
+</table>
+</div></div></div>
+</div>
+<h2 id="where-to-go-next">Where to go next<a class="headerlink" href="#where-to-go-next" title="Link to this heading">¶</a></h2>
+<p>This lesson used small draw counts so it runs quickly. For real work raise
+<code class="docutils literal notranslate"><span class="pre">draws</span></code> and <code class="docutils literal notranslate"><span class="pre">tune</span></code>, and if you see divergences or tree-depth warnings raise
+<code class="docutils literal notranslate"><span class="pre">target_accept</span></code> to 0.95–0.99. It is also worth checking that your conclusions
+survive a change of fixed-effects specification (<code class="docutils literal notranslate"><span class="pre">effects=0/1/2/3</span></code>) and of
+priors.</p>
+<ul class="simple">
+<li><p><a class="reference internal" href="../how-to/bayesian_lmtests.html"><span class="std std-doc">How to run Bayesian LM specification tests</span></a></p></li>
+<li><p><a class="reference internal" href="../how-to/tobit_panel_models.html"><span class="std std-doc">How to fit spatial tobit panel models</span></a> —
+panels with censored outcomes</p></li>
+<li><p><a class="reference internal" href="../how-to/priors.html"><span class="std std-doc">How to set priors</span></a> — the <code class="docutils literal notranslate"><span class="pre">Panel*Priors</span></code> classes</p></li>
+<li><p><a class="reference internal" href="../models.html"><span class="std std-doc">Supported Models</span></a> — every panel class and its equations</p></li>
+</ul>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  
+  
+  <div class="md-footer-meta md-typeset">
+    
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-footer-copyright__highlight">
+        &#169; Copyright 2018-, pysal developers.
+        
+    </div>
+  
+    Created using
+    <a href="https://www.sphinx-doc.org/" target="_blank" rel="noopener">Sphinx</a>
+    9.2.0.
+     and
+    <a href="https://github.com/jbms/sphinx-immaterial/" target="_blank" rel="noopener">Sphinx-Immaterial</a>
+  
+</div>
+      
+    </div>
+    
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    <script id="__config" type="application/json">{"base": "..", "features": ["navigation.sections", "navigation.top", "search.share", "search.suggest", "toc.follow", "toc.sticky", "content.code.copy", "content.action.edit"], "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike", "staticVersions": null, "versionPath": "https://pysal.org/neighbayes/versions.json"}}</script>
+    
+      
+        <script src="../_static/sphinx_immaterial_theme.32136f45f91ae6956.min.js?v=a7a9472a"></script>
+        <script src="../_static/clipboard.min.js?v=a7894cd8"></script>
+        <script src="../_static/copybutton.js?v=f281be69"></script>
+        <script>window.MathJax = {"options": {"processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+        <script id="MathJax-script" src="../_static/mathjax/tex-mml-chtml.js"></script>
+    
+  </body>
+</html>

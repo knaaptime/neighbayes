@@ -1,0 +1,37 @@
+﻿neighbayes.models.Probit
+========================
+
+.. currentmodule:: neighbayes.models
+
+.. autoclass:: Probit
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Probit.__init__
+      ~Probit.fit
+      ~Probit.fitted_probabilities
+      ~Probit.fitted_values
+      ~Probit.impacts
+      ~Probit.residuals
+      ~Probit.spatial_diagnostics
+      ~Probit.spatial_diagnostics_decision
+      ~Probit.summary
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~Probit.inference_data
+      ~Probit.pymc_model
+   
+   

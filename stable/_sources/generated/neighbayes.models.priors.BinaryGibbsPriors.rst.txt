@@ -1,0 +1,31 @@
+﻿neighbayes.models.priors.BinaryGibbsPriors
+==========================================
+
+.. currentmodule:: neighbayes.models.priors
+
+.. autoclass:: BinaryGibbsPriors
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~BinaryGibbsPriors.__init__
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~BinaryGibbsPriors.beta_mu
+      ~BinaryGibbsPriors.beta_sigma
+      ~BinaryGibbsPriors.rho_lower
+      ~BinaryGibbsPriors.rho_upper
+   
+   

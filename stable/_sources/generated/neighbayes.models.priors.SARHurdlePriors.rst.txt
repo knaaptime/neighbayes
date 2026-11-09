@@ -1,0 +1,41 @@
+﻿neighbayes.models.priors.SARHurdlePriors
+========================================
+
+.. currentmodule:: neighbayes.models.priors
+
+.. autoclass:: SARHurdlePriors
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SARHurdlePriors.__init__
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SARHurdlePriors.alpha_fixed
+      ~SARHurdlePriors.alpha_nu
+      ~SARHurdlePriors.alpha_sigma
+      ~SARHurdlePriors.beta_mu
+      ~SARHurdlePriors.beta_mu_zero
+      ~SARHurdlePriors.beta_sigma
+      ~SARHurdlePriors.beta_sigma_zero
+      ~SARHurdlePriors.nu
+      ~SARHurdlePriors.rho_lower
+      ~SARHurdlePriors.rho_lower_zero
+      ~SARHurdlePriors.rho_upper
+      ~SARHurdlePriors.rho_upper_zero
+      ~SARHurdlePriors.sigma2_alpha
+      ~SARHurdlePriors.sigma2_beta
+   
+   

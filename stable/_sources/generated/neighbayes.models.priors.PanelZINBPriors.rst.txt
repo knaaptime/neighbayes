@@ -1,0 +1,45 @@
+﻿neighbayes.models.priors.PanelZINBPriors
+========================================
+
+.. currentmodule:: neighbayes.models.priors
+
+.. autoclass:: PanelZINBPriors
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~PanelZINBPriors.__init__
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~PanelZINBPriors.alpha_fixed
+      ~PanelZINBPriors.alpha_nu
+      ~PanelZINBPriors.alpha_sigma
+      ~PanelZINBPriors.beta_mu
+      ~PanelZINBPriors.beta_mu_zero
+      ~PanelZINBPriors.beta_sigma
+      ~PanelZINBPriors.beta_sigma_zero
+      ~PanelZINBPriors.nu
+      ~PanelZINBPriors.rho_lower
+      ~PanelZINBPriors.rho_lower_zero
+      ~PanelZINBPriors.rho_upper
+      ~PanelZINBPriors.rho_upper_zero
+      ~PanelZINBPriors.sigma2_alpha
+      ~PanelZINBPriors.sigma2_beta
+      ~PanelZINBPriors.time_effect_mu
+      ~PanelZINBPriors.time_effect_sigma
+      ~PanelZINBPriors.unit_effect_mu
+      ~PanelZINBPriors.unit_effect_sd_scale
+   
+   

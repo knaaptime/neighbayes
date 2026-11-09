@@ -1,0 +1,6 @@
+﻿neighbayes.diagnostics.lmtests.bayesian\_robust\_lm\_error\_sar\_test
+=====================================================================
+
+.. currentmodule:: neighbayes.diagnostics.lmtests
+
+.. autofunction:: bayesian_robust_lm_error_sar_test

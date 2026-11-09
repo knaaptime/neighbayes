@@ -1,0 +1,6 @@
+﻿neighbayes.diagnostics.lmtests.bayesian\_glm\_moran\_working\_test
+==================================================================
+
+.. currentmodule:: neighbayes.diagnostics.lmtests
+
+.. autofunction:: bayesian_glm_moran_working_test

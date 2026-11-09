@@ -1,0 +1,409 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "id": "0",
+   "metadata": {},
+   "source": [
+    "# How to fit zero-inflated SAR negative binomial models\n",
+    "\n",
+    "Count data with more zeros than a negative binomial can account for, where the\n",
+    "excess zeros come from a *separate* process — units that are inactive\n",
+    "altogether, not merely low-intensity. `SARZINB` fits the zero and count\n",
+    "parts jointly, each with its own spatial structure and its own weights\n",
+    "matrix, and decomposes the observed zeros between the two.\n",
+    "\n",
+    "The unmarked `SARZINB` is the latent model, each part propagating its own\n",
+    "disturbance; this guide fits the reduced form, `SARZINB(latent=False)`, whose\n",
+    "spatial lags act on the linear predictors only. Both are Gibbs-only. Equations and constructor arguments are in\n",
+    "[Supported Models](../models.md).\n",
+    "\n",
+    ":::{important} Check that you need zero inflation\n",
+    "Excess zeros are often ordinary count zeros from a small mean, not a separate\n",
+    "process — Santos Silva & Tenreyro (2011) argue exactly this for trade flows.\n",
+    "Fit a plain [negative binomial](negbin_estimation.ipynb) first and compare\n",
+    "before reaching for this model.\n",
+    ":::"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "1",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import arviz as az\n",
+    "import matplotlib.pyplot as plt\n",
+    "import numpy as np\n",
+    "\n",
+    "from neighbayes.dgp import simulate_sar_zinb\n",
+    "from neighbayes.models import SARZINB\n",
+    "\n",
+    "az.style.use(\"arviz-darkgrid\")\n",
+    "plt.rcParams[\"figure.figsize\"] = (10, 6)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "2",
+   "metadata": {},
+   "source": [
+    "## Simulate a known process\n",
+    "\n",
+    "The `simulate_sar_zinb` function generates data from a two-part spatial model:\n",
+    "- **Zero part**: a reduced-form SAR logit with parameter `rho_zero` and covariates `X_zero`\n",
+    "- **Count part**: a reduced-form SAR NB with parameter `rho`, covariates `X`, and dispersion `alpha`\n",
+    "\n",
+    "We use a 50×50 grid (2500 observations) for a demo."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "3",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Simulate data from the ZINB DGP\n",
+    "# Use n=50 (50x50 grid → 2500 observations) for reliable parameter recovery.\n",
+    "# Spatial parameters (rho, rho_zero) require n ≥ 900 for reliable recovery in\n",
+    "# cross-sectional count models. The model raises a UserWarning when n < 900.\n",
+    "data = simulate_sar_zinb(\n",
+    "    n_side=50,  # 50x50 grid → 2500 observations\n",
+    "    rho=0.4,  # Count SAR parameter\n",
+    "    rho_zero=0.3,  # Zero-part SAR parameter\n",
+    "    alpha=5.0,  # NB dispersion (larger = less overdispersion)\n",
+    "    beta=np.array([1.0, 0.6]),  # Count coefficients [intercept, slope]\n",
+    "    beta_zero=np.array([0.3, 1.0]),  # Zero-part coefficients [intercept, slope]\n",
+    "    target_pi=0.7,  # Target activation probability\n",
+    "    seed=42,\n",
+    "    latent=False,\n",
+    ")\n",
+    "\n",
+    "y = data[\"y\"]\n",
+    "X = data[\"X\"]\n",
+    "X_zero = data[\"X_zero\"]\n",
+    "W_graph = data[\"W_graph\"]\n",
+    "W_zero_graph = data[\"W_zero_graph\"]\n",
+    "\n",
+    "print(f\"Observations: {len(y)}\")\n",
+    "print(f\"Zero fraction: {(y == 0).mean():.2%}\")\n",
+    "print(f\"Mean (y>0): {y[y > 0].mean():.1f}\")\n",
+    "print(f\"Max: {y.max():.0f}\")\n",
+    "print(\"\\nTrue parameters:\")\n",
+    "print(f\"  ρ (count SAR):  {data['params_true']['rho']}\")\n",
+    "print(f\"  ρ (zero SAR):   {data['params_true']['rho_zero']}\")\n",
+    "print(f\"  α (dispersion): {data['params_true']['alpha']}\")\n",
+    "print(f\"  β (count coef): {data['params_true']['beta']}\")\n",
+    "print(f\"  β (zero coef):  {data['params_true']['beta_zero']}\")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "4",
+   "metadata": {},
+   "source": [
+    "## Fit the model\n",
+    "\n",
+    "The `SARZINB` model class accepts:\n",
+    "- `y`: non-negative integer counts\n",
+    "- `X`: count covariate matrix\n",
+    "- `X_zero`: zero-part covariate matrix (defaults to `X` if not provided)\n",
+    "- `W`: spatial weights for the count part\n",
+    "- `W_zero`: spatial weights for the zero part (defaults to `W`)\n",
+    "\n",
+    "The `fit()` method runs a 9-block Gibbs sampler with profile-log-likelihood initialisation."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "5",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Create and fit the ZINB-SAR model\n",
+    "model = SARZINB(\n",
+    "    y=y,\n",
+    "    X=X,\n",
+    "    X_zero=X_zero,\n",
+    "    W=W_graph,\n",
+    "    W_zero=W_zero_graph,\n",
+    "    latent=False,\n",
+    ")\n",
+    "\n",
+    "idata = model.fit(\n",
+    "    draws=2000,\n",
+    "    tune=1000,\n",
+    "    chains=4,\n",
+    "    random_seed=123,\n",
+    "    n_jobs=-1,\n",
+    "    progressbar=True,\n",
+    ")"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "6",
+   "metadata": {},
+   "source": [
+    "## Read the two equations separately\n",
+    "\n",
+    "Compare posterior means to the true parameter values used in the DGP."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "7",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Posterior summary\n",
+    "summary = az.summary(idata, var_names=[\"rho\", \"rho_zero\", \"alpha\", \"beta\", \"beta_zero\"])\n",
+    "print(summary)\n",
+    "\n",
+    "# Compare with true values\n",
+    "print(\"\\n--- Parameter Recovery ---\")\n",
+    "print(\n",
+    "    f\"ρ (count SAR):  true={data['params_true']['rho']:.2f}, \"\n",
+    "    f\"posterior mean={float(idata.posterior['rho'].mean()):.3f} \"\n",
+    "    f\"± {float(idata.posterior['rho'].std()):.3f}\"\n",
+    ")\n",
+    "print(\n",
+    "    f\"ρ (zero SAR):   true={data['params_true']['rho_zero']:.2f}, \"\n",
+    "    f\"posterior mean={float(idata.posterior['rho_zero'].mean()):.3f} \"\n",
+    "    f\"± {float(idata.posterior['rho_zero'].std()):.3f}\"\n",
+    ")\n",
+    "print(\n",
+    "    f\"α (dispersion): true={data['params_true']['alpha']:.2f}, \"\n",
+    "    f\"posterior mean={float(idata.posterior['alpha'].mean()):.3f} \"\n",
+    "    f\"± {float(idata.posterior['alpha'].std()):.3f}\"\n",
+    ")\n",
+    "\n",
+    "# Note: spatial parameters (rho, rho_zero) require large samples (n ≥ 900)\n",
+    "# for reliable recovery in cross-sectional count models. The posterior\n",
+    "# is typically wide and may be attenuated toward zero at moderate n.\n",
+    "# The model raises a UserWarning when n < 900."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "8",
+   "metadata": {},
+   "source": [
+    "## What to check before trusting the output\n",
+    "\n",
+    "Check R-hat and effective sample sizes to verify MCMC convergence."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "9",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Convergence diagnostics\n",
+    "az.plot_trace_dist(idata, var_names=[\"rho\", \"rho_zero\", \"alpha\"], compact=False)\n",
+    "plt.tight_layout()\n",
+    "plt.show()\n",
+    "\n",
+    "# R-hat and ESS\n",
+    "diagnostics = az.summary(idata, var_names=[\"rho\", \"rho_zero\", \"alpha\"])\n",
+    "print(diagnostics[[\"r_hat\", \"ess_bulk\", \"ess_tail\"]])"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "10",
+   "metadata": {},
+   "source": [
+    "## Split the zeros between the two processes\n",
+    "\n",
+    "The ZINB model decomposes observed zeros into two types:\n",
+    "- **Structural zeros**: the observation is inactive (d=0)\n",
+    "- **Sampling zeros**: the observation is active (d=1) but the NB draw was zero\n",
+    "\n",
+    "The `zero_attribution()` method computes the posterior probability of each type for every zero observation."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "11",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Zero attribution\n",
+    "attribution = model.zero_attribution()\n",
+    "\n",
+    "print(f\"Number of zero observations: {len(attribution['zero_indices'])}\")\n",
+    "print(f\"\\nMean P(structural | y=0): {attribution['structural_prob'].mean():.3f}\")\n",
+    "print(f\"Mean P(sampling | y=0):   {attribution['sampling_prob'].mean():.3f}\")\n",
+    "\n",
+    "# Histogram of structural zero probabilities\n",
+    "fig, ax = plt.subplots(1, 2, figsize=(12, 4))\n",
+    "ax[0].hist(attribution[\"structural_prob\"], bins=20, edgecolor=\"white\")\n",
+    "ax[0].set_xlabel(\"P(structural zero | y=0)\")\n",
+    "ax[0].set_ylabel(\"Count\")\n",
+    "ax[0].set_title(\"Structural Zero Probabilities\")\n",
+    "\n",
+    "ax[1].hist(attribution[\"sampling_prob\"], bins=20, edgecolor=\"white\", color=\"C1\")\n",
+    "ax[1].set_xlabel(\"P(sampling zero | y=0)\")\n",
+    "ax[1].set_ylabel(\"Count\")\n",
+    "ax[1].set_title(\"Sampling Zero Probabilities\")\n",
+    "plt.tight_layout()\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "12",
+   "metadata": {},
+   "source": [
+    "## Get per-observation activation probabilities\n",
+    "\n",
+    "The `activation_probabilities()` method returns the posterior-mean probability that each observation is \"active\" (i.e., in the count regime rather than the always-zero regime)."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "13",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Activation probabilities\n",
+    "pi = model.activation_probabilities()\n",
+    "\n",
+    "print(f\"Mean activation probability:{pi.mean():.3f}\")\n",
+    "print(f\"Min activation probability: {pi.min():.3f}\")\n",
+    "print(f\"Max activation probability: {pi.max():.3f}\")\n",
+    "\n",
+    "# Compare with true d\n",
+    "d_true = data[\"d\"]\n",
+    "print(f\"\\nTrue activation rate: {d_true.mean():.3f}\")\n",
+    "print(f\"Estimated activation rate: {pi.mean():.3f}\")\n",
+    "\n",
+    "# Scatter: pi vs observed y\n",
+    "fig, ax = plt.subplots(figsize=(8, 5))\n",
+    "ax.scatter(pi, y, alpha=0.5, s=20)\n",
+    "ax.set_xlabel(\"Estimated P(active)\")\n",
+    "ax.set_ylabel(\"Observed count y\")\n",
+    "ax.set_title(\"Activation Probability vs Observed Count\")\n",
+    "ax.axhline(0, color=\"grey\", linestyle=\"--\", alpha=0.5)\n",
+    "plt.tight_layout()\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "14",
+   "metadata": {},
+   "source": [
+    "## Predict expected counts\n",
+    "\n",
+    "The `fitted_values()` method returns E[y_i] = π_i · exp(η_i^cnt), the posterior-mean expected count for each observation."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "15",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Fitted mean counts\n",
+    "fitted = model.fitted_values()\n",
+    "\n",
+    "print(f\"Mean fitted count: {fitted.mean():.2f}\")\n",
+    "print(f\"Mean observed count: {y.mean():.2f}\")\n",
+    "\n",
+    "# Scatter: fitted vs observed\n",
+    "fig, ax = plt.subplots(figsize=(8, 5))\n",
+    "ax.scatter(fitted, y, alpha=0.5, s=20)\n",
+    "ax.plot(\n",
+    "    [0, max(y.max(), fitted.max())],\n",
+    "    [0, max(y.max(), fitted.max())],\n",
+    "    \"r--\",\n",
+    "    alpha=0.5,\n",
+    "    label=\"45° line\",\n",
+    ")\n",
+    "ax.set_xlabel(\"Fitted E[y]\")\n",
+    "ax.set_ylabel(\"Observed y\")\n",
+    "ax.set_title(\"Fitted vs Observed Counts\")\n",
+    "ax.legend()\n",
+    "plt.tight_layout()\n",
+    "plt.show()"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "16",
+   "metadata": {},
+   "source": [
+    "## Inspect the posteriors\n",
+    "\n",
+    "Visualize the posterior distributions of the spatial parameters `rho` and `rho_zero`, and the NB dispersion `alpha`, with true values marked."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": null,
+   "id": "17",
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Posterior distributions with true values\n",
+    "truth = data[\"params_true\"]\n",
+    "pc = az.plot_dist(\n",
+    "    idata, var_names=[\"rho\", \"rho_zero\", \"alpha\"], figure_kwargs={\"figsize\": (14, 4)}\n",
+    ")\n",
+    "az.add_lines(pc, {name: truth[name] for name in (\"rho\", \"rho_zero\", \"alpha\")})\n",
+    "plt.show()\n",
+    "\n",
+    "# Note: spatial parameters (rho, rho_zero) require large samples (n ≥ 900)\n",
+    "# for reliable recovery in cross-sectional count models. The posterior\n",
+    "# is typically wide and may be attenuated toward zero at moderate n."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "id": "18",
+   "metadata": {},
+   "source": [
+    "## See also\n",
+    "\n",
+    "- [How to estimate spatial negative binomial models](negbin_estimation.ipynb) —\n",
+    "  fit this first and compare before assuming zero inflation\n",
+    "- [How to estimate Poisson origin–destination flow models](poisson_flow.ipynb) —\n",
+    "  the flow-data version of the same question\n",
+    "- [Supported Models](../models.md) — `SARZINB` equations and arguments\n",
+    "- [How to set priors](priors.ipynb)"
+   ]
+  }
+ ],
+ "metadata": {
+  "kernelspec": {
+   "display_name": "bayespreg",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.14.4"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 5
+}

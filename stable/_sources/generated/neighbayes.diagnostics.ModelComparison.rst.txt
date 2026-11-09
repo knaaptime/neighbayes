@@ -1,0 +1,33 @@
+﻿neighbayes.diagnostics.ModelComparison
+======================================
+
+.. currentmodule:: neighbayes.diagnostics
+
+.. autoclass:: ModelComparison
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~ModelComparison.__init__
+      ~ModelComparison.loo_comparison
+      ~ModelComparison.posterior_probabilities
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~ModelComparison.bayes_factors
+      ~ModelComparison.diagnostics
+      ~ModelComparison.labels
+      ~ModelComparison.log_marginal_likelihoods
+   
+   
